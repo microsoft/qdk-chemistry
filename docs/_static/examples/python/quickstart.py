@@ -8,13 +8,10 @@
 ################################################################################
 # start-cell-structure
 from pathlib import Path
+
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
-from qdk_chemistry.data.qubit_hamiltonian import (
-    filter_and_group_pauli_ops_from_wavefunction,
-)
-from qdk_chemistry.utils.wavefunction import get_top_determinants
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
@@ -83,7 +80,7 @@ print(
 ################################################################################
 # start-cell-wfn-select-configs
 # Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction
-top_configurations = get_top_determinants(wfn_cas, max_determinants=2)
+top_configurations = wfn_cas.get_top_determinants(max_determinants=2)
 
 # Compute the reference energy of the sparse wavefunction
 pmc_calculator = create("projected_multi_configuration_calculator")
@@ -106,36 +103,26 @@ sparse_isometry_circuit = state_prep.run(wfn_sparse)
 ################################################################################
 # start-cell-qubit-hamiltonian
 # Prepare qubit Hamiltonian
-qubit_mapper = create("qubit_mapper", algorithm_name="qiskit", encoding="jordan-wigner")
+qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wigner")
 qubit_hamiltonian = qubit_mapper.run(hamiltonian)
 
 # Print the number of Pauli strings in the full Hamiltonian
 print(
     f"Number of Pauli strings in the Hamiltonian: {len(qubit_hamiltonian.pauli_strings)}"
 )
-
-# Filter and group Pauli operators based on the wavefunction
-filtered_hamiltonian_ops, classical_coeffs = (
-    filter_and_group_pauli_ops_from_wavefunction(qubit_hamiltonian, wfn_sparse)
-)
-print(
-    f"Filtered and grouped qubit Hamiltonian contains {len(filtered_hamiltonian_ops)} groups:"
-)
-for igroup, group in enumerate(filtered_hamiltonian_ops):
-    print(f"Group {igroup + 1}: {[group.pauli_strings]}")
-print(f"Number of classical coefficients: {len(classical_coeffs)}")
 # end-cell-qubit-hamiltonian
 ################################################################################
 
 ################################################################################
 # start-cell-energy-estimation
-# Estimate energy using the optimized circuit and filtered Hamiltonian operators
-estimator = create("energy_estimator", algorithm_name="qdk_base_simulator")
+# Estimate energy using the optimized circuit and the qubit Hamiltonian
+estimator = create("energy_estimator", algorithm_name="qdk")
+circuit_executor = create("circuit_executor", algorithm_name="qdk_full_state_simulator")
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
-    qubit_hamiltonians=filtered_hamiltonian_ops,
-    total_shots=250000,
-    classical_coeffs=classical_coeffs,
+    qubit_hamiltonian=qubit_hamiltonian,
+    circuit_executor=circuit_executor,
+    total_shots=500000,
 )
 
 for i, results in enumerate(simulation_data.bitstring_counts):

@@ -1,0 +1,449 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Iterative phase estimation implementation.</span>
+
+<span class="sd">This module implements the Kitaev-style iterative quantum phase estimation (IQPE)</span>
+<span class="sd">algorithm, which measures phase bits sequentially from most-significant to least-significant</span>
+<span class="sd">using a single ancilla qubit and adaptive feedback corrections.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Kitaev, A. (1995). arXiv:quant-ph/9511026. :cite:`Kitaev1995`</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.circuit_executor.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitExecutor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeEvolutionBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">ControlledEvolutionCircuitMapper</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Circuit</span><span class="p">,</span>
+    <span class="n">ControlledTimeEvolutionUnitary</span><span class="p">,</span>
+    <span class="n">QpeResult</span><span class="p">,</span>
+    <span class="n">QuantumErrorProfile</span><span class="p">,</span>
+    <span class="n">QubitHamiltonian</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.phase</span><span class="w"> </span><span class="kn">import</span> <span class="n">iterative_phase_feedback_update</span><span class="p">,</span> <span class="n">phase_fraction_from_feedback</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">PhaseEstimation</span><span class="p">,</span> <span class="n">PhaseEstimationSettings</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;IterativePhaseEstimation&quot;</span><span class="p">,</span> <span class="s2">&quot;IterativePhaseEstimationSettings&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="IterativePhaseEstimationSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimationSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IterativePhaseEstimationSettings</span><span class="p">(</span><span class="n">PhaseEstimationSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for the Iterative Phase Estimation algorithm.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="IterativePhaseEstimationSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimationSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the settings for Iterative Phase Estimation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;shots_per_bit&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">3</span><span class="p">,</span>
+            <span class="s2">&quot;The number of shots to execute per measuring a bit in the iterative phase estimation.&quot;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="IterativePhaseEstimation">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">IterativePhaseEstimation</span><span class="p">(</span><span class="n">PhaseEstimation</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Iterative Phase Estimation algorithm implementation.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="IterativePhaseEstimation.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_bits</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">evolution_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">shots_per_bit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">3</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize IterativePhaseEstimation with the given settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.</span>
+<span class="sd">            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,</span>
+<span class="sd">                defaults to 0.0; user needs to set a valid value.</span>
+<span class="sd">            shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">num_bits</span><span class="o">=</span><span class="n">num_bits</span><span class="p">,</span> <span class="n">evolution_time</span><span class="o">=</span><span class="n">evolution_time</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">IterativePhaseEstimationSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">,</span> <span class="n">num_bits</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;evolution_time&quot;</span><span class="p">,</span> <span class="n">evolution_time</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;shots_per_bit&quot;</span><span class="p">,</span> <span class="n">shots_per_bit</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iteration_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">evolution_builder</span><span class="p">:</span> <span class="n">TimeEvolutionBuilder</span><span class="p">,</span>
+        <span class="n">circuit_mapper</span><span class="p">:</span> <span class="n">ControlledEvolutionCircuitMapper</span><span class="p">,</span>
+        <span class="n">circuit_executor</span><span class="p">:</span> <span class="n">CircuitExecutor</span><span class="p">,</span>
+        <span class="n">noise</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QpeResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the iterative phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: The state preparation circuit.</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.</span>
+<span class="sd">            evolution_builder: The time evolution builder to use.</span>
+<span class="sd">            circuit_mapper: The controlled evolution circuit mapper to use.</span>
+<span class="sd">            circuit_executor: The executor to run quantum circuits.</span>
+<span class="sd">            noise: The quantum error profile to simulate noise, defaults to None.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QpeResult: The result of the phase estimation.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Initialize the parameters</span>
+        <span class="n">phase_feedback</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">bits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">iter_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="c1"># Iterate over the number of phase bits</span>
+        <span class="k">for</span> <span class="n">iteration</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">)):</span>
+            <span class="c1"># Create the iteration circuit</span>
+            <span class="n">iteration_circuit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">create_iteration_circuit</span><span class="p">(</span>
+                <span class="n">state_preparation</span><span class="o">=</span><span class="n">state_preparation</span><span class="p">,</span>
+                <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+                <span class="n">evolution_builder</span><span class="o">=</span><span class="n">evolution_builder</span><span class="p">,</span>
+                <span class="n">circuit_mapper</span><span class="o">=</span><span class="n">circuit_mapper</span><span class="p">,</span>
+                <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+                <span class="n">total_iterations</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_bits&quot;</span><span class="p">),</span>
+                <span class="n">phase_correction</span><span class="o">=</span><span class="n">phase_feedback</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">iter_circuits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">iteration_circuit</span><span class="p">)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;num_bits&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">: circuit generated.&quot;</span><span class="p">)</span>
+            <span class="c1"># Run the iteration circuit on the simulator</span>
+            <span class="n">executor_data</span> <span class="o">=</span> <span class="n">circuit_executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">iteration_circuit</span><span class="p">,</span> <span class="n">shots</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;shots_per_bit&quot;</span><span class="p">),</span> <span class="n">noise</span><span class="o">=</span><span class="n">noise</span>
+            <span class="p">)</span>
+            <span class="n">bitstring_result</span> <span class="o">=</span> <span class="n">executor_data</span><span class="o">.</span><span class="n">bitstring_counts</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Iteration </span><span class="si">{</span><span class="n">iteration</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> / </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;num_bits&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">: &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Measurement results: </span><span class="si">{</span><span class="n">bitstring_result</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="c1"># Phase bit through majority vote</span>
+            <span class="n">measured_bit</span> <span class="o">=</span> <span class="mi">0</span> <span class="k">if</span> <span class="n">bitstring_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">bitstring_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="k">else</span> <span class="mi">1</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Majority measured bit: </span><span class="si">{</span><span class="n">measured_bit</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="c1"># Store the measured bit</span>
+            <span class="n">bits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">measured_bit</span><span class="p">)</span>
+
+            <span class="c1"># Update the phase feedback for next iteration</span>
+            <span class="n">phase_feedback</span> <span class="o">=</span> <span class="n">iterative_phase_feedback_update</span><span class="p">(</span><span class="n">phase_feedback</span><span class="p">,</span> <span class="n">measured_bit</span><span class="p">)</span>
+
+        <span class="c1"># Compute the final phase fraction</span>
+        <span class="n">phase_fraction</span> <span class="o">=</span> <span class="n">phase_fraction_from_feedback</span><span class="p">(</span><span class="n">phase_feedback</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_iteration_circuits</span> <span class="o">=</span> <span class="n">iter_circuits</span>
+        <span class="c1"># Create and return the result</span>
+        <span class="k">return</span> <span class="n">QpeResult</span><span class="o">.</span><span class="n">from_phase_fraction</span><span class="p">(</span>
+            <span class="n">method</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+            <span class="n">phase_fraction</span><span class="o">=</span><span class="n">phase_fraction</span><span class="p">,</span>
+            <span class="n">evolution_time</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;evolution_time&quot;</span><span class="p">),</span>
+            <span class="n">bits_msb_first</span><span class="o">=</span><span class="n">bits</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="IterativePhaseEstimation.create_iteration_circuit">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation.create_iteration_circuit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_iteration_circuit</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">evolution_builder</span><span class="p">:</span> <span class="n">TimeEvolutionBuilder</span><span class="p">,</span>
+        <span class="n">circuit_mapper</span><span class="p">:</span> <span class="n">ControlledEvolutionCircuitMapper</span><span class="p">,</span>
+        <span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">total_iterations</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">phase_correction</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a single IQPE iteration circuit.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.</span>
+<span class="sd">            evolution_builder: The time evolution builder to use.</span>
+<span class="sd">            circuit_mapper: The controlled evolution circuit mapper to use.</span>
+<span class="sd">            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.</span>
+<span class="sd">            total_iterations: Total number of phase bits to measure across all iterations.</span>
+<span class="sd">            phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A quantum circuit implementing one IQPE iteration.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">_validate_iteration_inputs</span><span class="p">(</span><span class="n">iteration</span><span class="p">,</span> <span class="n">total_iterations</span><span class="p">)</span>
+        <span class="c1"># Build the base circuit with registers</span>
+        <span class="n">num_system_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
+        <span class="n">time_evolution_unitary</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_time_evolution</span><span class="p">(</span>
+            <span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;evolution_time&quot;</span><span class="p">),</span> <span class="n">evolution_builder</span>
+        <span class="p">)</span>
+        <span class="n">controlled_evolution</span> <span class="o">=</span> <span class="n">ControlledTimeEvolutionUnitary</span><span class="p">(</span>
+            <span class="n">time_evolution_unitary</span><span class="o">=</span><span class="n">time_evolution_unitary</span><span class="p">,</span> <span class="n">control_indices</span><span class="o">=</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="p">)</span>
+        <span class="n">power</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">total_iterations</span> <span class="o">-</span> <span class="n">iteration</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">ctrl_evol_circuit</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_ctrl_time_evol_circuit</span><span class="p">(</span><span class="n">controlled_evolution</span><span class="p">,</span> <span class="n">power</span><span class="p">,</span> <span class="n">circuit_mapper</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">_qsharp_op</span> <span class="ow">and</span> <span class="n">ctrl_evol_circuit</span><span class="o">.</span><span class="n">_qsharp_op</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_circuit_from_qsharp_op</span><span class="p">(</span>
+                <span class="n">state_preparation</span><span class="p">,</span> <span class="n">ctrl_evol_circuit</span><span class="p">,</span> <span class="n">phase_correction</span><span class="p">,</span> <span class="n">num_system_qubits</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span> <span class="ow">and</span> <span class="n">ctrl_evol_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">():</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_circuit_from_qiskit</span><span class="p">(</span><span class="n">state_preparation</span><span class="p">,</span> <span class="n">ctrl_evol_circuit</span><span class="p">,</span> <span class="n">phase_correction</span><span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span>
+            <span class="s2">&quot;Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available.&quot;</span>
+        <span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_circuit_from_qsharp_op</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">controlled_evolution</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">phase_correction</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">num_system_qubits</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Circuit object from a Q# operation.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: Circuit object containing a Q# operation for state preparation.</span>
+<span class="sd">            controlled_evolution: Circuit object containing a Q# operation for the controlled time evolution.</span>
+<span class="sd">            phase_correction: Feedback phase angle to apply before controlled evolution.</span>
+<span class="sd">            num_system_qubits: Number of system qubits.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit object representing the IQPE iteration.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">state_prep_op</span> <span class="o">=</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">ctrl_evol_op</span> <span class="o">=</span> <span class="n">controlled_evolution</span><span class="o">.</span><span class="n">_qsharp_op</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">iterative_parameters</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;statePrep&quot;</span><span class="p">:</span> <span class="n">state_prep_op</span><span class="p">,</span>
+            <span class="s2">&quot;repControlledEvolution&quot;</span><span class="p">:</span> <span class="n">ctrl_evol_op</span><span class="p">,</span>
+            <span class="s2">&quot;accumulatePhase&quot;</span><span class="p">:</span> <span class="n">phase_correction</span><span class="p">,</span>
+            <span class="s2">&quot;control&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;systems&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_system_qubits</span><span class="p">)],</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span>
+            <span class="n">qsharp_factory</span><span class="o">=</span><span class="n">QsharpFactoryData</span><span class="p">(</span>
+                <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">IterativePhaseEstimation</span><span class="o">.</span><span class="n">MakeIQPECircuit</span><span class="p">,</span>
+                <span class="n">parameter</span><span class="o">=</span><span class="n">iterative_parameters</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_circuit_from_qiskit</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state_preparation</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">controlled_evolution</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">phase_correction</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Circuit object from Qiskit QuantumCircuit objects.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.</span>
+<span class="sd">            controlled_evolution: Circuit object containing a Qiskit QuantumCircuit for the controlled time evolution.</span>
+<span class="sd">            phase_correction: Feedback phase angle to apply before controlled evolution.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A Circuit object representing the IQPE iteration.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClassicalRegister</span><span class="p">,</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">QuantumRegister</span><span class="p">,</span> <span class="n">qasm3</span>  <span class="c1"># noqa: PLC0415</span>
+
+        <span class="n">state_prep_qc</span> <span class="o">=</span> <span class="n">state_preparation</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+        <span class="n">ctrl_evol_qc</span> <span class="o">=</span> <span class="n">controlled_evolution</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+        <span class="c1"># Parse the state preparation circuit from QASM</span>
+        <span class="n">ancilla</span> <span class="o">=</span> <span class="n">QuantumRegister</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ancilla&quot;</span><span class="p">)</span>
+        <span class="n">system_target</span> <span class="o">=</span> <span class="n">QuantumRegister</span><span class="p">(</span><span class="n">state_prep_qc</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span> <span class="s2">&quot;system&quot;</span><span class="p">)</span>
+        <span class="n">classical</span> <span class="o">=</span> <span class="n">ClassicalRegister</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">)</span>
+        <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">ancilla</span><span class="p">,</span> <span class="n">system_target</span><span class="p">,</span> <span class="n">classical</span><span class="p">)</span>
+        <span class="n">circuit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">state_prep_qc</span><span class="o">.</span><span class="n">to_gate</span><span class="p">(),</span> <span class="n">system_target</span><span class="p">)</span>
+        <span class="n">control</span> <span class="o">=</span> <span class="n">ancilla</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">target_qubits</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">system_target</span><span class="p">)</span>
+        <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">control</span><span class="p">)</span>
+
+        <span class="c1"># Apply phase correction if provided</span>
+        <span class="k">if</span> <span class="n">phase_correction</span><span class="p">:</span>
+            <span class="n">circuit</span><span class="o">.</span><span class="n">rz</span><span class="p">(</span><span class="n">phase_correction</span><span class="p">,</span> <span class="n">control</span><span class="p">)</span>
+
+        <span class="c1"># Append the controlled evolution circuit</span>
+        <span class="n">circuit</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ctrl_evol_qc</span><span class="o">.</span><span class="n">to_gate</span><span class="p">(),</span> <span class="p">[</span><span class="n">control</span><span class="p">,</span> <span class="o">*</span><span class="n">target_qubits</span><span class="p">])</span>
+        <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">control</span><span class="p">)</span>
+        <span class="n">circuit</span><span class="o">.</span><span class="n">measure</span><span class="p">(</span><span class="n">control</span><span class="p">,</span> <span class="n">classical</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">circuit</span><span class="p">))</span>
+
+<div class="viewcode-block" id="IterativePhaseEstimation.get_circuits">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation.get_circuits">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_circuits</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the list of iteration circuits generated during algorithm execution.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of quantum circuits for each IQPE iteration.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If no iteration circuits are available.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iteration_circuits</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_iteration_circuits</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;No iteration circuits have been generated. Please run the algorithm first.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="IterativePhaseEstimation.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.html#qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation.IterativePhaseEstimation.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the phase estimation algorithm.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;iterative&quot;</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_validate_iteration_inputs</span><span class="p">(</span><span class="n">iteration</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">total_iterations</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate iteration parameters for IQPE circuit construction.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        iteration: The current iteration index (0-based).</span>
+<span class="sd">        total_iterations: The total number of iterations.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">total_iterations</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;total_iterations must be a positive integer.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">iteration</span> <span class="o">&lt;</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">iteration</span> <span class="o">&gt;=</span> <span class="n">total_iterations</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;iteration index </span><span class="si">{</span><span class="n">iteration</span><span class="si">}</span><span class="s2"> is outside the valid range [0, </span><span class="si">{</span><span class="n">total_iterations</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">].&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

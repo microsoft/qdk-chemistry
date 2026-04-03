@@ -15,4 +15,5 @@ Submodules
 
    qdk_chemistry.plugins.qiskit._interop.circuit
    qdk_chemistry.plugins.qiskit._interop.noise_model
+   qdk_chemistry.plugins.qiskit._interop.qir
    qdk_chemistry.plugins.qiskit._interop.transpiler

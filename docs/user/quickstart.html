@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quickstart &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Quickstart &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../_static/jquery.js?v=5d32c60e"></script>
       <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../_static/tabs.js?v=3ee01567"></script>
@@ -66,7 +66,10 @@
 <li class="toctree-l3"><a class="reference internal" href="#estimate-the-ground-state-energy-by-sampling">Estimate the ground state energy by sampling</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#additional-examples">Additional examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#additional-examples">Additional examples</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#compiling-c-examples">Compiling C++ examples</a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="features.html">Features, methods and dependencies</a></li>
@@ -79,6 +82,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
 </ul>
@@ -109,19 +114,36 @@
              
   <section id="quickstart">
 <h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading"></a></h1>
-<p>These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
-More comprehensive documentation can be found in the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a>. A list of features can be found in the <a class="reference internal" href="features.html"><span class="doc">Features, methods and dependencies</span></a> document.</p>
+<p>This quickstart walks through a complete quantum chemistry workflow, from molecular structure to energy estimate, using QDK/Chemistry’s modular architecture.
+Each stage in the pipeline is an interchangeable component, so any step can be swapped for an alternative implementation without changing the rest of the workflow.</p>
+<p>More detailed documentation can be found in the <a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a>. A complete list of supported methods can be found in the <a class="reference internal" href="features.html"><span class="doc">Features, methods and dependencies</span></a> document.</p>
 <section id="installation">
 <h2>Installation<a class="headerlink" href="#installation" title="Link to this heading"></a></h2>
-<p>To install QDK/Chemistry, please see the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md">installation instructions</a>.</p>
+<p>Install from PyPI with all optional dependencies:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python3<span class="w"> </span>-m<span class="w"> </span>venv<span class="w"> </span>venv<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="nb">source</span><span class="w"> </span>venv/bin/activate
+python3<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[all]&#39;</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">[all]</span></code> pulls in all optional dependencies so that examples and tests work without extra steps.
+For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md">installation instructions</a>.</p>
 </section>
 <section id="end-to-end-example">
 <h2>End-to-end example<a class="headerlink" href="#end-to-end-example" title="Link to this heading"></a></h2>
-<p>This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
-The emphasis of this example is optimization:  reducing the resources required for the quantum computer to run a simple chemistry application.
-The example starts with a molecular structure and ends with an energy estimation computed by simulating a quantum circuit.
-The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.</p>
-<p>You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/">examples folder</a> of the GitHub repository.</p>
+<p>This example walks through the full quantum applications workflow: from building classical context around a molecular structure, through encoding for a quantum computer, to estimating the ground-state energy via circuit simulation.
+The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry’s modular pipeline makes it easy to select the right method for each step.</p>
+<p>You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/">examples folder</a> of the GitHub repository.
+Companion chemistry datasets and supporting assets are also available in <a class="reference external" href="https://github.com/microsoft/qdk-chemistry-data">microsoft/qdk-chemistry-data</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you installed <code class="docutils literal notranslate"><span class="pre">qdk-chemistry</span></code> from PyPI, use the <code class="docutils literal notranslate"><span class="pre">stable/major.minor</span></code> branch
+when cloning the repository for examples.
+The <code class="docutils literal notranslate"><span class="pre">main</span></code> branch is the active development branch and may be incompatible with
+the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git<span class="w"> </span>clone<span class="w"> </span>--branch<span class="w"> </span>stable/1.0<span class="w"> </span>https://github.com/microsoft/qdk-chemistry.git
+</pre></div>
+</div>
+<p>See the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md">examples README</a> for details.</p>
+</div>
 <section id="create-a-structure-object">
 <h3>Create a Structure object<a class="headerlink" href="#create-a-structure-object" title="Link to this heading"></a></h3>
 <p>The <a class="reference internal" href="comprehensive/data/structure.html"><span class="doc">Structure</span></a> class represents a molecular structure, i.e. the coordinates of its atoms.
@@ -147,13 +169,10 @@ See below for language specific examples of creating and serializing <a class="r
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">filter_and_group_pauli_ops_from_wavefunction</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.wavefunction</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_top_determinants</span>
 
 <span class="c1"># Load para-benzyne structure from XYZ file</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
@@ -314,48 +333,8 @@ These methods also serve as a critical analysis tool, allowing users to better u
 By identifying and retaining only the dominant configurations (those with the largest amplitudes), we can create a sparse wavefunction that maintains high fidelity with respect to the original Wavefunction while dramatically reducing resource requirements for quantum state preparation.</p>
 <div class="tab-set docutils container">
 <input checked="True" class="tab-input" id="tab-set--5-input--1" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--1">C++ API</label><div class="tab-content docutils container">
-<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
-<span class="cm"> * @brief Get top N determinants from a wavefunction sorted by coefficient</span>
-<span class="cm"> * magnitude</span>
-<span class="cm"> * @param wfn The wavefunction to extract determinants from</span>
-<span class="cm"> * @param max_determinants Maximum number of determinants to return</span>
-<span class="cm"> * @return Vector of top configurations</span>
-<span class="cm"> */</span>
-<span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">get_top_determinants</span><span class="p">(</span>
-<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">shared_ptr</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Wavefunction</span><span class="o">&gt;</span><span class="w"> </span><span class="n">wfn</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">max_determinants</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">determinants</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn</span><span class="o">-&gt;</span><span class="n">get_active_determinants</span><span class="p">();</span>
-<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn</span><span class="o">-&gt;</span><span class="n">get_coefficients</span><span class="p">();</span>
-
-<span class="w">  </span><span class="c1">// Extract coefficients as doubles (handle real case)</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">double</span><span class="o">&gt;</span><span class="w"> </span><span class="n">coeff_values</span><span class="p">;</span>
-<span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="k">auto</span><span class="o">&amp;</span><span class="w"> </span><span class="n">real_coeffs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">get</span><span class="o">&lt;</span><span class="n">Eigen</span><span class="o">::</span><span class="n">VectorXd</span><span class="o">&gt;</span><span class="p">(</span><span class="n">coeffs</span><span class="p">);</span>
-<span class="w">  </span><span class="n">coeff_values</span><span class="p">.</span><span class="n">resize</span><span class="p">(</span><span class="n">real_coeffs</span><span class="p">.</span><span class="n">size</span><span class="p">());</span>
-<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">real_coeffs</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">coeff_values</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">abs</span><span class="p">(</span><span class="n">real_coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
-<span class="w">  </span><span class="p">}</span>
-
-<span class="w">  </span><span class="c1">// Create indices and sort by coefficient magnitude</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="kt">size_t</span><span class="o">&gt;</span><span class="w"> </span><span class="n">indices</span><span class="p">(</span><span class="n">determinants</span><span class="p">.</span><span class="n">size</span><span class="p">());</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">iota</span><span class="p">(</span><span class="n">indices</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">indices</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">sort</span><span class="p">(</span><span class="n">indices</span><span class="p">.</span><span class="n">begin</span><span class="p">(),</span><span class="w"> </span><span class="n">indices</span><span class="p">.</span><span class="n">end</span><span class="p">(),</span>
-<span class="w">            </span><span class="p">[</span><span class="o">&amp;</span><span class="n">coeff_values</span><span class="p">](</span><span class="kt">size_t</span><span class="w"> </span><span class="n">i1</span><span class="p">,</span><span class="w"> </span><span class="kt">size_t</span><span class="w"> </span><span class="n">i2</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">              </span><span class="k">return</span><span class="w"> </span><span class="n">coeff_values</span><span class="p">[</span><span class="n">i1</span><span class="p">]</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">coeff_values</span><span class="p">[</span><span class="n">i2</span><span class="p">];</span>
-<span class="w">            </span><span class="p">});</span>
-
-<span class="w">  </span><span class="c1">// Extract top determinants</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">data</span><span class="o">::</span><span class="n">Configuration</span><span class="o">&gt;</span><span class="w"> </span><span class="n">top_dets</span><span class="p">;</span>
-<span class="w">  </span><span class="kt">size_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">min</span><span class="p">(</span><span class="n">max_determinants</span><span class="p">,</span><span class="w"> </span><span class="n">determinants</span><span class="p">.</span><span class="n">size</span><span class="p">());</span>
-<span class="w">  </span><span class="n">top_dets</span><span class="p">.</span><span class="n">reserve</span><span class="p">(</span><span class="n">n</span><span class="p">);</span>
-<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="n">top_dets</span><span class="p">.</span><span class="n">push_back</span><span class="p">(</span><span class="n">determinants</span><span class="p">[</span><span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]]);</span>
-<span class="w">  </span><span class="p">}</span>
-
-<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">top_dets</span><span class="p">;</span>
-<span class="p">}</span>
-</pre></div>
-</div>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="w">  </span><span class="c1">// Get top 2 determinants from the CASCI wavefunction</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">top_configurations</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">get_top_determinants</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">top_configurations</span><span class="p">,</span><span class="w"> </span><span class="n">top_coeffs</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">wfn_cas</span><span class="o">-&gt;</span><span class="n">get_top_determinants</span><span class="p">(</span><span class="mi">2</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Perform PMC calculation with selected configurations</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">pmc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">algorithms</span><span class="o">::</span><span class="n">ProjectedMultiConfigurationCalculatorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
@@ -367,7 +346,7 @@ By identifying and retaining only the dominant configurations (those with the la
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Get top 2 determinants from the CASCI wavefunction to form a sparse wavefunction</span>
-<span class="n">top_configurations</span> <span class="o">=</span> <span class="n">get_top_determinants</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">,</span> <span class="n">max_determinants</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">top_configurations</span> <span class="o">=</span> <span class="n">wfn_cas</span><span class="o">.</span><span class="n">get_top_determinants</span><span class="p">(</span><span class="n">max_determinants</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
 
 <span class="c1"># Compute the reference energy of the sparse wavefunction</span>
 <span class="n">pmc_calculator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;projected_multi_configuration_calculator&quot;</span><span class="p">)</span>
@@ -397,24 +376,13 @@ The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor
 </div>
 <input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare qubit Hamiltonian</span>
-<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qiskit&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+<span class="n">qubit_mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
 <span class="n">qubit_hamiltonian</span> <span class="o">=</span> <span class="n">qubit_mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
 
 <span class="c1"># Print the number of Pauli strings in the full Hamiltonian</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">&quot;Number of Pauli strings in the Hamiltonian: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="p">)</span>
-
-<span class="c1"># Filter and group Pauli operators based on the wavefunction</span>
-<span class="n">filtered_hamiltonian_ops</span><span class="p">,</span> <span class="n">classical_coeffs</span> <span class="o">=</span> <span class="p">(</span>
-    <span class="n">filter_and_group_pauli_ops_from_wavefunction</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">wfn_sparse</span><span class="p">)</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;Filtered and grouped qubit Hamiltonian contains </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">filtered_hamiltonian_ops</span><span class="p">)</span><span class="si">}</span><span class="s2"> groups:&quot;</span>
-<span class="p">)</span>
-<span class="k">for</span> <span class="n">igroup</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">filtered_hamiltonian_ops</span><span class="p">):</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Group </span><span class="si">{</span><span class="n">igroup</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="p">[</span><span class="n">group</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of classical coefficients: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">classical_coeffs</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
 </div>
@@ -423,7 +391,7 @@ The resulting qubit Hamiltonian is represented as a sum of Pauli strings (tensor
 <section id="generate-the-state-preparation-circuit">
 <h3>Generate the state preparation circuit<a class="headerlink" href="#generate-the-state-preparation-circuit" title="Link to this heading"></a></h3>
 <p>Given the classical representation of the sparse multi-configurational <a class="reference internal" href="../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a>, a quantum circuit can be generated to prepare this state on a quantum computer.
-This can be done in many ways, including via Isometry encoding <span id="id1">[<a class="reference internal" href="../references.html#id13" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries, and tensor product methods.
+This can be done in many ways, including via Isometry encoding <span id="id1">[<a class="reference internal" href="../references.html#id19" title="Raban Iten, Roger Colbeck, Ivan Kukuljan, Jonathan Home, and Matthias Christandl. Quantum circuits for isometries. Physical Review A, 93:032318, 2016. doi:10.1103/PhysRevA.93.032318.">ICK+16</a>]</span>, linear combinations of unitaries, and tensor product methods.
 However, when the wavefunction is very sparse, these methods can be inefficient.
 In QDK/Chemistry, we provide a specialized method for generating state preparation circuits for sparse wavefunctions based on the construction of sparse isometries over GF(2) with X gates, provided as a <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> algorithm.
 See <a class="reference internal" href="comprehensive/algorithms/state_preparation.html"><span class="doc">State preparation</span></a> for more details on the other algorithms provided for state preparation in QDK/Chemistry.</p>
@@ -458,13 +426,14 @@ The statistical nature of quantum measurements introduces variance in the energy
 </div>
 </div>
 <input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Estimate energy using the optimized circuit and filtered Hamiltonian operators</span>
-<span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_base_simulator&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Estimate energy using the optimized circuit and the qubit Hamiltonian</span>
+<span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">circuit_executor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;circuit_executor&quot;</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="o">=</span><span class="s2">&quot;qdk_full_state_simulator&quot;</span><span class="p">)</span>
 <span class="n">energy_results</span><span class="p">,</span> <span class="n">simulation_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">circuit</span><span class="o">=</span><span class="n">sparse_isometry_circuit</span><span class="p">,</span>
-    <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">filtered_hamiltonian_ops</span><span class="p">,</span>
-    <span class="n">total_shots</span><span class="o">=</span><span class="mi">250000</span><span class="p">,</span>
-    <span class="n">classical_coeffs</span><span class="o">=</span><span class="n">classical_coeffs</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+    <span class="n">circuit_executor</span><span class="o">=</span><span class="n">circuit_executor</span><span class="p">,</span>
+    <span class="n">total_shots</span><span class="o">=</span><span class="mi">500000</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">results</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">simulation_data</span><span class="o">.</span><span class="n">bitstring_counts</span><span class="p">):</span>
@@ -495,6 +464,26 @@ The statistical nature of quantum measurements introduces variance in the energy
 <li><p>Additional examples of workflows using QDK/Chemistry in the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/tree/main/examples">examples</a> directory of the source repository.</p></li>
 <li><p><a class="reference internal" href="comprehensive/index.html"><span class="doc">In-depth user guide</span></a> for links to more detailed documentation on specific components of QDK/Chemistry.</p></li>
 </ul>
+<section id="compiling-c-examples">
+<h3>Compiling C++ examples<a class="headerlink" href="#compiling-c-examples" title="Link to this heading"></a></h3>
+<p>To compile the C++ examples, the QDK/Chemistry C++ library must be installed on your system.
+See the <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md">installation instructions</a> for details on building and installing the library.</p>
+<p>Once installed, you can compile examples by linking against the <code class="docutils literal notranslate"><span class="pre">qdk::chemistry</span></code> CMake target:</p>
+<div class="highlight-cmake notranslate"><div class="highlight"><pre><span></span><span class="nb">cmake_minimum_required</span><span class="p">(</span><span class="s">VERSION</span><span class="w"> </span><span class="s">3.15</span><span class="p">)</span>
+<span class="nb">project</span><span class="p">(</span><span class="s">my_example</span><span class="w"> </span><span class="s">LANGUAGES</span><span class="w"> </span><span class="s">CXX</span><span class="p">)</span>
+
+<span class="nb">find_package</span><span class="p">(</span><span class="s">qdk</span><span class="w"> </span><span class="s">REQUIRED</span><span class="w"> </span><span class="s">COMPONENTS</span><span class="w"> </span><span class="s">chemistry</span><span class="p">)</span>
+
+<span class="nb">add_executable</span><span class="p">(</span><span class="s">my_example</span><span class="w"> </span><span class="s">example.cpp</span><span class="p">)</span>
+<span class="nb">target_link_libraries</span><span class="p">(</span><span class="s">my_example</span><span class="w"> </span><span class="s">PUBLIC</span><span class="w"> </span><span class="s">qdk::chemistry</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Then build with CMake, pointing to your QDK/Chemistry installation:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>cmake<span class="w"> </span>-B<span class="w"> </span>build<span class="w"> </span>-DCMAKE_PREFIX_PATH<span class="o">=</span><span class="s2">&quot;/path/to/qdk/install&quot;</span>
+cmake<span class="w"> </span>--build<span class="w"> </span>build
+</pre></div>
+</div>
+</section>
 </section>
 </section>
 

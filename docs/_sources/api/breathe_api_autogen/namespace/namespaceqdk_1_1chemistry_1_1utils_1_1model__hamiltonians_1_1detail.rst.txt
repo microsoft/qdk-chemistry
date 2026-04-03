@@ -1,0 +1,6 @@
+Namespace qdk::chemistry::utils::model_hamiltonians::detail
+===========================================================
+
+.. doxygennamespace:: qdk::chemistry::utils::model_hamiltonians::detail
+   :project: QDK/Chemistry
+   :members:

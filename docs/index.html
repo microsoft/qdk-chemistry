@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QDK/Chemistry: A Quantum Applications Toolkit &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>QDK/Chemistry: A Quantum Applications Toolkit &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=ac0f520b" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="_static/documentation_options.js?v=fc837d61"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -61,6 +61,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
 </ul>
@@ -93,22 +95,36 @@
 <h1>QDK/Chemistry:  A Quantum Applications Toolkit<a class="headerlink" href="#qdk-chemistry-a-quantum-applications-toolkit" title="Link to this heading"></a></h1>
 <section id="welcome-to-qdk-chemistry">
 <h2>Welcome to QDK/Chemistry<a class="headerlink" href="#welcome-to-qdk-chemistry" title="Link to this heading"></a></h2>
-<p><strong>QDK/Chemistry</strong> provides a set of tools and libraries to enable cutting edge quantum chemistry calculations on quantum computers.
-QDK/Chemistry tackles this problem holistically, by recognizing that a significant portion of the quantum applications pipeline heavily relies on the quality, robustness, and efficiency of the classical data preparation and post-processing steps.
-QDK/Chemistry also serves as a platform for innovation, by providing a unified interface to a variety of quantum chemistry methods and packages, allowing researchers to focus on their areas of interest while integrating with a vast community of existing tools to accelerate development.</p>
+<p><strong>QDK/Chemistry</strong> provides an end-to-end toolkit for developing, simulating, and running quantum chemistry calculations on quantum computers.
+It spans the entire quantum applications pipeline — from molecular setup and classical electronic structure through quantum algorithm execution and simulation — all within a single, modular framework.</p>
+<p>QDK/Chemistry recognizes that practical quantum chemistry depends on the quality of every stage, not just the quantum algorithm itself.
+By treating each stage as an interchangeable module, QDK/Chemistry serves as both a <strong>development platform</strong> for building new quantum algorithms and a <strong>composable framework</strong> for assembling reproducible quantum–classical pipelines from proven components.
+Its plugin architecture provides a unified interface to native high-performance C++ implementations alongside established community packages, so researchers can mix and match the best tools for their problem without being locked into any single approach.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, this library collects anonymous usage and performance data to help improve the user experience and product quality. The telemetry implementation can be found in <code class="docutils literal notranslate"><span class="pre">python/src/qdk_chemistry/utils/telemetry.py</span></code> and all
+telemetry events are defined in <code class="docutils literal notranslate"><span class="pre">python/src/qdk_chemistry/utils/telemetry_events.py</span></code>.</p>
+<p>To disable telemetry via bash, set the environment variable <code class="docutils literal notranslate"><span class="pre">QSHARP_PYTHON_TELEMETRY</span></code> to one of the
+following values: <code class="docutils literal notranslate"><span class="pre">none</span></code>, <code class="docutils literal notranslate"><span class="pre">disabled</span></code>, <code class="docutils literal notranslate"><span class="pre">false</span></code>, or <code class="docutils literal notranslate"><span class="pre">0</span></code>. For example:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">export</span><span class="w"> </span><span class="nv">QSHARP_PYTHON_TELEMETRY</span><span class="o">=</span><span class="s1">&#39;false&#39;</span>
+</pre></div>
+</div>
+<p>Alternatively, telemetry can be disabled within a python script by including the following at the top of the <code class="docutils literal notranslate"><span class="pre">.py</span></code> file:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;QSHARP_PYTHON_TELEMETRY&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;disabled&quot;</span>
+</pre></div>
+</div>
+</div>
 </section>
 <section id="key-features">
 <h2>Key Features<a class="headerlink" href="#key-features" title="Link to this heading"></a></h2>
 <dl class="simple">
-<dt>A Unified Interface for Modular Quantum Applications Development</dt><dd><p>The primary feature of QDK/Chemistry is its modular architecture that allows users to easily swap components in and out of their quantum applications workflows.
-This design promotes code reuse and accelerates development by enabling researchers to focus on their specific areas of interest.</p>
+<dt>Quantum Algorithms for Chemistry</dt><dd><p>A growing collection of chemistry-aware quantum algorithms that leverage molecular structure to minimize quantum resources on both near-term and fault-tolerant hardware.</p>
 </dd>
-<dt>Extensible-by-Design</dt><dd><p>We recognize that the field of quantum algorithms for chemistry is rapidly evolving, and our goal is to provide a platform that can adapt to these changes.
-Through our plugin system, QDK/Chemistry is built with extensibility in mind, allowing users to easily integrate and modify new quantum chemistry methods, algorithms, and workflows to the framework.</p>
+<dt>Classical Electronic Structure</dt><dd><p>Production-quality classical methods that generate the molecular orbitals, reference states, and compact Hamiltonians that quantum algorithms depend on.</p>
 </dd>
-<dt>Access to State-of-the-Art Algorithms</dt><dd><p>QDK/Chemistry provides access to an ever-evolving collection of cutting-edge methods for solving quantum chemistry problems on quantum computers, available through both built-in modules and our extensible plugin system.
-This comprehensive toolkit spans from robust, best-in-class implementations of classical computational chemistry methods that generate essential input data for quantum algorithms, to sophisticated “chemistry-aware” quantum algorithms that leverage symmetries and other chemical properties to optimize calculations for near-term quantum hardware.
-By maintaining this broad spectrum of capabilities, we ensure researchers have the tools they need to push the boundaries of quantum chemistry while remaining practical for current quantum computing limitations.</p>
+<dt>Composable, Extensible Architecture</dt><dd><p>Every component is an interchangeable module with a standardized interface.
+The plugin system lets users swap implementations, integrate external packages, and assemble custom quantum–classical pipelines — without changing application code.</p>
 </dd>
 </dl>
 <div class="toctree-wrapper compound">
@@ -123,6 +139,7 @@ By maintaining this broad spectrum of capabilities, we ensure researchers have t
 <li class="toctree-l1"><a class="reference internal" href="user/features.html">Features, methods and dependencies</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="user/features.html#supported-methods">Supported Methods</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/features.html#community-open-source-software-dependencies">Community Open Source Software Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="user/features.html#visual-studio-code-integration">Visual Studio Code Integration</a></li>
 <li class="toctree-l2"><a class="reference internal" href="user/features.html#see-also">See Also</a></li>
 </ul>
 </li>
@@ -160,10 +177,26 @@ By maintaining this broad spectrum of capabilities, we ensure researchers have t
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
 </ul>
 </div>
+<section id="companion-repositories">
+<h3>Companion repositories<a class="headerlink" href="#companion-repositories" title="Link to this heading"></a></h3>
+<ul class="simple">
+<li><p><a class="reference external" href="https://github.com/microsoft/qdk-chemistry-data">microsoft/qdk-chemistry-data</a>: Curated datasets and supporting materials for QDK/Chemistry.</p></li>
+</ul>
+</section>
+</section>
+<section id="citing-qdk-chemistry">
+<h2>Citing QDK/Chemistry<a class="headerlink" href="#citing-qdk-chemistry" title="Link to this heading"></a></h2>
+<p>If you use QDK/Chemistry in your work, please cite our paper <span id="id1">[<a class="reference internal" href="references.html#id4" title="Nathan A. Baker, Brian Bilodeau, Chi Chen, Yingrong Chen, Marco Eckhoff, Alexandra Efimovskaya, Piero Gasparotto, Puck van Gerwen, Rushi Gong, Kevin Hoang, Zahra Hooshmand, Andrew J. Jenkins, Conrad S. N. Johnston, Run R. Li, Jiashu Liang, Hongbin Liu, Alexis Mills, Maximilian M&quot;orchen, George Nishibuchi, Chong Sun, Bill Ticehurst, Matthias Troyer, Jan P. Unsleber, Stefan Wernli, David B. Williams-Young, and Boqin Zhang. QDK/Chemistry: a modular toolkit for quantum chemistry applications. arXiv, 2026. URL: https://arxiv.org/abs/2601.15253, doi:10.48550/arXiv.2601.15253.">BBC+26</a>]</span>:</p>
+<blockquote>
+<div><p>N. A. Baker <em>et al.</em>, “QDK/Chemistry: A Modular Toolkit for Quantum Chemistry Applications,”
+<a class="reference external" href="https://arxiv.org/abs/2601.15253">arXiv:2601.15253</a> (2026).</p>
+</div></blockquote>
 </section>
 </section>
 

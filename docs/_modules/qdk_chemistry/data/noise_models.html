@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.noise_models &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.data.noise_models &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -100,9 +102,11 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">ClassVar</span><span class="p">,</span> <span class="n">TypedDict</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qsharp._simulation</span><span class="w"> </span><span class="kn">import</span> <span class="n">NoiseConfig</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">ruamel.yaml</span><span class="w"> </span><span class="kn">import</span> <span class="n">YAML</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
 
 <span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;GateErrorDef&quot;</span><span class="p">,</span> <span class="s2">&quot;SupportedErrorTypes&quot;</span><span class="p">,</span> <span class="s2">&quot;SupportedGate&quot;</span><span class="p">]</span>
@@ -262,6 +266,7 @@
 <span class="sd">            errors (dict | None): Dictionary mapping supported gate names to their error definitions.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;default&quot;</span> <span class="k">if</span> <span class="n">name</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;No description provided&quot;</span> <span class="k">if</span> <span class="n">description</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">description</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">SupportedGate</span><span class="p">,</span> <span class="n">GateErrorDef</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -274,8 +279,12 @@
                         <span class="n">error_type</span> <span class="o">=</span> <span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
                     <span class="k">else</span><span class="p">:</span>
                         <span class="n">error_type</span> <span class="o">=</span> <span class="n">SupportedErrorTypes</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">])</span>
-                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span> <span class="nb">float</span><span class="p">)</span>
-                    <span class="k">assert</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected &#39;rate&#39; to be a float, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;rate&#39;</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">],</span> <span class="nb">int</span><span class="p">):</span>
+                        <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Expected &#39;num_qubits&#39; to be an int, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">error_dict</span><span class="p">[</span><span class="s1">&#39;num_qubits&#39;</span><span class="p">])</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="p">)</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="p">[</span><span class="n">gate</span><span class="p">]</span> <span class="o">=</span> <span class="n">GateErrorDef</span><span class="p">(</span>
                         <span class="nb">type</span><span class="o">=</span><span class="n">error_type</span><span class="p">,</span>
                         <span class="n">rate</span><span class="o">=</span><span class="n">error_dict</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">],</span>
@@ -500,6 +509,35 @@
             <span class="s2">&quot;errors&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;errors&quot;</span><span class="p">]),</span>  <span class="c1"># Deserialize errors from JSON string</span>
         <span class="p">}</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_json</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_qdk_noise_config</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NoiseConfig</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the QuantumErrorProfile to a QDK-compatible noise configuration dictionary.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QDK-compatible noise configuration object.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">noise</span> <span class="o">=</span> <span class="n">NoiseConfig</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">gate</span><span class="p">,</span> <span class="n">error_def</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">errors</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">gate_name</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">gate</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">error_def</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">SupportedErrorTypes</span><span class="o">.</span><span class="n">DEPOLARIZING_ERROR</span><span class="p">:</span>
+                <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="n">gate_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sdg&quot;</span><span class="p">:</span>
+                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;s_adj&quot;</span>
+                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;tdg&quot;</span><span class="p">:</span>
+                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;t_adj&quot;</span>
+                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;sxdg&quot;</span><span class="p">:</span>
+                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;sx_adj&quot;</span>
+                <span class="k">elif</span> <span class="n">gate_name_qdk</span> <span class="o">==</span> <span class="s2">&quot;measure&quot;</span><span class="p">:</span>
+                    <span class="n">gate_name_qdk</span> <span class="o">=</span> <span class="s2">&quot;mresetz&quot;</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="nb">getattr</span><span class="p">(</span><span class="n">noise</span><span class="p">,</span> <span class="n">gate_name_qdk</span><span class="p">)</span><span class="o">.</span><span class="n">set_depolarizing</span><span class="p">(</span><span class="n">error_def</span><span class="p">[</span><span class="s2">&quot;rate&quot;</span><span class="p">])</span>
+                <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                    <span class="c1"># Warn and skip unsupported gates</span>
+                    <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Gate </span><span class="si">{</span><span class="n">gate_name</span><span class="si">}</span><span class="s2"> not supported in QDK noise config; skipping.&quot;</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error type </span><span class="si">{</span><span class="n">error_def</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2"> is not currently supported.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">noise</span>
 </pre></div>
 
            </div>

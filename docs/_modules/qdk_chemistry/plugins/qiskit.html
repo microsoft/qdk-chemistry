@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.qiskit &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.plugins.qiskit &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -94,32 +96,89 @@
 <span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">importlib.util</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="c1"># Suppress deprecation warnings from Qiskit and Aer dependencies</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s2">&quot;qiskit.*&quot;</span><span class="p">)</span>
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">,</span> <span class="n">module</span><span class="o">=</span><span class="s2">&quot;qiskit_aer.*&quot;</span><span class="p">)</span>
 
 <span class="n">_loaded</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">QDK_CHEMISTRY_HAS_QISKIT</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span> <span class="o">=</span> <span class="kc">False</span>
 
 
 <div class="viewcode-block" id="load">
 <a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.load">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">load</span><span class="p">():</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit plugin into QDK/Chemistry.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit related plugins into QDK/Chemistry.&quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
     <span class="k">global</span> <span class="n">_loaded</span>  <span class="c1"># noqa: PLW0603</span>
+    <span class="k">global</span> <span class="n">QDK_CHEMISTRY_HAS_QISKIT</span><span class="p">,</span> <span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span><span class="p">,</span> <span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span>  <span class="c1"># noqa: PLW0603</span>
     <span class="k">if</span> <span class="n">_loaded</span><span class="p">:</span>
         <span class="k">return</span>
     <span class="n">_loaded</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;qiskit&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">QDK_CHEMISTRY_HAS_QISKIT</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">qiskit_load</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;qiskit_nature&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">qiskit_nature_load</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">importlib</span><span class="o">.</span><span class="n">util</span><span class="o">.</span><span class="n">find_spec</span><span class="p">(</span><span class="s2">&quot;qiskit_aer&quot;</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">qiskit_aer_load</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="qiskit_load">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_load">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qiskit_load</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit plugins into QDK/Chemistry.&quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
 
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitEnergyEstimator</span>  <span class="c1"># noqa: PLC0415</span>
-    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitQubitMapper</span>  <span class="c1"># noqa: PLC0415</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.regular_isometry</span><span class="w"> </span><span class="kn">import</span> <span class="n">RegularIsometryStatePreparation</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.standard_phase_estimation</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitStandardPhaseEstimation</span>  <span class="c1"># noqa: PLC0415</span>
 
-    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitEnergyEstimator</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">RegularIsometryStatePreparation</span><span class="p">())</span>
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitStandardPhaseEstimation</span><span class="p">())</span>
+
+    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+        <span class="s2">&quot;Qiskit plugins loaded: &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">RegularIsometryStatePreparation</span><span class="p">()</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">RegularIsometryStatePreparation</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">], &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">QiskitStandardPhaseEstimation</span><span class="p">()</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">QiskitStandardPhaseEstimation</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">].&quot;</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="qiskit_nature_load">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_nature_load">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qiskit_nature_load</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit Nature plugin into QDK/Chemistry.&quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitQubitMapper</span>  <span class="c1"># noqa: PLC0415</span>
+
     <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitQubitMapper</span><span class="p">())</span>
-    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">RegularIsometryStatePreparation</span><span class="p">())</span></div>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Nature plugin loaded: [</span><span class="si">{</span><span class="n">QiskitQubitMapper</span><span class="p">()</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">QiskitQubitMapper</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">].&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="qiskit_aer_load">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.plugins.qiskit.html#qdk_chemistry.plugins.qiskit.qiskit_aer_load">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">qiskit_aer_load</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Load the Qiskit Aer plugin into QDK/Chemistry.&quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit.circuit_executor</span><span class="w"> </span><span class="kn">import</span> <span class="n">QiskitAerSimulator</span>  <span class="c1"># noqa: PLC0415</span>
+
+    <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">QiskitAerSimulator</span><span class="p">())</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Aer plugins loaded: [</span><span class="si">{</span><span class="n">QiskitAerSimulator</span><span class="p">()</span><span class="o">.</span><span class="n">type_name</span><span class="p">()</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">QiskitAerSimulator</span><span class="p">()</span><span class="o">.</span><span class="n">name</span><span class="p">()</span><span class="si">}</span><span class="s2">].&quot;</span><span class="p">)</span></div>
 
 </pre></div>
 

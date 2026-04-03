@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Namespace qdk::chemistry::data::detail &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Namespace qdk::chemistry::data::detail &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -60,6 +60,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -125,6 +127,22 @@
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
 <dd class="field-even"><p>Shared pointer to new <a class="reference internal" href="namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes.html#namespaceqdk_1_1chemistry_1_1data_1_1ContainerTypes_1ae0a916b96daf243a607e0f54df2b81c0"><span class="std std-ref">ContainerTypes::VectorVariant</span></a> containing the sum </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="cpp function">
+<dt class="sig sig-object cpp" id="_CPPv4N3qdk9chemistry4data6detail24consolidate_determinantsERNSt6vectorI13ConfigurationEERN14ContainerTypes13VectorVariantEd">
+<span id="_CPPv3N3qdk9chemistry4data6detail24consolidate_determinantsERNSt6vectorI13ConfigurationEERN14ContainerTypes13VectorVariantEd"></span><span id="_CPPv2N3qdk9chemistry4data6detail24consolidate_determinantsERNSt6vectorI13ConfigurationEERN14ContainerTypes13VectorVariantEd"></span><span id="qdk::chemistry::data::detail::consolidate_determinants__std::vector:Configuration:R.ContainerTypes::VectorVariantR.double"></span><span class="target" id="namespaceqdk_1_1chemistry_1_1data_1_1detail_1a986b8c95a88cd0b1c0538c1b16f1e87c"></span><span class="kt"><span class="pre">void</span></span><span class="w"> </span><span class="sig-name descname"><span class="n"><span class="pre">consolidate_determinants</span></span></span><span class="sig-paren">(</span><span class="n"><span class="pre">std</span></span><span class="p"><span class="pre">::</span></span><span class="n"><span class="pre">vector</span></span><span class="p"><span class="pre">&lt;</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data13ConfigurationE" title="qdk::chemistry::data::Configuration"><span class="n"><span class="pre">Configuration</span></span></a><span class="p"><span class="pre">&gt;</span></span><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">determinants</span></span>, <a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypesE" title="qdk::chemistry::data::ContainerTypes"><span class="n"><span class="pre">ContainerTypes</span></span></a><span class="p"><span class="pre">::</span></span><a class="reference internal" href="namespaceqdk.html#_CPPv4N3qdk9chemistry4data14ContainerTypes13VectorVariantE" title="qdk::chemistry::data::ContainerTypes::VectorVariant"><span class="n"><span class="pre">VectorVariant</span></span></a><span class="w"> </span><span class="p"><span class="pre">&amp;</span></span><span class="n sig-param"><span class="pre">coefficients</span></span>, <span class="kt"><span class="pre">double</span></span><span class="w"> </span><span class="n sig-param"><span class="pre">threshold</span></span><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="m"><span class="pre">1e-9</span></span><span class="sig-paren">)</span><br /></dt>
+<dd><p>Consolidate duplicate determinants by summing their coefficients. </p>
+<p>This utility function merges duplicate determinants in a CI expansion by summing their coefficients. Determinants with coefficients below the threshold are removed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>determinants</strong> – Vector of determinants (modified in place) </p></li>
+<li><p><strong>coefficients</strong> – VectorVariant of coefficients (modified in place) </p></li>
+<li><p><strong>threshold</strong> – Coefficient magnitude threshold for pruning (default 1e-9) </p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>

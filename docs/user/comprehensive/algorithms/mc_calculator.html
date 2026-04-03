@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Multi-configuration calculations &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Multi-configuration calculations &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -26,7 +26,7 @@
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
-    <link rel="next" title="Multi-configuration SCF" href="mcscf.html" />
+    <link rel="next" title="Multi-Configuration Self-Consistent Field" href="mcscf.html" />
     <link rel="prev" title="Orbital localization" href="localizer.html" /> 
 </head>
 
@@ -72,11 +72,16 @@
 <li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
@@ -94,6 +99,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -218,9 +225,9 @@ See <a class="reference internal" href="#available-implementations">Available im
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>  <span class="c1"># noqa: E402</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Load H2 structure from XYZ file</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;../data/h2.structure.xyz&quot;</span><span class="p">)</span>
@@ -273,7 +280,7 @@ All implementations share a common base set of settings from <code class="docuti
 <td><p><code class="docutils literal notranslate"><span class="pre">1e-6</span></code></p></td>
 <td><p>Convergence threshold for <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> Davidson solver</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">davidson_iterations</span></code></p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">max_solver_iterations</span></code></p></td>
 <td><p>int</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">200</span></code></p></td>
 <td><p>Maximum number of Davidson iterations</p></td>
@@ -306,7 +313,7 @@ You can discover available implementations programmatically:</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">))</span>
 </pre></div>
@@ -325,9 +332,9 @@ You can discover available implementations programmatically:</p>
 <p>The <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> (Adaptive Sampling Configuration Interaction) implementation provides an efficient selected <a class="reference internal" href="../../../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> solver that can handle larger active spaces by adaptively selecting the most important configurations. This method balances accuracy and computational cost, making it suitable for medium-sized active spaces.</p>
 <section id="asci-algorithm">
 <span id="id2"></span><h4>ASCI Algorithm<a class="headerlink" href="#asci-algorithm" title="Link to this heading"></a></h4>
-<p>The Adaptive Sampling Configuration Interaction (<a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>) algorithm <span id="id3">[<a class="reference internal" href="../../../references.html#id43" title="Norm M. Tubman, C. Daniel Freeman, Daniel S. Levine, Diptarka Hait, Martin Head-Gordon, and K. Birgitta Whaley. Modern approaches to exact diagonalization and selected configuration interaction with the adaptive sampling CI method. Journal of Chemical Theory and Computation, 16(4):2139-2159, 2020. URL: https://doi.org/10.1021/acs.jctc.8b00536, doi:10.1021/acs.jctc.8b00536.">TFL+20</a>, <a class="reference internal" href="../../../references.html#id42" title="Norm M. Tubman, Joonho Lee, Tyler Y. Takeshita, Martin Head-Gordon, and K. Birgitta Whaley. A deterministic alternative to the full configuration interaction quantum Monte Carlo method. The Journal of Chemical Physics, 145(4):044112, 07 2016. URL: https://doi.org/10.1063/1.4955109, doi:10.1063/1.4955109.">TLT+16</a>]</span> is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> in the <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> library <span id="id4">[<a class="reference internal" href="../../../references.html#id6" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span>.</p>
+<p>The Adaptive Sampling Configuration Interaction (<a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>) algorithm <span id="id3">[<a class="reference internal" href="../../../references.html#id49" title="Norm M. Tubman, C. Daniel Freeman, Daniel S. Levine, Diptarka Hait, Martin Head-Gordon, and K. Birgitta Whaley. Modern approaches to exact diagonalization and selected configuration interaction with the adaptive sampling CI method. Journal of Chemical Theory and Computation, 16(4):2139-2159, 2020. URL: https://doi.org/10.1021/acs.jctc.8b00536, doi:10.1021/acs.jctc.8b00536.">TFL+20</a>, <a class="reference internal" href="../../../references.html#id48" title="Norm M. Tubman, Joonho Lee, Tyler Y. Takeshita, Martin Head-Gordon, and K. Birgitta Whaley. A deterministic alternative to the full configuration interaction quantum Monte Carlo method. The Journal of Chemical Physics, 145(4):044112, 07 2016. URL: https://doi.org/10.1063/1.4955109, doi:10.1063/1.4955109.">TLT+16</a>]</span> is a selected configuration interaction method that enables efficient treatment of large active spaces by iteratively identifying and including only the most important determinants. QDK/Chemistry integrates the high-performance, parallel implementation of <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> in the <a class="reference internal" href="../../../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> library <span id="id4">[<a class="reference internal" href="../../../references.html#id9" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span>.</p>
 <p>The <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-<a class="reference internal" href="../../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a> accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional <a class="reference internal" href="../../../glossary.html#term-CASCI"><span class="xref std std-term">CASCI</span></a>.</p>
-<p><a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the <a class="reference internal" href="active_space.html#autocas-algorithm-details"><span class="std std-ref">AutoCAS Algorithm</span></a> section in the active space selector documentation.</p>
+<p><a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as autoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the <a class="reference internal" href="active_space.html#autocas-algorithm-details"><span class="std std-ref">autoCAS Algorithm</span></a> section in the active space selector documentation.</p>
 <p>The <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> algorithm proceeds as a two-phase optimization:</p>
 <ol class="arabic simple">
 <li><p><strong>Growth Phase</strong>: The growth phase focuses on rapidly expanding the determinant space to capture the most important configurations. Starting from an initial set of determinants (often just the Hartree-Fock determinant), <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> generates new candidate determinants by estimating their importance to the overall wavefunction through perturbation theory. <a class="reference internal" href="../../../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> then ranks their contributions to the wavefunction and selects the most significant ones to add to the determinant space for the subsequent iterations. The Hamiltonian is then projected into this expanded space and diagonalized to produce an improved wavefunction. This process is repeated with a iteratively larger determinant space until a target number of determinants (<code class="docutils literal notranslate"><span class="pre">ntdets_max</span></code>) is reached. The rate at which the determinant space grows is controlled by the <code class="docutils literal notranslate"><span class="pre">grow_factor</span></code> setting, which determines how many new determinants are added at each iteration. However, if the search algorithm fails to find enough important determinants, the growth factor is reduced by the <code class="docutils literal notranslate"><span class="pre">growth_backoff_rate</span></code> to ensure stability. Conversely, if the search is successful, the growth factor is increased by the <code class="docutils literal notranslate"><span class="pre">growth_recovery_rate</span></code> to accelerate convergence in subsequent iterations.</p></li>
@@ -439,7 +446,7 @@ The method for selecting the core determinants is controlled by the <code class=
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="localizer.html" class="btn btn-neutral float-left" title="Orbital localization" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="mcscf.html" class="btn btn-neutral float-right" title="Multi-configuration SCF" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="mcscf.html" class="btn btn-neutral float-right" title="Multi-Configuration Self-Consistent Field" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

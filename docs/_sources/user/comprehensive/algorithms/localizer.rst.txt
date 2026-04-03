@@ -173,6 +173,10 @@ This implementation has no configurable settings.
 QDK VVHV
 ~~~~~~~~
 
+.. note::
+   This feature is experimental and under active development.
+
+
 .. rubric:: Factory name: ``"qdk_vvhv"``
 
 The :term:`VVHV` (Valence Virtual--Hard Virtual) localizer addresses the numerical challenges of orbital localization in near-complete basis sets by partitioning the virtual space into chemically meaningful subspaces.

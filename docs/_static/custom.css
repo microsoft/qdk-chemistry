@@ -10,16 +10,33 @@
 
 /* Italicize the definition term to increase contrast in text formatting */
 dl dt {
-    font-weight: normal; /* Remove the default bold */
-    font-style: italic;  /* Add italics */
+    font-weight: normal;
+    /* Remove the default bold */
+    font-style: italic;
+    /* Add italics */
 }
 
 /* Make the rubric directive more visually distinct */
 p.rubric {
     font-weight: bold;
-    padding-left: 10px;        /* Space text away from border */
-    border-left: 4px solid #2980b9; /* Thick blue line on the left */
-    background-color: #f8f9fa; /* Very light grey background */
-    display: inline-block;     /* Hug the text length */
-    width: 100%;               /* Or span full width */
+    padding-left: 10px;
+    /* Space text away from border */
+    border-left: 4px solid #2980b9;
+    /* Thick blue line on the left */
+    background-color: #f8f9fa;
+    /* Very light grey background */
+    display: inline-block;
+    /* Hug the text length */
+    width: 100%;
+    /* Or span full width */
+}
+
+/* Style for bibtex citations transformed from Doxygen :cite: markers */
+a.bibtex.internal {
+    text-decoration: none;
+    color: #2980b9;
+}
+
+a.bibtex.internal:hover {
+    text-decoration: underline;
 }

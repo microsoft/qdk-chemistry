@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.qsharp package
+===================================
+
+.. automodule:: qdk_chemistry.utils.qsharp
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

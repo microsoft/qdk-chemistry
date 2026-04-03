@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>High-level design &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>High-level design &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -81,6 +81,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -171,14 +173,14 @@ These classes are designed to be:</p>
 </dl>
 <p>Programmatically, Algorithms are specified as abstract interfaces which can be specialized downstream through concrete implementations.
 This allows QDK/Chemistry to be expressed as a <a class="reference internal" href="../plugins.html"><span class="doc">plugin architecture</span></a>, for which algorithm implementations may be specified either natively within QDK/Chemistry or through established third-party quantum chemistry packages:</p>
-<div class="graphviz"><img src="../../../_images/graphviz-425f73d86fb873b40e9ee4489a05e57b826832b4.png" alt="digraph PluginArchitecture {
+<div class="graphviz"><img src="../../../_images/graphviz-7beaae0da98b1b311668835c25f3dbe33cc0f307.png" alt="digraph PluginArchitecture {
     rankdir=LR;
     bgcolor=&quot;#FAFAFA&quot;;
     node [shape=box, style=&quot;rounded,filled&quot;, fontname=&quot;Arial&quot;, margin=0.3];
     edge [color=&quot;#1976D2&quot;, penwidth=2];
 
     Interface [label=&quot;QDK/Chemistry Interface\n(ScfSolver, Localizer,\nMCCalculator, etc.)&quot;, fillcolor=&quot;#E3F2FD&quot;, color=&quot;#42A5F5&quot;, penwidth=2, fontcolor=&quot;#1976D2&quot;];
-    QDK [label=&quot;QDK Implementation\n(AutoCAS, etc.)&quot;, fillcolor=&quot;#E0F2F1&quot;, color=&quot;#26A69A&quot;, penwidth=2, fontcolor=&quot;#00796B&quot;];
+    QDK [label=&quot;QDK Implementation\n(autoCAS, etc.)&quot;, fillcolor=&quot;#E0F2F1&quot;, color=&quot;#26A69A&quot;, penwidth=2, fontcolor=&quot;#00796B&quot;];
     ThirdParty [label=&quot;Third-Party Interfaces\n(PySCF, etc.)&quot;, fillcolor=&quot;#F3E5F5&quot;, color=&quot;#AB47BC&quot;, penwidth=2, fontcolor=&quot;#7B1FA2&quot;];
 
     Interface -&gt; QDK;
@@ -208,6 +210,7 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
@@ -255,8 +258,7 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 
 <span class="w">  </span><span class="c1">// Configure and run SCF calculation</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">scf_solver</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
-<span class="w">  </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
-<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">molecule</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">scf_energy</span><span class="p">,</span><span class="w"> </span><span class="n">wfn_hf</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf_solver</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">molecule</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
 
 <span class="w">  </span><span class="c1">// Select active space orbitals</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_valence&quot;</span><span class="p">);</span>
@@ -303,7 +305,7 @@ See the <a class="reference internal" href="../plugins.html"><span class="doc">P
 <span class="n">hamiltonian</span> <span class="o">=</span> <span class="n">ham_constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">active_orbitals</span><span class="p">)</span>
 
 <span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span>
-<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;davidson_iterations&quot;</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
+<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;max_solver_iterations&quot;</span><span class="p">,</span> <span class="mi">300</span><span class="p">)</span>
 <span class="n">E_cas</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
     <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">n_active_alpha_electrons</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_active_beta_electrons</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>

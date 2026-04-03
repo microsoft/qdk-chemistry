@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.coupled_cluster module &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.coupled_cluster module &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -78,6 +78,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
@@ -127,9 +129,17 @@ in QDK/Chemistry-compatible format.</p>
 <p>Upon import, this module automatically registers the PySCF CC calculator with QDK/Chemistry’s
 CC calculator registry under the name “pyscf_coupled_cluster”.</p>
 <p class="rubric">Examples</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.coupled_cluster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PyscfCoupledClusterCalculator</span>
+<p>Basic usage:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.pyscf.coupled_cluster</span><span class="w"> </span><span class="kn">import</span> <span class="n">PyscfCoupledClusterCalculator</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calculator</span> <span class="o">=</span> <span class="n">PyscfCoupledClusterCalculator</span><span class="p">()</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">cc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">cc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Computing the bra wavefunction (lambda/gamma amplitudes):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calculator</span> <span class="o">=</span> <span class="n">PyscfCoupledClusterCalculator</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;compute_bra&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">cc_calculator</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">energy</span><span class="p">,</span> <span class="n">ket_wavefunction</span><span class="p">,</span> <span class="n">bra_wavefunction</span> <span class="o">=</span> <span class="n">cc_calculator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>This module requires both QDK/Chemistry and PySCF to be installed.</p>
@@ -284,6 +294,29 @@ CC calculation.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Type<span class="colon">:</span></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a> or <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.store_amplitudes">
+<span class="sig-name descname"><span class="pre">store_amplitudes</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.store_amplitudes" title="Link to this definition"></a></dt>
+<dd><p>Whether to store amplitudes in the CC container. Default is False.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.compute_bra">
+<span class="sig-name descname"><span class="pre">compute_bra</span></span><a class="headerlink" href="#qdk_chemistry.plugins.pyscf.coupled_cluster.PyscfCoupledClusterSettings.compute_bra" title="Link to this definition"></a></dt>
+<dd><p>Whether to compute the bra wavefunction (lambda/gamma amplitudes).
+Default is False. When True, a second wavefunction with the lambda amplitudes is returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a></p>
 </dd>
 </dl>
 </dd></dl>

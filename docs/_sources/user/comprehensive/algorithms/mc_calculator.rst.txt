@@ -104,7 +104,7 @@ All implementations share a common base set of settings from ``MultiConfiguratio
      - float
      - ``1e-6``
      - Convergence threshold for :term:`CI` Davidson solver
-   * - ``davidson_iterations``
+   * - ``max_solver_iterations``
      - int
      - ``200``
      - Maximum number of Davidson iterations
@@ -167,7 +167,7 @@ The Adaptive Sampling Configuration Interaction (:term:`ASCI`) algorithm :cite:`
 
 The :term:`ASCI` works by growing the determinant space adaptively: at each iteration, it samples the space of possible determinants and selects those with the largest contributions to the wavefunction. This approach achieves near-:term:`CASCI` accuracy at a fraction of the computational cost, making it possible to treat active spaces that are intractable for conventional :term:`CASCI`.
 
-:term:`ASCI` is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as AutoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`AutoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
+:term:`ASCI` is especially useful for generating approximate wavefunctions and RDMs for use in automated active space selection protocols (such as autoCAS), as it provides a good balance between computational cost and accuracy. For best practices, see the :ref:`autoCAS Algorithm <autocas-algorithm-details>` section in the active space selector documentation.
 
 The :term:`ASCI` algorithm proceeds as a two-phase optimization:
 

@@ -1,0 +1,17 @@
+qdk\_chemistry.algorithms.phase\_estimation package
+===================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.algorithms.phase_estimation.base
+   qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation

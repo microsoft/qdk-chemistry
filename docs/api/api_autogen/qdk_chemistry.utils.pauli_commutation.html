@@ -1,0 +1,411 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.pauli_commutation module &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="qdk_chemistry.utils.pauli_matrix module" href="qdk_chemistry.utils.pauli_matrix.html" />
+    <link rel="prev" title="qdk_chemistry.utils.model_hamiltonians module" href="qdk_chemistry.utils.model_hamiltonians.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../python_api.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#data-classes">Data Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#plugins">Plugins</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#utilities">Utilities</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#qdk_chemistry.utils.rotate_orbitals"><code class="docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.utils.html#subpackages">Subpackages</a></li>
+<li class="toctree-l4 current"><a class="reference internal" href="qdk_chemistry.utils.html#submodules">Submodules</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../python_api.html#constants">Constants</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../python_api.html">Python API</a></li>
+          <li class="breadcrumb-item"><a href="qdk_chemistry.utils.html">qdk_chemistry.utils package</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.pauli_commutation module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/api/api_autogen/qdk_chemistry.utils.pauli_commutation.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-qdk_chemistry.utils.pauli_commutation">
+<span id="qdk-chemistry-utils-pauli-commutation-module"></span><h1>qdk_chemistry.utils.pauli_commutation module<a class="headerlink" href="#module-qdk_chemistry.utils.pauli_commutation" title="Link to this heading"></a></h1>
+<p>Pauli string commutation utilities.</p>
+<p>This module provides reusable functions for checking commutativity of
+Pauli operators and computing commutator norms.</p>
+<p>Label-based functions (<code class="docutils literal notranslate"><span class="pre">do_pauli_labels_*</span></code>) operate on Pauli string
+labels such as <code class="docutils literal notranslate"><span class="pre">&quot;XIZI&quot;</span></code>.  Map-based functions (<code class="docutils literal notranslate"><span class="pre">do_pauli_maps_*</span></code>)
+operate on sparse <code class="docutils literal notranslate"><span class="pre">dict[int,</span> <span class="pre">str]</span></code> qubit-index-to-Pauli-axis mappings.</p>
+<p class="rubric">References</p>
+<p>Childs, A. M., et al. “Toward the first quantum simulation with
+quantum speedup.” <em>Proceedings of the National Academy of Sciences</em>
+115.38 (2018): 9456-9461.</p>
+<p>Childs, A. M., et al. “Theory of Trotter Error with Commutator
+Scaling.” <em>Physical Review X</em> 11.1 (2021): 011020.
+<a class="reference external" href="https://arxiv.org/abs/1912.08854">https://arxiv.org/abs/1912.08854</a></p>
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.commutator_bound_first_order">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">commutator_bound_first_order</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#commutator_bound_first_order"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.commutator_bound_first_order" title="Link to this definition"></a></dt>
+<dd><p>Compute the first-order Trotter commutator bound.</p>
+<p>For a Hamiltonian <span class="math notranslate nohighlight">\(H = \sum_j \alpha_j P_j\)</span> the first-order
+(Lie-Trotter) product formula has error bounded by</p>
+<div class="math notranslate nohighlight">
+\[\lVert U(t) - S_1(t) \rVert \le
+    \frac{t^2}{2} \sum_{j &lt; k}
+    \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert\]</div>
+<p>For Pauli strings the spectral norm of the commutator is</p>
+<ul class="simple">
+<li><p>0  if <span class="math notranslate nohighlight">\(P_j\)</span> and <span class="math notranslate nohighlight">\(P_k\)</span> commute, or</p></li>
+<li><p><span class="math notranslate nohighlight">\(2 |\alpha_j| |\alpha_k|\)</span>  if they anticommute.</p></li>
+</ul>
+<p>This function returns
+<span class="math notranslate nohighlight">\(\sum_{j &lt; k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert\)</span>,
+so the user can multiply by <span class="math notranslate nohighlight">\(t^{2} / (2N)\)</span> to get the per-step
+error.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><em>QubitHamiltonian</em></a>) – The qubit Hamiltonian whose terms to analyse.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold below which coefficients are discarded.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The sum of commutator norms over all unique pairs.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">commutator_bound_higher_order</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#commutator_bound_higher_order"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order" title="Link to this definition"></a></dt>
+<dd><p>Compute the commutator bound term <span class="math notranslate nohighlight">\(\alpha\)</span> for arbitrary-order Trotter errors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a>) – The qubit Hamiltonian for which to compute the bound.</p></li>
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The order of the Trotter decomposition.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold for filtering small Hamiltonian coefficients.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The commutator bound term <span class="math notranslate nohighlight">\(\alpha\)</span> multiplying <span class="math notranslate nohighlight">\(t^{order+1}\)</span> in Theorem 6 of Childs et. al (2021).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.commutator_bound_second_order">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">commutator_bound_second_order</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hamiltonian</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#commutator_bound_second_order"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.commutator_bound_second_order" title="Link to this definition"></a></dt>
+<dd><p>Compute the commutator bound term multiplying <span class="math notranslate nohighlight">\(t^{3} / 12\)</span> in Proposition 10 in Childs et. al (2021).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>hamiltonian</strong> (<a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.qubit_hamiltonian.QubitHamiltonian"><em>QubitHamiltonian</em></a>) – The qubit Hamiltonian for which to compute the bound.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold for filtering small Hamiltonian coefficients.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>The commutator bound term multiplying <span class="math notranslate nohighlight">\(t^{3} / 12\)</span>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.do_pauli_labels_commute">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">do_pauli_labels_commute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_b</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#do_pauli_labels_commute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_commute" title="Link to this definition"></a></dt>
+<dd><p>Check whether two Pauli strings commute.</p>
+<p>Two multi-qubit Pauli strings <span class="math notranslate nohighlight">\(P_a\)</span> and <span class="math notranslate nohighlight">\(P_b\)</span> commute if and
+only if the number of qubit positions where the two single-qubit Pauli
+operators are <em>both</em> non-identity and <em>different</em> from each other is even.</p>
+<p>The labels use the Qiskit / <code class="docutils literal notranslate"><span class="pre">SparsePauliOp</span></code> convention: the rightmost
+character corresponds to qubit 0 (little-endian bit ordering).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>label_a</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Pauli string label (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;XIZI&quot;</span></code>).</p></li>
+<li><p><strong>label_b</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Pauli string label of the same length (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;YZXI&quot;</span></code>).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the two Pauli strings commute, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the labels have different lengths.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="s2">&quot;XI&quot;</span><span class="p">,</span> <span class="s2">&quot;IX&quot;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="s2">&quot;XX&quot;</span><span class="p">,</span> <span class="s2">&quot;YY&quot;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="s2">&quot;XY&quot;</span><span class="p">,</span> <span class="s2">&quot;YX&quot;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="s2">&quot;XI&quot;</span><span class="p">,</span> <span class="s2">&quot;YI&quot;</span><span class="p">)</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.do_pauli_labels_qw_commute">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">do_pauli_labels_qw_commute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">label_a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">label_b</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#do_pauli_labels_qw_commute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_qw_commute" title="Link to this definition"></a></dt>
+<dd><p>Check whether two Pauli strings qubit-wise commute.</p>
+<p>Two multi-qubit Pauli operators qubit-wise commute when every
+corresponding single-qubit pair commutes individually.  This is
+strictly stronger than general commutativity: qubit-wise commuting
+operators always commute, but the converse is not true
+(e.g. <code class="docutils literal notranslate"><span class="pre">&quot;XY&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;YX&quot;</span></code> commute globally but do <strong>not</strong>
+qubit-wise commute).</p>
+<p>The operators qubit-wise commute if and only if there are <strong>no</strong>
+qubit positions where both are non-identity and different.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>label_a</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Pauli string label (e.g. <code class="docutils literal notranslate"><span class="pre">&quot;XIZI&quot;</span></code>).</p></li>
+<li><p><strong>label_b</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Pauli string label of the same length.</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the terms qubit-wise commute.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If the labels have different lengths.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_qw_commute</span><span class="p">(</span><span class="s2">&quot;XI&quot;</span><span class="p">,</span> <span class="s2">&quot;IX&quot;</span><span class="p">)</span>
+<span class="go">True</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_qw_commute</span><span class="p">(</span><span class="s2">&quot;XI&quot;</span><span class="p">,</span> <span class="s2">&quot;YI&quot;</span><span class="p">)</span>
+<span class="go">False</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">do_pauli_labels_qw_commute</span><span class="p">(</span><span class="s2">&quot;XY&quot;</span><span class="p">,</span> <span class="s2">&quot;YX&quot;</span><span class="p">)</span>   <span class="c1"># commute, but NOT qw-commute</span>
+<span class="go">False</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.do_pauli_maps_commute">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">do_pauli_maps_commute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#do_pauli_maps_commute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_commute" title="Link to this definition"></a></dt>
+<dd><p>Check whether two Pauli terms commute (general/standard commutation).</p>
+<p>Two multi-qubit Pauli operators commute if and only if the number
+of qubit positions where both are non-identity <em>and</em> different is
+even.  This is weaker than qubit-wise commutation and allows
+larger merge groups.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>a</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – First Pauli term mapping (qubit index → Pauli axis).</p></li>
+<li><p><strong>b</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Second Pauli term mapping (qubit index → Pauli axis).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the terms commute.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">do_pauli_maps_qw_commute</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">a</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">b</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#do_pauli_maps_qw_commute"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute" title="Link to this definition"></a></dt>
+<dd><p>Check whether two Pauli terms qubit-wise commute.</p>
+<p>Two multi-qubit Pauli operators qubit-wise commute when every
+corresponding single-qubit pair commutes individually.  This is
+strictly stronger than general commutativity: qubit-wise
+commuting operators always commute, but the converse is not true
+(e.g. <code class="docutils literal notranslate"><span class="pre">{0:</span> <span class="pre">'X',</span> <span class="pre">1:</span> <span class="pre">'Y'}</span></code> and <code class="docutils literal notranslate"><span class="pre">{0:</span> <span class="pre">'Y',</span> <span class="pre">1:</span> <span class="pre">'X'}</span></code> commute
+globally but do not qubit-wise commute).</p>
+<p>The operators qubit-wise commute if and only if there are <strong>no</strong>
+qubit positions where both are non-identity and different.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>a</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – First Pauli term mapping (qubit index → Pauli axis).</p></li>
+<li><p><strong>b</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a><em>]</em>) – Second Pauli term mapping (qubit index → Pauli axis).</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the terms qubit-wise commute.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.does_nested_commutator_vanish">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">does_nested_commutator_vanish</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">labels</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#does_nested_commutator_vanish"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.does_nested_commutator_vanish" title="Link to this definition"></a></dt>
+<dd><p>Check whether a nested commutator of Pauli labels vanishes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a></span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>labels</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – A sequence of Pauli labels representing the nested commutator.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the nested commutator vanishes, <code class="docutils literal notranslate"><span class="pre">False</span></code> otherwise.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If fewer than two Pauli labels are provided.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qdk_chemistry.utils.pauli_commutation.get_commutation_checker">
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.pauli_commutation.</span></span><span class="sig-name descname"><span class="pre">get_commutation_checker</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">commutation_type</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/qdk_chemistry/utils/pauli_commutation.html#get_commutation_checker"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#qdk_chemistry.utils.pauli_commutation.get_commutation_checker" title="Link to this definition"></a></dt>
+<dd><p>Return the commutation checker function for the given type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">Callable</span></code></a>[[<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>], <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code></a>[<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code></a>, <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a>]], <a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code></a>]</span></p>
+</dd>
+<dt class="field-even">Parameters<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>commutation_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – <code class="docutils literal notranslate"><span class="pre">&quot;qubit_wise&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;general&quot;</span></code>.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A callable <code class="docutils literal notranslate"><span class="pre">(a,</span> <span class="pre">b)</span> <span class="pre">-&gt;</span> <span class="pre">bool</span></code> that checks commutation of two
+Pauli term mappings.</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If <em>commutation_type</em> is not recognised.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qdk_chemistry.utils.model_hamiltonians.html" class="btn btn-neutral float-left" title="qdk_chemistry.utils.model_hamiltonians module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.utils.pauli_matrix.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.pauli_matrix module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

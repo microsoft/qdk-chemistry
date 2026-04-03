@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.circuit\_executor.qdk module
+======================================================
+
+.. automodule:: qdk_chemistry.algorithms.circuit_executor.qdk
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

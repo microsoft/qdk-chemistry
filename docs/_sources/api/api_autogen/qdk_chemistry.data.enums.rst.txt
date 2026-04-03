@@ -1,0 +1,16 @@
+qdk\_chemistry.data.enums package
+=================================
+
+.. automodule:: qdk_chemistry.data.enums
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.data.enums.fermion_mode_order

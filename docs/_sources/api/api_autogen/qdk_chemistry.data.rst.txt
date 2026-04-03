@@ -13,6 +13,7 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.data.enums
    qdk_chemistry.data.time_evolution
 
 Submodules
@@ -23,7 +24,10 @@ Submodules
 
    qdk_chemistry.data.base
    qdk_chemistry.data.circuit
+   qdk_chemistry.data.circuit_executor_data
+   qdk_chemistry.data.encoding_validation
    qdk_chemistry.data.estimator_data
    qdk_chemistry.data.noise_models
    qdk_chemistry.data.qpe_result
    qdk_chemistry.data.qubit_hamiltonian
+   qdk_chemistry.data.symmetries

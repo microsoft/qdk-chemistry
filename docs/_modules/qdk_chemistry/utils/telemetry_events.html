@@ -1,0 +1,360 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.telemetry_events &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.telemetry_events</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.utils.telemetry_events</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Telemetry event logging for QDK Chemistry module.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">functools</span><span class="w"> </span><span class="kn">import</span> <span class="n">wraps</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.telemetry</span><span class="w"> </span><span class="kn">import</span> <span class="n">log_telemetry</span>
+
+
+<div class="viewcode-block" id="get_basis_functions_bucket">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.get_basis_functions_bucket">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_basis_functions_bucket</span><span class="p">(</span><span class="n">basis_functions</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Categorize the number of basis functions into buckets for telemetry aggregation.</span>
+
+<span class="sd">    This function groups number of basis functions into discrete buckets to enable</span>
+<span class="sd">    meaningful aggregation and analysis in telemetry data. Rather than tracking</span>
+<span class="sd">    exact counts (which would result in too many unique values), this bucketing</span>
+<span class="sd">    approach provides useful ranges for performance and usage analysis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        basis_functions: The number of basis functions.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The bucket that the basis function count falls into.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(7)</span>
+<span class="sd">        &quot;10&quot;</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(23)</span>
+<span class="sd">        &quot;30&quot;</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(150)</span>
+<span class="sd">        &quot;150&quot;</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(750)</span>
+<span class="sd">        &quot;800&quot;</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(1500)</span>
+<span class="sd">        &quot;1500+&quot;</span>
+<span class="sd">        &gt;&gt;&gt; get_basis_functions_bucket(&quot;unknown&quot;)</span>
+<span class="sd">        &quot;unknown&quot;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">==</span> <span class="s2">&quot;unknown&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span>
+
+    <span class="n">basis_functions</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">basis_functions</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">&lt;</span> <span class="mi">50</span><span class="p">:</span>
+        <span class="c1"># Buckets of 10 for basis functions 1-49</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(((</span><span class="n">basis_functions</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">10</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">10</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">&lt;=</span> <span class="mi">500</span><span class="p">:</span>
+        <span class="c1"># Buckets of 50 for basis functions 50-500</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(((</span><span class="n">basis_functions</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">50</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">50</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">basis_functions</span> <span class="o">&lt;</span> <span class="mi">1500</span><span class="p">:</span>
+        <span class="c1"># Buckets of 100 for basis functions 501-1499</span>
+        <span class="k">return</span> <span class="nb">str</span><span class="p">(((</span><span class="n">basis_functions</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="mi">100</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="c1"># Returns &quot;1500+&quot; for basis functions &gt;= 1500</span>
+    <span class="k">return</span> <span class="s2">&quot;1500+&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="extract_data">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.extract_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">extract_data</span><span class="p">(</span><span class="n">result</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Extract number of basis functions from algorithm result.</span>
+
+<span class="sd">    This function handles both single qdk_data objects and tuple results</span>
+<span class="sd">    (e.g., (energy, qdk_data) pairs) returned by QDK chemistry algorithms.</span>
+<span class="sd">    It extracts the number of basis functions from the qdk_data&#39;s orbital data for telemetry tracking.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        result: Algorithm result, either a qdk_data object or a tuple containing</span>
+<span class="sd">            a qdk_data (typically at index 1 for (energy, wavefunction) pairs).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Bucket of basis functions (e.g., &quot;10&quot;, &quot;50&quot;, &quot;100&quot;)</span>
+<span class="sd">        or &quot;unknown&quot; if no qdk_data is available.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; # Single qdk_data result</span>
+<span class="sd">        &gt;&gt;&gt; n_basis = extract_data(qdk_data)</span>
+<span class="sd">        &#39;50&#39;</span>
+
+<span class="sd">        &gt;&gt;&gt; # Tuple result (energy, qdk_data)</span>
+<span class="sd">        &gt;&gt;&gt; n_basis = extract_data((energy, qdk_data))</span>
+<span class="sd">        &#39;100&#39;</span>
+
+<span class="sd">        &gt;&gt;&gt; # No qdk_data</span>
+<span class="sd">        &gt;&gt;&gt; n_basis = extract_data(some_other_result)</span>
+<span class="sd">        &#39;unknown&#39;</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">qdk_data</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">result</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">):</span>
+        <span class="n">qdk_data</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="s2">&quot;orbitals&quot;</span><span class="p">):</span>
+        <span class="n">qdk_data</span> <span class="o">=</span> <span class="n">result</span>
+
+    <span class="k">if</span> <span class="n">qdk_data</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">orbitals</span> <span class="o">=</span> <span class="n">qdk_data</span><span class="o">.</span><span class="n">orbitals</span>
+            <span class="c1"># Check if get_basis_set method exists</span>
+            <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">orbitals</span><span class="p">,</span> <span class="s2">&quot;get_basis_set&quot;</span><span class="p">):</span>
+                <span class="n">n_basis</span> <span class="o">=</span> <span class="n">get_basis_functions_bucket</span><span class="p">(</span><span class="n">orbitals</span><span class="o">.</span><span class="n">get_basis_set</span><span class="p">()</span><span class="o">.</span><span class="n">get_num_atomic_orbitals</span><span class="p">())</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">n_basis</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+            <span class="k">return</span> <span class="n">n_basis</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">):</span>
+            <span class="c1"># Silently handle missing attributes</span>
+            <span class="k">pass</span>
+    <span class="k">return</span> <span class="s2">&quot;unknown&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="on_qdk_chemistry_import">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_qdk_chemistry_import">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">on_qdk_chemistry_import</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs a telemetry event indicating that the QDK Chemistry module has been imported.&quot;&quot;&quot;</span>
+    <span class="n">log_telemetry</span><span class="p">(</span><span class="s2">&quot;qdk_chemistry.import&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="on_algorithm">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_algorithm">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">on_algorithm</span><span class="p">(</span><span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs a telemetry event for the execution of a quantum chemistry algorithm.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type: The type or category of the algorithm being executed.</span>
+<span class="sd">        algorithm_name: The specific name of the algorithm.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">log_telemetry</span><span class="p">(</span>
+        <span class="s2">&quot;qdk_chemistry.algorithm&quot;</span><span class="p">,</span>
+        <span class="mi">1</span><span class="p">,</span>
+        <span class="n">properties</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;algorithm_type&quot;</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span> <span class="s2">&quot;algorithm_name&quot;</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">},</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="on_algorithm_end">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_algorithm_end">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">on_algorithm_end</span><span class="p">(</span>
+    <span class="n">algorithm_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">duration_sec</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">status</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">algorithm_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">error_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">properties</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Logs the execution duration and outcome of a chemistry algorithm.</span>
+
+<span class="sd">    Logs relevant metadata about algorithm execution including timing,</span>
+<span class="sd">    success/failure status, and additional contextual information.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        algorithm_type: The category of algorithm executed (e.g.,</span>
+<span class="sd">            &#39;scf_solver&#39;, &#39;active_space_selector&#39;).</span>
+<span class="sd">        duration_sec: The time taken to execute the algorithm,</span>
+<span class="sd">            in seconds.</span>
+<span class="sd">        status: The result of the execution, typically &#39;success&#39;</span>
+<span class="sd">            or &#39;failed&#39;.</span>
+<span class="sd">        algorithm_name: The specific implementation or backend</span>
+<span class="sd">            used (e.g., &#39;qdk&#39;, &#39;pyscf&#39;).</span>
+<span class="sd">        error_type: The type of error encountered, if</span>
+<span class="sd">            any. Defaults to None.</span>
+<span class="sd">        properties: Additional contextual information about the</span>
+<span class="sd">            execution (e.g., &#39;num_basis_functions&#39;).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">telemetry_properties</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;algorithm_type&quot;</span><span class="p">:</span> <span class="n">algorithm_type</span><span class="p">,</span>
+        <span class="s2">&quot;algorithm_name&quot;</span><span class="p">:</span> <span class="n">algorithm_name</span><span class="p">,</span>
+        <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="n">status</span><span class="p">,</span>
+        <span class="s2">&quot;error_type&quot;</span><span class="p">:</span> <span class="n">error_type</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">properties</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">log_telemetry</span><span class="p">(</span>
+        <span class="s2">&quot;qdk_chemistry.algorithm.durationSec&quot;</span><span class="p">,</span>
+        <span class="n">duration_sec</span><span class="p">,</span>
+        <span class="n">properties</span><span class="o">=</span><span class="n">telemetry_properties</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="s2">&quot;histogram&quot;</span><span class="p">,</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="telemetry_tracker">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.telemetry_tracker">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">telemetry_tracker</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decorator to track telemetry for algorithm run execution.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">run_method</span><span class="p">):</span>
+        <span class="nd">@wraps</span><span class="p">(</span><span class="n">run_method</span><span class="p">)</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">wrapper</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+            <span class="n">start_time</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">result</span> <span class="o">=</span> <span class="n">run_method</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+                <span class="n">duration</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">n_basis</span> <span class="o">=</span> <span class="n">extract_data</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+                    <span class="n">on_algorithm_end</span><span class="p">(</span>
+                        <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
+                        <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+                        <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
+                        <span class="n">status</span><span class="o">=</span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+                        <span class="n">num_basis_functions</span><span class="o">=</span><span class="n">n_basis</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">AttributeError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">,</span> <span class="ne">IndexError</span><span class="p">):</span>
+                    <span class="n">on_algorithm_end</span><span class="p">(</span>
+                        <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
+                        <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+                        <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
+                        <span class="n">status</span><span class="o">=</span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">return</span> <span class="n">result</span>
+
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">duration</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time</span>
+                <span class="n">on_algorithm_end</span><span class="p">(</span>
+                    <span class="n">algorithm_type</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">type_name</span><span class="p">(),</span>
+                    <span class="n">algorithm_name</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="p">(),</span>
+                    <span class="n">duration_sec</span><span class="o">=</span><span class="n">duration</span><span class="p">,</span>
+                    <span class="n">status</span><span class="o">=</span><span class="s2">&quot;failed&quot;</span><span class="p">,</span>
+                    <span class="n">error_type</span><span class="o">=</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="k">raise</span>
+
+        <span class="k">return</span> <span class="n">wrapper</span>
+
+    <span class="k">return</span> <span class="n">decorator</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

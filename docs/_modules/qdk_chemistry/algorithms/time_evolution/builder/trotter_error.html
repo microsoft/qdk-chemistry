@@ -1,0 +1,304 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.time_evolution.builder.trotter_error &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.time_evolution.builder.trotter_error</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.time_evolution.builder.trotter_error</h1><div class="highlight"><pre>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Trotter error bound estimation for accuracy-aware parameterization.</span>
+
+<span class="sd">This module provides functions to compute the number of Trotter steps</span>
+<span class="sd">required to achieve a target accuracy for product-formula decompositions.</span>
+
+<span class="sd">Two bounds are offered:</span>
+
+<span class="sd">* **naive** - uses the triangle-inequality bound</span>
+<span class="sd">  :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil`.</span>
+
+<span class="sd">* **commutator** (tighter) - uses the commutator-based bound from</span>
+<span class="sd">  Childs *et al.* (2021):</span>
+<span class="sd">  :math:`N = \\lceil \\frac{t^2}{2\\epsilon}</span>
+<span class="sd">  \\sum_{j&lt;k} \\lVert [\\alpha_j P_j, \\alpha_k P_k] \\rVert \\rceil`.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Childs, A. M., et al. &quot;Theory of Trotter Error with Commutator</span>
+<span class="sd">    Scaling.&quot; *Physical Review X* 11.1 (2021): 011020.</span>
+<span class="sd">    https://arxiv.org/abs/1912.08854</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.pauli_commutation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">commutator_bound_first_order</span><span class="p">,</span>
+    <span class="n">commutator_bound_higher_order</span><span class="p">,</span>
+    <span class="n">commutator_bound_second_order</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;trotter_steps_commutator&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;trotter_steps_naive&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="trotter_steps_naive">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.trotter_error.html#qdk_chemistry.algorithms.time_evolution.builder.trotter_error.trotter_steps_naive">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">trotter_steps_naive</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+    <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">target_accuracy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the number of Trotter steps using the naive bound.</span>
+
+<span class="sd">    The naive (triangle-inequality) bound is</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        N = \left\lceil \frac{2(\sum_j |\alpha_j|)^{1 + 1/p} \, t^{1+1/p}}</span>
+<span class="sd">        {\epsilon^{1/p}} \right\rceil</span>
+
+<span class="sd">    where :math:`\sum_j |\alpha_j|` is the 1-norm of the Hamiltonian</span>
+<span class="sd">    coefficients, :math:`p` is the order of the Trotter-Suzuki product formula.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The qubit Hamiltonian to simulate.</span>
+<span class="sd">        time: The total evolution time *t*.</span>
+<span class="sd">        target_accuracy: The target accuracy :math:`\epsilon &gt; 0`.</span>
+<span class="sd">        order: The order of the Trotter-Suzuki product formula.</span>
+<span class="sd">        weight_threshold: Absolute threshold below which coefficients are discarded.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The minimum number of Trotter steps (at least 1).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``target_accuracy`` is not positive.</span>
+<span class="sd">        NotImplementedError: If *order* is not supported.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">}</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Trotter step estimation for order </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2"> is not yet implemented. &quot;</span>
+            <span class="s2">&quot;Trotter orders must be positive and even for orders greater than 1&quot;</span>
+        <span class="p">)</span>
+    <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+    <span class="n">one_norm</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span>
+        <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span>
+            <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">order</span> <span class="o">*</span> <span class="n">one_norm</span> <span class="o">**</span> <span class="p">(</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">))</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">)</span>
+            <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">time</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">)</span>
+            <span class="o">/</span> <span class="p">(</span><span class="n">target_accuracy</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">))</span>
+        <span class="p">),</span>
+    <span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="trotter_steps_commutator">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.trotter_error.html#qdk_chemistry.algorithms.time_evolution.builder.trotter_error.trotter_steps_commutator">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">trotter_steps_commutator</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+    <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">target_accuracy</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the number of Trotter steps using the commutator bound.</span>
+
+<span class="sd">    The tighter commutator-based bound from Childs *et al.* (2021) is</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        N_1 = \left\lceil \frac{\alpha_1 t^2}{2\epsilon}\right\rceil</span>
+
+<span class="sd">        \alpha_1 =</span>
+<span class="sd">            \sum_{j&lt;k} \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert</span>
+
+<span class="sd">        N_2 = \left\lceil \frac{t^{3/2}\alpha_2^{1/2}}{(12\epsilon)^{1/2}} \right\rceil</span>
+
+<span class="sd">        \alpha_2 = \sum_{k &gt; j,l &gt; j} \lVert [\alpha_l P_l,\, [\alpha_k P_k,\, \alpha_j P_j] \rVert +</span>
+<span class="sd">            \frac{1}{2} \sum_{k &gt; j} \lVert [\alpha_j P_j,\, [\alpha_j P_j,\, \alpha_k P_k] \rVert</span>
+
+<span class="sd">        N_p = \left\lceil \frac{t^{1+1/p}\alpha_p^{1/p}}{\epsilon^{1/p}} \right\rceil</span>
+
+<span class="sd">        \alpha_p = \sum_{j_1,\ldots,j_{p+1}} \lVert [\alpha_{j_1} P_{j_1},\, [\ldots [\alpha_{j_p} P_{j_p},</span>
+<span class="sd">        \alpha_{j_{p+1}}P_{j_{p+1}}]\ldots]\rVert</span>
+
+<span class="sd">    For Pauli strings the commutator norm is :math:`2|\alpha_j||\alpha_k|`</span>
+<span class="sd">    when the pair anticommutes and 0 when it commutes.  This bound is never</span>
+<span class="sd">    looser than the naive bound and can be substantially tighter when many</span>
+<span class="sd">    terms commute.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The qubit Hamiltonian to simulate.</span>
+<span class="sd">        time: The total evolution time *t*.</span>
+<span class="sd">        target_accuracy: The target accuracy :math:`\epsilon &gt; 0`.</span>
+<span class="sd">        order: The order of the Trotter-Suzuki product formula.</span>
+<span class="sd">        weight_threshold: Absolute threshold below which coefficients are discarded.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The minimum number of Trotter steps (at least 1).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``target_accuracy`` is not positive.</span>
+<span class="sd">        NotImplementedError: If *order* is not supported.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;target_accuracy must be positive, got </span><span class="si">{</span><span class="n">target_accuracy</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">}</span> <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Trotter step estimation for order </span><span class="si">{</span><span class="n">order</span><span class="si">}</span><span class="s2"> is not yet implemented. &quot;</span>
+            <span class="s2">&quot;Trotter orders must be positive and even for orders greater than 1&quot;</span>
+        <span class="p">)</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">comm_bound</span> <span class="o">=</span> <span class="n">commutator_bound_first_order</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">comm_bound</span> <span class="o">*</span> <span class="mi">1</span> <span class="o">/</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">time</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="n">target_accuracy</span><span class="p">)))</span>
+    <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">comm_bound</span> <span class="o">=</span> <span class="n">commutator_bound_second_order</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+            <span class="mi">1</span><span class="p">,</span>
+            <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span>
+                <span class="n">comm_bound</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mf">12.0</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">time</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">target_accuracy</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+    <span class="n">comm_bound</span> <span class="o">=</span> <span class="n">commutator_bound_higher_order</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">max</span><span class="p">(</span>
+        <span class="mi">1</span><span class="p">,</span>
+        <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="n">comm_bound</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">)</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">time</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">target_accuracy</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="n">order</span><span class="p">)),</span>
+    <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

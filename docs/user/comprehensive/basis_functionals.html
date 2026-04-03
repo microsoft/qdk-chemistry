@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Available functionals and basis sets &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Available functionals and basis sets &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
     <link rel="next" title="Model Hamiltonians" href="model_hamiltonians.html" />
-    <link rel="prev" title="State preparation" href="algorithms/state_preparation.html" /> 
+    <link rel="prev" title="Circuit execution" href="algorithms/circuit_executor.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -74,6 +74,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
@@ -348,8 +350,8 @@
 </section>
 <section id="available-dft-functionals">
 <h2>Available DFT functionals<a class="headerlink" href="#available-dft-functionals" title="Link to this heading"></a></h2>
-<p>The default <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> implementation in QDK/Chemistry uses gauxc <span id="id2">[<a class="reference internal" href="../../references.html#id9" title="Alessio Petrone, David B. Williams–Young, Shichao Sun, Torin F. Stetina, and Xiaosong Li. An efficient implementation of two-component relativistic density functional theory with torque-free auxiliary variables. The European Physical Journal B, 91(169):169, 2018. doi:10.1140/epjb/e2018-90170-1.">PWYS+18</a>]</span>
-and thus also libxc <span id="id3">[<a class="reference internal" href="../../references.html#id8" title="Susi Lehtola, Conrad Steigemann, Micael J. T. Oliveira, and Miguel A. L. Marques. Recent developments in Libxc — a comprehensive library of functionals for density functional theory. SoftwareX, 7:1-5, 2018. doi:10.1016/j.softx.2017.11.002.">LSOM18</a>]</span> for the evaluation of <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> functionals.
+<p>The default <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> implementation in QDK/Chemistry uses gauxc <span id="id2">[<a class="reference internal" href="../../references.html#id12" title="Alessio Petrone, David B. Williams–Young, Shichao Sun, Torin F. Stetina, and Xiaosong Li. An efficient implementation of two-component relativistic density functional theory with torque-free auxiliary variables. The European Physical Journal B, 91(169):169, 2018. doi:10.1140/epjb/e2018-90170-1.">PWYS+18</a>]</span>
+and thus also libxc <span id="id3">[<a class="reference internal" href="../../references.html#id11" title="Susi Lehtola, Conrad Steigemann, Micael J. T. Oliveira, and Miguel A. L. Marques. Recent developments in Libxc — a comprehensive library of functionals for density functional theory. SoftwareX, 7:1-5, 2018. doi:10.1016/j.softx.2017.11.002.">LSOM18</a>]</span> for the evaluation of <a class="reference internal" href="../../glossary.html#term-DFT"><span class="xref std std-term">DFT</span></a> functionals.
 The following keywords are supported for the corresponding functionals:</p>
 <table class="hlist"><tr><td><ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">hf</span></code></p></li>
@@ -462,7 +464,7 @@ The following keywords are supported for the corresponding functionals:</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="algorithms/state_preparation.html" class="btn btn-neutral float-left" title="State preparation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="algorithms/circuit_executor.html" class="btn btn-neutral float-left" title="Circuit execution" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="model_hamiltonians.html" class="btn btn-neutral float-right" title="Model Hamiltonians" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

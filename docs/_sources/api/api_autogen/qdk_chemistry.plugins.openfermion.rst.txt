@@ -1,0 +1,17 @@
+qdk\_chemistry.plugins.openfermion package
+==========================================
+
+.. automodule:: qdk_chemistry.plugins.openfermion
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.plugins.openfermion.conversion
+   qdk_chemistry.plugins.openfermion.qubit_mapper

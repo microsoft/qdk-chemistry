@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Plugins &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Plugins &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -84,6 +84,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
@@ -160,11 +162,11 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <span class="k">auto</span><span class="w"> </span><span class="n">scf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ScfSolverFactory</span><span class="o">::</span><span class="n">create</span><span class="p">();</span>
 
 <span class="c1">// Configure it using the standard settings interface</span>
-<span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;basis_set&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;cc-pvdz&quot;</span><span class="p">);</span>
 <span class="n">scf</span><span class="o">-&gt;</span><span class="n">settings</span><span class="p">().</span><span class="n">set</span><span class="p">(</span><span class="s">&quot;method&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;hf&quot;</span><span class="p">);</span>
 
 <span class="c1">// Run calculation with the same API as native implementations</span>
-<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">);</span>
+<span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">energy</span><span class="p">,</span><span class="w"> </span><span class="n">orbitals</span><span class="p">]</span><span class="w"> </span><span class="o">=</span>
+<span class="w">    </span><span class="n">scf</span><span class="o">-&gt;</span><span class="n">solve</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span><span class="w"> </span><span class="n">charge</span><span class="p">,</span><span class="w"> </span><span class="n">spin_multiplicity</span><span class="p">,</span><span class="w"> </span><span class="n">basis_set_name</span><span class="p">);</span>
 </pre></div>
 </div>
 </div>
@@ -231,10 +233,85 @@ We refer the reader to the <a class="reference internal" href="algorithms/factor
 <p>In addition to the native implementations packaged within QDK/Chemistry, plugins are included for the following packages:</p>
 <ul class="simple">
 <li><p><a class="reference external" href="https://pyscf.org/">PySCF</a> — Python-based quantum chemistry</p></li>
-<li><p><a class="reference external" href="https://www.ibm.com/quantum/qiskit">Qiskit</a> — Quantum computing</p></li>
+<li><p><a class="reference external" href="https://www.ibm.com/quantum/qiskit">Qiskit</a> — Quantum algorithm primitives</p></li>
+<li><p><a class="reference external" href="https://quantumai.google/openfermion">OpenFermion</a> — Quantum algorithm primitives</p></li>
 </ul>
 <p>These plugins are enabled automatically when the corresponding package is installed.</p>
+<section id="qiskit-plugin-details">
+<span id="id3"></span><h4>Qiskit plugin details<a class="headerlink" href="#qiskit-plugin-details" title="Link to this heading"></a></h4>
+<p>The Qiskit plugin uses <strong>opportunistic loading</strong> to maximize compatibility across different installation configurations.
+When Qiskit is installed, the plugin will load and register the available algorithms. The optional ecosystem packages (Qiskit Aer and Qiskit Nature) are loaded based on their availability in your environment.</p>
+<p><strong>Loading behavior:</strong></p>
+<ul class="simple">
+<li><p><strong>Qiskit (core)</strong>: Loaded when the plugin is initialized and Qiskit is installed.</p></li>
+<li><p><strong>Qiskit Nature</strong>: Loaded if <code class="docutils literal notranslate"><span class="pre">qiskit-nature</span></code> is installed.</p></li>
+<li><p><strong>Qiskit Aer</strong>: Loaded if <code class="docutils literal notranslate"><span class="pre">qiskit-aer</span></code> is installed.</p></li>
+</ul>
+<p><strong>Installing optional Qiskit packages:</strong></p>
+<p>To install the optional Qiskit ecosystem packages, use the <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> extra when installing QDK/Chemistry:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[qiskit-extras]&#39;</span>
+</pre></div>
+</div>
+<p>Alternatively, you can install them directly:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>qiskit-aer<span class="w"> </span>qiskit-nature
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code> extra is not currently supported on Python 3.14.</p>
+</div>
+<p><strong>Checking what is loaded:</strong></p>
+<p>To determine which Qiskit components are available in your environment, you can check the following module-level variables:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">QDK_CHEMISTRY_HAS_QISKIT</span><span class="p">,</span>
+    <span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span><span class="p">,</span>
+    <span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit core available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Nature available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_NATURE</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qiskit Aer available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_QISKIT_AER</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>These boolean variables are set at module load time and reflect the actual availability of each package in your Python environment.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you attempt to use an algorithm that requires an optional Qiskit package that is not installed,
+the algorithm will not be available in the factory. Use the <span class="xref std std-ref">listing-implementations</span> pattern
+to see which implementations are currently available.</p>
+</div>
+</section>
+<section id="openfermion-plugin-details">
+<span id="id4"></span><h4>OpenFermion plugin details<a class="headerlink" href="#openfermion-plugin-details" title="Link to this heading"></a></h4>
+<p>The OpenFermion plugin integrates QDK/Chemistry with <a class="reference external" href="https://quantumai.google/openfermion">OpenFermion</a>.
+Like the Qiskit plugin, it uses <strong>opportunistic loading</strong>: the plugin loads when OpenFermion is installed.</p>
+<p><strong>Loading behavior:</strong></p>
+<ul class="simple">
+<li><p><strong>OpenFermion</strong>: Loaded when the plugin is initialized and OpenFermion is installed.</p></li>
+</ul>
+<p><strong>Installing OpenFermion packages:</strong></p>
+<p>To install OpenFermion, use the <code class="docutils literal notranslate"><span class="pre">openfermion-extras</span></code> extra when installing QDK/Chemistry:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[openfermion-extras]&#39;</span>
+</pre></div>
+</div>
+<p><strong>Checking what is loaded:</strong></p>
+<p>To determine which OpenFermion components are available in your environment, you can check the following module-level variables:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">QDK_CHEMISTRY_HAS_OPENFERMION</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OpenFermion available: </span><span class="si">{</span><span class="n">QDK_CHEMISTRY_HAS_OPENFERMION</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This boolean variable is set at module load time and reflects the actual availability of each package in your Python environment.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If you attempt to use an algorithm that requires OpenFermion but the package is not installed,
+the algorithm will not be available in the factory. Use the <span class="xref std std-ref">listing-implementations</span> pattern
+to see which implementations are currently available.</p>
+</div>
 <p id="community-plugins">Community-developed plugins are also welcome. See <a class="reference internal" href="#adding-plugins"><span class="std std-ref">Creating plugins</span></a> for guidance on creating new plugins.</p>
+</section>
 </section>
 </section>
 <section id="creating-plugins">
@@ -336,8 +413,8 @@ The <code class="docutils literal notranslate"><span class="pre">_run_impl()</sp
 </div>
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScfSolver</span>  <span class="c1"># noqa: E402</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ScfSolver</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">BasisSet</span><span class="p">,</span>
     <span class="n">Orbitals</span><span class="p">,</span>
     <span class="n">Structure</span><span class="p">,</span>
@@ -412,7 +489,7 @@ Registration is typically performed during module initialization:</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.registry</span><span class="w"> </span><span class="kn">import</span> <span class="n">register</span>
 
 <span class="c1"># Registration during module import</span>
 <span class="n">register</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">CustomScfSolver</span><span class="p">())</span>
@@ -421,8 +498,8 @@ Registration is typically performed during module initialization:</p>
 </div>
 </div>
 <p>Following registration, the implementation is accessible through the standard API:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Define a molecular structure (e.g., H2 molecule)</span>
 <span class="n">coords</span> <span class="o">=</span> <span class="p">[[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]]</span>
@@ -472,7 +549,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <input class="tab-input" id="tab-set--5-input--2" name="tab-set--5" type="radio" /><label class="tab-label" for="tab-set--5-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
@@ -510,7 +587,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <input class="tab-input" id="tab-set--6-input--2" name="tab-set--6" type="radio" /><label class="tab-label" for="tab-set--6-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">Algorithm</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizer</span><span class="p">(</span><span class="n">Algorithm</span><span class="p">):</span>
@@ -534,7 +611,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <input class="tab-input" id="tab-set--7-input--2" name="tab-set--7" type="radio" /><label class="tab-label" for="tab-set--7-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmFactory</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">AlgorithmFactory</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">GeometryOptimizerFactory</span><span class="p">(</span><span class="n">AlgorithmFactory</span><span class="p">):</span>
@@ -575,7 +652,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <input class="tab-input" id="tab-set--8-input--2" name="tab-set--8" type="radio" /><label class="tab-label" for="tab-set--8-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">BfgsOptimizer</span><span class="p">(</span><span class="n">GeometryOptimizer</span><span class="p">):</span>
@@ -634,7 +711,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 </div>
 <input class="tab-input" id="tab-set--9-input--2" name="tab-set--9" type="radio" /><label class="tab-label" for="tab-set--9-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">algorithms</span>
 
 <span class="c1"># Register the factory</span>
 <span class="n">algorithms</span><span class="o">.</span><span class="n">registry</span><span class="o">.</span><span class="n">register_factory</span><span class="p">(</span><span class="n">GeometryOptimizerFactory</span><span class="p">())</span>
@@ -648,7 +725,7 @@ This section demonstrates the complete process using a geometry optimizer as an 
 </div>
 <p class="rubric">Usage</p>
 <p>Following registration, the new algorithm type is accessible through the standard API:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 
 <span class="c1"># List available implementations</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;geometry_optimizer&quot;</span><span class="p">))</span>  <span class="c1"># [&#39;bfgs&#39;, &#39;steepest_descent&#39;]</span>

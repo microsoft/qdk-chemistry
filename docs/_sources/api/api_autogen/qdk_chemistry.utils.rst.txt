@@ -7,6 +7,14 @@ qdk\_chemistry.utils package
    :show-inheritance:
    :undoc-members:
 
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   qdk_chemistry.utils.qsharp
+
 Submodules
 ----------
 
@@ -15,6 +23,10 @@ Submodules
 
    qdk_chemistry.utils.cubegen
    qdk_chemistry.utils.enum
+   qdk_chemistry.utils.model_hamiltonians
+   qdk_chemistry.utils.pauli_commutation
+   qdk_chemistry.utils.pauli_matrix
    qdk_chemistry.utils.phase
-   qdk_chemistry.utils.time_evolution
+   qdk_chemistry.utils.telemetry
+   qdk_chemistry.utils.telemetry_events
    qdk_chemistry.utils.wavefunction

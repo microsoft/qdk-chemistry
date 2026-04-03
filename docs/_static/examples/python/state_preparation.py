@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms import create
 
 # Create a StatePreparation instance
 sparse_prep = create("state_prep", "sparse_isometry_gf2x")
-regular_prep = create("state_prep", "regular_isometry")
+regular_prep = create("state_prep", "qiskit_regular_isometry")
 # end-cell-create
 ################################################################################
 
@@ -26,8 +26,8 @@ sparse_prep.settings().set("transpile_optimization_level", 3)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+import numpy as np
+from qdk_chemistry.data import Structure
 
 # Specify a structure
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
@@ -51,16 +51,16 @@ E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 # Construct the circuit
 regular_circuit = regular_prep.run(wfn_cas)
 sparse_circuit = sparse_prep.run(wfn_cas)
-print(f"Regular isometry QASM:\n{regular_circuit.get_qasm()}")
-print(f"Sparse isometry QASM:\n{sparse_circuit.get_qasm()}")
+print(f"Regular isometry circuit:\n{regular_circuit.get_qiskit_circuit()}")
+print(f"Sparse isometry circuit:\n{sparse_circuit.get_qsharp_circuit()}")
 # end-cell-run
 ################################################################################
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("state_prep"))
-# ['sparse_isometry_gf2x', 'regular_isometry']
+# ['sparse_isometry_gf2x', 'qiskit_regular_isometry']
 # end-cell-list-implementations
 ################################################################################

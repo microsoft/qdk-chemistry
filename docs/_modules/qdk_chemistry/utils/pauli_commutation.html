@@ -1,0 +1,513 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.pauli_commutation &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.pauli_commutation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.utils.pauli_commutation</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Pauli string commutation utilities.</span>
+
+<span class="sd">This module provides reusable functions for checking commutativity of</span>
+<span class="sd">Pauli operators and computing commutator norms.</span>
+
+<span class="sd">Label-based functions (``do_pauli_labels_*``) operate on Pauli string</span>
+<span class="sd">labels such as ``&quot;XIZI&quot;``.  Map-based functions (``do_pauli_maps_*``)</span>
+<span class="sd">operate on sparse ``dict[int, str]`` qubit-index-to-Pauli-axis mappings.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Childs, A. M., et al. &quot;Toward the first quantum simulation with</span>
+<span class="sd">    quantum speedup.&quot; *Proceedings of the National Academy of Sciences*</span>
+<span class="sd">    115.38 (2018): 9456-9461.</span>
+
+<span class="sd">    Childs, A. M., et al. &quot;Theory of Trotter Error with Commutator</span>
+<span class="sd">    Scaling.&quot; *Physical Review X* 11.1 (2021): 011020.</span>
+<span class="sd">    https://arxiv.org/abs/1912.08854</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">PauliTermAccumulator</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;commutator_bound_first_order&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;commutator_bound_higher_order&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;commutator_bound_second_order&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;do_pauli_labels_commute&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;do_pauli_labels_qw_commute&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;do_pauli_maps_commute&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;do_pauli_maps_qw_commute&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;does_nested_commutator_vanish&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;get_commutation_checker&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_label_to_sparse_word</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+    <span class="c1">#    Convert a Pauli string label to a ``SparsePauliWord``.</span>
+    <span class="n">word</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># q_n...q_0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">label</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">c</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;X&quot;</span><span class="p">,</span> <span class="s2">&quot;Y&quot;</span><span class="p">,</span> <span class="s2">&quot;Z&quot;</span><span class="p">}:</span>
+            <span class="n">word</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">i</span><span class="p">,</span> <span class="mi">1</span> <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="s2">&quot;X&quot;</span> <span class="k">else</span> <span class="mi">2</span> <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="s2">&quot;Y&quot;</span> <span class="k">else</span> <span class="mi">3</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">c</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid character </span><span class="si">{</span><span class="n">c</span><span class="si">!r}</span><span class="s2"> in Pauli label; expected &#39;I&#39;, &#39;X&#39;, &#39;Y&#39;, or &#39;Z&#39;.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">word</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_sparse_word_to_label</span><span class="p">(</span><span class="n">word</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]],</span> <span class="n">n_qubits</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="c1">#    Convert a ``SparsePauliWord`` back to a Pauli string label.</span>
+    <span class="n">chars</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_qubits</span>
+    <span class="k">for</span> <span class="n">q</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">word</span><span class="p">:</span>
+        <span class="n">chars</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;X&quot;</span> <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="mi">1</span> <span class="k">else</span> <span class="s2">&quot;Y&quot;</span> <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="mi">2</span> <span class="k">else</span> <span class="s2">&quot;Z&quot;</span>
+    <span class="c1"># q_n...q_0</span>
+    <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">chars</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="do_pauli_labels_commute">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_commute">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">do_pauli_labels_commute</span><span class="p">(</span><span class="n">label_a</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label_b</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Check whether two Pauli strings commute.</span>
+
+<span class="sd">    Two multi-qubit Pauli strings :math:`P_a` and :math:`P_b` commute if and</span>
+<span class="sd">    only if the number of qubit positions where the two single-qubit Pauli</span>
+<span class="sd">    operators are *both* non-identity and *different* from each other is even.</span>
+
+<span class="sd">    The labels use the Qiskit / ``SparsePauliOp`` convention: the rightmost</span>
+<span class="sd">    character corresponds to qubit 0 (little-endian bit ordering).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        label_a: Pauli string label (e.g. ``&quot;XIZI&quot;``).</span>
+<span class="sd">        label_b: Pauli string label of the same length (e.g. ``&quot;YZXI&quot;``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the two Pauli strings commute, ``False`` otherwise.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the labels have different lengths.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_commute(&quot;XI&quot;, &quot;IX&quot;)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_commute(&quot;XX&quot;, &quot;YY&quot;)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_commute(&quot;XY&quot;, &quot;YX&quot;)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_commute(&quot;XI&quot;, &quot;YI&quot;)</span>
+<span class="sd">        False</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">label_a</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">label_b</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pauli labels must have the same length, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">label_a</span><span class="p">)</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">label_b</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="n">anticommuting_count</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">char_a</span><span class="p">,</span> <span class="n">char_b</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">label_a</span><span class="p">,</span> <span class="n">label_b</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">char_a</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span> <span class="ow">and</span> <span class="n">char_b</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="n">char_a</span><span class="p">):</span>
+            <span class="n">anticommuting_count</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">anticommuting_count</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="do_pauli_labels_qw_commute">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_qw_commute">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">do_pauli_labels_qw_commute</span><span class="p">(</span><span class="n">label_a</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">label_b</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Check whether two Pauli strings qubit-wise commute.</span>
+
+<span class="sd">    Two multi-qubit Pauli operators qubit-wise commute when every</span>
+<span class="sd">    corresponding single-qubit pair commutes individually.  This is</span>
+<span class="sd">    strictly stronger than general commutativity: qubit-wise commuting</span>
+<span class="sd">    operators always commute, but the converse is not true</span>
+<span class="sd">    (e.g. ``&quot;XY&quot;`` and ``&quot;YX&quot;`` commute globally but do **not**</span>
+<span class="sd">    qubit-wise commute).</span>
+
+<span class="sd">    The operators qubit-wise commute if and only if there are **no**</span>
+<span class="sd">    qubit positions where both are non-identity and different.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        label_a: Pauli string label (e.g. ``&quot;XIZI&quot;``).</span>
+<span class="sd">        label_b: Pauli string label of the same length.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the terms qubit-wise commute.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If the labels have different lengths.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_qw_commute(&quot;XI&quot;, &quot;IX&quot;)</span>
+<span class="sd">        True</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_qw_commute(&quot;XI&quot;, &quot;YI&quot;)</span>
+<span class="sd">        False</span>
+<span class="sd">        &gt;&gt;&gt; do_pauli_labels_qw_commute(&quot;XY&quot;, &quot;YX&quot;)   # commute, but NOT qw-commute</span>
+<span class="sd">        False</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">label_a</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">label_b</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pauli labels must have the same length, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">label_a</span><span class="p">)</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">label_b</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">ca</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span> <span class="ow">and</span> <span class="n">cb</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;I&quot;</span><span class="p">,</span> <span class="n">ca</span><span class="p">)</span> <span class="k">for</span> <span class="n">ca</span><span class="p">,</span> <span class="n">cb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">label_a</span><span class="p">,</span> <span class="n">label_b</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="do_pauli_maps_commute">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_commute">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">do_pauli_maps_commute</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check whether two Pauli terms commute (general/standard commutation).</span>
+
+<span class="sd">    Two multi-qubit Pauli operators commute if and only if the number</span>
+<span class="sd">    of qubit positions where both are non-identity *and* different is</span>
+<span class="sd">    even.  This is weaker than qubit-wise commutation and allows</span>
+<span class="sd">    larger merge groups.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        a: First Pauli term mapping (qubit index → Pauli axis).</span>
+<span class="sd">        b: Second Pauli term mapping (qubit index → Pauli axis).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the terms commute.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">anti_commuting</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">a</span> <span class="k">if</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">b</span> <span class="ow">and</span> <span class="n">a</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">!=</span> <span class="n">b</span><span class="p">[</span><span class="n">q</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">anti_commuting</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span></div>
+
+
+
+<div class="viewcode-block" id="do_pauli_maps_qw_commute">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">do_pauli_maps_qw_commute</span><span class="p">(</span><span class="n">a</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="n">b</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check whether two Pauli terms qubit-wise commute.</span>
+
+<span class="sd">    Two multi-qubit Pauli operators qubit-wise commute when every</span>
+<span class="sd">    corresponding single-qubit pair commutes individually.  This is</span>
+<span class="sd">    strictly stronger than general commutativity: qubit-wise</span>
+<span class="sd">    commuting operators always commute, but the converse is not true</span>
+<span class="sd">    (e.g. ``{0: &#39;X&#39;, 1: &#39;Y&#39;}`` and ``{0: &#39;Y&#39;, 1: &#39;X&#39;}`` commute</span>
+<span class="sd">    globally but do not qubit-wise commute).</span>
+
+<span class="sd">    The operators qubit-wise commute if and only if there are **no**</span>
+<span class="sd">    qubit positions where both are non-identity and different.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        a: First Pauli term mapping (qubit index → Pauli axis).</span>
+<span class="sd">        b: Second Pauli term mapping (qubit index → Pauli axis).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the terms qubit-wise commute.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">a</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">!=</span> <span class="n">b</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">a</span> <span class="k">if</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">b</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="get_commutation_checker">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.get_commutation_checker">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_commutation_checker</span><span class="p">(</span>
+    <span class="n">commutation_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]],</span> <span class="nb">bool</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the commutation checker function for the given type.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        commutation_type: ``&quot;qubit_wise&quot;`` or ``&quot;general&quot;``.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A callable ``(a, b) -&gt; bool`` that checks commutation of two</span>
+<span class="sd">        Pauli term mappings.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If *commutation_type* is not recognised.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">commutation_type</span> <span class="o">==</span> <span class="s2">&quot;general&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">do_pauli_maps_commute</span>
+    <span class="k">if</span> <span class="n">commutation_type</span> <span class="o">==</span> <span class="s2">&quot;qubit_wise&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">do_pauli_maps_qw_commute</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown commutation_type </span><span class="si">{</span><span class="n">commutation_type</span><span class="si">!r}</span><span class="s2">; expected &#39;general&#39; or &#39;qubit_wise&#39;.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="does_nested_commutator_vanish">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.does_nested_commutator_vanish">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">does_nested_commutator_vanish</span><span class="p">(</span><span class="o">*</span><span class="n">labels</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check whether a nested commutator of Pauli labels vanishes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        labels: A sequence of Pauli labels representing the nested commutator.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``True`` if the nested commutator vanishes, ``False`` otherwise.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If fewer than two Pauli labels are provided.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;At least two Pauli labels are required for a commutator.&quot;</span><span class="p">)</span>
+
+    <span class="n">pauli_string_length</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">lbl</span><span class="p">)</span> <span class="o">!=</span> <span class="n">pauli_string_length</span> <span class="k">for</span> <span class="n">lbl</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;All Pauli labels must have the same length.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Base case: [P_a, P_b] vanishes iff the two strings commute.</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">labels</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">labels</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+    <span class="c1"># Recursive case: [P_1, [P_2, ..., P_n]]</span>
+    <span class="c1"># 1. Inner nested commutator vanishes =&gt; whole expression vanishes.</span>
+    <span class="k">if</span> <span class="n">does_nested_commutator_vanish</span><span class="p">(</span><span class="o">*</span><span class="n">labels</span><span class="p">[</span><span class="mi">1</span><span class="p">:]):</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="c1"># 2. Compute the product P_2 P_3 … P_n via sparse-word multiplication</span>
+    <span class="c1">#    (proportional to the inner commutator when it is non-zero) and</span>
+    <span class="c1">#    check whether P_1 commutes with it.</span>
+    <span class="n">word</span> <span class="o">=</span> <span class="n">_label_to_sparse_word</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+    <span class="k">for</span> <span class="n">lbl</span> <span class="ow">in</span> <span class="n">labels</span><span class="p">[</span><span class="mi">2</span><span class="p">:]:</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">word</span> <span class="o">=</span> <span class="n">PauliTermAccumulator</span><span class="o">.</span><span class="n">multiply_uncached</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="n">_label_to_sparse_word</span><span class="p">(</span><span class="n">lbl</span><span class="p">))</span>
+    <span class="n">inner_product</span> <span class="o">=</span> <span class="n">_sparse_word_to_label</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="n">pauli_string_length</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="n">labels</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">inner_product</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="commutator_bound_first_order">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_first_order">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">commutator_bound_first_order</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+    <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the first-order Trotter commutator bound.</span>
+
+<span class="sd">    For a Hamiltonian :math:`H = \sum_j \alpha_j P_j` the first-order</span>
+<span class="sd">    (Lie-Trotter) product formula has error bounded by</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        \lVert U(t) - S_1(t) \rVert \le</span>
+<span class="sd">            \frac{t^2}{2} \sum_{j &lt; k}</span>
+<span class="sd">            \lVert [\alpha_j P_j,\, \alpha_k P_k] \rVert</span>
+
+<span class="sd">    For Pauli strings the spectral norm of the commutator is</span>
+
+<span class="sd">    * 0  if :math:`P_j` and :math:`P_k` commute, or</span>
+<span class="sd">    * :math:`2 |\alpha_j| |\alpha_k|`  if they anticommute.</span>
+
+<span class="sd">    This function returns</span>
+<span class="sd">    :math:`\sum_{j &lt; k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert`,</span>
+<span class="sd">    so the user can multiply by :math:`t^{2} / (2N)` to get the per-step</span>
+<span class="sd">    error.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The qubit Hamiltonian whose terms to analyse.</span>
+<span class="sd">        weight_threshold: Absolute threshold below which coefficients are discarded.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The sum of commutator norms over all unique pairs.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+    <span class="n">pauli_labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[</span><span class="n">coeff</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+
+    <span class="n">total</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">j</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">do_pauli_labels_commute</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">pauli_labels</span><span class="p">[</span><span class="n">k</span><span class="p">]):</span>
+                <span class="n">total</span> <span class="o">+=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">total</span></div>
+
+
+
+<div class="viewcode-block" id="commutator_bound_second_order">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_second_order">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">commutator_bound_second_order</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+    <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the commutator bound term multiplying :math:`t^{3} / 12` in Proposition 10 in Childs et. al (2021).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The qubit Hamiltonian for which to compute the bound.</span>
+<span class="sd">        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The commutator bound term multiplying :math:`t^{3} / 12`.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+    <span class="n">pauli_labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[</span><span class="n">coeff</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+
+    <span class="n">total_term1</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">does_nested_commutator_vanish</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">[</span><span class="n">k</span><span class="p">],</span> <span class="n">pauli_labels</span><span class="p">[</span><span class="n">j</span><span class="p">],</span> <span class="n">pauli_labels</span><span class="p">[</span><span class="n">i</span><span class="p">]):</span>
+                    <span class="n">total_term1</span> <span class="o">+=</span> <span class="mf">2.0</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">j</span><span class="p">])</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">k</span><span class="p">])</span>
+
+    <span class="n">total_term2</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">does_nested_commutator_vanish</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pauli_labels</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pauli_labels</span><span class="p">[</span><span class="n">j</span><span class="p">]):</span>
+                <span class="n">total_term2</span> <span class="o">+=</span> <span class="mf">2.0</span><span class="o">**</span><span class="mi">2</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">*</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">total_term1</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">total_term2</span></div>
+
+
+
+<div class="viewcode-block" id="commutator_bound_higher_order">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">commutator_bound_higher_order</span><span class="p">(</span>
+    <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+    <span class="n">order</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute the commutator bound term :math:`\alpha` for arbitrary-order Trotter errors.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The qubit Hamiltonian for which to compute the bound.</span>
+<span class="sd">        order: The order of the Trotter decomposition.</span>
+<span class="sd">        weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The commutator bound term :math:`\alpha` multiplying :math:`t^{order+1}` in Theorem 6 of Childs et. al (2021).</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">real_terms</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
+    <span class="n">pauli_labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">label</span> <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[</span><span class="n">coeff</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">real_terms</span><span class="p">]</span>
+    <span class="n">abs_coeffs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">abs</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">coefficients</span><span class="p">]</span>
+
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_labels</span><span class="p">)</span>
+    <span class="n">total</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="k">for</span> <span class="n">idx_tuple</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">product</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">repeat</span><span class="o">=</span><span class="n">order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">labels</span> <span class="o">=</span> <span class="p">[</span><span class="n">pauli_labels</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx_tuple</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">does_nested_commutator_vanish</span><span class="p">(</span><span class="o">*</span><span class="n">labels</span><span class="p">):</span>
+            <span class="n">total</span> <span class="o">+=</span> <span class="p">(</span><span class="mf">2.0</span><span class="o">**</span><span class="n">order</span><span class="p">)</span> <span class="o">*</span> <span class="n">math</span><span class="o">.</span><span class="n">prod</span><span class="p">(</span><span class="n">abs_coeffs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">idx_tuple</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">total</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

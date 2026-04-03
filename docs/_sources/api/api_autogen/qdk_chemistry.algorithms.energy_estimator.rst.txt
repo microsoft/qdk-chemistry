@@ -14,4 +14,4 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.algorithms.energy_estimator.energy_estimator
-   qdk_chemistry.algorithms.energy_estimator.qsharp
+   qdk_chemistry.algorithms.energy_estimator.qdk

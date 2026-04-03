@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.time\_evolution.builder.trotter\_error module
+=======================================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.builder.trotter_error
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

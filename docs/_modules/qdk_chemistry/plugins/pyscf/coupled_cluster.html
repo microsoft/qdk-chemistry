@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.coupled_cluster &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
 </ul>
@@ -109,9 +111,18 @@
 <span class="sd">CC calculator registry under the name &quot;pyscf_coupled_cluster&quot;.</span>
 
 <span class="sd">Examples:</span>
-<span class="sd">    &gt;&gt;&gt; from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator</span>
-<span class="sd">    &gt;&gt;&gt; cc_calculator = PyscfCoupledClusterCalculator()</span>
-<span class="sd">    &gt;&gt;&gt; energy, wavefunction = cc_calculator.run(ansatz)</span>
+<span class="sd">    Basic usage::</span>
+
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.plugins.pyscf.coupled_cluster import PyscfCoupledClusterCalculator</span>
+<span class="sd">        &gt;&gt;&gt; cc_calculator = PyscfCoupledClusterCalculator()</span>
+<span class="sd">        &gt;&gt;&gt; energy, wavefunction, _ = cc_calculator.run(ansatz)</span>
+
+<span class="sd">    Computing the bra wavefunction (lambda/gamma amplitudes)::</span>
+
+<span class="sd">        &gt;&gt;&gt; cc_calculator = PyscfCoupledClusterCalculator()</span>
+<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set(&quot;compute_bra&quot;, True)</span>
+<span class="sd">        &gt;&gt;&gt; cc_calculator.settings().set(&quot;store_amplitudes&quot;, True)</span>
+<span class="sd">        &gt;&gt;&gt; energy, ket_wavefunction, bra_wavefunction = cc_calculator.run(ansatz)</span>
 
 <span class="sd">This module requires both QDK/Chemistry and PySCF to be installed.</span>
 
@@ -156,6 +167,9 @@
 <span class="sd">        frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.</span>
 <span class="sd">            Given the orbital indices (0-based) in a list, both occupied and virtual orbitals can be frozen in the</span>
 <span class="sd">            CC calculation.</span>
+<span class="sd">        store_amplitudes (bool): Whether to store amplitudes in the CC container. Default is False.</span>
+<span class="sd">        compute_bra (bool): Whether to compute the bra wavefunction (lambda/gamma amplitudes).</span>
+<span class="sd">            Default is False. When True, a second wavefunction with the lambda amplitudes is returned.</span>
 
 <span class="sd">    Examples:</span>
 <span class="sd">        &gt;&gt;&gt; settings = PyscfCoupledClusterSettings()</span>
@@ -177,7 +191,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;direct&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;async_io&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;incore_complete&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;compute_bra&quot;</span><span class="p">,</span> <span class="s2">&quot;bool&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span></div>
 </div>
 
 
@@ -222,13 +237,18 @@
 
 <span class="sd">        Args:</span>
 <span class="sd">            ansatz: The QDK/Chemistry :class:`Ansatz` object representing the system to calculate.</span>
-<span class="sd">            store_amplitudes: Whether to store amplitudes or not in the CC container (default is False).</span>
 
 <span class="sd">        Returns:</span>
-<span class="sd">            A tuple containing the total energy and wavefunction, containing CC amplitudes.</span>
+<span class="sd">            A tuple containing:</span>
+<span class="sd">                - total_energy: The total CCSD energy (HF + correlation).</span>
+<span class="sd">                - ket_wavefunction: Wavefunction containing T amplitudes (ket state).</span>
+<span class="sd">                - bra_wavefunction (optional): If compute_bra is True, a second Wavefunction</span>
+<span class="sd">                  containing the lambda (gamma) amplitudes representing the bra state.</span>
+<span class="sd">                  When compute_bra is False, only (total_energy, ket_wavefunction, None) is returned.</span>
 
 <span class="sd">        Raises:</span>
 <span class="sd">            RuntimeError: If the CCSD calculation does not converge.</span>
+<span class="sd">            RuntimeError: If the lambda equation solver does not converge (when compute_bra=True).</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
@@ -239,6 +259,7 @@
         <span class="n">pyscf_cc</span> <span class="o">=</span> <span class="n">cc</span><span class="o">.</span><span class="n">CCSD</span><span class="p">(</span><span class="n">pyscf_scf</span><span class="p">)</span>
 
         <span class="n">store_amplitudes</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;store_amplitudes&quot;</span><span class="p">)</span>
+        <span class="n">compute_bra</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;compute_bra&quot;</span><span class="p">)</span>
 
         <span class="c1"># Handle Settings</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get_or_default</span><span class="p">(</span><span class="s2">&quot;verbose&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
@@ -334,7 +355,76 @@
         <span class="c1"># Total energy = SCF energy + correlation energy</span>
         <span class="n">total_energy</span> <span class="o">=</span> <span class="n">initial_energy</span> <span class="o">+</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">e_corr</span>
 
-        <span class="k">return</span> <span class="n">total_energy</span><span class="p">,</span> <span class="n">updated_wavefunction</span></div>
+        <span class="c1"># Compute bra wavefunction (lambda/gamma amplitudes) if requested</span>
+        <span class="k">if</span> <span class="n">compute_bra</span><span class="p">:</span>
+            <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">solve_lambda</span><span class="p">()</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">converged_lambda</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Lambda equation solver did not converge&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">is_unrestricted</span><span class="p">:</span>
+                <span class="c1"># Unrestricted case: l1 = (l1_aa, l1_bb), l2 = (l2_aaaa, l2_aabb, l2_bbbb)</span>
+                <span class="n">l1_aa</span><span class="p">,</span> <span class="n">l1_bb</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">l1</span>
+                <span class="n">l2_aaaa</span><span class="p">,</span> <span class="n">l2_aabb</span><span class="p">,</span> <span class="n">l2_bbbb</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">l2</span>
+
+                <span class="k">if</span> <span class="n">store_amplitudes</span><span class="p">:</span>
+                    <span class="c1"># Reshape amplitudes for storage</span>
+                    <span class="n">l1_aa</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l1_aa</span><span class="p">,</span> <span class="p">(</span><span class="n">l1_aa</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="n">l1_bb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l1_bb</span><span class="p">,</span> <span class="p">(</span><span class="n">l1_bb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="n">l2_aaaa</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2_aaaa</span><span class="p">,</span> <span class="p">(</span><span class="n">l2_aaaa</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="n">l2_aabb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2_aabb</span><span class="p">,</span> <span class="p">(</span><span class="n">l2_aabb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="n">l2_bbbb</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2_bbbb</span><span class="p">,</span> <span class="p">(</span><span class="n">l2_bbbb</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+                    <span class="c1"># Create CoupledClusterContainer for bra with lambda amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                        <span class="n">orbitals</span><span class="p">,</span>
+                        <span class="n">original_wavefunction</span><span class="p">,</span>
+                        <span class="n">l1_aa</span><span class="p">,</span>  <span class="c1"># Alpha L1 (gamma) amplitudes</span>
+                        <span class="n">l1_bb</span><span class="p">,</span>  <span class="c1"># Beta L1 (gamma) amplitudes</span>
+                        <span class="n">l2_aabb</span><span class="p">,</span>  <span class="c1"># Alpha-beta L2 (gamma) amplitudes</span>
+                        <span class="n">l2_aaaa</span><span class="p">,</span>  <span class="c1"># Alpha-alpha L2 (gamma) amplitudes</span>
+                        <span class="n">l2_bbbb</span><span class="p">,</span>  <span class="c1"># Beta-beta L2 (gamma) amplitudes</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                        <span class="n">orbitals</span><span class="p">,</span>
+                        <span class="n">original_wavefunction</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                    <span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="c1"># Restricted case: l1 and l2 are single arrays</span>
+                <span class="n">l1</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">l1</span>
+                <span class="n">l2</span> <span class="o">=</span> <span class="n">pyscf_cc</span><span class="o">.</span><span class="n">l2</span>
+
+                <span class="k">if</span> <span class="n">store_amplitudes</span><span class="p">:</span>
+                    <span class="c1"># Reshape amplitudes for storage</span>
+                    <span class="n">l1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l1</span><span class="p">,</span> <span class="p">(</span><span class="n">l1</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+                    <span class="n">l2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">l2</span><span class="p">,</span> <span class="p">(</span><span class="n">l2</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+
+                    <span class="c1"># Create CoupledClusterContainer for bra with lambda amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                        <span class="n">orbitals</span><span class="p">,</span>
+                        <span class="n">original_wavefunction</span><span class="p">,</span>
+                        <span class="n">l1</span><span class="p">,</span>  <span class="c1"># L1 (gamma) amplitudes</span>
+                        <span class="n">l2</span><span class="p">,</span>  <span class="c1"># L2 (gamma) amplitudes</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Create CoupledClusterContainer without storing amplitudes</span>
+                    <span class="n">bra_container</span> <span class="o">=</span> <span class="n">CoupledClusterContainer</span><span class="p">(</span>
+                        <span class="n">orbitals</span><span class="p">,</span>
+                        <span class="n">original_wavefunction</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                        <span class="kc">None</span><span class="p">,</span>
+                    <span class="p">)</span>
+
+            <span class="n">bra_wavefunction</span> <span class="o">=</span> <span class="n">Wavefunction</span><span class="p">(</span><span class="n">bra_container</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">total_energy</span><span class="p">,</span> <span class="n">updated_wavefunction</span><span class="p">,</span> <span class="n">bra_wavefunction</span>
+
+        <span class="k">return</span> <span class="n">total_energy</span><span class="p">,</span> <span class="n">updated_wavefunction</span><span class="p">,</span> <span class="kc">None</span></div>
 
 </pre></div>
 

@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.telemetry module
+=====================================
+
+.. automodule:: qdk_chemistry.utils.telemetry
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

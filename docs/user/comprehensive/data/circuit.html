@@ -1,0 +1,470 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circuit &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Algorithm classes" href="../algorithms/index.html" />
+    <link rel="prev" title="QpeResult" href="qpe_result.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="symmetries.html">Symmetries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Circuit</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#worked-example">Worked example</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#q-factory-harness">Q# factory harness</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#conversion-methods">Conversion methods</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#properties">Properties</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#serialization">Serialization</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
+      <li class="breadcrumb-item active">Circuit</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/circuit.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="circuit">
+<h1>Circuit<a class="headerlink" href="#circuit" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> class in QDK/Chemistry represents a quantum circuit.
+It stores the circuit in one or more formats and converts between them on demand.</p>
+<section id="worked-example">
+<h2>Worked example<a class="headerlink" href="#worked-example" title="Link to this heading"></a></h2>
+<p>The following example defines a Q# operation from a string, wraps the compiled circuit in a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a>, inspects the gate-level diagram, and runs resource estimation:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--0-input--1" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">qdk</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">qsharp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+
+<span class="c1"># 1. Define a Q# operation from string</span>
+<span class="n">qsharp</span><span class="o">.</span><span class="n">eval</span><span class="p">(</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    operation GHZSample(n: Int) : Result[] {</span>
+<span class="sd">    use qs = Qubit[n];</span>
+
+<span class="sd">    H(qs[0]);</span>
+<span class="sd">    ApplyToEach(CNOT(qs[0], _), qs[1...]);</span>
+
+<span class="sd">    let results = MeasureEachZ(qs);</span>
+<span class="sd">    ResetAll(qs);</span>
+<span class="sd">    return results;</span>
+<span class="sd">    }</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+<span class="p">)</span>
+
+<span class="c1"># 2. Get a Q# circuit object and wrap it</span>
+<span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+    <span class="n">program</span><span class="o">=</span><span class="n">qdk</span><span class="o">.</span><span class="n">code</span><span class="o">.</span><span class="n">GHZSample</span><span class="p">,</span>
+    <span class="n">parameter</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;n&quot;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">)</span>
+
+<span class="c1"># 3. Inspect the circuit</span>
+<span class="n">qsharp_circuit</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">qsharp_circuit</span><span class="p">)</span>
+<span class="c1"># Return an ASCII diagram of the circuit</span>
+<span class="c1">#    q_0    ── H ──── ● ──── ● ──── M ──── |0〉 ──</span>
+<span class="c1">#                     │      │      ╘════════════</span>
+<span class="c1">#    q_1    ───────── X ─────┼───── M ──── |0〉 ──</span>
+<span class="c1">#                            │      ╘════════════</span>
+<span class="c1">#    q_2    ──────────────── X ──── M ──── |0〉 ──</span>
+<span class="c1">#                                   ╘════════════</span>
+
+<span class="c1"># 4. Access the gate-level JSON structure</span>
+<span class="n">circuit_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">qsharp_circuit</span><span class="o">.</span><span class="n">json</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Qubits: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">circuit_json</span><span class="p">[</span><span class="s1">&#39;qubits&#39;</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># 5. Resource estimation</span>
+<span class="n">estimate_result</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">estimate</span><span class="p">()</span>
+<span class="n">formatted</span> <span class="o">=</span> <span class="n">estimate_result</span><span class="p">[</span><span class="s2">&quot;physicalCountsFormatted&quot;</span><span class="p">]</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Physical qubits: </span><span class="si">{</span><span class="n">formatted</span><span class="p">[</span><span class="s1">&#39;physicalQubits&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Runtime: </span><span class="si">{</span><span class="n">formatted</span><span class="p">[</span><span class="s1">&#39;runtime&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> wraps a quantum circuit that may be represented in any combination of the following formats:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 75.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Format</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qasm</span></code></p></td>
+<td><p>An OpenQASM string.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qir</span></code></p></td>
+<td><p>A <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> (Quantum Intermediate Representation) object for cross-platform compilation.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp</span></code></p></td>
+<td><p>A compiled <code class="docutils literal notranslate"><span class="pre">qsharp._native.Circuit</span></code> object for inspection and visualization.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp_op</span></code></p></td>
+<td><p>A Q# callable — a native Q# operation that can be composed with other Q# operations.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp_factory</span></code></p></td>
+<td><p>A <code class="docutils literal notranslate"><span class="pre">QsharpFactoryData</span></code> — a deferred Q# program that compiles on demand (see <a class="reference internal" href="#q-factory-harness">Q# factory harness</a> below).</p></td>
+</tr>
+</tbody>
+</table>
+<p>At least one representation must be provided at construction.
+When a format that is not stored is requested, the class converts automatically — for example, calling <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qsharp_circuit" title="qdk_chemistry.data.Circuit.get_qsharp_circuit"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qsharp_circuit()</span></code></a> on a circuit that only has <code class="docutils literal notranslate"><span class="pre">qasm</span></code> will compile it to Q# via the <code class="docutils literal notranslate"><span class="pre">qsharp</span></code> package.</p>
+<p>The full constructor signature is:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">Circuit</span><span class="p">(</span>
+    <span class="n">qasm</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qir</span><span class="p">:</span> <span class="n">QirInputData</span> <span class="o">|</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsharp</span><span class="p">:</span> <span class="n">qsharp</span><span class="o">.</span><span class="n">_native</span><span class="o">.</span><span class="n">Circuit</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsharp_op</span><span class="p">:</span> <span class="n">Callable</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">qsharp_factory</span><span class="p">:</span> <span class="n">QsharpFactoryData</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">encoding</span></code> parameter records the fermion-to-qubit mapping assumed by the circuit (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code>).</p>
+</section>
+<section id="q-factory-harness">
+<span id="qsharp-factory-harness"></span><h2>Q# factory harness<a class="headerlink" href="#q-factory-harness" title="Link to this heading"></a></h2>
+<p>The Q# factory is the primary mechanism by which QDK/Chemistry builds circuits internally.
+Rather than constructing a circuit as a gate sequence, the library stores a reference to a <strong>Q# callable</strong> along with the <strong>classical parameters</strong> that configure it.
+The circuit is compiled only when a concrete representation is actually needed.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">QsharpFactoryData</span></code> is a frozen dataclass with two fields:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">program</span></code></dt><dd><p>A Q# callable — a reference to a Q# operation that constructs the circuit.
+In practice this is typically a Q# factory function exposed via the <code class="docutils literal notranslate"><span class="pre">qsharp</span></code> Python package (e.g., <code class="docutils literal notranslate"><span class="pre">QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit</span></code>).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">parameter</span></code></dt><dd><p>A <code class="docutils literal notranslate"><span class="pre">dict[str,</span> <span class="pre">Any]</span></code> of classical parameters that are passed to the Q# callable at compilation time.
+These are Python-native values — lists, ints, floats, nested dicts, or even other Q# operations — that the Q# program uses to configure the circuit it produces.</p>
+</dd>
+</dl>
+<p>The standard pattern for building a factory is:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--1-input--1" name="tab-set--1" type="radio" /><label class="tab-label" for="tab-set--1-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Prepare single-reference state with Q# factory parameters</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="c1"># 1. Build a parameter object (a dictionary or a Q# structured parameter class)</span>
+<span class="n">bitstring</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+<span class="n">params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">SingleReferenceParams</span><span class="p">(</span>
+    <span class="n">bitStrings</span><span class="o">=</span><span class="n">bitstring</span><span class="p">,</span> <span class="n">numQubits</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstring</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="c1"># 2. Create the factory — vars() converts the dataclass to a dict</span>
+<span class="n">factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+    <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">StatePreparation</span><span class="o">.</span><span class="n">MakeSingleReferenceStateCircuit</span><span class="p">,</span>
+    <span class="n">parameter</span><span class="o">=</span><span class="nb">vars</span><span class="p">(</span><span class="n">params</span><span class="p">),</span>
+<span class="p">)</span>
+
+<span class="c1"># 3. Wrap in a Circuit — nothing is compiled yet</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">factory</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+
+<span class="c1"># 4. Compilation happens on demand:</span>
+<span class="n">circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">()</span>  <span class="c1"># → qsharp.circuit(program, **params)</span>
+<span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span>  <span class="c1"># → qsharp.compile(program, **params)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>This pattern is what enables end-to-end Q# composition: because the factory stores Q# callables rather than serialized gate sequences, multi-stage circuits compose natively in the Q# runtime without intermediate format conversions.</p>
+</section>
+<section id="conversion-methods">
+<h2>Conversion methods<a class="headerlink" href="#conversion-methods" title="Link to this heading"></a></h2>
+<p>Each method returns the circuit in the requested format, converting from whatever representation is available:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 35.0%" />
+<col style="width: 65.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Method</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qsharp_circuit" title="qdk_chemistry.data.Circuit.get_qsharp_circuit"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qsharp_circuit()</span></code></a></p></td>
+<td><p>Returns a <code class="docutils literal notranslate"><span class="pre">qsharp._native.Circuit</span></code> for inspection. Accepts <code class="docutils literal notranslate"><span class="pre">prune_classical_qubits</span></code> to remove unused qubits.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qir" title="qdk_chemistry.data.Circuit.get_qir"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qir()</span></code></a></p></td>
+<td><p>Returns the <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> representation. Compiles from Q# factory or converts from QASM if needed.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qasm" title="qdk_chemistry.data.Circuit.get_qasm"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qasm()</span></code></a></p></td>
+<td><p>Returns the OpenQASM string. Converts from <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> via Qiskit if only <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> is available.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.get_qiskit_circuit" title="qdk_chemistry.data.Circuit.get_qiskit_circuit"><code class="xref py py-meth docutils literal notranslate"><span class="pre">get_qiskit_circuit()</span></code></a></p></td>
+<td><p>Returns a Qiskit <code class="docutils literal notranslate"><span class="pre">QuantumCircuit</span></code>. Requires <code class="docutils literal notranslate"><span class="pre">qiskit</span></code> to be installed.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit.estimate" title="qdk_chemistry.data.Circuit.estimate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">estimate()</span></code></a></p></td>
+<td><p>Runs Q#’s resource estimator on the circuit. Accepts optional <code class="docutils literal notranslate"><span class="pre">params</span></code> for estimation configuration.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="example-convert-state-preparation-circuits-to-different-formats">
+<h3>Example: Convert state preparation circuits to different formats<a class="headerlink" href="#example-convert-state-preparation-circuits-to-different-formats" title="Link to this heading"></a></h3>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--2-input--1" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">Structure</span>
+
+<span class="c1"># When algorithms produce circuits, they carry native Q# operations internally.</span>
+<span class="c1"># This enables end-to-end Q# composition without format conversions.</span>
+<span class="n">coords</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.4</span><span class="p">]])</span>
+<span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="p">(</span><span class="n">coords</span><span class="p">,</span> <span class="n">symbols</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;H&quot;</span><span class="p">,</span> <span class="s2">&quot;H&quot;</span><span class="p">])</span>
+
+<span class="n">scf</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">wfn</span> <span class="o">=</span> <span class="n">scf</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span><span class="p">)</span>
+<span class="n">ham</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">())</span>
+<span class="n">_</span><span class="p">,</span> <span class="n">wfn_cas</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">ham</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+<span class="c1"># StatePreparation produces a Circuit with a native Q# factory</span>
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wfn_cas</span><span class="p">)</span>
+
+<span class="c1"># Inspect the Q# circuit (prune unused qubits for clarity)</span>
+<span class="n">pruned_qsharp_circuit</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">(</span><span class="n">prune_classical_qubits</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">pruned_qsharp_circuit</span><span class="p">)</span>
+
+<span class="c1"># Get the QIR representation</span>
+<span class="n">qir</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">qir</span><span class="p">)</span>
+
+<span class="c1"># Export to OpenQASM or Qiskit when needed (if qiskit is installed)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="n">qasm_str</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qasm</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">qasm_str</span><span class="p">)</span>
+
+    <span class="n">qiskit_circuit</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">qiskit_circuit</span><span class="p">)</span>
+<span class="k">except</span> <span class="p">(</span><span class="ne">ImportError</span><span class="p">,</span> <span class="ne">RuntimeError</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Qiskit not installed — skipping OpenQASM/Qiskit export&quot;</span><span class="p">)</span>
+
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="properties">
+<h2>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25.0%" />
+<col style="width: 15.0%" />
+<col style="width: 60.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Property</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qasm</span></code></p></td>
+<td><p>str | None</p></td>
+<td><p>OpenQASM circuit string, if available.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">qir</span></code></p></td>
+<td><p>QirInputData | str | None</p></td>
+<td><p><a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> representation, if available. Lazily compiled from the Q# factory on first access.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">qsharp</span></code></p></td>
+<td><p>qsharp._native.Circuit | None</p></td>
+<td><p>Compiled Q# circuit object, if available.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">encoding</span></code></p></td>
+<td><p>str | None</p></td>
+<td><p>Qubit encoding label (e.g., <code class="docutils literal notranslate"><span class="pre">&quot;jordan-wigner&quot;</span></code>), if set.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="serialization">
+<h2>Serialization<a class="headerlink" href="#serialization" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Circuit" title="qdk_chemistry.data.Circuit"><code class="xref py py-class docutils literal notranslate"><span class="pre">Circuit</span></code></a> supports the same <a class="reference internal" href="serialization.html"><span class="doc">serialization</span></a> formats as other QDK/Chemistry data classes:</p>
+<div class="tab-set docutils container">
+<input checked="True" class="tab-input" id="tab-set--3-input--1" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--1">Python API</label><div class="tab-content docutils container">
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Save to JSON</span>
+<span class="n">circuit</span><span class="o">.</span><span class="n">to_json_file</span><span class="p">(</span><span class="s2">&quot;example_circuit.circuit.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Load from JSON</span>
+<span class="n">loaded</span> <span class="o">=</span> <span class="n">Circuit</span><span class="o">.</span><span class="n">from_json_file</span><span class="p">(</span><span class="s2">&quot;example_circuit.circuit.json&quot;</span><span class="p">)</span>
+
+<span class="c1"># Save to HDF5</span>
+<span class="n">circuit</span><span class="o">.</span><span class="n">to_hdf5_file</span><span class="p">(</span><span class="s2">&quot;example_circuit.circuit.h5&quot;</span><span class="p">)</span>
+
+<span class="c1"># Load from HDF5</span>
+<span class="n">loaded_h5</span> <span class="o">=</span> <span class="n">Circuit</span><span class="o">.</span><span class="n">from_hdf5_file</span><span class="p">(</span><span class="s2">&quot;example_circuit.circuit.h5&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Serialization persists the OpenQASM and <a class="reference internal" href="../../../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> representations.
+Q# callables and factories are not directly serializable — they are reconstructed when the producing algorithm re-creates the circuit.</p>
+</div>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.CircuitExecutorData" title="qdk_chemistry.data.CircuitExecutorData"><code class="xref py py-class docutils literal notranslate"><span class="pre">CircuitExecutorData</span></code></a>: Measurement results from circuit execution</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Often paired with a circuit for energy estimation</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>The above examples can be downloaded as a complete <a class="reference external" href="../../../_static/examples/python/circuit.py">Python</a> script.</p></li>
+<li><p><a class="reference internal" href="../algorithms/circuit_executor.html"><span class="doc">CircuitExecutor</span></a>: Execute circuits on backends</p></li>
+<li><p><a class="reference internal" href="serialization.html"><span class="doc">Serialization</span></a>: Data persistence formats</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="qpe_result.html" class="btn btn-neutral float-left" title="QpeResult" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../algorithms/index.html" class="btn btn-neutral float-right" title="Algorithm classes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

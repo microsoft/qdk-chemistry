@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.qiskit.standard\_phase\_estimation module
+================================================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit.standard_phase_estimation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

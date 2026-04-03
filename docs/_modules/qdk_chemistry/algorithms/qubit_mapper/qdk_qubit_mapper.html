@@ -1,0 +1,736 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK native qubit mapper using an optimized expression layer.</span>
+
+<span class="sd">This module provides the QdkQubitMapper class for transforming electronic structure</span>
+<span class="sd">Hamiltonians to qubit Hamiltonians using various fermion-to-qubit encodings.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span><span class="p">,</span> <span class="n">QubitMapperSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">PauliTermAccumulator</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.enums.fermion_mode_order</span><span class="w"> </span><span class="kn">import</span> <span class="n">FermionModeOrder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.qubit_hamiltonian</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Symmetries</span>
+
+<span class="c1"># Type alias for sparse Pauli word: list of (qubit_index, op_type)</span>
+<span class="c1"># op_type: 1=X, 2=Y, 3=Z (identity is implicit/omitted)</span>
+<span class="n">SparsePauliWord</span> <span class="o">=</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span>
+
+<span class="c1"># Pauli operator type constants</span>
+<span class="n">_X</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">_Y</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">_Z</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QdkQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;QdkQubitMapperSettings&quot;</span><span class="p">]</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># Bravyi-Kitaev Binary Tree Index Sets</span>
+<span class="c1"># =============================================================================</span>
+<span class="c1"># The following functions compute the qubit index sets for Bravyi-Kitaev encoding</span>
+<span class="c1"># as defined in the original paper:</span>
+<span class="c1">#</span>
+<span class="c1">#   Seeley, Richard, and Love. &quot;The Bravyi-Kitaev transformation for quantum</span>
+<span class="c1">#   computation of electronic structure.&quot; J. Chem. Phys. 137, 224109 (2012).</span>
+<span class="c1">#   https://doi.org/10.1063/1.4768229</span>
+<span class="c1">#</span>
+<span class="c1"># The BK encoding maps fermionic operators to qubit operators using a binary</span>
+<span class="c1"># tree structure where:</span>
+<span class="c1">#   - Even-indexed qubits store occupation information</span>
+<span class="c1">#   - Odd-indexed qubits store partial parity sums</span>
+<span class="c1">#</span>
+<span class="c1"># Each ladder operator requires three index sets derived from the tree structure:</span>
+<span class="c1">#   - P(j): &quot;parity set&quot; - qubits encoding parity of orbitals &lt; j</span>
+<span class="c1">#   - U(j): &quot;update set&quot; - ancestor qubits whose parity includes orbital j</span>
+<span class="c1">#   - F(j): &quot;flip set&quot; - subset of P(j) for the imaginary component</span>
+<span class="c1">#   - R(j): &quot;remainder set&quot; = P(j) \ F(j) - used for Z operators in Y component</span>
+<span class="c1"># =============================================================================</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bk_compute_parity_indices</span><span class="p">(</span><span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute qubit indices encoding cumulative parity for orbital j.</span>
+
+<span class="sd">    In the Bravyi-Kitaev binary tree, the parity set P(j) contains indices</span>
+<span class="sd">    of qubits that together encode the parity of all orbitals with index &lt; j.</span>
+<span class="sd">    This is used to construct the Z-string in the real component of ladder operators.</span>
+
+<span class="sd">    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (17).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        j: Spin-orbital index.</span>
+<span class="sd">        n: Size of the binary superset (must be a power of 2).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Frozenset of qubit indices in the parity set.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If n is not a power of 2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">()</span>  <span class="c1"># Base case: single orbital has no parity dependencies</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="p">(</span><span class="n">n</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n must be a power of 2, got </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">half</span> <span class="o">=</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">half</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_bk_compute_parity_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">half</span><span class="p">)</span>
+    <span class="c1"># Right half: recurse with offset, then add n/2-1</span>
+    <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">half</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_parity_indices</span><span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="n">half</span><span class="p">,</span> <span class="n">half</span><span class="p">))</span> <span class="o">|</span> <span class="nb">frozenset</span><span class="p">({</span><span class="n">half</span> <span class="o">-</span> <span class="mi">1</span><span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bk_compute_ancestor_indices</span><span class="p">(</span><span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute qubit indices that are ancestors of orbital j in the binary tree.</span>
+
+<span class="sd">    The update set U(j) contains indices of qubits whose stored parity value</span>
+<span class="sd">    must be flipped when orbital j is occupied. These correspond to ancestor</span>
+<span class="sd">    nodes in the binary tree representation.</span>
+
+<span class="sd">    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (18).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        j: Spin-orbital index.</span>
+<span class="sd">        n: Size of the binary superset (must be a power of 2).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Frozenset of qubit indices in the update (ancestor) set.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If n is not a power of 2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">()</span>  <span class="c1"># Base case: single orbital has no ancestors</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="p">(</span><span class="n">n</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n must be a power of 2, got </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">half</span> <span class="o">=</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">half</span><span class="p">:</span>
+        <span class="c1"># Left half: include n-1 and recurse</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">({</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">})</span> <span class="o">|</span> <span class="n">_bk_compute_ancestor_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">half</span><span class="p">)</span>
+    <span class="c1"># Right half: recurse with offset</span>
+    <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">half</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_ancestor_indices</span><span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="n">half</span><span class="p">,</span> <span class="n">half</span><span class="p">))</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bk_compute_children_indices</span><span class="p">(</span><span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute qubit indices for the imaginary component parity subset.</span>
+
+<span class="sd">    The flip set F(j) is used to partition the parity set when constructing</span>
+<span class="sd">    the Y-component of BK ladder operators. It identifies which parity qubits</span>
+<span class="sd">    contribute to the imaginary vs real components.</span>
+
+<span class="sd">    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Eq. (19).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        j: Spin-orbital index.</span>
+<span class="sd">        n: Size of the binary superset (must be a power of 2).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Frozenset of qubit indices in the flip (children) set.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If n is not a power of 2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">()</span>  <span class="c1"># Base case: single orbital has no children</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="p">(</span><span class="n">n</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n must be a power of 2, got </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">half</span> <span class="o">=</span> <span class="n">n</span> <span class="o">//</span> <span class="mi">2</span>
+    <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">half</span><span class="p">:</span>
+        <span class="c1"># Left half: recurse</span>
+        <span class="k">return</span> <span class="n">_bk_compute_children_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">half</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">n</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># Right half but not last: recurse with offset</span>
+        <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">half</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_children_indices</span><span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="n">half</span><span class="p">,</span> <span class="n">half</span><span class="p">))</span>
+    <span class="c1"># Last element (j == n-1): recurse with offset and add n/2-1</span>
+    <span class="k">return</span> <span class="nb">frozenset</span><span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="n">half</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_children_indices</span><span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="n">half</span><span class="p">,</span> <span class="n">half</span><span class="p">))</span> <span class="o">|</span> <span class="nb">frozenset</span><span class="p">({</span><span class="n">half</span> <span class="o">-</span> <span class="mi">1</span><span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_bk_compute_z_indices_for_y_component</span><span class="p">(</span><span class="n">j</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Compute qubit indices for Z operators in the Y-component of ladder operators.</span>
+
+<span class="sd">    The remainder set R(j) = P(j) \\ F(j) determines which qubits receive Z gates</span>
+<span class="sd">    in the imaginary (Y) component of BK ladder operators. This set difference</span>
+<span class="sd">    partitions the parity information between real and imaginary components.</span>
+
+<span class="sd">    Reference: Seeley et al., J. Chem. Phys. 137, 224109 (2012), Section II.B.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        j: Spin-orbital index.</span>
+<span class="sd">        n: Size of the binary superset (must be a power of 2).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Frozenset of qubit indices for Z operators in Y-component.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If n is not a power of 2.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">parity</span> <span class="o">=</span> <span class="n">_bk_compute_parity_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    <span class="n">flip</span> <span class="o">=</span> <span class="n">_bk_compute_children_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">parity</span> <span class="o">-</span> <span class="n">flip</span>  <span class="c1"># Set difference, not symmetric difference</span>
+
+
+<div class="viewcode-block" id="QdkQubitMapperSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapperSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QdkQubitMapperSettings</span><span class="p">(</span><span class="n">QubitMapperSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for a QdkQubitMapper.</span>
+
+<span class="sd">    Inherits base settings from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.</span>
+
+<span class="sd">    Available encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
+
+<span class="sd">    Additional settings:</span>
+<span class="sd">        threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.</span>
+<span class="sd">        integral_threshold (double, default=1e-12): Threshold for filtering small integrals.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QdkQubitMapperSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapperSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QdkQubitMapperSettings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">valid_encodings</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span> <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;threshold&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">1e-12</span><span class="p">,</span>
+            <span class="s2">&quot;Threshold for pruning small Pauli coefficients&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;integral_threshold&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">1e-12</span><span class="p">,</span>
+            <span class="s2">&quot;Threshold for filtering small integrals (improves performance)&quot;</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QdkQubitMapper">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QdkQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;QDK native qubit mapper using PauliTermAccumulator.</span>
+
+<span class="sd">    This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian using</span>
+<span class="sd">    configurable fermion-to-qubit encodings.</span>
+
+<span class="sd">    Available encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
+
+<span class="sd">    The mapper uses canonical blocked spin-orbital ordering internally:</span>
+<span class="sd">    qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the</span>
+<span class="sd">    number of spatial orbitals). Use ``QubitHamiltonian.to_interleaved()``</span>
+<span class="sd">    for alternative qubit orderings.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        encoding (str): The fermion-to-qubit encoding type. Default: &quot;jordan-wigner&quot;.</span>
+<span class="sd">        threshold (float): Threshold for pruning small Pauli coefficients. Default: 1e-12.</span>
+<span class="sd">        integral_threshold (float): Threshold for filtering small integrals. Default: 1e-12.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import QdkQubitMapper</span>
+<span class="sd">        &gt;&gt;&gt; mapper = QdkQubitMapper()</span>
+<span class="sd">        &gt;&gt;&gt; mapper.settings().set(&quot;encoding&quot;, &quot;jordan-wigner&quot;)</span>
+<span class="sd">        &gt;&gt;&gt; mapper.settings().set(&quot;threshold&quot;, 1e-10)</span>
+<span class="sd">        &gt;&gt;&gt; qubit_hamiltonian = mapper.run(hamiltonian)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QdkQubitMapper.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+        <span class="n">integral_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the QdkQubitMapper with default settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encoding: Fermion-to-qubit encoding type. Default: &quot;jordan-wigner&quot;.</span>
+<span class="sd">            threshold: Threshold for pruning small Pauli coefficients. Default: 1e-12.</span>
+<span class="sd">            integral_threshold: Threshold for filtering small integrals. Default: 1e-12.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QdkQubitMapperSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;integral_threshold&quot;</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="QdkQubitMapper.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.html#qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper.QdkQubitMapper.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>  <span class="c1"># noqa: ARG002</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transform a fermionic Hamiltonian to a qubit Hamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.</span>
+<span class="sd">            symmetries: Optional symmetry information. Not used by this implementation.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If the mapping type is not supported.</span>
+<span class="sd">            RuntimeError: If the Hamiltonian does not have required integrals.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+        <span class="n">encoding</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">))</span>
+        <span class="n">threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;threshold&quot;</span><span class="p">))</span>
+        <span class="n">integral_threshold</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;integral_threshold&quot;</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">encoding</span> <span class="o">==</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_jordan_wigner_transform</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">encoding</span> <span class="o">==</span> <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_bravyi_kitaev_transform</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">)</span>
+
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported encoding: &#39;</span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_jordan_wigner_transform</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Perform Jordan-Wigner transformation.</span>
+
+<span class="sd">        Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.</span>
+<span class="sd">        Spin-orbital index p = spatial_orbital for alpha, p = spatial_orbital + n_spatial for beta.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            threshold: Threshold for pruning small coefficients.</span>
+<span class="sd">            integral_threshold: Threshold for discarding small integrals.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: The transformed qubit Hamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+        <span class="n">h1_alpha</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">h1_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Use C++ to compute all N² excitation terms in one call</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Computing all JW excitation terms in C++...&quot;</span><span class="p">)</span>
+        <span class="n">all_excitation_terms</span> <span class="o">=</span> <span class="n">PauliTermAccumulator</span><span class="o">.</span><span class="n">compute_all_jw_excitation_terms</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transform_with_excitation_terms_dict</span><span class="p">(</span>
+            <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">,</span> <span class="n">n_spin_orbitals</span><span class="p">,</span> <span class="n">all_excitation_terms</span><span class="p">,</span> <span class="s2">&quot;jordan-wigner&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_bravyi_kitaev_transform</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Perform Bravyi-Kitaev transformation.</span>
+
+<span class="sd">        Implements the fermion-to-qubit encoding from Seeley, Richard, and Love,</span>
+<span class="sd">        &quot;The Bravyi-Kitaev transformation for quantum computation of electronic</span>
+<span class="sd">        structure,&quot; J. Chem. Phys. 137, 224109 (2012).</span>
+
+<span class="sd">        Uses blocked spin-orbital ordering: alpha orbitals first, then beta orbitals.</span>
+<span class="sd">        The Bravyi-Kitaev encoding uses a binary tree structure where even-indexed</span>
+<span class="sd">        qubits store occupation and odd-indexed qubits store partial parity sums,</span>
+<span class="sd">        achieving O(log n) operator weight compared to O(n) for Jordan-Wigner.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            threshold: Threshold for pruning small coefficients.</span>
+<span class="sd">            integral_threshold: Threshold for discarding small integrals.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: The transformed qubit Hamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+        <span class="n">h1_alpha</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">n_spin_orbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">h1_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Binary superset size (next power of 2)</span>
+        <span class="n">bin_sup</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">while</span> <span class="n">n_spin_orbitals</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="o">**</span><span class="n">bin_sup</span><span class="p">:</span>
+            <span class="n">bin_sup</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">n_binary</span> <span class="o">=</span> <span class="mi">2</span><span class="o">**</span><span class="n">bin_sup</span>
+
+        <span class="c1"># Precompute BK index sets for all orbitals (as dict[int, list[int]] for C++)</span>
+        <span class="n">update_sets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">parity_sets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="n">remainder_sets</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">):</span>
+            <span class="n">update_sets</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_ancestor_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n_binary</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n_spin_orbitals</span><span class="p">)</span>
+            <span class="n">parity_sets</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_parity_indices</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n_binary</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n_spin_orbitals</span><span class="p">)</span>
+            <span class="n">remainder_sets</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span>
+                <span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">_bk_compute_z_indices_for_y_component</span><span class="p">(</span><span class="n">j</span><span class="p">,</span> <span class="n">n_binary</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">n_spin_orbitals</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Use C++ to compute all N² excitation terms in one call</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Computing all BK excitation terms in C++...&quot;</span><span class="p">)</span>
+        <span class="n">all_excitation_terms</span> <span class="o">=</span> <span class="n">PauliTermAccumulator</span><span class="o">.</span><span class="n">compute_all_bk_excitation_terms</span><span class="p">(</span>
+            <span class="n">n_spin_orbitals</span><span class="p">,</span> <span class="n">parity_sets</span><span class="p">,</span> <span class="n">update_sets</span><span class="p">,</span> <span class="n">remainder_sets</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_transform_with_excitation_terms_dict</span><span class="p">(</span>
+            <span class="n">hamiltonian</span><span class="p">,</span> <span class="n">threshold</span><span class="p">,</span> <span class="n">integral_threshold</span><span class="p">,</span> <span class="n">n_spin_orbitals</span><span class="p">,</span> <span class="n">all_excitation_terms</span><span class="p">,</span> <span class="s2">&quot;bravyi-kitaev&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_transform_with_excitation_terms_dict</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span>
+        <span class="n">threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">integral_threshold</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">n_spin_orbitals</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">excitation_terms_dict</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">complex</span><span class="p">,</span> <span class="n">SparsePauliWord</span><span class="p">]]],</span>
+        <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Transform Hamiltonian to qubit representation using precomputed excitation terms.</span>
+
+<span class="sd">        This is the shared infrastructure for all fermion-to-qubit encodings.</span>
+<span class="sd">        It handles integral extraction, excitation operator construction,</span>
+<span class="sd">        spin-summed operators, one-body and two-body terms, and output processing.</span>
+
+<span class="sd">        The second-quantized Hamiltonian in chemist notation is:</span>
+<span class="sd">            H = sum_{pq,sigma} h_pq a†_{p,sigma} a_{q,sigma}</span>
+<span class="sd">              + 1/2 sum_{pqrs,sigma,tau} (pq|rs) a†_{p,sigma} a†_{r,tau} a_{s,tau} a_{q,sigma}</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            threshold: Threshold for pruning small coefficients.</span>
+<span class="sd">            integral_threshold: Threshold for discarding small integrals.</span>
+<span class="sd">            n_spin_orbitals: Total number of spin orbitals.</span>
+<span class="sd">            excitation_terms_dict: Pre-computed dictionary mapping (p, q) to</span>
+<span class="sd">                E_pq = a†_p a_q terms in sparse format.</span>
+<span class="sd">            encoding: The fermion-to-qubit encoding used (e.g., &quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: The transformed qubit Hamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+
+        <span class="n">h1_alpha</span><span class="p">,</span> <span class="n">h1_beta</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">h2_aaaa</span><span class="p">,</span> <span class="n">h2_aabb</span><span class="p">,</span> <span class="n">h2_bbbb</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_two_body_integrals</span><span class="p">()</span>
+
+        <span class="n">n_spatial</span> <span class="o">=</span> <span class="n">h1_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="c1"># Reshape two-body integrals to 4D tensors for direct indexing (zero-copy view)</span>
+        <span class="n">eri_aaaa</span> <span class="o">=</span> <span class="n">h2_aaaa</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">))</span>
+        <span class="n">eri_aabb</span> <span class="o">=</span> <span class="n">h2_aabb</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">))</span>
+        <span class="n">eri_bbbb</span> <span class="o">=</span> <span class="n">h2_bbbb</span><span class="o">.</span><span class="n">reshape</span><span class="p">((</span><span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">n_spatial</span><span class="p">))</span>
+
+        <span class="c1"># Use C++ PauliTermAccumulator for efficient term accumulation</span>
+        <span class="n">accumulator</span> <span class="o">=</span> <span class="n">PauliTermAccumulator</span><span class="p">()</span>
+
+        <span class="c1"># Eagerly precompute spin-summed excitation terms: E_pq = E_pq_alpha + E_pq_beta</span>
+        <span class="c1"># (indexed by spatial orbitals p, q)</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Pre-computing spin-summed excitation terms...&quot;</span><span class="p">)</span>
+        <span class="n">spin_summed_terms</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">complex</span><span class="p">,</span> <span class="n">SparsePauliWord</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="c1"># Get alpha and beta excitation terms (inline index computation)</span>
+                <span class="n">alpha_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span>
+                <span class="n">beta_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">q</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]</span>
+                <span class="c1"># Merge terms with same sparse word</span>
+                <span class="n">combined</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="o">...</span><span class="p">],</span> <span class="nb">complex</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+                <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">alpha_terms</span><span class="p">:</span>
+                    <span class="n">key_tuple</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+                    <span class="n">combined</span><span class="p">[</span><span class="n">key_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_tuple</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">coeff</span>
+                <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">beta_terms</span><span class="p">:</span>
+                    <span class="n">key_tuple</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+                    <span class="n">combined</span><span class="p">[</span><span class="n">key_tuple</span><span class="p">]</span> <span class="o">=</span> <span class="n">combined</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key_tuple</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">coeff</span>
+                <span class="c1"># Filter using machine epsilon for efficiency</span>
+                <span class="n">spin_summed_terms</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="p">(</span><span class="n">coeff</span><span class="p">,</span> <span class="nb">list</span><span class="p">(</span><span class="n">word_tuple</span><span class="p">))</span>
+                    <span class="k">for</span> <span class="n">word_tuple</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">combined</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span>
+                <span class="p">]</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Building one-body terms...&quot;</span><span class="p">)</span>
+        <span class="n">is_spin_free</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">is_restricted</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">is_spin_free</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="n">h_pq</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">h1_alpha</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">])</span>
+                    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">h_pq</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">spin_summed_terms</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]:</span>
+                            <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="n">h_pq</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># General case: handle alpha and beta separately</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="n">h_pq_alpha</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">h1_alpha</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">])</span>
+                    <span class="n">h_pq_beta</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">h1_beta</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">])</span>
+
+                    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">h_pq_alpha</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]:</span>
+                            <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="n">h_pq_alpha</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+
+                    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">h_pq_beta</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                        <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">q</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]:</span>
+                            <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="n">h_pq_beta</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Building two-body terms...&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">is_spin_free</span><span class="p">:</span>
+            <span class="c1"># Spin-free case: use spin-summed factorization</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                            <span class="n">eri</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">eri_aaaa</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">eri</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                                <span class="n">e_pq_terms</span> <span class="o">=</span> <span class="n">spin_summed_terms</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span>
+                                <span class="n">e_rs_terms</span> <span class="o">=</span> <span class="n">spin_summed_terms</span><span class="p">[(</span><span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">)]</span>
+                                <span class="n">scale</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span>
+                                <span class="k">for</span> <span class="n">c1</span><span class="p">,</span> <span class="n">w1</span> <span class="ow">in</span> <span class="n">e_pq_terms</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">c2</span><span class="p">,</span> <span class="n">w2</span> <span class="ow">in</span> <span class="n">e_rs_terms</span><span class="p">:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate_product</span><span class="p">(</span><span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">,</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">c1</span> <span class="o">*</span> <span class="n">c2</span><span class="p">)</span>
+
+                                <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">spin_summed_terms</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">s</span><span class="p">)]:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Spin-polarized case: explicit channel blocks</span>
+
+            <span class="c1"># aaaa channel (same-spin alpha-alpha)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing aaaa channel...&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                            <span class="k">continue</span>
+                        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">s</span><span class="p">:</span>
+                                <span class="k">continue</span>
+                            <span class="n">eri</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">eri_aaaa</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">eri</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                                <span class="n">e_pq_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span>
+                                <span class="n">e_rs_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">)]</span>
+                                <span class="n">scale</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span>
+                                <span class="k">for</span> <span class="n">c1</span><span class="p">,</span> <span class="n">w1</span> <span class="ow">in</span> <span class="n">e_pq_terms</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">c2</span><span class="p">,</span> <span class="n">w2</span> <span class="ow">in</span> <span class="n">e_rs_terms</span><span class="p">:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate_product</span><span class="p">(</span><span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">,</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">c1</span> <span class="o">*</span> <span class="n">c2</span><span class="p">)</span>
+
+                                <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">s</span><span class="p">)]:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+
+            <span class="c1"># bbbb channel (same-spin beta-beta)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing bbbb channel...&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                        <span class="k">if</span> <span class="n">p</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                            <span class="k">continue</span>
+                        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                            <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">s</span><span class="p">:</span>
+                                <span class="k">continue</span>
+                            <span class="n">eri</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">eri_bbbb</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">eri</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                                <span class="n">e_pq_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">q</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]</span>
+                                <span class="n">e_rs_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">r</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">s</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]</span>
+                                <span class="n">scale</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span>
+                                <span class="k">for</span> <span class="n">c1</span><span class="p">,</span> <span class="n">w1</span> <span class="ow">in</span> <span class="n">e_pq_terms</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">c2</span><span class="p">,</span> <span class="n">w2</span> <span class="ow">in</span> <span class="n">e_rs_terms</span><span class="p">:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate_product</span><span class="p">(</span><span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">,</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">c1</span> <span class="o">*</span> <span class="n">c2</span><span class="p">)</span>
+
+                                <span class="k">if</span> <span class="n">q</span> <span class="o">==</span> <span class="n">r</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">word</span> <span class="ow">in</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">s</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate</span><span class="p">(</span><span class="n">word</span><span class="p">,</span> <span class="nb">complex</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span> <span class="o">*</span> <span class="n">coeff</span><span class="p">)</span>
+
+            <span class="c1"># aabb channel (mixed alpha-beta)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing aabb channel...&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                            <span class="n">eri</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">eri_aabb</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">eri</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                                <span class="n">e_pq_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">)]</span>
+                                <span class="n">e_rs_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">r</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">s</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]</span>
+                                <span class="n">scale</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span>
+                                <span class="k">for</span> <span class="n">c1</span><span class="p">,</span> <span class="n">w1</span> <span class="ow">in</span> <span class="n">e_pq_terms</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">c2</span><span class="p">,</span> <span class="n">w2</span> <span class="ow">in</span> <span class="n">e_rs_terms</span><span class="p">:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate_product</span><span class="p">(</span><span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">,</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">c1</span> <span class="o">*</span> <span class="n">c2</span><span class="p">)</span>
+
+            <span class="c1"># bbaa channel (mixed beta-alpha)</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Processing bbaa channel...&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_spatial</span><span class="p">):</span>
+                            <span class="n">eri</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">eri_aabb</span><span class="p">[</span><span class="n">p</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">])</span>
+                            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">eri</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">integral_threshold</span><span class="p">:</span>
+                                <span class="n">e_pq_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">p</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">,</span> <span class="n">q</span> <span class="o">+</span> <span class="n">n_spatial</span><span class="p">)]</span>
+                                <span class="n">e_rs_terms</span> <span class="o">=</span> <span class="n">excitation_terms_dict</span><span class="p">[(</span><span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">)]</span>
+                                <span class="n">scale</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">eri</span><span class="p">)</span>
+                                <span class="k">for</span> <span class="n">c1</span><span class="p">,</span> <span class="n">w1</span> <span class="ow">in</span> <span class="n">e_pq_terms</span><span class="p">:</span>
+                                    <span class="k">for</span> <span class="n">c2</span><span class="p">,</span> <span class="n">w2</span> <span class="ow">in</span> <span class="n">e_rs_terms</span><span class="p">:</span>
+                                        <span class="n">accumulator</span><span class="o">.</span><span class="n">accumulate_product</span><span class="p">(</span><span class="n">w1</span><span class="p">,</span> <span class="n">w2</span><span class="p">,</span> <span class="n">scale</span> <span class="o">*</span> <span class="n">c1</span> <span class="o">*</span> <span class="n">c2</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Finalizing Pauli terms...&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get terms from C++ accumulator as canonical strings (only place we use strings)</span>
+        <span class="n">canonical_terms</span> <span class="o">=</span> <span class="n">accumulator</span><span class="o">.</span><span class="n">get_terms_as_strings</span><span class="p">(</span><span class="n">n_spin_orbitals</span><span class="p">,</span> <span class="n">threshold</span><span class="p">)</span>
+
+        <span class="n">pauli_strings</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">coefficients</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">coeff</span><span class="p">,</span> <span class="n">pauli_str</span> <span class="ow">in</span> <span class="n">canonical_terms</span><span class="p">:</span>
+            <span class="c1"># Convert to Qiskit-style little-endian ordering</span>
+            <span class="n">pauli_strings</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">[::</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
+            <span class="n">coefficients</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Generated </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span><span class="si">}</span><span class="s2"> Pauli terms for </span><span class="si">{</span><span class="n">n_spin_orbitals</span><span class="si">}</span><span class="s2"> qubits&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">QubitHamiltonian</span><span class="p">(</span>
+            <span class="n">pauli_strings</span><span class="o">=</span><span class="n">pauli_strings</span><span class="p">,</span>
+            <span class="n">coefficients</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">),</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">BLOCKED</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

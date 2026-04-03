@@ -6,23 +6,24 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.time_evolution.builder package &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.algorithms.time_evolution.builder package &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
       <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
       <script src="../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -62,20 +63,19 @@
 <li class="toctree-l2 current"><a class="reference internal" href="../python_api.html#algorithms">Algorithms</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="qdk_chemistry.algorithms.html">qdk_chemistry.algorithms package</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">ActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.CircuitExecutor"><code class="docutils literal notranslate"><span class="pre">CircuitExecutor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper"><code class="docutils literal notranslate"><span class="pre">ControlledEvolutionCircuitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.DynamicalCorrelationCalculator"><code class="docutils literal notranslate"><span class="pre">DynamicalCorrelationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.EnergyEstimator"><code class="docutils literal notranslate"><span class="pre">EnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.HamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">HamiltonianConstructor</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimation"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimation</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.IterativePhaseEstimationIteration"><code class="docutils literal notranslate"><span class="pre">IterativePhaseEstimationIteration</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.MultiConfigurationScf"><code class="docutils literal notranslate"><span class="pre">MultiConfigurationScf</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.OrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">OrbitalLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimation"><code class="docutils literal notranslate"><span class="pre">PhaseEstimation</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.PhaseEstimationAlgorithm"><code class="docutils literal notranslate"><span class="pre">PhaseEstimationAlgorithm</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator"><code class="docutils literal notranslate"><span class="pre">ProjectedMultiConfigurationCalculator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkAutocasEosActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkAutocasEosActiveSpaceSelector</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkEnergyEstimator"><code class="docutils literal notranslate"><span class="pre">QdkEnergyEstimator</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkHamiltonianConstructor"><code class="docutils literal notranslate"><span class="pre">QdkHamiltonianConstructor</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMP2NaturalOrbitalLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkMP2NaturalOrbitalLocalizer</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisAsci"><code class="docutils literal notranslate"><span class="pre">QdkMacisAsci</span></code></a></li>
@@ -83,6 +83,7 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkMacisPmc"><code class="docutils literal notranslate"><span class="pre">QdkMacisPmc</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkOccupationActiveSpaceSelector"><code class="docutils literal notranslate"><span class="pre">QdkOccupationActiveSpaceSelector</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkPipekMezeyLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkPipekMezeyLocalizer</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkQubitMapper"><code class="docutils literal notranslate"><span class="pre">QdkQubitMapper</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkScfSolver"><code class="docutils literal notranslate"><span class="pre">QdkScfSolver</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkStabilityChecker"><code class="docutils literal notranslate"><span class="pre">QdkStabilityChecker</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.QdkVVHVLocalizer"><code class="docutils literal notranslate"><span class="pre">QdkVVHVLocalizer</span></code></a></li>
@@ -93,10 +94,8 @@
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StabilityChecker"><code class="docutils literal notranslate"><span class="pre">StabilityChecker</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.StatePreparation"><code class="docutils literal notranslate"><span class="pre">StatePreparation</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TimeEvolutionBuilder"><code class="docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.TraditionalPhaseEstimation"><code class="docutils literal notranslate"><span class="pre">TraditionalPhaseEstimation</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.available"><code class="docutils literal notranslate"><span class="pre">available()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.create"><code class="docutils literal notranslate"><span class="pre">create()</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.energy_from_phase"><code class="docutils literal notranslate"><span class="pre">energy_from_phase()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.inspect_settings"><code class="docutils literal notranslate"><span class="pre">inspect_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.print_settings"><code class="docutils literal notranslate"><span class="pre">print_settings()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.html#qdk_chemistry.algorithms.register"><code class="docutils literal notranslate"><span class="pre">register()</span></code></a></li>
@@ -117,6 +116,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
@@ -152,6 +153,317 @@
 <span id="qdk-chemistry-algorithms-time-evolution-builder-package"></span><h1>qdk_chemistry.algorithms.time_evolution.builder package<a class="headerlink" href="#module-qdk_chemistry.algorithms.time_evolution.builder" title="Link to this heading"></a></h1>
 <p>QDK/Chemistry time evolution constructor module.</p>
 <dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">PartiallyRandomized</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trotter_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_random_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_duplicate_terms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'general'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift" title="qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift"><code class="xref py py-class docutils literal notranslate"><span class="pre">QDrift</span></code></a></p>
+<p>Partially randomized product formula builder.</p>
+<p>Implements a hybrid Hamiltonian simulation method that combines deterministic
+Trotter decomposition with randomized sampling. The Hamiltonian is split as:</p>
+<div class="math notranslate nohighlight">
+\[H = H_D + H_R = \sum_{l=1}^{L_D} H_l + \sum_{m=1}^{M} h_m P_m\]</div>
+<p>where:
+- <span class="math notranslate nohighlight">\(H_D\)</span> contains the <span class="math notranslate nohighlight">\(L_D\)</span> largest-weight terms, treated with Trotter
+- <span class="math notranslate nohighlight">\(H_R\)</span> contains the remaining terms, treated with qDRIFT-style sampling</p>
+<p>The method is effective when:
+- <span class="math notranslate nohighlight">\(\lambda_R = \sum_m |h_m| \ll \lambda\)</span> (random part has small total weight)
+- <span class="math notranslate nohighlight">\(L_D \ll M\)</span> (few deterministic terms, many random terms)</p>
+<p>For a second-order Trotter formula, each step applies the deterministic
+part <span class="math notranslate nohighlight">\(H_D\)</span> with half-angles in a symmetric (palindromic) sweep, with the
+randomized part <span class="math notranslate nohighlight">\(H_R\)</span> sandwiched in between. The first-order variant
+applies <span class="math notranslate nohighlight">\(H_D\)</span> at full angle followed by <span class="math notranslate nohighlight">\(H_R\)</span>.</p>
+<p>The total cost scales as
+<span class="math notranslate nohighlight">\(O(\lambda_R^2 / \epsilon^2)\)</span> Pauli rotations for the randomized part,
+where <span class="math notranslate nohighlight">\(\lambda_R = \sum_m |h_m|\)</span> is the 1-norm of <span class="math notranslate nohighlight">\(H_R\)</span>
+(Theorem 2 of <span id="id1">[<a class="reference internal" href="../../references.html#id3" title="Jakob G&quot;unther, Freek Witteveen, Alexander Schmidhuber, Marek Miller, Matthias Christandl, and Aram Harrow. Phase estimation with partially randomized time evolution. arXiv, 2025. URL: https://arxiv.org/abs/2503.05647, doi:10.48550/arXiv.2503.05647.">GuntherWS+25</a>]</span>).</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a partially randomized builder</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">builder</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="s2">&quot;time_evolution_builder&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s2">&quot;partially_randomized&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">weight_threshold</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>  <span class="c1"># Terms with |h_j| &gt;= 0.1 treated deterministically</span>
+<span class="gp">... </span>    <span class="n">num_random_samples</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">trotter_order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">time_evolution</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<p>Günther, J., Witteveen, F., et al. Phase estimation with partially
+randomized time evolution.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>trotter_order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>num_random_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>tolerance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>merge_duplicate_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>commutation_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">trotter_order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_random_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_duplicate_terms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'general'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize partially randomized builder with specified settings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Terms with |h_j| &gt;= threshold are treated
+deterministically with Trotter. Use -1.0 for automatic
+determination (top 10% of terms by weight).</p></li>
+<li><p><strong>trotter_order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Order of Trotter formula for deterministic part.
+1 = first order, 2 = second order (symmetric). Defaults to 2.</p></li>
+<li><p><strong>num_random_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of random samples for the qDRIFT-style
+treatment of H_R. Defaults to 100.</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Random seed for reproducibility. Use -1 for non-deterministic.
+Defaults to -1.</p></li>
+<li><p><strong>tolerance</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Threshold for filtering negligible coefficients.
+Defaults to 1e-12.</p></li>
+<li><p><strong>merge_duplicate_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, identical Pauli terms within
+consecutive mutually-commuting runs in the random block
+are fused to reduce circuit depth.  Distinct commuting
+terms are kept separate.  Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>commutation_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Commutation check used when merging duplicate
+terms.  <code class="docutils literal notranslate"><span class="pre">&quot;qubit_wise&quot;</span></code> requires every single-qubit
+pair to commute individually — stricter but always safe.
+<code class="docutils literal notranslate"><span class="pre">&quot;general&quot;</span></code> (default) uses standard Pauli commutation (even number of
+anti-commuting positions), which allows larger merge groups.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the time evolution unitary builder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomized.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return time_evolution_builder as the algorithm type name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">PartiallyRandomizedSettings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings for partially randomized product formula builder.</p>
+<p>The partially randomized method splits the Hamiltonian into:
+- H_D: Large-weight terms treated deterministically (Trotter)
+- H_R: Small-weight terms treated randomly (qDRIFT-style)</p>
+<p>This hybrid approach benefits from:
+- Better ε-scaling from deterministic treatment of dominant terms
+- Reduced circuit depth from random sampling of the long tail</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize PartiallyRandomizedSettings with default values.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.weight_threshold">
+<span class="sig-name descname"><span class="pre">weight_threshold</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.weight_threshold" title="Link to this definition"></a></dt>
+<dd><p>Terms with |h_j| &gt;= threshold are treated deterministically.
+Use -1.0 for automatic determination (top 10% of terms by weight).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.trotter_order">
+<span class="sig-name descname"><span class="pre">trotter_order</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.trotter_order" title="Link to this definition"></a></dt>
+<dd><p>Order of Trotter formula for deterministic terms (1 or 2).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.num_random_samples">
+<span class="sig-name descname"><span class="pre">num_random_samples</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.num_random_samples" title="Link to this definition"></a></dt>
+<dd><p>Number of random samples for the randomized part.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.seed">
+<span class="sig-name descname"><span class="pre">seed</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.seed" title="Link to this definition"></a></dt>
+<dd><p>Random seed for reproducibility. Use -1 for non-deterministic.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.tolerance">
+<span class="sig-name descname"><span class="pre">tolerance</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.PartiallyRandomizedSettings.tolerance" title="Link to this definition"></a></dt>
+<dd><p>Absolute tolerance for filtering small coefficients.</p>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">QDrift</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_duplicate_terms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'general'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.base.html#qdk_chemistry.algorithms.time_evolution.builder.base.TimeEvolutionBuilder" title="qdk_chemistry.algorithms.time_evolution.builder.base.TimeEvolutionBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></p>
+<p>qDRIFT randomized product formula builder.</p>
+<p>Implements the qDRIFT algorithm from Campbell (2019), which approximates the
+time evolution operator <span class="math notranslate nohighlight">\(U(t) = e^{-iHt}\)</span> using randomized sampling of
+Hamiltonian terms.</p>
+<p>Instead of applying all Hamiltonian terms in a fixed sequence (as in Trotter
+decomposition), qDRIFT randomly samples terms with probability proportional
+to their coefficient magnitudes. This can achieve better gate complexity for
+Hamiltonians with many terms.</p>
+<p>The algorithm works as follows:</p>
+<ol class="arabic simple">
+<li><p>Compute <span class="math notranslate nohighlight">\(\lambda = \sum_j |h_j|\)</span> (1-norm of coefficients)</p></li>
+<li><p>Build probability distribution <span class="math notranslate nohighlight">\(p_j = |h_j| / \lambda\)</span></p></li>
+<li><p>Sample N terms according to this distribution</p></li>
+<li><p>Each sample contributes <span class="math notranslate nohighlight">\(e^{-i \cdot \text{sign}(h_j) \cdot \lambda t / N \cdot P_j}\)</span></p></li>
+</ol>
+<p>The approximation error is bounded by <span class="math notranslate nohighlight">\(\epsilon \leq 2\lambda^2 t^2 / N\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>merge_duplicate_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>)</p></li>
+<li><p><strong>commutation_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.num_samples">
+<span class="sig-name descname"><span class="pre">num_samples</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.num_samples" title="Link to this definition"></a></dt>
+<dd><p>Number of random samples to draw.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.seed">
+<span class="sig-name descname"><span class="pre">seed</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.seed" title="Link to this definition"></a></dt>
+<dd><p>Random seed for reproducibility.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.merge_duplicate_terms">
+<span class="sig-name descname"><span class="pre">merge_duplicate_terms</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.merge_duplicate_terms" title="Link to this definition"></a></dt>
+<dd><p>Whether to fuse identical Pauli terms within
+consecutive commuting runs.</p>
+</dd></dl>
+
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a qDRIFT builder with 500 samples</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qdrift</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;time_evolution_builder&quot;</span><span class="p">,</span> <span class="s2">&quot;qdrift&quot;</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Use it to build time evolution for a Hamiltonian</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">time_evolution</span> <span class="o">=</span> <span class="n">qdrift</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p class="rubric">References</p>
+<p>Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.
+Physical Review Letters, 123(7), 070503.
+<a class="reference external" href="https://arxiv.org/abs/1811.08017">https://arxiv.org/abs/1811.08017</a>
+<a class="reference external" href="https://doi.org/10.1103/PhysRevLett.123.070503">https://doi.org/10.1103/PhysRevLett.123.070503</a></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">num_samples</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_duplicate_terms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">commutation_type</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'general'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize qDRIFT builder with specified settings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_samples</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Number of random samples N. More samples increase accuracy
+but also increase circuit depth. Error scales as O(λ²t²/N).
+Defaults to 100.</p></li>
+<li><p><strong>seed</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Random seed for reproducibility. Use -1 for non-deterministic
+sampling. Defaults to -1.</p></li>
+<li><p><strong>merge_duplicate_terms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – If <code class="docutils literal notranslate"><span class="pre">True</span></code>, identical Pauli terms within
+consecutive mutually-commuting runs are fused to reduce
+circuit depth.  Distinct commuting terms are kept separate.
+The merging is exact and preserves the Campbell (2019)
+error bound.  Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p></li>
+<li><p><strong>commutation_type</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Commutation check used when merging duplicate
+terms.  <code class="docutils literal notranslate"><span class="pre">&quot;qubit_wise&quot;</span></code> requires every single-qubit
+pair to commute individually — stricter but always safe.
+<code class="docutils literal notranslate"><span class="pre">&quot;general&quot;</span></code> (default) uses standard Pauli commutation (even number of
+anti-commuting positions), which allows larger merge groups.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the time evolution unitary builder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDrift.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDrift.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return time_evolution_builder as the algorithm type name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">QDriftSettings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings for qDRIFT randomized decomposition builder.</p>
+<p>The qDRIFT algorithm approximates the time evolution operator using randomized
+sampling of Hamiltonian terms. The error scales as O(λ²t²/N), where λ is the
+1-norm of the Hamiltonian coefficients, t is evolution time, and N is the
+number of samples.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize QDriftSettings with default values.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.num_samples">
+<span class="sig-name descname"><span class="pre">num_samples</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.num_samples" title="Link to this definition"></a></dt>
+<dd><p>Number of random samples N. More samples = higher accuracy.
+Error scales as O(λ²t²/N).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.seed">
+<span class="sig-name descname"><span class="pre">seed</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.seed" title="Link to this definition"></a></dt>
+<dd><p>Random seed for reproducibility. Use -1 for non-deterministic behavior.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.merge_duplicate_terms">
+<span class="sig-name descname"><span class="pre">merge_duplicate_terms</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.QDriftSettings.merge_duplicate_terms" title="Link to this definition"></a></dt>
+<dd><p>Whether to fuse identical Pauli terms that
+appear in consecutive mutually-commuting runs, reducing circuit
+depth.  Only equal operators are combined; distinct commuting
+terms are kept separate.  The merging is exact and preserves
+the error bound.</p>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
 <dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TimeEvolutionBuilderFactory">
 <span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">TimeEvolutionBuilderFactory</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TimeEvolutionBuilderFactory" title="Link to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.base.html#qdk_chemistry.algorithms.base.AlgorithmFactory" title="qdk_chemistry.algorithms.base.AlgorithmFactory"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlgorithmFactory</span></code></a></p>
@@ -182,6 +494,139 @@
 
 </dd></dl>
 
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.Trotter">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">Trotter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_accuracy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_divisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'commutator'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.Trotter" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.base.html#qdk_chemistry.algorithms.time_evolution.builder.base.TimeEvolutionBuilder" title="qdk_chemistry.algorithms.time_evolution.builder.base.TimeEvolutionBuilder"><code class="xref py py-class docutils literal notranslate"><span class="pre">TimeEvolutionBuilder</span></code></a></p>
+<p>Trotter decomposition builder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>target_accuracy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+<li><p><strong>num_divisions</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>)</p></li>
+<li><p><strong>error_bound</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>)</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.Trotter.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">target_accuracy</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_divisions</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">error_bound</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'commutator'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">weight_threshold</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-12</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.Trotter.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize Trotter builder with specified Trotter decomposition settings.</p>
+<p>The Trotter decomposition approximates the time evolution operator <span class="math notranslate nohighlight">\(e^{-iHt}\)</span>
+when the Hamiltonian <span class="math notranslate nohighlight">\(H\)</span> can be expressed as a sum of terms <span class="math notranslate nohighlight">\(H = \sum_j \alpha_j P_j\)</span>
+where <span class="math notranslate nohighlight">\(P_j\)</span> are Pauli strings and <span class="math notranslate nohighlight">\(\alpha_j\)</span> are scalar coefficients. Rather than
+exponentiating the full Hamiltonian at once, the Trotter method constructs an approximation by
+exponentiating each term separately and combining them in a product formula. For example,
+the first-order Trotter formula approximates the time evolution operator as</p>
+<p><span class="math notranslate nohighlight">\(e^{-iHt} \approx S_1^N(t) = \left[\prod_j e^{-i\alpha_j P_j t/N}\right]^N\)</span>, where <span class="math notranslate nohighlight">\(N\)</span> is the
+number of divisions.</p>
+<p>The number of divisions <em>N</em> can be determined automatically from
+<em>target_accuracy</em>, fixed explicitly via <em>num_divisions</em>, or both
+(in which case the larger value is used).</p>
+<p>The error associated with the Trotter decomposition, <span class="math notranslate nohighlight">\(S_k^N(t)\)</span>, can be expressted in terms of the
+spectral norm of the difference between the exact and approximate time evolution operators:</p>
+<p><span class="math notranslate nohighlight">\(\lVert e^{-iHt} - S_k^N(t) \rVert \leq \epsilon\)</span></p>
+<p>However, the cost of computing this norm is equivalent to computing the exact exponential itself. For this
+reason, we provide two approximate error-bound strategies to determine the number of divisions required to
+achieve a target accuracy at a particular Trotter order (used only when <em>target_accuracy</em> is set):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> (default, tighter): uses the commutator-based bound
+from Childs <em>et al.</em> (2021).  <span class="math notranslate nohighlight">\(N = \lceil \frac{t^{2}}{2\epsilon}
+\sum_{j&lt;k}\lVert[\alpha_jP_j,\alpha_kP_k]\rVert \rceil\)</span></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code>: uses the triangle-inequality bound.
+<span class="math notranslate nohighlight">\(N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil\)</span></p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>order</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – The order of the Trotter decomposition (currently only
+first order is supported). Defaults to 1.</p></li>
+<li><p><strong>target_accuracy</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Target accuracy for automatic step computation.
+Must be positive to enable automatic computation.
+Use 0.0 (default) to disable.</p></li>
+<li><p><strong>num_divisions</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Explicit number of divisions within a Trotter
+step.  When both <em>num_divisions</em> and <em>target_accuracy</em>
+are given the larger value is used.  Use 0 (default) for
+automatic determination.</p></li>
+<li><p><strong>error_bound</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Strategy for computing the Trotter error bound
+when <em>target_accuracy</em> is set.  Either <code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code>
+(default, tighter) or <code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code>.</p></li>
+<li><p><strong>weight_threshold</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Absolute threshold for filtering small
+Hamiltonian coefficients. Defaults to 1e-12.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.Trotter.name">
+<span class="sig-name descname"><span class="pre">name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.Trotter.name" title="Link to this definition"></a></dt>
+<dd><p>Return the name of the time evolution unitary builder.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.Trotter.type_name">
+<span class="sig-name descname"><span class="pre">type_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.Trotter.type_name" title="Link to this definition"></a></dt>
+<dd><p>Return time_evolution_builder as the algorithm type name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code></a></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">qdk_chemistry.algorithms.time_evolution.builder.</span></span><span class="sig-name descname"><span class="pre">TrotterSettings</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings" title="Link to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Settings" title="qdk_chemistry.data.Settings"><code class="xref py py-class docutils literal notranslate"><span class="pre">Settings</span></code></a></p>
+<p>Settings for Trotter decomposition builder.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.__init__" title="Link to this definition"></a></dt>
+<dd><p>Initialize TrotterSettings with default values.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.order">
+<span class="sig-name descname"><span class="pre">order</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.order" title="Link to this definition"></a></dt>
+<dd><p>The order of the Trotter decomposition (currently only first order is supported).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.target_accuracy">
+<span class="sig-name descname"><span class="pre">target_accuracy</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.target_accuracy" title="Link to this definition"></a></dt>
+<dd><p>Target accuracy for automatic step computation (0.0 means disabled).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.num_divisions">
+<span class="sig-name descname"><span class="pre">num_divisions</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.num_divisions" title="Link to this definition"></a></dt>
+<dd><p>Explicit number of divisions within a Trotter step (0 means automatic).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.error_bound">
+<span class="sig-name descname"><span class="pre">error_bound</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.error_bound" title="Link to this definition"></a></dt>
+<dd><p>Strategy for computing the Trotter error bound (“commutator” or “naive”).</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.weight_threshold">
+<span class="sig-name descname"><span class="pre">weight_threshold</span></span><a class="headerlink" href="#qdk_chemistry.algorithms.time_evolution.builder.TrotterSettings.weight_threshold" title="Link to this definition"></a></dt>
+<dd><p>The absolute threshold for filtering small coefficients.</p>
+</dd></dl>
+
+</dd></dl>
+
+</dd></dl>
+
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
@@ -198,6 +643,47 @@
 </li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html">qdk_chemistry.algorithms.time_evolution.builder.partially_randomized module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.__init__"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.name"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.type_name"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomized.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.__init__"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.weight_threshold"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.weight_threshold</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.trotter_order"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.trotter_order</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.num_random_samples"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.num_random_samples</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.seed"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.seed</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.tolerance"><code class="docutils literal notranslate"><span class="pre">PartiallyRandomizedSettings.tolerance</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html">qdk_chemistry.algorithms.time_evolution.builder.qdrift module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift"><code class="docutils literal notranslate"><span class="pre">QDrift</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.num_samples"><code class="docutils literal notranslate"><span class="pre">QDrift.num_samples</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.seed"><code class="docutils literal notranslate"><span class="pre">QDrift.seed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.merge_duplicate_terms"><code class="docutils literal notranslate"><span class="pre">QDrift.merge_duplicate_terms</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.__init__"><code class="docutils literal notranslate"><span class="pre">QDrift.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.name"><code class="docutils literal notranslate"><span class="pre">QDrift.name()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.type_name"><code class="docutils literal notranslate"><span class="pre">QDrift.type_name()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings"><code class="docutils literal notranslate"><span class="pre">QDriftSettings</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings.__init__"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.__init__()</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings.num_samples"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.num_samples</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings.seed"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.seed</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings.merge_duplicate_terms"><code class="docutils literal notranslate"><span class="pre">QDriftSettings.merge_duplicate_terms</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html">qdk_chemistry.algorithms.time_evolution.builder.trotter module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.Trotter"><code class="docutils literal notranslate"><span class="pre">Trotter</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.Trotter.__init__"><code class="docutils literal notranslate"><span class="pre">Trotter.__init__()</span></code></a></li>
@@ -208,12 +694,19 @@
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings"><code class="docutils literal notranslate"><span class="pre">TrotterSettings</span></code></a><ul>
 <li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.__init__"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.__init__()</span></code></a><ul>
 <li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.order"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.order</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.num_trotter_steps"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.num_trotter_steps</span></code></a></li>
-<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.tolerance"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.tolerance</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.target_accuracy"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.target_accuracy</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.num_divisions"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.num_divisions</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.error_bound"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.error_bound</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.TrotterSettings.weight_threshold"><code class="docutils literal notranslate"><span class="pre">TrotterSettings.weight_threshold</span></code></a></li>
 </ul>
 </li>
 </ul>
 </li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter_error.html">qdk_chemistry.algorithms.time_evolution.builder.trotter_error module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter_error.html#qdk_chemistry.algorithms.time_evolution.builder.trotter_error.trotter_steps_commutator"><code class="docutils literal notranslate"><span class="pre">trotter_steps_commutator()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.algorithms.time_evolution.builder.trotter_error.html#qdk_chemistry.algorithms.time_evolution.builder.trotter_error.trotter_steps_naive"><code class="docutils literal notranslate"><span class="pre">trotter_steps_naive()</span></code></a></li>
 </ul>
 </li>
 </ul>

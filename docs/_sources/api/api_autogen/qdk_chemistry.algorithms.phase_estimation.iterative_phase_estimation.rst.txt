@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.phase\_estimation.iterative\_phase\_estimation module
+===============================================================================
+
+.. automodule:: qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

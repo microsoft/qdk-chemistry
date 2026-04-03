@@ -13,4 +13,5 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper
    qdk_chemistry.algorithms.qubit_mapper.qubit_mapper

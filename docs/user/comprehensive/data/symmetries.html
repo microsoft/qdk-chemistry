@@ -1,0 +1,249 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Symmetries &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Wavefunction" href="wavefunction.html" />
+    <link rel="prev" title="Structure" href="structure.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">In-depth user guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../design/index.html">High-level design</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">Data classes</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="serialization.html">Serialization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ansatz.html">Ansatz</a></li>
+<li class="toctree-l3"><a class="reference internal" href="basis_set.html">BasisSet</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hamiltonian.html">Hamiltonian</a></li>
+<li class="toctree-l3"><a class="reference internal" href="orbitals.html">Orbitals</a></li>
+<li class="toctree-l3"><a class="reference internal" href="lattice_graph.html">LatticeGraph</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pauli_operator.html">Pauli Operators</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structure.html">Structure</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Symmetries</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creating-a-symmetries-object">Creating a Symmetries object</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#related-classes">Related classes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#further-reading">Further reading</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="wavefunction.html">Wavefunction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qpe_result.html">QpeResult</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit.html">Circuit</a></li>
+<li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../algorithms/index.html">Algorithm classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basis_functionals.html">Available functionals and basis sets</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../model_hamiltonians.html">Model Hamiltonians</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../plugins.html">Plugins</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">In-depth user guide</a></li>
+          <li class="breadcrumb-item"><a href="index.html">Data classes</a></li>
+      <li class="breadcrumb-item active">Symmetries</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../../_sources/user/comprehensive/data/symmetries.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="symmetries">
+<h1>Symmetries<a class="headerlink" href="#symmetries" title="Link to this heading"></a></h1>
+<p>The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> class in QDK/Chemistry is a general container for symmetry information that quantum algorithms can exploit to reduce resource requirements.
+As a core <a class="reference internal" href="../design/index.html"><span class="doc">data class</span></a>, it follows QDK/Chemistry’s immutable data pattern.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading"></a></h2>
+<p>Many quantum algorithms can reduce circuit depth, qubit count, or classical post-processing cost when the symmetries of the target quantum state are known in advance.
+The <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> class encapsulates this symmetry information so that it can be passed to any algorithm that exploits it, such as the <a class="reference internal" href="../algorithms/qubit_mapper.html#encoding-scbk"><span class="std std-ref">symmetry-conserving Bravyi-Kitaev</span></a> qubit mapping.</p>
+<section id="conserved-quantum-numbers">
+<h3>Conserved quantum numbers<a class="headerlink" href="#conserved-quantum-numbers" title="Link to this heading"></a></h3>
+<p>From the alpha and beta electron counts, several derived quantities are available as read-only properties.</p>
+</section>
+<section id="properties">
+<h3>Properties<a class="headerlink" href="#properties" title="Link to this heading"></a></h3>
+<dl class="simple">
+<dt>n_alpha</dt><dd><p>Number of alpha (spin-up) electrons in the active space.</p>
+</dd>
+<dt>n_beta</dt><dd><p>Number of beta (spin-down) electrons in the active space.</p>
+</dd>
+<dt>n_particles</dt><dd><p>Total number of active electrons, <span class="math notranslate nohighlight">\(n_\alpha + n_\beta\)</span>.</p>
+</dd>
+<dt>sz</dt><dd><p>Spin projection quantum number, <span class="math notranslate nohighlight">\(S_z = (n_\alpha - n_\beta) / 2\)</span>.</p>
+</dd>
+<dt>spin_multiplicity</dt><dd><p>Spin multiplicity, <span class="math notranslate nohighlight">\(2S + 1 = |n_\alpha - n_\beta| + 1\)</span>.</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="creating-a-symmetries-object">
+<h2>Creating a Symmetries object<a class="headerlink" href="#creating-a-symmetries-object" title="Link to this heading"></a></h2>
+<p>A <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries" title="qdk_chemistry.data.Symmetries"><code class="xref py py-class docutils literal notranslate"><span class="pre">Symmetries</span></code></a> object can be created by specifying electron counts directly, or by using a factory method to extract them from an existing <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> or <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Ansatz" title="qdk_chemistry.data.Ansatz"><code class="xref py py-class docutils literal notranslate"><span class="pre">Ansatz</span></code></a>.</p>
+<section id="direct-construction">
+<h3>Direct construction<a class="headerlink" href="#direct-construction" title="Link to this heading"></a></h3>
+<p>Provide the alpha and beta electron counts explicitly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+
+<span class="c1"># Closed-shell singlet with 4 active electrons</span>
+<span class="n">sym</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="p">(</span><span class="n">n_alpha</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">n_beta</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sym</span><span class="o">.</span><span class="n">n_particles</span><span class="p">)</span>       <span class="c1"># 4</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sym</span><span class="o">.</span><span class="n">sz</span><span class="p">)</span>                <span class="c1"># 0.0</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sym</span><span class="o">.</span><span class="n">spin_multiplicity</span><span class="p">)</span> <span class="c1"># 1</span>
+
+<span class="c1"># Open-shell doublet</span>
+<span class="n">sym</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="p">(</span><span class="n">n_alpha</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_beta</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sym</span><span class="o">.</span><span class="n">sz</span><span class="p">)</span>                <span class="c1"># 0.5</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">sym</span><span class="o">.</span><span class="n">spin_multiplicity</span><span class="p">)</span> <span class="c1"># 2</span>
+</pre></div>
+</div>
+</section>
+<section id="from-a-wavefunction">
+<h3>From a wavefunction<a class="headerlink" href="#from-a-wavefunction" title="Link to this heading"></a></h3>
+<p>If a <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">Wavefunction</span></code></a> is available, for example from an <a class="reference internal" href="../algorithms/scf_solver.html"><span class="doc">ScfSolver</span></a> or <a class="reference internal" href="../algorithms/mc_calculator.html"><span class="doc">MCCalculator</span></a> calculation, the factory method <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries.from_wavefunction" title="qdk_chemistry.data.Symmetries.from_wavefunction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_wavefunction()</span></code></a> extracts the active-space electron counts automatically:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+
+<span class="n">symmetries</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="o">.</span><span class="n">from_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="from-an-ansatz">
+<h3>From an ansatz<a class="headerlink" href="#from-an-ansatz" title="Link to this heading"></a></h3>
+<p>When an <a class="reference internal" href="ansatz.html"><span class="doc">Ansatz</span></a> is available, for example after a multi-configuration calculation, the electron counts can be derived from the ansatz’s wavefunction:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+
+<span class="n">symmetries</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="o">.</span><span class="n">from_ansatz</span><span class="p">(</span><span class="n">ansatz</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">Symmetries.from_ansatz(ansatz)</span></code> is equivalent to
+<code class="docutils literal notranslate"><span class="pre">Symmetries.from_wavefunction(ansatz.get_wavefunction())</span></code>.</p>
+</div>
+</section>
+</section>
+<section id="related-classes">
+<h2>Related classes<a class="headerlink" href="#related-classes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="wavefunction.html"><span class="doc">Wavefunction</span></a>: Source of active-space electron counts via <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries.from_wavefunction" title="qdk_chemistry.data.Symmetries.from_wavefunction"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_wavefunction()</span></code></a></p></li>
+<li><p><a class="reference internal" href="ansatz.html"><span class="doc">Ansatz</span></a>: Combined Hamiltonian + Wavefunction container, used with <a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.Symmetries.from_ansatz" title="qdk_chemistry.data.Symmetries.from_ansatz"><code class="xref py py-meth docutils literal notranslate"><span class="pre">from_ansatz()</span></code></a></p></li>
+<li><p><a class="reference internal" href="hamiltonian.html"><span class="doc">Hamiltonian</span></a>: Input to qubit mapping algorithms</p></li>
+<li><p><a class="reference internal" href="../../../api/api_autogen/qdk_chemistry.data.html#qdk_chemistry.data.QubitHamiltonian" title="qdk_chemistry.data.QubitHamiltonian"><code class="xref py py-class docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code></a>: Output of qubit mapping algorithms</p></li>
+</ul>
+</section>
+<section id="further-reading">
+<h2>Further reading<a class="headerlink" href="#further-reading" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../algorithms/qubit_mapper.html"><span class="doc">QubitMapper</span></a>: Fermion-to-qubit mapping algorithms that consume <code class="docutils literal notranslate"><span class="pre">Symmetries</span></code></p></li>
+<li><p><a class="reference internal" href="../design/index.html"><span class="doc">Design principles</span></a>: Data class design principles in QDK/Chemistry</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="structure.html" class="btn btn-neutral float-left" title="Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="wavefunction.html" class="btn btn-neutral float-right" title="Wavefunction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

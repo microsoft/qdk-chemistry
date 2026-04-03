@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.pauli\_matrix module
+=========================================
+
+.. automodule:: qdk_chemistry.utils.pauli_matrix
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

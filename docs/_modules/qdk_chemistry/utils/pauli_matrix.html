@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.pauli_matrix &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.pauli_matrix</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.utils.pauli_matrix</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Pure-Python Pauli matrix utilities.</span>
+
+<span class="sd">Provides the same functionality as the C++ pybind11 ``pauli_matrix`` module</span>
+<span class="sd">using only NumPy (and SciPy for sparse output), preserving the original</span>
+<span class="sd">bitmask algorithms to minimise memory cost and keep efficiency.</span>
+
+<span class="sd">All functions use Little-Endian label convention: ``label[0]`` corresponds to</span>
+<span class="sd">qubit *n*-1 (MSB).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy.sparse</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;pauli_string_to_masks&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;pauli_to_dense_matrix&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;pauli_to_sparse_matrix&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="pauli_string_to_masks">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_string_to_masks">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pauli_string_to_masks</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">complex</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Decompose a Pauli label string into bitmasks and phase factor.</span>
+
+<span class="sd">    X sets a bit in *x_mask*, Z sets a bit in *z_mask*, Y sets both.</span>
+<span class="sd">    The cumulative phase factor ``(i)^(number of Y operators)`` is also</span>
+<span class="sd">    returned.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pauli_str: Pauli string (characters in {I, X, Y, Z}), using Little-Endian label convention.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        ``(x_mask, z_mask, y_phase)`` where *x_mask* and *z_mask* are</span>
+<span class="sd">        integers and *y_phase* is a complex number.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">)</span>
+    <span class="n">x_mask</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">z_mask</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">y_count</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pauli_str</span><span class="p">):</span>
+        <span class="n">bit</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="p">(</span><span class="n">n</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">i</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">&quot;XY&quot;</span><span class="p">:</span>
+            <span class="n">x_mask</span> <span class="o">|=</span> <span class="n">bit</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="ow">in</span> <span class="s2">&quot;ZY&quot;</span><span class="p">:</span>
+            <span class="n">z_mask</span> <span class="o">|=</span> <span class="n">bit</span>
+        <span class="k">if</span> <span class="n">ch</span> <span class="o">==</span> <span class="s2">&quot;Y&quot;</span><span class="p">:</span>
+            <span class="n">y_count</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">x_mask</span><span class="p">,</span> <span class="n">z_mask</span><span class="p">,</span> <span class="mi">1</span><span class="n">j</span> <span class="o">**</span> <span class="p">(</span><span class="n">y_count</span> <span class="o">&amp;</span> <span class="mi">3</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="pauli_to_dense_matrix">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_to_dense_matrix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pauli_to_dense_matrix</span><span class="p">(</span>
+    <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a dense Hamiltonian matrix from Pauli strings and coefficients.</span>
+
+<span class="sd">    Computes :math:`H = \sum_t \mathrm{coeff}[t] \cdot P_t` where each</span>
+<span class="sd">    :math:`P_t` is a Pauli string in Little-Endian convention.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}), all of the same length *n*.</span>
+<span class="sd">        coefficients: Complex array of coefficients, one per Pauli term.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Dense complex matrix of shape ``(2**n, 2**n)``.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">n</span>
+    <span class="n">pauli_t</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span>
+
+    <span class="c1"># Pre-compute masks for all terms</span>
+    <span class="n">x_masks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">pauli_t</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">z_masks</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">pauli_t</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">scaled</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">pauli_t</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">ps</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">):</span>
+        <span class="n">xm</span><span class="p">,</span> <span class="n">zm</span><span class="p">,</span> <span class="n">yph</span> <span class="o">=</span> <span class="n">pauli_string_to_masks</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+        <span class="n">x_masks</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="n">xm</span>
+        <span class="n">z_masks</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="n">zm</span>
+        <span class="n">scaled</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">=</span> <span class="n">coefficients</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">yph</span>
+
+    <span class="n">matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pauli_t</span><span class="p">):</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">rows</span> <span class="o">^</span> <span class="n">x_masks</span><span class="p">[</span><span class="n">t</span><span class="p">]</span>
+        <span class="n">signs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bitwise_count</span><span class="p">(</span><span class="n">cols</span> <span class="o">&amp;</span> <span class="n">z_masks</span><span class="p">[</span><span class="n">t</span><span class="p">])</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+        <span class="n">matrix</span><span class="p">[</span><span class="n">rows</span><span class="p">,</span> <span class="n">cols</span><span class="p">]</span> <span class="o">+=</span> <span class="n">scaled</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">signs</span>
+
+    <span class="k">return</span> <span class="n">matrix</span></div>
+
+
+
+<div class="viewcode-block" id="pauli_to_sparse_matrix">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_to_sparse_matrix">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">pauli_to_sparse_matrix</span><span class="p">(</span>
+    <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">coefficients</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">:</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Build a sparse CSR Hamiltonian matrix from Pauli strings and coefficients.</span>
+
+<span class="sd">    Computes :math:`H = \sum_t \mathrm{coeff}[t] \cdot P_t` and returns the</span>
+<span class="sd">    result as a :class:`scipy.sparse.csr_matrix`.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pauli_strings: List of Pauli label strings (characters in {I, X, Y, Z}), all of the same length *n*.</span>
+<span class="sd">        coefficients: Complex array of coefficients, one per Pauli term.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Sparse complex matrix of shape ``(2**n, 2**n)``.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        RuntimeError: If the matrix dimensions exceed int32 index limits.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">coefficients</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">coefficients</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">dim</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">n</span>
+    <span class="c1"># Pre-compute masks for all terms</span>
+    <span class="n">x_masks_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">z_masks_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">scaled_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">complex</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">ps</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">):</span>
+        <span class="n">xm</span><span class="p">,</span> <span class="n">zm</span><span class="p">,</span> <span class="n">yph</span> <span class="o">=</span> <span class="n">pauli_string_to_masks</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span>
+        <span class="n">x_masks_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">xm</span><span class="p">)</span>
+        <span class="n">z_masks_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">zm</span><span class="p">)</span>
+        <span class="n">scaled_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">complex</span><span class="p">(</span><span class="n">coefficients</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">yph</span><span class="p">))</span>
+
+    <span class="c1"># Deduplicate x_masks to find nnz per row (same for every row)</span>
+    <span class="n">unique_xm</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">x_masks_list</span><span class="p">))</span>
+    <span class="n">nnz_per_row</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_xm</span><span class="p">)</span>
+    <span class="n">total_nnz</span> <span class="o">=</span> <span class="n">nnz_per_row</span> <span class="o">*</span> <span class="n">dim</span>
+
+    <span class="k">if</span> <span class="n">dim</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">max</span> <span class="ow">or</span> <span class="n">total_nnz</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">iinfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span><span class="o">.</span><span class="n">max</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Matrix too large for int32 CSR indices in pauli_to_sparse_matrix.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Group terms by their x_mask</span>
+    <span class="n">xm_to_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">xm</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">xm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">unique_xm</span><span class="p">)}</span>
+    <span class="n">terms_by_x</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[[]</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nnz_per_row</span><span class="p">)]</span>
+    <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">xm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x_masks_list</span><span class="p">):</span>
+        <span class="n">terms_by_x</span><span class="p">[</span><span class="n">xm_to_idx</span><span class="p">[</span><span class="n">xm</span><span class="p">]]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+
+    <span class="n">z_masks_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">z_masks_list</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+    <span class="n">scaled_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">scaled_list</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+
+    <span class="c1"># Allocate CSR arrays</span>
+    <span class="n">indptr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="p">(</span><span class="n">dim</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">nnz_per_row</span><span class="p">,</span> <span class="n">nnz_per_row</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">total_nnz</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+    <span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">(</span><span class="n">total_nnz</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+
+    <span class="n">rows</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int64</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">xm</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">unique_xm</span><span class="p">):</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">rows</span> <span class="o">^</span> <span class="n">xm</span>
+        <span class="n">group</span> <span class="o">=</span> <span class="n">terms_by_x</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        <span class="n">acc</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">complex128</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">t</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
+            <span class="n">signs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">bitwise_count</span><span class="p">(</span><span class="n">cols</span> <span class="o">&amp;</span> <span class="n">z_masks_arr</span><span class="p">[</span><span class="n">t</span><span class="p">])</span> <span class="o">&amp;</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">)</span>
+            <span class="n">acc</span> <span class="o">+=</span> <span class="n">scaled_arr</span><span class="p">[</span><span class="n">t</span><span class="p">]</span> <span class="o">*</span> <span class="n">signs</span>
+        <span class="c1"># Fill into the k-th slot of each row</span>
+        <span class="n">indices</span><span class="p">[</span><span class="n">k</span><span class="p">::</span><span class="n">nnz_per_row</span><span class="p">]</span> <span class="o">=</span> <span class="n">cols</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+        <span class="n">data</span><span class="p">[</span><span class="n">k</span><span class="p">::</span><span class="n">nnz_per_row</span><span class="p">]</span> <span class="o">=</span> <span class="n">acc</span>
+
+    <span class="k">return</span> <span class="n">scipy</span><span class="o">.</span><span class="n">sparse</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">((</span><span class="n">data</span><span class="p">,</span> <span class="n">indices</span><span class="p">,</span> <span class="n">indptr</span><span class="p">),</span> <span class="n">shape</span><span class="o">=</span><span class="p">(</span><span class="n">dim</span><span class="p">,</span> <span class="n">dim</span><span class="p">))</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

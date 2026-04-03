@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Active space selection &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Active space selection &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -72,11 +72,16 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#quick-reference">Quick reference</a></li>
 <li class="toctree-l3"><a class="reference internal" href="index.html#discovering-implementations">Discovering implementations</a></li>
 </ul>
@@ -94,6 +99,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -233,8 +240,8 @@ See <a class="reference internal" href="#available-implementations">Available im
 </div>
 </div>
 <input class="tab-input" id="tab-set--2-input--2" name="tab-set--2" type="radio" /><label class="tab-label" for="tab-set--2-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>  <span class="c1"># noqa: E402</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Structure</span>
 
 <span class="c1"># Load a molecular structure (water molecule) from XYZ file</span>
 <span class="n">structure</span> <span class="o">=</span> <span class="n">Structure</span><span class="o">.</span><span class="n">from_xyz_file</span><span class="p">(</span>
@@ -274,7 +281,7 @@ You can discover available implementations programmatically:</p>
 </div>
 </div>
 <input class="tab-input" id="tab-set--3-input--2" name="tab-set--3" type="radio" /><label class="tab-label" for="tab-set--3-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">registry</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">registry</span><span class="o">.</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">))</span>
 <span class="c1"># [&#39;pyscf_avas&#39;, &#39;qdk_occupation&#39;, &#39;qdk_autocas_eos&#39;, &#39;qdk_autocas&#39;, &#39;qdk_valence&#39;]</span>
@@ -345,10 +352,10 @@ Selects orbitals near the <a class="reference internal" href="../../../glossary.
 </table>
 </section>
 <section id="qdk-autocas">
-<span id="autocas-algorithm"></span><h3>QDK AutoCAS<a class="headerlink" href="#qdk-autocas" title="Link to this heading"></a></h3>
+<span id="autocas-algorithm"></span><h3>QDK autoCAS<a class="headerlink" href="#qdk-autocas" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_autocas&quot;</span></code></p>
 <p>Entropy-based automatic selection using histogram-based plateau detection to identify strongly correlated orbitals.
-See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">AutoCAS Algorithm</span></a> below for a detailed description.</p>
+See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">autoCAS Algorithm</span></a> below for a detailed description.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This method requires the input wavefunction to have orbital entropies populated.
@@ -395,10 +402,10 @@ Orbital entropies are computed from the one- and two-electron reduced density ma
 </table>
 </section>
 <section id="qdk-autocas-eos">
-<h3>QDK AutoCAS EOS<a class="headerlink" href="#qdk-autocas-eos" title="Link to this heading"></a></h3>
+<h3>QDK autoCAS EOS<a class="headerlink" href="#qdk-autocas-eos" title="Link to this heading"></a></h3>
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;qdk_autocas_eos&quot;</span></code></p>
 <p>Entropy-based selection using consecutive entropy differences to identify plateau boundaries.
-See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">AutoCAS Algorithm</span></a> below for a detailed description.</p>
+See <a class="reference internal" href="#autocas-algorithm-details"><span class="std std-ref">autoCAS Algorithm</span></a> below for a detailed description.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This method requires the input wavefunction to have orbital entropies populated.
@@ -438,27 +445,27 @@ Orbital entropies are computed from the one- and two-electron reduced density ma
 </tbody>
 </table>
 <section id="autocas-algorithm-details">
-<span id="id1"></span><h4>AutoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
+<span id="id1"></span><h4>autoCAS Algorithm<a class="headerlink" href="#autocas-algorithm-details" title="Link to this heading"></a></h4>
 <p>Selecting an appropriate active space is one of the most challenging aspects of multi-configuration calculations.
 Traditional approaches rely on chemical intuition and trial-and-error, which can be unreliable for complex systems.
-The AutoCAS algorithm <span id="id2">[<a class="reference internal" href="../../../references.html#id25" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id26" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
-<p>AutoCAS leverages concepts from quantum information theory to quantify orbital correlation.
+The autoCAS algorithm <span id="id2">[<a class="reference internal" href="../../../references.html#id31" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id32" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span> provides a systematic, black-box approach to active space selection.</p>
+<p>autoCAS leverages concepts from quantum information theory to quantify orbital correlation.
 The key insight is that strongly correlated orbitals are highly <em>entangled</em> with the rest of the electronic system.
 This entanglement can be measured using the single-orbital entropy <span class="math notranslate nohighlight">\(s_i^{(1)}\)</span>, which quantifies how much information about orbital <span class="math notranslate nohighlight">\(i\)</span> is “shared” with all other orbitals.</p>
-<p>Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>) <span id="id3">[<a class="reference internal" href="../../../references.html#id4" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a>. The QDK/Chemistry implementation of AutoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.</p>
-<p class="rubric">QDK/Chemistry AutoCAS Variants</p>
+<p>Single orbital entropies can be calculated for many-body systems given access to (approximate) one- and two-particle reduced density matrices (<a class="reference internal" href="../../../glossary.html#term-RDM"><span class="xref std std-term">RDM</span></a>) <span id="id3">[<a class="reference internal" href="../../../references.html#id7" title="Katharina Boguslawski and Paweł Tecmer. Orbital entanglement in quantum chemistry. International Journal of Quantum Chemistry, 115(19):1289-1295, 2015. doi:10.1002/qua.24832.">BT15</a>]</span>, which are easily accessible in QDK/Chemistry through multi-configuration wavefunction data structures. As such, single orbital entropies are computed by default when RDMs are requested in <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculations</span></a>. The QDK/Chemistry implementation of autoCAS is agnostic to the underlying wavefunction method, as long as the required RDMs are available, thus allowing for comparisons across different multi-configuration approaches.</p>
+<p class="rubric">QDK/Chemistry autoCAS Variants</p>
 <p>QDK/Chemistry provides two entropy-based selection methods:</p>
 <dl class="simple">
-<dt>AutoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original AutoCAS protocol <span id="id4">[<a class="reference internal" href="../../../references.html#id25" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id26" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
+<dt>autoCAS (Histogram-Based Plateau Detection)</dt><dd><p>As described in the original autoCAS protocol <span id="id4">[<a class="reference internal" href="../../../references.html#id31" title="Christopher J. Stein and Markus Reiher. Automated selection of active orbital spaces. Journal of Chemical Theory and Computation, 12(4):1760-1771, 2016. URL: https://arxiv.org/abs/1602.03835, doi:10.1021/acs.jctc.6b00156.">SR16</a>, <a class="reference internal" href="../../../references.html#id32" title="Christopher J. Stein and Markus Reiher. autoCAS: a program for fully automated multiconfigurational calculations. Journal of Computational Chemistry, 40(25):2216-2226, 2019. URL: https://arxiv.org/abs/1904.00097, doi:10.1002/jcc.25869.">SR19</a>]</span>, this method discretizes the entropy distribution into histogram bins and identifies plateaus—contiguous regions where the count of orbitals above each entropy threshold remains constant.
 This approach is robust for systems with clear entropy gaps but requires tuning of <code class="docutils literal notranslate"><span class="pre">num_bins</span></code> and <code class="docutils literal notranslate"><span class="pre">min_plateau_size</span></code> parameters.
 If none of the entropies exceed the <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, the system is considered single configurational and all orbitals are excluded from the active space.</p>
 </dd>
-<dt>AutoCAS-EOS (Entropy Difference Detection)</dt><dd><p>Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds <code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code> and the entropy is above <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, a plateau boundary is identified.</p>
+<dt>autoCAS-EOS (Entropy Difference Detection)</dt><dd><p>Uses a direct approach that examines consecutive differences in the sorted entropy values. When the difference between adjacent entropies exceeds <code class="docutils literal notranslate"><span class="pre">diff_threshold</span></code> and the entropy is above <code class="docutils literal notranslate"><span class="pre">entropy_threshold</span></code>, a plateau boundary is identified.</p>
 </dd>
 </dl>
 <p>Both methods sort orbitals by decreasing entropy and select the largest identified group of strongly correlated orbitals for the active space.</p>
 <p class="rubric">Populating Orbital Entropies</p>
-<p>The entropy-based AutoCAS methods require orbital entropies as input, which are computed from the one- and two-electron reduced density matrices (RDMs).
+<p>The entropy-based autoCAS methods require orbital entropies as input, which are computed from the one- and two-electron reduced density matrices (RDMs).
 These RDMs must be obtained from a <a class="reference internal" href="mc_calculator.html"><span class="doc">multi-configuration calculation</span></a> that captures static correlation.
 A key practical consideration is balancing the cost of this initial calculation against the quality of the resulting entropies.</p>
 <p>A recommended approach is to use <a class="reference internal" href="mc_calculator.html#macis-asci"><span class="std std-ref">Selected Configuration Interaction (SCI)</span></a> with a relatively small number of determinants (e.g., 10,000–50,000) within a conservatively chosen active space.
@@ -501,16 +508,24 @@ The resulting entropies are typically sufficient to identify strongly correlated
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="p">[</span><span class="n">mc_energy</span><span class="p">,</span><span class="w"> </span><span class="n">mc_wavefunction</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_calculator</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span>
 <span class="w">      </span><span class="n">active_hamiltonian</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="n">num_electrons</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span>
 
-<span class="w">  </span><span class="c1">// Select active space using AutoCAS</span>
+<span class="w">  </span><span class="c1">// Print single orbital entropies which are used by autoCAS to determine the</span>
+<span class="w">  </span><span class="c1">// active space</span>
+<span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">entropies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mc_wavefunction</span><span class="o">-&gt;</span><span class="n">get_single_orbital_entropies</span><span class="p">();</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Single orbital entropies:&quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">size_t</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">idx</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">entropies</span><span class="p">.</span><span class="n">size</span><span class="p">();</span><span class="w"> </span><span class="o">++</span><span class="n">idx</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;Orbital &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="p">(</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;: &quot;</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">entropies</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
+<span class="w">  </span><span class="p">}</span>
+
+<span class="w">  </span><span class="c1">// Select active space using autoCAS</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">autocas_selector</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ActiveSpaceSelectorFactory</span><span class="o">::</span><span class="n">create</span><span class="p">(</span><span class="s">&quot;qdk_autocas_eos&quot;</span><span class="p">);</span>
 <span class="w">  </span><span class="k">auto</span><span class="w"> </span><span class="n">active_autocas_wfn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">autocas_selector</span><span class="o">-&gt;</span><span class="n">run</span><span class="p">(</span><span class="n">mc_wavefunction</span><span class="p">);</span>
-<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;AutoCAS selected active orbitals summary:</span><span class="se">\n</span><span class="s">&quot;</span>
+<span class="w">  </span><span class="n">std</span><span class="o">::</span><span class="n">cout</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="s">&quot;autoCAS selected active orbitals summary:</span><span class="se">\n</span><span class="s">&quot;</span>
 <span class="w">            </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">active_autocas_wfn</span><span class="o">-&gt;</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">-&gt;</span><span class="n">get_summary</span><span class="p">()</span><span class="w"> </span><span class="o">&lt;&lt;</span><span class="w"> </span><span class="n">std</span><span class="o">::</span><span class="n">endl</span><span class="p">;</span>
 </pre></div>
 </div>
 </div>
 <input class="tab-input" id="tab-set--4-input--2" name="tab-set--4" type="radio" /><label class="tab-label" for="tab-set--4-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_valence_space_parameters</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">compute_valence_space_parameters</span>
 
 <span class="c1"># Create a valence space active space selector</span>
 <span class="n">valence_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_valence&quot;</span><span class="p">)</span>
@@ -533,10 +548,16 @@ The resulting entropies are typically sufficient to identify strongly correlated
     <span class="n">active_hamiltonian</span><span class="p">,</span> <span class="n">num_electrons</span> <span class="o">//</span> <span class="mi">2</span><span class="p">,</span> <span class="n">num_electrons</span> <span class="o">//</span> <span class="mi">2</span>
 <span class="p">)</span>
 
-<span class="c1"># Select active space using AutoCAS</span>
+<span class="c1"># Print single orbital entropies which are used by autoCAS to determine the active space</span>
+<span class="n">entropies</span> <span class="o">=</span> <span class="n">mc_wavefunction</span><span class="o">.</span><span class="n">get_single_orbital_entropies</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Single orbital entropies:&quot;</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">entropy</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">entropies</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Orbital </span><span class="si">{</span><span class="n">idx</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">entropy</span><span class="si">:</span><span class="s2">.6f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Select active space using autoCAS</span>
 <span class="n">autocas_selector</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;active_space_selector&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_autocas_eos&quot;</span><span class="p">)</span>
 <span class="n">active_autocas_wfn</span> <span class="o">=</span> <span class="n">autocas_selector</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">mc_wavefunction</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;AutoCAS selected active orbitals summary:&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;autoCAS selected active orbitals summary:&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">active_autocas_wfn</span><span class="o">.</span><span class="n">get_orbitals</span><span class="p">()</span><span class="o">.</span><span class="n">get_summary</span><span class="p">())</span>
 </pre></div>
 </div>
@@ -549,7 +570,7 @@ The resulting entropies are typically sufficient to identify strongly correlated
 <p class="rubric">Factory name: <code class="docutils literal notranslate"><span class="pre">&quot;pyscf_avas&quot;</span></code></p>
 <p>The PySCF plugin provides access to the Automated Valence Active Space (<a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a>) method from <a class="reference external" href="https://pyscf.org/">PySCF</a>.
 <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> selects active orbitals by projecting molecular orbitals onto a target atomic orbital basis.
-See the original <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> publication <span id="id5">[<a class="reference internal" href="../../../references.html#id2" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span> for details.</p>
+See the original <a class="reference internal" href="../../../glossary.html#term-AVAS"><span class="xref std std-term">AVAS</span></a> publication <span id="id5">[<a class="reference internal" href="../../../references.html#id5" title="Elvira R. Sayfutyarova, Qiming Sun, Garnet Kin-Lic Chan, and Gerald Knizia. Automated construction of molecular active spaces from atomic valence orbitals. Journal of Chemical Theory and Computation, 13(9):4063-4078, 2017. URL: https://arxiv.org/abs/1701.07862, doi:10.1021/acs.jctc.7b00128.">SSCK17</a>]</span> for details.</p>
 <p class="rubric">Settings</p>
 <table class="docutils align-default">
 <colgroup>

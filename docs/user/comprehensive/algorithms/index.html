@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Algorithm classes &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Algorithm classes &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../_static/tabs.js?v=3ee01567"></script>
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" />
     <link rel="next" title="Factory pattern" href="factory_pattern.html" />
-    <link rel="prev" title="Structure" href="../data/structure.html" /> 
+    <link rel="prev" title="Circuit" href="../data/circuit.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -64,11 +64,16 @@
 <li class="toctree-l3"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
 <li class="toctree-l3"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
 <li class="toctree-l3"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
-<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-configuration <span class="xref std std-term">SCF</span></a></li>
+<li class="toctree-l3"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
 <li class="toctree-l3"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
 <li class="toctree-l3"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
 <li class="toctree-l3"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l3"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#quick-reference">Quick reference</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#discovering-implementations">Discovering implementations</a></li>
 </ul>
@@ -86,6 +91,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
 </ul>
@@ -117,12 +124,30 @@
              
   <section id="algorithm-classes">
 <h1>Algorithm classes<a class="headerlink" href="#algorithm-classes" title="Link to this heading"></a></h1>
-<div class="toctree-wrapper compound">
-</div>
-<div class="toctree-wrapper compound">
-</div>
 <p>QDK/Chemistry provides a comprehensive set of algorithm classes which express core methodological primitives for quantum and classical chemistry calculations.
 All algorithms follow a <a class="reference internal" href="factory_pattern.html"><span class="doc">factory pattern</span></a> design, allowing you to create instances by name and configured through a unified <a class="reference internal" href="settings.html"><span class="doc">settings</span></a> interface.</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="factory_pattern.html">Factory pattern</a></li>
+<li class="toctree-l1"><a class="reference internal" href="settings.html">Settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="active_space.html">Active space selection</a></li>
+<li class="toctree-l1"><a class="reference internal" href="energy_estimator.html">Energy estimation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="hamiltonian_constructor.html">Hamiltonian construction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="localizer.html">Orbital localization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mc_calculator.html">Multi-configuration calculations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="mcscf.html">Multi-Configuration Self-Consistent Field</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pmc.html">Projected Multi-Configuration calculations</a></li>
+<li class="toctree-l1"><a class="reference internal" href="qubit_mapper.html">Qubit mapping</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scf_solver.html">Self-consistent field (SCF) solver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="stability_checker.html">Stability analysis</a></li>
+<li class="toctree-l1"><a class="reference internal" href="state_preparation.html">State preparation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="phase_estimation.html">Phase estimation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="time_evolution_builder.html">Time evolution builder</a></li>
+<li class="toctree-l1"><a class="reference internal" href="circuit_mapper.html">Controlled evolution circuit mapper</a></li>
+<li class="toctree-l1"><a class="reference internal" href="circuit_executor.html">Circuit execution</a></li>
+</ul>
+</div>
 <section id="quick-reference">
 <h2>Quick reference<a class="headerlink" href="#quick-reference" title="Link to this heading"></a></h2>
 <p>The following table summarizes the available algorithm classes in QDK/Chemistry and their purposes. For detailed documentation, refer to the linked pages.</p>
@@ -159,25 +184,45 @@ All algorithms follow a <a class="reference internal" href="factory_pattern.html
 <td><p>Many-body wavefunction calculations</p></td>
 <td><p>Hamiltonian → Wavefunction</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="mcscf.html"><span class="doc">MultiConfigurationScf</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="pmc.html"><span class="doc">ProjectedMultiConfigurationCalculator</span></a></p></td>
+<td><p>Projected many-body wavefunction calculations</p></td>
+<td><p>Hamiltonian → Wavefunction</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="mcscf.html"><span class="doc">MultiConfigurationScf</span></a></p></td>
 <td><p>Coupled <cite>Orbital</cite>-<cite>Wavefunction</cite> calculations.</p></td>
 <td><p>Orbitals → Wavefunction</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="qubit_mapper.html"><span class="doc">QubitMapper</span></a></p></td>
 <td><p>Fermion-to-qubit mapping</p></td>
 <td><p>Hamiltonian → QubitHamiltonian</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="state_preparation.html"><span class="doc">StatePreparation</span></a></p></td>
 <td><p>Quantum state preparation</p></td>
 <td><p>Wavefunction → Circuit</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="energy_estimator.html"><span class="doc">EnergyEstimator</span></a></p></td>
 <td><p>Quantum energy expectation values</p></td>
 <td><p>Circuit + QubitHamiltonian → Energy</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="stability_checker.html"><span class="doc">StabilityChecker</span></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="stability_checker.html"><span class="doc">StabilityChecker</span></a></p></td>
 <td><p><a class="reference internal" href="../../../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> stability analysis</p></td>
 <td><p>Orbitals → Stability</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="phase_estimation.html"><span class="doc">PhaseEstimation</span></a></p></td>
+<td><p>Quantum phase estimation</p></td>
+<td><p>Circuit + QubitHamiltonian → QpeResult</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="time_evolution_builder.html"><span class="doc">TimeEvolutionBuilder</span></a></p></td>
+<td><p>Hamiltonian simulation unitaries</p></td>
+<td><p>QubitHamiltonian → TimeEvolutionUnitary</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="circuit_mapper.html"><span class="doc">ControlledEvolutionCircuitMapper</span></a></p></td>
+<td><p>Controlled-unitary circuit synthesis</p></td>
+<td><p>TimeEvolutionUnitary → Circuit</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="circuit_executor.html"><span class="doc">CircuitExecutor</span></a></p></td>
+<td><p>Quantum circuit execution</p></td>
+<td><p>Circuit → CircuitExecutorData</p></td>
 </tr>
 </tbody>
 </table>
@@ -202,7 +247,7 @@ Use <code class="docutils literal notranslate"><span class="pre">available()</sp
 </div>
 </div>
 <input class="tab-input" id="tab-set--0-input--2" name="tab-set--0" type="radio" /><label class="tab-label" for="tab-set--0-input--2">Python API</label><div class="tab-content docutils container">
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>  <span class="c1"># noqa: E402</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">available</span><span class="p">,</span> <span class="n">create</span>
 
 <span class="c1"># List all registered SCF solver implementations</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">available</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">))</span>  <span class="c1"># [&#39;qdk&#39;, &#39;pyscf&#39;]</span>
@@ -224,7 +269,7 @@ Use <code class="docutils literal notranslate"><span class="pre">available()</sp
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="../data/structure.html" class="btn btn-neutral float-left" title="Structure" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../data/circuit.html" class="btn btn-neutral float-left" title="Circuit" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="factory_pattern.html" class="btn btn-neutral float-right" title="Factory pattern" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

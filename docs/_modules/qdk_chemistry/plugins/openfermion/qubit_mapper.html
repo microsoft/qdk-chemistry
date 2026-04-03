@@ -1,0 +1,372 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.plugins.openfermion.qubit_mapper &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+          <li class="breadcrumb-item"><a href="../openfermion.html">qdk_chemistry.plugins.openfermion</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.plugins.openfermion.qubit_mapper</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.plugins.openfermion.qubit_mapper</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.</span>
+
+<span class="sd">This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians</span>
+<span class="sd">using different mapping strategies (&quot;jordan-wigner&quot;, &quot;bravyi-kitaev&quot;,</span>
+<span class="sd">&quot;symmetry-conserving-bravyi-kitaev&quot;, and &quot;bravyi-kitaev-tree&quot;).</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">openfermion</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">of</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.qubit_mapper</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitMapper</span><span class="p">,</span> <span class="n">QubitMapperSettings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.enums.fermion_mode_order</span><span class="w"> </span><span class="kn">import</span> <span class="n">FermionModeOrder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.plugins.openfermion.conversion</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">hamiltonian_to_fermion_operator</span><span class="p">,</span>
+    <span class="n">hamiltonian_to_interaction_operator</span><span class="p">,</span>
+    <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Symmetries</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;OpenFermionQubitMapper&quot;</span><span class="p">,</span> <span class="s2">&quot;OpenFermionQubitMapperSettings&quot;</span><span class="p">]</span>
+
+<span class="n">_VALID_ENCODINGS</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;symmetry-conserving-bravyi-kitaev&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;bravyi-kitaev-tree&quot;</span><span class="p">,</span>
+<span class="p">]</span>
+
+
+<div class="viewcode-block" id="OpenFermionQubitMapperSettings">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OpenFermionQubitMapperSettings</span><span class="p">(</span><span class="n">QubitMapperSettings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings configuration for an OpenFermionQubitMapper.</span>
+
+<span class="sd">    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.</span>
+
+<span class="sd">    Available encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
+<span class="sd">        - ``&quot;symmetry-conserving-bravyi-kitaev&quot;`` (requires :class:`~qdk_chemistry.data.Symmetries`)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev-tree&quot;``</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="OpenFermionQubitMapperSettings.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapperSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize OpenFermionQubitMapperSettings.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">valid_encodings</span><span class="o">=</span><span class="n">_VALID_ENCODINGS</span><span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="OpenFermionQubitMapper">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">OpenFermionQubitMapper</span><span class="p">(</span><span class="n">QubitMapper</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.</span>
+
+<span class="sd">    Available encodings:</span>
+<span class="sd">        - ``&quot;jordan-wigner&quot;`` (default)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev&quot;``</span>
+<span class="sd">        - ``&quot;symmetry-conserving-bravyi-kitaev&quot;`` (requires :class:`~qdk_chemistry.data.Symmetries`)</span>
+<span class="sd">        - ``&quot;bravyi-kitaev-tree&quot;``</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="OpenFermionQubitMapper.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize OpenFermionQubitMapper with a specific mapping strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            encoding: Qubit mapping strategy. See *Available encodings* above.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">OpenFermionQubitMapperSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QubitHamiltonian</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            symmetries: Symmetry information. Required for SCBK encoding.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            QubitHamiltonian: An instance of the QubitHamiltonian.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;encoding&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">_VALID_ENCODINGS</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Encoding &#39;</span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&#39; is unknown for OpenFermionQubitMapper.</span><span class="se">\n</span><span class="s2">Please use one of: </span><span class="si">{</span><span class="n">_VALID_ENCODINGS</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Mapping Hamiltonian with OpenFermion encoding: </span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">encoding</span> <span class="o">==</span> <span class="s2">&quot;symmetry-conserving-bravyi-kitaev&quot;</span><span class="p">:</span>
+            <span class="n">qubit_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map_scbk</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">)</span>
+            <span class="n">fermion_mode_order</span> <span class="o">=</span> <span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">INTERLEAVED</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">qubit_op</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_map_standard</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">encoding</span><span class="p">)</span>
+            <span class="n">fermion_mode_order</span> <span class="o">=</span> <span class="n">FermionModeOrder</span><span class="o">.</span><span class="n">BLOCKED</span>
+
+        <span class="n">qubit_op</span><span class="o">.</span><span class="n">compress</span><span class="p">()</span>
+
+        <span class="c1"># OpenFermion folds core_energy into the identity Pauli term.</span>
+        <span class="c1"># QDK convention stores core energy separately, so subtract it.</span>
+        <span class="n">core_energy</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_core_energy</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">core_energy</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">finfo</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span><span class="o">.</span><span class="n">eps</span><span class="p">:</span>
+            <span class="n">qubit_op</span> <span class="o">-=</span> <span class="n">core_energy</span> <span class="o">*</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">(())</span>
+            <span class="n">qubit_op</span><span class="o">.</span><span class="n">compress</span><span class="p">()</span>
+
+        <span class="k">return</span> <span class="n">qubit_operator_to_qubit_hamiltonian</span><span class="p">(</span>
+            <span class="n">qubit_op</span><span class="p">,</span>
+            <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+            <span class="n">fermion_mode_order</span><span class="o">=</span><span class="n">fermion_mode_order</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_map_standard</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">encoding</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).</span>
+
+<span class="sd">        Uses blocked spin-orbital ordering (α₀, α₁, …, β₀, β₁, …) so that</span>
+<span class="sd">        the resulting qubit Hamiltonian matches the QDK native mapper output.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            encoding: One of ``&quot;jordan-wigner&quot;``, ``&quot;bravyi-kitaev&quot;``,</span>
+<span class="sd">                or ``&quot;bravyi-kitaev-tree&quot;``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            openfermion.QubitOperator: The mapped qubit operator.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">fermion_op</span> <span class="o">=</span> <span class="n">_build_blocked_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+
+        <span class="n">transform_map</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;jordan-wigner&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">jordan_wigner</span><span class="p">,</span>
+            <span class="s2">&quot;bravyi-kitaev&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev</span><span class="p">,</span>
+            <span class="s2">&quot;bravyi-kitaev-tree&quot;</span><span class="p">:</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">bravyi_kitaev_tree</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">transform</span> <span class="o">=</span> <span class="n">transform_map</span><span class="p">[</span><span class="n">encoding</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">transform</span><span class="p">(</span><span class="n">fermion_op</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_map_scbk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">symmetries</span><span class="p">:</span> <span class="n">Symmetries</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">of</span><span class="o">.</span><span class="n">QubitOperator</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply symmetry-conserving Bravyi-Kitaev transformation.</span>
+
+<span class="sd">        This transform reduces the qubit count by 2 by exploiting particle number</span>
+<span class="sd">        and spin symmetry. The number of active electrons is read from the</span>
+<span class="sd">        ``symmetries`` parameter.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonian: The fermionic Hamiltonian.</span>
+<span class="sd">            symmetries: Symmetry information providing the active electron count.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            openfermion.QubitOperator: The mapped qubit operator.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If ``symmetries`` is not provided.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">symmetries</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries &quot;</span>
+                <span class="s2">&quot;object specifying the number of active electrons.</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;Example:</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;  from qdk_chemistry.data import Symmetries</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;  symmetries = Symmetries(n_alpha=1, n_beta=1)</span><span class="se">\n</span><span class="s2">&quot;</span>
+                <span class="s2">&quot;  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)&quot;</span>
+            <span class="p">)</span>
+
+        <span class="n">fermion_op</span> <span class="o">=</span> <span class="n">hamiltonian_to_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+        <span class="n">n_active_electrons</span> <span class="o">=</span> <span class="n">symmetries</span><span class="o">.</span><span class="n">n_particles</span>
+
+        <span class="c1"># Number of spin-orbitals</span>
+        <span class="n">h1_alpha</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">hamiltonian</span><span class="o">.</span><span class="n">get_one_body_integrals</span><span class="p">()</span>
+        <span class="n">n_spinorbitals</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">h1_alpha</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;SCBK: n_spinorbitals=</span><span class="si">{</span><span class="n">n_spinorbitals</span><span class="si">}</span><span class="s2">, n_active_electrons=</span><span class="si">{</span><span class="n">n_active_electrons</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">symmetry_conserving_bravyi_kitaev</span><span class="p">(</span>
+            <span class="n">fermion_op</span><span class="p">,</span>
+            <span class="n">n_spinorbitals</span><span class="p">,</span>
+            <span class="n">n_active_electrons</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="OpenFermionQubitMapper.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.plugins.openfermion.qubit_mapper.html#qdk_chemistry.plugins.openfermion.qubit_mapper.OpenFermionQubitMapper.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the algorithm name ``openfermion``.&quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">return</span> <span class="s2">&quot;openfermion&quot;</span></div>
+</div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_blocked_fermion_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">:</span> <span class="n">Hamiltonian</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">of</span><span class="o">.</span><span class="n">FermionOperator</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a FermionOperator using blocked spin-orbital ordering.</span>
+
+<span class="sd">    Blocked ordering: [α₀, α₁, …, αₙ₋₁, β₀, β₁, …, βₙ₋₁]</span>
+<span class="sd">    (QDK native convention)</span>
+
+<span class="sd">    This differs from OpenFermion&#39;s native interleaved convention</span>
+<span class="sd">    [α₀, β₀, α₁, β₁, …].  Building the operator in blocked order ensures</span>
+<span class="sd">    that subsequent fermion-to-qubit transforms (JW, BK, BK-tree) produce</span>
+<span class="sd">    qubit Hamiltonians directly compatible with the QDK native mapper.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        hamiltonian: The QDK/Chemistry Hamiltonian.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        openfermion.FermionOperator in blocked spin-orbital ordering.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Start from the correct interleaved InteractionOperator</span>
+    <span class="n">iop</span> <span class="o">=</span> <span class="n">hamiltonian_to_interaction_operator</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+
+    <span class="n">n_so</span> <span class="o">=</span> <span class="n">iop</span><span class="o">.</span><span class="n">n_qubits</span>
+    <span class="n">n_spatial</span> <span class="o">=</span> <span class="n">n_so</span> <span class="o">//</span> <span class="mi">2</span>
+
+    <span class="c1"># Permutation: blocked index j → interleaved index</span>
+    <span class="c1">#   j &lt; n_spatial  (alpha): 2*j</span>
+    <span class="c1">#   j &gt;= n_spatial (beta):  2*(j - n_spatial) + 1</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">2</span> <span class="o">*</span> <span class="n">j</span> <span class="k">if</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="n">n_spatial</span> <span class="k">else</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">j</span> <span class="o">-</span> <span class="n">n_spatial</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_so</span><span class="p">)])</span>
+
+    <span class="c1"># Re-index the one- and two-body tensors from interleaved to blocked</span>
+    <span class="n">h1_blocked</span> <span class="o">=</span> <span class="n">iop</span><span class="o">.</span><span class="n">one_body_tensor</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)]</span>
+    <span class="n">h2_blocked</span> <span class="o">=</span> <span class="n">iop</span><span class="o">.</span><span class="n">two_body_tensor</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ix_</span><span class="p">(</span><span class="n">idx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">idx</span><span class="p">,</span> <span class="n">idx</span><span class="p">)]</span>
+
+    <span class="n">iop_blocked</span> <span class="o">=</span> <span class="n">of</span><span class="o">.</span><span class="n">InteractionOperator</span><span class="p">(</span><span class="n">iop</span><span class="o">.</span><span class="n">constant</span><span class="p">,</span> <span class="n">h1_blocked</span><span class="p">,</span> <span class="n">h2_blocked</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">of</span><span class="o">.</span><span class="n">transforms</span><span class="o">.</span><span class="n">get_fermion_operator</span><span class="p">(</span><span class="n">iop_blocked</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -23,8 +23,9 @@ mp2_calculator = create("dynamical_correlation_calculator")
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
-from qdk_chemistry.data import Ansatz, Structure  # noqa: E402
+from pathlib import Path
+
+from qdk_chemistry.data import Ansatz, Structure
 
 # Load H2 structure from XYZ file
 structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
@@ -43,7 +44,7 @@ hamiltonian = hamiltonian_constructor.run(wfn_hf.get_orbitals())
 ansatz = Ansatz(hamiltonian, wfn_hf)
 
 # Run the correlation calculation
-mp2_total_energy, final_wavefunction = mp2_calculator.run(ansatz)
+mp2_total_energy, final_wavefunction, _ = mp2_calculator.run(ansatz)
 
 # Extract correlation energy
 mp2_corr_energy = mp2_total_energy - E_hf
@@ -54,7 +55,7 @@ print(f"MP2 Total Energy: {mp2_total_energy:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("dynamical_correlation_calculator"))
 # ['pyscf_coupled_cluster', 'qdk_mp2_calculator']

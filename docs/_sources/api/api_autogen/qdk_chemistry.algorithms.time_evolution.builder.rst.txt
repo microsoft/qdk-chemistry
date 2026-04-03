@@ -14,4 +14,7 @@ Submodules
    :maxdepth: 4
 
    qdk_chemistry.algorithms.time_evolution.builder.base
+   qdk_chemistry.algorithms.time_evolution.builder.partially_randomized
+   qdk_chemistry.algorithms.time_evolution.builder.qdrift
    qdk_chemistry.algorithms.time_evolution.builder.trotter
+   qdk_chemistry.algorithms.time_evolution.builder.trotter_error

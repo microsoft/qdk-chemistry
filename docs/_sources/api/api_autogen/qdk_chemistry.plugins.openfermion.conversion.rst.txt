@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.openfermion.conversion module
+====================================================
+
+.. automodule:: qdk_chemistry.plugins.openfermion.conversion
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

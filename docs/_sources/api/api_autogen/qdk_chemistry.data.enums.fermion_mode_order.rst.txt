@@ -1,0 +1,8 @@
+qdk\_chemistry.data.enums.fermion\_mode\_order module
+=====================================================
+
+.. automodule:: qdk_chemistry.data.enums.fermion_mode_order
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

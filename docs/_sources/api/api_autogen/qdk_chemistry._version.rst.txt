@@ -1,0 +1,8 @@
+qdk\_chemistry.\_version module
+===============================
+
+.. automodule:: qdk_chemistry._version
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,23 +1,45 @@
 Quickstart
 ==========
 
-These quickstart instructions provide a high-level overview of the typical workflow when using the QDK/Chemistry library.
-More comprehensive documentation can be found in the :doc:`comprehensive/index`. A list of features can be found in the :doc:`features` document.
+This quickstart walks through a complete quantum chemistry workflow, from molecular structure to energy estimate, using QDK/Chemistry's modular architecture.
+Each stage in the pipeline is an interchangeable component, so any step can be swapped for an alternative implementation without changing the rest of the workflow.
+
+More detailed documentation can be found in the :doc:`comprehensive/index`. A complete list of supported methods can be found in the :doc:`features` document.
 
 Installation
 ------------
 
-To install QDK/Chemistry, please see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+Install from PyPI with all optional dependencies:
+
+.. code-block:: bash
+
+   python3 -m venv venv && source venv/bin/activate
+   python3 -m pip install 'qdk-chemistry[all]'
+
+``[all]`` pulls in all optional dependencies so that examples and tests work without extra steps.
+For a minimal install, other methods (Dev Container, building from source), and platform-specific notes, see the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
 
 End-to-end example
 ------------------
 
-This document is intended to provide a brief introduction to the QDK/Chemistry library by walking through a minimal end-to-end example for ground state energy estimation with state preparation and measurement.
-The emphasis of this example is optimization:  reducing the resources required for the quantum computer to run a simple chemistry application.
-The example starts with a molecular structure and ends with an energy estimation computed by simulating a quantum circuit.
-The focus of this example is on high-level concepts and common coding patterns that can be extended to other applications.
+This example walks through the full quantum applications workflow: from building classical context around a molecular structure, through encoding for a quantum computer, to estimating the ground-state energy via circuit simulation.
+The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
+Companion chemistry datasets and supporting assets are also available in `microsoft/qdk-chemistry-data <https://github.com/microsoft/qdk-chemistry-data>`_.
+
+.. note::
+
+   If you installed ``qdk-chemistry`` from PyPI, use the ``stable/major.minor`` branch
+   when cloning the repository for examples.
+   The ``main`` branch is the active development branch and may be incompatible with
+   the released pip package. For example, to clone the repository for the latest stable 1.0 release, use:
+
+   .. code-block:: bash
+
+      git clone --branch stable/1.0 https://github.com/microsoft/qdk-chemistry.git
+
+   See the `examples README <https://github.com/microsoft/qdk-chemistry/blob/main/examples/README.md>`_ for details.
 
 Create a Structure object
 ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -155,11 +177,6 @@ By identifying and retaining only the dominant configurations (those with the la
 
    .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
       :language: cpp
-      :start-after: // start-cell-wfn-fn-select-configs
-      :end-before: // end-cell-wfn-fn-select-configs
-
-   .. literalinclude:: ../_static/examples/cpp/quickstart.cpp
-      :language: cpp
       :start-after: // start-cell-wfn-select-configs
       :end-before: // end-cell-wfn-select-configs
 
@@ -198,8 +215,6 @@ For efficient energy estimation, the qubit Hamiltonian can be optimized in two w
 
 Generate the state preparation circuit
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. TODO: Add more references to other methods
 
 Given the classical representation of the sparse multi-configurational :class:`~qdk_chemistry.data.Wavefunction`, a quantum circuit can be generated to prepare this state on a quantum computer.
 This can be done in many ways, including via Isometry encoding :cite:`Christandl2016`, linear combinations of unitaries, and tensor product methods.
@@ -252,3 +267,28 @@ For more information, see:
 - Above examples as complete `C++ <../_static/examples/cpp/quickstart.cpp>`_ and `Python <../_static/examples/python/quickstart.py>`_ scripts.
 - Additional examples of workflows using QDK/Chemistry in the `examples <https://github.com/microsoft/qdk-chemistry/tree/main/examples>`_ directory of the source repository.
 - :doc:`comprehensive/index` for links to more detailed documentation on specific components of QDK/Chemistry.
+
+Compiling C++ examples
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+To compile the C++ examples, the QDK/Chemistry C++ library must be installed on your system.
+See the `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for details on building and installing the library.
+
+Once installed, you can compile examples by linking against the ``qdk::chemistry`` CMake target:
+
+.. code-block:: cmake
+
+   cmake_minimum_required(VERSION 3.15)
+   project(my_example LANGUAGES CXX)
+
+   find_package(qdk REQUIRED COMPONENTS chemistry)
+
+   add_executable(my_example example.cpp)
+   target_link_libraries(my_example PUBLIC qdk::chemistry)
+
+Then build with CMake, pointing to your QDK/Chemistry installation:
+
+.. code-block:: bash
+
+   cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
+   cmake --build build

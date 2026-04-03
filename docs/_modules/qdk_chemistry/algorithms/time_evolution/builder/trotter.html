@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.time_evolution.builder.trotter &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.algorithms.time_evolution.builder.trotter &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
 </ul>
@@ -88,7 +90,20 @@
            <div itemprop="articleBody">
              
   <h1>Source code for qdk_chemistry.algorithms.time_evolution.builder.trotter</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry implementation of the Trotter decomposition Builder.&quot;&quot;&quot;</span>
+<span></span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;QDK/Chemistry implementation of the Trotter decomposition Builder.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Childs, A. M., et al. &quot;Theory of Trotter Error with Commutator</span>
+<span class="sd">    Scaling.&quot; *Physical Review X* 11.1 (2021): 011020.</span>
+
+<span class="sd">    Strang, G. &quot;On the construction and comparison of difference</span>
+<span class="sd">    schemes.&quot; SIAM Journal on Numerical Analysis 5.3 (1968): 506-517.</span>
+
+<span class="sd">    Suzuki, M. &quot;General theory of higher-order decomposition of</span>
+<span class="sd">    exponential operators and symplectic integrators.&quot;</span>
+<span class="sd">    Physics Letters A 165.5-6 (1992): 387-395.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
 
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 <span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
@@ -96,11 +111,16 @@
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeEvolutionBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter_error</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">trotter_steps_commutator</span><span class="p">,</span>
+    <span class="n">trotter_steps_naive</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">TimeEvolutionUnitary</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.time_evolution.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">ExponentiatedPauliTerm</span><span class="p">,</span>
     <span class="n">PauliProductFormulaContainer</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
 
 <span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Trotter&quot;</span><span class="p">,</span> <span class="s2">&quot;TrotterSettings&quot;</span><span class="p">]</span>
 
@@ -117,14 +137,36 @@
 
 <span class="sd">        Attributes:</span>
 <span class="sd">            order: The order of the Trotter decomposition (currently only first order is supported).</span>
-<span class="sd">            num_trotter_steps: The number of Trotter steps to use in the construction.</span>
-<span class="sd">            tolerance: The absolute tolerance for filtering small coefficients.</span>
+<span class="sd">            target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).</span>
+<span class="sd">            num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).</span>
+<span class="sd">            error_bound: Strategy for computing the Trotter error bound (&quot;commutator&quot; or &quot;naive&quot;).</span>
+<span class="sd">            weight_threshold: The absolute threshold for filtering small coefficients.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;The order of the Trotter decomposition.&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;num_trotter_steps&quot;</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;The number of Trotter steps.&quot;</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="s2">&quot;The absolute tolerance for filtering small coefficients.&quot;</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;target_accuracy&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;double&quot;</span><span class="p">,</span>
+            <span class="mf">0.0</span><span class="p">,</span>
+            <span class="s2">&quot;Target accuracy for automatic step computation (0.0 means disabled).&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;num_divisions&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">0</span><span class="p">,</span>
+            <span class="s2">&quot;Explicit number of divisions within a Trotter step (0 means automatic).&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;error_bound&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;commutator&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Strategy for computing the Trotter error bound (&#39;commutator&#39; or &#39;naive&#39;).&quot;</span><span class="p">,</span>
+            <span class="p">[</span><span class="s2">&quot;commutator&quot;</span><span class="p">,</span> <span class="s2">&quot;naive&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span> <span class="s2">&quot;float&quot;</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">,</span> <span class="s2">&quot;The absolute threshold for filtering small coefficients.&quot;</span>
+        <span class="p">)</span></div>
 </div>
 
 
@@ -136,21 +178,70 @@
 
 <div class="viewcode-block" id="Trotter.__init__">
 <a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.trotter.html#qdk_chemistry.algorithms.time_evolution.builder.trotter.Trotter.__init__">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">num_trotter_steps</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Trotter builder with specified Trotter decomposition settings.</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">target_accuracy</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">num_divisions</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">error_bound</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;commutator&quot;</span><span class="p">,</span>
+        <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize Trotter builder with specified Trotter decomposition settings.</span>
+
+<span class="sd">        The Trotter decomposition approximates the time evolution operator :math:`e^{-iHt}`</span>
+<span class="sd">        when the Hamiltonian :math:`H` can be expressed as a sum of terms :math:`H = \sum_j \alpha_j P_j`</span>
+<span class="sd">        where :math:`P_j` are Pauli strings and :math:`\alpha_j` are scalar coefficients. Rather than</span>
+<span class="sd">        exponentiating the full Hamiltonian at once, the Trotter method constructs an approximation by</span>
+<span class="sd">        exponentiating each term separately and combining them in a product formula. For example,</span>
+<span class="sd">        the first-order Trotter formula approximates the time evolution operator as</span>
+
+<span class="sd">        :math:`e^{-iHt} \approx S_1^N(t) = \left[\prod_j e^{-i\alpha_j P_j t/N}\right]^N`, where :math:`N` is the</span>
+<span class="sd">        number of divisions.</span>
+
+<span class="sd">        The number of divisions *N* can be determined automatically from</span>
+<span class="sd">        *target_accuracy*, fixed explicitly via *num_divisions*, or both</span>
+<span class="sd">        (in which case the larger value is used).</span>
+
+<span class="sd">        The error associated with the Trotter decomposition, :math:`S_k^N(t)`, can be expressted in terms of the</span>
+<span class="sd">        spectral norm of the difference between the exact and approximate time evolution operators:</span>
+
+<span class="sd">        :math:`\lVert e^{-iHt} - S_k^N(t) \rVert \leq \epsilon`</span>
+
+<span class="sd">        However, the cost of computing this norm is equivalent to computing the exact exponential itself. For this</span>
+<span class="sd">        reason, we provide two approximate error-bound strategies to determine the number of divisions required to</span>
+<span class="sd">        achieve a target accuracy at a particular Trotter order (used only when *target_accuracy* is set):</span>
+
+<span class="sd">        * ``&quot;commutator&quot;`` (default, tighter): uses the commutator-based bound</span>
+<span class="sd">          from Childs *et al.* (2021).  :math:`N = \lceil \frac{t^{2}}{2\epsilon}</span>
+<span class="sd">          \sum_{j&lt;k}\lVert[\alpha_jP_j,\alpha_kP_k]\rVert \rceil`</span>
+<span class="sd">        * ``&quot;naive&quot;``: uses the triangle-inequality bound.</span>
+<span class="sd">          :math:`N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil`</span>
 
 <span class="sd">        Args:</span>
-<span class="sd">            order: The order of the Trotter decomposition (currently only first order is supported). Defaults to 1.</span>
-<span class="sd">            num_trotter_steps: Number of Trotter steps for the decomposition. Higher values improve accuracy</span>
-<span class="sd">                but increase circuit depth. Defaults to 1.</span>
-<span class="sd">            tolerance: Absolute threshold for filtering small Hamiltonian coefficients. Defaults to 1e-12.</span>
+<span class="sd">            order: The order of the Trotter decomposition (currently only</span>
+<span class="sd">                first order is supported). Defaults to 1.</span>
+<span class="sd">            target_accuracy: Target accuracy for automatic step computation.</span>
+<span class="sd">                Must be positive to enable automatic computation.</span>
+<span class="sd">                Use 0.0 (default) to disable.</span>
+<span class="sd">            num_divisions: Explicit number of divisions within a Trotter</span>
+<span class="sd">                step.  When both *num_divisions* and *target_accuracy*</span>
+<span class="sd">                are given the larger value is used.  Use 0 (default) for</span>
+<span class="sd">                automatic determination.</span>
+<span class="sd">            error_bound: Strategy for computing the Trotter error bound</span>
+<span class="sd">                when *target_accuracy* is set.  Either ``&quot;commutator&quot;``</span>
+<span class="sd">                (default, tighter) or ``&quot;naive&quot;``.</span>
+<span class="sd">            weight_threshold: Absolute threshold for filtering small</span>
+<span class="sd">                Hamiltonian coefficients. Defaults to 1e-12.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">TrotterSettings</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">,</span> <span class="n">order</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_trotter_steps&quot;</span><span class="p">,</span> <span class="n">num_trotter_steps</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">,</span> <span class="n">target_accuracy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_divisions&quot;</span><span class="p">,</span> <span class="n">num_divisions</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">,</span> <span class="n">error_bound</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeEvolutionUnitary</span><span class="p">:</span>
@@ -164,16 +255,26 @@
 <span class="sd">            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_first_order_trotter</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Only first-order Trotter decomposition is currently supported.&quot;</span><span class="p">)</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">order</span> <span class="ow">in</span> <span class="p">{</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">}</span> <span class="ow">or</span> <span class="p">(</span><span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">order</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_trotter</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span><span class="s2">&quot;Trotter orders must be positive and even for orders greater than 1&quot;</span><span class="p">)</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_first_order_trotter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeEvolutionUnitary</span><span class="p">:</span>
-<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Construct the time evolution unitary using first-order Trotter decomposition.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_trotter</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeEvolutionUnitary</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Construct the time evolution unitary using the Trotter decomposition.</span>
 
 <span class="sd">        The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`</span>
 <span class="sd">        by decomposing the Hamiltonian H into a sum of terms and using the product formula:</span>
-<span class="sd">        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of Trotter steps.</span>
+<span class="sd">        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of divisions.</span>
+
+<span class="sd">        The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`</span>
+<span class="sd">        by decomposing the Hamiltonian H into a sum of terms and using the product formula:</span>
+<span class="sd">        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/2n}e^{-iH_L t/n}\prod_{i=L-1}^{1}</span>
+<span class="sd">        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions (See Strang (1968)).</span>
+
+<span class="sd">        Higher order Trotter methods are constructed using the recursive Suzuki method, which builds order 2k formulas</span>
+<span class="sd">        as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,</span>
+<span class="sd">        where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).</span>
 
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.</span>
@@ -183,47 +284,73 @@
 <span class="sd">            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="c1"># Calculate evolution time per Trotter step</span>
-        <span class="n">delta</span> <span class="o">=</span> <span class="n">time</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_trotter_steps&quot;</span><span class="p">)</span>
-        <span class="n">tolerance</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+        <span class="n">weight_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">)</span>
 
-        <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decompose_trotter_step</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">delta</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">tolerance</span><span class="p">)</span>
+        <span class="n">num_divisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_resolve_num_divisions</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+
+        <span class="n">delta</span> <span class="o">=</span> <span class="n">time</span> <span class="o">/</span> <span class="n">num_divisions</span>
+
+        <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_decompose_trotter_step</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="n">delta</span><span class="p">,</span> <span class="n">atol</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">)</span>
 
         <span class="n">num_qubits</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span>
 
         <span class="n">container</span> <span class="o">=</span> <span class="n">PauliProductFormulaContainer</span><span class="p">(</span>
             <span class="n">step_terms</span><span class="o">=</span><span class="n">terms</span><span class="p">,</span>
-            <span class="n">step_reps</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_trotter_steps&quot;</span><span class="p">),</span>
+            <span class="n">step_reps</span><span class="o">=</span><span class="n">num_divisions</span><span class="p">,</span>
             <span class="n">num_qubits</span><span class="o">=</span><span class="n">num_qubits</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="k">return</span> <span class="n">TimeEvolutionUnitary</span><span class="p">(</span><span class="n">container</span><span class="o">=</span><span class="n">container</span><span class="p">)</span>
 
-    <span class="nd">@staticmethod</span>
-    <span class="k">def</span><span class="w"> </span><span class="nf">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Translate a Pauli label to a mapping ``qubit -&gt; {X, Y, Z}``.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_resolve_num_divisions</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determine the number of Trotter divisions to use.</span>
 
-<span class="sd">        Args:</span>
-<span class="sd">            label: Pauli string label in little-endian ordering.</span>
-
-<span class="sd">        Returns:</span>
-<span class="sd">            Dictionary assigning each non-identity qubit index to its Pauli axis.</span>
+<span class="sd">        When both *num_divisions* and *target_accuracy* are provided, the</span>
+<span class="sd">        larger value wins.  When neither is provided, the default is 1.</span>
 
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">mapping</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">char</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">reversed</span><span class="p">(</span><span class="n">label</span><span class="p">)):</span>  <span class="c1"># reversed: right-most char -&gt; qubit 0</span>
-            <span class="k">if</span> <span class="n">char</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span><span class="p">:</span>
-                <span class="n">mapping</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="n">char</span>
-        <span class="k">return</span> <span class="n">mapping</span>
+        <span class="n">num_divisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_divisions&quot;</span><span class="p">)</span>
+        <span class="n">manual</span> <span class="o">=</span> <span class="n">num_divisions</span> <span class="k">if</span> <span class="n">num_divisions</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">1</span>
+
+        <span class="n">target_accuracy</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;target_accuracy&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">target_accuracy</span> <span class="o">&lt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">manual</span>
+
+        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
+        <span class="n">weight_threshold</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">)</span>
+
+        <span class="n">error_bound</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;error_bound&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">error_bound</span> <span class="o">==</span> <span class="s2">&quot;commutator&quot;</span><span class="p">:</span>
+            <span class="n">auto</span> <span class="o">=</span> <span class="n">trotter_steps_commutator</span><span class="p">(</span>
+                <span class="n">hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+                <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+                <span class="n">target_accuracy</span><span class="o">=</span><span class="n">target_accuracy</span><span class="p">,</span>
+                <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+                <span class="n">weight_threshold</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">auto</span> <span class="o">=</span> <span class="n">trotter_steps_naive</span><span class="p">(</span>
+                <span class="n">hamiltonian</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="p">,</span>
+                <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+                <span class="n">target_accuracy</span><span class="o">=</span><span class="n">target_accuracy</span><span class="p">,</span>
+                <span class="n">order</span><span class="o">=</span><span class="n">order</span><span class="p">,</span>
+                <span class="n">weight_threshold</span><span class="o">=</span><span class="n">weight_threshold</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">manual</span><span class="p">,</span> <span class="n">auto</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_decompose_trotter_step</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">atol</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span>
     <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Decompose a single Trotter step into exponentiated Pauli terms.</span>
 
+<span class="sd">        The order of the Trotter decomposition is taken from the settings associated</span>
+<span class="sd">        with this builder.</span>
+
 <span class="sd">        Args:</span>
 <span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be decomposed.</span>
 <span class="sd">            time: The evolution time for the single step.</span>
+
 <span class="sd">            atol: Absolute tolerance for filtering small coefficients.</span>
 
 <span class="sd">        Returns:</span>
@@ -232,25 +359,92 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
 
-        <span class="k">for</span> <span class="n">pauli</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-            <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">paulis</span><span class="p">,</span>
-            <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_ops</span><span class="o">.</span><span class="n">coeffs</span><span class="p">,</span>
-            <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="p">):</span>
-            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">atol</span><span class="p">:</span>
-                <span class="k">continue</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">is_hermitian</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">atol</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.&quot;</span><span class="p">)</span>
 
-            <span class="n">coeff_complex</span> <span class="o">=</span> <span class="nb">complex</span><span class="p">(</span><span class="n">coeff</span><span class="p">)</span>
-            <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">coeff_complex</span><span class="o">.</span><span class="n">imag</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">atol</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
-                    <span class="sa">f</span><span class="s2">&quot;Non-Hermitian Hamiltonian: coefficient </span><span class="si">{</span><span class="n">coeff</span><span class="si">}</span><span class="s2"> for term &quot;</span>
-                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pauli</span><span class="o">.</span><span class="n">to_label</span><span class="p">()</span><span class="si">}</span><span class="s2"> has nonzero imaginary part.&quot;</span>
-                <span class="p">)</span>
-            <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">pauli</span><span class="o">.</span><span class="n">to_label</span><span class="p">())</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;order&quot;</span><span class="p">)</span>
 
-            <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff_complex</span><span class="o">.</span><span class="n">real</span> <span class="o">*</span> <span class="n">time</span>
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">atol</span><span class="p">))</span>
+        <span class="c1"># If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),</span>
+        <span class="c1"># there is nothing to decompose; return the empty list of terms.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">coeffs</span><span class="p">:</span>
+            <span class="n">Logger</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;No coefficients above the tolerance; returning empty term list.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">terms</span>
+
+        <span class="k">if</span> <span class="n">order</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">coeffs</span><span class="p">:</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span>
+                <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+        <span class="c1"># order = 2 or order = 2k with k&gt;1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">coeffs</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span> <span class="o">/</span> <span class="mi">2</span>
+                <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+            <span class="c1"># e^{-iH_L t/n}</span>
+            <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="o">=</span> <span class="n">coeffs</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+            <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span>
             <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
 
+            <span class="c1"># \prod_{i=L-1}^1 e^{-iH_i t/(2n)}</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">coeffs</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span> <span class="o">/</span> <span class="mi">2</span>
+                <span class="n">terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+
+            <span class="c1"># Construct order 2k formula bottom up dynamic-programming style</span>
+            <span class="k">if</span> <span class="n">order</span> <span class="o">&gt;</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">step_terms</span> <span class="o">=</span> <span class="n">terms</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">order</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+                    <span class="n">u_k</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">**</span> <span class="p">(</span><span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)))</span>
+                    <span class="n">new_terms</span> <span class="o">=</span> <span class="p">[]</span>
+
+                    <span class="c1"># S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)</span>
+                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">step_terms</span><span class="p">:</span>
+                            <span class="n">new_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span>
+                                    <span class="n">pauli_term</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span>
+                                    <span class="n">angle</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span> <span class="o">*</span> <span class="n">u_k</span><span class="p">,</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+                    <span class="c1"># S_{2k-2}((1-4u_k) t)</span>
+                    <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">step_terms</span><span class="p">:</span>
+                        <span class="n">new_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                            <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span>
+                                <span class="n">pauli_term</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span>
+                                <span class="n">angle</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">4</span> <span class="o">*</span> <span class="n">u_k</span><span class="p">),</span>
+                            <span class="p">)</span>
+                        <span class="p">)</span>
+
+                    <span class="c1"># S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)</span>
+                    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">step_terms</span><span class="p">:</span>
+                            <span class="n">new_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                                <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span>
+                                    <span class="n">pauli_term</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span>
+                                    <span class="n">angle</span><span class="o">=</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span> <span class="o">*</span> <span class="n">u_k</span><span class="p">,</span>
+                                <span class="p">)</span>
+                            <span class="p">)</span>
+
+                    <span class="n">step_terms</span> <span class="o">=</span> <span class="n">new_terms</span>
+                <span class="n">terms</span> <span class="o">=</span> <span class="n">step_terms</span>
+
+            <span class="c1"># Merge adjacent terms with the same pauli_term by summing angles.</span>
+            <span class="n">merged_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">merged_terms</span> <span class="ow">and</span> <span class="n">merged_terms</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">pauli_term</span> <span class="o">==</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">:</span>
+                    <span class="n">last</span> <span class="o">=</span> <span class="n">merged_terms</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="n">merged_terms</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span>
+                        <span class="n">pauli_term</span><span class="o">=</span><span class="n">last</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span>
+                        <span class="n">angle</span><span class="o">=</span><span class="n">last</span><span class="o">.</span><span class="n">angle</span> <span class="o">+</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span>
+                    <span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">merged_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+            <span class="n">terms</span> <span class="o">=</span> <span class="n">merged_terms</span>
         <span class="k">return</span> <span class="n">terms</span>
 
 <div class="viewcode-block" id="Trotter.name">

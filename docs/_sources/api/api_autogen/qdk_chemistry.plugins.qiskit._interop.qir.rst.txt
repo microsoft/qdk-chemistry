@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.qiskit.\_interop.qir module
+==================================================
+
+.. automodule:: qdk_chemistry.plugins.qiskit._interop.qir
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

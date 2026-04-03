@@ -21,7 +21,8 @@ Submodules
 .. toctree::
    :maxdepth: 4
 
+   qdk_chemistry.plugins.qiskit.circuit_executor
    qdk_chemistry.plugins.qiskit.conversion
-   qdk_chemistry.plugins.qiskit.energy_estimator
    qdk_chemistry.plugins.qiskit.qubit_mapper
    qdk_chemistry.plugins.qiskit.regular_isometry
+   qdk_chemistry.plugins.qiskit.standard_phase_estimation

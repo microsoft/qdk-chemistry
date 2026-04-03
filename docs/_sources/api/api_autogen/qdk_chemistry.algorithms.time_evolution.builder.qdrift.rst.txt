@@ -1,0 +1,8 @@
+qdk\_chemistry.algorithms.time\_evolution.builder.qdrift module
+===============================================================
+
+.. automodule:: qdk_chemistry.algorithms.time_evolution.builder.qdrift
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

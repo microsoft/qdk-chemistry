@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.utils package &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.utils package &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../_static/tabs.js?v=3ee01567"></script>
@@ -26,8 +26,8 @@
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
-    <link rel="next" title="qdk_chemistry.utils.cubegen module" href="qdk_chemistry.utils.cubegen.html" />
-    <link rel="prev" title="qdk_chemistry.plugins.qiskit.regular_isometry module" href="qdk_chemistry.plugins.qiskit.regular_isometry.html" /> 
+    <link rel="next" title="qdk_chemistry.utils.qsharp package" href="qdk_chemistry.utils.qsharp.html" />
+    <link rel="prev" title="qdk_chemistry.plugins.qiskit.standard_phase_estimation module" href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -66,6 +66,7 @@
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.utils.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.utils.compute_valence_space_parameters"><code class="docutils literal notranslate"><span class="pre">compute_valence_space_parameters()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="#qdk_chemistry.utils.rotate_orbitals"><code class="docutils literal notranslate"><span class="pre">rotate_orbitals()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="#subpackages">Subpackages</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#submodules">Submodules</a></li>
 </ul>
 </li>
@@ -78,6 +79,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../references.html">References</a></li>
 </ul>
@@ -119,7 +122,7 @@
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.compute_valence_space_parameters">
-<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.</span></span><span class="sig-name descname"><span class="pre">compute_valence_space_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavefunction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><span class="pre">qdk_chemistry.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.compute_valence_space_parameters" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.</span></span><span class="sig-name descname"><span class="pre">compute_valence_space_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavefunction</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Wavefunction" title="qdk_chemistry.data.Wavefunction"><span class="pre">qdk_chemistry.data.Wavefunction</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">charge</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsIndex" title="(in Python v3.14)"><span class="pre">SupportsIndex</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#tuple" title="(in Python v3.14)"><span class="pre">tuple</span></a><span class="p"><span class="pre">[</span></span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="headerlink" href="#qdk_chemistry.utils.compute_valence_space_parameters" title="Link to this definition"></a></dt>
 <dd><p>Get the default number of active electrons, active orbitals, which are obtained from the valence electrons and orbitals of the atomic element types in the structure.
 The structure is automatically extracted from the wavefunction.</p>
 <dl class="field-list simple">
@@ -136,7 +139,7 @@ The structure is automatically extracted from the wavefunction.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="qdk_chemistry.utils.rotate_orbitals">
-<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.</span></span><span class="sig-name descname"><span class="pre">rotate_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotation_vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_alpha_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_beta_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">restricted_external</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.rotate_orbitals" title="Link to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">qdk_chemistry.utils.</span></span><span class="sig-name descname"><span class="pre">rotate_orbitals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">rotation_vector</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.Annotated" title="(in Python v3.14)"><span class="pre">Annotated</span></a><span class="p"><span class="pre">[</span></span><span class="pre">numpy.typing.ArrayLike</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">numpy.float64</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'[m,</span> <span class="pre">1]'</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_alpha_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsIndex" title="(in Python v3.14)"><span class="pre">SupportsIndex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_beta_occupied_orbitals</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsInt" title="(in Python v3.14)"><span class="pre">SupportsInt</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/typing.html#typing.SupportsIndex" title="(in Python v3.14)"><span class="pre">SupportsIndex</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">restricted_external</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><span class="pre">bool</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="qdk_chemistry.data.html#qdk_chemistry.data.Orbitals" title="qdk_chemistry.data.Orbitals"><span class="pre">qdk_chemistry.data.Orbitals</span></a></span></span><a class="headerlink" href="#qdk_chemistry.utils.rotate_orbitals" title="Link to this definition"></a></dt>
 <dd><p>Rotate molecular orbitals using a rotation vector.</p>
 <p>This function takes Orbitals and applies orbital rotations using a
 rotation vector, typically taken from stability analysis eigenvectors.</p>
@@ -189,6 +192,14 @@ then beta rotations (n_occ_beta * n_vir_beta elements).</p></li>
 </div>
 </dd></dl>
 
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading"></a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.qsharp.html">qdk_chemistry.utils.qsharp package</a></li>
+</ul>
+</div>
+</section>
 <section id="submodules">
 <h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading"></a></h2>
 <div class="toctree-wrapper compound">
@@ -201,6 +212,35 @@ then beta rotations (n_occ_beta * n_vir_beta elements).</p></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.enum.html#qdk_chemistry.utils.enum.CaseInsensitiveStrEnum"><code class="docutils literal notranslate"><span class="pre">CaseInsensitiveStrEnum</span></code></a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html">qdk_chemistry.utils.model_hamiltonians module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_heisenberg_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_hubbard_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_huckel_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_huckel_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_ising_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian"><code class="docutils literal notranslate"><span class="pre">create_ppp_hamiltonian()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.mataga_nishimoto_potential"><code class="docutils literal notranslate"><span class="pre">mataga_nishimoto_potential()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.ohno_potential"><code class="docutils literal notranslate"><span class="pre">ohno_potential()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.model_hamiltonians.html#qdk_chemistry.utils.model_hamiltonians.pairwise_potential"><code class="docutils literal notranslate"><span class="pre">pairwise_potential()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html">qdk_chemistry.utils.pauli_commutation module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_first_order"><code class="docutils literal notranslate"><span class="pre">commutator_bound_first_order()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order"><code class="docutils literal notranslate"><span class="pre">commutator_bound_higher_order()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.commutator_bound_second_order"><code class="docutils literal notranslate"><span class="pre">commutator_bound_second_order()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_commute"><code class="docutils literal notranslate"><span class="pre">do_pauli_labels_commute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_labels_qw_commute"><code class="docutils literal notranslate"><span class="pre">do_pauli_labels_qw_commute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_commute"><code class="docutils literal notranslate"><span class="pre">do_pauli_maps_commute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute"><code class="docutils literal notranslate"><span class="pre">do_pauli_maps_qw_commute()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.does_nested_commutator_vanish"><code class="docutils literal notranslate"><span class="pre">does_nested_commutator_vanish()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_commutation.html#qdk_chemistry.utils.pauli_commutation.get_commutation_checker"><code class="docutils literal notranslate"><span class="pre">get_commutation_checker()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.pauli_matrix.html">qdk_chemistry.utils.pauli_matrix module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_string_to_masks"><code class="docutils literal notranslate"><span class="pre">pauli_string_to_masks()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_to_dense_matrix"><code class="docutils literal notranslate"><span class="pre">pauli_to_dense_matrix()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.pauli_matrix.html#qdk_chemistry.utils.pauli_matrix.pauli_to_sparse_matrix"><code class="docutils literal notranslate"><span class="pre">pauli_to_sparse_matrix()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.phase.html">qdk_chemistry.utils.phase module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.accumulated_phase_from_bits"><code class="docutils literal notranslate"><span class="pre">accumulated_phase_from_bits()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.energy_alias_candidates"><code class="docutils literal notranslate"><span class="pre">energy_alias_candidates()</span></code></a></li>
@@ -210,23 +250,115 @@ then beta rotations (n_occ_beta * n_vir_beta elements).</p></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.phase.html#qdk_chemistry.utils.phase.resolve_energy_aliases"><code class="docutils literal notranslate"><span class="pre">resolve_energy_aliases()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html">qdk_chemistry.utils.time_evolution module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.PauliEvolutionTerm"><code class="docutils literal notranslate"><span class="pre">PauliEvolutionTerm</span></code></a><ul>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.PauliEvolutionTerm.pauli_map"><code class="docutils literal notranslate"><span class="pre">PauliEvolutionTerm.pauli_map</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.PauliEvolutionTerm.coefficient"><code class="docutils literal notranslate"><span class="pre">PauliEvolutionTerm.coefficient</span></code></a></li>
-<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.PauliEvolutionTerm.__init__"><code class="docutils literal notranslate"><span class="pre">PauliEvolutionTerm.__init__()</span></code></a></li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html">qdk_chemistry.utils.telemetry module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime"><code class="docutils literal notranslate"><span class="pre">datetime</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.astimezone"><code class="docutils literal notranslate"><span class="pre">datetime.astimezone()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.combine"><code class="docutils literal notranslate"><span class="pre">datetime.combine()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.ctime"><code class="docutils literal notranslate"><span class="pre">datetime.ctime()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.date"><code class="docutils literal notranslate"><span class="pre">datetime.date()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.dst"><code class="docutils literal notranslate"><span class="pre">datetime.dst()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.fold"><code class="docutils literal notranslate"><span class="pre">datetime.fold</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.fromisoformat"><code class="docutils literal notranslate"><span class="pre">datetime.fromisoformat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.fromtimestamp"><code class="docutils literal notranslate"><span class="pre">datetime.fromtimestamp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.hour"><code class="docutils literal notranslate"><span class="pre">datetime.hour</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.isoformat"><code class="docutils literal notranslate"><span class="pre">datetime.isoformat()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.max"><code class="docutils literal notranslate"><span class="pre">datetime.max</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.microsecond"><code class="docutils literal notranslate"><span class="pre">datetime.microsecond</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.min"><code class="docutils literal notranslate"><span class="pre">datetime.min</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.minute"><code class="docutils literal notranslate"><span class="pre">datetime.minute</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.now"><code class="docutils literal notranslate"><span class="pre">datetime.now()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.replace"><code class="docutils literal notranslate"><span class="pre">datetime.replace()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.resolution"><code class="docutils literal notranslate"><span class="pre">datetime.resolution</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.second"><code class="docutils literal notranslate"><span class="pre">datetime.second</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.strptime"><code class="docutils literal notranslate"><span class="pre">datetime.strptime()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.time"><code class="docutils literal notranslate"><span class="pre">datetime.time()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.timestamp"><code class="docutils literal notranslate"><span class="pre">datetime.timestamp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.timetuple"><code class="docutils literal notranslate"><span class="pre">datetime.timetuple()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.timetz"><code class="docutils literal notranslate"><span class="pre">datetime.timetz()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.tzinfo"><code class="docutils literal notranslate"><span class="pre">datetime.tzinfo</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.tzname"><code class="docutils literal notranslate"><span class="pre">datetime.tzname()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.utcfromtimestamp"><code class="docutils literal notranslate"><span class="pre">datetime.utcfromtimestamp()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.utcnow"><code class="docutils literal notranslate"><span class="pre">datetime.utcnow()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.utcoffset"><code class="docutils literal notranslate"><span class="pre">datetime.utcoffset()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.datetime.utctimetuple"><code class="docutils literal notranslate"><span class="pre">datetime.utctimetuple()</span></code></a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.append_controlled_time_evolution"><code class="docutils literal notranslate"><span class="pre">append_controlled_time_evolution()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.controlled_pauli_rotation"><code class="docutils literal notranslate"><span class="pre">controlled_pauli_rotation()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.extract_terms_from_hamiltonian"><code class="docutils literal notranslate"><span class="pre">extract_terms_from_hamiltonian()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.time_evolution.html#qdk_chemistry.utils.time_evolution.pauli_evolution_terms"><code class="docutils literal notranslate"><span class="pre">pauli_evolution_terms()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone"><code class="docutils literal notranslate"><span class="pre">timezone</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.dst"><code class="docutils literal notranslate"><span class="pre">timezone.dst()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.fromutc"><code class="docutils literal notranslate"><span class="pre">timezone.fromutc()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.max"><code class="docutils literal notranslate"><span class="pre">timezone.max</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.min"><code class="docutils literal notranslate"><span class="pre">timezone.min</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.tzname"><code class="docutils literal notranslate"><span class="pre">timezone.tzname()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.utc"><code class="docutils literal notranslate"><span class="pre">timezone.utc</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.timezone.utcoffset"><code class="docutils literal notranslate"><span class="pre">timezone.utcoffset()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PackageNotFoundError"><code class="docutils literal notranslate"><span class="pre">PackageNotFoundError</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PackageNotFoundError.name"><code class="docutils literal notranslate"><span class="pre">PackageNotFoundError.name</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.version"><code class="docutils literal notranslate"><span class="pre">version()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Empty"><code class="docutils literal notranslate"><span class="pre">Empty</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue"><code class="docutils literal notranslate"><span class="pre">SimpleQueue</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.empty"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.empty()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.get"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.get()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.get_nowait"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.get_nowait()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.put"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.put()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.put_nowait"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.put_nowait()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.SimpleQueue.qsize"><code class="docutils literal notranslate"><span class="pre">SimpleQueue.qsize()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread"><code class="docutils literal notranslate"><span class="pre">Thread</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.__init__"><code class="docutils literal notranslate"><span class="pre">Thread.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.start"><code class="docutils literal notranslate"><span class="pre">Thread.start()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.run"><code class="docutils literal notranslate"><span class="pre">Thread.run()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.join"><code class="docutils literal notranslate"><span class="pre">Thread.join()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.name"><code class="docutils literal notranslate"><span class="pre">Thread.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.ident"><code class="docutils literal notranslate"><span class="pre">Thread.ident</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.native_id"><code class="docutils literal notranslate"><span class="pre">Thread.native_id</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.is_alive"><code class="docutils literal notranslate"><span class="pre">Thread.is_alive()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.daemon"><code class="docutils literal notranslate"><span class="pre">Thread.daemon</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.isDaemon"><code class="docutils literal notranslate"><span class="pre">Thread.isDaemon()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.setDaemon"><code class="docutils literal notranslate"><span class="pre">Thread.setDaemon()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.getName"><code class="docutils literal notranslate"><span class="pre">Thread.getName()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Thread.setName"><code class="docutils literal notranslate"><span class="pre">Thread.setName()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric"><code class="docutils literal notranslate"><span class="pre">Metric</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric.name"><code class="docutils literal notranslate"><span class="pre">Metric.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric.value"><code class="docutils literal notranslate"><span class="pre">Metric.value</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric.count"><code class="docutils literal notranslate"><span class="pre">Metric.count</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric.properties"><code class="docutils literal notranslate"><span class="pre">Metric.properties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric.type"><code class="docutils literal notranslate"><span class="pre">Metric.type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric"><code class="docutils literal notranslate"><span class="pre">PendingMetric</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.min"><code class="docutils literal notranslate"><span class="pre">PendingMetric.min</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.max"><code class="docutils literal notranslate"><span class="pre">PendingMetric.max</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.name"><code class="docutils literal notranslate"><span class="pre">PendingMetric.name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.value"><code class="docutils literal notranslate"><span class="pre">PendingMetric.value</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.count"><code class="docutils literal notranslate"><span class="pre">PendingMetric.count</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.properties"><code class="docutils literal notranslate"><span class="pre">PendingMetric.properties</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric.type"><code class="docutils literal notranslate"><span class="pre">PendingMetric.type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.log_telemetry"><code class="docutils literal notranslate"><span class="pre">log_telemetry()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html">qdk_chemistry.utils.telemetry_events module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.wraps"><code class="docutils literal notranslate"><span class="pre">wraps()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.log_telemetry"><code class="docutils literal notranslate"><span class="pre">log_telemetry()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.get_basis_functions_bucket"><code class="docutils literal notranslate"><span class="pre">get_basis_functions_bucket()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.extract_data"><code class="docutils literal notranslate"><span class="pre">extract_data()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_qdk_chemistry_import"><code class="docutils literal notranslate"><span class="pre">on_qdk_chemistry_import()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_algorithm"><code class="docutils literal notranslate"><span class="pre">on_algorithm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.on_algorithm_end"><code class="docutils literal notranslate"><span class="pre">on_algorithm_end()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.telemetry_events.html#qdk_chemistry.utils.telemetry_events.telemetry_tracker"><code class="docutils literal notranslate"><span class="pre">telemetry_tracker()</span></code></a></li>
 </ul>
 </li>
 <li class="toctree-l1"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html">qdk_chemistry.utils.wavefunction module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.calculate_sparse_wavefunction"><code class="docutils literal notranslate"><span class="pre">calculate_sparse_wavefunction()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.get_active_determinants_info"><code class="docutils literal notranslate"><span class="pre">get_active_determinants_info()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="qdk_chemistry.utils.wavefunction.html#qdk_chemistry.utils.wavefunction.get_top_determinants"><code class="docutils literal notranslate"><span class="pre">get_top_determinants()</span></code></a></li>
 </ul>
 </li>
 </ul>
@@ -238,8 +370,8 @@ then beta rotations (n_occ_beta * n_vir_beta elements).</p></li>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="qdk_chemistry.plugins.qiskit.regular_isometry.html" class="btn btn-neutral float-left" title="qdk_chemistry.plugins.qiskit.regular_isometry module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="qdk_chemistry.utils.cubegen.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.cubegen module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="qdk_chemistry.plugins.qiskit.standard_phase_estimation.html" class="btn btn-neutral float-left" title="qdk_chemistry.plugins.qiskit.standard_phase_estimation module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="qdk_chemistry.utils.qsharp.html" class="btn btn-neutral float-right" title="qdk_chemistry.utils.qsharp package" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

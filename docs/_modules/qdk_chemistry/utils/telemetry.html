@@ -1,0 +1,448 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.utils.telemetry &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.utils.telemetry</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.utils.telemetry</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Telemetry module for QDK Chemistry.</span>
+
+<span class="sd">Module sends telemetry directly to Azure Monitor using a similar mechanism and</span>
+<span class="sd">format to the Azure Monitor OpenTelemetry Python SDK. It only supports custom metrics of</span>
+<span class="sd">type &quot;counter&quot; and &quot;histogram&quot; for now. Its goal is to be minimal in size and dependencies,</span>
+<span class="sd">and easy to read to understand exactly what data is being sent.</span>
+
+<span class="sd">To use this API, simply call `log_telemetry` with the metric name, value, and any other</span>
+<span class="sd">optional properties. The telemetry will be batched and sent at a regular intervals (60 sec),</span>
+<span class="sd">and when the process is about to exit.</span>
+
+<span class="sd">Disable qdk_chemistry Python telemetry by setting the environment variable</span>
+<span class="sd">`QSHARP_PYTHON_TELEMETRY` to one of the following: `none`, `disabled`, `false`, or `0`.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">atexit</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">locale</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">platform</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib.error</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">urllib.request</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span><span class="p">,</span> <span class="n">timezone</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">importlib.metadata</span><span class="w"> </span><span class="kn">import</span> <span class="n">PackageNotFoundError</span><span class="p">,</span> <span class="n">version</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">queue</span><span class="w"> </span><span class="kn">import</span> <span class="n">Empty</span><span class="p">,</span> <span class="n">SimpleQueue</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">threading</span><span class="w"> </span><span class="kn">import</span> <span class="n">Thread</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Literal</span><span class="p">,</span> <span class="n">TypedDict</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="c1"># Define the package version</span>
+    <span class="n">QDK_CHEMISTRY_VERSION</span> <span class="o">=</span> <span class="n">version</span><span class="p">(</span><span class="s2">&quot;qdk-chemistry&quot;</span><span class="p">)</span>
+<span class="k">except</span> <span class="n">PackageNotFoundError</span><span class="p">:</span>
+    <span class="c1"># Package is not installed (e.g. running from source tree).</span>
+    <span class="c1"># Use a dev sentinel - telemetry does not require the real version.</span>
+    <span class="n">QDK_CHEMISTRY_VERSION</span> <span class="o">=</span> <span class="s2">&quot;0.0.0.dev0&quot;</span>
+
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span> <span class="o">&gt;=</span> <span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">11</span><span class="p">):</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">UTC</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="c1"># Backport for Python 3.10</span>
+    <span class="n">UTC</span> <span class="o">=</span> <span class="n">timezone</span><span class="o">.</span><span class="n">utc</span>
+
+<span class="c1"># Application Insights configuration</span>
+<span class="n">AIKEY</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QSHARP_PYTHON_AI_KEY&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;95d25b22-8b6d-448e-9677-78ad4047a95a&quot;</span>
+<span class="n">_AIURL_DEFAULT</span> <span class="o">=</span> <span class="s2">&quot;https://westus2-2.in.applicationinsights.azure.com/v2.1/track&quot;</span>
+<span class="n">_aiurl_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QSHARP_PYTHON_AI_URL&quot;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">_aiurl_env</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_aiurl_env</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;https://&quot;</span><span class="p">):</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="s2">&quot;QSHARP_PYTHON_AI_URL must use HTTPS scheme; falling back to default URL.&quot;</span><span class="p">)</span>
+    <span class="n">_aiurl_env</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="n">AIURL</span> <span class="o">=</span> <span class="n">_aiurl_env</span> <span class="ow">or</span> <span class="n">_AIURL_DEFAULT</span>
+
+<span class="c1"># Environment variables take precedence, else disable telemetry for non &#39;stable&#39; builds</span>
+<span class="n">QSHARP_PYTHON_TELEMETRY</span> <span class="o">=</span> <span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QSHARP_PYTHON_TELEMETRY&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+<span class="n">TELEMETRY_ENABLED</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">QSHARP_PYTHON_TELEMETRY</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="s2">&quot;enabled&quot;</span><span class="p">]</span>
+    <span class="k">else</span> <span class="p">(</span>
+        <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">QSHARP_PYTHON_TELEMETRY</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;0&quot;</span><span class="p">,</span> <span class="s2">&quot;false&quot;</span><span class="p">,</span> <span class="s2">&quot;disabled&quot;</span><span class="p">,</span> <span class="s2">&quot;none&quot;</span><span class="p">]</span>
+        <span class="k">else</span> <span class="p">(</span><span class="s2">&quot;dev&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">QDK_CHEMISTRY_VERSION</span><span class="p">)</span>  <span class="c1"># Auto-disable for dev builds</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">_raw_interval</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;QSHARP_PYTHON_TELEMETRY_INTERVAL&quot;</span><span class="p">)</span> <span class="ow">or</span> <span class="mi">60</span><span class="p">)</span>
+<span class="n">BATCH_INTERVAL_SEC</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">_raw_interval</span><span class="p">,</span> <span class="mi">3600</span><span class="p">))</span>  <span class="c1"># Clamp to 10s-1h</span>
+
+
+<span class="c1"># The below is taken from the Azure Monitor Python SDK</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_getlocale</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+            <span class="c1"># Workaround for https://github.com/python/cpython/issues/82986</span>
+            <span class="c1"># by continuing to use getdefaultlocale() even though it has been deprecated.</span>
+            <span class="c1"># Ignore the deprecation warnings to reduce noise</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">DeprecationWarning</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">locale</span><span class="o">.</span><span class="n">getdefaultlocale</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="c1"># Use this as a fallback if locale.getdefaultlocale() doesn&#39;t exist (&gt;Py3.13)</span>
+        <span class="k">return</span> <span class="n">locale</span><span class="o">.</span><span class="n">getlocale</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+
+
+<span class="c1"># Minimal device information to include with telemetry</span>
+<span class="n">AI_DEVICE_LOCALE</span> <span class="o">=</span> <span class="n">_getlocale</span><span class="p">()</span>
+<span class="n">AI_DEVICE_OS_VERSION</span> <span class="o">=</span> <span class="n">platform</span><span class="o">.</span><span class="n">version</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="Metric">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.Metric">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Metric</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Used internally for objects in the telemetry queue.&quot;&quot;&quot;</span>
+
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">count</span><span class="p">:</span> <span class="nb">int</span>
+    <span class="n">properties</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="PendingMetric">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.PendingMetric">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PendingMetric</span><span class="p">(</span><span class="n">Metric</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Used internally to aggregate metrics before sending.&quot;&quot;&quot;</span>
+
+    <span class="nb">min</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="nb">max</span><span class="p">:</span> <span class="nb">float</span></div>
+
+
+
+<span class="c1"># Maintain a collection of custom metrics to log, stored by metric name with a list entry</span>
+<span class="c1"># for each unique set of properties per metric name</span>
+<span class="n">pending_metrics</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">PendingMetric</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+<span class="c1"># The telemetry queue is used to send telemetry from the main thread to the telemetry thread</span>
+<span class="c1"># This simplifies any thread-safety concerns, and avoids the need for locks, etc.</span>
+<span class="n">telemetry_queue</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">SimpleQueue</span><span class="p">()</span>  <span class="c1"># type &#39;Any&#39; until we get off Python 3.8 builds</span>
+
+
+<div class="viewcode-block" id="log_telemetry">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.utils.telemetry.html#qdk_chemistry.utils.telemetry.log_telemetry">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">log_telemetry</span><span class="p">(</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="n">properties</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;counter&quot;</span><span class="p">,</span> <span class="s2">&quot;histogram&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;counter&quot;</span><span class="p">,</span>  <span class="c1"># noqa: A002</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Log a custom telemetry metric.</span>
+
+<span class="sd">    Logs a custom metric with the name provided. Properties are optional and can be used to</span>
+<span class="sd">    capture additional context about the metric (but should be a relatively static set of</span>
+<span class="sd">    values, as each unique set of properties will be sent as a separate metric and creates</span>
+<span class="sd">    a separate &#39;dimension&#39; in the backend telemetry store).</span>
+
+<span class="sd">    The type can be either &#39;counter&#39; or &#39;histogram&#39;. A &#39;counter&#39; is a simple value</span>
+<span class="sd">    that is summed over time, such as how many times an event occurs, while a</span>
+<span class="sd">    &#39;histogram&#39; is used to track &#39;quantitative&#39; values, such as the distribution of values</span>
+<span class="sd">    over time, e.g., the duration of an operation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">TELEMETRY_ENABLED</span><span class="p">:</span>
+        <span class="k">return</span>
+
+    <span class="k">if</span> <span class="n">properties</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">properties</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="n">obj</span><span class="p">:</span> <span class="n">Metric</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
+        <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span>
+        <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">count</span><span class="p">,</span>
+        <span class="s2">&quot;properties&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">**</span><span class="n">properties</span><span class="p">,</span> <span class="s2">&quot;qdk_chemistry.version&quot;</span><span class="p">:</span> <span class="n">QDK_CHEMISTRY_VERSION</span><span class="p">},</span>
+        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="nb">type</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Queuing telemetry: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">obj</span><span class="p">)</span>
+    <span class="n">telemetry_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_add_to_pending</span><span class="p">(</span><span class="n">metric</span><span class="p">:</span> <span class="n">Metric</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Used by the telemetry thread to aggregate metrics before sending.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;counter&quot;</span><span class="p">,</span> <span class="s2">&quot;histogram&quot;</span><span class="p">]:</span>
+        <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Metric must be of type counter or histogram&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Get or create the entry list for this name</span>
+    <span class="n">name_entries</span> <span class="o">=</span> <span class="n">pending_metrics</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">metric</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="p">[])</span>
+
+    <span class="c1"># Try to find the entry with matching properties</span>
+    <span class="c1"># This relies on the fact dicts with matching keys/values compare equal in Python</span>
+    <span class="n">prop_entry</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
+        <span class="p">(</span><span class="n">entry</span> <span class="k">for</span> <span class="n">entry</span> <span class="ow">in</span> <span class="n">name_entries</span> <span class="k">if</span> <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;properties&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;properties&quot;</span><span class="p">]),</span>
+        <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="n">prop_entry</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">new_entry</span><span class="p">:</span> <span class="n">PendingMetric</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="o">**</span><span class="n">metric</span><span class="p">,</span>
+            <span class="s2">&quot;min&quot;</span><span class="p">:</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span>
+            <span class="s2">&quot;max&quot;</span><span class="p">:</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span>
+        <span class="p">}</span>
+        <span class="n">name_entries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_entry</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">Exception</span><span class="p">(</span><span class="s2">&quot;Cannot mix counter and histogram for the same metric name&quot;</span><span class="p">)</span>
+        <span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+        <span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">]</span>
+        <span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;min&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;min&quot;</span><span class="p">],</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])</span>
+        <span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">prop_entry</span><span class="p">[</span><span class="s2">&quot;max&quot;</span><span class="p">],</span> <span class="n">metric</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_pending_to_payload</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts the pending metrics to the JSON payload for Azure Monitor.&quot;&quot;&quot;</span>
+    <span class="n">result_array</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">formatted_time</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">UTC</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">(</span><span class="n">timespec</span><span class="o">=</span><span class="s2">&quot;microseconds&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;+00:00&quot;</span><span class="p">,</span> <span class="s2">&quot;Z&quot;</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">metric_list</span> <span class="ow">in</span> <span class="n">pending_metrics</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">unique_props</span> <span class="ow">in</span> <span class="n">metric_list</span><span class="p">:</span>
+            <span class="c1"># The below matches the entry format for Azure Monitor REST API</span>
+            <span class="n">entry</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+                <span class="s2">&quot;ver&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;Microsoft.ApplicationInsights.Metric&quot;</span><span class="p">,</span>
+                <span class="s2">&quot;time&quot;</span><span class="p">:</span> <span class="n">formatted_time</span><span class="p">,</span>
+                <span class="s2">&quot;sampleRate&quot;</span><span class="p">:</span> <span class="mf">100.0</span><span class="p">,</span>
+                <span class="s2">&quot;iKey&quot;</span><span class="p">:</span> <span class="n">AIKEY</span><span class="p">,</span>
+                <span class="s2">&quot;tags&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;ai.device.locale&quot;</span><span class="p">:</span> <span class="n">AI_DEVICE_LOCALE</span><span class="p">,</span>
+                    <span class="s2">&quot;ai.device.osVersion&quot;</span><span class="p">:</span> <span class="n">AI_DEVICE_OS_VERSION</span><span class="p">,</span>
+                <span class="p">},</span>
+                <span class="s2">&quot;data&quot;</span><span class="p">:</span> <span class="p">{</span>
+                    <span class="s2">&quot;baseType&quot;</span><span class="p">:</span> <span class="s2">&quot;MetricData&quot;</span><span class="p">,</span>
+                    <span class="s2">&quot;baseData&quot;</span><span class="p">:</span> <span class="p">{</span>
+                        <span class="s2">&quot;ver&quot;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+                        <span class="s2">&quot;metrics&quot;</span><span class="p">:</span> <span class="p">[</span>
+                            <span class="p">{</span>
+                                <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span>
+                                <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span>
+                                <span class="s2">&quot;count&quot;</span><span class="p">:</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;count&quot;</span><span class="p">],</span>
+                            <span class="p">}</span>
+                        <span class="p">],</span>
+                        <span class="s2">&quot;properties&quot;</span><span class="p">:</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;properties&quot;</span><span class="p">],</span>
+                    <span class="p">},</span>
+                <span class="p">},</span>
+            <span class="p">}</span>
+
+            <span class="k">if</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;histogram&quot;</span><span class="p">:</span>
+                <span class="c1"># Histogram values differ only in that they have min/max values also</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;baseData&quot;</span><span class="p">][</span><span class="s2">&quot;metrics&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;min&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;min&quot;</span><span class="p">]</span>
+                <span class="n">entry</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">][</span><span class="s2">&quot;baseData&quot;</span><span class="p">][</span><span class="s2">&quot;metrics&quot;</span><span class="p">][</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;max&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">unique_props</span><span class="p">[</span><span class="s2">&quot;max&quot;</span><span class="p">]</span>
+
+            <span class="n">result_array</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">entry</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result_array</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_post_telemetry</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Posts the pending telemetry to Azure Monitor.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">pending_metrics</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="n">payload</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">_pending_to_payload</span><span class="p">())</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Sending telemetry request: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">payload</span><span class="p">)</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">request</span> <span class="o">=</span> <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">Request</span><span class="p">(</span><span class="n">AIURL</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">payload</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">&quot;POST&quot;</span><span class="p">)</span>
+        <span class="n">request</span><span class="o">.</span><span class="n">add_header</span><span class="p">(</span><span class="s2">&quot;Content-Type&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">)</span>
+        <span class="k">with</span> <span class="n">urllib</span><span class="o">.</span><span class="n">request</span><span class="o">.</span><span class="n">urlopen</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span> <span class="k">as</span> <span class="n">response</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Telemetry response: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">response</span><span class="o">.</span><span class="n">status</span><span class="p">)</span>
+            <span class="c1"># On a successful post, clear the pending list. (Else they will be included on the next retry)</span>
+            <span class="n">pending_metrics</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">except</span> <span class="n">urllib</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">HTTPError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;HTTP error posting telemetry (status </span><span class="si">%d</span><span class="s2">): </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">code</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="n">urllib</span><span class="o">.</span><span class="n">error</span><span class="o">.</span><span class="n">URLError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;URL error posting telemetry: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">reason</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Network/system error posting telemetry: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">ValueError</span><span class="p">,</span> <span class="ne">TypeError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Data serialization error in telemetry: </span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_telemetry_thread_start</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Starts the telemetry background thread that processes and posts telemetry metrics in batches.&quot;&quot;&quot;</span>
+    <span class="n">next_post_sec</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_metric</span><span class="p">(</span><span class="n">msg</span><span class="p">:</span> <span class="n">Metric</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handles a new metric message by adding &amp; scheduling it to the pending batch.&quot;&quot;&quot;</span>
+        <span class="k">nonlocal</span> <span class="n">next_post_sec</span>
+
+        <span class="c1"># Add to the pending batch to send next</span>
+        <span class="n">_add_to_pending</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Schedule the next post if one is not scheduled</span>
+        <span class="k">if</span> <span class="n">next_post_sec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">next_post_sec</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">+</span> <span class="n">BATCH_INTERVAL_SEC</span>
+
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Block if no timeout, else wait a maximum of time until the next post is due</span>
+            <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="k">if</span> <span class="n">next_post_sec</span><span class="p">:</span>
+                <span class="n">timeout</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">next_post_sec</span> <span class="o">-</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">(),</span> <span class="mi">0</span><span class="p">)</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">telemetry_queue</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">msg</span> <span class="o">==</span> <span class="s2">&quot;exit&quot;</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Exiting telemetry thread&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">_post_telemetry</span><span class="p">():</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Failed to post telemetry on exit&quot;</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="n">on_metric</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="c1"># Loop until the queue has been drained. This will cause the &#39;Empty&#39; exception</span>
+            <span class="c1"># below once the queue is empty and it&#39;s time to post</span>
+            <span class="k">continue</span>
+        <span class="k">except</span> <span class="n">Empty</span><span class="p">:</span>
+            <span class="c1"># No more telemetry within timeout, so write what we have pending</span>
+            <span class="n">_</span> <span class="o">=</span> <span class="n">_post_telemetry</span><span class="p">()</span>
+
+        <span class="c1"># If we get here, it&#39;s after a post attempt. Pending will still have items if the attempt</span>
+        <span class="c1"># failed, so update the time for the next attempt in that case.</span>
+        <span class="n">next_post_sec</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">pending_metrics</span> <span class="k">else</span> <span class="n">time</span><span class="o">.</span><span class="n">monotonic</span><span class="p">()</span> <span class="o">+</span> <span class="n">BATCH_INTERVAL_SEC</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_on_exit</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;On exit handler to flush telemetry before process exits.&quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;In on_exit handler&quot;</span><span class="p">)</span>
+    <span class="n">telemetry_queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="s2">&quot;exit&quot;</span><span class="p">)</span>
+    <span class="c1"># Wait at most 3 seconds for the telemetry thread to flush and exit</span>
+    <span class="n">telemetry_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+
+
+<span class="c1"># Mark the telemetry thread as a daemon thread, else it will keep the process alive when the main thread exits</span>
+<span class="k">if</span> <span class="n">TELEMETRY_ENABLED</span><span class="p">:</span>
+    <span class="n">telemetry_thread</span> <span class="o">=</span> <span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">_telemetry_thread_start</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">telemetry_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="n">atexit</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">_on_exit</span><span class="p">)</span>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

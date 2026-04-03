@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
 </ul>
@@ -97,17 +99,15 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuantumCircuit</span><span class="p">,</span> <span class="n">qasm3</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk</span><span class="w"> </span><span class="kn">import</span> <span class="n">qsharp</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Settings</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">QsharpFactoryData</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.time_evolution.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">ExponentiatedPauliTerm</span><span class="p">,</span>
     <span class="n">PauliProductFormulaContainer</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.time_evolution.controlled_time_evolution</span><span class="w"> </span><span class="kn">import</span> <span class="n">ControlledTimeEvolutionUnitary</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">ControlledEvolutionCircuitMapper</span>
 
@@ -222,119 +222,50 @@
 
         <span class="k">if</span> <span class="n">target_indices</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">target_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">i</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">total_qubits</span><span class="p">)</span> <span class="k">if</span> <span class="n">i</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">controlled_evolution</span><span class="o">.</span><span class="n">control_indices</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">target_indices_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">target_indices</span><span class="p">)</span>
+            <span class="n">control_indices_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">controlled_evolution</span><span class="o">.</span><span class="n">control_indices</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">target_indices_set</span> <span class="o">&amp;</span> <span class="n">control_indices_set</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_indices and control_indices must not overlap.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">target_indices_set</span> <span class="o">|</span> <span class="n">control_indices_set</span> <span class="o">!=</span> <span class="nb">set</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">total_qubits</span><span class="p">)):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;target_indices and control_indices must cover all qubits.&quot;</span><span class="p">)</span>
 
-        <span class="n">circuit</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">total_qubits</span><span class="p">)</span>
+        <span class="n">pauli_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">angles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">:</span>
+            <span class="n">base_terms</span> <span class="o">=</span> <span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="o">.</span><span class="n">I</span><span class="p">]</span> <span class="o">*</span> <span class="n">unitary_container</span><span class="o">.</span><span class="n">num_qubits</span>
+            <span class="k">for</span> <span class="n">index</span><span class="p">,</span> <span class="n">pauli</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">base_terms</span><span class="p">[</span><span class="n">index</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">,</span> <span class="n">pauli</span><span class="p">)</span>
+            <span class="n">pauli_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">base_terms</span><span class="o">.</span><span class="n">copy</span><span class="p">())</span>
+            <span class="n">angles</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">)</span>
 
-        <span class="n">append_controlled_time_evolution</span><span class="p">(</span>
-            <span class="n">circuit</span><span class="p">,</span>
-            <span class="n">exponential_terms</span><span class="o">=</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">step_terms</span><span class="p">,</span>
-            <span class="n">reps</span><span class="o">=</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">step_reps</span><span class="p">,</span>
-            <span class="n">control_qubit</span><span class="o">=</span><span class="n">controlled_evolution</span><span class="o">.</span><span class="n">control_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-            <span class="n">target_qubits</span><span class="o">=</span><span class="n">target_indices</span><span class="p">,</span>
-            <span class="n">power</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">),</span>
+        <span class="n">flattened_pauli_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">list</span><span class="p">[</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">flattened_angles</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">unitary_container</span><span class="o">.</span><span class="n">step_reps</span><span class="p">):</span>
+            <span class="n">flattened_pauli_terms</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">pauli_terms</span><span class="p">)</span>
+            <span class="n">flattened_angles</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">angles</span><span class="p">)</span>
+
+        <span class="n">power</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">power</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;PauliSequenceMapper requires &#39;power&#39; to be an integer greater than or equal to 1.&quot;</span><span class="p">)</span>
+
+        <span class="n">controlled_evo_params</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledPauliExp</span><span class="o">.</span><span class="n">RepControlledPauliExpParams</span><span class="p">(</span>
+            <span class="n">pauliExponents</span><span class="o">=</span><span class="n">flattened_pauli_terms</span><span class="p">,</span>
+            <span class="n">pauliCoefficients</span><span class="o">=</span><span class="n">flattened_angles</span><span class="p">,</span>
+            <span class="n">repetitions</span><span class="o">=</span><span class="n">power</span><span class="p">,</span>
+            <span class="n">control</span><span class="o">=</span><span class="n">controlled_evolution</span><span class="o">.</span><span class="n">control_indices</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+            <span class="n">systems</span><span class="o">=</span><span class="n">target_indices</span><span class="p">,</span>
         <span class="p">)</span>
 
-        <span class="n">qasm_str</span> <span class="o">=</span> <span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">circuit</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm_str</span><span class="p">)</span></div>
+        <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+            <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledPauliExp</span><span class="o">.</span><span class="n">MakeRepControlledPauliExpCircuit</span><span class="p">,</span>
+            <span class="n">parameter</span><span class="o">=</span><span class="nb">vars</span><span class="p">(</span><span class="n">controlled_evo_params</span><span class="p">),</span>
+        <span class="p">)</span>
 
+        <span class="n">controlled_evolution_op</span> <span class="o">=</span> <span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">ControlledPauliExp</span><span class="o">.</span><span class="n">MakeRepControlledPauliExpOp</span><span class="p">(</span><span class="n">controlled_evo_params</span><span class="p">)</span>
 
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">,</span> <span class="n">qsharp_op</span><span class="o">=</span><span class="n">controlled_evolution_op</span><span class="p">)</span></div>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">_append_controlled_pauli_rotation</span><span class="p">(</span>
-    <span class="n">circuit</span><span class="p">:</span> <span class="n">QuantumCircuit</span><span class="p">,</span>
-    <span class="n">control_qubit</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-    <span class="n">target_qubits</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-    <span class="n">term</span><span class="p">:</span> <span class="n">ExponentiatedPauliTerm</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuantumCircuit</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append a controlled ``exp(-i angle * P)`` to ``circuit``.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        circuit: Quantum circuit receiving the controlled rotation.</span>
-<span class="sd">        control_qubit: Index of the ancilla qubit providing the control.</span>
-<span class="sd">        target_qubits: Ordered collection of target qubit indices.</span>
-<span class="sd">        term: Pauli term describing the rotation axis.</span>
-
-<span class="sd">    Returns:</span>
-<span class="sd">        The quantum circuit with the controlled rotation appended.</span>
-
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-    <span class="k">if</span> <span class="ow">not</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">:</span>
-        <span class="c1"># Identity contribution results in a controlled phase on the ancilla.</span>
-        <span class="n">circuit</span><span class="o">.</span><span class="n">p</span><span class="p">(</span><span class="o">-</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span> <span class="n">control_qubit</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">circuit</span>
-
-    <span class="n">involved_indices</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
-    <span class="n">involved_qubits</span> <span class="o">=</span> <span class="p">[</span><span class="n">target_qubits</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">involved_indices</span><span class="p">]</span>
-
-    <span class="c1"># Basis-change into Z</span>
-    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">qubit</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">involved_indices</span><span class="p">,</span> <span class="n">involved_qubits</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
-        <span class="n">pauli</span> <span class="o">=</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">pauli</span> <span class="o">==</span> <span class="s2">&quot;X&quot;</span><span class="p">:</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">pauli</span> <span class="o">==</span> <span class="s2">&quot;Y&quot;</span><span class="p">:</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">sdg</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-
-    <span class="n">target</span> <span class="o">=</span> <span class="n">involved_qubits</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-    <span class="k">for</span> <span class="n">qubit</span> <span class="ow">in</span> <span class="n">involved_qubits</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
-        <span class="n">circuit</span><span class="o">.</span><span class="n">cx</span><span class="p">(</span><span class="n">qubit</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
-
-    <span class="n">circuit</span><span class="o">.</span><span class="n">crz</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span> <span class="n">control_qubit</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">qubit</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">involved_qubits</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]):</span>
-        <span class="n">circuit</span><span class="o">.</span><span class="n">cx</span><span class="p">(</span><span class="n">qubit</span><span class="p">,</span> <span class="n">target</span><span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">idx</span><span class="p">,</span> <span class="n">qubit</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">involved_indices</span><span class="p">,</span> <span class="n">involved_qubits</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">))):</span>
-        <span class="n">pauli</span> <span class="o">=</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">pauli</span> <span class="o">==</span> <span class="s2">&quot;X&quot;</span><span class="p">:</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">pauli</span> <span class="o">==</span> <span class="s2">&quot;Y&quot;</span><span class="p">:</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-            <span class="n">circuit</span><span class="o">.</span><span class="n">s</span><span class="p">(</span><span class="n">qubit</span><span class="p">)</span>
-
-    <span class="k">return</span> <span class="n">circuit</span>
-
-
-<span class="k">def</span><span class="w"> </span><span class="nf">append_controlled_time_evolution</span><span class="p">(</span>
-    <span class="n">circuit</span><span class="p">:</span> <span class="n">QuantumCircuit</span><span class="p">,</span>
-    <span class="o">*</span><span class="p">,</span>
-    <span class="n">exponential_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">],</span>
-    <span class="n">reps</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-    <span class="n">control_qubit</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
-    <span class="n">target_qubits</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
-    <span class="n">power</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
-<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append the controlled unitary ``(exp(-i H time))**power``.</span>
-
-<span class="sd">    Args:</span>
-<span class="sd">        circuit: Circuit being extended.</span>
-<span class="sd">        exponential_terms: List of exponentiated Pauli terms describing the rotation axes.</span>
-<span class="sd">        reps: Number of repetitions for each step.</span>
-<span class="sd">        control_qubit: Index of the control qubit.</span>
-<span class="sd">        target_qubits: The target qubit indices.</span>
-<span class="sd">            If None, assumes target qubits are all qubits except the control qubit.</span>
-<span class="sd">        power: Number of repeated applications (``U`` raised to ``power``).</span>
-
-<span class="sd">    Raises:</span>
-<span class="sd">        ValueError: If ``power`` is less than 1.</span>
-
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
-
-    <span class="k">if</span> <span class="n">power</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;power must be at least 1 for controlled time evolution.&quot;</span><span class="p">)</span>
-
-    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">power</span><span class="p">):</span>
-        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">reps</span><span class="p">):</span>
-            <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">exponential_terms</span><span class="p">:</span>
-                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isclose</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">):</span>
-                    <span class="k">continue</span>
-                <span class="n">_append_controlled_pauli_rotation</span><span class="p">(</span>
-                    <span class="n">circuit</span><span class="p">,</span>
-                    <span class="n">control_qubit</span><span class="p">,</span>
-                    <span class="n">target_qubits</span><span class="p">,</span>
-                    <span class="n">term</span><span class="p">,</span>
-                <span class="p">)</span>
 </pre></div>
 
            </div>

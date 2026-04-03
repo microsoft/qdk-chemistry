@@ -1,0 +1,470 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.time_evolution.builder.partially_randomized &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.time_evolution.builder.partially_randomized</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.time_evolution.builder.partially_randomized</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry implementation of partially randomized product formula builder.</span>
+
+<span class="sd">This module implements a hybrid approach that combines deterministic Trotter decomposition</span>
+<span class="sd">for large-weight terms with qDRIFT-style randomized sampling for small-weight terms.</span>
+<span class="sd">This is particularly effective for quantum chemistry Hamiltonians where a few terms</span>
+<span class="sd">dominate the weight while many small terms form a long tail.</span>
+
+<span class="sd">The method is based on:</span>
+<span class="sd">    Günther, J., Witteveen, F., et al. (2025). Phase estimation with partially</span>
+<span class="sd">    randomized time evolution. https://doi.org/10.48550/arXiv.2503.05647</span>
+
+<span class="sd">See Also:</span>
+<span class="sd">    - Hagan, M., &amp; Wiebe, N. (2023). Composite randomized benchmarking.</span>
+<span class="sd">    - Ouyang, Y., et al. (2020). Compilation by stochastic Hamiltonian sparsification.</span>
+<span class="sd">    - Jin, P., et al. (2023). Partially randomized Hamiltonian simulation.</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.qdrift</span><span class="w"> </span><span class="kn">import</span> <span class="n">QDrift</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">TimeEvolutionUnitary</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.time_evolution.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ExponentiatedPauliTerm</span><span class="p">,</span>
+    <span class="n">PauliProductFormulaContainer</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.pauli_commutation</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_commutation_checker</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;PartiallyRandomized&quot;</span><span class="p">,</span> <span class="s2">&quot;PartiallyRandomizedSettings&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="PartiallyRandomizedSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PartiallyRandomizedSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for partially randomized product formula builder.</span>
+
+<span class="sd">    The partially randomized method splits the Hamiltonian into:</span>
+<span class="sd">    - H_D: Large-weight terms treated deterministically (Trotter)</span>
+<span class="sd">    - H_R: Small-weight terms treated randomly (qDRIFT-style)</span>
+
+<span class="sd">    This hybrid approach benefits from:</span>
+<span class="sd">    - Better ε-scaling from deterministic treatment of dominant terms</span>
+<span class="sd">    - Reduced circuit depth from random sampling of the long tail</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PartiallyRandomizedSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomizedSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize PartiallyRandomizedSettings with default values.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            weight_threshold: Terms with \|h_j\| &gt;= threshold are treated deterministically.</span>
+<span class="sd">                Use -1.0 for automatic determination (top 10% of terms by weight).</span>
+<span class="sd">            trotter_order: Order of Trotter formula for deterministic terms (1 or 2).</span>
+<span class="sd">            num_random_samples: Number of random samples for the randomized part.</span>
+<span class="sd">            seed: Random seed for reproducibility. Use -1 for non-deterministic.</span>
+<span class="sd">            tolerance: Absolute tolerance for filtering small coefficients.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;float&quot;</span><span class="p">,</span>
+            <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="sa">r</span><span class="s2">&quot;Terms with \|h_j\| &gt;= threshold are treated deterministically. Use -1.0 for automatic.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;trotter_order&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">2</span><span class="p">,</span>
+            <span class="s2">&quot;Order of Trotter formula for deterministic terms (1 or 2).&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;num_random_samples&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">100</span><span class="p">,</span>
+            <span class="s2">&quot;Number of random samples for the randomized part (H_R).&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;seed&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Random seed for reproducibility. Use -1 for non-deterministic.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;tolerance&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;float&quot;</span><span class="p">,</span>
+            <span class="mf">1e-12</span><span class="p">,</span>
+            <span class="s2">&quot;Absolute tolerance for filtering small coefficients.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;bool&quot;</span><span class="p">,</span>
+            <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;Fuse identical Pauli terms within consecutive commuting runs of the random block.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;commutation_type&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;general&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Commutation check for merging: &#39;qubit_wise&#39; (per-qubit) or &#39;general&#39; (standard Pauli).&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="s2">&quot;qubit_wise&quot;</span><span class="p">,</span> <span class="s2">&quot;general&quot;</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="PartiallyRandomized">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PartiallyRandomized</span><span class="p">(</span><span class="n">QDrift</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Partially randomized product formula builder.</span>
+
+<span class="sd">    Implements a hybrid Hamiltonian simulation method that combines deterministic</span>
+<span class="sd">    Trotter decomposition with randomized sampling. The Hamiltonian is split as:</span>
+
+<span class="sd">    .. math::</span>
+
+<span class="sd">        H = H_D + H_R = \sum_{l=1}^{L_D} H_l + \sum_{m=1}^{M} h_m P_m</span>
+
+<span class="sd">    where:</span>
+<span class="sd">    - :math:`H_D` contains the :math:`L_D` largest-weight terms, treated with Trotter</span>
+<span class="sd">    - :math:`H_R` contains the remaining terms, treated with qDRIFT-style sampling</span>
+
+<span class="sd">    The method is effective when:</span>
+<span class="sd">    - :math:`\lambda_R = \sum_m |h_m| \ll \lambda` (random part has small total weight)</span>
+<span class="sd">    - :math:`L_D \ll M` (few deterministic terms, many random terms)</span>
+
+<span class="sd">    For a second-order Trotter formula, each step applies the deterministic</span>
+<span class="sd">    part :math:`H_D` with half-angles in a symmetric (palindromic) sweep, with the</span>
+<span class="sd">    randomized part :math:`H_R` sandwiched in between. The first-order variant</span>
+<span class="sd">    applies :math:`H_D` at full angle followed by :math:`H_R`.</span>
+
+<span class="sd">    The total cost scales as</span>
+<span class="sd">    :math:`O(\lambda_R^2 / \epsilon^2)` Pauli rotations for the randomized part,</span>
+<span class="sd">    where :math:`\lambda_R = \sum_m |h_m|` is the 1-norm of :math:`H_R`</span>
+<span class="sd">    (Theorem 2 of :cite:`Guenther2025`).</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt; # Create a partially randomized builder</span>
+<span class="sd">        &gt;&gt;&gt; builder = create(</span>
+<span class="sd">        ...     &quot;time_evolution_builder&quot;,</span>
+<span class="sd">        ...     &quot;partially_randomized&quot;,</span>
+<span class="sd">        ...     weight_threshold=0.1,  # Terms with |h_j| &gt;= 0.1 treated deterministically</span>
+<span class="sd">        ...     num_random_samples=200,</span>
+<span class="sd">        ...     trotter_order=2,</span>
+<span class="sd">        ... )</span>
+<span class="sd">        &gt;&gt;&gt; time_evolution = builder.run(qubit_hamiltonian, time=1.0)</span>
+
+<span class="sd">    References:</span>
+<span class="sd">        Günther, J., Witteveen, F., et al. Phase estimation with partially</span>
+<span class="sd">        randomized time evolution.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="PartiallyRandomized.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="o">-</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">trotter_order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">num_random_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span><span class="p">,</span>
+        <span class="n">merge_duplicate_terms</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">commutation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;general&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Initialize partially randomized builder with specified settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            weight_threshold: Terms with \|h_j\| &gt;= threshold are treated</span>
+<span class="sd">                deterministically with Trotter. Use -1.0 for automatic</span>
+<span class="sd">                determination (top 10% of terms by weight).</span>
+<span class="sd">            trotter_order: Order of Trotter formula for deterministic part.</span>
+<span class="sd">                1 = first order, 2 = second order (symmetric). Defaults to 2.</span>
+<span class="sd">            num_random_samples: Number of random samples for the qDRIFT-style</span>
+<span class="sd">                treatment of H_R. Defaults to 100.</span>
+<span class="sd">            seed: Random seed for reproducibility. Use -1 for non-deterministic.</span>
+<span class="sd">                Defaults to -1.</span>
+<span class="sd">            tolerance: Threshold for filtering negligible coefficients.</span>
+<span class="sd">                Defaults to 1e-12.</span>
+<span class="sd">            merge_duplicate_terms: If ``True``, identical Pauli terms within</span>
+<span class="sd">                consecutive mutually-commuting runs in the random block</span>
+<span class="sd">                are fused to reduce circuit depth.  Distinct commuting</span>
+<span class="sd">                terms are kept separate.  Defaults to ``True``.</span>
+<span class="sd">            commutation_type: Commutation check used when merging duplicate</span>
+<span class="sd">                terms.  ``&quot;qubit_wise&quot;`` requires every single-qubit</span>
+<span class="sd">                pair to commute individually — stricter but always safe.</span>
+<span class="sd">                ``&quot;general&quot;`` (default) uses standard Pauli commutation (even number of</span>
+<span class="sd">                anti-commuting positions), which allows larger merge groups.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">PartiallyRandomizedSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">,</span> <span class="n">weight_threshold</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;trotter_order&quot;</span><span class="p">,</span> <span class="n">trotter_order</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_random_samples&quot;</span><span class="p">,</span> <span class="n">num_random_samples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">,</span> <span class="n">tolerance</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">,</span> <span class="n">merge_duplicate_terms</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;commutation_type&quot;</span><span class="p">,</span> <span class="n">commutation_type</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeEvolutionUnitary</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Construct the time evolution unitary using partially randomized product formula.</span>
+
+<span class="sd">        The algorithm:</span>
+<span class="sd">        1. Sort Hamiltonian terms by coefficient magnitude</span>
+<span class="sd">        2. Split into H_D (deterministic, large terms) and H_R (random, small terms)</span>
+<span class="sd">        3. Apply first- or second-order Trotter structure with qDRIFT for the H_R block</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.</span>
+<span class="sd">            time: The total evolution time (δ in the formula).</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TimeEvolutionUnitary: The time evolution unitary built by the</span>
+<span class="sd">                partially randomized method.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">tolerance</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;tolerance&quot;</span><span class="p">)</span>
+        <span class="n">trotter_order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trotter_order&quot;</span><span class="p">)</span>
+        <span class="n">num_random_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_random_samples&quot;</span><span class="p">)</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">)</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span> <span class="k">if</span> <span class="n">seed</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">is_hermitian</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Get non-negligible real terms, sorted by descending weight</span>
+        <span class="n">real_terms</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">get_real_coefficients</span><span class="p">(</span><span class="n">tolerance</span><span class="o">=</span><span class="n">tolerance</span><span class="p">,</span> <span class="n">sort_by_magnitude</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">real_terms</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># Identity evolution</span>
+            <span class="k">return</span> <span class="n">TimeEvolutionUnitary</span><span class="p">(</span>
+                <span class="n">container</span><span class="o">=</span><span class="n">PauliProductFormulaContainer</span><span class="p">(</span>
+                    <span class="n">step_terms</span><span class="o">=</span><span class="p">[],</span>
+                    <span class="n">step_reps</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                    <span class="n">num_qubits</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Determine split between deterministic and random terms</span>
+        <span class="n">num_deterministic</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_determine_num_deterministic</span><span class="p">(</span><span class="n">real_terms</span><span class="p">)</span>
+
+        <span class="c1"># Split into H_D and H_R</span>
+        <span class="n">deterministic_terms</span> <span class="o">=</span> <span class="n">real_terms</span><span class="p">[:</span><span class="n">num_deterministic</span><span class="p">]</span>
+        <span class="n">random_terms</span> <span class="o">=</span> <span class="n">real_terms</span><span class="p">[</span><span class="n">num_deterministic</span><span class="p">:]</span>
+
+        <span class="c1"># Build the product formula</span>
+        <span class="n">all_terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">trotter_order</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Only first-order (1) and second-order (2) Trotter decompositions are supported, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;but got trotter_order=</span><span class="si">{</span><span class="n">trotter_order</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">trotter_order</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="c1"># Second-order: e^{-iδH_1/2} ... e^{-iδH_L/2} e^{-iδH_R} e^{-iδH_L/2} ... e^{-iδH_1/2}</span>
+            <span class="n">half_time</span> <span class="o">=</span> <span class="n">time</span> <span class="o">/</span> <span class="mf">2.0</span>
+
+            <span class="c1"># Forward sweep of deterministic terms (half angle)</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">deterministic_terms</span><span class="p">:</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">half_time</span>
+                <span class="n">all_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+
+            <span class="c1"># Random part (full time)</span>
+            <span class="n">random_part_terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_qdrift_terms</span><span class="p">(</span><span class="n">random_terms</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">num_random_samples</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">):</span>
+                <span class="n">commute_fn</span> <span class="o">=</span> <span class="n">get_commutation_checker</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;commutation_type&quot;</span><span class="p">))</span>
+                <span class="n">random_part_terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_duplicate_terms</span><span class="p">(</span><span class="n">random_part_terms</span><span class="p">,</span> <span class="n">commute_fn</span><span class="o">=</span><span class="n">commute_fn</span><span class="p">)</span>
+            <span class="n">all_terms</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">random_part_terms</span><span class="p">)</span>
+
+            <span class="c1"># Backward sweep of deterministic terms (half angle, reversed order)</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">deterministic_terms</span><span class="p">):</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">half_time</span>
+                <span class="n">all_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># First-order: e^{-iδH_1} ... e^{-iδH_L} e^{-iδH_R}</span>
+            <span class="c1"># Deterministic terms</span>
+            <span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="ow">in</span> <span class="n">deterministic_terms</span><span class="p">:</span>
+                <span class="n">mapping</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+                <span class="n">angle</span> <span class="o">=</span> <span class="n">coeff</span> <span class="o">*</span> <span class="n">time</span>
+                <span class="n">all_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">))</span>
+
+            <span class="c1"># Random part</span>
+            <span class="n">random_part_terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_qdrift_terms</span><span class="p">(</span><span class="n">random_terms</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">num_random_samples</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">):</span>
+                <span class="n">commute_fn</span> <span class="o">=</span> <span class="n">get_commutation_checker</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;commutation_type&quot;</span><span class="p">))</span>
+                <span class="n">random_part_terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_duplicate_terms</span><span class="p">(</span><span class="n">random_part_terms</span><span class="p">,</span> <span class="n">commute_fn</span><span class="o">=</span><span class="n">commute_fn</span><span class="p">)</span>
+            <span class="n">all_terms</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">random_part_terms</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">TimeEvolutionUnitary</span><span class="p">(</span>
+            <span class="n">container</span><span class="o">=</span><span class="n">PauliProductFormulaContainer</span><span class="p">(</span>
+                <span class="n">step_terms</span><span class="o">=</span><span class="n">all_terms</span><span class="p">,</span>
+                <span class="n">step_reps</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+                <span class="n">num_qubits</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_determine_num_deterministic</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Determine how many terms to treat deterministically.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            terms: List of (label, coeff) sorted by |coeff| descending.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Number of terms to treat deterministically.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">weight_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;weight_threshold&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">weight_threshold</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="c1"># Count terms with |coeff| &gt;= threshold; may be 0 (all-random)</span>
+            <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="mi">1</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">terms</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">c</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="n">weight_threshold</span><span class="p">)</span>
+
+        <span class="c1"># Default: top 10% of terms (at least 1, at most all but 1 for random)</span>
+        <span class="n">num_deterministic</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span> <span class="o">//</span> <span class="mi">10</span><span class="p">)</span>
+        <span class="c1"># Ensure at least some terms remain for random treatment</span>
+        <span class="k">if</span> <span class="n">num_deterministic</span> <span class="o">&gt;=</span> <span class="nb">len</span><span class="p">(</span><span class="n">terms</span><span class="p">):</span>
+            <span class="n">num_deterministic</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">num_deterministic</span>
+
+<div class="viewcode-block" id="PartiallyRandomized.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the time evolution unitary builder.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;partially_randomized&quot;</span></div>
+
+
+<div class="viewcode-block" id="PartiallyRandomized.type_name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.html#qdk_chemistry.algorithms.time_evolution.builder.partially_randomized.PartiallyRandomized.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return time_evolution_builder as the algorithm type name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;time_evolution_builder&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

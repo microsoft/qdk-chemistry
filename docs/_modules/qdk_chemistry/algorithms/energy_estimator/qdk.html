@@ -1,0 +1,507 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.energy_estimator.qdk &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.energy_estimator.qdk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.energy_estimator.qdk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry energy estimator abstractions and utilities.&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">qsharp</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">CircuitExecutor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Circuit</span><span class="p">,</span>
+    <span class="n">EnergyExpectationResult</span><span class="p">,</span>
+    <span class="n">MeasurementData</span><span class="p">,</span>
+    <span class="n">QuantumErrorProfile</span><span class="p">,</span>
+    <span class="n">QubitHamiltonian</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.circuit</span><span class="w"> </span><span class="kn">import</span> <span class="n">QsharpFactoryData</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.pauli_matrix</span><span class="w"> </span><span class="kn">import</span> <span class="n">pauli_string_to_masks</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.qsharp</span><span class="w"> </span><span class="kn">import</span> <span class="n">QSHARP_UTILS</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">.energy_estimator</span><span class="w"> </span><span class="kn">import</span> <span class="n">EnergyEstimator</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QdkEnergyEstimator&quot;</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_parity</span><span class="p">(</span><span class="n">integer</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the parity of an integer.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">integer</span><span class="o">.</span><span class="n">bit_count</span><span class="p">()</span> <span class="o">%</span> <span class="mi">2</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_paulis_to_nonid_masks</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Converts a list of Pauli operators into a list of non-identity bitmasks.</span>
+
+<span class="sd">    Example:</span>
+<span class="sd">        [&quot;IZ&quot;, &quot;ZX&quot;, &quot;YZ&quot;, &quot;ZY&quot;] -&gt; [1, 3, 3, 3]</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pauli_strings: List of Pauli label strings.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A list of integer bitmasks (``x_mask | z_mask``) for each operator.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">x</span> <span class="o">|</span> <span class="n">z</span> <span class="k">for</span> <span class="n">x</span><span class="p">,</span> <span class="n">z</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="p">(</span><span class="n">pauli_string_to_masks</span><span class="p">(</span><span class="n">ps</span><span class="p">)</span> <span class="k">for</span> <span class="n">ps</span> <span class="ow">in</span> <span class="n">pauli_strings</span><span class="p">)]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_compute_expval_and_variance_from_bitstrings</span><span class="p">(</span>
+    <span class="n">bitstring_counts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span> <span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Computes the expectation values and variances for a given set of Pauli operators.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        bitstring_counts: A dictionary of measurement outcomes.</span>
+<span class="sd">        pauli_strings: List of Pauli label strings for computing expectation values.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A tuple containing expectation values and variances.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+    <span class="c1"># Determine measurement basis and restrict Paulis to measured qubits (drop I terms)</span>
+    <span class="n">basis</span> <span class="o">=</span> <span class="n">_determine_measurement_basis</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span>
+    <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+
+    <span class="c1"># For each Pauli string, extract only the measured-qubit bits and compress</span>
+    <span class="c1"># them into a contiguous index via bit extraction.</span>
+    <span class="n">measured_indices</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="n">n_qubits</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">j</span> <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span> <span class="k">if</span> <span class="n">ch</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span><span class="p">)</span>
+    <span class="n">nonid_masks</span> <span class="o">=</span> <span class="n">_paulis_to_nonid_masks</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">)</span>
+    <span class="n">diag_inds</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">nonid</span> <span class="ow">in</span> <span class="n">nonid_masks</span><span class="p">:</span>
+        <span class="n">val</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">bit_pos</span><span class="p">,</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">measured_indices</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">nonid</span> <span class="o">&amp;</span> <span class="p">(</span><span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">q</span><span class="p">):</span>
+                <span class="n">val</span> <span class="o">|=</span> <span class="mi">1</span> <span class="o">&lt;&lt;</span> <span class="n">bit_pos</span>
+        <span class="n">diag_inds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+    <span class="n">expvals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">nshots</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">bitstring_counts</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="k">if</span> <span class="n">nshots</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Bitstring counts are empty.&quot;</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">bitstr</span><span class="p">,</span> <span class="n">freq</span> <span class="ow">in</span> <span class="n">bitstring_counts</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">outcome</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">bitstr</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span> <span class="k">if</span> <span class="n">bitstr</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;0x&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="nb">int</span><span class="p">(</span><span class="n">bitstr</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported bitstring format: </span><span class="si">{</span><span class="n">bitstr</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">mask</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">diag_inds</span><span class="p">):</span>
+            <span class="n">expvals</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+=</span> <span class="n">freq</span> <span class="o">*</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">**</span> <span class="n">_parity</span><span class="p">(</span><span class="n">mask</span> <span class="o">&amp;</span> <span class="n">outcome</span><span class="p">)</span>
+
+    <span class="n">expvals</span> <span class="o">/=</span> <span class="n">nshots</span>
+    <span class="n">variances</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">expvals</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="n">nshots</span>
+    <span class="k">return</span> <span class="n">expvals</span><span class="p">,</span> <span class="n">variances</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_determine_measurement_basis</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Determine the measurement basis for a group of qubit-wise commuting Pauli operators.</span>
+
+<span class="sd">    Example: [&quot;IZ&quot;, &quot;YZ&quot;] -&gt; &quot;YZ&quot;</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pauli_strings: List of Pauli label strings that must be qubit-wise commuting.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A Pauli label string representing the combined measurement basis.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n_qubits</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">pauli_strings</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    <span class="n">basis</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;I&quot;</span><span class="p">]</span> <span class="o">*</span> <span class="n">n_qubits</span>
+    <span class="k">for</span> <span class="n">ps</span> <span class="ow">in</span> <span class="n">pauli_strings</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">ch</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ps</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">ch</span> <span class="o">!=</span> <span class="s2">&quot;I&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">basis</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;I&quot;</span><span class="p">:</span>
+                    <span class="n">basis</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">ch</span>
+                <span class="k">elif</span> <span class="n">basis</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">!=</span> <span class="n">ch</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="s2">&quot;Paulis are not qubit-wise commuting. &quot;</span>
+                        <span class="s2">&quot;Please group them first to generate a valid measurement basis.&quot;</span>
+                    <span class="p">)</span>
+    <span class="k">return</span> <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">basis</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_append_measurement_to_circuit</span><span class="p">(</span><span class="n">base_circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">m_basis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Circuit</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Append measurement operations to a base circuit according to the specified measurement basis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        base_circuit: The original quantum circuit to which measurement operations will be appended.</span>
+<span class="sd">        m_basis: Pauli label string (e.g. ``&quot;YZI&quot;``).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Circuit: The modified circuit with measurement operations appended.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">base_circuit</span><span class="o">.</span><span class="n">_qsharp_op</span><span class="p">:</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="n">pauli_base</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">pauli</span> <span class="ow">in</span> <span class="nb">reversed</span><span class="p">(</span><span class="n">m_basis</span><span class="p">):</span>
+            <span class="n">pauli_base</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">getattr</span><span class="p">(</span><span class="n">qsharp</span><span class="o">.</span><span class="n">Pauli</span><span class="p">,</span> <span class="n">pauli</span><span class="p">))</span>
+        <span class="n">qsharp_factory</span> <span class="o">=</span> <span class="n">QsharpFactoryData</span><span class="p">(</span>
+            <span class="n">program</span><span class="o">=</span><span class="n">QSHARP_UTILS</span><span class="o">.</span><span class="n">MeasurementBasis</span><span class="o">.</span><span class="n">MakeMeasurementCircuit</span><span class="p">,</span>
+            <span class="n">parameter</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;baseCircuit&quot;</span><span class="p">:</span> <span class="n">base_circuit</span><span class="o">.</span><span class="n">_qsharp_op</span><span class="p">,</span> <span class="s2">&quot;bases&quot;</span><span class="p">:</span> <span class="n">pauli_base</span><span class="p">,</span> <span class="s2">&quot;numQubits&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">m_basis</span><span class="p">)},</span>  <span class="c1"># noqa: SLF001</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qsharp_factory</span><span class="o">=</span><span class="n">qsharp_factory</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># noqa: PLC0415</span>
+            <span class="n">ClassicalRegister</span><span class="p">,</span>
+            <span class="n">QuantumCircuit</span><span class="p">,</span>
+            <span class="n">QuantumRegister</span><span class="p">,</span>
+            <span class="n">qasm3</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">qiskit.quantum_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">Pauli</span>  <span class="c1"># noqa: PLC0415</span>
+    <span class="k">except</span> <span class="ne">ImportError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ImportError</span><span class="p">(</span><span class="s2">&quot;Qiskit is required to use Qiskit circuits with EnergyEstimator.&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+    <span class="n">base_circuit</span> <span class="o">=</span> <span class="n">base_circuit</span><span class="o">.</span><span class="n">get_qiskit_circuit</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">base_circuit</span><span class="o">.</span><span class="n">num_qubits</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">m_basis</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Measurement basis length must match the number of qubits in the circuit.&quot;</span><span class="p">)</span>
+    <span class="n">basis</span> <span class="o">=</span> <span class="n">Pauli</span><span class="p">(</span><span class="n">m_basis</span><span class="p">)</span>
+    <span class="n">active</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">basis</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">)[</span><span class="n">basis</span><span class="o">.</span><span class="n">z</span> <span class="o">|</span> <span class="n">basis</span><span class="o">.</span><span class="n">x</span><span class="p">]</span>
+    <span class="n">qreg</span> <span class="o">=</span> <span class="n">QuantumRegister</span><span class="p">(</span><span class="n">basis</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span> <span class="s2">&quot;q&quot;</span><span class="p">)</span>
+    <span class="n">creg</span> <span class="o">=</span> <span class="n">ClassicalRegister</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">active</span><span class="p">),</span> <span class="s2">&quot;c&quot;</span><span class="p">)</span>
+    <span class="n">qc</span> <span class="o">=</span> <span class="n">QuantumCircuit</span><span class="p">(</span><span class="n">qreg</span><span class="p">,</span> <span class="n">creg</span><span class="p">)</span>
+    <span class="n">qc</span><span class="o">.</span><span class="n">compose</span><span class="p">(</span><span class="n">base_circuit</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">cidx</span><span class="p">,</span> <span class="n">qidx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">active</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">basis</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="n">qidx</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">basis</span><span class="o">.</span><span class="n">z</span><span class="p">[</span><span class="n">qidx</span><span class="p">]:</span>
+                <span class="n">qc</span><span class="o">.</span><span class="n">sdg</span><span class="p">(</span><span class="n">qreg</span><span class="p">[</span><span class="n">qidx</span><span class="p">])</span>  <span class="c1"># If x=1 and z=1, Y basis</span>
+            <span class="n">qc</span><span class="o">.</span><span class="n">h</span><span class="p">(</span><span class="n">qreg</span><span class="p">[</span><span class="n">qidx</span><span class="p">])</span>  <span class="c1"># If x=1 and z=0, X basis</span>
+        <span class="n">qc</span><span class="o">.</span><span class="n">measure</span><span class="p">(</span><span class="n">qreg</span><span class="p">[</span><span class="n">qidx</span><span class="p">],</span> <span class="n">creg</span><span class="p">[</span><span class="n">cidx</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">Circuit</span><span class="p">(</span><span class="n">qasm</span><span class="o">=</span><span class="n">qasm3</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">qc</span><span class="p">))</span>
+
+
+<div class="viewcode-block" id="QdkEnergyEstimator">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qdk.html#qdk_chemistry.algorithms.energy_estimator.qdk.QdkEnergyEstimator">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QdkEnergyEstimator</span><span class="p">(</span><span class="n">EnergyEstimator</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;QDK implementation of the EnergyEstimator.&quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QdkEnergyEstimator.__init__">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qdk.html#qdk_chemistry.algorithms.energy_estimator.qdk.QdkEnergyEstimator.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize the QdkEnergyEstimator.&quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="QdkEnergyEstimator.type_name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qdk.html#qdk_chemistry.algorithms.energy_estimator.qdk.QdkEnergyEstimator.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return ``energy_estimator`` as the algorithm type name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;energy_estimator&quot;</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span>
+        <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span>
+        <span class="n">circuit_executor</span><span class="p">:</span> <span class="n">CircuitExecutor</span><span class="p">,</span>
+        <span class="n">total_shots</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">noise_model</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">EnergyExpectationResult</span><span class="p">,</span> <span class="n">MeasurementData</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Estimate the expectation value and variance of the Hamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            circuit: Circuit.</span>
+<span class="sd">            qubit_hamiltonian: ``QubitHamiltonian`` to estimate.</span>
+<span class="sd">            circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.</span>
+<span class="sd">            total_shots: Total number of shots to allocate across the observable terms.</span>
+<span class="sd">            noise_model: Optional noise model to simulate noise in the quantum circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:</span>
+
+<span class="sd">                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonian.</span>
+<span class="sd">                * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.</span>
+
+<span class="sd">        Note:</span>
+<span class="sd">            * Measurement circuits are generated for each QubitHamiltonian term.</span>
+<span class="sd">            * Parameterized circuits are not supported.</span>
+<span class="sd">            * Only one circuit is supported per run.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># This function definition is not required it is present to add type hints and docstrings</span>
+        <span class="c1">#  for the derived classes specialized run() method.</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">qubit_hamiltonians</span> <span class="o">=</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">group_commuting</span><span class="p">(</span><span class="n">qubit_wise</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">num_observables</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">qubit_hamiltonians</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">total_shots</span> <span class="o">&lt;</span> <span class="n">num_observables</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Total shots </span><span class="si">{</span><span class="n">total_shots</span><span class="si">}</span><span class="s2"> is less than the number of observables </span><span class="si">{</span><span class="n">num_observables</span><span class="si">}</span><span class="s2">. &quot;</span>
+                <span class="s2">&quot;Please increase total shots to ensure each observable is measured.&quot;</span>
+            <span class="p">)</span>
+
+        <span class="c1"># Evenly distribute shots across all observables</span>
+        <span class="n">shots_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">total_shots</span> <span class="o">//</span> <span class="n">num_observables</span><span class="p">]</span> <span class="o">*</span> <span class="n">num_observables</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Shots allocated: </span><span class="si">{</span><span class="n">shots_list</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Create measurement circuits</span>
+        <span class="n">measurement_circuits</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_create_measurement_circuits</span><span class="p">(</span>
+            <span class="n">circuit</span><span class="o">=</span><span class="n">circuit</span><span class="p">,</span>
+            <span class="n">grouped_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">measurement_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_measurement_data</span><span class="p">(</span>
+            <span class="n">measurement_circuits</span><span class="o">=</span><span class="n">measurement_circuits</span><span class="p">,</span>
+            <span class="n">qubit_hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
+            <span class="n">circuit_executor</span><span class="o">=</span><span class="n">circuit_executor</span><span class="p">,</span>
+            <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">,</span>
+            <span class="n">noise_model</span><span class="o">=</span><span class="n">noise_model</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_energy_expectation_from_bitstrings</span><span class="p">(</span>
+            <span class="n">qubit_hamiltonians</span><span class="p">,</span> <span class="n">measurement_data</span><span class="o">.</span><span class="n">bitstring_counts</span>
+        <span class="p">),</span> <span class="n">measurement_data</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_create_measurement_circuits</span><span class="p">(</span><span class="n">circuit</span><span class="p">:</span> <span class="n">Circuit</span><span class="p">,</span> <span class="n">grouped_hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create measurement circuits for each QubitHamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            circuit: Circuit that provides an OpenQASM3 string of the base circuit.</span>
+<span class="sd">            grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of Circuits that provide the measurement circuits in OpenQASM3 format.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="n">meas_circuits</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">hamiltonian</span> <span class="ow">in</span> <span class="n">grouped_hamiltonians</span><span class="p">:</span>
+            <span class="n">basis</span> <span class="o">=</span> <span class="n">_determine_measurement_basis</span><span class="p">(</span><span class="n">hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">)</span>
+            <span class="n">full_circuit</span> <span class="o">=</span> <span class="n">_append_measurement_to_circuit</span><span class="p">(</span><span class="n">circuit</span><span class="p">,</span> <span class="n">basis</span><span class="p">)</span>
+            <span class="n">meas_circuits</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">full_circuit</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">meas_circuits</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_energy_expectation_from_bitstrings</span><span class="p">(</span>
+        <span class="n">hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">],</span>
+        <span class="n">bitstring_counts_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">EnergyExpectationResult</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute total energy expectation value and variance for a QubitHamiltonian.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            hamiltonians: List of ``QubitHamiltonian`` defining Pauli terms and coefficients.</span>
+<span class="sd">            bitstring_counts_list: List of bitstring count dictionaries corresponding to each QubitHamiltonian.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            ``EnergyExpectationResult`` containing the energy expectation value and variance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">Logger</span><span class="o">.</span><span class="n">trace_entering</span><span class="p">()</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">bitstring_counts_list</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hamiltonians</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Expected </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">hamiltonians</span><span class="p">)</span><span class="si">}</span><span class="s2"> bitstring result sets, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">bitstring_counts_list</span><span class="p">)</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">total_expval</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">total_var</span> <span class="o">=</span> <span class="mf">0.0</span>
+        <span class="n">expvals_list</span><span class="p">,</span> <span class="n">vars_list</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">counts</span><span class="p">,</span> <span class="n">group</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">bitstring_counts_list</span><span class="p">,</span> <span class="n">hamiltonians</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">counts</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">continue</span>
+            <span class="n">paulis</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">pauli_strings</span>
+            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">group</span><span class="o">.</span><span class="n">coefficients</span>
+
+            <span class="n">expvals</span><span class="p">,</span> <span class="n">variances</span> <span class="o">=</span> <span class="n">_compute_expval_and_variance_from_bitstrings</span><span class="p">(</span><span class="n">counts</span><span class="p">,</span> <span class="n">paulis</span><span class="p">)</span>
+            <span class="n">expvals_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">expvals</span><span class="p">)</span>
+            <span class="n">vars_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">variances</span><span class="p">)</span>
+
+            <span class="n">total_expval</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">expvals</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">)</span>
+            <span class="n">total_var</span> <span class="o">+=</span> <span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">variances</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">EnergyExpectationResult</span><span class="p">(</span>
+            <span class="n">energy_expectation_value</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real_if_close</span><span class="p">(</span><span class="n">total_expval</span><span class="p">)),</span>
+            <span class="n">energy_variance</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">real_if_close</span><span class="p">(</span><span class="n">total_var</span><span class="p">)),</span>
+            <span class="n">expvals_each_term</span><span class="o">=</span><span class="n">expvals_list</span><span class="p">,</span>
+            <span class="n">variances_each_term</span><span class="o">=</span><span class="n">vars_list</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">measurement_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">],</span>
+        <span class="n">circuit_executor</span><span class="p">:</span> <span class="n">CircuitExecutor</span><span class="p">,</span>
+        <span class="n">shots_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">noise_model</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Run the measurement circuits and return the bitstring counts.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            measurement_circuits: A list of Circuits that provide measurement circuits in OpenQASM3 format to run.</span>
+<span class="sd">            circuit_executor: An instance of CircuitExecutor to run the circuits.</span>
+<span class="sd">            shots_list: A list of shots allocated for each measurement circuit.</span>
+<span class="sd">            noise_model: Optional noise model to simulate noise in the quantum circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A list of dictionaries containing the bitstring counts for each measurement circuit.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">all_bitstring_counts</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">circuit</span><span class="p">,</span> <span class="n">shots</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">measurement_circuits</span><span class="p">,</span> <span class="n">shots_list</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">circuit_executor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+                <span class="n">circuit</span><span class="p">,</span>
+                <span class="n">shots</span><span class="o">=</span><span class="n">shots</span><span class="p">,</span>
+                <span class="n">noise</span><span class="o">=</span><span class="n">noise_model</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="n">all_bitstring_counts</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span> <span class="k">if</span> <span class="n">result</span> <span class="ow">and</span> <span class="n">result</span><span class="o">.</span><span class="n">bitstring_counts</span> <span class="k">else</span> <span class="p">{})</span>
+        <span class="k">return</span> <span class="n">all_bitstring_counts</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_measurement_data</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">measurement_circuits</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Circuit</span><span class="p">],</span>
+        <span class="n">qubit_hamiltonians</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">QubitHamiltonian</span><span class="p">],</span>
+        <span class="n">circuit_executor</span><span class="p">:</span> <span class="n">CircuitExecutor</span><span class="p">,</span>
+        <span class="n">shots_list</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+        <span class="n">noise_model</span><span class="p">:</span> <span class="n">QuantumErrorProfile</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MeasurementData</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get ``MeasurementData`` from running measurement circuits.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            measurement_circuits: A list of measurement circuits to run.</span>
+<span class="sd">            qubit_hamiltonians: A list of ``QubitHamiltonian`` to be evaluated.</span>
+<span class="sd">            circuit_executor: An instance of ``CircuitExecutor`` to run the circuits.</span>
+<span class="sd">            shots_list: A list of shots allocated for each measurement circuit.</span>
+<span class="sd">            noise_model: Optional noise model to simulate noise in the quantum circuit.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">counts</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_measurement_circuits_and_get_bitstring_counts</span><span class="p">(</span>
+            <span class="n">measurement_circuits</span><span class="p">,</span> <span class="n">circuit_executor</span><span class="p">,</span> <span class="n">shots_list</span><span class="p">,</span> <span class="n">noise_model</span>
+        <span class="p">)</span>
+        <span class="k">return</span> <span class="n">MeasurementData</span><span class="p">(</span>
+            <span class="n">bitstring_counts</span><span class="o">=</span><span class="n">counts</span><span class="p">,</span>
+            <span class="n">hamiltonians</span><span class="o">=</span><span class="n">qubit_hamiltonians</span><span class="p">,</span>
+            <span class="n">shots_list</span><span class="o">=</span><span class="n">shots_list</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="QdkEnergyEstimator.name">
+<a class="viewcode-back" href="../../../../api/api_autogen/qdk_chemistry.algorithms.energy_estimator.qdk.html#qdk_chemistry.algorithms.energy_estimator.qdk.QdkEnergyEstimator.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get the name of the estimator for registry purposes.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdk&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

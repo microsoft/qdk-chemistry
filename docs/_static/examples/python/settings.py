@@ -31,8 +31,8 @@ for key, value in scf.settings().items():
 
 ################################################################################
 # start-cell-get-settings
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Settings  # noqa: E402
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Settings
 
 # Create an algorithm
 scf_solver = create("scf_solver")
@@ -64,7 +64,7 @@ settings.set("convergence_threshold", 1.0e-8)
 
 ################################################################################
 # start-cell-factory-settings
-from qdk_chemistry.algorithms import create  # noqa E402
+from qdk_chemistry.algorithms import create
 
 # Pass settings directly to create() as keyword arguments
 scf_solver = create(
@@ -76,7 +76,6 @@ scf_solver = create(
 # This is equivalent to:
 # scf_solver = create("scf_solver")
 # scf_solver.settings().set("max_iterations", 100)
-# scf_solver.settings().set("basis_set", "def2-tzvp")
 # scf_solver.settings().set("convergence_threshold", 1.0e-8)
 # end-cell-factory-settings
 ################################################################################
@@ -117,8 +116,8 @@ type_name = settings.get_type_name("convergence_threshold")
 
 ################################################################################
 # start-cell-serialization
-import os  # noqa E402
-import tempfile  # noqa E402
+import os
+import tempfile
 
 tmpdir = tempfile.mkdtemp()
 os.chdir(tmpdir)
@@ -140,8 +139,8 @@ json_data = settings.to_json()
 settings_from_json = Settings.from_json(json_data)
 # end-cell-serialization
 ################################################################################
-import numpy as np  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+import numpy as np
+from qdk_chemistry.data import Structure
 
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
 structure = Structure(coords, ["H", "H"])
@@ -150,7 +149,7 @@ structure = Structure(coords, ["H", "H"])
 # start-cell-settings-locked
 scf = create("scf_solver")
 scf.settings().set("method", "hf")
-energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")  # type: ignore[name-defined]  # noqa: F821
+energy, wfn = scf.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")  # type: ignore[name-defined]
 
 # Settings are now locked - this raises SettingsAreLocked:
 # scf.settings().set("method", "b3lyp")
@@ -160,7 +159,7 @@ scf2 = create("scf_solver")
 scf2.settings().set("method", "b3lyp")
 energy2, wfn2 = scf2.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
-)  # type: ignore[name-defined]  # noqa: F821
+)  # type: ignore[name-defined]
 # end-cell-settings-locked
 ################################################################################
 
@@ -181,7 +180,7 @@ class MySettings(Settings):
 
 ################################################################################
 # start-cell-settings-errors
-import qdk_chemistry  # noqa E402
+import qdk_chemistry
 
 # Error handling example
 try:

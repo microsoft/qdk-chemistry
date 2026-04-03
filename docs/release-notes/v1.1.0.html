@@ -1,0 +1,416 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What’s New in Version 1.1 &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../_static/tabs.js?v=3ee01567"></script>
+      <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../_static/copybutton.js?v=f281be69"></script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Changelog" href="../changelog.html" />
+    <link rel="prev" title="Release Notes" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">What’s New in Version 1.1</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#highlights">Highlights</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#model-hamiltonians">Model Hamiltonians</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#q-native-circuit-architecture">Q#-Native Circuit Architecture</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arbitrary-order-trotter-suzuki">Arbitrary-Order Trotter-Suzuki</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#native-rohf-in-qdk-scf">Native ROHF in QDK SCF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#cholesky-based-ao-to-mo-transformation">Cholesky-Based AO-to-MO Transformation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#openfermion-plugin">OpenFermion Plugin</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#macis-improvements">MACIS Improvements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#orbital-localization">Orbital Localization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#other-improvements">Other Improvements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bug-fixes">Bug Fixes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#infrastructure-and-packaging">Infrastructure and Packaging</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="index.html">Release Notes</a></li>
+      <li class="breadcrumb-item active">What’s New in Version 1.1</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/release-notes/v1.1.0.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-s-new-in-version-1-1">
+<span id="release-v1-1-0"></span><h1>What’s New in Version 1.1<a class="headerlink" href="#what-s-new-in-version-1-1" title="Link to this heading"></a></h1>
+<p>Version 1.1 introduces Q#-native circuits, model Hamiltonians, higher-order Trotter-Suzuki formulas,
+native <a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a>, Cholesky-based integral transformations, and an OpenFermion plugin.</p>
+<section id="highlights">
+<h2>Highlights<a class="headerlink" href="#highlights" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>Q#-native circuit architecture</strong> — circuits are now built and composed as native Q# operations, eliminating intermediate format conversions for faster circuit construction and lower memory overhead, and enabling a streamlined end-to-end <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> code path with lazy <a class="reference internal" href="../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> compilation.</p></li>
+<li><p><strong>Model Hamiltonians</strong> — native construction of fermionic and spin lattice Hamiltonians (Hückel, Fermi-Hubbard, <a class="reference internal" href="../glossary.html#term-PPP"><span class="xref std std-term">PPP</span></a>, Ising, Heisenberg) on arbitrary lattice geometries.</p></li>
+<li><p><strong>Arbitrary-order Trotter-Suzuki</strong> — product formulas of any even order with accuracy-aware step sizing and commutator-based error bounds.</p></li>
+<li><p><strong>Native ROHF</strong> — <a class="reference internal" href="../glossary.html#term-DIIS"><span class="xref std std-term">DIIS</span></a>-accelerated restricted open-shell Hartree-Fock in the <a class="reference internal" href="../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a> <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solver.</p></li>
+<li><p><strong>Cholesky AO→MO transformation</strong> — pivoted Cholesky decomposition for two-electron integrals, reducing memory from <span class="math notranslate nohighlight">\(O(N^4)\)</span> to <span class="math notranslate nohighlight">\(O(N^2 N_\text{chol})\)</span> and enabling treatment of larger molecular systems with significant speedup over full four-center <a class="reference internal" href="../glossary.html#term-ERI"><span class="xref std std-term">ERI</span></a> evaluation.</p></li>
+<li><p><strong>OpenFermion plugin</strong> — Jordan-Wigner, Bravyi-Kitaev, and symmetry-conserving Bravyi-Kitaev mappings via OpenFermion.</p></li>
+</ul>
+</section>
+<section id="model-hamiltonians">
+<h2>Model Hamiltonians<a class="headerlink" href="#model-hamiltonians" title="Link to this heading"></a></h2>
+<p>Running quantum phase estimation on a full <em>ab initio</em> molecular Hamiltonian is general and accurate, but the number of qubits and gates grows with the orbital basis set, making even modest molecules expensive to simulate.
+An alternative is to <strong>map the essential physics onto a simpler model Hamiltonian</strong> that captures the key interactions with far fewer degrees of freedom.
+New model-Hamiltonian constructors make it possible to build these Hamiltonians directly, without quantum-chemistry input files or external electronic-structure codes.</p>
+<p><strong>Fermionic models</strong> — Hückel, Hubbard, and Pariser-Parr-Pople (<a class="reference internal" href="../glossary.html#term-PPP"><span class="xref std std-term">PPP</span></a>) — return a second-quantized <code class="docutils literal notranslate"><span class="pre">Hamiltonian</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">LatticeGraph</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.model_hamiltonians</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">create_hubbard_hamiltonian</span><span class="p">,</span>
+    <span class="n">create_huckel_hamiltonian</span><span class="p">,</span>
+    <span class="n">create_ppp_hamiltonian</span><span class="p">,</span>
+    <span class="n">ohno_potential</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># 8-site open chain with tight-binding (Hückel) hopping</span>
+<span class="n">chain</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">8</span><span class="p">)</span>
+<span class="n">ham</span> <span class="o">=</span> <span class="n">create_huckel_hamiltonian</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+
+<span class="c1"># Add on-site Coulomb repulsion (Hubbard)</span>
+<span class="n">ham</span> <span class="o">=</span> <span class="n">create_hubbard_hamiltonian</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=-</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">4.0</span><span class="p">)</span>
+
+<span class="c1"># 4-site periodic ring with intersite Coulomb via Ohno potential (PPP)</span>
+<span class="n">ring</span> <span class="o">=</span> <span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">V</span> <span class="o">=</span> <span class="n">ohno_potential</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">11.26</span><span class="p">,</span> <span class="n">R</span><span class="o">=</span><span class="mf">1.4</span><span class="p">,</span> <span class="n">nearest_neighbor_only</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">ham</span> <span class="o">=</span> <span class="n">create_ppp_hamiltonian</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span> <span class="n">epsilon</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">t</span><span class="o">=</span><span class="mf">2.4</span><span class="p">,</span> <span class="n">U</span><span class="o">=</span><span class="mf">11.26</span><span class="p">,</span> <span class="n">V</span><span class="o">=</span><span class="n">V</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>All parameters (<code class="docutils literal notranslate"><span class="pre">epsilon</span></code>, <code class="docutils literal notranslate"><span class="pre">t</span></code>, <code class="docutils literal notranslate"><span class="pre">U</span></code>, <code class="docutils literal notranslate"><span class="pre">V</span></code>, <code class="docutils literal notranslate"><span class="pre">z</span></code>) accept either a scalar or per-site/per-bond arrays for inhomogeneous lattices.</p>
+<p><strong>Spin models</strong> — Ising and Heisenberg — return a <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code> directly:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.model_hamiltonians</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">create_heisenberg_hamiltonian</span><span class="p">,</span>
+    <span class="n">create_ising_hamiltonian</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Transverse-field Ising model (ZZ coupling + transverse X field)</span>
+<span class="n">ising</span> <span class="o">=</span> <span class="n">create_ising_hamiltonian</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">j</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+
+<span class="c1"># Isotropic Heisenberg (XXX) model</span>
+<span class="n">heisenberg</span> <span class="o">=</span> <span class="n">create_heisenberg_hamiltonian</span><span class="p">(</span><span class="n">chain</span><span class="p">,</span> <span class="n">jx</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">jy</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">jz</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Lattice geometries.</strong> All constructors take a <code class="docutils literal notranslate"><span class="pre">LatticeGraph</span></code> that defines the site connectivity. Common topologies are built in:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">LatticeGraph</span><span class="o">.</span><span class="n">chain</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="n">periodic</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># ring</span>
+<span class="n">LatticeGraph</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>  <span class="c1"># 2D grid</span>
+<span class="n">LatticeGraph</span><span class="o">.</span><span class="n">triangular</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="n">LatticeGraph</span><span class="o">.</span><span class="n">honeycomb</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+<span class="n">LatticeGraph</span><span class="o">.</span><span class="n">kagome</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
+
+<span class="c1"># Or from an adjacency matrix / edge dict</span>
+<span class="n">LatticeGraph</span><span class="p">({(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">):</span> <span class="mf">1.0</span><span class="p">,</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span> <span class="mf">0.5</span><span class="p">},</span> <span class="n">num_sites</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>See <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/extended_hubbard.ipynb">examples/extended_hubbard.ipynb</a> for a complete walkthrough that models cyclobutadiene with the extended Hubbard (<a class="reference internal" href="../glossary.html#term-PPP"><span class="xref std std-term">PPP</span></a>) model and runs <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> on it.
+The interoperability examples under <code class="docutils literal notranslate"><span class="pre">examples/interoperability/</span></code> also demonstrate constructing model Hamiltonians directly without relying on the built-in infrastructure.</p>
+</section>
+<section id="q-native-circuit-architecture">
+<h2>Q#-Native Circuit Architecture<a class="headerlink" href="#q-native-circuit-architecture" title="Link to this heading"></a></h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">Circuit</span></code> class now composes quantum operations as native Q# callables (exposed in <cite>qdk&gt;=1.27.0</cite>). By removing intermediate format conversions (e.g., QASM-to-QIR round-trips), circuit construction is faster and uses less memory, especially for large active spaces. This enables:</p>
+<ul class="simple">
+<li><p>End-to-end <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> without intermediate format conversions — faster pipeline execution</p></li>
+<li><p>Lazy compilation to <a class="reference internal" href="../glossary.html#term-QIR"><span class="xref std std-term">QIR</span></a> only at execution time — construction cost is deferred until the circuit is actually run</p></li>
+<li><p>Direct access to Q#’s resource estimator on any <code class="docutils literal notranslate"><span class="pre">Circuit</span></code></p></li>
+<li><p>A leaner default install with framework-specific dependencies as optional extras</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">Circuit</span></code> can hold any combination of:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">qsharp_op</span></code> — a callable Q# operation</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qsharp_factory</span></code> — a lazy <code class="docutils literal notranslate"><span class="pre">QsharpFactoryData(program,</span> <span class="pre">parameter)</span></code> that compiles on demand</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qasm</span></code> / <code class="docutils literal notranslate"><span class="pre">qir</span></code> — for interoperability with external tools</p></li>
+</ul>
+<p>The <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> pipeline composes Q# callables end-to-end — state preparation, controlled time evolution, and phase estimation are all native Q# operations:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms</span><span class="w"> </span><span class="kn">import</span> <span class="n">create</span>
+
+<span class="n">state_prep</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;state_prep&quot;</span><span class="p">,</span> <span class="s2">&quot;sparse_isometry_gf2x&quot;</span><span class="p">)</span>
+<span class="n">circuit</span> <span class="o">=</span> <span class="n">state_prep</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+
+<span class="c1"># Inspect the Q# circuit</span>
+<span class="n">circuit</span><span class="o">.</span><span class="n">get_qsharp_circuit</span><span class="p">(</span><span class="n">prune_classical_qubits</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<span class="c1"># Compile to QIR for external use</span>
+<span class="n">qir</span> <span class="o">=</span> <span class="n">circuit</span><span class="o">.</span><span class="n">get_qir</span><span class="p">()</span>
+
+<span class="c1"># Use Q#&#39;s resource estimator directly</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">qsharp</span>
+<span class="n">qsharp</span><span class="o">.</span><span class="n">estimate</span><span class="p">(</span>
+    <span class="n">circuit</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">program</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="o">*</span><span class="n">circuit</span><span class="o">.</span><span class="n">_qsharp_factory</span><span class="o">.</span><span class="n">parameter</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p><strong>Lightweight core dependencies.</strong> Framework-specific dependencies are now isolated as optional extras, keeping the core install lean:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>qdk-chemistry<span class="w">                        </span><span class="c1"># core (Q#-native)</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[qiskit-extras]&#39;</span><span class="w">       </span><span class="c1"># + Qiskit interop</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[openfermion-extras]&#39;</span><span class="w">   </span><span class="c1"># + OpenFermion interop</span>
+</pre></div>
+</div>
+<p>See <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/qpe_stretched_n2.ipynb">examples/qpe_stretched_n2.ipynb</a> and <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/state_prep_energy.ipynb">examples/state_prep_energy.ipynb</a> for worked end-to-end <a class="reference internal" href="../glossary.html#term-QPE"><span class="xref std std-term">QPE</span></a> notebooks.</p>
+</section>
+<section id="arbitrary-order-trotter-suzuki">
+<h2>Arbitrary-Order Trotter-Suzuki<a class="headerlink" href="#arbitrary-order-trotter-suzuki" title="Link to this heading"></a></h2>
+<p>Time-evolution builders now support product formulas of any even order via recursive Suzuki composition <span id="id1">[<a class="reference internal" href="../references.html#id59" title="Masuo Suzuki. General theory of higher-order decomposition of exponential operators and symplectic integrators. Physics Letters A, 165(5–6):387–395, 1992. doi:10.1016/0375-9601(92)90335-J.">Suz92</a>]</span>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Trotter</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">builder</span> <span class="o">=</span> <span class="n">Trotter</span><span class="p">(</span><span class="n">order</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">target_accuracy</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">error_bound</span><span class="o">=</span><span class="s2">&quot;commutator&quot;</span><span class="p">)</span>
+<span class="n">unitary</span> <span class="o">=</span> <span class="n">builder</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>When both <code class="docutils literal notranslate"><span class="pre">num_divisions</span></code> and <code class="docutils literal notranslate"><span class="pre">target_accuracy</span></code> are specified, the builder uses whichever requires more Trotter steps. The <code class="docutils literal notranslate"><span class="pre">error_bound</span></code> parameter selects between two bounds:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;naive&quot;</span></code> — triangle-inequality bound: <span class="math notranslate nohighlight">\(N = \lceil (\sum_j |\alpha_j|)^2 t^2 / \epsilon \rceil\)</span></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;commutator&quot;</span></code> — tighter commutator-scaling bound from <span id="id2">[<a class="reference internal" href="../references.html#id58" title="Andrew M. Childs, Yuan Su, Minh C. Tran, Nathan Wiebe, and Shuchen Zhu. Theory of Trotter error with commutator scaling. Physical Review X, 11(1):011020, 2021. URL: https://arxiv.org/abs/1912.08854, doi:10.1103/PhysRevX.11.011020.">CST+21</a>]</span>: <span class="math notranslate nohighlight">\(N = \lceil \frac{t^2}{2\epsilon} \sum_{j&lt;k} \lVert [\alpha_j P_j, \alpha_k P_k] \rVert \rceil\)</span></p></li>
+</ul>
+<p><strong>Error-bound utilities</strong> are available for manual step-count analysis:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.trotter_error</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">trotter_steps_commutator</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">n_steps</span> <span class="o">=</span> <span class="n">trotter_steps_commutator</span><span class="p">(</span>
+    <span class="n">qubit_hamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">target_accuracy</span><span class="o">=</span><span class="mf">1e-3</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">2</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="native-rohf-in-qdk-scf">
+<h2>Native ROHF in QDK SCF<a class="headerlink" href="#native-rohf-in-qdk-scf" title="Link to this heading"></a></h2>
+<p>The <a class="reference internal" href="../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a> <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> solver now supports restricted open-shell Hartree-Fock (<a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a>) with <a class="reference internal" href="../glossary.html#term-DIIS"><span class="xref std std-term">DIIS</span></a> acceleration for systems with unpaired electrons. Previously, open-shell calculations required an unrestricted formulation through the <a class="reference internal" href="../glossary.html#term-QDK"><span class="xref std std-term">QDK</span></a> <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> code path.</p>
+<p><a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a> is automatically selected when specifying <code class="docutils literal notranslate"><span class="pre">scf_type=&quot;restricted&quot;</span></code> on a system with multiplicity &gt; 1. The <a class="reference internal" href="../glossary.html#term-DIIS"><span class="xref std std-term">DIIS</span></a> extrapolation works with the <a class="reference internal" href="../glossary.html#term-ROHF"><span class="xref std std-term">ROHF</span></a>-effective Fock matrix and total density matrix.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">scf_solver</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;scf_solver&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;method&quot;</span><span class="p">,</span> <span class="s2">&quot;hf&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;scf_type&quot;</span><span class="p">,</span> <span class="s2">&quot;restricted&quot;</span><span class="p">)</span>
+<span class="n">scf_solver</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;enable_gdm&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+<span class="n">energy</span><span class="p">,</span> <span class="n">wavefunction</span> <span class="o">=</span> <span class="n">scf_solver</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">structure</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">spin_multiplicity</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">basis_or_guess</span><span class="o">=</span><span class="s2">&quot;sto-3g&quot;</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="cholesky-based-ao-to-mo-transformation">
+<h2>Cholesky-Based AO-to-MO Transformation<a class="headerlink" href="#cholesky-based-ao-to-mo-transformation" title="Link to this heading"></a></h2>
+<p>A new Hamiltonian constructor uses pivoted Cholesky decomposition of the <a class="reference internal" href="../glossary.html#term-AO"><span class="xref std std-term">AO</span></a> electron-repulsion integrals (<a class="reference internal" href="../glossary.html#term-ERI"><span class="xref std std-term">ERI</span></a>), reducing memory from <span class="math notranslate nohighlight">\(O(N^4)\)</span> to <span class="math notranslate nohighlight">\(O(N^2 N_\text{chol})\)</span> and significantly accelerating the <a class="reference internal" href="../glossary.html#term-AO"><span class="xref std std-term">AO</span></a>-to-<a class="reference internal" href="../glossary.html#term-MO"><span class="xref std std-term">MO</span></a> integral transformation compared to full four-center <a class="reference internal" href="../glossary.html#term-ERI"><span class="xref std std-term">ERI</span></a> evaluation. This enables treatment of active-space methods for larger molecular systems that would be impractical with the conventional approach.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">constructor</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;hamiltonian_constructor&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk_cholesky&quot;</span><span class="p">)</span>
+<span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;cholesky_tolerance&quot;</span><span class="p">,</span> <span class="mf">1e-8</span><span class="p">)</span>
+<span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;eri_threshold&quot;</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+<span class="n">constructor</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;store_cholesky_vectors&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">cholesky_hamiltonian</span> <span class="o">=</span> <span class="n">constructor</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">orbitals</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The implementation includes Schwarz-based shell-quartet screening, stability guards for near-singular decompositions, and diagnostic logging for convergence monitoring.</p>
+</section>
+<section id="openfermion-plugin">
+<h2>OpenFermion Plugin<a class="headerlink" href="#openfermion-plugin" title="Link to this heading"></a></h2>
+<p>A new plugin provides qubit mappings backed by <a class="reference external" href="https://quantumai.google/openfermion">OpenFermion</a>:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;qdk-chemistry[openfermion-extras]&#39;</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span>    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+
+    <span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span> <span class="s2">&quot;openfermion&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;jordan-wigner&quot;</span><span class="p">)</span>
+    <span class="n">qh</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">)</span>
+
+    <span class="c1"># Symmetry-conserving Bravyi-Kitaev (reduces qubit count by 2)</span>
+    <span class="n">sym</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="p">(</span><span class="n">n_alpha</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">n_beta</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">mapper</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span>
+        <span class="s2">&quot;qubit_mapper&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;openfermion&quot;</span><span class="p">,</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;symmetry-conserving-bravyi-kitaev&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">qh</span> <span class="o">=</span> <span class="n">mapper</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="n">sym</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Available encodings: <code class="docutils literal notranslate"><span class="pre">jordan-wigner</span></code>, <code class="docutils literal notranslate"><span class="pre">bravyi-kitaev</span></code>, <code class="docutils literal notranslate"><span class="pre">bravyi-kitaev-tree</span></code>, <code class="docutils literal notranslate"><span class="pre">symmetry-conserving-bravyi-kitaev</span></code>.
+Please see the OpenFermion documentation for more information.</p>
+<p>See <a class="reference external" href="https://github.com/microsoft/qdk-chemistry/blob/v1.1.0/examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py">examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py</a> for a worked example.</p>
+</section>
+<section id="macis-improvements">
+<h2>MACIS Improvements<a class="headerlink" href="#macis-improvements" title="Link to this heading"></a></h2>
+<ul>
+<li><p><strong>Expanded orbital limits.</strong> The selected-<a class="reference internal" href="../glossary.html#term-CI"><span class="xref std std-term">CI</span></a> dispatch now supports active spaces up to <strong>2048 orbitals</strong> (up from 127 in v1.0). The internal <a class="reference internal" href="../glossary.html#term-SCI"><span class="xref std std-term">SCI</span></a> bit-string representation was widened to 255 orbitals.</p></li>
+<li><p><strong>Single-orbital entropies and mutual information.</strong> <a class="reference internal" href="../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> calculators can now compute S1 entropies and two-orbital mutual information for active-space analysis:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mc</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;multi_configuration_calculator&quot;</span><span class="p">,</span> <span class="s2">&quot;macis_asci&quot;</span><span class="p">)</span>
+<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_single_orbital_entropies&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">mc</span><span class="o">.</span><span class="n">settings</span><span class="p">()</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;calculate_mutual_information&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+<span class="n">E_asci</span><span class="p">,</span> <span class="n">wfn_asci</span> <span class="o">=</span> <span class="n">mc</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">hamiltonian</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>ASCI refinement stability.</strong> The <a class="reference internal" href="../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a> refinement loop now detects sign-flipping energy oscillations and terminates gracefully instead of looping indefinitely.</p></li>
+<li><p><strong>Unrestricted-orbital guard.</strong> <a class="reference internal" href="../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> calculators (<a class="reference internal" href="../glossary.html#term-CAS"><span class="xref std std-term">CAS</span></a>, <a class="reference internal" href="../glossary.html#term-ASCI"><span class="xref std std-term">ASCI</span></a>, <a class="reference internal" href="../glossary.html#term-PMC"><span class="xref std std-term">PMC</span></a>) now raise a clear error if passed an unrestricted Hamiltonian, which is not supported by the <a class="reference internal" href="../glossary.html#term-MACIS"><span class="xref std std-term">MACIS</span></a> backend.</p></li>
+</ul>
+</section>
+<section id="orbital-localization">
+<h2>Orbital Localization<a class="headerlink" href="#orbital-localization" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>One-shot VVHV localization.</strong> The valence-virtual hard-virtual (<a class="reference internal" href="../glossary.html#term-VVHV"><span class="xref std std-term">VVHV</span></a>) localizer was rewritten to use a proper one-shot localization for proto hard-virtuals, replacing the previous canonicalization-based approach. This improves numerical stability with better weighted orthogonalization and singular-value diagnostics.</p></li>
+<li><p><strong>Bug fix</strong> in the proto-HV construction that could produce incorrect localized orbitals in certain basis sets.</p></li>
+</ul>
+</section>
+<section id="other-improvements">
+<h2>Other Improvements<a class="headerlink" href="#other-improvements" title="Link to this heading"></a></h2>
+<ul>
+<li><p><strong>Refactored energy estimator.</strong> <code class="docutils literal notranslate"><span class="pre">QdkEnergyEstimator</span></code> now takes a single <code class="docutils literal notranslate"><span class="pre">QubitHamiltonian</span></code>, groups commuting terms internally via <code class="docutils literal notranslate"><span class="pre">group_commuting(qubit_wise=True)</span></code>, and delegates execution to a <code class="docutils literal notranslate"><span class="pre">CircuitExecutor</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">estimator</span> <span class="o">=</span> <span class="n">create</span><span class="p">(</span><span class="s2">&quot;energy_estimator&quot;</span><span class="p">,</span> <span class="s2">&quot;qdk&quot;</span><span class="p">)</span>
+<span class="n">energy_result</span><span class="p">,</span> <span class="n">measurement_data</span> <span class="o">=</span> <span class="n">estimator</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+    <span class="n">circuit</span><span class="p">,</span>
+    <span class="n">qubit_hamiltonian</span><span class="p">,</span>
+    <span class="n">circuit_executor</span><span class="p">,</span>
+    <span class="n">total_shots</span><span class="o">=</span><span class="mi">10_000</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>CI coefficients for CC and MP2.</strong> Coupled-cluster and <a class="reference internal" href="../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> wavefunctions now expose a CI-like expansion with <code class="docutils literal notranslate"><span class="pre">get_coefficients()</span></code>, <code class="docutils literal notranslate"><span class="pre">get_coefficient(...)</span></code>, and <code class="docutils literal notranslate"><span class="pre">get_active_determinants()</span></code> methods, enabling determinant-level analysis of post-<a class="reference internal" href="../glossary.html#term-HF"><span class="xref std std-term">HF</span></a> wavefunctions.</p></li>
+<li><p><strong>Configurable ERI threshold.</strong> The <code class="docutils literal notranslate"><span class="pre">eri_threshold</span></code> setting (default <code class="docutils literal notranslate"><span class="pre">1e-12</span></code>) controls shell-quartet screening in Hamiltonian construction. A separate <code class="docutils literal notranslate"><span class="pre">shell_pair_threshold</span></code> is available for <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> pre-screening.</p></li>
+<li><p><strong>Wavefunction file I/O with</strong> <code class="docutils literal notranslate"><span class="pre">pathlib.Path</span></code>. Python bindings for <code class="docutils literal notranslate"><span class="pre">to_file</span></code> / <code class="docutils literal notranslate"><span class="pre">from_file</span></code>, <code class="docutils literal notranslate"><span class="pre">to_json_file</span></code> / <code class="docutils literal notranslate"><span class="pre">from_json_file</span></code>, and <code class="docutils literal notranslate"><span class="pre">to_hdf5_file</span></code> / <code class="docutils literal notranslate"><span class="pre">from_hdf5_file</span></code> now accept <code class="docutils literal notranslate"><span class="pre">pathlib.Path</span></code> objects in addition to strings.</p></li>
+<li><p><strong>Dedicated</strong> <code class="docutils literal notranslate"><span class="pre">[jupyter]</span></code> <strong>install extra.</strong> Notebook dependencies are now isolated from the core install: <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">'qdk-chemistry[jupyter]'</span></code>.</p></li>
+<li><p><strong>``Symmetries`` data class.</strong> A new immutable container for active-space quantum numbers, used by qubit mappers that exploit particle-number or spin symmetries (e.g., symmetry-conserving Bravyi-Kitaev):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Symmetries</span>
+
+<span class="n">sym</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="p">(</span><span class="n">n_alpha</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">n_beta</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">sym</span><span class="o">.</span><span class="n">n_particles</span>  <span class="c1"># 5</span>
+<span class="n">sym</span><span class="o">.</span><span class="n">sz</span>  <span class="c1"># 0.5</span>
+<span class="n">sym</span><span class="o">.</span><span class="n">spin_multiplicity</span>  <span class="c1"># 2</span>
+
+<span class="c1"># Or construct from an existing wavefunction</span>
+<span class="n">sym</span> <span class="o">=</span> <span class="n">Symmetries</span><span class="o">.</span><span class="n">from_wavefunction</span><span class="p">(</span><span class="n">wavefunction</span><span class="p">)</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="bug-fixes">
+<h2>Bug Fixes<a class="headerlink" href="#bug-fixes" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Fixed inactive Fock matrix dimension validation — matrices are now checked for full NMO × NMO shape before Hamiltonian construction, preventing silent size mismatches.</p></li>
+<li><p>Fixed active-space <a class="reference internal" href="../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a> orbital energies — denominators now use active-space orbital energies rather than full-system indices for both restricted and unrestricted <a class="reference internal" href="../glossary.html#term-MP2"><span class="xref std std-term">MP2</span></a>.</p></li>
+<li><p>Fixed JSON serialization of <code class="docutils literal notranslate"><span class="pre">TimeEvolutionContainer</span></code> — Pauli-term keys are now correctly serialized as strings and deserialized back to integer qubit indices.</p></li>
+<li><p>Fixed <a class="reference internal" href="../glossary.html#term-SCF"><span class="xref std std-term">SCF</span></a> logging suppression — the solver no longer silences the global logger during execution, which was hiding unrelated log messages.</p></li>
+<li><p>Aligned logger flush policy with the configured log level.</p></li>
+</ul>
+</section>
+<section id="infrastructure-and-packaging">
+<h2>Infrastructure and Packaging<a class="headerlink" href="#infrastructure-and-packaging" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p><strong>macOS ARM64 wheels.</strong> Pre-built wheels are now published for macOS Apple Silicon alongside Linux x86_64 and Linux aarch64.</p></li>
+<li><p><strong>Modular install extras.</strong> Framework-specific dependencies are now optional extras (<code class="docutils literal notranslate"><span class="pre">qiskit-extras</span></code>, <code class="docutils literal notranslate"><span class="pre">openfermion-extras</span></code>, <code class="docutils literal notranslate"><span class="pre">jupyter</span></code>), keeping the default install lightweight.</p></li>
+<li><p><strong>Telemetry sanitization.</strong> Tests and CI builds now force telemetry off (<code class="docutils literal notranslate"><span class="pre">QSHARP_PYTHON_TELEMETRY=false</span></code>) to prevent accidental data collection during development.</p></li>
+<li><p><strong>Centralized</strong> <code class="docutils literal notranslate"><span class="pre">VERSION</span></code> <strong>file.</strong> A single <code class="docutils literal notranslate"><span class="pre">VERSION</span></code> file at the repo root is the source of truth for CMake, Python packaging, and CI. Format: <code class="docutils literal notranslate"><span class="pre">X.Y.Z</span></code> or <code class="docutils literal notranslate"><span class="pre">X.Y.Z.T</span></code>.</p></li>
+<li><p>Broadened CI/CD coverage and release pipeline hardening.</p></li>
+<li><p>Documentation restructured with clearer navigation and a layered quick-reference style.</p></li>
+<li><p>Added <a class="reference external" href="https://github.com/microsoft/qdk-chemistry-data">qdk-chemistry-data</a> companion repo references for curated datasets and benchmark materials.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="index.html" class="btn btn-neutral float-left" title="Release Notes" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../changelog.html" class="btn btn-neutral float-right" title="Changelog" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

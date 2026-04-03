@@ -1,0 +1,8 @@
+qdk\_chemistry.utils.model\_hamiltonians module
+===============================================
+
+.. automodule:: qdk_chemistry.utils.model_hamiltonians
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

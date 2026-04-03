@@ -6,18 +6,18 @@
   <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Acronym definitions &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>Acronym definitions &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="_static/custom.css?v=ac0f520b" />
 
   
       <script src="_static/jquery.js?v=5d32c60e"></script>
       <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="_static/documentation_options.js?v=fc837d61"></script>
       <script src="_static/doctools.js?v=fd6eb6e6"></script>
       <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="_static/tabs.js?v=3ee01567"></script>
@@ -27,7 +27,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="References" href="references.html" />
-    <link rel="prev" title="Namespace qdk::chemistry::constants" href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html" /> 
+    <link rel="prev" title="Changelog" href="changelog.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -62,6 +62,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog.html">Changelog</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="references.html">References</a></li>
 </ul>
@@ -126,9 +128,9 @@ Method that projects molecular orbitals onto a target atomic orbital basis to id
 </dd>
 <dt id="term-ERI">ERI<a class="headerlink" href="#term-ERI" title="Link to this term"></a></dt><dd><p>Electron Repulsion Integral.</p>
 </dd>
-<dt id="term-FCIDUMP">FCIDUMP<a class="headerlink" href="#term-FCIDUMP" title="Link to this term"></a></dt><dd><p>Text format for storing one- and two-electron integrals (FCIDUMP standard).</p>
-</dd>
 <dt id="term-FCI">FCI<a class="headerlink" href="#term-FCI" title="Link to this term"></a></dt><dd><p>Full Configuration Interaction.</p>
+</dd>
+<dt id="term-FCIDUMP">FCIDUMP<a class="headerlink" href="#term-FCIDUMP" title="Link to this term"></a></dt><dd><p>Text format for storing one- and two-electron integrals (FCIDUMP standard).</p>
 </dd>
 <dt id="term-GDM">GDM<a class="headerlink" href="#term-GDM" title="Link to this term"></a></dt><dd><p>Geometric Direct Minimization.</p>
 </dd>
@@ -138,12 +140,15 @@ Method that projects molecular orbitals onto a target atomic orbital basis to id
 </dd>
 <dt id="term-HOMO">HOMO<a class="headerlink" href="#term-HOMO" title="Link to this term"></a></dt><dd><p>Highest Occupied Molecular Orbital.</p>
 </dd>
+<dt id="term-IQPE">IQPE<a class="headerlink" href="#term-IQPE" title="Link to this term"></a></dt><dd><p>Iterative Quantum Phase Estimation.
+A variant of QPE using a single ancilla qubit with sequential bit extraction and adaptive feedback.</p>
+</dd>
 <dt id="term-LDA">LDA<a class="headerlink" href="#term-LDA" title="Link to this term"></a></dt><dd><p>Local Density Approximation.</p>
 </dd>
 <dt id="term-LUMO">LUMO<a class="headerlink" href="#term-LUMO" title="Link to this term"></a></dt><dd><p>Lowest Unoccupied Molecular Orbital.</p>
 </dd>
 <dt id="term-MACIS">MACIS<a class="headerlink" href="#term-MACIS" title="Link to this term"></a></dt><dd><p>Many-body Adaptive Configuration Interaction Solver.
-See <span id="id1">[<a class="reference internal" href="references.html#id6" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span> for more details.</p>
+See <span id="id1">[<a class="reference internal" href="references.html#id9" title="David B. Williams-Young, Norm M. Tubman, Carlos Mejuto-Zaera, and Wibe A. de Jong. A parallel, distributed memory implementation of the adaptive sampling configuration interaction method. The Journal of Chemical Physics, 158:214109, 2023. URL: https://arxiv.org/abs/2303.05688, doi:10.1063/5.0148650.">WYTMZdJ23</a>]</span> for more details.</p>
 </dd>
 <dt id="term-MC">MC<a class="headerlink" href="#term-MC" title="Link to this term"></a></dt><dd><p>Multi-Configuration.</p>
 </dd>
@@ -153,9 +158,21 @@ See <span id="id1">[<a class="reference internal" href="references.html#id6" tit
 </dd>
 <dt id="term-MP2">MP2<a class="headerlink" href="#term-MP2" title="Link to this term"></a></dt><dd><p>Second-order Møller-Plesset perturbation theory.</p>
 </dd>
+<dt id="term-NISQ">NISQ<a class="headerlink" href="#term-NISQ" title="Link to this term"></a></dt><dd><p>Noisy Intermediate-Scale Quantum.
+Refers to the current era of quantum computing with limited qubit counts and imperfect gate operations.</p>
+</dd>
+<dt id="term-PMC">PMC<a class="headerlink" href="#term-PMC" title="Link to this term"></a></dt><dd><p>Projected Multi-Configuration.</p>
+</dd>
+<dt id="term-PPP">PPP<a class="headerlink" href="#term-PPP" title="Link to this term"></a></dt><dd><p>Pariser-Parr-Pople.
+Semi-empirical model Hamiltonian that adds intersite Coulomb interactions to the Hubbard model.</p>
+</dd>
 <dt id="term-QDK">QDK<a class="headerlink" href="#term-QDK" title="Link to this term"></a></dt><dd><p>Quantum Development Kit.</p>
 </dd>
-<dt id="term-QPE">QPE<a class="headerlink" href="#term-QPE" title="Link to this term"></a></dt><dd><p>Quantum Phase Estimation.</p>
+<dt id="term-QIR">QIR<a class="headerlink" href="#term-QIR" title="Link to this term"></a></dt><dd><p>Quantum Intermediate Representation.
+LLVM-based intermediate representation for quantum programs, used for cross-platform compilation and execution.</p>
+</dd>
+<dt id="term-QPE">QPE<a class="headerlink" href="#term-QPE" title="Link to this term"></a></dt><dd><p>Quantum Phase Estimation.
+Algorithm that extracts energy eigenvalues by measuring the phase accumulated under Hamiltonian time evolution.</p>
 </dd>
 <dt id="term-RDM">RDM<a class="headerlink" href="#term-RDM" title="Link to this term"></a></dt><dd><p>Reduced Density Matrix; one- or two-particle reduced density matrices used for many-body properties.</p>
 </dd>
@@ -188,7 +205,7 @@ See <span id="id1">[<a class="reference internal" href="references.html#id6" tit
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="api/breathe_api_autogen/namespace/namespaceqdk_1_1chemistry_1_1constants.html" class="btn btn-neutral float-left" title="Namespace qdk::chemistry::constants" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="changelog.html" class="btn btn-neutral float-left" title="Changelog" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="references.html" class="btn btn-neutral float-right" title="References" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.data.time_evolution.containers.pauli_product_formula &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.data.time_evolution.containers.pauli_product_formula &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
 </ul>
@@ -243,7 +245,10 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
             <span class="s2">&quot;container_type&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">type</span><span class="p">,</span>
-            <span class="s2">&quot;step_terms&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;pauli_term&quot;</span><span class="p">:</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span> <span class="s2">&quot;angle&quot;</span><span class="p">:</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">}</span> <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_terms</span><span class="p">],</span>
+            <span class="s2">&quot;step_terms&quot;</span><span class="p">:</span> <span class="p">[</span>
+                <span class="p">{</span><span class="s2">&quot;pauli_term&quot;</span><span class="p">:</span> <span class="p">{</span><span class="nb">str</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">items</span><span class="p">()},</span> <span class="s2">&quot;angle&quot;</span><span class="p">:</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span><span class="p">}</span>
+                <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_terms</span>
+            <span class="p">],</span>
             <span class="s2">&quot;step_reps&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">step_reps</span><span class="p">,</span>
             <span class="s2">&quot;num_qubits&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
         <span class="p">}</span>
@@ -287,13 +292,25 @@
 
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_json_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">json_data</span><span class="p">)</span>
-        <span class="n">step_terms</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span>
-                <span class="n">pauli_term</span><span class="o">=</span><span class="n">term_data</span><span class="p">[</span><span class="s2">&quot;pauli_term&quot;</span><span class="p">],</span>
-                <span class="n">angle</span><span class="o">=</span><span class="n">term_data</span><span class="p">[</span><span class="s2">&quot;angle&quot;</span><span class="p">],</span>
-            <span class="p">)</span>
-            <span class="k">for</span> <span class="n">term_data</span> <span class="ow">in</span> <span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;step_terms&quot;</span><span class="p">]</span>
-        <span class="p">]</span>
+        <span class="n">step_terms</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">term_data</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;step_terms&quot;</span><span class="p">]):</span>
+            <span class="n">pauli_term</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+            <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">term_data</span><span class="p">[</span><span class="s2">&quot;pauli_term&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+                    <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;step_terms[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">].pauli_term: expected str key, got </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">k</span><span class="si">!r}</span><span class="s2">)&quot;</span><span class="p">)</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">qubit_index</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;step_terms[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">].pauli_term: key </span><span class="si">{</span><span class="n">k</span><span class="si">!r}</span><span class="s2"> is not a valid integer qubit index&quot;</span>
+                    <span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">exc</span>
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">qubit_index</span><span class="p">)</span> <span class="o">!=</span> <span class="n">k</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;step_terms[</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">].pauli_term: key </span><span class="si">{</span><span class="n">k</span><span class="si">!r}</span><span class="s2"> is not a canonical integer &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;(expected </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">qubit_index</span><span class="p">)</span><span class="si">!r}</span><span class="s2">)&quot;</span>
+                    <span class="p">)</span>
+                <span class="n">pauli_term</span><span class="p">[</span><span class="n">qubit_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="n">step_terms</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">pauli_term</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">term_data</span><span class="p">[</span><span class="s2">&quot;angle&quot;</span><span class="p">]))</span>
         <span class="n">step_reps</span> <span class="o">=</span> <span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;step_reps&quot;</span><span class="p">]</span>
         <span class="n">num_qubits</span> <span class="o">=</span> <span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;num_qubits&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>

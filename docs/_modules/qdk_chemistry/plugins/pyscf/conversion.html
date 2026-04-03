@@ -5,18 +5,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>qdk_chemistry.plugins.pyscf.conversion &mdash; qdk-chemistry 1.0.0-rc1 documentation</title>
+  <title>qdk_chemistry.plugins.pyscf.conversion &mdash; qdk-chemistry 1.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=b86133f3" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/css/theme.css?v=9edc463e" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/tabs.css?v=4c969af8" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/graphviz.css?v=4ae1632d" />
       <link rel="stylesheet" type="text/css" href="../../../../_static/copybutton.css?v=76b2166b" />
-      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=06674eb4" />
+      <link rel="stylesheet" type="text/css" href="../../../../_static/custom.css?v=ac0f520b" />
 
   
       <script src="../../../../_static/jquery.js?v=5d32c60e"></script>
       <script src="../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
-      <script src="../../../../_static/documentation_options.js?v=81bd8d55"></script>
+      <script src="../../../../_static/documentation_options.js?v=fc837d61"></script>
       <script src="../../../../_static/doctools.js?v=fd6eb6e6"></script>
       <script src="../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
       <script src="../../../../_static/tabs.js?v=3ee01567"></script>
@@ -59,6 +59,8 @@
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
 <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../changelog.html">Changelog</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../glossary.html">Acronym definitions</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../../../references.html">References</a></li>
 </ul>
@@ -124,13 +126,13 @@
 <span class="c1"># --------------------------------------------------------------------------------------------</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">Counter</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">StrEnum</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pyscf</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">AOType</span><span class="p">,</span> <span class="n">BasisSet</span><span class="p">,</span> <span class="n">Hamiltonian</span><span class="p">,</span> <span class="n">Orbitals</span><span class="p">,</span> <span class="n">Shell</span><span class="p">,</span> <span class="n">Structure</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logger</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">CaseInsensitiveStrEnum</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span>
     <span class="s2">&quot;basis_to_pyscf_mol&quot;</span><span class="p">,</span>
@@ -140,7 +142,7 @@
 <span class="p">]</span>
 
 
-<span class="k">class</span><span class="w"> </span><span class="nc">SCFType</span><span class="p">(</span><span class="n">StrEnum</span><span class="p">):</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">SCFType</span><span class="p">(</span><span class="n">CaseInsensitiveStrEnum</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Enum to specify the type of SCF calculation out of auto/restricted/unrestricted.</span>
 
 <span class="sd">    Attributes:</span>
@@ -253,7 +255,7 @@
             <span class="n">atom_basis</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">shell_rec</span><span class="p">))</span>
         <span class="n">basis_dict</span><span class="p">[</span><span class="n">pyscf_symbols</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">atom_basis</span>
 
-    <span class="c1"># TODO Handle Cartesian basis sets, workitem: 41406</span>
+    <span class="c1"># TODO Handle Cartesian basis sets</span>
     <span class="n">mol</span> <span class="o">=</span> <span class="n">pyscf</span><span class="o">.</span><span class="n">gto</span><span class="o">.</span><span class="n">mole</span><span class="o">.</span><span class="n">Mole</span><span class="p">(</span><span class="n">atom</span><span class="o">=</span><span class="n">atoms</span><span class="p">,</span> <span class="n">basis</span><span class="o">=</span><span class="n">basis_dict</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;Bohr&quot;</span><span class="p">,</span> <span class="n">charge</span><span class="o">=</span><span class="n">charge</span><span class="p">,</span> <span class="n">spin</span><span class="o">=</span><span class="n">multiplicity</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
 
     <span class="c1"># Store the original QDK/Chemistry basis name as an attribute for round-trip conversion</span>
@@ -366,11 +368,8 @@
             <span class="n">basis_name</span> <span class="o">=</span> <span class="s2">&quot;pyscf_basis&quot;</span>
     <span class="c1"># Create shells from PySCF molecule data first</span>
     <span class="n">shells</span> <span class="o">=</span> <span class="p">[]</span>
-    <span class="c1"># TODO: This should deduce the structure from the PySCF Mole object</span>
-    <span class="c1"># For now, we&#39;ll collect the shells and pass structure to constructor</span>
-    <span class="c1"># workitem 41407</span>
 
-    <span class="c1"># TODO Handle Cartesian, workitem 41406</span>
+    <span class="c1"># TODO Handle Cartesian</span>
     <span class="n">atom_symbols</span> <span class="o">=</span> <span class="p">[</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">atom_symbol</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">)]</span>
     <span class="k">for</span> <span class="n">iatm</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pyscf_mol</span><span class="o">.</span><span class="n">natm</span><span class="p">):</span>
         <span class="n">atom_symbol</span> <span class="o">=</span> <span class="n">atom_symbols</span><span class="p">[</span><span class="n">iatm</span><span class="p">]</span>

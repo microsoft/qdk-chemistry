@@ -59,7 +59,7 @@ print(hamiltonian.get_summary())
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("hamiltonian_constructor"))
 # ['qdk']

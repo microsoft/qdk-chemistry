@@ -1,0 +1,8 @@
+qdk\_chemistry.plugins.openfermion.qubit\_mapper module
+=======================================================
+
+.. automodule:: qdk_chemistry.plugins.openfermion.qubit_mapper
+   :members:
+   :private-members:
+   :show-inheritance:
+   :undoc-members:

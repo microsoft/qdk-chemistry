@@ -1,0 +1,489 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.algorithms.time_evolution.builder.qdrift &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.algorithms.time_evolution.builder.qdrift</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.algorithms.time_evolution.builder.qdrift</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;QDK/Chemistry implementation of the qDRIFT randomized evolution builder.</span>
+
+<span class="sd">This module implements the qDRIFT algorithm for Hamiltonian simulation, which provides</span>
+<span class="sd">an alternative to deterministic Trotter decomposition by using randomized sampling.</span>
+
+<span class="sd">References:</span>
+<span class="sd">    Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.</span>
+<span class="sd">    Physical Review Letters, 123(7), 070503.</span>
+<span class="sd">    https://arxiv.org/abs/1811.08017</span>
+<span class="sd">    https://doi.org/10.1103/PhysRevLett.123.070503</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.algorithms.time_evolution.builder.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">TimeEvolutionBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">Settings</span><span class="p">,</span> <span class="n">TimeEvolutionUnitary</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.time_evolution.containers.pauli_product_formula</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">ExponentiatedPauliTerm</span><span class="p">,</span>
+    <span class="n">PauliProductFormulaContainer</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.utils.pauli_commutation</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">do_pauli_maps_qw_commute</span><span class="p">,</span>
+    <span class="n">get_commutation_checker</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">__all__</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;QDrift&quot;</span><span class="p">,</span> <span class="s2">&quot;QDriftSettings&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="QDriftSettings">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QDriftSettings</span><span class="p">(</span><span class="n">Settings</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Settings for qDRIFT randomized decomposition builder.</span>
+
+<span class="sd">    The qDRIFT algorithm approximates the time evolution operator using randomized</span>
+<span class="sd">    sampling of Hamiltonian terms. The error scales as O(λ²t²/N), where λ is the</span>
+<span class="sd">    1-norm of the Hamiltonian coefficients, t is evolution time, and N is the</span>
+<span class="sd">    number of samples.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QDriftSettings.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDriftSettings.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize QDriftSettings with default values.</span>
+
+<span class="sd">        Attributes:</span>
+<span class="sd">            num_samples: Number of random samples N. More samples = higher accuracy.</span>
+<span class="sd">                         Error scales as O(λ²t²/N).</span>
+<span class="sd">            seed: Random seed for reproducibility. Use -1 for non-deterministic behavior.</span>
+<span class="sd">            merge_duplicate_terms: Whether to fuse identical Pauli terms that</span>
+<span class="sd">                appear in consecutive mutually-commuting runs, reducing circuit</span>
+<span class="sd">                depth.  Only equal operators are combined; distinct commuting</span>
+<span class="sd">                terms are kept separate.  The merging is exact and preserves</span>
+<span class="sd">                the error bound.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;num_samples&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="mi">100</span><span class="p">,</span>
+            <span class="s2">&quot;Number of random samples N. Error scales as O(λ²t²/N).&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;seed&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;int&quot;</span><span class="p">,</span>
+            <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+            <span class="s2">&quot;Random seed for reproducibility. Use -1 for non-deterministic.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;bool&quot;</span><span class="p">,</span>
+            <span class="kc">True</span><span class="p">,</span>
+            <span class="s2">&quot;Fuse identical Pauli terms within consecutive commuting runs to reduce circuit depth.&quot;</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_set_default</span><span class="p">(</span>
+            <span class="s2">&quot;commutation_type&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;string&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;general&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;Commutation check for merging: &#39;qubit_wise&#39; (per-qubit) or &#39;general&#39; (standard Pauli).&quot;</span><span class="p">,</span>
+            <span class="p">(</span><span class="s2">&quot;qubit_wise&quot;</span><span class="p">,</span> <span class="s2">&quot;general&quot;</span><span class="p">),</span>
+        <span class="p">)</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="QDrift">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">QDrift</span><span class="p">(</span><span class="n">TimeEvolutionBuilder</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;qDRIFT randomized product formula builder.</span>
+
+<span class="sd">    Implements the qDRIFT algorithm from Campbell (2019), which approximates the</span>
+<span class="sd">    time evolution operator :math:`U(t) = e^{-iHt}` using randomized sampling of</span>
+<span class="sd">    Hamiltonian terms.</span>
+
+<span class="sd">    Instead of applying all Hamiltonian terms in a fixed sequence (as in Trotter</span>
+<span class="sd">    decomposition), qDRIFT randomly samples terms with probability proportional</span>
+<span class="sd">    to their coefficient magnitudes. This can achieve better gate complexity for</span>
+<span class="sd">    Hamiltonians with many terms.</span>
+
+<span class="sd">    The algorithm works as follows:</span>
+
+<span class="sd">    1. Compute :math:`\lambda = \sum_j |h_j|` (1-norm of coefficients)</span>
+<span class="sd">    2. Build probability distribution :math:`p_j = |h_j| / \lambda`</span>
+<span class="sd">    3. Sample N terms according to this distribution</span>
+<span class="sd">    4. Each sample contributes :math:`e^{-i \cdot \text{sign}(h_j) \cdot \lambda t / N \cdot P_j}`</span>
+
+<span class="sd">    The approximation error is bounded by :math:`\epsilon \leq 2\lambda^2 t^2 / N`.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        num_samples: Number of random samples to draw.</span>
+<span class="sd">        seed: Random seed for reproducibility.</span>
+<span class="sd">        merge_duplicate_terms: Whether to fuse identical Pauli terms within</span>
+<span class="sd">            consecutive commuting runs.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; from qdk_chemistry.algorithms import create</span>
+<span class="sd">        &gt;&gt;&gt; # Create a qDRIFT builder with 500 samples</span>
+<span class="sd">        &gt;&gt;&gt; qdrift = create(&quot;time_evolution_builder&quot;, &quot;qdrift&quot;, num_samples=500, seed=42)</span>
+<span class="sd">        &gt;&gt;&gt; # Use it to build time evolution for a Hamiltonian</span>
+<span class="sd">        &gt;&gt;&gt; time_evolution = qdrift.run(qubit_hamiltonian, time=1.0)</span>
+
+<span class="sd">    References:</span>
+<span class="sd">        Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.</span>
+<span class="sd">        Physical Review Letters, 123(7), 070503.</span>
+<span class="sd">        https://arxiv.org/abs/1811.08017</span>
+<span class="sd">        https://doi.org/10.1103/PhysRevLett.123.070503</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="QDrift.__init__">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">merge_duplicate_terms</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+        <span class="n">commutation_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;general&quot;</span><span class="p">,</span>
+    <span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize qDRIFT builder with specified settings.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            num_samples: Number of random samples N. More samples increase accuracy</span>
+<span class="sd">                but also increase circuit depth. Error scales as O(λ²t²/N).</span>
+<span class="sd">                Defaults to 100.</span>
+<span class="sd">            seed: Random seed for reproducibility. Use -1 for non-deterministic</span>
+<span class="sd">                sampling. Defaults to -1.</span>
+<span class="sd">            merge_duplicate_terms: If ``True``, identical Pauli terms within</span>
+<span class="sd">                consecutive mutually-commuting runs are fused to reduce</span>
+<span class="sd">                circuit depth.  Distinct commuting terms are kept separate.</span>
+<span class="sd">                The merging is exact and preserves the Campbell (2019)</span>
+<span class="sd">                error bound.  Defaults to ``True``.</span>
+<span class="sd">            commutation_type: Commutation check used when merging duplicate</span>
+<span class="sd">                terms.  ``&quot;qubit_wise&quot;`` requires every single-qubit</span>
+<span class="sd">                pair to commute individually — stricter but always safe.</span>
+<span class="sd">                ``&quot;general&quot;`` (default) uses standard Pauli commutation (even number of</span>
+<span class="sd">                anti-commuting positions), which allows larger merge groups.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span> <span class="o">=</span> <span class="n">QDriftSettings</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;num_samples&quot;</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">,</span> <span class="n">seed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">,</span> <span class="n">merge_duplicate_terms</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;commutation_type&quot;</span><span class="p">,</span> <span class="n">commutation_type</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_run_impl</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">qubit_hamiltonian</span><span class="p">:</span> <span class="n">QubitHamiltonian</span><span class="p">,</span> <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TimeEvolutionUnitary</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Construct the time evolution unitary using qDRIFT randomized sampling.</span>
+
+<span class="sd">        The qDRIFT method approximates :math:`e^{-iHt}` by:</span>
+
+<span class="sd">        1. Computing :math:`\lambda = \sum_j |h_j|`</span>
+<span class="sd">        2. Sampling N term indices with probability :math:`p_j = |h_j|/\lambda`</span>
+<span class="sd">        3. For each sampled term j, applying :math:`e^{-i \cdot \text{sign}(h_j) \cdot \lambda t / N \cdot P_j}`</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.</span>
+<span class="sd">            time: The total evolution time.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            TimeEvolutionUnitary: The time evolution unitary built by qDRIFT sampling.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">seed</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;seed&quot;</span><span class="p">)</span>
+        <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span> <span class="k">if</span> <span class="n">seed</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;num_samples&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">is_hermitian</span><span class="p">():</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Build (label, real_coeff) pairs from the full Hamiltonian</span>
+        <span class="n">all_terms</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span>
+            <span class="nb">zip</span><span class="p">(</span>
+                <span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">pauli_strings</span><span class="p">,</span>
+                <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">coefficients</span><span class="p">)</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+                <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+        <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sample_qdrift_terms</span><span class="p">(</span><span class="n">all_terms</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+
+        <span class="c1"># Optionally fuse identical Pauli operators that appear within</span>
+        <span class="c1"># consecutive mutually-commuting runs.  Within such a run,</span>
+        <span class="c1"># identical Pauli strings satisfy e^{-iaP} e^{-ibP} = e^{-i(a+b)P}</span>
+        <span class="c1"># exactly, reducing circuit depth.  Distinct Pauli strings are</span>
+        <span class="c1"># kept as separate rotations and non-commuting boundaries are</span>
+        <span class="c1"># never crossed, preserving the Campbell (2019) error bound.</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;merge_duplicate_terms&quot;</span><span class="p">):</span>
+            <span class="n">commute_fn</span> <span class="o">=</span> <span class="n">get_commutation_checker</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_settings</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;commutation_type&quot;</span><span class="p">))</span>
+            <span class="n">terms</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_merge_duplicate_terms</span><span class="p">(</span><span class="n">terms</span><span class="p">,</span> <span class="n">commute_fn</span><span class="o">=</span><span class="n">commute_fn</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">TimeEvolutionUnitary</span><span class="p">(</span>
+            <span class="n">container</span><span class="o">=</span><span class="n">PauliProductFormulaContainer</span><span class="p">(</span>
+                <span class="n">step_terms</span><span class="o">=</span><span class="n">terms</span><span class="p">,</span>
+                <span class="n">step_reps</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># All samples are already in the terms list</span>
+                <span class="n">num_qubits</span><span class="o">=</span><span class="n">qubit_hamiltonian</span><span class="o">.</span><span class="n">num_qubits</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+
+    <span class="c1"># ------------------------------------------------------------------</span>
+    <span class="c1"># qDRIFT sampling and duplicate-term fusion helpers</span>
+    <span class="c1"># ------------------------------------------------------------------</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_sample_qdrift_terms</span><span class="p">(</span>
+        <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]],</span>
+        <span class="n">time</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+        <span class="n">num_samples</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+        <span class="n">rng</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">Generator</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build qDRIFT-style random samples from a set of Pauli terms.</span>
+
+<span class="sd">        Each term ``(label, coeff)`` is sampled with probability proportional</span>
+<span class="sd">        to ``|coeff|``.  Every sample contributes a rotation</span>
+<span class="sd">        ``exp(-i * sign(coeff) * λ * t / N * P)`` where ``λ`` is the 1-norm</span>
+<span class="sd">        of the coefficients and ``N`` is the number of samples.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            terms: List of ``(pauli_label, coefficient)`` pairs.</span>
+<span class="sd">            time: Evolution time for this block.</span>
+<span class="sd">            num_samples: Number of random samples (N).</span>
+<span class="sd">            rng: Random number generator.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            List of :class:`ExponentiatedPauliTerm` for the sampled sequence.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">terms</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="k">if</span> <span class="n">num_samples</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num_samples must be a positive integer, got </span><span class="si">{</span><span class="n">num_samples</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+
+        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">c</span> <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">])</span>
+        <span class="n">abs_coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">coeffs</span><span class="p">)</span>
+        <span class="n">lambda_norm</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">abs_coeffs</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+
+        <span class="k">if</span> <span class="n">lambda_norm</span> <span class="o">&lt;</span> <span class="mf">1e-14</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+        <span class="n">probabilities</span> <span class="o">=</span> <span class="n">abs_coeffs</span> <span class="o">/</span> <span class="n">lambda_norm</span>
+        <span class="n">term_indices</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">terms</span><span class="p">),</span> <span class="n">size</span><span class="o">=</span><span class="n">num_samples</span><span class="p">,</span> <span class="n">p</span><span class="o">=</span><span class="n">probabilities</span><span class="p">)</span>
+
+        <span class="n">angle_magnitude</span> <span class="o">=</span> <span class="n">lambda_norm</span> <span class="o">*</span> <span class="n">time</span> <span class="o">/</span> <span class="n">num_samples</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="n">term_indices</span><span class="p">:</span>
+            <span class="n">label</span><span class="p">,</span> <span class="n">coeff</span> <span class="o">=</span> <span class="n">terms</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">sign</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="k">if</span> <span class="n">coeff</span> <span class="o">&gt;=</span> <span class="mi">0</span> <span class="k">else</span> <span class="o">-</span><span class="mf">1.0</span>
+            <span class="n">mapping</span> <span class="o">=</span> <span class="n">TimeEvolutionBuilder</span><span class="o">.</span><span class="n">_pauli_label_to_map</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>  <span class="c1"># noqa: SLF001</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="n">mapping</span><span class="p">,</span> <span class="n">angle</span><span class="o">=</span><span class="n">sign</span> <span class="o">*</span> <span class="n">angle_magnitude</span><span class="p">))</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_merge_duplicate_terms</span><span class="p">(</span>
+        <span class="bp">cls</span><span class="p">,</span>
+        <span class="n">terms</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">],</span>
+        <span class="n">commute_fn</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Fuse identical Pauli operators within consecutive commuting runs.</span>
+
+<span class="sd">        Walks through the term sequence and accumulates maximal runs of</span>
+<span class="sd">        mutually commuting terms (using the supplied commutation checker).</span>
+<span class="sd">        Within each run, *identical* Pauli operators (same string) have</span>
+<span class="sd">        their rotation angles summed:</span>
+
+<span class="sd">        .. math::</span>
+
+<span class="sd">            e^{-i a P}\,e^{-i b P} = e^{-i(a+b)P}</span>
+
+<span class="sd">        This is exact because scalar multiples of the same operator</span>
+<span class="sd">        trivially commute.  Distinct Pauli strings are **not** combined;</span>
+<span class="sd">        they remain as separate rotations.  Non-commuting boundaries are</span>
+<span class="sd">        never crossed.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            terms: Ordered list of exponentiated Pauli terms.</span>
+<span class="sd">            commute_fn: A callable ``(a, b) -&gt; bool`` that checks whether</span>
+<span class="sd">                two Pauli term mappings commute.  Defaults to</span>
+<span class="sd">                :func:`~qdk_chemistry.utils.pauli_commutation.do_pauli_maps_qw_commute` if ``None``.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A (potentially shorter) list producing the same unitary.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">terms</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">terms</span>
+
+        <span class="k">if</span> <span class="n">commute_fn</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">commute_fn</span> <span class="o">=</span> <span class="n">do_pauli_maps_qw_commute</span>
+
+        <span class="n">result</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">group</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">terms</span><span class="p">[</span><span class="mi">0</span><span class="p">]]</span>
+
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">terms</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+            <span class="k">if</span> <span class="nb">all</span><span class="p">(</span><span class="n">commute_fn</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">,</span> <span class="n">g</span><span class="o">.</span><span class="n">pauli_term</span><span class="p">)</span> <span class="k">for</span> <span class="n">g</span> <span class="ow">in</span> <span class="n">group</span><span class="p">):</span>
+                <span class="n">group</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">term</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_flush_duplicate_terms</span><span class="p">(</span><span class="n">group</span><span class="p">))</span>
+                <span class="n">group</span> <span class="o">=</span> <span class="p">[</span><span class="n">term</span><span class="p">]</span>
+
+        <span class="n">result</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_flush_duplicate_terms</span><span class="p">(</span><span class="n">group</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_flush_duplicate_terms</span><span class="p">(</span>
+        <span class="n">group</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">],</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">ExponentiatedPauliTerm</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Fuse *identical* Pauli operators within a mutually qubit-wise commuting group.</span>
+
+<span class="sd">        Only rotations around the **same** Pauli string have their angles</span>
+<span class="sd">        summed (e^{-iaP} e^{-ibP} = e^{-i(a+b)P}).  Distinct Pauli</span>
+<span class="sd">        strings are emitted as separate terms.  Terms whose fused angle</span>
+<span class="sd">        is exactly zero are dropped.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">merged</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="o">...</span><span class="p">],</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">term</span> <span class="ow">in</span> <span class="n">group</span><span class="p">:</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">sorted</span><span class="p">(</span><span class="n">term</span><span class="o">.</span><span class="n">pauli_term</span><span class="o">.</span><span class="n">items</span><span class="p">()))</span>
+            <span class="n">merged</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">merged</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">+</span> <span class="n">term</span><span class="o">.</span><span class="n">angle</span>
+
+        <span class="k">return</span> <span class="p">[</span>
+            <span class="n">ExponentiatedPauliTerm</span><span class="p">(</span><span class="n">pauli_term</span><span class="o">=</span><span class="nb">dict</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">angle</span><span class="o">=</span><span class="n">angle</span><span class="p">)</span> <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">angle</span> <span class="ow">in</span> <span class="n">merged</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">angle</span> <span class="o">!=</span> <span class="mf">0.0</span>
+        <span class="p">]</span>
+
+<div class="viewcode-block" id="QDrift.name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return the name of the time evolution unitary builder.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;qdrift&quot;</span></div>
+
+
+<div class="viewcode-block" id="QDrift.type_name">
+<a class="viewcode-back" href="../../../../../api/api_autogen/qdk_chemistry.algorithms.time_evolution.builder.qdrift.html#qdk_chemistry.algorithms.time_evolution.builder.qdrift.QDrift.type_name">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">type_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return time_evolution_builder as the algorithm type name.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="s2">&quot;time_evolution_builder&quot;</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

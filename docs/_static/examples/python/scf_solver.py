@@ -10,7 +10,7 @@
 import numpy as np
 from pathlib import Path
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import Structure, BasisSet
 
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
@@ -42,8 +42,23 @@ print(f"SCF Energy: {E_scf:.10f} Hartree")
 ################################################################################
 
 ################################################################################
+# start-cell-alternative-run
+# Run scf with an initial guess from previous calculation
+E_scf2, wfn2 = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess=scf_orbitals
+)
+
+# Run scf with a custom basis set
+basis_set = BasisSet.from_basis_name("def2-tzvpp", structure)
+E_scf3, wfn3 = scf_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess=basis_set
+)
+# end-cell-alternative-run
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
 # end-cell-list-implementations
@@ -51,8 +66,8 @@ print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
 
 ################################################################################
 # start-cell-pyscf-example
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
 
 # Create and configure the PySCF solver
 solver = create("scf_solver", "pyscf")

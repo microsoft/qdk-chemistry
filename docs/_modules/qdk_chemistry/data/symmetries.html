@@ -1,0 +1,385 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>qdk_chemistry.data.symmetries &mdash; qdk-chemistry 1.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/tabs.css?v=4c969af8" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/graphviz.css?v=4ae1632d" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/copybutton.css?v=76b2166b" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/custom.css?v=ac0f520b" />
+
+  
+      <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../../_static/documentation_options.js?v=fc837d61"></script>
+      <script src="../../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script src="../../../_static/tabs.js?v=3ee01567"></script>
+      <script src="../../../_static/clipboard.min.js?v=a7894cd8"></script>
+      <script src="../../../_static/copybutton.js?v=f281be69"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            qdk-chemistry
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User Documentation</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/features.html">Features, methods and dependencies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/comprehensive/index.html">In-depth user guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/python_api.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api/cpp_api.html">C++ API</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Supporting Information</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../release-notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../changelog.html">Changelog</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../glossary.html">Acronym definitions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../references.html">References</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">qdk-chemistry</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">qdk_chemistry.data.symmetries</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for qdk_chemistry.data.symmetries</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Symmetries data class for encoding physical symmetries of an electronic state.</span>
+
+<span class="sd">The :class:`Symmetries` class is a general container for symmetry information</span>
+<span class="sd">that quantum algorithms can exploit to reduce circuit depth or qubit count.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+<span class="c1"># Copyright (c) Microsoft Corporation. All rights reserved.</span>
+<span class="c1"># Licensed under the MIT License. See LICENSE.txt in the project root for license information.</span>
+<span class="c1"># --------------------------------------------------------------------------------------------</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data.base</span><span class="w"> </span><span class="kn">import</span> <span class="n">DataClass</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">h5py</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">qdk_chemistry.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ansatz</span><span class="p">,</span> <span class="n">Wavefunction</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Symmetries&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="Symmetries">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Symmetries</span><span class="p">(</span><span class="n">DataClass</span><span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Immutable container for the physical symmetries of an electronic state.</span>
+
+<span class="sd">    ``Symmetries`` serves as the central object for communicating symmetry</span>
+<span class="sd">    information to algorithms that can exploit it.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        n_alpha: Number of alpha (spin-up) electrons in the active space.</span>
+<span class="sd">        n_beta: Number of beta (spin-down) electrons in the active space.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        ValueError: If ``n_alpha`` or ``n_beta`` is negative.</span>
+
+<span class="sd">    Examples:</span>
+<span class="sd">        &gt;&gt;&gt; sym = Symmetries(n_alpha=2, n_beta=2)</span>
+<span class="sd">        &gt;&gt;&gt; sym.n_particles</span>
+<span class="sd">        4</span>
+
+<span class="sd">        &gt;&gt;&gt; sym = Symmetries.from_wavefunction(wfn)</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Class attribute for filename validation</span>
+    <span class="n">_data_type_name</span> <span class="o">=</span> <span class="s2">&quot;symmetries&quot;</span>
+
+    <span class="c1"># Serialization version for this class</span>
+    <span class="n">_serialization_version</span> <span class="o">=</span> <span class="s2">&quot;0.1.0&quot;</span>
+
+<div class="viewcode-block" id="Symmetries.__init__">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.__init__">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">n_alpha</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">n_beta</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Symmetries with active-space electron counts.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">n_alpha</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_alpha must be non-negative, got </span><span class="si">{</span><span class="n">n_alpha</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">n_beta</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;n_beta must be non-negative, got </span><span class="si">{</span><span class="n">n_beta</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_alpha</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">n_beta</span><span class="p">)</span>
+        <span class="c1"># Make instance immutable after construction (handled by base class)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span></div>
+
+
+    <span class="c1"># -- Factory methods -------------------------------------------------------</span>
+
+<div class="viewcode-block" id="Symmetries.from_wavefunction">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.from_wavefunction">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_wavefunction</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">wavefunction</span><span class="p">:</span> <span class="n">Wavefunction</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Symmetries</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct ``Symmetries`` from a :class:`~qdk_chemistry.data.Wavefunction`.</span>
+
+<span class="sd">        Reads the active-space electron counts via ``get_active_num_electrons()``.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            wavefunction: A wavefunction carrying active-space electron information.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new ``Symmetries`` instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">n_alpha</span><span class="p">,</span> <span class="n">n_beta</span> <span class="o">=</span> <span class="n">wavefunction</span><span class="o">.</span><span class="n">get_active_num_electrons</span><span class="p">()</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">n_alpha</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">n_alpha</span><span class="p">),</span> <span class="n">n_beta</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">n_beta</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.from_ansatz">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.from_ansatz">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_ansatz</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">ansatz</span><span class="p">:</span> <span class="n">Ansatz</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Symmetries</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Construct ``Symmetries`` from an :class:`~qdk_chemistry.data.Ansatz`.</span>
+
+<span class="sd">        Delegates to :meth:`from_wavefunction` using the ansatz&#39;s wavefunction.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            ansatz: An ansatz bundling a Hamiltonian and wavefunction.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            A new ``Symmetries`` instance.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">from_wavefunction</span><span class="p">(</span><span class="n">ansatz</span><span class="o">.</span><span class="n">get_wavefunction</span><span class="p">())</span></div>
+
+
+    <span class="c1"># -- Read-only properties --------------------------------------------------</span>
+
+<div class="viewcode-block" id="Symmetries.n_alpha">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.n_alpha">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_alpha</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of alpha (spin-up) electrons in the active space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.n_beta">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.n_beta">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_beta</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Number of beta (spin-down) electrons in the active space.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.n_particles">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.n_particles">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">n_particles</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Total number of active electrons (``n_alpha + n_beta``).&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.sz">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.sz">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">sz</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Spin projection quantum number :math:`S_z = (n_\alpha - n_\beta) / 2`.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.spin_multiplicity">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.spin_multiplicity">[docs]</a>
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">spin_multiplicity</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Spin multiplicity :math:`2S + 1 = |n_\alpha - n_\beta| + 1`.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span></div>
+
+
+    <span class="c1"># -- Dunder methods --------------------------------------------------------</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a string representation.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;Symmetries(n_alpha=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span><span class="si">}</span><span class="s2">, n_beta=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="si">}</span><span class="s2">)&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Check equality.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">Symmetries</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">NotImplemented</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_n_alpha</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_n_beta</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__hash__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Return a hash.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">hash</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="p">))</span>
+
+    <span class="c1"># -- DataClass interface ---------------------------------------------------</span>
+
+<div class="viewcode-block" id="Symmetries.get_summary">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.get_summary">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_summary</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Get a human-readable summary of the symmetries.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            str: Summary string describing the symmetries.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Symmetries</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Alpha electrons: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Beta electrons: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Total particles: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">n_particles</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Sz: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">sz</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;  Spin multiplicity: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">spin_multiplicity</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.to_json">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.to_json">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_json</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Convert the symmetries to a dictionary for JSON serialization.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            dict[str, Any]: Dictionary representation of the symmetries.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;n_alpha&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span><span class="p">,</span>
+            <span class="s2">&quot;n_beta&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_json_version</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.to_hdf5">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.to_hdf5">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">to_hdf5</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Save the symmetries to an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group (h5py.Group): HDF5 group or file to write the symmetries to.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_add_hdf5_version</span><span class="p">(</span><span class="n">group</span><span class="p">)</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;n_alpha&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_alpha</span>
+        <span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;n_beta&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_n_beta</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.from_json">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.from_json">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_json</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">json_data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Symmetries</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a Symmetries from a JSON dictionary.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            json_data (dict[str, Any]): Dictionary containing the serialized data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Symmetries: New instance reconstructed from JSON data.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If version field is missing or incompatible.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_json_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">json_data</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">n_alpha</span><span class="o">=</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;n_alpha&quot;</span><span class="p">],</span>
+            <span class="n">n_beta</span><span class="o">=</span><span class="n">json_data</span><span class="p">[</span><span class="s2">&quot;n_beta&quot;</span><span class="p">],</span>
+        <span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Symmetries.from_hdf5">
+<a class="viewcode-back" href="../../../api/api_autogen/qdk_chemistry.data.symmetries.html#qdk_chemistry.data.symmetries.Symmetries.from_hdf5">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">from_hdf5</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">group</span><span class="p">:</span> <span class="n">h5py</span><span class="o">.</span><span class="n">Group</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Symmetries</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Load a Symmetries from an HDF5 group.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            group (h5py.Group): HDF5 group or file containing the data.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Symmetries: New instance reconstructed from HDF5 data.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            RuntimeError: If version attribute is missing or incompatible.</span>
+
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">cls</span><span class="o">.</span><span class="n">_validate_hdf5_version</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="n">_serialization_version</span><span class="p">,</span> <span class="n">group</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span>
+            <span class="n">n_alpha</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;n_alpha&quot;</span><span class="p">]),</span>
+            <span class="n">n_beta</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">group</span><span class="o">.</span><span class="n">attrs</span><span class="p">[</span><span class="s2">&quot;n_beta&quot;</span><span class="p">]),</span>
+        <span class="p">)</span></div>
+</div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright Microsoft Corporation. All rights reserved. Licensed under the MIT License.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
