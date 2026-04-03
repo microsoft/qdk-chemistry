@@ -28,7 +28,9 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _find_pivot_row,
     _is_diagonal_matrix,
     _perform_gaussian_elimination,
+    _perform_gaussian_elimination_forward_only,
     _reduce_diagonal_matrix,
+    _ref_to_staircase,
     _remove_all_ones_rows_with_x,
     _remove_duplicate_rows_with_cnot,
     _remove_zero_rows,
@@ -889,7 +891,8 @@ def test_reduce_diagonal_matrix() -> None:
 
     non_diagonal_m = np.array([[1, 0], [1, 0]], dtype=np.int8)
     elimination_results = _reduce_diagonal_matrix(non_diagonal_m, row_map, col_map, operations)
-    assert all(non_diagonal_m[i, j] == elimination_results.reduced_matrix[i, j] for i in range(2) for j in range(2))
+    assert elimination_results.reduced_matrix.shape == (1, 2)
+    assert np.array_equal(elimination_results.reduced_matrix[0], non_diagonal_m[0])
 
 
 def test_gf2x_edge_cases():
@@ -952,3 +955,243 @@ def test_gf2x_with_tracking_edge_case_pseudo_diagonal():
 
     # Should have some operations recorded
     assert len(elimination_results.operations) > 0, "Should have recorded some operations"
+
+
+def test_forward_only_produces_upper_triangular():
+    """Forward-only elimination produces row echelon form (zeros below each pivot)."""
+    matrix = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1]], dtype=np.int8)
+    m_result, _, _ = _perform_gaussian_elimination_forward_only(matrix, [0, 1, 2], [])
+
+    for r in range(m_result.shape[0]):
+        nz = np.flatnonzero(m_result[r])
+        if nz.size == 0:
+            continue
+        pivot_col = int(nz[0])
+        assert np.all(m_result[r + 1 :, pivot_col] == 0)
+
+
+def test_forward_only_does_not_back_substitute():
+    """Forward-only differs from full RREF — above-diagonal entries survive."""
+    matrix = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
+    m_fwd, _, _ = _perform_gaussian_elimination_forward_only(matrix, [0, 1, 2], [])
+    m_full, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [])
+    assert not np.array_equal(m_fwd, m_full)
+
+
+def test_forward_only_reconstruction():
+    """Reversing recorded CNOTs on the REF result recovers the original matrix."""
+    matrix = np.array(
+        [[1, 0, 1, 1], [0, 1, 1, 0], [1, 1, 0, 1], [0, 0, 1, 1]],
+        dtype=np.int8,
+    )
+    row_map = list(range(4))
+    m_result, rm_result, cnot_ops = _perform_gaussian_elimination_forward_only(matrix, row_map, [])
+
+    reconstructed = np.zeros_like(matrix)
+    for i, orig in enumerate(rm_result):
+        reconstructed[orig] = m_result[i]
+    for target, control in reversed(cnot_ops):
+        reconstructed[target] ^= reconstructed[control]
+
+    assert np.array_equal(reconstructed, matrix)
+
+
+def test_forward_only_row_swap_tracking():
+    """Row swaps needed for pivoting are reflected in the returned row_map."""
+    matrix = np.array([[0, 1], [1, 0]], dtype=np.int8)
+    _, rm_result, _ = _perform_gaussian_elimination_forward_only(matrix, [0, 1], [])
+    assert rm_result[0] == 1
+    assert rm_result[1] == 0
+
+
+def test_forward_only_large_rank_deficient():
+    """Rank-4 matrix: REF has exactly 4 non-zero rows and 2 zero rows."""
+    matrix = np.array(
+        [
+            [1, 0, 1, 0, 1, 1, 0, 0],
+            [0, 1, 0, 1, 0, 0, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],  # row 0 XOR row 1
+            [1, 0, 1, 0, 1, 1, 0, 0],  # duplicate of row 0
+            [0, 0, 0, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1, 0, 1],
+        ],
+        dtype=np.int8,
+    )
+    m_ref, rm, ops = _perform_gaussian_elimination_forward_only(matrix, list(range(6)), [])
+    non_zero = int(np.sum(np.any(m_ref, axis=1)))
+    assert non_zero == 4
+
+    # Verify REF property: below each pivot is all zero
+    for r in range(m_ref.shape[0]):
+        nz = np.flatnonzero(m_ref[r])
+        if nz.size == 0:
+            continue
+        assert np.all(m_ref[r + 1 :, int(nz[0])] == 0)
+
+    # Reconstruction must recover original
+    reconstructed = np.zeros_like(matrix)
+    for i, orig in enumerate(rm):
+        reconstructed[orig] = m_ref[i]
+    for target, control in reversed(ops):
+        reconstructed[target] ^= reconstructed[control]
+    assert np.array_equal(reconstructed, matrix)
+
+
+def test_forward_only_wide_matrix():
+    """Wide matrix test: more columns than rows, full GF(2) rank 3."""
+    matrix = np.array(
+        [
+            [1, 0, 0, 1, 1, 0, 1, 0, 1, 1],
+            [0, 1, 0, 0, 1, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0, 1, 1, 1, 0, 0],
+        ],
+        dtype=np.int8,
+    )
+    m_ref, _, ops = _perform_gaussian_elimination_forward_only(matrix, list(range(3)), [])
+
+    # Already in REF (identity-like left block), should need 0 ops
+    assert len(ops) == 0
+    assert np.array_equal(m_ref, matrix)
+    # All 3 rows non-zero
+    assert int(np.sum(np.any(m_ref, axis=1))) == 3
+
+
+def test_ref_to_staircase_fills_above_diagonal():
+    """Every above-diagonal entry in a pivot column becomes 1."""
+    matrix = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 1]], dtype=np.int8)
+    m_result, _, _ = _ref_to_staircase(matrix, [0, 1, 2], [])
+
+    pivot_cols = [int(np.flatnonzero(m_result[r])[0]) for r in range(3)]
+    for j_idx, pc in enumerate(pivot_cols):
+        for i_idx in range(j_idx):
+            assert m_result[i_idx, pc] == 1
+
+
+def test_ref_to_staircase_already_done_no_ops():
+    """If the matrix is already staircase, no CX ops are emitted."""
+    staircase = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]], dtype=np.int8)
+    _, _, ops = _ref_to_staircase(staircase, [0, 1, 2], [])
+    assert [op for op in ops if op[0] == "cx"] == []
+
+
+def test_ref_to_staircase_reconstruction():
+    """Reversing the CX ops on the staircase result recovers the input REF."""
+    ref_matrix = np.array(
+        [[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 0]],
+        dtype=np.int8,
+    )
+    row_map = [2, 5, 8]
+    m_result, rm_result, ops = _ref_to_staircase(ref_matrix, row_map, [])
+
+    reconstructed = m_result.copy()
+    for op_name, args in reversed(ops):
+        if op_name == "cx":
+            target, control = args
+            reconstructed[rm_result.index(target)] ^= reconstructed[rm_result.index(control)]
+
+    assert np.array_equal(reconstructed, ref_matrix)
+
+
+def test_ref_to_staircase_5x8_complex():
+    """5-row REF with non-contiguous pivot columns: staircase fills all above-diagonal pivot entries."""
+    # Pivots at columns 0, 2, 3, 5, 7 — gaps at cols 1, 4, 6.
+    ref = np.array(
+        [
+            [1, 1, 0, 0, 1, 0, 0, 0],
+            [0, 0, 1, 0, 0, 0, 1, 0],
+            [0, 0, 0, 1, 1, 0, 0, 1],
+            [0, 0, 0, 0, 0, 1, 0, 1],
+            [0, 0, 0, 0, 0, 0, 0, 1],
+        ],
+        dtype=np.int8,
+    )
+    # Verify it's valid REF before transforming
+    for r in range(ref.shape[0]):
+        nz = np.flatnonzero(ref[r])
+        if nz.size:
+            assert np.all(ref[r + 1 :, int(nz[0])] == 0)
+
+    row_map = [0, 3, 5, 7, 9]
+    m_result, rm_result, ops = _ref_to_staircase(ref, row_map, [])
+
+    # Check staircase property: all above-diagonal pivot entries are 1
+    pivot_cols = []
+    for r in range(m_result.shape[0]):
+        nz = np.flatnonzero(m_result[r])
+        if nz.size:
+            pivot_cols.append(int(nz[0]))
+    for j_idx, pc in enumerate(pivot_cols):
+        for i_idx in range(j_idx):
+            assert m_result[i_idx, pc] == 1
+
+    # CX ops should use the row_map indices, not matrix row indices
+    for op_name, args in ops:
+        if op_name == "cx":
+            assert args[0] in row_map
+            assert args[1] in row_map
+
+    # Reconstruction: undo CX ops to recover original REF
+    reconstructed = m_result.copy()
+    for op_name, args in reversed(ops):
+        if op_name == "cx":
+            target, control = args
+            reconstructed[rm_result.index(target)] ^= reconstructed[rm_result.index(control)]
+    assert np.array_equal(reconstructed, ref)
+
+
+def test_forward_only_then_staircase_end_to_end():
+    """Full pipeline: raw matrix, forward-only REF, staircase, verify properties."""
+    # A realistic-ish 5x6 binary matrix (5 qubits, 6 determinants)
+    matrix = np.array(
+        [
+            [1, 0, 1, 1, 0, 1],
+            [0, 1, 1, 0, 1, 1],
+            [1, 1, 0, 0, 1, 0],
+            [0, 0, 1, 1, 1, 0],
+            [1, 0, 0, 1, 0, 0],
+        ],
+        dtype=np.int8,
+    )
+    row_map = list(range(5))
+
+    # Step 1: forward-only to REF
+    m_ref, rm_ref, cnot_ops = _perform_gaussian_elimination_forward_only(matrix, row_map, [])
+
+    # Verify REF
+    for r in range(m_ref.shape[0]):
+        nz = np.flatnonzero(m_ref[r])
+        if nz.size == 0:
+            continue
+        assert np.all(m_ref[r + 1 :, int(nz[0])] == 0)
+
+    # Remove zero rows
+    non_zero_mask = np.any(m_ref, axis=1)
+    ref_nz = m_ref[non_zero_mask]
+    rm_nz = [rm_ref[i] for i in range(len(rm_ref)) if non_zero_mask[i]]
+
+    # Step 2: staircase conversion
+    ops_so_far = [("cx", (t, c)) for t, c in cnot_ops]
+    m_stair, rm_stair, all_ops = _ref_to_staircase(ref_nz, rm_nz, ops_so_far)
+
+    # Verify staircase: every above-diagonal pivot entry is 1
+    pivot_cols = []
+    for r in range(m_stair.shape[0]):
+        nz = np.flatnonzero(m_stair[r])
+        if nz.size:
+            pivot_cols.append(int(nz[0]))
+    for j_idx, pc in enumerate(pivot_cols):
+        for i_idx in range(j_idx):
+            assert m_stair[i_idx, pc] == 1
+
+    # Verify combined reconstruction recovers original matrix
+    reconstructed = np.zeros_like(matrix)
+    for i, orig in enumerate(rm_stair):
+        reconstructed[orig] = m_stair[i]
+
+    # Undo all ops in reverse (staircase CX ops first, then forward-elim CX ops)
+    for op_name, args in reversed(all_ops):
+        if op_name == "cx":
+            target, control = args
+            reconstructed[target] ^= reconstructed[control]
+
+    assert np.array_equal(reconstructed, matrix)

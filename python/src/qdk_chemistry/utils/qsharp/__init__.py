@@ -18,8 +18,9 @@ __all__ = ["QSHARP_UTILS"]
 # Initialize Q# interpreter
 qdk_config = get_qdk_profile_config()
 _QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
-if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
-    _QDK_INTERPRETER_PROFILE = qsharp.TargetProfile.Adaptive_RIF
+if _QDK_INTERPRETER_PROFILE != "adaptive_rif":  # Default by Q# if not set
+    target_profile = qsharp.TargetProfile.Adaptive_RIF
+    _QDK_INTERPRETER_PROFILE = str(target_profile)
     Logger.debug(
         f"QDK interpreter profile initialized to '{_QDK_INTERPRETER_PROFILE}'. "
         "If you imported Q# code before this module was loaded, please re-import it, "
@@ -27,5 +28,5 @@ if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
     )
 
 _QS_DIR = Path(__file__).parent
-qdk_init(project_root=_QS_DIR, target_profile=_QDK_INTERPRETER_PROFILE)
+qdk_init(project_root=_QS_DIR, target_profile=target_profile)
 QSHARP_UTILS = qdk.code.QDKChemistry.Utils

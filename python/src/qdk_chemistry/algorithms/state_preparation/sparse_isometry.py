@@ -482,6 +482,15 @@ class MatrixCompressionOp:
             "lookupData": self.lookup_data,
         }
 
+    def to_qsharp_parameter(self) -> QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp:
+        """Convert to a Q# MatrixCompressionOp struct."""
+        return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
+            name=self.name,
+            qubits=self.qubits,
+            controlState=self.control_state,
+            lookupData=self.lookup_data,
+        )
+
 
 def gf2x_with_tracking(
     matrix: np.ndarray,

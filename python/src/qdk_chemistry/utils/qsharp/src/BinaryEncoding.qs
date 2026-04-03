@@ -267,9 +267,21 @@ namespace QDKChemistry.Utils.BinaryEncoding {
 
     /// Create a callable for the binary-encoding state preparation.
     function MakeBinaryEncodingStatePreparationOp(
-        params : BinaryEncodingStatePreparationParams,
+        rowMap : Int[],
+        stateVector : Double[],
+        expansionOps : MatrixCompressionOp[],
+        binaryEncodingOps : MatrixCompressionOp[],
+        numQubits : Int,
+        numAncilla : Int,
     ) : Qubit[] => Unit {
-        BinaryEncodingStatePreparation(params, _)
+        BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
+            rowMap = rowMap,
+            stateVector = stateVector,
+            expansionOps = expansionOps,
+            binaryEncodingOps = binaryEncodingOps,
+            numQubits = numQubits,
+            numAncilla = numAncilla,
+        }, _)
     }
 
     /// Top-level circuit entry point for binary-encoding state preparation.
@@ -290,34 +302,5 @@ namespace QDKChemistry.Utils.BinaryEncoding {
             numQubits = numQubits,
             numAncilla = numAncilla,
         }, qs);
-    }
-
-    /// Simulate the binary-encoding state preparation and measure system qubits.
-    ///
-    /// This is a verification helper: it runs the full state preparation,
-    /// measures only the system qubits (not ancilla), resets everything,
-    /// and returns the measurement results.
-    import Std.Measurement.MeasureEachZ;
-
-    operation VerifyBinaryEncodingStatePrep(
-        rowMap : Int[],
-        stateVector : Double[],
-        expansionOps : MatrixCompressionOp[],
-        binaryEncodingOps : MatrixCompressionOp[],
-        numQubits : Int,
-        numAncilla : Int,
-    ) : Result[] {
-        use qs = Qubit[numQubits + numAncilla];
-        BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
-            rowMap = rowMap,
-            stateVector = stateVector,
-            expansionOps = expansionOps,
-            binaryEncodingOps = binaryEncodingOps,
-            numQubits = numQubits,
-            numAncilla = numAncilla,
-        }, qs);
-        let results = MeasureEachZ(qs[0..numQubits - 1]);
-        ResetAll(qs);
-        return results
     }
 }

@@ -7,11 +7,6 @@ subspace to a dense state preparation routine (as the base
 RREF matrix directly into the binary-encoding solver which synthesises the
 full circuit using batched Toffoli gates and Partial Unary Iteration (PUI)
 lookup blocks.
-
-The approach is particularly effective for wavefunctions with many
-determinants whose binary matrix has favourable sparsity structure,
-since the entire expansion is expressed in terms of CX, Toffoli, and
-lookup gates with no intermediate dense state preparation.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -22,7 +17,6 @@ lookup gates with no intermediate dense state preparation.
 from typing import Any
 
 import numpy as np
-import qdk
 
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -128,7 +122,7 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, staircase_mode=True)
 
         # Step 2: Binary encoding on the reduced RREF matrix
-        binary_ops, num_ancilla, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
+        binary_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
 
         # Step 2b: Build compressed statevector reindexed by the bijection.
         # The bijection maps (dense_val, orig_col) where orig_col is the
@@ -180,33 +174,34 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         # PreparePureStateD treats qubits[0] as MSB, so pass dense_row_map
         # as-is (row 0 first) — do NOT reverse like the parent sparse isometry
         # (which uses the opposite convention: row rank-1 = MSB).
-        state_prep_params = qdk.code.BinaryEncodingStatePreparationParams(
+        state_prep_params = QSHARP_UTILS.BinaryEncoding.BinaryEncodingStatePreparationParams(
             rowMap=list(dense_row_map),
             stateVector=compressed_sv.tolist(),
-            expansionOps=[op.to_dict() for op in expansion_ops],
-            binaryEncodingOps=[op.to_dict() for op in encoded_ops],
+            expansionOps=[op.to_qsharp_parameter() for op in expansion_ops],
+            binaryEncodingOps=[op.to_qsharp_parameter() for op in encoded_ops],
             numQubits=n_qubits,
-            numAncilla=num_ancilla,
+            numAncilla=0,
         )
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
             parameter=vars(state_prep_params),
         )
-
+        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*vars(state_prep_params).values())
         Logger.info(
             f"Binary encoding produced {len(binary_ops)} operations ({len(encoded_ops)} encoded) "
-            f"using {num_ancilla} ancillae for {n_qubits}-qubit system with {len(bitstrings)} determinants"
+            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants"
         )
 
         return Circuit(
             qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
             encoding="jordan-wigner",
         )
 
     def _perform_binary_encoding(
         self, gf2x_result: GF2XEliminationResult, n_qubits: int
-    ) -> tuple[list[tuple[str, Any]], int, list[tuple[int, int]], int]:
+    ) -> tuple[list[tuple[str, Any]], list[tuple[int, int]], int]:
         """Run binary-encoding synthesis on the reduced RREF matrix.
 
         Args:
@@ -214,10 +209,9 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             n_qubits: Total number of qubits in the original space.
 
         Returns:
-            Tuple of ``(gf2x_ops, num_ancilla, bijection, dense_size)``:
+            Tuple of ``(gf2x_ops, bijection, dense_size)``:
 
             - ``gf2x_ops``: gate operations from the binary-encoding solver.
-            - ``num_ancilla``: number of ancilla qubits consumed.
             - ``bijection``: list of ``(dense_val, orig_col)`` mapping each
               original matrix column to its compressed binary-register label.
             - ``dense_size``: number of qubits in the compressed dense register.
@@ -236,7 +230,7 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
         )
 
-        gf2x_ops, num_ancilla = synthesizer.to_gf2x_operations(
+        gf2x_ops = synthesizer.to_gf2x_operations(
             num_local_qubits=n_qubits,
             active_qubit_indices=gf2x_result.row_map,
             ancilla_start=n_qubits,
@@ -244,11 +238,11 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
 
         Logger.debug(
             f"Binary encoding output: {len(gf2x_ops)} ops, "
-            f"{num_ancilla} ancillae, bijection size {len(synthesizer.bijection)}, "
+            f"bijection size {len(synthesizer.bijection)}, "
             f"dense_size {synthesizer.dense_size}"
         )
 
-        return gf2x_ops, num_ancilla, synthesizer.bijection, synthesizer.dense_size
+        return gf2x_ops, synthesizer.bijection, synthesizer.dense_size
 
     def name(self) -> str:
         """Return the algorithm identifier string."""
