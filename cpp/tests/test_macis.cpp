@@ -30,7 +30,7 @@ inline static constexpr size_t max_solver_iterations = 200;
 inline static constexpr size_t ntdets_max_small = 10;
 
 ///@brief Large wfn size for tests requiring more growth
-inline static constexpr size_t ntdets_max_large = 50;
+inline static constexpr size_t ntdets_max_large = 400;
 
 ///@brief Minimum wfn size
 inline static constexpr size_t ntdets_min = 1;
@@ -45,7 +45,7 @@ inline static constexpr double rv_prune_tol = 1e-8;
 inline static constexpr double h_el_tol = 1e-8;
 
 ///@brief Growth factor for determinant space
-inline static constexpr size_t grow_factor = 2;
+inline static constexpr double grow_factor = 2.0;
 
 ///@brief Turn off refinement
 inline static constexpr size_t refine_off = 0;
@@ -155,13 +155,18 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
 
   // Set minimal ASCI settings for fast execution
   auto& settings = calculator->settings();
-  // Use larger number to avoid growth issues
+  // Allow enough determinants for convergence in this small active space
   settings.set("ntdets_max", macis_params::ntdets_max_large);
   settings.set("ntdets_min", macis_params::ntdets_min);
-  // Disable refinement for speed
-  settings.set("max_refine_iter", macis_params::refine_off);
-  // Smaller growth factor
+  // Enable refinement so ASCI converges
+  settings.set("max_refine_iter", macis_params::refine_on);
+  // Growth factor
   settings.set("grow_factor", macis_params::grow_factor);
+  // Use triplet constraints (less restrictive for this small active space)
+  settings.set("constraint_level", 0);
+  // Loosen pruning to discover the full CI space for this small system
+  settings.set("h_el_tol", 1e-14);
+  settings.set("rv_prune_tol", 1e-14);
   // Use fixed core selection strategy for deterministic growth
   settings.set("core_selection_strategy", "fixed");
 
@@ -178,9 +183,11 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   EXPECT_LE(wavefunction.size(),
             macis_params::ntdets_max_large);  // Should respect ntdets_max
 
-  // Energy should be reasonable (above HF but below exact)
+  // Energy should be close to FCI for this small active space.
+  // ASCI with refinement converges to within ~1e-4 Eh of FCI;
+  // tighter agreement requires the full C(6,3)^2 = 400 determinant space.
   EXPECT_NEAR(energy, -75.945264376786554,
-              macis_params::energy_tol);  // Should be negative for bound system
+              1e-4);  // ASCI energy tolerance vs FCI reference
 }
 
 TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {

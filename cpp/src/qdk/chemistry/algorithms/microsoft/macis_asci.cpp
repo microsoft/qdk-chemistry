@@ -87,7 +87,18 @@ struct asci_helper {
     std::unique_ptr<macis::HamiltonianGenerator<wfn_type>> ham_gen_ptr;
     const auto& algo = asci_settings.h_build_algo;
     if (algo == "residue_arrays") {
-      ham_gen_ptr = std::make_unique<ra_gen_t>(T_span, V_span);
+      // Guard: residue arrays require O(n_e^2) residues per det and become
+      // infeasible for large active spaces.  Fall back to SDL with a warning.
+      const size_t total_elec = nalpha + nbeta;
+      if (total_elec > 60) {
+        QDK_LOGGER().warn(
+            "residue_arrays infeasible with {} electrons (O(n_e^2) memory). "
+            "Falling back to sorted_double_loop.",
+            total_elec);
+        ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
+      } else {
+        ham_gen_ptr = std::make_unique<ra_gen_t>(T_span, V_span);
+      }
     } else if (algo == "dynamic_bit_masking") {
       ham_gen_ptr = std::make_unique<dbm_gen_t>(T_span, V_span);
     } else if (algo == "dynamic_bit_masking_8") {

@@ -382,32 +382,10 @@ class DynamicBitMaskHamiltonianGenerator
   sparse_matrix_type<index_t> dynamic_bit_mask_build_(
       full_det_iterator dets_begin, full_det_iterator dets_end,
       double H_thresh) {
-    using clock_type = std::chrono::high_resolution_clock;
-
     const size_t ndets = std::distance(dets_begin, dets_end);
-    if (ndets == 0) return sparse_matrix_type<index_t>(0, 0, 0, 0);
-    auto h_logger = spdlog::get("h_build");
-
-    auto enum_st = clock_type::now();
     auto [all_pairs, cache] = enumerate_connected_pairs_(dets_begin, dets_end);
-    auto enum_en = clock_type::now();
-
-    auto csr_st = clock_type::now();
-    auto result = detail::build_csr_from_pairs<index_t>(
+    return detail::pair_based_build_impl_<index_t>(
         ndets, all_pairs, cache, *this, H_thresh);
-    auto csr_en = clock_type::now();
-
-    if (h_logger) {
-      auto dur = [](auto a, auto b) {
-        return std::chrono::duration<double>(b - a).count();
-      };
-      h_logger->info(
-          "  H_BUILD(DBM): enum={:.2e}s csr={:.2e}s "
-          "pairs_uniq={} nnz={}",
-          dur(enum_st, enum_en), dur(csr_st, csr_en), all_pairs.size(),
-          result.nnz());
-    }
-    return result;
   }
 };
 

@@ -131,32 +131,24 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // much larger space, causing Davidson to stall.
   std::vector<double> X_local;
   if (asci_settings.warm_start_davidson && !old_wfn.empty()) {
-    // Sort old dets by the same comparator used for the new wfn so we can
-    // binary-search into them.
-    std::vector<size_t> perm(old_wfn.size());
-    std::iota(perm.begin(), perm.end(), size_t(0));
-    std::sort(perm.begin(), perm.end(),
-              [&](size_t a, size_t b) { return wfn_comp{}(old_wfn[a], old_wfn[b]); });
-    std::vector<wfn_t<N>> sorted_old(old_wfn.size());
-    std::vector<double> sorted_old_X(old_wfn.size());
-    for (size_t i = 0; i < perm.size(); ++i) {
-      sorted_old[i] = old_wfn[perm[i]];
-      sorted_old_X[i] = old_X[perm[i]];
-    }
-    old_wfn.clear();
-    old_X.clear();
-
-    // Map onto new determinant ordering (wfn is already sorted by wfn_comp)
+    // new wfn is already sorted by wfn_comp.  Iterate unsorted old dets
+    // and binary-search each into the new wfn.  This avoids sorting the
+    // old wfn (O(D log D) on large bitsets) and the associated permutation
+    // temporaries.
     X_local.resize(wfn.size(), 0.0);
     size_t n_matched = 0;
-    for (size_t i = 0; i < wfn.size(); ++i) {
-      auto it = std::lower_bound(sorted_old.begin(), sorted_old.end(),
-                                 wfn[i], wfn_comp{});
-      if (it != sorted_old.end() && *it == wfn[i]) {
-        X_local[i] = sorted_old_X[std::distance(sorted_old.begin(), it)];
+    const size_t old_size = old_wfn.size();
+    for (size_t i = 0; i < old_size; ++i) {
+      auto it = std::lower_bound(wfn.begin(), wfn.end(),
+                                 old_wfn[i], wfn_comp{});
+      if (it != wfn.end() && *it == old_wfn[i]) {
+        size_t new_idx = static_cast<size_t>(std::distance(wfn.begin(), it));
+        X_local[new_idx] = old_X[i];
         ++n_matched;
       }
     }
+    old_wfn.clear();
+    old_X.clear();
 
     // Only use warm-start if overlap is high enough; otherwise the guess
     // is too far from the ground state in the new, much larger space.
