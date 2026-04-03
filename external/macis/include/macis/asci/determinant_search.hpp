@@ -510,7 +510,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto gen_c_st = clock_type::now();
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha, total_workers);
+      uniq_alpha, total_workers * 1000);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * NCONSTRAINTS = {}, GEN_DUR = {:.2e} ms", constraints.size(),
@@ -594,6 +594,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
         working_pairs.clear();
+        asci_contrib_container<wfn_t<N>> working_pairs_alpha;
 
         for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
@@ -602,6 +603,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           bits_to_indices(alpha_det, occ_alpha_buf);
           const auto& occ_alpha = occ_alpha_buf;
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
+
+          working_pairs_alpha.clear();
 
           const auto& bcd = uad[i_alpha];
           const size_t nbeta = bcd.size();
@@ -620,47 +623,65 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, working_pairs);
+                ham_gen, working_pairs_alpha);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
+                norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs_alpha, O_buf,
                 V_buf, virt_ind_buf, occ_ind_buf);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, working_pairs);
+                ham_gen, working_pairs_alpha);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs);
+                  h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs_alpha);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, working_pairs);
+                  ham_gen, working_pairs_alpha);
 
               // No excitation (push inf to remove from list)
-              working_pairs.push_back(
+              working_pairs_alpha.push_back(
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
+
+            // Prune working set if it gets too large
+            size_t working_alpha_size_limit = ntdets;
+            size_t working_pairs_alpha_size = working_pairs_alpha.size();
+            // if (tid == 0)
+            //   logger->info("  * thread {}, working_pairs_alpha_size = {} AT CON = {} IALPHA = {} JBETA = {}", tid, working_pairs_alpha_size, ic, i_alpha, j_beta);
+            // if (working_pairs_alpha_size > working_alpha_size_limit) {
+            //   auto uit = sort_and_accumulate_asci_pairs(working_pairs_alpha.begin(),
+            //                                             working_pairs_alpha.end());
+            //   working_pairs_alpha.erase(uit, working_pairs_alpha.end());
+            // }
           }
 
-          // Prune working set if it gets too large
-          if (working_pairs.size() > asci_settings.pair_size_max) {
-            logger->info("  * PRUNING AT CON = {} IALPHA = {}", ic, i_alpha);
+          working_pairs.insert(
+            working_pairs.end(),
+            std::make_move_iterator(working_pairs_alpha.begin()),
+            std::make_move_iterator(working_pairs_alpha.end()));
+          working_pairs_alpha.clear();
+
+          size_t working_size_limit = ntdets;
+          size_t working_pairs_size = working_pairs.size();
+          if (tid == 0)
+            logger->info("  * thread {}, working_pairs_size = {} AT CON = {} IALPHA = {}", tid, working_pairs_size, ic, i_alpha);
+          if (working_pairs_size > working_size_limit) {
             auto uit = sort_and_accumulate_asci_pairs(working_pairs.begin(),
                                                       working_pairs.end());
             working_pairs.erase(uit, working_pairs.end());
           }
-
         }  // Unique Alpha Loop
 
         // S&A the working set and prune small contributions
@@ -680,7 +701,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             std::make_move_iterator(working_pairs.begin()),
             std::make_move_iterator(working_pairs.end()));
         working_pairs.clear();
-        if (accumulated_pairs.size() > ntdets) {
+        size_t accumulated_size = accumulated_pairs.size();
+        logger->info("  * thread {}, accumulated_size = {} AT CON = {}", tid, accumulated_size, ic);
+        if (accumulated_size > ntdets) {
           const size_t cutoff_idx = ntdets - 1;
           std::nth_element(accumulated_pairs.begin(),
                            accumulated_pairs.begin() + cutoff_idx,

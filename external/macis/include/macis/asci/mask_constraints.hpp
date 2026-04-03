@@ -831,11 +831,12 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
                       [](auto s, const auto& p) { return s + p.second; });
   size_t local_average = total_work / world_size;
+  if (local_average == 0) local_average = 1;
 
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
     size_t max_w = constraint_sizes.empty() ? 0 : constraint_sizes.front().second;
-    cgen_logger->debug(
+    cgen_logger->info(
         "  * CGEN: ncon={}, total_work={}, avg/worker={}, max_single={}, "
         "nlevels={}",
         constraint_sizes.size(), total_work, local_average, max_w, nlevels);
@@ -947,7 +948,11 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     {
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(),
-          [=](const auto& a) { return a.second <= local_average; });
+          [=](const auto& a) {
+            // Constraints with C_min == 0 cannot be further decomposed.
+            // Keep them in-place even when they exceed local_average.
+            return a.second <= local_average or a.first.C_min() == 0 or a.first.C_min() == 1;
+          });
 
       // Remove constraints from full list
       tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
@@ -989,12 +994,13 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         constraint_sizes.begin(), constraint_sizes.end(), 0ul,
         [](auto s, const auto& p) { return s + p.second; });
     local_average = total_work / world_size;
+    if (local_average == 0) local_average = 1;
 
     if (cgen_logger) {
       size_t max_w = 0;
       for (const auto& [c, w] : constraint_sizes)
         if (w > max_w) max_w = w;
-      cgen_logger->debug(
+      cgen_logger->info(
           "  * CGEN level {}: split {} -> ncon={}, total_work={}, "
           "avg/worker={}, max_single={}",
           ilevel, tps_to_next.size(), constraint_sizes.size(),
