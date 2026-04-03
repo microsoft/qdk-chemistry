@@ -68,7 +68,9 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 # 1. Build a parameter object (a dictionary or a Q# structured parameter class)
 bitstring = [1, 1, 0, 0]
-params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(bitStrings=bitstring, numQubits=len(bitstring))
+params = QSHARP_UTILS.StatePreparation.SingleReferenceParams(
+    bitStrings=bitstring, numQubits=len(bitstring)
+)
 
 # 2. Create the factory — vars() converts the dataclass to a dict
 factory = QsharpFactoryData(
