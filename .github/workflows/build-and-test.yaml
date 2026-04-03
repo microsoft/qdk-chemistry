@@ -56,21 +56,21 @@ jobs:
       matrix:
         include:
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool]
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.14'
@@ -94,6 +94,29 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
+    - name: Free up disk space (Linux)
+      if: matrix.os-name == 'Linux'
+      run: |
+        echo "=== Disk space before cleanup ==="
+        df -h
+
+        # Remove unnecessary large packages commonly present on GitHub runners
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /usr/local/lib/android || true
+        sudo rm -rf /opt/ghc || true
+        sudo rm -rf /opt/hostedtoolcache/go || true
+        sudo rm -rf /opt/hostedtoolcache/Ruby || true
+
+        # Clean apt cache
+        sudo apt-get clean || true
+
+        echo "=== Disk space after cleanup ==="
+        df -h
+
+        echo "Workspace path: ${{ github.workspace }}"
+        echo "Space available:"
+        df -h "${{ github.workspace }}"
+
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -114,6 +137,22 @@ jobs:
     - name: Install Linux system packages
       if: matrix.os-name == 'Linux'
       run: |
+        # Wait for any existing apt/dpkg processes to finish (e.g., unattended-upgrades)
+        MAX_WAIT_SECONDS=300
+        WAIT_INTERVAL_SECONDS=5
+        ELAPSED_SECONDS=0
+        while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for dpkg lock to be released (elapsed: ${ELAPSED_SECONDS}s, timeout: ${MAX_WAIT_SECONDS}s)..."
+          # Log the process(es) currently holding the dpkg lock, if possible
+          sudo fuser -v /var/lib/dpkg/lock-frontend || true
+          sleep "${WAIT_INTERVAL_SECONDS}"
+          ELAPSED_SECONDS=$((ELAPSED_SECONDS + WAIT_INTERVAL_SECONDS))
+          if [ "${ELAPSED_SECONDS}" -ge "${MAX_WAIT_SECONDS}" ]; then
+            echo "Error: dpkg lock was not released after ${MAX_WAIT_SECONDS} seconds. Failing step."
+            exit 1
+          fi
+        done
+
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \

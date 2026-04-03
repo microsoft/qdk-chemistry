@@ -11,7 +11,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.utils.pauli_matrix import (
-    pauli_expectation,
     pauli_string_to_masks,
     pauli_to_dense_matrix,
     pauli_to_sparse_matrix,
@@ -124,31 +123,6 @@ class TestPauliStringToMasks:
         assert x_mask == self._bit(3, 0) | self._bit(3, 2)  # X and Y set x
         assert z_mask == self._bit(3, 1) | self._bit(3, 2)  # Z and Y set z
         assert np.isclose(phase, 1j, atol=float_comparison_absolute_tolerance)
-
-
-class TestPauliExpectation:
-    """Tests for pauli_expectation."""
-
-    def test_on_bell_state(self):
-        """<Bell|ZZ|Bell> = 1 for Bell state (|00>+|11>)/sqrt(2)."""
-        psi = np.array([1, 0, 0, 1], dtype=complex) / np.sqrt(2)
-        assert np.isclose(pauli_expectation("ZZ", psi), 1.0, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(pauli_expectation("XX", psi), 1.0, atol=float_comparison_absolute_tolerance)
-        assert np.isclose(pauli_expectation("YY", psi), -1.0, atol=float_comparison_absolute_tolerance)
-
-    @pytest.mark.parametrize("label", _COMPREHENSIVE_LABELS)
-    def test_agrees_with_matrix_comprehensive(self, label):
-        """pauli_expectation matches <psi|P|psi> for all labels in the comprehensive set."""
-        n = len(label)
-        rng = np.random.default_rng(_SEED + n)
-        psi = rng.standard_normal(2**n) + 1j * rng.standard_normal(2**n)
-        psi /= np.linalg.norm(psi)
-        mat = _pauli_mat(label)
-        expected = np.real(psi.conj() @ mat @ psi)
-        got = pauli_expectation(label, psi)
-        assert np.isclose(got, expected, atol=float_comparison_absolute_tolerance), (
-            f"Mismatch for {label}: expected {expected}, got {got}"
-        )
 
 
 class TestPauliToDenseMatrix:
@@ -265,19 +239,3 @@ class TestPauliToSparseMatrix:
         coeffs = rng.standard_normal(n_terms) + 1j * rng.standard_normal(n_terms)
         sparse = pauli_to_sparse_matrix(labels, coeffs)
         assert sparse.shape == (dim, dim)
-
-
-class TestPauliExpectationVsDenseMatrix:
-    """Cross-validation: pauli_expectation should agree with matrix-based <psi|H|psi>."""
-
-    def test_2qubit_hamiltonian_energy(self):
-        """For a 2-qubit random state, expectation of Pauli sum = sum of individual expectations."""
-        rng = np.random.default_rng(_SEED)
-        psi = rng.standard_normal(4) + 1j * rng.standard_normal(4)
-        psi /= np.linalg.norm(psi)
-        labels = ["ZI", "IZ", "XX", "YY"]
-        coeffs = np.array([0.5, -0.3, 0.2, 0.1])
-        mat = np.asarray(pauli_to_dense_matrix(labels, coeffs.astype(complex)))
-        energy_matrix = np.real(psi.conj() @ mat @ psi)
-        energy_sum = sum(c * pauli_expectation(label, psi) for c, label in zip(coeffs, labels, strict=True))
-        assert np.isclose(energy_matrix, energy_sum, atol=float_comparison_absolute_tolerance)

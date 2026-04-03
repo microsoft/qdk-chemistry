@@ -12,7 +12,9 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/utils/model_hamiltonians.hpp>

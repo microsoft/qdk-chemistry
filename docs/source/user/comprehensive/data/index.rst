@@ -18,10 +18,13 @@ Each of the links below leads to a detailed description of the data class, inclu
    basis_set
    hamiltonian
    orbitals
+   lattice_graph
    pauli_operator
    structure
    symmetries
    wavefunction
+   qpe_result
+   circuit
 
 
 Quick reference
@@ -57,6 +60,15 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`Symmetries <symmetries>`
      - Physical symmetries
      - Factory methods, User input
+   * - :doc:`LatticeGraph <lattice_graph>`
+     - Lattice topology for model Hamiltonians
+     - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic
      - User construction
+   * - :doc:`QpeResult <qpe_result>`
+     - Phase estimation results (phase, energy, aliases)
+     - :doc:`PhaseEstimation <../algorithms/phase_estimation>`
+   * - :doc:`Circuit <circuit>`
+     - Quantum circuit (OpenQASM, Q#, QIR, Qiskit)
+     - :doc:`StatePreparation <../algorithms/state_preparation>`, User input
