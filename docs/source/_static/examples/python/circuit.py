@@ -116,11 +116,14 @@ qir = circuit.get_qir()
 print(qir)
 
 # Export to OpenQASM or Qiskit when needed (if qiskit is installed)
-qasm_str = circuit.get_qasm()
-print(qasm_str)
+try:
+    qasm_str = circuit.get_qasm()
+    print(qasm_str)
 
-qiskit_circuit = circuit.get_qiskit_circuit()
-print(qiskit_circuit)
+    qiskit_circuit = circuit.get_qiskit_circuit()
+    print(qiskit_circuit)
+except ImportError:
+    print("Qiskit not installed — skipping OpenQASM/Qiskit export")
 
 # end-cell-conversion
 ################################################################################
