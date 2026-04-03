@@ -23,9 +23,9 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from pathlib import Path
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
 
 # Load H2 structure from XYZ file
 structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
@@ -53,7 +53,7 @@ print(f"CI Energy:  {E_ci:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("multi_configuration_calculator"))
 # end-cell-list-implementations

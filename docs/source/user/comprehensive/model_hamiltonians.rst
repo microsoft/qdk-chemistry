@@ -305,7 +305,8 @@ Using model Hamiltonians with algorithms
 Fermionic model Hamiltonians produce :doc:`Hamiltonian <data/hamiltonian>` objects that are fully compatible with all QDK/Chemistry algorithms, including:
 
 * :doc:`Multi-configuration calculators <algorithms/mc_calculator>` (:term:`FCI`, :term:`ASCI`, etc.)
-* Quantum algorithm interfaces (:term:`VQE`, :term:`QPE`, etc.)
+* :doc:`Qubit mapping <algorithms/qubit_mapper>` (Jordan-Wigner, Bravyi-Kitaev, etc.)
+* :doc:`Phase estimation <algorithms/phase_estimation>` (:term:`IQPE`, standard :term:`QPE`)
 
 Spin model Hamiltonians produce :class:`~qdk_chemistry.data.QubitHamiltonian` objects directly, which can be used with quantum algorithms without an intermediate qubit mapping step.
 

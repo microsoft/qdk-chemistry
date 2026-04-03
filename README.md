@@ -8,10 +8,10 @@ Designed as both a **development platform** and a **composable framework**, QDK/
 
 QDK/Chemistry bridges classical computational chemistry with quantum computing by providing every stage of the quantum applications pipeline in a single, modular toolkit:
 
-- **Quantum algorithms** — a growing collection of chemistry-aware quantum algorithms, with composable building blocks for constructing higher-level quantum workflows
-- **Classical electronic structure** — production-quality classical methods that generate the high-quality inputs quantum algorithms require
-- **Composable architecture** — a plugin system that lets users assemble custom pipelines from interchangeable components, mixing native high-performance C++ backends with established community packages
-- **Multiple quantum backends** — execute circuits on a variety of simulators through a unified interface that decouples algorithm development from backend selection
+- **Quantum algorithms**: a growing collection of chemistry-aware quantum algorithms, with composable building blocks for constructing higher-level quantum workflows
+- **Classical electronic structure**: production-quality classical methods that generate the high-quality inputs quantum algorithms require
+- **Composable architecture**: a plugin system that lets users assemble custom pipelines from interchangeable components, mixing native high-performance C++ backends with established community packages
+- **Multiple quantum backends**: execute circuits on a variety of simulators through a unified interface that decouples algorithm development from backend selection
 
 ## Documentation
 
@@ -39,7 +39,12 @@ qdk-chemistry/
 
 ## Installing
 
-Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
+```bash
+python3 -m venv venv && source venv/bin/activate
+python3 -m pip install 'qdk-chemistry[all]'
+```
+
+The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
 ## Telemetry
 

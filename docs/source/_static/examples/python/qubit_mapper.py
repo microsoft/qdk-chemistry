@@ -23,9 +23,9 @@ qubit_mapper.settings().set("encoding", "jordan-wigner")
 
 ################################################################################
 # start-cell-run
-from pathlib import Path  # noqa: E402
+from pathlib import Path
 
-from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.data import Structure
 
 # Read a molecular structure from XYZ file
 structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
@@ -58,7 +58,7 @@ print(f"Qubit Hamiltonian has {qubit_hamiltonian.num_qubits} qubits")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("qubit_mapper"))
 # ['qdk', 'qiskit']
@@ -67,7 +67,7 @@ print(registry.available("qubit_mapper"))
 
 ################################################################################
 # start-cell-qdk-mapper
-from qdk_chemistry.algorithms import create as create_algorithm  # noqa: E402
+from qdk_chemistry.algorithms import create as create_algorithm
 
 # Create a native QDK QubitMapper instance
 qdk_mapper = create_algorithm("qubit_mapper", "qdk")
@@ -87,7 +87,7 @@ print(f"QDK mapper produced {len(qdk_qubit_hamiltonian.pauli_strings)} Pauli ter
 
 ################################################################################
 # start-cell-scbk-mapper
-from qdk_chemistry.data import Symmetries  # noqa: E402
+from qdk_chemistry.data import Symmetries
 
 # Create an OpenFermion mapper with SCBK encoding
 scbk_mapper = create_algorithm(
