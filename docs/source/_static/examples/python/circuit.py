@@ -122,7 +122,7 @@ try:
 
     qiskit_circuit = circuit.get_qiskit_circuit()
     print(qiskit_circuit)
-except ImportError:
+except (ImportError, RuntimeError):
     print("Qiskit not installed — skipping OpenQASM/Qiskit export")
 
 # end-cell-conversion
