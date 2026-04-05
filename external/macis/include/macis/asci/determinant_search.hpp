@@ -586,9 +586,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      size_t ntake = ic < asci_settings.nxtval_bcount_thresh
-                         ? 1
-                         : asci_settings.nxtval_bcount_inc;
+      // size_t ntake = ic < asci_settings.nxtval_bcount_thresh
+      //                    ? 1
+      //                    : asci_settings.nxtval_bcount_inc;
+      size_t ntake = 1;
       ic = nxtval.fetch_add(ntake);
 
       // Loop over assigned tasks
@@ -656,17 +657,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
               working_pairs_alpha.push_back(
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
-
-            // Prune working set if it gets too large
-            size_t working_alpha_size_limit = ntdets;
-            size_t working_pairs_alpha_size = working_pairs_alpha.size();
-            // if (tid == 0)
-            //   logger->info("  * thread {}, working_pairs_alpha_size = {} AT CON = {} IALPHA = {} JBETA = {}", tid, working_pairs_alpha_size, ic, i_alpha, j_beta);
-            // if (working_pairs_alpha_size > working_alpha_size_limit) {
-            //   auto uit = sort_and_accumulate_asci_pairs(working_pairs_alpha.begin(),
-            //                                             working_pairs_alpha.end());
-            //   working_pairs_alpha.erase(uit, working_pairs_alpha.end());
-            // }
           }
 
           working_pairs.insert(
@@ -677,8 +667,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
           size_t working_size_limit = ntdets;
           size_t working_pairs_size = working_pairs.size();
-          if (tid == 0)
-            logger->info("  * thread {}, working_pairs_size = {} AT CON = {} IALPHA = {}", tid, working_pairs_size, ic, i_alpha);
+          if (tid == 0 && i_alpha % 10 == 0)
+            logger->debug("  * thread {}, working_pairs_size = {} AT CON = {} IALPHA = {}", tid, working_pairs_size, ic, i_alpha);
           if (working_pairs_size > working_size_limit) {
             auto uit = sort_and_accumulate_asci_pairs(working_pairs.begin(),
                                                       working_pairs.end());
@@ -704,7 +694,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             std::make_move_iterator(working_pairs.end()));
         working_pairs.clear();
         size_t accumulated_size = accumulated_pairs.size();
-        logger->info("  * thread {}, accumulated_size = {} AT CON = {}", tid, accumulated_size, ic);
+        if (ic % 10 == 0)
+          logger->debug("  * thread {}, accumulated_size = {} AT CON = {}", tid, accumulated_size, ic);
         if (accumulated_size > ntdets) {
           const size_t cutoff_idx = ntdets - 1;
           std::nth_element(accumulated_pairs.begin(),

@@ -836,7 +836,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
     size_t max_w = constraint_sizes.empty() ? 0 : constraint_sizes.front().second;
-    cgen_logger->info(
+    cgen_logger->debug(
         "  * CGEN: ncon={}, total_work={}, avg/worker={}, max_single={}, "
         "nlevels={}",
         constraint_sizes.size(), total_work, local_average, max_w, nlevels);
@@ -1009,7 +1009,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       size_t max_w = 0;
       for (const auto& [c, w] : constraint_sizes)
         if (w > max_w) max_w = w;
-      cgen_logger->info(
+      cgen_logger->debug(
           "  * CGEN level {}: split {} -> ncon={}, total_work={}, "
           "avg/worker={}, max_single={}",
           ilevel, tps_to_next.size(), constraint_sizes.size(),
