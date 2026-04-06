@@ -24,6 +24,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     Ansatz,
+    BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     DensityFittedHamiltonianContainer,
@@ -1560,7 +1561,10 @@ class TestDensityFittedHamiltonianConstructor:
 
         # Density-fitted Hamiltonian construction with auxiliary basis
         ham_constructor = create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
-        df_hamiltonian = ham_constructor.run(wfn_active.get_orbitals(), "cc-pvdz-rifit")
+        orbitals = wfn_active.get_orbitals()
+        aux_basis = BasisSet.from_basis_name("cc-pvdz-rifit", o2)
+        orbitals.basis_set.set_auxiliary_basis_set(aux_basis)
+        df_hamiltonian = ham_constructor.run(orbitals)
 
         assert df_hamiltonian.has_one_body_integrals()
         assert df_hamiltonian.has_two_body_integrals()

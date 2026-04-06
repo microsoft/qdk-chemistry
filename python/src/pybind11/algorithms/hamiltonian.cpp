@@ -39,8 +39,7 @@ class HamiltonianConstructorBase
 
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals,
-      OptionalAuxBasis aux_basis) const override {
+      std::shared_ptr<Orbitals> orbitals) const override {
     // Support both old (1-arg) and new (2-arg) Python overrides for
     // backwards compatibility. Try the 2-arg call first; fall back to
     // 1-arg on TypeError.
@@ -49,8 +48,7 @@ class HamiltonianConstructorBase
         static_cast<const HamiltonianConstructor *>(this), "_run_impl");
     if (override) {
       try {
-        return override(orbitals, aux_basis)
-            .cast<std::shared_ptr<Hamiltonian>>();
+        return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
       } catch (py::error_already_set &e) {
         if (e.matches(PyExc_TypeError)) {
           // Only fall back to the 1-argument override if the TypeError
@@ -118,8 +116,7 @@ Examples:
   hamiltonian_constructor.def(
       "run",
       static_cast<std::shared_ptr<Hamiltonian> (HamiltonianConstructor::*)(
-          std::shared_ptr<Orbitals>, OptionalAuxBasis) const>(
-          &HamiltonianConstructor::run),
+          std::shared_ptr<Orbitals>) const>(&HamiltonianConstructor::run),
       R"(
 Construct a Hamiltonian from the given orbitals.
 
@@ -128,9 +125,6 @@ modifications during construction.
 
 Args:
     orbitals (qdk_chemistry.data.Orbitals): The orbital data to construct the Hamiltonian from
-    aux_basis (str or BasisSet, optional): Auxiliary basis set name or object.
-        Required for density-fitted Hamiltonian constructors (e.g. "cc-pvdz-rifit").
-        Defaults to None.
 
 Returns:
     qdk_chemistry.data.Hamiltonian: The constructed Hamiltonian matrix
@@ -139,8 +133,7 @@ Raises:
     SettingsAreLocked: If attempting to modify settings after run() is called
 
 )",
-      py::arg("orbitals"),
-      py::arg("aux_basis") = OptionalAuxBasis{std::nullopt});
+      py::arg("orbitals"));
 
   hamiltonian_constructor.def("settings", &HamiltonianConstructor::settings,
                               R"(
@@ -265,11 +258,8 @@ Typical usage:
     # Assuming you have orbitals from an SCF calculation
     constructor = alg.QdkDensityFittedHamiltonianConstructor()
 
-    # Specify an auxiliary basis required for density fitting (e.g., "cc-pvdz-rifit")
-    aux_basis = "cc-pvdz-rifit"
-
     # Construct Hamiltonian using density fitting
-    hamiltonian = constructor.run(orbitals, aux_basis)
+    hamiltonian = constructor.run(orbitals)
 
 See Also:
     :class:`HamiltonianConstructor`

@@ -430,15 +430,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 }  // namespace detail
 
 std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals,
-    OptionalAuxBasis aux_basis) const {
+    std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
-
-  if (aux_basis) {
-    throw std::runtime_error(
-        "Auxiliary basis sets are not supported in the Cholesky Hamiltonian "
-        "constructor. Do you mean to use DensityFittedHamiltonianConstructor?");
-  }
 
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();

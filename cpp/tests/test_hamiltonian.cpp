@@ -218,8 +218,7 @@ class TestHamiltonianConstructor : public HamiltonianConstructor {
  public:
   std::string name() const override { return "test-hamiltonian_constructor"; }
   std::shared_ptr<Hamiltonian> _run_impl(
-      std::shared_ptr<Orbitals> orbitals,
-      OptionalAuxBasis aux_basis) const override {
+      std::shared_ptr<Orbitals> orbitals) const override {
     // Dummy implementation for testing
     Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::VectorXd two_body = Eigen::VectorXd::Random(81);
@@ -1362,10 +1361,13 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
     ham_factory->settings().set("store_cholesky_vectors", true);
   }
 
-  auto rhf_hamiltonian =
-      (factory_name == "qdk_density_fitted_hamiltonian")
-          ? ham_factory->run(rhf_orbitals, std::string("cc-pvdz-rifit"))
-          : ham_factory->run(rhf_orbitals);
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    auto aux_basis = BasisSet::from_basis_name(
+        "cc-pvdz-rifit", rhf_orbitals->get_basis_set()->get_structure());
+    rhf_orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
+  }
+
+  auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian, rhf_wavefunction);
 };
@@ -1390,10 +1392,13 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
     ham_factory->settings().set("store_cholesky_vectors", true);
   }
 
-  auto uhf_hamiltonian =
-      (factory_name == "qdk_density_fitted_hamiltonian")
-          ? ham_factory->run(uhf_orbitals, std::string("cc-pvdz-rifit"))
-          : ham_factory->run(uhf_orbitals);
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    auto aux_basis = BasisSet::from_basis_name(
+        "cc-pvdz-rifit", uhf_orbitals->get_basis_set()->get_structure());
+    uhf_orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
+  }
+
+  auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
   return std::make_tuple(uhf_energy, uhf_hamiltonian);
 };
@@ -1427,10 +1432,14 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
     ham_factory->settings().set("store_cholesky_vectors", true);
   }
 
-  auto rhf_hamiltonian = (factory_name == "qdk_density_fitted_hamiltonian")
-                             ? ham_factory->run(wfn_active->get_orbitals(),
-                                                std::string("cc-pvdz-rifit"))
-                             : ham_factory->run(wfn_active->get_orbitals());
+  auto orbitals = wfn_active->get_orbitals();
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    auto aux_basis = BasisSet::from_basis_name(
+        "cc-pvdz-rifit", orbitals->get_basis_set()->get_structure());
+    orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
+  }
+
+  auto rhf_hamiltonian = ham_factory->run(orbitals);
 
   return std::make_tuple(rhf_energy, rhf_hamiltonian, wfn_active);
 };

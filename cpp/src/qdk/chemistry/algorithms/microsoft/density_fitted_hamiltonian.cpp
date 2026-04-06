@@ -65,51 +65,19 @@ void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
 
 std::shared_ptr<data::Hamiltonian>
 DensityFittedHamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals,
-    OptionalAuxBasis aux_basis) const {
+    std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
-  if (!aux_basis) {
+  auto basis_set = orbitals->get_basis_set();
+  auto aux_basis_set = basis_set->get_auxiliary_basis_set();
+  if (!aux_basis_set) {
     throw std::runtime_error(
         "An auxiliary basis set must be provided for density-fitted "
         "Hamiltonian construction.");
   }
 
-  enum class BasisSetType { Explicit, FromString };
-  BasisSetType aux_basis_set_type;
-
-  std::string aux_basis_set_name;
-  // aux_basis is std::optional<std::variant<...>>, so dereference it first
-  const auto& aux_basis_value = *aux_basis;
-  if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
-          aux_basis_value)) {
-    aux_basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(aux_basis_value)->get_name();
-    aux_basis_set_type = BasisSetType::Explicit;
-  } else if (std::holds_alternative<std::string>(aux_basis_value)) {
-    aux_basis_set_name = std::get<std::string>(aux_basis_value);
-    aux_basis_set_type = BasisSetType::FromString;
-  }
-  std::transform(aux_basis_set_name.begin(), aux_basis_set_name.end(),
-                 aux_basis_set_name.begin(), ::tolower);
-
-  std::shared_ptr<data::BasisSet> qdk_raw_aux_basis_set = nullptr;
-
-  if (aux_basis_set_name == data::BasisSet::custom_name ||
-      aux_basis_set_type == BasisSetType::Explicit) {
-    qdk_raw_aux_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(aux_basis_value);
-  } else {
-    // Create auxiliary basis set from standard name
-    auto structure = orbitals->get_basis_set()->get_structure();
-    qdk_raw_aux_basis_set =
-        data::BasisSet::from_basis_name(aux_basis_set_name, structure);
-  }
-
-  auto basis_set = orbitals->get_basis_set();
-  auto aux_basis_set = qdk_raw_aux_basis_set;
   const auto& [Ca, Cb] = orbitals->get_coefficients();
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   const size_t num_auxiliary_orbitals =

@@ -15,16 +15,6 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @brief Type alias for basis set specification or initial guess
- *
- * Can be one of:
- * - A shared pointer to BasisSet for custom basis
- * - A string for standard basis set name (e.g., "sto-3g")
- */
-using OptionalAuxBasis =
-    std::optional<std::variant<std::shared_ptr<data::BasisSet>, std::string>>;
-
-/**
  * @class HamiltonianConstructor
  * @brief Abstract base class for constructing Hamiltonian operators
  *
@@ -43,7 +33,7 @@ using OptionalAuxBasis =
 class HamiltonianConstructor
     : public Algorithm<HamiltonianConstructor,
                        std::shared_ptr<data::Hamiltonian>,
-                       std::shared_ptr<data::Orbitals>, OptionalAuxBasis> {
+                       std::shared_ptr<data::Orbitals>> {
  public:
   /**
    * @brief Default constructor
@@ -82,16 +72,17 @@ class HamiltonianConstructor
    */
   using Algorithm::run;
 
-  /**
-   * @brief Convenience overload that defaults aux_basis to nullopt
-   *
-   * @param orbitals The orbital data from which to construct the Hamiltonian
-   * @return The constructed Hamiltonian operator
-   */
-  std::shared_ptr<data::Hamiltonian> run(
-      std::shared_ptr<data::Orbitals> orbitals) const {
-    return this->run(std::move(orbitals), std::nullopt);
-  }
+  //   /**
+  //    * @brief Convenience overload that defaults aux_basis to nullopt
+  //    *
+  //    * @param orbitals The orbital data from which to construct the
+  //    Hamiltonian
+  //    * @return The constructed Hamiltonian operator
+  //    */
+  //   std::shared_ptr<data::Hamiltonian> run(
+  //       std::shared_ptr<data::Orbitals> orbitals) const {
+  //     return this->run(std::move(orbitals), std::nullopt);
+  //   }
 
   /**
    * @brief Access the algorithm's name
@@ -115,15 +106,10 @@ class HamiltonianConstructor
    * called by run() after settings have been locked.
    *
    * @param orbitals The orbital data from which to construct the Hamiltonian
-   * @param aux_basis Optional auxiliary basis set for density-fitted
-   *        implementations. Can be a BasisSet pointer or a string name.
-   *        Implementations that don't use density fitting should not provide
-   *        this parameter.
    * @return The constructed Hamiltonian operator
    */
   virtual std::shared_ptr<data::Hamiltonian> _run_impl(
-      std::shared_ptr<data::Orbitals> orbitals,
-      OptionalAuxBasis aux_basis) const = 0;
+      std::shared_ptr<data::Orbitals> orbitals) const = 0;
 };
 
 /**

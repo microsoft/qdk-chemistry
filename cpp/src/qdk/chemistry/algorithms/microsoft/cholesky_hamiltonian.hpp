@@ -37,8 +37,7 @@ class CholeskyHamiltonianConstructor
 
  protected:
   std::shared_ptr<data::Hamiltonian> _run_impl(
-      std::shared_ptr<data::Orbitals> orbitals,
-      OptionalAuxBasis aux_basis) const override;
+      std::shared_ptr<data::Orbitals> orbitals) const override;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

@@ -30,17 +30,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 namespace qcs = qdk::chemistry::scf;
 
 std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
-    std::shared_ptr<data::Orbitals> orbitals,
-    OptionalAuxBasis aux_basis) const {
+    std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
-
-  if (aux_basis) {
-    throw std::runtime_error(
-        "Auxiliary basis sets are not supported in the four-center Hamiltonian "
-        "constructor. Do you mean to use DensityFittedHamiltonianConstructor?");
-  }
 
   auto basis_set = orbitals->get_basis_set();
   const auto& [Ca, Cb] = orbitals->get_coefficients();
