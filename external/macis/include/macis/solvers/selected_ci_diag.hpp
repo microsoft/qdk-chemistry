@@ -241,11 +241,6 @@ double selected_ci_diag(
                    duration_type(dav_en - dav_st).count());
       E = eigval;
 
-      // Invalidate cache — next iteration does a full build and re-caches.
-      // Consolidation (assembling a new CSR from the three blocks) was
-      // measured at 10-16s per call at 1M dets, which is more expensive
-      // than the alternating full-build approach on current workloads.
-      cache->clear();
 
       return E;
     }

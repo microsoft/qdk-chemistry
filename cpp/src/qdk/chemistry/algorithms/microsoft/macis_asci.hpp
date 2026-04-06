@@ -126,11 +126,15 @@ class MacisAsciSettings : public MultiConfigurationSettings {
     set_default<double>(
         "min_warm_start_overlap",
         macis_defaults.min_warm_start_overlap,
-        "Minimum determinant overlap fraction for warm-start Davidson",
+        "Minimum projected vector norm for warm-start Davidson. "
+        "Measures how much of the previous eigenvector's weight is "
+        "retained in the new determinant set (0=never, 1=always reject)",
         data::BoundConstraint<double>{0.0, 1.0});
     set_default<double>(
         "min_patch_overlap", macis_defaults.min_patch_overlap,
-        "Minimum determinant overlap fraction for incremental H build",
+        "Minimum determinant overlap for incremental H build. "
+        "The cache persists across iterations; a full rebuild is "
+        "triggered only when overlap drops below this threshold",
         data::BoundConstraint<double>{0.0, 1.0});
     set_default<double>(
         "grow_ci_residual_tolerance",

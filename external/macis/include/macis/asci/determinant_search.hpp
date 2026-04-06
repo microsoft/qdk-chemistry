@@ -152,15 +152,17 @@ struct ASCISettings {
   /// onto the new determinant set and used as the initial guess.
   bool warm_start_davidson = true;
 
-  /// @brief Minimum determinant overlap fraction for warm-starting Davidson.
-  /// If the fraction of new dets also present in the old set falls below
-  /// this, the warm-start guess is discarded in favour of a diagonal guess.
+  /// @brief Minimum projected vector norm for warm-starting Davidson.
+  /// After mapping old CI coefficients onto the new determinant set, the
+  /// L2 norm of the projected vector measures how much of the old
+  /// eigenvector's weight is retained.  Below this threshold, the
+  /// warm-start guess is discarded in favour of a diagonal guess.
   double min_warm_start_overlap = 0.5;
 
-  /// @brief Minimum determinant overlap fraction for using incremental
-  /// (patched) Hamiltonian build.  Below this threshold the full CSR is
-  /// rebuilt from scratch.  Range: (0, 1].
-  // This is misleading as it will still enforce alternation. We should check whether that's actually required or if it just requires tinkering with the grow_factor parameters.
+  /// @brief Minimum determinant overlap fraction for using the incremental
+  /// (patched) Hamiltonian build.  When the fraction of current dets that
+  /// also appear in the cached set drops below this threshold, a full CSR
+  /// rebuild is triggered and the cache is refreshed.  Range: (0, 1].
   double min_patch_overlap = 0.3;
 
   /// @brief CI residual tolerance used during the grow phase.

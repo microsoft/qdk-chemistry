@@ -51,7 +51,6 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb,
-               // This should take the cache as the last parameter and not default the communicator
                CachedHamiltonianState<wfn_t<N>, index_t>* h_cache = nullptr
                MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   // Sort wfn on coefficient weights
@@ -150,22 +149,22 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     old_wfn.clear();
     old_X.clear();
 
-    // Only use warm-start if overlap is high enough; otherwise the guess
-    // is too far from the ground state in the new, much larger space.
-    // This is not the actual overlap fraction - the inner product would need to be computed
-    double overlap_fraction = wfn.size() > 0
-        ? static_cast<double>(n_matched) / static_cast<double>(wfn.size())
-        : 0.0;
-    if (overlap_fraction < asci_settings.min_warm_start_overlap) {
+    // Use the projected vector norm as the warm-start quality metric.
+    // ||P·ψ_old||₂ measures how much of the old eigenvector's weight lives
+    // in the new determinant space.  Near 1.0 → excellent guess; near 0.0
+    // → most weight was on determinants that were dropped.
+    double norm = blas::nrm2(X_local.size(), X_local.data(), 1);
+    if (logger) {
+      logger->info("  WARM_START: matched={}/{}, projected_norm={:.4f}",
+                   n_matched, wfn.size(), norm);
+    }
+    if (norm < asci_settings.min_warm_start_overlap) {
       X_local.clear();  // triggers identity guess in selected_ci_diag
+      if (logger)
+        logger->info("  WARM_START: norm {:.4f} < {:.4f} threshold, using diagonal guess",
+                     norm, asci_settings.min_warm_start_overlap);
     } else {
-      // Renormalize — the mapped vector has zero entries for new dets.
-      double norm = blas::nrm2(X_local.size(), X_local.data(), 1);
-      if (norm > 0.0) {
-        blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
-      } else {
-        X_local.clear();  // all-zero → identity guess
-      }
+      blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
     }
   }
 
