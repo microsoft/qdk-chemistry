@@ -1,11 +1,4 @@
-"""Tests for the sparse isometry with binary encoding state preparation.
-
-All tests live in a single class ``TestSparseIsometryBinaryEncoding``.
-Two main tests exercise the full ``run()`` → ``Circuit`` → ``estimate()``
-pipeline on the ozone SCI wavefunction and random wavefunctions.  The
-remaining tests cover settings, single-determinant fast-path, scaling,
-``_encode_gf2x_ops_for_qs`` unit tests, and algorithm metadata.
-"""
+"""Tests for the sparse isometry with binary encoding state preparation."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
