@@ -669,11 +669,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           size_t working_pairs_size = working_pairs.size();
           if (tid == 0 && i_alpha % 10 == 0)
             logger->debug("  * thread {}, working_pairs_size = {} AT CON = {} IALPHA = {}", tid, working_pairs_size, ic, i_alpha);
-          if (working_pairs_size > working_size_limit) {
-            auto uit = sort_and_accumulate_asci_pairs(working_pairs.begin(),
-                                                      working_pairs.end());
-            working_pairs.erase(uit, working_pairs.end());
-          }
         }  // Unique Alpha Loop
 
         // S&A the working set and prune small contributions
