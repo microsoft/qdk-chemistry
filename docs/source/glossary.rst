@@ -107,8 +107,16 @@ Acronym definitions
    PMC
       Projected Multi-Configuration.
 
+   PPP
+      Pariser-Parr-Pople.
+      Semi-empirical model Hamiltonian that adds intersite Coulomb interactions to the Hubbard model.
+
    QDK
       Quantum Development Kit.
+
+   QIR
+      Quantum Intermediate Representation.
+      LLVM-based intermediate representation for quantum programs, used for cross-platform compilation and execution.
 
    QPE
       Quantum Phase Estimation.

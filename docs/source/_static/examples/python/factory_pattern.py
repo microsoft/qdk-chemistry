@@ -29,7 +29,7 @@ E_scf, wfn = scf_solver.run(
 
 ################################################################################
 # start-cell-list-algorithms
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 # List all algorithm types and their implementations
 all_algorithms = registry.available()
@@ -54,7 +54,7 @@ print("Defaults:", defaults)
 
 ################################################################################
 # start-cell-inspect-settings
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 # Create a SCF solver and inspect its settings
 scf = registry.create("scf_solver", "qdk")
