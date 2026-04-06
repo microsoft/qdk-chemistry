@@ -1467,6 +1467,7 @@ bool BasisSet::_is_valid() const {
     // auxiliary basis set should not have ECP or auxiliary basis set
     is_aux_valid = _auxiliary_basis_set->_is_valid() &&
                    !_auxiliary_basis_set->has_ecp_electrons() &&
+                   !_auxiliary_basis_set->has_ecp_shells() &&
                    !_auxiliary_basis_set->has_auxiliary_basis_set();
   }
 

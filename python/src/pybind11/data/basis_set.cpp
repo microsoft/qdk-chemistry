@@ -277,7 +277,6 @@ Examples:
 Constructor with shells, auxiliary basis set, and structure.
 
 Creates a basis set with an attached auxiliary basis set object.
-ECP and auxiliary basis sets are mutually exclusive.
 
 Args:
     name (str): Name of the basis set
@@ -356,8 +355,6 @@ Examples:
                 R"(
 Constructor with basis set name, auxiliary basis name, and structure.
 
-Creates a basis set with an auxiliary basis set, both looked up by name.
-ECP and auxiliary basis sets are mutually exclusive.
 
 Args:
     name (str): Name of the primary basis set (e.g., "cc-pVDZ")
@@ -1188,7 +1185,7 @@ Examples:
 Create a basis set with an auxiliary basis set, both looked up by name.
 
 Loads a primary and auxiliary basis set from the database for all atoms
-in the structure. ECP and auxiliary basis sets are mutually exclusive.
+in the structure.
 
 Args:
     basis_name (str): Name of the primary basis set (e.g., "cc-pVDZ")

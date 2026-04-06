@@ -180,29 +180,35 @@ where :math:`P` indexes an auxiliary basis set. The four-center integrals are co
 - Systems where the density fitting approximation provides acceptable accuracy
 - Workflows already using density-fitted :term:`SCF` calculations
 
-.. rubric:: Auxiliary basis
-
-The ``run`` method requires an extra auxiliary basis set parameter.
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
+      // Set the auxiliary basis set for density fitting, unless it is already set
+      if (!orbitals->get_basis_set()->has_auxiliary_basis()) {
+        orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
+      }
+
       // Create density-fitted Hamiltonian constructor
       auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
 
-      // Specify auxiliary basis explicitly
-      auto hamiltonian_with_aux = constructor->run(orbitals, aux_basis);
+      // Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
+      auto hamiltonian_with_aux = constructor->run(orbitals);
 
 .. tab:: Python API
 
    .. code-block:: python
 
+      # Set the auxiliary basis set for density fitting, unless it is already set
+      if not orbitals.basis_set.has_auxiliary_basis():
+          orbitals.basis_set.set_auxiliary_basis_set(aux_basis)
+
       # Create density-fitted Hamiltonian constructor
       constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
 
-      # Specify auxiliary basis explicitly
-      hamiltonian_with_aux = constructor.run(orbitals, aux_basis)
+      # Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
+      hamiltonian_with_aux = constructor.run(orbitals)
 
 .. rubric:: Settings
 

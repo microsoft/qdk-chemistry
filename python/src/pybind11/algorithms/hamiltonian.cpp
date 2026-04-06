@@ -40,31 +40,12 @@ class HamiltonianConstructorBase
  protected:
   std::shared_ptr<Hamiltonian> _run_impl(
       std::shared_ptr<Orbitals> orbitals) const override {
-    // Support both old (1-arg) and new (2-arg) Python overrides for
-    // backwards compatibility. Try the 2-arg call first; fall back to
-    // 1-arg on TypeError.
     py::gil_scoped_acquire gil;
     py::function override = py::get_override(
         static_cast<const HamiltonianConstructor *>(this), "_run_impl");
     if (override) {
       try {
         return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
-      } catch (py::error_already_set &e) {
-        if (e.matches(PyExc_TypeError)) {
-          // Only fall back to the 1-argument override if the TypeError
-          // message suggests an argument/signature mismatch.
-          py::object exc = e.value();
-          std::string msg = py::str(exc);
-          if (msg.find("positional argument") != std::string::npos ||
-              msg.find("positional arguments") != std::string::npos ||
-              msg.find("required positional argument") != std::string::npos ||
-              msg.find("takes") != std::string::npos) {
-            e.restore();
-            PyErr_Clear();
-            return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
-          }
-        }
-        throw;
       }
     }
     py::pybind11_fail(
