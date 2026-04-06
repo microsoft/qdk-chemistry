@@ -24,9 +24,9 @@ pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
 
 ################################################################################
 # start-cell-run
-import numpy as np  # noqa: E402
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Configuration, Structure  # noqa: E402
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Configuration, Structure
 
 # Create a structure (H2 molecule)
 coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
@@ -59,7 +59,7 @@ print(f"PMC Energy: {E_pmc:.10f} Hartree")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 available = registry.available("projected_multi_configuration_calculator")
 print(available)

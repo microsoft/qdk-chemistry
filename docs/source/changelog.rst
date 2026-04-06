@@ -2,6 +2,22 @@
 Changelog
 =========
 
+For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
+
+Version 1.1.0
+=============
+
+See :ref:`release-v1.1.0` for full details.
+
+- Q#-native circuit architecture with lazy QIR compilation
+- Model Hamiltonians (Hückel, Hubbard, PPP, Ising, Heisenberg)
+- Arbitrary-order Trotter-Suzuki product formulas
+- Native ROHF with DIIS acceleration
+- Cholesky-based AO→MO integral transformation
+- OpenFermion qubit-mapping plugin
+- MACIS active-space expansion to 2048 orbitals
+- One-shot VVHV orbital localization
+
 Version 1.0.2
 =============
 

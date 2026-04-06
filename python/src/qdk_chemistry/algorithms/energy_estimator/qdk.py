@@ -185,16 +185,16 @@ class QdkEnergyEstimator(EnergyEstimator):
     def _run_impl(
         self,
         circuit: Circuit,
-        qubit_hamiltonians: list[QubitHamiltonian],
+        qubit_hamiltonian: QubitHamiltonian,
         circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
-        """Estimate the expectation value and variance of Hamiltonians.
+        """Estimate the expectation value and variance of the Hamiltonian.
 
         Args:
             circuit: Circuit.
-            qubit_hamiltonians: List of ``QubitHamiltonian`` to estimate.
+            qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
             circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
@@ -202,7 +202,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         Returns:
             tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
 
-                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonians.
+                * ``energy_result``: Energy expectation value and variance for the provided Hamiltonian.
                 * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
         Note:
@@ -214,6 +214,7 @@ class QdkEnergyEstimator(EnergyEstimator):
         # This function definition is not required it is present to add type hints and docstrings
         #  for the derived classes specialized run() method.
         Logger.trace_entering()
+        qubit_hamiltonians = qubit_hamiltonian.group_commuting(qubit_wise=True)
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(

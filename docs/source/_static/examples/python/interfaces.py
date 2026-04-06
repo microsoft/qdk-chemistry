@@ -46,7 +46,7 @@ for algorithm_name in available():
 
 ################################################################################
 # start-cell-discover-implementations
-from qdk_chemistry.algorithms import available, create  # noqa: E402
+from qdk_chemistry.algorithms import available, create
 
 # List all registered SCF solver implementations
 print(available("scf_solver"))  # ['qdk', 'pyscf']
