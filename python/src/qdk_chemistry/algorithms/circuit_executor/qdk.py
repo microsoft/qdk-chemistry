@@ -87,7 +87,8 @@ class QdkFullStateSimulator(CircuitExecutor):
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
         # Reorder bits in each measurement result to match Little Endian convention
-        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results]
+        # If result is Loss, treat it as "0" in the bitstring
+        bitstrings = ["".join("1" if str(x) == "One" else "0" for x in reversed(one_run)) for one_run in raw_results]
         counts = dict(Counter(bitstrings))
         return CircuitExecutorData(
             bitstring_counts=counts,
@@ -138,18 +139,19 @@ class QdkSparseStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-
-        if noise is not None:
-            raise NotImplementedError("Gate specific noise is not yet supported for the QDK Sparse State Simulator. ")
+        noise_config = noise.to_qdk_noise_config() if noise is not None else None
         if circuit._qsharp_factory is not None:  # noqa: SLF001
             raw_results = qsharp.run(
                 circuit._qsharp_factory.program,  # noqa: SLF001
                 shots,
                 *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
+                noise=noise_config,
+                seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
+            # If result is Loss, treat it as "0" in the bitstring
             bitstrings = [
-                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
+                "".join("1" if str(x) == "One" else "0" for x in reversed(one_run)) for one_run in raw_results
             ]
             bitstring_counts = dict(Counter(bitstrings))
         else:
@@ -158,6 +160,7 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 qasm,
                 shots=shots,
                 as_bitstring=True,
+                noise=noise_config,
                 seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")

@@ -95,10 +95,10 @@ class TestQdkFullStateCircuitExecutor:
         for outcome in raw_data:
             assert "One, Zero" in str(outcome)  # Raw data bitstring outcomes should be in qubit order
 
-    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile):
+    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile_with_qubit_loss):
         """Test execution with a depolarizing noise model."""
         executor = QdkFullStateSimulator()
-        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile)
+        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile_with_qubit_loss)
         counts = result.bitstring_counts
         # With noise, we expect some erroneous outcomes ("01" or "10") in addition to "00" and "11"
         total = sum(counts.values())
@@ -112,9 +112,9 @@ class TestQdkFullStateCircuitExecutor:
             name="high_noise",
             description="High noise for testing",
             errors={
-                "x": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 1},
-                "h": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 1},
-                "cx": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 2},
+                "x": {"depolarizing_error": 0.5},
+                "h": {"depolarizing_error": 0.5},
+                "cx": {"depolarizing_error": 0.5},
             },
         )
         executor = QdkFullStateSimulator()
@@ -167,8 +167,13 @@ class TestQdkSparseStateCircuitExecutor:
         assert result.get_executor_metadata() is not None
         assert all("10" in str(outcome) for outcome in result.get_executor_metadata())
 
-    def test_gate_noise_profile_raises(self, test_circuit_1, simple_error_profile):
-        """Test that passing a QuantumErrorProfile noise raises NotImplementedError."""
+    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile_with_qubit_loss):
+        """Test execution with a depolarizing noise model."""
         executor = QdkSparseStateSimulator()
-        with pytest.raises(NotImplementedError, match="Gate specific noise is not yet supported"):
-            executor.run(test_circuit_1, shots=10, noise=simple_error_profile)
+        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile_with_qubit_loss)
+        counts = result.bitstring_counts
+        # With noise, we expect some erroneous outcomes ("01" or "10") in addition to "00" and "11"
+        total = sum(counts.values())
+        assert total == 1000
+        error_count = counts.get("01", 0) + counts.get("10", 0)
+        assert error_count > 0, "Noise should introduce some erroneous outcomes"

@@ -47,10 +47,10 @@ def test_get_noise_model_with_multiple_gates():
         name="multi_gate",
         description="test with multiple gates",
         errors={
-            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "x": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
-            "cz": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+            "h": {"depolarizing_error": 0.01},
+            "x": {"depolarizing_error": 0.01},
+            "cx": {"depolarizing_error": 0.02},
+            "cz": {"depolarizing_error": 0.02},
         },
     )
 
@@ -69,10 +69,10 @@ def test_get_noise_model_excludes_multiple_gates():
         name="exclude_multiple",
         description="test excluding multiple gates",
         errors={
-            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "x": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
-            "cz": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+            "h": {"depolarizing_error": 0.01},
+            "x": {"depolarizing_error": 0.01},
+            "cx": {"depolarizing_error": 0.02},
+            "cz": {"depolarizing_error": 0.02},
         },
     )
 
@@ -100,16 +100,48 @@ def test_get_noise_model_empty_profile():
     assert len(noise_model.noise_instructions) == 0
 
 
+def test_get_noise_model_qubit_loss_warns(simple_error_profile_with_qubit_loss):
+    """Test that qubit_loss error type emits a warning and is skipped in the Qiskit noise model."""
+    with pytest.warns(UserWarning, match="Unsupported error type.*qubit_loss"):
+        noise_model = get_noise_model_from_profile(simple_error_profile_with_qubit_loss)
+
+    assert isinstance(noise_model, NoiseModel)
+    # Depolarizing errors should still be applied
+    assert "h" in noise_model.noise_instructions
+    assert "cx" in noise_model.noise_instructions
+
+
+def test_get_noise_model_mixed_errors_per_gate():
+    """Test noise model with a gate having both depolarizing and qubit_loss errors."""
+    profile = QuantumErrorProfile(
+        name="mixed",
+        description="mixed error types per gate",
+        errors={
+            "cx": {
+                "depolarizing_error": 0.02,
+                "qubit_loss": 0.005,
+            },
+        },
+    )
+
+    with pytest.warns(UserWarning, match="Unsupported error type.*qubit_loss"):
+        noise_model = get_noise_model_from_profile(profile)
+
+    assert isinstance(noise_model, NoiseModel)
+    # Depolarizing should still be applied
+    assert "cx" in noise_model.noise_instructions
+
+
 def test_get_noise_model_basis_gates_match_profile():
     """Test that noise model basis gates match the profile's basis gates."""
     profile = QuantumErrorProfile(
         name="basis_test",
         description="test basis gates",
         errors={
-            "h": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "s": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "t": {"type": "depolarizing_error", "rate": 0.01, "num_qubits": 1},
-            "cx": {"type": "depolarizing_error", "rate": 0.02, "num_qubits": 2},
+            "h": {"depolarizing_error": 0.01},
+            "s": {"depolarizing_error": 0.01},
+            "t": {"depolarizing_error": 0.01},
+            "cx": {"depolarizing_error": 0.02},
         },
     )
 

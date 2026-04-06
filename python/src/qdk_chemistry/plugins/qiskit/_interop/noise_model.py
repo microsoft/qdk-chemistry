@@ -31,19 +31,32 @@ def get_noise_model_from_profile(
     Logger.trace_entering()
     noise_model = NoiseModel(basis_gates=quantum_error_profile.basis_gates)
 
-    for gate, error_dict in quantum_error_profile.errors.items():
+    for gate, error_rates in quantum_error_profile.errors.items():
         if exclude_gates is not None and str(gate) in exclude_gates:
             continue
-        if error_dict["type"] == SupportedErrorTypes.DEPOLARIZING_ERROR:
-            noise_model.add_all_qubit_quantum_error(
-                depolarizing_error(error_dict["rate"], error_dict["num_qubits"]),
-                [str(gate)],  # Convert gate to string for Qiskit
-            )
-        else:
-            warnings.warn(
-                f"Unsupported error type: {error_dict['type']} for gate {gate}. "
-                "The error contribution will be ignored in this error model.",
-                category=UserWarning,
-                stacklevel=2,
-            )
+        for error_type, rate in error_rates.items():
+            if error_type == SupportedErrorTypes.DEPOLARIZING_ERROR:
+                num_qubits = _check_num_qubits(str(gate), noise_model)
+                noise_model.add_all_qubit_quantum_error(
+                    depolarizing_error(rate, num_qubits),
+                    [str(gate)],  # Convert gate to string for Qiskit
+                )
+            else:
+                warnings.warn(
+                    f"Unsupported error type: {error_type} for gate {gate}. "
+                    "The error contribution will be ignored in this error model.",
+                    category=UserWarning,
+                    stacklevel=2,
+                )
     return noise_model
+
+
+def _check_num_qubits(gate: str, noise_model: NoiseModel) -> int:
+    """Helper function to determine the number of qubits for a given gate."""
+    if gate in noise_model._1qubit_instructions:  # noqa: SLF001
+        return 1
+    if gate in noise_model._2qubit_instructions:  # noqa: SLF001
+        return 2
+    if gate in noise_model._3qubit_instructions:  # noqa: SLF001
+        return 3
+    raise ValueError(f"Unsupported gate type: {gate}")
