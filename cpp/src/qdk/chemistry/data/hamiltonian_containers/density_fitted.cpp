@@ -243,11 +243,11 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
   // Check two-body integrals dimensions
   // Three-center integrals have shape [n_orb_pairs x n_aux] where n_orb_pairs =
   // norb^2
-  size_t norb_alpha = _one_body_integrals.first->rows();
-  unsigned orb_pair_size = norb_alpha * norb_alpha;
+  auto norb_alpha = _one_body_integrals.first->rows();
+  auto orb_pair_size = norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals - rows should equal orb_pair_size
-  if (static_cast<unsigned>(_three_center_integrals.first->rows()) !=
+  if (static_cast<size_t>(_three_center_integrals.first->rows()) !=
       orb_pair_size) {
     throw std::invalid_argument(
         "Alpha-alpha three-center integrals rows (" +
@@ -259,10 +259,10 @@ void DensityFittedHamiltonianContainer::validate_integral_dimensions() const {
 
   // Check beta-beta integrals (if different from alpha-alpha)
   if (_three_center_integrals.second != _three_center_integrals.first) {
-    if (static_cast<unsigned>(_three_center_integrals.second->rows()) !=
-            orb_pair_size or
-        static_cast<unsigned>(_three_center_integrals.second->cols()) !=
-            static_cast<unsigned>(_three_center_integrals.first->cols())) {
+    if (static_cast<size_t>(_three_center_integrals.second->rows()) !=
+            orb_pair_size ||
+        static_cast<size_t>(_three_center_integrals.second->cols()) !=
+            static_cast<size_t>(_three_center_integrals.first->cols())) {
       throw std::invalid_argument(
           "Beta three-center integrals size does not match with Alpha");
     }
