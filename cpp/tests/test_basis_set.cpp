@@ -91,6 +91,12 @@ TEST_F(BasisSetTest, Constructors) {
   EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
                std::invalid_argument);
 
+  // Constructor with name, structure and basis type should throw (empty basis
+  // invalid)
+  EXPECT_THROW(BasisSet basis3("def2-svp", "def2-universal-jfit", structure,
+                               AOType::Cartesian),
+               std::invalid_argument);
+
   // Constructor with shells should work
   std::vector<Shell> shells;
   shells.emplace_back(
@@ -426,6 +432,18 @@ TEST_F(BasisSetTest, Summary) {
   EXPECT_NE(std::string::npos, summary.find("6-31G"));
   EXPECT_NE(std::string::npos, summary.find("2"));  // 2 shells
   EXPECT_NE(std::string::npos, summary.find("4"));  // 4 atomic orbitals
+  EXPECT_EQ(std::string::npos, summary.find("Auxiliary"));
+
+  // Set auxiliary
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("my-aux-basis", aux_shells);
+  basis.set_auxiliary_basis_set(aux);
+
+  summary = basis.get_summary();
+  // Summary should mention the auxiliary basis set
+  EXPECT_NE(std::string::npos, summary.find("Auxiliary"));
 }
 
 TEST_F(BasisSetTest, JSONSerialization) {
@@ -1840,4 +1858,365 @@ TEST_F(BasisSetTest, DataTypeName) {
   BasisSet basis("6-31G", shells, structure);
 
   EXPECT_EQ(basis.get_data_type_name(), "basis_set");
+}
+
+// ============================================================================
+// Auxiliary Basis Set Tests
+// ============================================================================
+
+TEST_F(BasisSetTest, AuxiliaryBasisSetAccessors) {
+  // Create a basis set without auxiliary
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coords, symbols);
+
+  BasisSet basis("test", shells, structure);
+
+  // Default: no auxiliary basis
+  EXPECT_FALSE(basis.has_auxiliary_basis_set());
+  EXPECT_EQ(nullptr, basis.get_auxiliary_basis_set());
+
+  // Set auxiliary basis
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("aux-basis", aux_shells, structure);
+  basis.set_auxiliary_basis_set(aux);
+
+  EXPECT_TRUE(basis.has_auxiliary_basis_set());
+  EXPECT_NE(nullptr, basis.get_auxiliary_basis_set());
+  EXPECT_EQ("aux-basis", basis.get_auxiliary_basis_set()->get_name());
+  EXPECT_EQ(1u, basis.get_auxiliary_basis_set()->get_num_shells());
+
+  // Clear auxiliary basis by setting nullptr
+  basis.set_auxiliary_basis_set(nullptr);
+  EXPECT_FALSE(basis.has_auxiliary_basis_set());
+  EXPECT_EQ(nullptr, basis.get_auxiliary_basis_set());
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisFromSharedPtrConstructor) {
+  // Constructor: BasisSet(name, shells, shared_ptr<BasisSet>, structure)
+  auto structure = testing::create_water_structure();
+
+  // Create primary shells
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+
+  // Create auxiliary basis
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::P, std::vector{1.5}, std::vector{0.8}));
+  aux_shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{2.5}, std::vector{1.2}));
+  aux_shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("custom-aux", aux_shells, *structure);
+
+  // Create primary basis with aux
+  BasisSet basis("custom-primary", shells, aux, *structure);
+
+  EXPECT_EQ("custom-primary", basis.get_name());
+  EXPECT_EQ(3u, basis.get_num_shells());
+  EXPECT_TRUE(basis.has_auxiliary_basis_set());
+  EXPECT_EQ("custom-aux", basis.get_auxiliary_basis_set()->get_name());
+  EXPECT_EQ(4u, basis.get_auxiliary_basis_set()->get_num_shells());
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisFromShellsConstructor) {
+  // Constructor: BasisSet(name, shells, ecp_shells, aux_shells, structure)
+  auto structure = testing::create_water_structure();
+
+  // Primary shells
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+
+  // Empty ECP shells
+  std::vector<Shell> ecp_shells;
+
+  // Auxiliary shells
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{3.0}, std::vector{1.5}));
+  aux_shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{3.5}, std::vector{1.2}));
+  aux_shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{3.0}, std::vector{1.5}));
+
+  BasisSet basis("test-with-aux-shells", shells, ecp_shells, aux_shells,
+                 *structure);
+
+  EXPECT_EQ("test-with-aux-shells", basis.get_name());
+  EXPECT_EQ(3u, basis.get_num_shells());
+  EXPECT_TRUE(basis.has_auxiliary_basis_set());
+  EXPECT_EQ(3u, basis.get_auxiliary_basis_set()->get_num_shells());
+}
+
+TEST_F(BasisSetTest, FullConstructorWithECPAndAux) {
+  // Full constructor: BasisSet(name, shells, ecp_name, ecp_shells,
+  //   ecp_electrons, aux_name, aux_shells, structure)
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"Ag", "H"};
+  Structure structure(coords, symbols);
+
+  // Primary shells
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+
+  // ECP shells
+  std::vector<Shell> ecp_shells;
+  Eigen::VectorXd exp(1), coeff(1);
+  Eigen::VectorXi rpow(1);
+  exp << 10.0;
+  coeff << 50.0;
+  rpow << 0;
+  ecp_shells.emplace_back(0, OrbitalType::S, exp, coeff, rpow);
+
+  std::string ecp_name = "test-ecp";
+  std::vector<size_t> ecp_electrons = {28, 0};
+
+  // Auxiliary shells
+  std::string aux_name = "test-aux";
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{5.0}, std::vector{2.0}));
+  aux_shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{4.0}, std::vector{1.5}));
+
+  BasisSet basis("full-test", shells, ecp_name, ecp_shells, ecp_electrons,
+                 aux_name, aux_shells, structure);
+
+  // Verify primary basis
+  EXPECT_EQ("full-test", basis.get_name());
+  EXPECT_EQ(2u, basis.get_num_shells());
+
+  // Verify ECP
+  EXPECT_TRUE(basis.has_ecp_electrons());
+  EXPECT_EQ("test-ecp", basis.get_ecp_name());
+  EXPECT_EQ(28u, basis.get_ecp_electrons()[0]);
+  EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
+  EXPECT_TRUE(basis.has_ecp_shells());
+
+  // Verify auxiliary
+  EXPECT_TRUE(basis.has_auxiliary_basis_set());
+  auto aux = basis.get_auxiliary_basis_set();
+  EXPECT_EQ("test-aux", aux->get_name());
+  EXPECT_EQ(2u, aux->get_num_shells());
+}
+
+TEST_F(BasisSetTest, FromElementMapWithAux) {
+  // Static factory: from_element_map(elem_map, aux_elem_map, structure)
+  auto structure = testing::create_water_structure();
+
+  std::map<std::string, std::string> elem_map;
+  elem_map["O"] = "def2-svp";
+  elem_map["H"] = "def2-svp";
+
+  std::map<std::string, std::string> aux_elem_map;
+  aux_elem_map["O"] = "def2-universal-jfit";
+  aux_elem_map["H"] = "def2-universal-jfit";
+
+  auto basis = BasisSet::from_element_map(elem_map, aux_elem_map, *structure);
+
+  EXPECT_NE(nullptr, basis);
+  EXPECT_GT(basis->get_num_shells(), 0u);
+  EXPECT_TRUE(basis->has_auxiliary_basis_set());
+
+  auto aux = basis->get_auxiliary_basis_set();
+  EXPECT_NE(nullptr, aux);
+  EXPECT_GT(aux->get_num_shells(), 0u);
+}
+
+TEST_F(BasisSetTest, FromIndexMapWithAux) {
+  // Static factory: from_index_map(idx_map, aux_idx_map, structure)
+  auto structure = testing::create_water_structure();
+
+  std::map<size_t, std::string> idx_map;
+  idx_map[0] = "def2-svp";
+  idx_map[1] = "def2-svp";
+  idx_map[2] = "def2-svp";
+
+  std::map<size_t, std::string> aux_idx_map;
+  aux_idx_map[0] = "def2-universal-jfit";
+  aux_idx_map[1] = "def2-universal-jfit";
+  aux_idx_map[2] = "def2-universal-jfit";
+
+  auto basis = BasisSet::from_index_map(idx_map, aux_idx_map, *structure);
+
+  EXPECT_NE(nullptr, basis);
+  EXPECT_GT(basis->get_num_shells(), 0u);
+  EXPECT_TRUE(basis->has_auxiliary_basis_set());
+
+  auto aux = basis->get_auxiliary_basis_set();
+  EXPECT_NE(nullptr, aux);
+  EXPECT_GT(aux->get_num_shells(), 0u);
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisCopyConstructorAndAssignment) {
+  auto structure = testing::create_water_structure();
+
+  // Create basis with auxiliary
+  auto basis_ptr =
+      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", *structure);
+  BasisSet& original = *basis_ptr;
+
+  // Test copy constructor
+  BasisSet copy_constructed(original);
+  EXPECT_TRUE(copy_constructed.has_auxiliary_basis_set());
+  EXPECT_EQ(original.get_auxiliary_basis_set()->get_name(),
+            copy_constructed.get_auxiliary_basis_set()->get_name());
+  EXPECT_EQ(original.get_auxiliary_basis_set()->get_num_shells(),
+            copy_constructed.get_auxiliary_basis_set()->get_num_shells());
+
+  // Test copy assignment
+  std::vector<Shell> other_shells;
+  other_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  BasisSet assigned("other", other_shells);
+  EXPECT_FALSE(assigned.has_auxiliary_basis_set());
+
+  assigned = original;
+  EXPECT_TRUE(assigned.has_auxiliary_basis_set());
+  EXPECT_EQ(original.get_auxiliary_basis_set()->get_name(),
+            assigned.get_auxiliary_basis_set()->get_name());
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisJSONSerialization) {
+  auto structure = testing::create_water_structure();
+
+  // Create basis with auxiliary via manual shells
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::P, std::vector{1.5}, std::vector{0.8}));
+  aux_shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{2.5}, std::vector{1.2}));
+  aux_shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("my-aux", aux_shells, *structure);
+
+  BasisSet basis("my-primary", shells, aux, *structure);
+
+  // In-memory JSON round-trip
+  auto json = basis.to_json();
+  EXPECT_TRUE(json.contains("auxiliary_basis_set"));
+
+  auto loaded = BasisSet::from_json(json);
+  EXPECT_TRUE(loaded->has_auxiliary_basis_set());
+  EXPECT_EQ("my-aux", loaded->get_auxiliary_basis_set()->get_name());
+  EXPECT_EQ(4u, loaded->get_auxiliary_basis_set()->get_num_shells());
+
+  // File-based JSON round-trip
+  std::string filename = "test_aux.basis_set.json";
+  basis.to_json_file(filename);
+  auto loaded_file = BasisSet::from_json_file(filename);
+  EXPECT_TRUE(loaded_file->has_auxiliary_basis_set());
+  EXPECT_EQ("my-aux", loaded_file->get_auxiliary_basis_set()->get_name());
+  std::filesystem::remove(filename);
+
+  // Test without auxiliary (ensure no crash)
+  BasisSet no_aux("no-aux", shells, *structure);
+  auto json_no_aux = no_aux.to_json();
+  auto loaded_no_aux = BasisSet::from_json(json_no_aux);
+  EXPECT_FALSE(loaded_no_aux->has_auxiliary_basis_set());
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisHDF5Serialization) {
+  auto structure = testing::create_water_structure();
+
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+  shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
+
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  aux_shells.emplace_back(
+      Shell(1, OrbitalType::S, std::vector{2.5}, std::vector{1.2}));
+  aux_shells.emplace_back(
+      Shell(2, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("hdf5-aux", aux_shells, *structure);
+
+  BasisSet basis("hdf5-primary", shells, aux, *structure);
+
+  std::string filename = "test_aux.basis_set.h5";
+  basis.to_hdf5_file(filename);
+
+  auto loaded = BasisSet::from_hdf5_file(filename);
+  EXPECT_TRUE(loaded->has_auxiliary_basis_set());
+  EXPECT_EQ("hdf5-aux", loaded->get_auxiliary_basis_set()->get_name());
+  EXPECT_EQ(3u, loaded->get_auxiliary_basis_set()->get_num_shells());
+
+  std::filesystem::remove(filename);
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisSummary) {
+  std::vector<Shell> shells;
+  shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+
+  BasisSet basis("primary", shells);
+
+  // Set auxiliary
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
+  auto aux = std::make_shared<BasisSet>("my-aux-basis", aux_shells);
+  basis.set_auxiliary_basis_set(aux);
+
+  std::string summary = basis.get_summary();
+  EXPECT_FALSE(summary.empty());
+  // Summary should mention the auxiliary basis set
+  EXPECT_NE(std::string::npos, summary.find("Auxiliary"));
+}
+
+TEST_F(BasisSetTest, FromBasisNameWithAuxSCFComparison) {
+  // Verify that from_basis_name with aux produces a valid basis
+  // by comparing it against from_basis_name without aux
+  auto structure = testing::create_water_structure();
+
+  auto basis_no_aux = BasisSet::from_basis_name("def2-svp", *structure);
+  auto basis_with_aux =
+      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", *structure);
+
+  // Primary basis should match
+  EXPECT_EQ(basis_no_aux->get_name(), basis_with_aux->get_name());
+  EXPECT_EQ(basis_no_aux->get_num_shells(), basis_with_aux->get_num_shells());
+  EXPECT_EQ(basis_no_aux->get_num_atomic_orbitals(),
+            basis_with_aux->get_num_atomic_orbitals());
+
+  // Only the version with aux should have auxiliary
+  EXPECT_FALSE(basis_no_aux->has_auxiliary_basis_set());
+  EXPECT_TRUE(basis_with_aux->has_auxiliary_basis_set());
 }
