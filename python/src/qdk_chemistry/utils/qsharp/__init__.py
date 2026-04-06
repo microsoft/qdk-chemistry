@@ -18,7 +18,7 @@ __all__ = ["QSHARP_UTILS"]
 # Initialize Q# interpreter
 qdk_config = get_qdk_profile_config()
 _QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
-if _QDK_INTERPRETER_PROFILE != "adaptive_rif":  # Default by Q# if not set
+if _QDK_INTERPRETER_PROFILE != "adaptive_rif":
     target_profile = qsharp.TargetProfile.Adaptive_RIF
     _QDK_INTERPRETER_PROFILE = str(target_profile)
     Logger.debug(
