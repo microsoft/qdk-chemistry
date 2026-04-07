@@ -67,6 +67,7 @@ Composable, Extensible Architecture
    :maxdepth: 1
    :caption:  Supporting Information
 
+   release-notes/index
    changelog
    glossary
    references

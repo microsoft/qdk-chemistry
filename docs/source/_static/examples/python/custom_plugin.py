@@ -34,8 +34,8 @@ class CustomScfSettings(ElectronicStructureSettings):
 
 ################################################################################
 # start-cell-custom-scf-solver
-from qdk_chemistry.algorithms import ScfSolver  # noqa: E402
-from qdk_chemistry.data import (  # noqa: E402
+from qdk_chemistry.algorithms import ScfSolver
+from qdk_chemistry.data import (
     BasisSet,
     Orbitals,
     Structure,
@@ -96,7 +96,7 @@ class CustomScfSolver(ScfSolver):
 
 ################################################################################
 # start-cell-registration
-from qdk_chemistry.algorithms.registry import register  # noqa: E402
+from qdk_chemistry.algorithms.registry import register
 
 # Registration during module import
 register(lambda: CustomScfSolver())
@@ -105,8 +105,8 @@ register(lambda: CustomScfSolver())
 
 ################################################################################
 # start-cell-usage-after-registration
-from qdk_chemistry.algorithms import available, create  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.data import Structure
 
 # Define a molecular structure (e.g., H2 molecule)
 coords = [[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]]
@@ -125,7 +125,7 @@ print(available("scf_solver"))  # [..., 'custom']
 
 ################################################################################
 # start-cell-geometry-settings
-from qdk_chemistry.data import Settings  # noqa: E402
+from qdk_chemistry.data import Settings
 
 
 class GeometryOptimizerSettings(Settings):
@@ -147,7 +147,7 @@ class GeometryOptimizerSettings(Settings):
 
 ################################################################################
 # start-cell-geometry-base-class
-from qdk_chemistry.algorithms.base import Algorithm  # noqa: E402
+from qdk_chemistry.algorithms.base import Algorithm
 
 
 class GeometryOptimizer(Algorithm):
@@ -162,7 +162,7 @@ class GeometryOptimizer(Algorithm):
 
 ################################################################################
 # start-cell-geometry-factory
-from qdk_chemistry.algorithms.base import AlgorithmFactory  # noqa: E402
+from qdk_chemistry.algorithms.base import AlgorithmFactory
 
 
 class GeometryOptimizerFactory(AlgorithmFactory):
@@ -180,7 +180,7 @@ class GeometryOptimizerFactory(AlgorithmFactory):
 
 ################################################################################
 # start-cell-geometry-implementations
-from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.data import Structure
 
 
 class BfgsOptimizer(GeometryOptimizer):
@@ -231,7 +231,7 @@ class SteepestDescentOptimizer(GeometryOptimizer):
 
 ################################################################################
 # start-cell-geometry-registration
-import qdk_chemistry.algorithms as algorithms  # noqa: E402
+import qdk_chemistry.algorithms as algorithms
 
 # Register the factory
 algorithms.registry.register_factory(GeometryOptimizerFactory())
@@ -244,7 +244,7 @@ algorithms.register(lambda: SteepestDescentOptimizer())
 
 ################################################################################
 # start-cell-geometry-usage
-from qdk_chemistry.algorithms import available, create  # noqa: E402
+from qdk_chemistry.algorithms import available, create
 
 # List available implementations
 print(available("geometry_optimizer"))  # ['bfgs', 'steepest_descent']

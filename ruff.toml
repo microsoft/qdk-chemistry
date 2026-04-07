@@ -1,0 +1,16 @@
+# Root-level ruff overrides for files outside the Python package.
+# The primary ruff configuration lives in python/pyproject.toml and applies
+# automatically to files under python/.
+#
+# This file only relaxes lint rules for documentation example scripts so they
+# don't need inline `# noqa` comments.
+
+[lint.per-file-ignores]
+"docs/source/_static/examples/**/*.py" = [
+  "E402",  # Module-level import not at top of file (literate scripts)
+  "F821",  # Undefined name (cross-section references)
+]
+"examples/**/*.py" = [
+  "E402",
+  "F821",
+]
