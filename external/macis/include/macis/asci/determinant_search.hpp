@@ -512,7 +512,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   auto gen_c_st = clock_type::now();
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha, total_workers * 1000);
+      uniq_alpha, total_workers);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
   logger->info("  * NCONSTRAINTS = {}, GEN_DUR = {:.2e} ms", constraints.size(),
@@ -586,10 +586,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
       // Atomically get the next task ID and increment for other
       // MPI ranks and threads
-      // size_t ntake = ic < asci_settings.nxtval_bcount_thresh
-      //                    ? 1
-      //                    : asci_settings.nxtval_bcount_inc;
-      size_t ntake = 1;
+      size_t ntake = ic < asci_settings.nxtval_bcount_thresh
+                         ? 1
+                         : asci_settings.nxtval_bcount_inc;
       ic = nxtval.fetch_add(ntake);
 
       // Loop over assigned tasks
