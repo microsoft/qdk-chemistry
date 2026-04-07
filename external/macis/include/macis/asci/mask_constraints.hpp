@@ -830,8 +830,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   size_t total_work =
       std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
                       [](auto s, const auto& p) { return s + p.second; });
-  size_t local_average = total_work / world_size;
-  if (local_average == 0) local_average = 1;
+  size_t local_average = std::max(1ul, total_work / world_size);
 
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
@@ -946,11 +945,11 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     // Select constraints larger than average to be broken apart
     std::vector<std::pair<constraint_type, size_t>> tps_to_next;
     {
+      // Constraints with C_min == 0 cannot be further decomposed.
+      // Keep them in-place even when they exceed local_average.
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(),
           [=](const auto& a) {
-            // Constraints with C_min == 0 cannot be further decomposed.
-            // Keep them in-place even when they exceed local_average.
             return a.second <= local_average or a.first.C_min() == 0 or a.first.C_min() == 1;
           });
 
@@ -993,8 +992,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     total_work = std::accumulate(
         constraint_sizes.begin(), constraint_sizes.end(), 0ul,
         [](auto s, const auto& p) { return s + p.second; });
-    local_average = total_work / world_size;
-    if (local_average == 0) local_average = 1;
+    local_average = std::max(1ul, total_work / world_size);
 
     if (cgen_logger) {
       size_t max_w = 0;

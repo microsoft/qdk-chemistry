@@ -690,11 +690,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
                            accumulated_pairs.end(), contrib_cmp);
           const double threshold =
               std::abs(accumulated_pairs[cutoff_idx].rv());
-          // Keep all contributions tied at the cutoff so equal-|rv| entries
-          // survive trimming
+          // Repartition only the tail so entries tied at the cutoff are moved
+          // directly behind the nth position before trimming.
           auto new_end = std::partition(
-              accumulated_pairs.begin(), accumulated_pairs.end(),
-              [threshold](const auto& contrib) {
+              accumulated_pairs.begin() + cutoff_idx + 1,
+              accumulated_pairs.end(), [threshold](const auto& contrib) {
                 return std::abs(contrib.rv()) >= threshold;
               });
           accumulated_pairs.erase(new_end, accumulated_pairs.end());
