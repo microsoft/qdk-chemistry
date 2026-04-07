@@ -60,10 +60,11 @@ class HadamardTest(Algorithm):
         self,
         state_preparation_circuit: Circuit,
         time_evolution_unitary: TimeEvolutionUnitary,
+        shots: int,
+        unitary_power: int,
         mapper_type: str = "pauli_sequence",
-        unitary_power: int = 1,
         simulator_type: str = "qdk_full_state_simulator",
-        shots: int = 1,
+        simulator_seed: int = 42,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
     ) -> CircuitExecutorData:
         r"""Run the Hadamard test by building and executing a backend-specific circuit.
@@ -71,10 +72,11 @@ class HadamardTest(Algorithm):
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             time_evolution_unitary: Time evolution unitary :math:`\exp(-i H \Delta t)`.
-            mapper_type: Algorithm name for controlled evolution circuit mapper.
-            unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`.
-            simulator_type: Algorithm name for the circuit executor.
             shots: Number of shots to execute the circuit.
+            unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`.
+            mapper_type: Algorithm name for controlled evolution circuit mapper.
+            simulator_type: Algorithm name for the circuit executor.
+            simulator_seed: Random seed used by the circuit executor for reproducible sampling.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
                 or ``HadamardTestBasis.Z``).
 
@@ -95,6 +97,8 @@ class HadamardTest(Algorithm):
             raise ValueError("unitary_power must be a positive integer.")
         if not isinstance(simulator_type, str) or not simulator_type:
             raise TypeError("simulator_type must be a non-empty string.")
+        if not isinstance(simulator_seed, int):
+            raise TypeError("simulator_seed must be an integer.")
         if not isinstance(shots, int):
             raise TypeError("shots must be an integer.")
         if shots <= 0:
@@ -129,6 +133,7 @@ class HadamardTest(Algorithm):
             raise ValueError(f"Unknown simulator type: {simulator_type}.") from err
         if not isinstance(simulator, CircuitExecutor):
             raise TypeError("simulator_type did not resolve to a CircuitExecutor.")
+        simulator.settings().update("seed", simulator_seed)
 
         return simulator.run(circuit, shots=shots)
 
