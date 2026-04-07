@@ -8,18 +8,20 @@
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 from qdk_chemistry.utils.binary_encoding import (
     BinaryEncodingSynthesizer,
     MatrixCompressionType,
-    NotRrefError,
-    RrefTableau,
+    NotRefError,
+    RefTableau,
     _bits_to_int,
-    _check_rref,
+    _check_ref,
     _dense_qubits_size,
     _int_to_bits,
-    _is_diagonal_reduction_shape,
     _lookup_select,
 )
+
+from .test_helpers import create_random_bitstring_matrix
 
 
 class TestDenseQubitsSize:
@@ -87,67 +89,49 @@ class TestBitsToInt:
             assert _bits_to_int(_int_to_bits(val, 4)) == val
 
 
-class TestCheckRref:
-    """Tests for _check_rref RREF validation."""
+class TestCheckRef:
+    """Tests for _check_ref REF validation."""
 
-    def test_identity_is_rref(self):
-        """Identity matrix is a valid RREF."""
-        _check_rref(np.eye(3, dtype=np.int8))
+    def test_identity_is_ref(self):
+        """Identity matrix is a valid REF."""
+        _check_ref(np.eye(3, dtype=np.int8))
 
-    def test_valid_rref_non_square(self):
-        """Non-square matrix with trailing zero row is valid RREF."""
+    def test_valid_ref_non_square(self):
+        """Non-square matrix with trailing zero row is valid REF."""
         mat = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 0, 0]], dtype=np.int8)
-        _check_rref(mat)
+        _check_ref(mat)
 
-    def test_valid_rref_with_trailing_zeros(self):
-        """RREF with a trailing all-zero row is accepted."""
+    def test_valid_ref_with_trailing_zeros(self):
+        """REF with a trailing all-zero row is accepted."""
         mat = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 0]], dtype=np.int8)
-        _check_rref(mat)
+        _check_ref(mat)
+
+    def test_valid_ref_upper_triangular(self):
+        """REF matrix with entries above the diagonal is accepted."""
+        mat = np.array([[1, 1], [0, 1]], dtype=np.int8)
+        _check_ref(mat)
 
     def test_empty_matrix(self):
-        """All-zero matrix is trivially in RREF."""
-        _check_rref(np.zeros((3, 3), dtype=np.int8))
+        """All-zero matrix is trivially in REF."""
+        _check_ref(np.zeros((3, 3), dtype=np.int8))
 
-    def test_non_rref_pivots_not_increasing(self):
+    def test_non_ref_pivots_not_increasing(self):
         """Pivots must appear in strictly increasing column order."""
         mat = np.array([[0, 1, 0], [1, 0, 0], [0, 0, 1]], dtype=np.int8)
-        with pytest.raises(NotRrefError, match="not strictly to the right"):
-            _check_rref(mat)
+        with pytest.raises(NotRefError, match="not strictly to the right"):
+            _check_ref(mat)
 
-    def test_non_rref_pivot_col_not_unique(self):
-        """Pivot column with two non-zero entries is rejected."""
-        mat = np.array([[1, 0], [1, 1]], dtype=np.int8)
-        with pytest.raises(NotRrefError, match="non-zero entries"):
-            _check_rref(mat)
-
-    def test_non_rref_nonzero_after_zero_row(self):
+    def test_non_ref_nonzero_after_zero_row(self):
         """Non-zero row appearing after an all-zero row is rejected."""
         mat = np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1]], dtype=np.int8)
-        with pytest.raises(NotRrefError, match="after an all-zero row"):
-            _check_rref(mat)
+        with pytest.raises(NotRefError, match="after an all-zero row"):
+            _check_ref(mat)
 
 
-class TestIsDiagonalReductionShape:
-    """Tests for _is_diagonal_reduction_shape."""
+class TestRefTableau:
+    """Tests for RefTableau construction and gate operations."""
 
-    def test_identity_is_not_staircase(self):
-        """Identity matrix has no upper-triangular fill, so it is not staircase."""
-        assert not _is_diagonal_reduction_shape(np.eye(3, dtype=np.int8))
-
-    def test_upper_triangular_ones(self):
-        """Upper-triangular matrix with fill above the diagonal is staircase."""
-        mat = np.array([[1, 1, 1], [0, 1, 1], [0, 0, 1]], dtype=np.int8)
-        assert _is_diagonal_reduction_shape(mat)
-
-    def test_all_zeros(self):
-        """All-zero matrix is not staircase-shaped."""
-        assert not _is_diagonal_reduction_shape(np.zeros((3, 3), dtype=np.int8))
-
-
-class TestRrefTableau:
-    """Tests for RrefTableau construction and gate operations."""
-
-    def _make_rref(self, n_pivots: int, n_extra_cols: int) -> RrefTableau:
+    def _make_ref(self, n_pivots: int, n_extra_cols: int) -> RefTableau:
         """Build a realistic RREF tableau with fill in non-pivot columns.
 
         The pivot block is an identity matrix.  Non-pivot columns get
@@ -159,7 +143,7 @@ class TestRrefTableau:
             n_extra_cols: Additional non-pivot columns to add after the pivots.
 
         Returns:
-            RrefTableau with the specified shape and pivot structure.
+            RefTableau with the specified shape and pivot structure.
 
         """
         num_cols = n_pivots + n_extra_cols
@@ -170,25 +154,25 @@ class TestRrefTableau:
         for c in range(n_pivots, num_cols):
             for r in range(n_pivots):
                 mat[r, c] = (r + c) % 2
-        return RrefTableau(mat)
+        return RefTableau(mat)
 
     def test_construction_from_rref(self):
         """Valid RREF matrix produces a tableau with correct dimensions and pivots."""
-        t = self._make_rref(3, 2)
+        t = self._make_ref(3, 2)
         assert t.num_rows == 4
         assert t.num_cols == 5
         assert t.dense_size == _dense_qubits_size(5)
         assert len(t.pivots) == 3
 
-    def test_construction_rejects_non_rref(self):
-        """Non-RREF matrix must raise NotRrefError."""
+    def test_construction_rejects_non_ref(self):
+        """Non-REF matrix must raise NotRefError."""
         mat = np.array([[0, 1], [1, 0]], dtype=np.int8)
-        with pytest.raises(NotRrefError):
-            RrefTableau(mat)
+        with pytest.raises(NotRefError):
+            RefTableau(mat)
 
     def test_get_and_get_col(self):
         """Element access and column extraction return correct values."""
-        t = self._make_rref(3, 0)
+        t = self._make_ref(3, 0)
         assert t.get(0, 0) is True
         assert t.get(0, 1) is False
         col = t.get_col(1)
@@ -196,54 +180,54 @@ class TestRrefTableau:
 
     def test_row_is_zero(self):
         """Pivot rows are non-zero; trailing rows below rank are zero."""
-        t = self._make_rref(3, 2)
+        t = self._make_ref(3, 2)
         assert not t.row_is_zero(0)
         assert not t.row_is_zero(2)
         assert t.row_is_zero(t.num_rows - 1)
 
     def test_cx_operation(self):
         """CX XORs the control row into the target row."""
-        t = self._make_rref(3, 0)
+        t = self._make_ref(3, 0)
         t.cx(0, 1)
         np.testing.assert_array_equal(t.data[1], [1, 1, 0])
         np.testing.assert_array_equal(t.data[0], [1, 0, 0])
 
     def test_swap_operation(self):
         """SWAP exchanges two rows."""
-        t = self._make_rref(3, 0)
+        t = self._make_ref(3, 0)
         t.swap(0, 2)
         np.testing.assert_array_equal(t.data[0], [0, 0, 1])
         np.testing.assert_array_equal(t.data[2], [1, 0, 0])
 
     def test_x_operation(self):
         """X flips every bit in the target row."""
-        t = self._make_rref(3, 0)
+        t = self._make_ref(3, 0)
         t.x(0)
         np.testing.assert_array_equal(t.data[0], [0, 1, 1])
 
     def test_toffoli_both_positive(self):
         """Toffoli with both controls positive ANDs the two rows into the target."""
         mat = np.array([[1, 0, 1, 1], [0, 1, 1, 0], [0, 0, 0, 0]], dtype=np.int8)
-        t = RrefTableau(mat)
+        t = RefTableau(mat)
         t.toffoli(2, (0, True), (1, True))
         np.testing.assert_array_equal(t.data[2], [0, 0, 1, 0])
 
     def test_toffoli_negative_control(self):
         """Toffoli with a negated control ANDs row0 with ~row1 into the target."""
         mat = np.array([[1, 0, 1, 1], [0, 1, 1, 0], [0, 0, 0, 0]], dtype=np.int8)
-        t = RrefTableau(mat)
+        t = RefTableau(mat)
         t.toffoli(2, (0, True), (1, False))
         np.testing.assert_array_equal(t.data[2], [1, 0, 0, 1])
 
     def test_identify_rref_pivots(self):
         """Pivot detection returns (row, col) pairs for each leading 1."""
         mat = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 0, 0]], dtype=np.int8)
-        t = RrefTableau(mat)
+        t = RefTableau(mat)
         assert t.pivots == [(0, 0), (1, 1)]
 
     def test_permute_columns(self):
         """Column permutation reorders all rows accordingly."""
-        t = self._make_rref(3, 0)
+        t = self._make_ref(3, 0)
         t.permute_columns([2, 1, 0])
         np.testing.assert_array_equal(t.data[0], [0, 0, 1])
         np.testing.assert_array_equal(t.data[2], [1, 0, 0])
@@ -259,7 +243,7 @@ class TestRrefTableau:
             ],
             dtype=np.int8,
         )
-        t = RrefTableau(mat)
+        t = RefTableau(mat)
         # Fixed control: row 0 must be 1
         t.toffoli_pui_fixed([(0, True)])
         # _tmp_row should be row0 = [1, 0, 1, 0]
@@ -282,10 +266,10 @@ class TestBinaryEncodingSynthesizerBasic:
         assert synth.dense_size == _dense_qubits_size(4)
         assert len(synth.bijection) == 4
 
-    def test_from_matrix_rejects_non_rref(self):
-        """Non-RREF input must raise NotRrefError."""
+    def test_from_matrix_rejects_non_ref(self):
+        """Non-REF input must raise NotRefError."""
         mat = np.array([[0, 1], [1, 0]], dtype=np.int8)
-        with pytest.raises(NotRrefError):
+        with pytest.raises(NotRefError):
             BinaryEncodingSynthesizer.from_matrix(mat)
 
     def test_max_batch_size_power_of_two(self):
@@ -294,7 +278,7 @@ class TestBinaryEncodingSynthesizerBasic:
             [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
             dtype=np.int8,
         )
-        synth = BinaryEncodingSynthesizer(RrefTableau(mat))
+        synth = BinaryEncodingSynthesizer(RefTableau(mat))
         mbs = synth.max_batch_size()
         assert mbs > 0
         assert mbs & (mbs - 1) == 0  # power of two
@@ -478,6 +462,84 @@ class TestBinaryEncodingSynthesizerCircuit:
         first_operation_type = synth.circuit[0][0]
         assert first_operation_type in (MatrixCompressionType.CX, MatrixCompressionType.X)
 
+    @pytest.mark.parametrize(
+        ("n_electrons", "n_orbitals", "n_dets", "seed"),
+        [
+            (6, 6, 5, 42),
+            (8, 10, 20, 99),
+            (10, 15, 30, 13),
+            (14, 20, 50, 0),
+        ],
+        ids=["6e6o_5det", "8e10o_20det", "10e15o_30det", "14e20o_50det"],
+    )
+    def test_gf2x_forward_only_fewer_cx_than_rref(self, n_electrons, n_orbitals, n_dets, seed):
+        """Test forward_only produces fewer CX than RREF."""
+        raw_matrix = create_random_bitstring_matrix(
+            n_electrons=n_electrons, n_orbitals=n_orbitals, n_dets=n_dets, seed=seed
+        )
+
+        # --- RREF path ---
+        rref_result = gf2x_with_tracking(raw_matrix, skip_diagonal_reduction=True)
+        rref_tableau = RefTableau(rref_result.reduced_matrix)
+        rref_synth = BinaryEncodingSynthesizer(rref_tableau)
+        rank, _ = rref_synth._permute_columns_pivots_first()
+        rref_synth._apply_unary_staircase(rank)
+        rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
+        assert rref_cx == rank * (rank - 1) // 2
+
+        # --- REF path ---
+        ref_result = gf2x_with_tracking(raw_matrix, forward_only=True)
+        ref_tableau = RefTableau(ref_result.reduced_matrix)
+        ref_synth = BinaryEncodingSynthesizer(ref_tableau)
+        rank_s, _ = ref_synth._permute_columns_pivots_first()
+        ref_synth._apply_unary_staircase(rank_s)
+        ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
+        assert ref_cx < rref_cx
+
+    @pytest.mark.parametrize(
+        ("n_electrons", "n_orbitals", "n_dets", "seed"),
+        [
+            (6, 6, 5, 42),
+            (8, 10, 20, 99),
+            (10, 15, 30, 13),
+            (14, 20, 50, 0),
+        ],
+        ids=["6e6o_5det", "8e10o_20det", "10e15o_30det", "14e20o_50det"],
+    )
+    def test_stage1_forward_only_fewer_cx_than_rref(self, n_electrons, n_orbitals, n_dets, seed):
+        """Full stage 1 (staircase + binary compression) emits fewer CX for REF than RREF."""
+        raw_matrix = create_random_bitstring_matrix(
+            n_electrons=n_electrons, n_orbitals=n_orbitals, n_dets=n_dets, seed=seed
+        )
+
+        # --- RREF path ---
+        rref_result = gf2x_with_tracking(raw_matrix, skip_diagonal_reduction=True)
+        rref_tableau = RefTableau(rref_result.reduced_matrix)
+        rref_synth = BinaryEncodingSynthesizer(rref_tableau)
+        rank, _ = rref_synth._permute_columns_pivots_first()
+        rref_synth._run_stage1_diagonal_encoding(rank)
+        rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
+        rref_x = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.X)
+
+        # --- REF path ---
+        ref_result = gf2x_with_tracking(raw_matrix, forward_only=True)
+        ref_tableau = RefTableau(ref_result.reduced_matrix)
+        ref_synth = BinaryEncodingSynthesizer(ref_tableau)
+        rank_s, _ = ref_synth._permute_columns_pivots_first()
+        ref_synth._run_stage1_diagonal_encoding(rank_s)
+        ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
+        ref_x = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.X)
+
+        assert ref_cx < rref_cx
+        assert ref_x == rref_x
+
+        # After stage 1 the pivot block should be identical regardless of input form
+        assert rank == rank_s
+        assert np.array_equal(
+            rref_synth.tableau.data[:, :rank],
+            ref_synth.tableau.data[:, :rank],
+        )
+
 
 class TestBinaryEncodingSynthesizerReplay:
     """Verify that replaying the circuit on the original matrix produces the final tableau."""
@@ -491,7 +553,7 @@ class TestBinaryEncodingSynthesizerReplay:
         synth = BinaryEncodingSynthesizer.from_matrix(mat)
 
         # Reconstruct by creating a fresh tableau and replaying
-        replay = RrefTableau(mat.copy())
+        replay = RefTableau(mat.copy())
 
         # Permute columns the same way the solver did
         pivot_cols = [p[1] for p in replay.pivots]

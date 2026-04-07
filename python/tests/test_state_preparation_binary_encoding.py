@@ -13,78 +13,12 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncodingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import _encode_gf2x_ops_for_qs
-from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration, Wavefunction
+from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import create_test_orbitals
-
-
-def _hf_determinant(n_alpha: int, n_beta: int, n_orbitals: int) -> np.ndarray:
-    """Build the Hartree-Fock reference determinant [alpha|beta]."""
-    det = np.zeros(2 * n_orbitals, dtype=np.int8)
-    det[:n_alpha] = 1
-    det[n_orbitals : n_orbitals + n_beta] = 1
-    return det
-
-
-def _random_excitation(det: np.ndarray, n_orbitals: int, rng: np.random.Generator) -> np.ndarray | None:
-    """Apply a random excitation independently in alpha and beta channels."""
-    new_det = det.copy()
-    for channel_start in (0, n_orbitals):
-        channel = det[channel_start : channel_start + n_orbitals]
-        occupied = np.where(channel == 1)[0]
-        virtual = np.where(channel == 0)[0]
-        if len(occupied) == 0 or len(virtual) == 0:
-            continue
-        order = rng.integers(0, min(len(occupied), len(virtual)) + 1)
-        if order == 0:
-            continue
-        occ = rng.choice(occupied, size=order, replace=False)
-        vir = rng.choice(virtual, size=order, replace=False)
-        new_det[channel_start + occ] = 0
-        new_det[channel_start + vir] = 1
-    return None if np.array_equal(new_det, det) else new_det
-
-
-def _determinants_to_configs(matrix: np.ndarray, n_orbitals: int) -> list[str]:
-    """Convert (n_dets, 2*n_orbitals) occupation matrix to config strings."""
-    mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}
-    return ["".join(mapping[int(row[i]), int(row[n_orbitals + i])] for i in range(n_orbitals)) for row in matrix]
-
-
-def _generate_random_wavefunction(
-    n_electrons: int,
-    n_orbitals: int,
-    n_dets: int,
-    seed: int = 0,
-) -> Wavefunction:
-    """Generate a random normalised Wavefunction for testing."""
-    n_alpha = n_electrons // 2
-    n_beta = n_electrons - n_alpha
-    rng = np.random.default_rng(seed)
-    hf = _hf_determinant(n_alpha, n_beta, n_orbitals)
-
-    seen: set[bytes] = {hf.tobytes()}
-    dets = [hf]
-    for _ in range(n_dets * 200):
-        if len(dets) >= n_dets:
-            break
-        exc = _random_excitation(hf, n_orbitals, rng)
-        if exc is not None and exc.tobytes() not in seen:
-            seen.add(exc.tobytes())
-            dets.append(exc)
-
-    det_matrix = np.array(dets, dtype=np.int8)
-    configs = [Configuration(s) for s in _determinants_to_configs(det_matrix, n_orbitals)]
-
-    coeff_rng = np.random.default_rng(seed)
-    raw = coeff_rng.standard_normal(n_dets)
-    coeffs = raw / np.linalg.norm(raw)
-
-    orbitals = create_test_orbitals(n_orbitals)
-    return Wavefunction(CasWavefunctionContainer(coeffs, configs, orbitals))
+from .test_helpers import create_random_wavefunction
 
 
 def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
@@ -106,7 +40,7 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
 
     n_system = len(bitstrings[0])
     matrix = np.array([[int(b) for b in bs] for bs in bitstrings], dtype=np.int8).T
-    gf2x_result = gf2x_with_tracking(matrix, skip_diagonal_reduction=True, staircase_mode=True)
+    gf2x_result = gf2x_with_tracking(matrix, skip_diagonal_reduction=True, forward_only=True)
 
     synthesizer = BinaryEncodingSynthesizer.from_matrix(gf2x_result.reduced_matrix)
     ops = synthesizer.to_gf2x_operations(
@@ -191,7 +125,7 @@ class TestSparseIsometryBinaryEncoding:
         The expected qubit count is decomposed into system qubits (from the
         matrix dimensions) and ancilla qubits (from the compiled Q# circuit).
         """
-        wf = _generate_random_wavefunction(
+        wf = create_random_wavefunction(
             n_electrons=n_electrons,
             n_orbitals=n_orbitals,
             n_dets=n_dets,
@@ -247,7 +181,7 @@ class TestSparseIsometryBinaryEncoding:
 
         from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
 
-        wf = _generate_random_wavefunction(
+        wf = create_random_wavefunction(
             n_electrons=n_electrons,
             n_orbitals=n_orbitals,
             n_dets=n_dets,

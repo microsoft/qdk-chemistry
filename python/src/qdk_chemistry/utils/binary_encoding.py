@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 __all__ = [
     "BinaryEncodingSynthesizer",
     "MatrixCompressionType",
-    "NotRrefError",
-    "RrefTableau",
+    "NotRefError",
+    "RefTableau",
 ]
 
 
@@ -76,8 +76,8 @@ def _bits_to_int(bits: Iterable[int | bool]) -> int:
     return sum(int(b) << i for i, b in enumerate(reversed(list(bits))))
 
 
-class NotRrefError(ValueError):
-    """Raised when a matrix is not in reduced row echelon form (RREF)."""
+class NotRefError(ValueError):
+    """Raised when a matrix is not in row echelon form (REF)."""
 
 
 class MatrixCompressionType(Enum):
@@ -90,43 +90,18 @@ class MatrixCompressionType(Enum):
     X = "x"
 
 
-def _is_diagonal_reduction_shape(data: np.ndarray) -> bool:
-    """Return True when the pivot sub-matrix is already upper-staircase.
+def _check_ref(data: np.ndarray) -> None:
+    """Validate that a binary matrix is in row echelon form (REF).
 
-    Args:
-        data: Binary matrix to check.
-
-    Returns:
-        True if the pivot sub-matrix is upper-triangular with all 1s, False otherwise.
-
-    """
-    row_norms = np.any(data, axis=1)
-    effective_rows = int(row_norms.sum()) if row_norms.any() else 0
-    if effective_rows == 0:
-        return False
-
-    # Identify pivot columns (leftmost 1 in each non-zero row)
-    pivot_cols: list[int] = []
-    for r in range(effective_rows):
-        nz = np.flatnonzero(data[r])
-        if nz.size == 0:
-            return False
-        pivot_cols.append(int(nz[0]))
-
-    # Check that pivot sub-matrix is upper-triangular with all 1s
-    pivot_submatrix = data[np.ix_(range(effective_rows), pivot_cols)]
-    expected = np.triu(np.ones((effective_rows, effective_rows), dtype=np.int8))
-    return bool(np.array_equal(pivot_submatrix, expected))
-
-
-def _check_rref(data: np.ndarray) -> None:
-    """Validate that a binary matrix is in reduced row echelon form.
+    REF requires non-zero rows to appear before any all-zero rows and each
+    row's leading 1 (pivot) to be strictly to the right of the pivot above.
+    Unlike RREF, pivot columns may have multiple non-zero entries.
 
     Args:
         data: Binary matrix to validate.
 
     Raises:
-        NotRrefError: If *data* is not in RREF.
+        NotRefError: If *data* is not in REF.
 
     """
     num_rows, _ = data.shape
@@ -138,24 +113,21 @@ def _check_rref(data: np.ndarray) -> None:
             found_zero_row = True
             continue
         if found_zero_row:
-            raise NotRrefError(f"Non-zero row {row} appears after an all-zero row")
+            raise NotRefError(f"Non-zero row {row} appears after an all-zero row")
 
         pivot_col = int(nz[0])
         if pivot_col <= prev_pivot:
-            raise NotRrefError(
+            raise NotRefError(
                 f"Pivot at row {row}, col {pivot_col} is not strictly to the right of previous pivot col {prev_pivot}"
             )
-        col_sum = int(data[:, pivot_col].sum())
-        if col_sum != 1:
-            raise NotRrefError(f"Pivot column {pivot_col} has {col_sum} non-zero entries (expected 1)")
         prev_pivot = pivot_col
 
 
-class RrefTableau:
+class RefTableau:
     """Binary tableau for the batched sparse-isometry algorithm.
 
-    The input matrix must be in reduced row echelon form (RREF) or
-    upper-staircase diagonal-reduction shape.
+    The input matrix must be in row echelon form (REF), reduced row echelon
+    form (RREF), or upper-staircase diagonal-reduction shape.
 
     The tableau supports in-place updates via the compression operations.
     """
@@ -168,7 +140,7 @@ class RrefTableau:
                 basis states. Values are coerced to ``np.int8``.
 
         Raises:
-            NotRrefError: If ``data`` is neither in RREF nor in the accepted
+            NotRefError: If ``data`` is not in REF, RREF, or the accepted
                 upper-staircase diagonal-reduction form.
             AssertionError: If the matrix rank/size assumptions required by
                 the algorithm are violated.
@@ -177,9 +149,7 @@ class RrefTableau:
         self.data = np.asarray(data, dtype=np.int8)
         assert self.data.ndim == 2
 
-        self.is_diagonal_reduced = _is_diagonal_reduction_shape(self.data)
-        if not self.is_diagonal_reduced:
-            _check_rref(self.data)
+        _check_ref(self.data)
 
         self.num_rows, self.num_cols = self.data.shape
         self.dense_size = _dense_qubits_size(self.num_cols)
@@ -365,7 +335,7 @@ class BinaryEncodingSynthesizer:
 
     def __init__(
         self,
-        tableau: RrefTableau,
+        tableau: RefTableau,
         *,
         include_negative_controls: bool = True,
         measurement_based_uncompute: bool = False,
@@ -408,13 +378,13 @@ class BinaryEncodingSynthesizer:
     ) -> BinaryEncodingSynthesizer:
         """Create a synthesiser, run both stages, and return the solved instance.
 
-        This is the primary entry point.  It validates the input RREF matrix,
+        This is the primary entry point.  It validates the input matrix,
         executes the full two-stage synthesis, and returns the ready-to-export
         synthesiser.
 
         Args:
-            matrix: Binary (0/1) matrix in RREF or upper-staircase diagonal
-                form, shaped ``(num_qubits, num_determinants)``.
+            matrix: Binary (0/1) matrix in REF, RREF, or upper-staircase
+                diagonal form, shaped ``(num_qubits, num_determinants)``.
             include_negative_controls: If True, include both positive and
                 negative (0-valued) fixed controls in PUI blocks.  If False,
                 only positive (1-valued) controls are emitted.
@@ -426,11 +396,11 @@ class BinaryEncodingSynthesizer:
             A solved :class:`BinaryEncodingSynthesizer`.
 
         Raises:
-            NotRrefError: If *matrix* is not in valid RREF form.
+            NotRefError: If *matrix* is not in valid REF form.
 
         """
         synth = cls(
-            RrefTableau(matrix),
+            RefTableau(matrix),
             include_negative_controls=include_negative_controls,
             measurement_based_uncompute=measurement_based_uncompute,
         )
@@ -554,22 +524,29 @@ class BinaryEncodingSynthesizer:
             self.bijection.append((dense_val, c))
 
     def _apply_unary_staircase(self, rank: int) -> list[int]:
-        """Convert the identity block into an upper-staircase matrix.
+        """Convert the pivot block into an upper-staircase matrix.
 
-        For each pivot column c, apply CX from row c into every row above it,
-        then apply X to row 0 and SWAP to move the pivot row up to row c.
+        Inspects each above-diagonal entry in the pivot block (columns
+        0 … rank-1 after pivot permutation) and emits a CX to fill any
+        missing 1.  This handles RREF (identity), REF (upper-triangular),
+        and staircase (already filled) inputs uniformly.
+
+        Processing columns left-to-right ensures side effects on later
+        columns are absorbed when they are reached.
 
         Args:
-            rank: Number of pivot columns (size of the identity block).
+            rank: Number of pivot columns (size of the pivot block).
 
         Returns:
             List of logical row indices corresponding to the original pivot rows.
 
         """
         logical_rows = list(range(rank))
-        if not self.tableau.is_diagonal_reduced:
-            for i in range(rank - 2, -1, -1):
-                self._record((MatrixCompressionType.CX, (logical_rows[i + 1], logical_rows[i])))
+        # Fill above-diagonal 0s in the pivot block to reach upper-staircase
+        for j in range(1, rank):
+            for i in range(j):
+                if not self.tableau.data[logical_rows[i], j]:
+                    self._record((MatrixCompressionType.CX, (logical_rows[j], logical_rows[i])))
         self._record((MatrixCompressionType.X, (logical_rows[0],)))
         return logical_rows
 

@@ -119,7 +119,7 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         # binary encoding's stage-1 handles the identity pivot block natively;
         # the extra CX + X ops from diagonal reduction would be redundant.
         bitstring_matrix = self._bitstrings_to_binary_matrix(bitstrings)
-        gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, staircase_mode=True)
+        gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, forward_only=True)
 
         # Step 2: Binary encoding on the reduced RREF matrix
         binary_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
