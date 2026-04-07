@@ -168,9 +168,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.s(self._qubit(target))
 
-    def _on_qis_s_adj(
-        self, call: pyqir.Call, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_s_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply an S† (adjoint S) gate to the target qubit.
 
         Args:
@@ -190,9 +188,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.t(self._qubit(target))
 
-    def _on_qis_t_adj(
-        self, call: pyqir.Call, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_t_adj(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a T† (adjoint T) gate to the target qubit.
 
         Args:
@@ -206,9 +202,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Rotation gates
     # =========================================================================
 
-    def _on_qis_rx(
-        self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_rx(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a RX gate to the target qubit.
 
         Args:
@@ -219,9 +213,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.rx(self._angle(angle), self._qubit(target))
 
-    def _on_qis_ry(
-        self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_ry(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a RY gate to the target qubit.
 
         Args:
@@ -232,9 +224,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.ry(self._angle(angle), self._qubit(target))
 
-    def _on_qis_rz(
-        self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_rz(self, call: pyqir.Call, angle: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a RZ gate to the target qubit.
 
         Args:
@@ -249,9 +239,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Two-qubit gates
     # =========================================================================
 
-    def _on_qis_cx(
-        self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_cx(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a CX (CNOT) gate to the target qubit.
 
         Args:
@@ -262,9 +250,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.cx(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_cy(
-        self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_cy(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a CY gate to the target qubit.
 
         Args:
@@ -275,9 +261,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.cy(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_cz(
-        self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_cz(self, call: pyqir.Call, ctrl: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a CZ gate to the target qubit.
 
         Args:
@@ -288,9 +272,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.cz(self._qubit(ctrl), self._qubit(target))
 
-    def _on_qis_swap(
-        self, call: pyqir.Call, t1: pyqir.Value, t2: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_swap(self, call: pyqir.Call, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a SWAP gate to the target qubits.
 
         Args:
@@ -301,9 +283,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.swap(self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_rxx(
-        self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_rxx(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
         """Apply an RXX gate to the target qubits.
 
         Args:
@@ -315,9 +295,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.rxx(self._angle(angle), self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_ryy(
-        self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_ryy(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
         """Apply an RYY gate to the target qubits.
 
         Args:
@@ -329,9 +307,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.ryy(self._angle(angle), self._qubit(t1), self._qubit(t2))
 
-    def _on_qis_rzz(
-        self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_rzz(self, call: pyqir.Call, angle: pyqir.Value, t1: pyqir.Value, t2: pyqir.Value) -> None:  # noqa: ARG002
         """Apply an RZZ gate to the target qubits.
 
         Args:
@@ -347,9 +323,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Three-qubit gates
     # =========================================================================
 
-    def _on_qis_ccx(
-        self, call: pyqir.Call, c1: pyqir.Value, c2: pyqir.Value, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_ccx(self, call: pyqir.Call, c1: pyqir.Value, c2: pyqir.Value, target: pyqir.Value) -> None:  # noqa: ARG002
         """Apply a CCX (Toffoli) gate to the target qubit.
 
         Args:
@@ -365,9 +339,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
     # Measurement and reset
     # =========================================================================
 
-    def _on_qis_m(
-        self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_m(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
         """Measure the target qubit and store the result in the classical bit.
 
         Args:
@@ -378,9 +350,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.measure(self._qubit(target), self._clbit(result))
 
-    def _on_qis_mz(
-        self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_mz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
         """Measure the target qubit in the Z basis and store the result in the classical bit.
 
         Args:
@@ -391,9 +361,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         """
         self._circuit.measure(self._qubit(target), self._clbit(result))
 
-    def _on_qis_mresetz(
-        self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_mresetz(self, call: pyqir.Call, target: pyqir.Value, result: pyqir.Value) -> None:  # noqa: ARG002
         """Measure the target qubit in the Z basis, store the result in the classical bit, and reset the qubit.
 
         Args:
@@ -405,9 +373,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
         self._circuit.measure(self._qubit(target), self._clbit(result))
         self._circuit.reset(self._qubit(target))
 
-    def _on_qis_reset(
-        self, call: pyqir.Call, target: pyqir.Value
-    ) -> None:  # noqa: ARG002
+    def _on_qis_reset(self, call: pyqir.Call, target: pyqir.Value) -> None:  # noqa: ARG002
         """Reset the target qubit to the |0> state.
 
         Args:
@@ -423,9 +389,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
 
     def _on_qis_read_result(self) -> None:
         """Handle read_result operation, which is not supported in Qiskit."""
-        raise UnsupportedQIROperationError(
-            "read_result is not supported in Qiskit QuantumCircuit."
-        )
+        raise UnsupportedQIROperationError("read_result is not supported in Qiskit QuantumCircuit.")
 
 
 def qir_ir_to_qiskit(ir: str) -> QuantumCircuit:
