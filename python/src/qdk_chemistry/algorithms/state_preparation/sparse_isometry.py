@@ -45,7 +45,7 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = []
+__all__: list[str] = ["SparseIsometryGF2XStatePreparationSettings"]
 
 
 class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):

@@ -2,9 +2,8 @@
 
 This module implements a state preparation algorithm that combines GF2+X
 elimination with batched binary encoding.  Instead of delegating the reduced
-subspace to a dense state preparation routine (as the base
-:class:`SparseIsometryGF2XStatePreparation` does), this algorithm feeds the
-RREF matrix directly into the binary-encoding solver which synthesises the
+subspace to a dense state preparation routine, this algorithm feeds the
+REF matrix directly into the binary-encoding solver which synthesises the
 full circuit using batched Toffoli gates and Partial Unary Iteration (PUI)
 lookup blocks.
 """
@@ -32,6 +31,10 @@ from .sparse_isometry import (
     gf2x_with_tracking,
 )
 
+__all__ = [
+    "SparseIsometryBinaryEncodingSettings",
+]
+
 
 class SparseIsometryBinaryEncodingSettings(SparseIsometryGF2XStatePreparationSettings):
     """Settings for SparseIsometryBinaryEncodingStatePreparation."""
@@ -56,11 +59,10 @@ class SparseIsometryBinaryEncodingSettings(SparseIsometryGF2XStatePreparationSet
 class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePreparation):
     """State preparation using sparse isometry with binary encoding.
 
-    This class extends :class:`SparseIsometryGF2XStatePreparation` by replacing
+    This class extends sparse isometry with GF2+X elimination by replacing
     the dense state preparation step with a binary-encoding circuit synthesiser.
     After GF2+X elimination produces a reduced RREF matrix, the binary-encoding
-    synthesiser (:class:`~qdk_chemistry.algorithms.state_preparation.binary_encoding.BinaryEncodingSynthesizer`)
-    compresses the matrix into an efficient circuit using:
+    synthesiser compresses the matrix into an efficient circuit using:
 
         1. Stage 1 — diagonal (unary-to-binary) encoding of pivot columns
         2. Stage 2 — non-pivot column processing with batched PUI lookup blocks

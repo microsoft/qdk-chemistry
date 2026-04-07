@@ -1,11 +1,4 @@
-"""Binary encoding circuit synthesiser for RREF matrices.
-
-This module implements the "binary encoding" step of the GF2+X pipeline:
-given a reduced binary matrix (in RREF or upper-staircase diagonal form),
-it synthesises a circuit that compresses the sparse rows into a dense
-binary-counter register using batched Toffoli gates and Partial Unary
-Iteration (PUI) lookup blocks.
-"""
+"""Binary encoding circuit synthesiser for REF matrices."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -42,8 +35,7 @@ def _dense_qubits_size(num_cols: int) -> int:
         num_cols: Number of columns to index.
 
     Returns:
-        Number of qubits needed in the dense register to uniquely index all
-        columns.
+        Number of qubits needed in the dense register to uniquely index all columns.
 
     """
     return 1 if num_cols < 2 else math.ceil(math.log2(num_cols))
@@ -128,8 +120,8 @@ class RefTableau:
 
     The input matrix must be in row echelon form (REF), reduced row echelon
     form (RREF), or upper-staircase diagonal-reduction shape.
-
     The tableau supports in-place updates via the compression operations.
+
     """
 
     def __init__(self, data: np.ndarray):
@@ -331,6 +323,7 @@ class BinaryEncodingSynthesizer:
       a compact binary-counter register via a unary-to-binary ladder.
     * **Stage 2 — non-pivot processing**: encodes remaining columns using
       batched Toffoli gates and Partial Unary Iteration (PUI) lookup blocks.
+
     """
 
     def __init__(
@@ -1014,8 +1007,8 @@ class BinaryEncodingSynthesizer:
             rest_entries: Per-target offsets and changing controls.
 
         Returns:
-            ``(ops, and_count)`` where ``and_count`` is the
-            number of emitted ``and`` operations, used as a Toffoli-cost proxy.
+            ``(ops, and_count)`` where ``and_count`` is the number of
+            emitted ``and`` operations, used as a Toffoli-cost proxy.
 
         """
         if not rest_entries:
@@ -1054,13 +1047,13 @@ class BinaryEncodingSynthesizer:
 
         Args:
             fixed_controls: Initial list of fixed controls, as (row, value) pairs.
-            rest_entries: List of (offset, changing_controls) where changing_controls is a list of
-                (row, value) pairs that may differ between entries.
+            rest_entries: List of (offset, changing_controls) where changing_controls is
+                a list of (row, value) pairs that may differ between entries.
 
         Returns:
             Tuple of (new_fixed_controls, new_rest_entries)
-            where new_fixed_controls is the updated list of fixed controls and new_rest_entries
-            is the updated list of entries with promoted controls removed from changing_controls.
+                where new_fixed_controls is the updated list of fixed controls and new_rest_entries
+                is the updated list of entries with promoted controls removed from changing_controls.
 
         """
         if not rest_entries:
@@ -1153,8 +1146,7 @@ class BinaryEncodingSynthesizer:
             address_qubits: List of control rows that will serve as address bits for the lookup.
 
         Returns:
-            Mapping from address bit tuples to one-hot output tuples, with
-            all-zero outputs omitted.
+            Mapping from address bit tuples to one-hot output tuples, with all-zero outputs omitted.
 
         """
         n_outputs = len(rest_entries)
