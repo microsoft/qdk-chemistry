@@ -73,7 +73,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
 
         """
         # Use `qubit_id` on older pyqir instances
-        if pyqir.qubit_id:
+        if hasattr(pyqir, "qubit_id"):
             return pyqir.qubit_id(q)
         # Newer pyqir versions use the more generic `ptr_id` for both qubits and results
         return pyqir.ptr_id(q)
@@ -89,7 +89,7 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
 
         """
         # Use `result_id` on older pyqir instances
-        if pyqir.result_id:
+        if hasattr(pyqir, "result_id"):
             return pyqir.result_id(r)
         # Newer pyqir versions use the more generic `ptr_id` for both qubits and results
         return pyqir.ptr_id(r)
