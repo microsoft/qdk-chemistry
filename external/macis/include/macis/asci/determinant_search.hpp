@@ -667,8 +667,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
           size_t working_size_limit = ntdets;
           size_t working_pairs_size = working_pairs.size();
-          if (tid == 0 && i_alpha % 10 == 0)
-            logger->debug("  * thread {}, working_pairs_size = {} AT CON = {} IALPHA = {}", tid, working_pairs_size, ic, i_alpha);
         }  // Unique Alpha Loop
 
         // S&A the working set and prune small contributions
@@ -689,8 +687,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             std::make_move_iterator(working_pairs.end()));
         working_pairs.clear();
         size_t accumulated_size = accumulated_pairs.size();
-        if (ic % 10 == 0)
-          logger->debug("  * thread {}, accumulated_size = {} AT CON = {}", tid, accumulated_size, ic);
+
         if (accumulated_size > ntdets) {
           const size_t cutoff_idx = ntdets - 1;
           std::nth_element(accumulated_pairs.begin(),

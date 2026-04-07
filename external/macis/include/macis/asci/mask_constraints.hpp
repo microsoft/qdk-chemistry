@@ -966,15 +966,6 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     for (auto [c, nw_trip] : tps_to_next) {
       const auto C_min = c.C_min();
 
-      // If the constraint can't be refined further (C_min == 0 means no
-      // bit positions below the constraint's minimum to add), keep it as-is
-      // to avoid silently dropping work.
-      if (C_min == 0) {
-        constraint_sizes.emplace_back(c, nw_trip);
-        total_work += nw_trip;
-        continue;
-      }
-
       // Loop over possible constraints with one more element
       for (auto q_l = 0; q_l < C_min; ++q_l) {
         // Generate masks / counts
