@@ -5,10 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 from abc import abstractmethod
-
-from qdk import qsharp
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
@@ -24,12 +21,10 @@ from qdk_chemistry.data import (
     Settings,
     TimeEvolutionUnitary,
 )
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = ["MeasureSimulation", "MeasureSimulationFactory", "MeasureSimulationSettings"]
-
-_QASM_QUBIT_DECLARATION_PATTERN = re.compile(r"\bqubit\s*\[(\d+)\]")
-_QIR_REQUIRED_NUM_QUBITS_PATTERN = re.compile(r'"required_num_qubits"="(\d+)"')
 
 
 class MeasureSimulationSettings(Settings):
@@ -66,6 +61,7 @@ class MeasureSimulation(Algorithm):
         circuit_executor: CircuitExecutor,
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
         basis_gates: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
@@ -81,6 +77,7 @@ class MeasureSimulation(Algorithm):
             circuit_executor: Circuit executor backend.
             energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
+            device_backend_name: Optional device backend name.
             basis_gates: Optional list of basis gates to transpile the circuit into before execution.
 
         Returns:
@@ -105,7 +102,7 @@ class MeasureSimulation(Algorithm):
         """Map a time-evolution unitary into an executable circuit."""
         return circuit_mapper.run(evolution)
 
-    def _prepend_state_prep_circuit(self, state_prep: Circuit, circuit: Circuit) -> Circuit:
+    def _prepend_state_prep_circuit(self, state_prep: Circuit, circuit: Circuit, num_qubits: int) -> Circuit:
         state_prep_op = getattr(state_prep, "_qsharp_op", None)
         circuit_op = getattr(circuit, "_qsharp_op", None)
         if state_prep_op is None or circuit_op is None:
@@ -117,49 +114,19 @@ class MeasureSimulation(Algorithm):
                 f"('{state_prep.encoding}' and '{circuit.encoding}')."
             )
 
-        num_qubits = None
-        for representation in (state_prep.qir, circuit.qir, state_prep.qasm, circuit.qasm):
-            if representation is None:
-                continue
-
-            match = _QIR_REQUIRED_NUM_QUBITS_PATTERN.search(str(representation))
-            if match:
-                candidate = int(match.group(1))
-            else:
-                qasm_match = _QASM_QUBIT_DECLARATION_PATTERN.search(str(representation))
-                if not qasm_match:
-                    continue
-                candidate = int(qasm_match.group(1))
-
-            if num_qubits is None:
-                num_qubits = candidate
-            elif num_qubits != candidate:
-                raise ValueError(
-                    "State-preparation circuit and evolution circuit must act on the same number of qubits "
-                    f"(received {num_qubits} and {candidate})."
-                )
-
-        if num_qubits is None:
-            raise RuntimeError("Unable to infer the number of qubits needed to compose the Q# circuits.")
-
         target_indices = list(range(num_qubits))
         combined_encoding = circuit.encoding if circuit.encoding is not None else state_prep.encoding
-        qsharp_circuit = qsharp.circuit(
-            QSHARP_UTILS.CircuitComposition.MakeSequentialCircuit,
-            state_prep_op,
-            circuit_op,
-            target_indices,
-        )
-        qir = qsharp.compile(
-            QSHARP_UTILS.CircuitComposition.MakeSequentialCircuit,
-            state_prep_op,
-            circuit_op,
-            target_indices,
-        )
+        sequential_parameters = {
+            "first": state_prep_op,
+            "second": circuit_op,
+            "targets": target_indices,
+        }
 
         return Circuit(
-            qsharp=qsharp_circuit,
-            qir=qir,
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.CircuitComposition.MakeSequentialCircuit,
+                parameter=sequential_parameters,
+            ),
             qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSequentialOp(state_prep_op, circuit_op),
             encoding=combined_encoding,
         )
@@ -181,6 +148,8 @@ class MeasureSimulation(Algorithm):
             from qiskit.transpiler import PassManager  # noqa: PLC0415
 
             from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
+                FactorCliffordFromRz,
+                FactorPauliFromRotation,
                 MergeZBasisRotations,
                 RemoveZBasisOnZeroState,
                 SubstituteCliffordRz,
@@ -193,16 +162,45 @@ class MeasureSimulation(Algorithm):
             ) from exc
 
         qc = circuit.get_qiskit_circuit()
-        qc = transpile(qc, basis_gates=basis_gates, optimization_level=3)
 
         pm = PassManager(
             [
-                MergeZBasisRotations(),
-                SubstituteCliffordRz(),
-                RemoveZBasisOnZeroState(),
+                FactorCliffordFromRz(),
+                FactorPauliFromRotation(),
             ]
         )
         qc = pm.run(qc)
+
+        qc = transpile(qc, basis_gates=basis_gates, optimization_level=0)
+
+        if (
+            "x" in basis_gates
+            and "y" in basis_gates
+            and "z" in basis_gates
+            and "h" in basis_gates
+            and "s" in basis_gates
+            and "sdg" in basis_gates
+            and "rz" in basis_gates
+        ):
+            # If the basis gates include all Clifford gates, we substitute rz gates with Clifford gates wherever possible
+            pm = PassManager(
+                [
+                    # RemoveZBasisOnZeroState(),
+                    MergeZBasisRotations(),
+                    SubstituteCliffordRz(),
+                ]
+            )
+            qc = pm.run(qc)
+        else:
+            pm = PassManager(
+                [
+                    MergeZBasisRotations(),
+                    RemoveZBasisOnZeroState(),
+                ]
+            )
+            qc = pm.run(qc)
+
+            qc = transpile(qc, basis_gates=basis_gates, optimization_level=3)
 
         return Circuit(qasm=qasm3.dumps(qc), encoding=circuit.encoding)
 
@@ -214,6 +212,7 @@ class MeasureSimulation(Algorithm):
         energy_estimator: EnergyEstimator,
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
         energy_result, measurement_data = energy_estimator.run(
@@ -222,6 +221,7 @@ class MeasureSimulation(Algorithm):
             circuit_executor,
             total_shots=shots,
             noise_model=noise,
+            device_backend_name=device_backend_name,
         )
         return energy_result, measurement_data
 

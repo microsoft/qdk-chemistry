@@ -10,7 +10,12 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+import qiskit_ibm_runtime.fake_provider as _fake_provider
 from qiskit import transpile
+from qiskit.circuit import ClassicalRegister
+from qiskit.result import marginal_counts
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
@@ -70,6 +75,7 @@ class QiskitAerSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the Qiskit Aer Simulator.
 
@@ -77,6 +83,7 @@ class QiskitAerSimulator(CircuitExecutor):
             circuit: The quantum circuit to execute.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
+            device_backend_name: Optional name of a fake device backend to use for noise modeling.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
@@ -85,27 +92,79 @@ class QiskitAerSimulator(CircuitExecutor):
         Logger.trace_entering()
         meas_circuit = circuit.get_qiskit_circuit()
         Logger.debug("Qiskit QuantumCircuit loaded.")
-        noise_model = get_noise_model_from_profile(noise) if noise else None
-        backend = AerSimulator(
-            method=self._settings.get("method"),
-            seed_simulator=self._settings.get("seed"),
-            noise_model=noise_model,
-        )
-        if noise_model:
+        if noise is not None and device_backend_name is not None:
+            raise ValueError("Cannot specify both a noise model and a device backend. Please choose one or the other.")
+
+        opt_level = self._settings.get("transpile_optimization_level")
+
+        if device_backend_name is not None:
+            # Directly look up the backend class to avoid instantiating all
+            # fake backends (which triggers unrelated warnings).
+            # Try both "FakeManila" and "FakeManilaV2" since naming is inconsistent.
+            class_name = "".join(part.capitalize() for part in device_backend_name.split("_"))
+            backend_class = getattr(_fake_provider, class_name, None) or getattr(
+                _fake_provider, class_name + "V2", None
+            )
+            if backend_class is None:
+                raise ValueError(
+                    f"Unknown device backend '{device_backend_name}'. "
+                    f"Expected a class '{class_name}' or '{class_name}V2' in qiskit_ibm_runtime.fake_provider."
+                )
+            device_backend = backend_class()
+
+            # If circuit has no measurements, add them for all logical qubits
+            if meas_circuit.num_clbits == 0:
+                meas_circuit = meas_circuit.copy()
+                creg = ClassicalRegister(meas_circuit.num_qubits)
+                meas_circuit.add_register(creg)
+                meas_circuit.measure(range(meas_circuit.num_qubits), creg)
+
+            n_clbits = meas_circuit.num_clbits
+
+            backend = AerSimulator.from_backend(device_backend)
+            backend.set_options(
+                method=self._settings.get("method"),
+                seed_simulator=self._settings.get("seed"),
+            )
+
             transpiled_circuit = transpile(
                 meas_circuit,
-                basis_gates=noise_model.basis_gates,
-                optimization_level=self._settings.get("transpile_optimization_level"),
+                backend=device_backend,
+                optimization_level=opt_level,
             )
+
         else:
-            # Use qiskit_aer NoiseModel() default basis gates if no noise model is provided
-            transpiled_circuit = transpile(
-                meas_circuit,
-                basis_gates=NoiseModel().basis_gates,
-                optimization_level=self._settings.get("transpile_optimization_level"),
+            # If circuit has no measurements, add them for all qubits
+            if meas_circuit.num_clbits == 0:
+                meas_circuit = meas_circuit.copy()
+                creg = ClassicalRegister(meas_circuit.num_qubits)
+                meas_circuit.add_register(creg)
+                meas_circuit.measure(range(meas_circuit.num_qubits), creg)
+
+            noise_model = get_noise_model_from_profile(noise) if noise else None
+            backend = AerSimulator(
+                method=self._settings.get("method"),
+                seed_simulator=self._settings.get("seed"),
+                noise_model=noise_model,
             )
+            if noise_model:
+                transpiled_circuit = transpile(
+                    meas_circuit,
+                    basis_gates=noise_model.basis_gates,
+                    optimization_level=opt_level,
+                )
+            else:
+                # Use qiskit_aer NoiseModel() default basis gates if no noise model is provided
+                transpiled_circuit = transpile(
+                    meas_circuit,
+                    basis_gates=NoiseModel().basis_gates,
+                    optimization_level=opt_level,
+                )
         raw_results = backend.run(transpiled_circuit, shots=shots).result()
-        counts = raw_results.get_counts()
+        if device_backend_name is not None:
+            counts = marginal_counts(raw_results, indices=list(range(n_clbits))).get_counts()
+        else:
+            counts = raw_results.get_counts()
         Logger.debug(f"Measurement results obtained: {counts}")
         return CircuitExecutorData(
             bitstring_counts=counts,

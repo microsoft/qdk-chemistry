@@ -20,6 +20,15 @@ from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAnd
 from qdk_chemistry.data import Circuit, QubitHamiltonian
 
 
+def _has_qiskit_aer() -> bool:
+    try:
+        from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+
+        return QDK_CHEMISTRY_HAS_QISKIT_AER
+    except ImportError:
+        return False
+
+
 def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pytest.MonkeyPatch) -> None:
     """The helper should compose state preparation and evolution through Q# operations."""
     algo = EvolveAndMeasure()
@@ -36,16 +45,6 @@ def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pyte
             )
         ),
     )
-    monkeypatch.setattr(
-        measure_base.qsharp,
-        "circuit",
-        lambda *args: ("qsharp-circuit", args),
-    )
-    monkeypatch.setattr(
-        measure_base.qsharp,
-        "compile",
-        lambda *args: ("qir", args),
-    )
 
     state_prep = Circuit(
         qir='attributes #0 = { "required_num_qubits"="1" }',
@@ -58,28 +57,17 @@ def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pyte
         encoding="jordan-wigner",
     )
 
-    combined = algo._prepend_state_prep_circuit(state_prep, evolution)
+    combined = algo._prepend_state_prep_circuit(state_prep, evolution, num_qubits=1)
 
-    assert combined.qsharp == (
-        "qsharp-circuit",
-        ("sequential-circuit", state_prep_op, evolution_op, [0]),
-    )
-    assert combined.qir == (
-        "qir",
-        ("sequential-circuit", state_prep_op, evolution_op, [0]),
-    )
+    assert combined._qsharp_factory is not None
+    assert combined._qsharp_factory.program == "sequential-circuit"
+    assert combined._qsharp_factory.parameter == {
+        "first": state_prep_op,
+        "second": evolution_op,
+        "targets": [0],
+    }
     assert combined._qsharp_op == ("sequential-op", state_prep_op, evolution_op)
     assert combined.encoding == "jordan-wigner"
-
-
-def test_prepend_state_prep_circuit_rejects_mismatched_qubit_counts() -> None:
-    """The helper should reject incompatible circuit widths before composing."""
-    algo = EvolveAndMeasure()
-    state_prep = Circuit(qir='attributes #0 = { "required_num_qubits"="1" }', qsharp_op=lambda _: None)
-    evolution = Circuit(qir='attributes #0 = { "required_num_qubits"="2" }', qsharp_op=lambda _: None)
-
-    with pytest.raises(ValueError, match="same number of qubits"):
-        algo._prepend_state_prep_circuit(state_prep, evolution)
 
 
 def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
@@ -89,7 +77,7 @@ def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
     evolution = Circuit(qasm="OPENQASM 3.0;\nqubit[1] q;\nx q[0];\n")
 
     with pytest.raises(RuntimeError, match="requires Q# operations"):
-        algo._prepend_state_prep_circuit(state_prep, evolution)
+        algo._prepend_state_prep_circuit(state_prep, evolution, num_qubits=1)
 
 
 def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
@@ -121,3 +109,35 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
 
     for measurement in measurements:
         assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.2)
+
+
+@pytest.mark.skipif(
+    not _has_qiskit_aer(),
+    reason="Qiskit Aer not available",
+)
+def test_evolve_and_measure_with_device_backend() -> None:
+    """Run EvolveAndMeasure with a device_backend_name string."""
+    hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
+
+    evolution_builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=True)
+    algo = EvolveAndMeasure()
+    mapper = PauliSequenceMapper()
+    energy_estimator = create("energy_estimator", "qdk")
+    circuit_executor = create("circuit_executor", "qiskit_aer_simulator")
+
+    measurements = algo.run(
+        [hamiltonian],
+        times=[1.0],
+        observables=[observable],
+        evolution_builder=evolution_builder,
+        circuit_mapper=mapper,
+        circuit_executor=circuit_executor,
+        energy_estimator=energy_estimator,
+        shots=1024,
+        device_backend_name="fake_manila",
+    )
+
+    for measurement in measurements:
+        # With device noise the expectation value should still be close to 1.0
+        assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.5)

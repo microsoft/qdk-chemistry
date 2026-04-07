@@ -35,6 +35,8 @@ class EvolveAndMeasureSettings(MeasureSimulationSettings):
 class EvolveAndMeasure(MeasureSimulation):
     """Evolve under a Hamiltonian and measure a target observable."""
 
+    _evolution_circuit: Circuit | None = None
+
     def __init__(self):
         """Initialize EvolveAndMeasure with the given settings."""
         Logger.trace_entering()
@@ -54,6 +56,7 @@ class EvolveAndMeasure(MeasureSimulation):
         circuit_executor: CircuitExecutor,
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
         basis_gates: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
@@ -95,41 +98,78 @@ class EvolveAndMeasure(MeasureSimulation):
         for observable in observables:
             if observable.num_qubits != reference_num_qubits:
                 raise ValueError("All Hamiltonians and observables must have the same number of qubits.")
-        evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
-
-        for i in range(1, len(qubit_hamiltonians)):
-            qubit_hamiltonian = qubit_hamiltonians[i]
-            time = times[i]
-            delta_t = time - times[i - 1]
-
-            evolution = TimeEvolutionUnitary(
-                evolution.get_container().combine(
-                    self._create_time_evolution(qubit_hamiltonian, delta_t, evolution_builder).get_container(),
-                )
-            )
-
-        evolution_circuit = self._map_time_evolution_to_circuit(evolution, circuit_mapper)
-
-        if state_prep is not None:
-            evolution_circuit = self._prepend_state_prep_circuit(state_prep, evolution_circuit)
-
-        # Transpile to basis gates
-        if basis_gates is not None:
-            evolution_circuit = self._transpile_to_basis_gates(evolution_circuit, basis_gates)
+        self._evolution_circuit = self._build_evolution_circuit(
+            qubit_hamiltonians=qubit_hamiltonians,
+            times=times,
+            evolution_builder=evolution_builder,
+            circuit_mapper=circuit_mapper,
+            state_prep=state_prep,
+            basis_gates=basis_gates,
+        )
 
         measurements = []
         for observable in observables:
             measurements.append(
                 self._measure_observable(
-                    circuit=evolution_circuit,
+                    circuit=self._evolution_circuit,
                     shots=shots,
                     observable=observable,
                     circuit_executor=circuit_executor,
                     energy_estimator=energy_estimator,
                     noise=noise,
+                    device_backend_name=device_backend_name,
                 )
             )
         return measurements
+
+    def _build_evolution_circuit(
+        self,
+        qubit_hamiltonians: list[QubitHamiltonian],
+        times: list[float],
+        evolution_builder: TimeEvolutionBuilder,
+        circuit_mapper: EvolutionCircuitMapper,
+        *,
+        state_prep: Circuit | None = None,
+        basis_gates: list[str] | None = None,
+    ) -> Circuit:
+        """Construct the combined evolution circuit.
+
+        Args:
+            qubit_hamiltonians: List of Hamiltonians used to build time evolution.
+            times: Monotonically-increasing list of times to evolve under the Hamiltonians.
+            evolution_builder: Time-evolution builder.
+            circuit_mapper: Mapper for time-evolution unitary to circuit.
+            state_prep: Optional circuit that prepares the initial state before time evolution.
+            basis_gates: Optional list of basis gates to transpile the circuit into.
+
+        Returns:
+            The combined evolution circuit.
+
+        """
+        evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
+
+        for i in range(1, len(qubit_hamiltonians)):
+            delta_t = times[i] - times[i - 1]
+            evolution = TimeEvolutionUnitary(
+                evolution.get_container().combine(
+                    self._create_time_evolution(qubit_hamiltonians[i], delta_t, evolution_builder).get_container(),
+                )
+            )
+
+        circuit = self._map_time_evolution_to_circuit(evolution, circuit_mapper)
+
+        if state_prep is not None:
+            circuit = self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)
+
+        if basis_gates is not None:
+            circuit = self._transpile_to_basis_gates(circuit, basis_gates)
+
+        self._evolution_circuit = circuit
+        return circuit
+
+    def get_circuit(self) -> Circuit | None:
+        """Get the evolution circuit used in the simulation."""
+        return self._evolution_circuit
 
     def name(self) -> str:
         """Return ``classical_sampling`` as the algorithm name."""

@@ -12,7 +12,20 @@ state. It also includes functions to create custom pass managers based on preset
 
 import numpy as np
 from qiskit.circuit import ParameterExpression
-from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+from qiskit.circuit.library import (
+    IGate,
+    RXGate,
+    RXXGate,
+    RYGate,
+    RYYGate,
+    RZGate,
+    RZZGate,
+    SdgGate,
+    SGate,
+    XGate,
+    YGate,
+    ZGate,
+)
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
@@ -22,6 +35,8 @@ from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
 from qdk_chemistry.utils import Logger
 
 __all__ = [
+    "FactorCliffordFromRz",
+    "FactorPauliFromRotation",
     "MergeZBasisRotations",
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
@@ -293,6 +308,209 @@ class SubstituteCliffordRz(TransformationPass):
         """
         Logger.trace_entering()
         return self._settings
+
+
+# Clifford angles indexed by their multiples of π/2 (mod 4).
+_CLIFFORD_TABLE: list[tuple[float, type]] = [
+    (0.0, IGate),  # 0 · π/2
+    (np.pi / 2, SGate),  # 1 · π/2
+    (np.pi, ZGate),  # 2 · π/2
+    (3 * np.pi / 2, SdgGate),  # 3 · π/2  (≡ −π/2 mod 2π)
+]
+
+
+class FactorCliffordFromRz(TransformationPass):
+    r"""Factor out the nearest Clifford rotation from an arbitrary Rz gate.
+
+    For every ``Rz(θ)`` in the circuit this pass finds the Clifford angle
+    ``θ_c ∈ {0, π/2, π, 3π/2}`` that is closest to ``θ (mod 2π)`` and
+    replaces the single gate with the two-gate sequence::
+
+        Clifford(θ_c) · Rz(θ − θ_c)
+
+    When ``θ`` is already an exact Clifford angle (within *tolerance*) the
+    residual ``Rz`` vanishes and only the Clifford gate is emitted.
+    Parameterized ``Rz`` gates are left untouched.
+
+    This is useful as a pre-processing step: by pulling out the Clifford
+    component the remaining ``Rz`` rotations are bounded to ``|θ_rem| ≤ π/4``,
+    which can improve subsequent synthesis or error-mitigation passes.
+
+    Example:
+        ``Rz(1.6)`` is closest to ``S = Rz(π/2 ≈ 1.5708)``, so it becomes
+        ``S · Rz(0.0292)``.
+
+    """
+
+    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
+        """Initialize the FactorCliffordFromRz transformation pass.
+
+        Args:
+            tolerance: Angle comparison tolerance used to decide whether
+                the residual rotation is negligible (i.e. the original gate
+                is already Clifford).  Default is ``np.finfo(np.float64).eps``.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._tolerance = tolerance
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with factored Clifford rotations.
+
+        """
+        Logger.trace_entering()
+        Logger.debug("Running FactorCliffordFromRz pass.")
+
+        for node in dag.op_nodes():
+            if node.op.name != "rz":
+                continue
+
+            angle = node.op.params[0]
+            if isinstance(angle, ParameterExpression):
+                continue
+
+            # Normalise to [0, 2π)
+            angle_mod = float(angle) % (2 * np.pi)
+
+            # Find the nearest Clifford angle
+            best_cliff_angle, best_gate_cls = min(
+                _CLIFFORD_TABLE,
+                key=lambda entry: min(abs(angle_mod - entry[0]), 2 * np.pi - abs(angle_mod - entry[0])),
+            )
+
+            remainder = angle_mod - best_cliff_angle
+            # Wrap remainder into (−π, π]
+            remainder = (remainder + np.pi) % (2 * np.pi) - np.pi
+
+            if abs(remainder) <= self._tolerance:
+                # Exact Clifford — replace with the single Clifford gate
+                dag.substitute_node(node, best_gate_cls(), inplace=True)
+            else:
+                # Factor: Clifford · Rz(remainder)
+                replacement = DAGCircuit()
+                replacement.add_qubits(node.qargs)
+                if not isinstance(best_gate_cls(), IGate):
+                    replacement.apply_operation_back(best_gate_cls(), qargs=node.qargs)
+                replacement.apply_operation_back(RZGate(remainder), qargs=node.qargs)
+                dag.substitute_node_with_dag(node, replacement)
+
+        return dag
+
+
+# Mapping from rotation gate name to (single-qubit Pauli class, rotation gate class).
+_ROTATION_GATE_TABLE: dict[str, tuple[type, type]] = {
+    "rx": (XGate, RXGate),
+    "ry": (YGate, RYGate),
+    "rz": (ZGate, RZGate),
+    "rxx": (XGate, RXXGate),
+    "ryy": (YGate, RYYGate),
+    "rzz": (ZGate, RZZGate),
+}
+
+
+class FactorPauliFromRotation(TransformationPass):
+    r"""Factor out multiples of π from 1- and 2-qubit Pauli rotation gates.
+
+    Every rotation gate :math:`R_P(\theta) = \exp(-i \theta / 2\; P)` satisfies:
+
+    * :math:`R_P(\pi) = -i P` — equivalent to applying the Pauli operator (up to
+      global phase).
+    * :math:`R_P(2\pi) = -I` — identity (up to global phase).
+
+    This pass finds the nearest integer multiple :math:`k` of :math:`\pi` in the
+    gate angle and decomposes::
+
+        R_P(θ)  →  P^(k mod 2)  ·  R_P(θ − kπ)
+
+    where the Pauli part is emitted only when *k* is odd.  When the residual
+    vanishes (the angle was already an exact multiple of :math:`\pi`) only the
+    Pauli gates (or nothing) are emitted.
+
+    Supported gates: ``rx``, ``ry``, ``rz``, ``rxx``, ``ryy``, ``rzz``.
+    Parameterized gates are left untouched.
+
+    For 2-qubit gates such as :math:`R_{XX}(\pi)` the Pauli contribution is
+    the tensor product :math:`X \otimes X`, so the pass emits the
+    corresponding single-qubit Pauli on each qubit independently.
+
+    Example:
+        ``Rzz(π + 0.1)`` → ``Z · Z · Rzz(0.1)`` (Z on each qubit, then small
+        residual rotation).
+
+    """
+
+    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
+        """Initialize the FactorPauliFromRotation transformation pass.
+
+        Args:
+            tolerance: Angle comparison tolerance used to decide whether
+                the residual rotation is negligible.  Default is
+                ``np.finfo(np.float64).eps``.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._tolerance = tolerance
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with factored Pauli rotations.
+
+        """
+        Logger.trace_entering()
+        Logger.debug("Running FactorPauliFromRotation pass.")
+
+        for node in dag.op_nodes():
+            if node.op.name not in _ROTATION_GATE_TABLE:
+                continue
+
+            angle = node.op.params[0]
+            if isinstance(angle, ParameterExpression):
+                continue
+
+            # Normalise to [0, 2π)
+            angle_f = float(angle) % (2 * np.pi)
+            pauli_cls, rot_cls = _ROTATION_GATE_TABLE[node.op.name]
+
+            # Nearest integer multiple of π
+            k = round(angle_f / np.pi)
+            remainder = angle_f - k * np.pi
+
+            need_pauli = (k % 2) != 0
+            need_residual = abs(remainder) > self._tolerance
+
+            if not need_pauli and not need_residual:
+                # Even multiple of π → identity; remove the gate
+                dag.remove_op_node(node)
+                continue
+
+            if not need_pauli and need_residual:
+                # Even multiple of π + small residual → just the reduced rotation
+                dag.substitute_node(node, rot_cls(remainder), inplace=True)
+                continue
+
+            # Odd multiple of π → emit Pauli gate(s), possibly followed by residual
+            replacement = DAGCircuit()
+            replacement.add_qubits(node.qargs)
+            for qubit in node.qargs:
+                replacement.apply_operation_back(pauli_cls(), qargs=[qubit])
+            if need_residual:
+                replacement.apply_operation_back(rot_cls(remainder), qargs=node.qargs)
+            dag.substitute_node_with_dag(node, replacement)
+
+        return dag
 
 
 class RemoveZBasisOnZeroState(TransformationPass):
