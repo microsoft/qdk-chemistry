@@ -10,7 +10,11 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+import qiskit_ibm_runtime.fake_provider
 from qiskit import transpile
+from qiskit.providers.exceptions import QiskitBackendNotFoundError
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
@@ -70,6 +74,7 @@ class QiskitAerSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the Qiskit Aer Simulator.
 
@@ -85,25 +90,54 @@ class QiskitAerSimulator(CircuitExecutor):
         Logger.trace_entering()
         meas_circuit = circuit.get_qiskit_circuit()
         Logger.debug("Qiskit QuantumCircuit loaded.")
-        noise_model = get_noise_model_from_profile(noise) if noise else None
-        backend = AerSimulator(
-            method=self._settings.get("method"),
-            seed_simulator=self._settings.get("seed"),
-            noise_model=noise_model,
-        )
-        if noise_model:
+        if noise is not None and device_backend_name is not None:
+            raise ValueError("Cannot specify both a noise model and a device backend. Please choose one or the other.")
+
+        opt_level = self._settings.get("transpile_optimization_level")
+
+        if device_backend_name is not None:
+            provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
+            try:
+                device_backend = provider.backend(device_backend_name)
+            except QiskitBackendNotFoundError:
+                available = [b.name for b in provider.backends()]
+                raise ValueError(
+                    f"Unknown device backend '{device_backend_name}'. "
+                    f"Available backends: {available}"
+                ) from None
+
+            backend = AerSimulator.from_backend(device_backend)
+            backend.set_options(
+                method=self._settings.get("method"),
+                seed_simulator=self._settings.get("seed"),
+            )
+
             transpiled_circuit = transpile(
                 meas_circuit,
-                basis_gates=noise_model.basis_gates,
-                optimization_level=self._settings.get("transpile_optimization_level"),
+                backend=device_backend,
+                optimization_level=opt_level,
             )
+
         else:
-            # Use qiskit_aer NoiseModel() default basis gates if no noise model is provided
-            transpiled_circuit = transpile(
-                meas_circuit,
-                basis_gates=NoiseModel().basis_gates,
-                optimization_level=self._settings.get("transpile_optimization_level"),
+            noise_model = get_noise_model_from_profile(noise) if noise else None
+            backend = AerSimulator(
+                method=self._settings.get("method"),
+                seed_simulator=self._settings.get("seed"),
+                noise_model=noise_model,
             )
+            if noise_model:
+                transpiled_circuit = transpile(
+                    meas_circuit,
+                    basis_gates=noise_model.basis_gates,
+                    optimization_level=opt_level,
+                )
+            else:
+                # Use qiskit_aer NoiseModel() default basis gates if no noise model is provided
+                transpiled_circuit = transpile(
+                    meas_circuit,
+                    basis_gates=NoiseModel().basis_gates,
+                    optimization_level=opt_level,
+                )
         raw_results = backend.run(transpiled_circuit, shots=shots).result()
         counts = raw_results.get_counts()
         Logger.debug(f"Measurement results obtained: {counts}")

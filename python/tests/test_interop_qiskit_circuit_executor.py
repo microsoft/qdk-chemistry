@@ -88,3 +88,12 @@ class TestQiskitAerCircuitExecutor:
         assert counts.get("00", 0) > 0
         assert counts.get("11", 0) > 0
         assert counts.get("01", 0) + counts.get("10", 0) > 0  # Expect some errors to occur
+
+    def test_circuit_executor_with_device_backend(self, test_circuit_2: Circuit):
+        """Test the Qiskit Aer circuit executor with a device backend name string."""
+        executor = QiskitAerSimulator()
+        result = executor.run(test_circuit_2, shots=100, device_backend_name="fake_manila")
+        counts = result.bitstring_counts
+        # Circuit applies X on q[0], so only "01" (little-endian) should appear
+        assert counts.get("01", 0) > 0
+        assert result.total_shots == 100
