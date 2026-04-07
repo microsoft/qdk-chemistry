@@ -82,6 +82,7 @@ class QiskitAerSimulator(CircuitExecutor):
             circuit: The quantum circuit to execute.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
+            device_backend_name: Optional name of a fake device backend to use for noise modeling.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
@@ -102,8 +103,7 @@ class QiskitAerSimulator(CircuitExecutor):
             except QiskitBackendNotFoundError:
                 available = [b.name for b in provider.backends()]
                 raise ValueError(
-                    f"Unknown device backend '{device_backend_name}'. "
-                    f"Available backends: {available}"
+                    f"Unknown device backend '{device_backend_name}'. Available backends: {available}"
                 ) from None
 
             backend = AerSimulator.from_backend(device_backend)
