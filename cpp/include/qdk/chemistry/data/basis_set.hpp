@@ -275,7 +275,6 @@ class BasisSet : public DataClass,
    *
    * Both primary and auxiliary basis sets are looked up by name. The primary
    * basis set will have no shells until populated by a factory method or SCF.
-   * ECP and auxiliary basis sets are mutually exclusive.
    *
    * @param name Name of the primary basis set
    * @param aux_name Name of the auxiliary basis set
@@ -525,8 +524,7 @@ class BasisSet : public DataClass,
   /**
    * @brief Create a basis set with an auxiliary basis set from database names
    *
-   * ECP and auxiliary basis sets are mutually exclusive. This factory method
-   * creates a primary basis set with an attached auxiliary basis set, both
+   * Creates a primary basis set with an attached auxiliary basis set, both
    * looked up by name from the basis set database.
    *
    * @param basis_name Name of the primary basis set (e.g., "cc-pVDZ")
@@ -545,8 +543,7 @@ class BasisSet : public DataClass,
   /**
    * @brief Create a basis set with an auxiliary basis set from database names
    *
-   * ECP and auxiliary basis sets are mutually exclusive. This factory method
-   * creates a primary basis set with an attached auxiliary basis set, both
+   * Creates a primary basis set with an attached auxiliary basis set, both
    * looked up by name from the basis set database.
    *
    * @param basis_name Name of the primary basis set (e.g., "cc-pVDZ")

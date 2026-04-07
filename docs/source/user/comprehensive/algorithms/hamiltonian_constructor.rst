@@ -186,7 +186,7 @@ where :math:`P` indexes an auxiliary basis set. The four-center integrals are co
    .. code-block:: cpp
 
       // Set the auxiliary basis set for density fitting, unless it is already set
-      if (!orbitals->get_basis_set()->has_auxiliary_basis()) {
+      if (!orbitals->get_basis_set()->has_auxiliary_basis_set()) {
         orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
       }
 
@@ -201,8 +201,8 @@ where :math:`P` indexes an auxiliary basis set. The four-center integrals are co
    .. code-block:: python
 
       # Set the auxiliary basis set for density fitting, unless it is already set
-      if not orbitals.basis_set.has_auxiliary_basis():
-          orbitals.basis_set.set_auxiliary_basis_set(aux_basis)
+      if not orbitals.get_basis_set().has_auxiliary_basis_set():
+          orbitals.get_basis_set().set_auxiliary_basis_set(aux_basis)
 
       # Create density-fitted Hamiltonian constructor
       constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")

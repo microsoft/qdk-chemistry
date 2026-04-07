@@ -5,12 +5,10 @@
 #pragma once
 #include <functional>
 #include <iostream>
-#include <optional>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/settings.hpp>
-#include <variant>
 
 namespace qdk::chemistry::algorithms {
 
@@ -71,18 +69,6 @@ class HamiltonianConstructor
    * @see data::Hamiltonian
    */
   using Algorithm::run;
-
-  //   /**
-  //    * @brief Convenience overload that defaults aux_basis to nullopt
-  //    *
-  //    * @param orbitals The orbital data from which to construct the
-  //    Hamiltonian
-  //    * @return The constructed Hamiltonian operator
-  //    */
-  //   std::shared_ptr<data::Hamiltonian> run(
-  //       std::shared_ptr<data::Orbitals> orbitals) const {
-  //     return this->run(std::move(orbitals), std::nullopt);
-  //   }
 
   /**
    * @brief Access the algorithm's name

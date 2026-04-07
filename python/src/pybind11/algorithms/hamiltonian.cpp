@@ -44,9 +44,7 @@ class HamiltonianConstructorBase
     py::function override = py::get_override(
         static_cast<const HamiltonianConstructor *>(this), "_run_impl");
     if (override) {
-      try {
-        return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
-      }
+      return override(orbitals).cast<std::shared_ptr<Hamiltonian>>();
     }
     py::pybind11_fail(
         "Tried to call pure virtual function "

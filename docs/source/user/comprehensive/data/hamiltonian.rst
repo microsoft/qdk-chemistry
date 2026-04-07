@@ -182,14 +182,14 @@ Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``DensityF
    .. code-block:: cpp
 
       auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
-      auto hamiltonian = constructor->run(orbitals, aux_basis);
+      auto hamiltonian = constructor->run(orbitals);
 
 .. tab:: Python API
 
    .. code-block:: python
 
       constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
-      hamiltonian = constructor.run(orbitals, aux_basis)
+      hamiltonian = constructor.run(orbitals)
 
 Serialization
 -------------
