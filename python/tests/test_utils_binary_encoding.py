@@ -132,7 +132,7 @@ class TestRefTableau:
     """Tests for RefTableau construction and gate operations."""
 
     def _make_ref(self, n_pivots: int, n_extra_cols: int) -> RefTableau:
-        """Build a realistic RREF tableau with fill in non-pivot columns.
+        """Build a realistic REF tableau with fill in non-pivot columns.
 
         The pivot block is an identity matrix.  Non-pivot columns get
         alternating 0/1 entries (a common pattern after Gaussian
@@ -156,8 +156,8 @@ class TestRefTableau:
                 mat[r, c] = (r + c) % 2
         return RefTableau(mat)
 
-    def test_construction_from_rref(self):
-        """Valid RREF matrix produces a tableau with correct dimensions and pivots."""
+    def test_construction_from_ref(self):
+        """Valid REF matrix produces a tableau with correct dimensions and pivots."""
         t = self._make_ref(3, 2)
         assert t.num_rows == 4
         assert t.num_cols == 5
@@ -219,7 +219,7 @@ class TestRefTableau:
         t.toffoli(2, (0, True), (1, False))
         np.testing.assert_array_equal(t.data[2], [1, 0, 0, 1])
 
-    def test_identify_rref_pivots(self):
+    def test_identify_pivots(self):
         """Pivot detection returns (row, col) pairs for each leading 1."""
         mat = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 0, 0]], dtype=np.int8)
         t = RefTableau(mat)
@@ -232,35 +232,12 @@ class TestRefTableau:
         np.testing.assert_array_equal(t.data[0], [0, 0, 1])
         np.testing.assert_array_equal(t.data[2], [1, 0, 0])
 
-    def test_toffoli_pui_fixed_and_rest(self):
-        """Test PUI initialization and per-branch application."""
-        mat = np.array(
-            [
-                [1, 0, 1, 0],
-                [0, 1, 0, 1],
-                [0, 0, 0, 0],
-                [0, 0, 0, 0],
-            ],
-            dtype=np.int8,
-        )
-        t = RefTableau(mat)
-        # Fixed control: row 0 must be 1
-        t.toffoli_pui_fixed([(0, True)])
-        # _tmp_row should be row0 = [1, 0, 1, 0]
-        np.testing.assert_array_equal(t._tmp_row, [1, 0, 1, 0])
-
-        # Apply rest: target offset 0 (row dense_size + 0), control: row 1 True
-        # mask = _tmp_row & row1 = [1,0,1,0] & [0,1,0,1] = [0,0,0,0]
-        t.toffoli_pui_rest(0, [(1, True)])
-        # Row dense_size+0 should be unchanged (XOR with zeros)
-        np.testing.assert_array_equal(t.data[t.dense_size], [0, 0, 0, 0])
-
 
 class TestBinaryEncodingSynthesizerBasic:
     """Basic construction and property tests."""
 
     def test_from_matrix_identity(self):
-        """Identity RREF matrix should produce a valid synthesiser."""
+        """Identity REF matrix should produce a valid synthesiser."""
         mat = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.int8)
         synth = BinaryEncodingSynthesizer.from_matrix(mat)
         assert synth.dense_size == _dense_qubits_size(4)
@@ -312,7 +289,7 @@ class TestBinaryEncodingSynthesizerBasic:
 class TestBinaryEncodingSynthesizerBijection:
     """End-to-end compression correctness for BinaryEncodingSynthesizer.
 
-    Each parametrized RREF matrix is fed through from_matrix(); the tests
+    Each parametrized REF matrix is fed through from_matrix(); the tests
     verify that the bijection faithfully represents the compressed output.
     """
 
@@ -320,16 +297,17 @@ class TestBinaryEncodingSynthesizerBijection:
         params=[
             "identity_3x4",
             "identity_4x5",
-            "rref_with_fill",
-            "wide_rref",
+            "ref_with_fill",
+            "wide_ref",
             "minimal_3x3",
             "staircase_4x5",
             "all_pivot_4x5",
             "many_non_pivot_5x8",
+            "upper_triangular_5x8",
         ]
     )
-    def rref_matrix(self, request) -> np.ndarray:
-        """Parametrized RREF matrices covering various shapes."""
+    def ref_matrix(self, request) -> np.ndarray:
+        """Parametrized REF matrices covering various shapes."""
         matrices = {
             # 3 pivots, 1 non-pivot, 1 trailing zero row
             "identity_3x4": np.array(
@@ -342,7 +320,7 @@ class TestBinaryEncodingSynthesizerBijection:
                 dtype=np.int8,
             ),
             # 4 pivots, 2 non-pivot columns with fill
-            "rref_with_fill": np.array(
+            "ref_with_fill": np.array(
                 [
                     [1, 0, 0, 0, 1, 1],
                     [0, 1, 0, 0, 0, 1],
@@ -352,7 +330,7 @@ class TestBinaryEncodingSynthesizerBijection:
                 dtype=np.int8,
             ),
             # 5 pivots, 3 non-pivot columns (wide matrix, dense_size=3)
-            "wide_rref": np.array(
+            "wide_ref": np.array(
                 [
                     [1, 0, 0, 0, 0, 1, 1, 0],
                     [0, 1, 0, 0, 0, 0, 1, 1],
@@ -393,43 +371,54 @@ class TestBinaryEncodingSynthesizerBijection:
                 ],
                 dtype=np.int8,
             ),
+            # Larger upper-triangular REF with non-pivot columns
+            "upper_triangular_5x8": np.array(
+                [
+                    [1, 1, 1, 1, 1, 1, 0, 1],
+                    [0, 1, 1, 1, 0, 1, 1, 0],
+                    [0, 0, 1, 1, 1, 0, 1, 1],
+                    [0, 0, 0, 1, 1, 1, 1, 0],
+                    [0, 0, 0, 0, 0, 0, 0, 0],
+                ],
+                dtype=np.int8,
+            ),
         }
         return matrices[request.param]
 
-    def test_bijection_covers_all_columns(self, rref_matrix):
+    def test_bijection_covers_all_columns(self, ref_matrix):
         """Every column must appear exactly once in the bijection."""
-        synth = BinaryEncodingSynthesizer.from_matrix(rref_matrix)
+        synth = BinaryEncodingSynthesizer.from_matrix(ref_matrix)
         cols = [c for _, c in synth.bijection]
-        assert sorted(cols) == list(range(rref_matrix.shape[1]))
+        assert sorted(cols) == list(range(ref_matrix.shape[1]))
 
-    def test_bijection_dense_labels_unique(self, rref_matrix):
+    def test_bijection_dense_labels_unique(self, ref_matrix):
         """Dense labels must be unique."""
-        synth = BinaryEncodingSynthesizer.from_matrix(rref_matrix)
+        synth = BinaryEncodingSynthesizer.from_matrix(ref_matrix)
         dense_vals = [dv for dv, _ in synth.bijection]
         assert len(set(dense_vals)) == len(dense_vals)
 
-    def test_bijection_dense_labels_fit_in_register(self, rref_matrix):
+    def test_bijection_dense_labels_fit_in_register(self, ref_matrix):
         """All dense labels must fit in the dense register."""
-        synth = BinaryEncodingSynthesizer.from_matrix(rref_matrix)
+        synth = BinaryEncodingSynthesizer.from_matrix(ref_matrix)
         max_label = (1 << synth.dense_size) - 1
         for dv, _ in synth.bijection:
             assert 0 <= dv <= max_label
 
-    def test_sparse_rows_zeroed_after_synthesis(self, rref_matrix):
+    def test_sparse_rows_zeroed_after_synthesis(self, ref_matrix):
         """After synthesis, all sparse rows should be all-zero."""
-        synth = BinaryEncodingSynthesizer.from_matrix(rref_matrix)
+        synth = BinaryEncodingSynthesizer.from_matrix(ref_matrix)
         for row in range(synth.dense_size, synth.tableau.num_rows):
             assert synth.tableau.row_is_zero(row)
 
-    def test_dense_register_matches_bijection(self, rref_matrix):
+    def test_dense_register_matches_bijection(self, ref_matrix):
         """Reading dense rows of each column must reproduce the bijection label.
 
         This is the core compression-correctness check: the synthesizer
-        transforms the original RREF matrix so that the top ``dense_size``
+        transforms the original REF matrix so that the top ``dense_size``
         rows encode a binary label for every column, and that label matches
         what the bijection records.
         """
-        synth = BinaryEncodingSynthesizer.from_matrix(rref_matrix)
+        synth = BinaryEncodingSynthesizer.from_matrix(ref_matrix)
         ds = synth.dense_size
         for dense_val, col in synth.bijection:
             actual = _bits_to_int(synth.tableau.data[:ds, col])
@@ -473,26 +462,24 @@ class TestBinaryEncodingSynthesizerCircuit:
         ids=["6e6o_5det", "8e10o_20det", "10e15o_30det", "14e20o_50det"],
     )
     def test_gf2x_forward_only_fewer_cx_than_rref(self, n_electrons, n_orbitals, n_dets, seed):
-        """Test forward_only produces fewer CX than RREF."""
+        """Test forward_only (REF) produces fewer CX than back-substituted (RREF)."""
         raw_matrix = create_random_bitstring_matrix(
             n_electrons=n_electrons, n_orbitals=n_orbitals, n_dets=n_dets, seed=seed
         )
 
-        # --- RREF path ---
+        # --- RREF path (back-substituted) ---
         rref_result = gf2x_with_tracking(raw_matrix, skip_diagonal_reduction=True)
-        rref_tableau = RefTableau(rref_result.reduced_matrix)
-        rref_synth = BinaryEncodingSynthesizer(rref_tableau)
+        rref_synth = BinaryEncodingSynthesizer(RefTableau(rref_result.reduced_matrix))
         rank, _ = rref_synth._permute_columns_pivots_first()
         rref_synth._apply_unary_staircase(rank)
         rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
         assert rref_cx == rank * (rank - 1) // 2
 
-        # --- REF path ---
+        # --- REF path (forward-only) ---
         ref_result = gf2x_with_tracking(raw_matrix, forward_only=True)
-        ref_tableau = RefTableau(ref_result.reduced_matrix)
-        ref_synth = BinaryEncodingSynthesizer(ref_tableau)
-        rank_s, _ = ref_synth._permute_columns_pivots_first()
-        ref_synth._apply_unary_staircase(rank_s)
+        ref_synth = BinaryEncodingSynthesizer(RefTableau(ref_result.reduced_matrix))
+        rank_ref, _ = ref_synth._permute_columns_pivots_first()
+        ref_synth._apply_unary_staircase(rank_ref)
         ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
         assert ref_cx < rref_cx
 
@@ -512,21 +499,19 @@ class TestBinaryEncodingSynthesizerCircuit:
             n_electrons=n_electrons, n_orbitals=n_orbitals, n_dets=n_dets, seed=seed
         )
 
-        # --- RREF path ---
+        # --- RREF path (back-substituted) ---
         rref_result = gf2x_with_tracking(raw_matrix, skip_diagonal_reduction=True)
-        rref_tableau = RefTableau(rref_result.reduced_matrix)
-        rref_synth = BinaryEncodingSynthesizer(rref_tableau)
+        rref_synth = BinaryEncodingSynthesizer(RefTableau(rref_result.reduced_matrix))
         rank, _ = rref_synth._permute_columns_pivots_first()
         rref_synth._run_stage1_diagonal_encoding(rank)
         rref_cx = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.CX)
         rref_x = sum(1 for t, _ in rref_synth.circuit if t is MatrixCompressionType.X)
 
-        # --- REF path ---
+        # --- REF path (forward-only) ---
         ref_result = gf2x_with_tracking(raw_matrix, forward_only=True)
-        ref_tableau = RefTableau(ref_result.reduced_matrix)
-        ref_synth = BinaryEncodingSynthesizer(ref_tableau)
-        rank_s, _ = ref_synth._permute_columns_pivots_first()
-        ref_synth._run_stage1_diagonal_encoding(rank_s)
+        ref_synth = BinaryEncodingSynthesizer(RefTableau(ref_result.reduced_matrix))
+        rank_ref, _ = ref_synth._permute_columns_pivots_first()
+        ref_synth._run_stage1_diagonal_encoding(rank_ref)
         ref_cx = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.CX)
         ref_x = sum(1 for t, _ in ref_synth.circuit if t is MatrixCompressionType.X)
 
@@ -534,7 +519,7 @@ class TestBinaryEncodingSynthesizerCircuit:
         assert ref_x == rref_x
 
         # After stage 1 the pivot block should be identical regardless of input form
-        assert rank == rank_s
+        assert rank == rank_ref
         assert np.array_equal(
             rref_synth.tableau.data[:, :rank],
             ref_synth.tableau.data[:, :rank],
@@ -563,21 +548,18 @@ class TestBinaryEncodingSynthesizerReplay:
         replay.permute_columns(col_perm)
 
         # Replay all operations
-        for operation_type, payload in synth.circuit:
+        for operation_type, qubit_args in synth.circuit:
             if operation_type is MatrixCompressionType.CX:
-                replay.cx(*payload)
+                replay.cx(*qubit_args)
             elif operation_type is MatrixCompressionType.SWAP:
-                replay.swap(*payload)
-            elif operation_type is MatrixCompressionType.TOFFOLI:
-                tgt, ctrl_pos, ctrl_row, ctrl_val = payload
-                replay.toffoli(tgt, (ctrl_pos, True), (ctrl_row, ctrl_val))
+                replay.swap(*qubit_args)
+            elif operation_type is MatrixCompressionType.CCX:
+                replay.toffoli(qubit_args[0], (qubit_args[1], True), (qubit_args[2], True))
             elif operation_type is MatrixCompressionType.X:
-                replay.x(*payload)
-            elif operation_type is MatrixCompressionType.PUI_BLOCK:
-                fixed_controls, rest_entries = payload
-                replay.toffoli_pui_fixed(fixed_controls)
-                for off, ctrls in rest_entries:
-                    replay.toffoli_pui_rest(off, ctrls)
+                replay.x(*qubit_args)
+            elif operation_type in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}:
+                data_table, addr_qubits, dat_qubits = qubit_args
+                replay.select(data_table, addr_qubits, dat_qubits)
 
         # Undo column permutation
         inv_perm = [0] * len(col_perm)
@@ -593,27 +575,35 @@ class TestToGf2xOperations:
     """Tests for operation export."""
 
     def test_returns_ops_and_ancilla_count(self):
-        """to_gf2x_operations returns an op list."""
+        """to_operations returns an op list."""
         mat = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 0]], dtype=np.int8)
         synth = BinaryEncodingSynthesizer.from_matrix(mat)
-        ops = synth.to_gf2x_operations(num_local_qubits=3)
+        ops = synth.to_operations(num_local_qubits=3)
         assert isinstance(ops, list)
 
-    def test_op_names_are_strings(self):
-        """All emitted op names must belong to the known gate vocabulary."""
+    def test_op_names_are_valid(self):
+        """All emitted op types must belong to the known gate vocabulary."""
         mat = np.array([[1, 0, 0, 1], [0, 1, 0, 1], [0, 0, 1, 0]], dtype=np.int8)
         synth = BinaryEncodingSynthesizer.from_matrix(mat)
-        ops = synth.to_gf2x_operations(num_local_qubits=3)
-        valid_names = {"cx", "swap", "ccx", "x", "mcx", "select", "select_and"}
-        for name, _ in ops:
-            assert name in valid_names, f"Unexpected op name: {name}"
+        ops = synth.to_operations(num_local_qubits=3)
+        valid_types = {
+            MatrixCompressionType.CX,
+            MatrixCompressionType.SWAP,
+            MatrixCompressionType.CCX,
+            MatrixCompressionType.X,
+            MatrixCompressionType.MCX,
+            MatrixCompressionType.SELECT,
+            MatrixCompressionType.SELECT_AND,
+        }
+        for op in ops:
+            assert op.name in valid_types, f"Unexpected op type: {op.name}"
 
     def test_translate_ops_identity_mapping(self):
         """When active_qubit_indices is identity, ops stay the same."""
         mat = np.array([[1, 0, 1], [0, 1, 1], [0, 0, 0]], dtype=np.int8)
         synth = BinaryEncodingSynthesizer.from_matrix(mat)
-        ops_raw = synth.to_gf2x_operations(num_local_qubits=3)
-        ops_xlat = synth.to_gf2x_operations(
+        ops_raw = synth.to_operations(num_local_qubits=3)
+        ops_xlat = synth.to_operations(
             num_local_qubits=3,
             active_qubit_indices=[0, 1, 2],
             ancilla_start=3,
@@ -623,19 +613,19 @@ class TestToGf2xOperations:
 
     def test_translate_ops_remaps_indices(self):
         """Translation must remap qubit indices through the provided map."""
-        ops = [("cx", (0, 1)), ("x", 2)]
+        ops = [(MatrixCompressionType.CX, (0, 1)), (MatrixCompressionType.X, 2)]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=3,
             active_qubit_indices=[10, 20, 30],
             ancilla_start=100,
         )
-        assert translated[0] == ("cx", (10, 20))
-        assert translated[1] == ("x", 30)
+        assert translated[0] == (MatrixCompressionType.CX, (10, 20))
+        assert translated[1] == (MatrixCompressionType.X, 30)
 
     def test_translate_ops_remaps_ancilla(self):
         """Indices >= num_local_qubits should map to ancilla space."""
-        ops = [("cx", (0, 3))]
+        ops = [(MatrixCompressionType.CX, (0, 3))]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=3,
@@ -643,23 +633,23 @@ class TestToGf2xOperations:
             ancilla_start=100,
         )
         # Index 3 >= num_local_qubits=3, so maps to ancilla_start + (3 - 3) = 100
-        assert translated[0] == ("cx", (10, 100))
+        assert translated[0] == (MatrixCompressionType.CX, (10, 100))
 
     def test_translate_ops_ccx(self):
         """CCX indices are remapped through active_qubit_indices."""
-        ops = [("ccx", (0, 1, 2))]
+        ops = [(MatrixCompressionType.CCX, (0, 1, 2))]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=3,
             active_qubit_indices=[5, 6, 7],
             ancilla_start=10,
         )
-        assert translated[0] == ("ccx", (5, 6, 7))
+        assert translated[0] == (MatrixCompressionType.CCX, (5, 6, 7))
 
     def test_translate_ops_select(self):
         """Select ops remap address and data qubit indices, keeping the table."""
         data_table = [[True, False], [False, True]]
-        ops = [("select", (data_table, [0, 1], [2, 3]))]
+        ops = [(MatrixCompressionType.SELECT, (data_table, [0, 1], [2, 3]))]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=4,
@@ -673,7 +663,7 @@ class TestToGf2xOperations:
 
     def test_translate_ops_mcx(self):
         """MCX remaps control and target indices, preserving control states."""
-        ops = [("mcx", ([0, 1], [True, False], 2))]
+        ops = [(MatrixCompressionType.MCX, ([0, 1], [True, False], 2))]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=3,
@@ -692,10 +682,12 @@ class TestToGf2xOperations:
             dtype=np.int8,
         )
         synth = BinaryEncodingSynthesizer.from_matrix(mat, measurement_based_uncompute=True)
-        ops = synth.to_gf2x_operations(num_local_qubits=4)
-        select_names = {name for name, _ in ops if "select" in name}
-        if select_names:
-            assert "select_and" in select_names
+        ops = synth.to_operations(num_local_qubits=4)
+        select_types = {
+            op.name for op in ops if op.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND}
+        }
+        if select_types:
+            assert MatrixCompressionType.SELECT_AND in select_types
 
 
 class TestLookupSelect:
@@ -711,7 +703,7 @@ class TestLookupSelect:
         table = {(1,): (1,)}
         ops = _lookup_select(table, [0], [1])
         assert len(ops) == 1
-        assert ops[0][0] == "select"
+        assert ops[0][0] == MatrixCompressionType.SELECT
 
     def test_two_address_bits(self):
         """Two address bits produce a 2^2 = 4 entry dense data table."""
@@ -719,7 +711,7 @@ class TestLookupSelect:
         ops = _lookup_select(table, [0, 1], [2])
         assert len(ops) == 1
         name, (data_table, addr, dat) = ops[0]
-        assert name == "select"
+        assert name == MatrixCompressionType.SELECT
         assert addr == [0, 1]
         assert dat == [2]
         assert len(data_table) == 4
@@ -742,4 +734,4 @@ class TestLookupSelect:
         """use_measurement_and=True emits select_and instead of select."""
         table = {(1,): (1,)}
         ops = _lookup_select(table, [0], [1], use_measurement_and=True)
-        assert ops[0][0] == "select_and"
+        assert ops[0][0] == MatrixCompressionType.SELECT_AND

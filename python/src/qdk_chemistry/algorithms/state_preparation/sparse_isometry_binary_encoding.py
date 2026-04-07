@@ -13,19 +13,16 @@ lookup blocks.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
-
 import numpy as np
 
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer
+from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionOp, MatrixCompressionType
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .sparse_isometry import (
     GF2XEliminationResult,
-    MatrixCompressionOp,
     SparseIsometryGF2XStatePreparation,
     SparseIsometryGF2XStatePreparationSettings,
     gf2x_with_tracking,
@@ -61,7 +58,7 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
 
     This class extends sparse isometry with GF2+X elimination by replacing
     the dense state preparation step with a binary-encoding circuit synthesiser.
-    After GF2+X elimination produces a reduced RREF matrix, the binary-encoding
+    After GF2+X elimination produces a REF matrix, the binary-encoding
     synthesiser compresses the matrix into an efficient circuit using:
 
         1. Stage 1 — diagonal (unary-to-binary) encoding of pivot columns
@@ -92,16 +89,6 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
 
         """
         Logger.trace_entering()
-
-        # Active Space Consistency Check (same as parent)
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
-
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
@@ -123,8 +110,8 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         bitstring_matrix = self._bitstrings_to_binary_matrix(bitstrings)
         gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, forward_only=True)
 
-        # Step 2: Binary encoding on the reduced RREF matrix
-        binary_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
+        # Step 2: Binary encoding on the REF matrix
+        encoded_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
 
         # Step 2b: Build compressed statevector reindexed by the bijection.
         # The bijection maps (dense_val, orig_col) where orig_col is the
@@ -142,34 +129,14 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         dense_row_map = gf2x_result.row_map[:dense_size]
 
         # Step 3: Build expansion operations from GF2+X elimination
-        expansion_ops: list[MatrixCompressionOp] = []
+        gaussian_elimination_ops: list[MatrixCompressionOp] = []
         for operation in reversed(gf2x_result.operations):
             if operation[0] in ("cx", "cnot"):
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
-                    expansion_ops.append(MatrixCompressionOp("CX", [control, target]))
+                    gaussian_elimination_ops.append(MatrixCompressionOp(MatrixCompressionType.CX, [control, target]))
             elif operation[0] == "x" and isinstance(operation[1], int):
-                expansion_ops.append(MatrixCompressionOp("X", [operation[1]]))
-
-        # Step 4: Pre-process binary-encoding ops into MatrixCompressionOp instances
-        encoded_ops = _encode_gf2x_ops_for_qs(binary_ops)
-
-        # Step 4b: Elide redundant CX pair at the boundary.
-        # Binary encoding's unary staircase always starts with CX(row_map[rank-1], row_map[rank-2])
-        # which, after reversal, becomes the LAST encoded_op.
-        # GF2+X back-substitution often ends with the same CX (clearing the
-        # entry above the last pivot), which becomes the FIRST expansion_op.
-        # Since CX is self-inverse, the pair cancels — remove both.
-        if (
-            encoded_ops
-            and expansion_ops
-            and encoded_ops[-1].name == "CX"
-            and expansion_ops[0].name == "CX"
-            and encoded_ops[-1].qubits == expansion_ops[0].qubits
-        ):
-            Logger.debug(f"Eliding redundant boundary CX pair on qubits {encoded_ops[-1].qubits}")
-            encoded_ops.pop()
-            expansion_ops.pop(0)
+                gaussian_elimination_ops.append(MatrixCompressionOp(MatrixCompressionType.X, [operation[1]]))
 
         # Build circuit using QDK Q# factory with binary-encoding entry point
         # dense_val from the bijection uses row 0 = MSB (_bits_to_int is MSB-first).
@@ -179,10 +146,9 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         state_prep_params = QSHARP_UTILS.BinaryEncoding.BinaryEncodingStatePreparationParams(
             rowMap=list(dense_row_map),
             stateVector=compressed_sv.tolist(),
-            expansionOps=[op.to_qsharp_parameter() for op in expansion_ops],
+            gaussianEliminationOps=[op.to_qsharp_parameter() for op in gaussian_elimination_ops],
             binaryEncodingOps=[op.to_qsharp_parameter() for op in encoded_ops],
             numQubits=n_qubits,
-            numAncilla=0,
         )
 
         qsharp_factory = QsharpFactoryData(
@@ -191,7 +157,7 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         )
         qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*vars(state_prep_params).values())
         Logger.info(
-            f"Binary encoding produced {len(binary_ops)} operations ({len(encoded_ops)} encoded) "
+            f"Binary encoding produced {len(encoded_ops)} operations "
             f"for {n_qubits}-qubit system with {len(bitstrings)} determinants"
         )
 
@@ -203,17 +169,21 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
 
     def _perform_binary_encoding(
         self, gf2x_result: GF2XEliminationResult, n_qubits: int
-    ) -> tuple[list[tuple[str, Any]], list[tuple[int, int]], int]:
-        """Run binary-encoding synthesis on the reduced RREF matrix.
+    ) -> tuple[list[MatrixCompressionOp], list[tuple[int, int]], int]:
+        """Run binary-encoding synthesis and return Q#-ready ops.
+
+        Runs the synthesiser, translates qubit indices from local to global,
+        and converts operations directly into MatrixCompressionOp
+        instances in reversed order (so Q# can iterate forward).
 
         Args:
             gf2x_result: Result from GF2+X elimination containing the reduced matrix.
             n_qubits: Total number of qubits in the original space.
 
         Returns:
-            Tuple of ``(gf2x_ops, bijection, dense_size)``:
+            Tuple of ``(ops, bijection, dense_size)``:
 
-            - ``gf2x_ops``: gate operations from the binary-encoding solver.
+            - ``ops``: MatrixCompressionOp list ready for Q#.
             - ``bijection``: list of ``(dense_val, orig_col)`` mapping each
               original matrix column to its compressed binary-register label.
             - ``dense_size``: number of qubits in the compressed dense register.
@@ -232,68 +202,21 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             measurement_based_uncompute=self._settings.get("measurement_based_uncompute"),
         )
 
-        gf2x_ops = synthesizer.to_gf2x_operations(
+        ops = synthesizer.to_operations(
             num_local_qubits=n_qubits,
             active_qubit_indices=gf2x_result.row_map,
             ancilla_start=n_qubits,
+            reverse=True,
         )
 
         Logger.debug(
-            f"Binary encoding output: {len(gf2x_ops)} ops, "
+            f"Binary encoding output: {len(ops)} ops, "
             f"bijection size {len(synthesizer.bijection)}, "
             f"dense_size {synthesizer.dense_size}"
         )
 
-        return gf2x_ops, synthesizer.bijection, synthesizer.dense_size
+        return ops, synthesizer.bijection, synthesizer.dense_size
 
     def name(self) -> str:
         """Return the algorithm identifier string."""
         return "sparse_isometry_binary_encoding"
-
-
-def _encode_gf2x_ops_for_qs(
-    operations: list[tuple[str, Any]],
-) -> list[MatrixCompressionOp]:
-    """Pre-process GF2+X operations into :class:`MatrixCompressionOp` instances for Q#.
-
-    The resulting list is already in *reversed* order so that Q# can iterate
-    forward.
-
-    Args:
-        operations: Sequence of ``(op_name, op_args)`` tuples as produced by
-            :meth:`BinaryEncodingSynthesizer.to_gf2x_operations`.
-
-    Returns:
-        List of :class:`MatrixCompressionOp` ready to be serialised for Q#.
-
-    """
-    ops: list[MatrixCompressionOp] = []
-
-    for op_name, op_args in reversed(operations):
-        if op_name == "x":
-            ops.append(MatrixCompressionOp("X", [int(op_args)]))
-
-        elif op_name == "cx":
-            ops.append(MatrixCompressionOp("CX", [int(op_args[0]), int(op_args[1])]))
-
-        elif op_name == "swap":
-            ops.append(MatrixCompressionOp("SWAP", [int(op_args[0]), int(op_args[1])]))
-
-        elif op_name == "ccx":
-            target, ctrl1, ctrl2 = op_args
-            ops.append(MatrixCompressionOp("CCX", [int(ctrl1), int(ctrl2), int(target)]))
-
-        elif op_name in ("select", "select_and"):
-            data_table, addr_qubits, dat_qubits = op_args
-            qubits = [int(q) for q in addr_qubits] + [int(q) for q in dat_qubits]
-            qs_name = "SELECT_AND" if op_name == "select_and" else "SELECT"
-            ops.append(
-                MatrixCompressionOp(
-                    qs_name,
-                    qubits,
-                    control_state=len(addr_qubits),
-                    lookup_data=data_table,
-                )
-            )
-
-    return ops

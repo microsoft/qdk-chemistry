@@ -12,10 +12,9 @@ import qsharp
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncodingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import _encode_gf2x_ops_for_qs
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer
+from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionType
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -43,16 +42,15 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
     gf2x_result = gf2x_with_tracking(matrix, skip_diagonal_reduction=True, forward_only=True)
 
     synthesizer = BinaryEncodingSynthesizer.from_matrix(gf2x_result.reduced_matrix)
-    ops = synthesizer.to_gf2x_operations(
+    ops = synthesizer.to_operations(
         num_local_qubits=n_system,
         active_qubit_indices=gf2x_result.row_map,
         ancilla_start=n_system,
     )
     max_select_ancilla = 0
-    for op_name, op_args in ops:
-        if op_name in ("select", "select_and"):
-            _, address_qubits, _ = op_args
-            n_addr = len(address_qubits)
+    for op in ops:
+        if op.name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND):
+            n_addr = op.control_state
             max_select_ancilla = max(max_select_ancilla, n_addr - 1)
 
     return n_system, max_select_ancilla
@@ -199,58 +197,3 @@ class TestSparseIsometryBinaryEncoding:
         assert np.isclose(
             overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
-
-    def test_encode_empty_ops(self):
-        """Empty ops list produces empty encoded list."""
-        assert _encode_gf2x_ops_for_qs([]) == []
-
-    def test_encode_cx(self):
-        """CX op is encoded as MatrixCompressionOp('CX', ...)."""
-        encoded = _encode_gf2x_ops_for_qs([("cx", (0, 1))])
-        assert len(encoded) == 1
-        assert encoded[0].name == "CX"
-        assert encoded[0].qubits == [0, 1]
-
-    def test_encode_x(self):
-        """X op is encoded as MatrixCompressionOp('X', [qubit])."""
-        encoded = _encode_gf2x_ops_for_qs([("x", 5)])
-        assert encoded[0].name == "X"
-        assert encoded[0].qubits == [5]
-
-    def test_encode_swap(self):
-        """SWAP op is encoded correctly."""
-        encoded = _encode_gf2x_ops_for_qs([("swap", (2, 3))])
-        assert encoded[0].name == "SWAP"
-        assert encoded[0].qubits == [2, 3]
-
-    def test_encode_ccx(self):
-        """CCX op encodes [ctrl1, ctrl2, target]."""
-        encoded = _encode_gf2x_ops_for_qs([("ccx", (4, 0, 1))])
-        assert encoded[0].name == "CCX"
-        assert encoded[0].qubits == [0, 1, 4]
-
-    def test_encode_select(self):
-        """SELECT op preserves data table and records address qubit count."""
-        data = [[True, False], [False, True]]
-        encoded = _encode_gf2x_ops_for_qs([("select", (data, [0, 1], [2, 3]))])
-        assert encoded[0].name == "SELECT"
-        assert encoded[0].qubits == [0, 1, 2, 3]
-        assert encoded[0].control_state == 2
-        assert encoded[0].lookup_data is data
-
-    def test_encode_select_and(self):
-        """SELECT_AND is used for measurement-based ops."""
-        encoded = _encode_gf2x_ops_for_qs([("select_and", ([[True]], [0], [1]))])
-        assert encoded[0].name == "SELECT_AND"
-
-    def test_encode_reversed_order(self):
-        """Encoded ops appear in reversed order relative to input."""
-        encoded = _encode_gf2x_ops_for_qs([("x", 0), ("cx", (1, 2)), ("x", 3)])
-        assert [op.name for op in encoded] == ["X", "CX", "X"]
-        assert encoded[0].qubits == [3]
-        assert encoded[2].qubits == [0]
-
-    def test_encode_to_dict_keys(self):
-        """to_dict produces camelCase keys required by Q# bridge."""
-        encoded = _encode_gf2x_ops_for_qs([("cx", (0, 1))])
-        assert set(encoded[0].to_dict().keys()) == {"name", "qubits", "controlState", "lookupData"}

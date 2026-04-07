@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 import qsharp
 
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
     SparseIsometryGF2XStatePreparation,
@@ -308,52 +308,6 @@ def test_prepare_single_reference_state_error_cases():
 
     with pytest.raises(ValueError, match="Bitstring must contain only '0' and '1' characters"):
         test_cls._prepare_single_reference_state("1012")
-
-
-def test_asymmetric_active_space_error():
-    """Test error for asymmetric active space in StatePrep."""
-
-    class MockOrbitals:
-        """Mock orbitals with asymmetric active space indices."""
-
-        def get_active_space_indices(self):
-            """Return asymmetric active space indices."""
-            return ([0, 1, 2], [0, 1, 2, 3])
-
-    class MockWavefunction:
-        """Mock wavefunction for testing asymmetric active space."""
-
-        def get_orbitals(self):
-            """Return mock orbitals."""
-            return MockOrbitals()
-
-        def get_active_determinants(self):
-            """Return mock determinants."""
-            return [Configuration("2020000"), Configuration("2200000")]
-
-        def get_coefficient(self, _):
-            """Return mock coefficient."""
-            return 1.0
-
-        def get_coefficients(self):
-            """Return coefficients for all determinants."""
-            return [1.0, 0.5]  # Two coefficients for the two determinants
-
-        def size(self):
-            """Return the number of determinants."""
-            return len(self.get_active_determinants())
-
-    mock_wfn = MockWavefunction()
-    for sp_key in available("state_prep"):
-        prep = create("state_prep", sp_key)
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            ),
-        ):
-            prep.run(mock_wfn)
 
 
 def test_find_pivot_row():
@@ -969,7 +923,7 @@ def test_forward_only_produces_upper_triangular():
 
 
 def test_forward_only_does_not_back_substitute():
-    """Forward-only differs from full RREF — above-diagonal entries survive."""
+    """Forward-only differs from full RREF, above-diagonal entries survive."""
     matrix = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
     m_fwd, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [], forward_only=True)
     m_full, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [])

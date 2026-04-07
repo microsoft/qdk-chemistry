@@ -33,8 +33,7 @@ Algorithm Details:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -43,6 +42,7 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePr
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.binary_encoding import MatrixCompressionOp, MatrixCompressionType
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = ["SparseIsometryGF2XStatePreparationSettings"]
@@ -155,9 +155,9 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             if operation[0] == "cx":
                 if isinstance(operation[1], tuple):
                     target, control = operation[1]
-                    expansion_ops.append(MatrixCompressionOp("CX", [control, target]))
+                    expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.CX, [control, target]))
             elif operation[0] == "x" and isinstance(operation[1], int):
-                expansion_ops.append(MatrixCompressionOp("X", [operation[1]]))
+                expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.X, [operation[1]]))
 
         # State vector indexing is in little-endian order, the row map is reversed for Q# convention
         state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
@@ -448,48 +448,6 @@ class GF2XEliminationResult:
 
     rank: int
     """Rank of the reduced matrix (number of non-zero rows)."""
-
-
-@dataclass
-class MatrixCompressionOp:
-    """A single gate in the compressed matrix-encoding circuit.
-
-    Mirrors the Q# ``MatrixCompressionOp`` struct.  Use :meth:`to_dict` to
-    produce a camelCase dict consumable by the Q# bridge.
-
-    Attributes:
-        name: Gate name (e.g. ``"CX"``, ``"CCX"``, ``"SELECT"``).
-        qubits: Qubit indices involved in the operation.
-        control_state: Integer encoding of the control state for multi-
-            controlled gates.  For ``SELECT``/``SELECT_AND``, this stores
-            the number of address qubits.
-        lookup_data: Boolean lookup table for ``SELECT`` operations;
-            empty list for all other gate types.
-
-    """
-
-    name: str
-    qubits: list[int]
-    control_state: int = 0
-    lookup_data: list[list[bool]] = field(default_factory=list)
-
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct."""
-        return {
-            "name": self.name,
-            "qubits": self.qubits,
-            "controlState": self.control_state,
-            "lookupData": self.lookup_data,
-        }
-
-    def to_qsharp_parameter(self) -> QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp:
-        """Convert to a Q# MatrixCompressionOp struct."""
-        return QSHARP_UTILS.BinaryEncoding.MatrixCompressionOp(
-            name=self.name,
-            qubits=self.qubits,
-            controlState=self.control_state,
-            lookupData=self.lookup_data,
-        )
 
 
 def gf2x_with_tracking(
@@ -842,7 +800,7 @@ def _reduce_diagonal_matrix(
         operations: Operations list to extend.
 
     Returns:
-        :class:`GF2XEliminationResult` with rank decremented by 1.
+        GF2XEliminationResult with rank decremented by 1.
 
     """
     matrix_work = matrix.copy()

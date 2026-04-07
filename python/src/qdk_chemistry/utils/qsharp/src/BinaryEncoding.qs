@@ -37,13 +37,11 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         /// Amplitudes of the reduced-space statevector.
         stateVector : Double[],
         /// GF2+X expansion operations (CX / X) to reverse the GF2+X elimination.
-        expansionOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
         /// Binary-encoding gate sequence (already reversed by Python).
         binaryEncodingOps : MatrixCompressionOp[],
-        /// Total number of qubits (system + ancilla).
+        /// Total number of qubits.
         numQubits : Int,
-        /// Number of ancilla qubits required by the binary-encoding circuit.
-        numAncilla : Int,
     }
 
     /// Apply a single matrix-compression gate to a qubit register.
@@ -260,7 +258,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         }
 
         // Step 3: Expand back via GF2+X operations
-        for gate in params.expansionOps {
+        for gate in params.gaussianEliminationOps {
             ApplyMatrixCompressionOp(gate, qs);
         }
     }
@@ -269,18 +267,16 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     function MakeBinaryEncodingStatePreparationOp(
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
         binaryEncodingOps : MatrixCompressionOp[],
         numQubits : Int,
-        numAncilla : Int,
     ) : Qubit[] => Unit {
         BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
             rowMap = rowMap,
             stateVector = stateVector,
-            expansionOps = expansionOps,
+            gaussianEliminationOps = gaussianEliminationOps,
             binaryEncodingOps = binaryEncodingOps,
             numQubits = numQubits,
-            numAncilla = numAncilla,
         }, _)
     }
 
@@ -288,19 +284,17 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     operation MakeBinaryEncodingStatePreparationCircuit(
         rowMap : Int[],
         stateVector : Double[],
-        expansionOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
         binaryEncodingOps : MatrixCompressionOp[],
         numQubits : Int,
-        numAncilla : Int,
     ) : Unit {
-        use qs = Qubit[numQubits + numAncilla];
+        use qs = Qubit[numQubits];
         BinaryEncodingStatePreparation(new BinaryEncodingStatePreparationParams {
             rowMap = rowMap,
             stateVector = stateVector,
-            expansionOps = expansionOps,
+            gaussianEliminationOps = gaussianEliminationOps,
             binaryEncodingOps = binaryEncodingOps,
             numQubits = numQubits,
-            numAncilla = numAncilla,
         }, qs);
     }
 }
