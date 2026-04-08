@@ -62,8 +62,8 @@ class HadamardTest(Algorithm):
         time_evolution_unitary: TimeEvolutionUnitary,
         shots: int,
         unitary_power: int,
-        mapper_type: str = "pauli_sequence",
-        simulator_type: str = "qdk_full_state_simulator",
+        mapper: ControlledEvolutionCircuitMapper | None = None,
+        simulator: CircuitExecutor | None = None,
         simulator_seed: int = 42,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
     ) -> CircuitExecutorData:
@@ -74,9 +74,9 @@ class HadamardTest(Algorithm):
             time_evolution_unitary: Time evolution unitary :math:`\exp(-i H \Delta t)`.
             shots: Number of shots to execute the circuit.
             unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`.
-            mapper_type: Algorithm name for controlled evolution circuit mapper.
-            simulator_type: Algorithm name for the circuit executor.
-            simulator_seed: Random seed used by the circuit executor for reproducible sampling.
+            mapper: Controlled evolution circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
+            simulator: Circuit executor. If ``None``, the default ``qdk_full_state_simulator`` is used.
+            simulator_seed: Random seed used for reproducible sampling when ``simulator`` is ``None``.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
                 or ``HadamardTestBasis.Z``).
 
@@ -89,14 +89,10 @@ class HadamardTest(Algorithm):
         if not isinstance(time_evolution_unitary, TimeEvolutionUnitary):
             raise TypeError("time_evolution_unitary must be an instance of TimeEvolutionUnitary.")
         num_system_qubits = time_evolution_unitary.get_num_qubits()
-        if not isinstance(mapper_type, str) or not mapper_type:
-            raise TypeError("mapper_type must be a non-empty string.")
         if not isinstance(unitary_power, int):
             raise TypeError("unitary_power must be an integer.")
         if unitary_power < 1:
             raise ValueError("unitary_power must be a positive integer.")
-        if not isinstance(simulator_type, str) or not simulator_type:
-            raise TypeError("simulator_type must be a non-empty string.")
         if not isinstance(simulator_seed, int):
             raise TypeError("simulator_seed must be an integer.")
         if not isinstance(shots, int):
@@ -111,12 +107,13 @@ class HadamardTest(Algorithm):
             control_indices=[0],
         )
 
-        try:
-            mapper = create("controlled_evolution_circuit_mapper", mapper_type)
-        except KeyError as err:
-            raise ValueError(f"Unknown controlled evolution circuit mapper type: {mapper_type}.") from err
-        if not isinstance(mapper, ControlledEvolutionCircuitMapper):
-            raise TypeError("mapper_type did not resolve to a ControlledEvolutionCircuitMapper.")
+        if mapper is None:
+            try:
+                mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+            except KeyError as err:
+                raise ValueError("Unknown controlled evolution circuit mapper type: pauli_sequence.") from err
+        elif not isinstance(mapper, ControlledEvolutionCircuitMapper):
+            raise TypeError("mapper must be an instance of ControlledEvolutionCircuitMapper or None.")
         mapper.settings().update("power", unitary_power)
         ctrl_time_evol_unitary_circuit = mapper.run(controlled_evolution=controlled_evolution)
 
@@ -127,13 +124,14 @@ class HadamardTest(Algorithm):
             test_basis,
         )
 
-        try:
-            simulator = create("circuit_executor", simulator_type)
-        except KeyError as err:
-            raise ValueError(f"Unknown simulator type: {simulator_type}.") from err
-        if not isinstance(simulator, CircuitExecutor):
-            raise TypeError("simulator_type did not resolve to a CircuitExecutor.")
-        simulator.settings().update("seed", simulator_seed)
+        if simulator is None:
+            try:
+                simulator = create("circuit_executor", "qdk_full_state_simulator")
+            except KeyError as err:
+                raise ValueError("Unknown simulator type: qdk_full_state_simulator.") from err
+            simulator.settings().update("seed", simulator_seed)
+        elif not isinstance(simulator, CircuitExecutor):
+            raise TypeError("simulator must be an instance of CircuitExecutor or None.")
 
         return simulator.run(circuit, shots=shots)
 

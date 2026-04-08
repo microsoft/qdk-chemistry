@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import importlib.util
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -18,6 +19,10 @@ from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest, HadamardTe
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import QdkHadamardTest
 from qdk_chemistry.data import Circuit, Structure, TimeEvolutionUnitary
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+
+if TYPE_CHECKING:
+    from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -46,9 +51,9 @@ def _measure_observable(
     generator: HadamardTest,
     test_basis: HadamardTestBasis = HadamardTestBasis.X,
     shots: int = _SHOTS,
-    mapper_type: str = "pauli_sequence",
+    mapper: ControlledEvolutionCircuitMapper | None = None,
     unitary_power: int = _OBSERVABLE_POWER,
-    simulator_type: str = "qdk_full_state_simulator",
+    simulator: CircuitExecutor | None = None,
 ) -> float:
     """Measure the Hadamard-test expectation value for the given basis.
 
@@ -60,8 +65,8 @@ def _measure_observable(
         time_evolution_unitary,
         shots=shots,
         unitary_power=unitary_power,
-        mapper_type=mapper_type,
-        simulator_type=simulator_type,
+        mapper=mapper,
+        simulator=simulator,
         test_basis=test_basis,
     )
     counts = result.bitstring_counts
@@ -187,8 +192,6 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
             object(),
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis="Z",
         )
 
@@ -202,8 +205,6 @@ def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
             object(),
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis="Z",
         )
 
@@ -221,8 +222,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
             water_hadamard_benchmark.time_evolution_unitary,
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis=HadamardTestBasis.X,
         )
 
@@ -232,8 +231,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
             object(),
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis=HadamardTestBasis.X,
         )
 
@@ -252,8 +249,6 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
             water_hadamard_benchmark.time_evolution_unitary,
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis=HadamardTestBasis.X,
         )
 
@@ -263,7 +258,5 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
             object(),
             shots=_SHOTS,
             unitary_power=_OBSERVABLE_POWER,
-            mapper_type="pauli_sequence",
-            simulator_type="qdk_full_state_simulator",
             test_basis=HadamardTestBasis.X,
         )
