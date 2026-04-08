@@ -12,13 +12,17 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 
 from __future__ import annotations
 
-import qiskit_ibm_runtime.fake_provider
 from qiskit import transpile
 from qiskit.providers.exceptions import QiskitBackendNotFoundError
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
+
+if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+    import qiskit_ibm_runtime.fake_provider
+
 from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
@@ -97,13 +101,20 @@ class QiskitAerSimulator(CircuitExecutor):
         opt_level = self._settings.get("transpile_optimization_level")
 
         if device_backend_name is not None:
+            if not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+                raise ImportError(
+                    "qiskit_ibm_runtime is required for device backend simulation. "
+                    "Install it with: pip install qiskit-ibm-runtime"
+                )
+
             provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
             try:
                 device_backend = provider.backend(device_backend_name)
             except QiskitBackendNotFoundError:
-                available = [b.name for b in provider.backends()]
+                available = sorted(b.name for b in provider.backends())
+                available_backends = ", ".join(available)
                 raise ValueError(
-                    f"Unknown device backend '{device_backend_name}'. Available backends: {available}"
+                    f"Unknown device backend '{device_backend_name}'. Available backends: {available_backends}"
                 ) from None
 
             backend = AerSimulator.from_backend(device_backend)
