@@ -36,10 +36,14 @@ def load():
         QDK_CHEMISTRY_HAS_QISKIT_NATURE = True
     if importlib.util.find_spec("qiskit_aer") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_AER = True
+<<<<<<< HEAD
     if (
         importlib.util.find_spec("qiskit_ibm_runtime") is not None
         and importlib.util.find_spec("qiskit_ibm_runtime.fake_provider") is not None
     ):
+=======
+    if importlib.util.find_spec("qiskit_ibm_runtime") is not None:
+>>>>>>> origin/feature/agamshayit/transpile_to_backend
         QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = True
 
     if QDK_CHEMISTRY_HAS_QISKIT:

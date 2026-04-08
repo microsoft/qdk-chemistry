@@ -20,8 +20,14 @@ from qiskit_aer.noise import NoiseModel
 
 import qdk_chemistry.plugins.qiskit as qiskit_plugin
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+<<<<<<< HEAD
 
 if qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+=======
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
+
+if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+>>>>>>> origin/feature/agamshayit/transpile_to_backend
     import qiskit_ibm_runtime.fake_provider
 
 from qdk_chemistry.data import (
@@ -116,9 +122,15 @@ class QiskitAerSimulator(CircuitExecutor):
         ).run(meas_circuit)
 
         if device_backend_name is not None:
+<<<<<<< HEAD
             if not qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
                 raise ImportError(
                     "The fake_provider module from qiskit_ibm_runtime is required for device backend simulation. "
+=======
+            if not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+                raise ImportError(
+                    "qiskit_ibm_runtime is required for device backend simulation. "
+>>>>>>> origin/feature/agamshayit/transpile_to_backend
                     "Install it with: pip install qiskit-ibm-runtime"
                 )
 
