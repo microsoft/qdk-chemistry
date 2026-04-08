@@ -242,10 +242,10 @@ jobs:
       if: matrix.os-name == 'Windows'
       shell: pwsh
       run: |
-        # Search for clang-cl in Visual Studio installations
+        # Search for clang-cl in Visual Studio installations (-products * includes BuildTools)
         $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
         if (Test-Path $vswhere) {
-            $vsPath = & $vswhere -latest -property installationPath
+            $vsPath = & $vswhere -latest -products * -property installationPath
             $clangCandidates = @(
                 "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
                 "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
@@ -265,7 +265,7 @@ jobs:
         Write-Host "clang-cl not found, installing LLVM/Clang component..."
         $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
         if (Test-Path $vsInstaller) {
-            $vsPath = & $vswhere -latest -property installationPath
+            $vsPath = & $vswhere -latest -products * -property installationPath
             & $vsInstaller modify --installPath "$vsPath" `
                 --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
                 --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset `
