@@ -1,0 +1,46 @@
+{
+  "name": "openblas",
+  "version": "0.3.29",
+  "description": "Optimized BLAS library based on GotoBLAS2, with LAPACK support enabled",
+  "homepage": "https://github.com/OpenMathLib/OpenBLAS",
+  "license": "BSD-3-Clause",
+  "dependencies": [
+    {
+      "name": "openblas",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ],
+  "features": {
+    "threads": {
+      "description": "Enable multi-threading",
+      "dependencies": [
+        {
+          "name": "pthreads",
+          "platform": "!windows | mingw"
+        }
+      ]
+    },
+    "simplethread": {
+      "description": "Simple thread safety for level-3 BLAS",
+      "dependencies": [
+        {
+          "name": "openblas",
+          "default-features": false,
+          "features": ["threads"]
+        }
+      ]
+    },
+    "dynamic-arch": {
+      "description": "Enable multi-target support",
+      "supports": "!windows | mingw"
+    }
+  }
+}

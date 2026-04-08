@@ -17,6 +17,44 @@
 
 namespace macis {
 
+// Portable bit-manipulation helpers
+#if defined(_MSC_VER) && !defined(__clang__)
+
+/**
+ *  @brief CLZ (count leading zeros) for MSVC
+ */
+inline auto clz(unsigned int i) {
+    unsigned long idx;
+    _BitScanReverse(&idx, i);
+    return 31 - static_cast<int>(idx);
+}
+inline auto clz(unsigned long int i) {
+    return clz(static_cast<unsigned int>(i));
+}
+inline auto clz(unsigned long long int i) {
+    unsigned long idx;
+    _BitScanReverse64(&idx, i);
+    return 63 - static_cast<int>(idx);
+}
+
+/**
+ *  @brief ffsl/ffsll equivalents for MSVC
+ *
+ *  Returns the position of the first set bit (1-indexed), or 0 if none.
+ */
+inline int macis_ffsl(unsigned long i) {
+    unsigned long idx;
+    if (_BitScanForward(&idx, i)) return static_cast<int>(idx) + 1;
+    return 0;
+}
+inline int macis_ffsll(unsigned long long i) {
+    unsigned long idx;
+    if (_BitScanForward64(&idx, i)) return static_cast<int>(idx) + 1;
+    return 0;
+}
+
+#else  // GCC/Clang
+
 /**
  *  @brief Typesafe CLZ
  *
@@ -46,6 +84,14 @@ inline auto clz(unsigned long int i) { return __builtin_clzl(i); }
  *  @returns CLZ for `i`
  */
 inline auto clz(unsigned long long int i) { return __builtin_clzll(i); }
+
+/**
+ *  @brief ffsl/ffsll wrappers for GCC/Clang
+ */
+inline int macis_ffsl(unsigned long i) { return ffsl(i); }
+inline int macis_ffsll(unsigned long long i) { return ffsll(i); }
+
+#endif  // _MSC_VER
 
 /**
  *  @brief Typesafe FLS
@@ -127,9 +173,18 @@ template <size_t N>
 uint128_t to_uint128(std::bitset<N> bits) {
   static_assert(N <= 128, "N > 128");
   if constexpr (N == 128) {
+#if defined(_MSC_VER) && !defined(__clang__)
+    uint128_t result;
+    result.lo = fast_to_ullong(bits);
+    std::bitset<64> hi_bits;
+    for (size_t i = 0; i < 64; ++i) hi_bits[i] = bits[i + 64];
+    result.hi = fast_to_ullong(hi_bits);
+    return result;
+#else
     alignas(alignof(uint128_t)) std::bitset<N> cpy = bits;
     auto _x = reinterpret_cast<uint128_t*>(&cpy);
     return *_x;
+#endif
   } else {
     return fast_to_ullong(bits);
   }
@@ -202,9 +257,9 @@ std::bitset<N> full_mask(size_t i) {
 template <size_t N>
 uint32_t ffs(const std::bitset<N>& bits) {
   if constexpr (N <= 32)
-    return ffsl(fast_to_ulong(bits));
+    return macis_ffsl(fast_to_ulong(bits));
   else if constexpr (N <= 64)
-    return ffsll(fast_to_ullong(bits));
+    return macis_ffsll(fast_to_ullong(bits));
   else if constexpr (N <= 128) {
     // For 128-bit, check low 64 bits then high 64 bits
     std::bitset<64> low_bits;
@@ -213,9 +268,9 @@ uint32_t ffs(const std::bitset<N>& bits) {
       low_bits[i] = bits[i];
       if (i < N - 64) high_bits[i] = bits[i + 64];
     }
-    auto low_result = ffsll(fast_to_ullong(low_bits));
+    auto low_result = macis_ffsll(fast_to_ullong(low_bits));
     if (low_result) return low_result;
-    auto high_result = ffsll(fast_to_ullong(high_bits));
+    auto high_result = macis_ffsll(fast_to_ullong(high_bits));
     if (high_result) return high_result + 64;
     return 0;
   } else {

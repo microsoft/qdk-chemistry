@@ -137,8 +137,12 @@ target_compile_features(_core PUBLIC cxx_std_20)
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
-        target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(_core PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+            target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(_core PRIVATE --coverage)
+        else()
+            message(WARNING "Coverage build is only supported with GCC or Clang compilers")
+        endif()
     else()
         message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()
@@ -172,10 +176,14 @@ target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES
-    BUILD_RPATH "$ORIGIN:$ORIGIN/.."
-    INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
-    BUILD_RPATH_USE_ORIGIN ON
 )
+if(NOT WIN32)
+    set_target_properties(_core PROPERTIES
+        BUILD_RPATH "$ORIGIN:$ORIGIN/.."
+        INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
+        BUILD_RPATH_USE_ORIGIN ON
+    )
+endif()
 
 # Install the Python extension module
 install(TARGETS _core
