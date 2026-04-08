@@ -86,7 +86,7 @@ plugins = [
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0",
   "qiskit-aer",
-  "qiskit-ibm-runtime",
+  "qiskit-ibm-runtime>=0.46.1",
   "qiskit-nature",
   "pylatexenc==2.10"
 ]
