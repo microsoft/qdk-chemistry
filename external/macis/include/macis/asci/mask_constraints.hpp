@@ -830,7 +830,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   size_t total_work =
       std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
                       [](auto s, const auto& p) { return s + p.second; });
-  size_t local_average = total_work / world_size;
+  size_t local_average = std::max(1ul, total_work / world_size);
 
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
@@ -945,9 +945,13 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     // Select constraints larger than average to be broken apart
     std::vector<std::pair<constraint_type, size_t>> tps_to_next;
     {
+      // Constraints with C_min == 0 cannot be further decomposed.
+      // Keep them in-place even when they exceed local_average.
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(),
-          [=](const auto& a) { return a.second <= local_average; });
+          [=](const auto& a) {
+            return a.second <= local_average or a.first.C_min() == 0 or a.first.C_min() == 1;
+          });
 
       // Remove constraints from full list
       tps_to_next = decltype(tps_to_next)(it, constraint_sizes.end());
@@ -960,15 +964,6 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     // Break apart constraints
     for (auto [c, nw_trip] : tps_to_next) {
       const auto C_min = c.C_min();
-
-      // If the constraint can't be refined further (C_min == 0 means no
-      // bit positions below the constraint's minimum to add), keep it as-is
-      // to avoid silently dropping work.
-      if (C_min == 0) {
-        constraint_sizes.emplace_back(c, nw_trip);
-        total_work += nw_trip;
-        continue;
-      }
 
       // Loop over possible constraints with one more element
       for (auto q_l = 0; q_l < C_min; ++q_l) {
@@ -997,7 +992,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     total_work = std::accumulate(
         constraint_sizes.begin(), constraint_sizes.end(), 0ul,
         [](auto s, const auto& p) { return s + p.second; });
-    local_average = total_work / world_size;
+    local_average = std::max(1ul, total_work / world_size);
 
     if (cgen_logger) {
       size_t max_w = 0;

@@ -15,6 +15,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -531,9 +532,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         "  * CONSTRAINT_WORK: total={}, max_single={}, avg/worker={}, "
         "max/avg={:.2f}",
         total_cwork, max_cwork, avg_per_worker,
-        avg_per_worker > 0
-            ? static_cast<double>(max_cwork) / avg_per_worker
-            : 1.0);
+        avg_per_worker > 0 ? static_cast<double>(max_cwork) / avg_per_worker
+                           : 1.0);
   }
 
   size_t max_size =
@@ -560,6 +560,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 #pragma omp parallel
   {
     const int tid = omp_get_thread_num();
+    const asci_contrib_topk_comparator<wfn_t<N>> contrib_cmp{};
     auto t_wall_st = clock_type::now();
 
     // Accumulated results from all constraints processed by this thread.
@@ -663,7 +664,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
                                                       working_pairs.end());
             working_pairs.erase(uit, working_pairs.end());
           }
-
         }  // Unique Alpha Loop
 
         // S&A the working set and prune small contributions
@@ -678,8 +678,34 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         }
 
         // Merge into accumulated results
-        accumulated_pairs.insert(accumulated_pairs.end(), working_pairs.begin(),
-                                 working_pairs.end());
+        accumulated_pairs.insert(
+            accumulated_pairs.end(),
+            std::make_move_iterator(working_pairs.begin()),
+            std::make_move_iterator(working_pairs.end()));
+        working_pairs.clear();
+        size_t accumulated_size = accumulated_pairs.size();
+
+        if (accumulated_size > ntdets) {
+          const size_t cutoff_idx = ntdets - 1;
+          std::nth_element(accumulated_pairs.begin(),
+                           accumulated_pairs.begin() + cutoff_idx,
+                           accumulated_pairs.end(), contrib_cmp);
+          const double threshold =
+              std::abs(accumulated_pairs[cutoff_idx].rv());
+          // Repartition only the tail so entries tied at the cutoff are moved
+          // directly behind the nth position before trimming.
+          auto new_end = std::partition(
+              accumulated_pairs.begin() + cutoff_idx + 1,
+              accumulated_pairs.end(), [threshold](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold;
+              });
+          accumulated_pairs.erase(new_end, accumulated_pairs.end());
+        }
+
+        logger->debug(
+            "after merge, thread {} accumulated_pairs.size() = {}, ntdets = {} "
+            "at CON = {}",
+            tid, accumulated_pairs.size(), ntdets, ic);
       }  // Loc constraint loop
     }  // Constraint Loop
 
@@ -703,8 +729,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     logger->debug(
         "  * THREAD_WALL: min={:.3f}s max={:.3f}s avg={:.3f}s "
         "imbalance={:.2f}x efficiency={:.1f}%",
-        t_min, t_max, t_avg,
-        t_avg > 0 ? t_max / t_avg : 1.0,
+        t_min, t_max, t_avg, t_avg > 0 ? t_max / t_avg : 1.0,
         t_max > 0 ? 100.0 * t_avg / t_max : 100.0);
   }
 
