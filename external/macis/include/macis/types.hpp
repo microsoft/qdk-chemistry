@@ -8,7 +8,12 @@
  */
 
 #pragma once
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#include <intrin.h>
+#else
 #include <strings.h>
+#endif
 
 #include <bit>
 #include <bitset>
@@ -64,11 +69,27 @@ using wfn_t = std::bitset<N>;
 template <size_t N>
 using wavefunction_iterator_t = typename std::vector<std::bitset<N> >::iterator;
 
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(push)
+#pragma warning(disable: 4146)  // unary minus on unsigned
+// MSVC does not support __uint128_t; use a struct-based polyfill
+struct uint128_t {
+    uint64_t lo;
+    uint64_t hi;
+    uint128_t() : lo(0), hi(0) {}
+    uint128_t(uint64_t v) : lo(v), hi(0) {}
+    bool operator<(const uint128_t& o) const {
+        return hi < o.hi || (hi == o.hi && lo < o.lo);
+    }
+};
+#pragma warning(pop)
+#else
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 /// @brief 128-bit unsigned integer type
 using uint128_t = __uint128_t;
 #pragma GCC diagnostic pop
+#endif
 
 /**
  * @brief A type-safe wrapper that associates a value with a specific parameter

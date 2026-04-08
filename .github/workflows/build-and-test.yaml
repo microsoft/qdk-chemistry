@@ -85,6 +85,13 @@ jobs:
           python-version: '3.13'
           cpp-test-threads: 16
           python-test-threads: 16
+        - os-name: Windows
+          runner: windows-2022
+          build-parallel: 4
+          uarch: x86-64-v3
+          python-version: '3.13'
+          cpp-test-threads: 2
+          python-test-threads: 2
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
@@ -122,11 +129,18 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Set up environment paths
+    - name: Set up environment paths (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+    - name: Set up environment paths (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        echo "PATH=${{ github.workspace }}\install\bin;${{ github.workspace }}\install\lib;$env:PATH" >> $env:GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -218,7 +232,114 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+    # ---- Windows: Install vcpkg dependencies and set up clang-cl ----
+
+    - name: Set up MSVC Developer Environment (Windows)
+      if: matrix.os-name == 'Windows'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Install and verify clang-cl (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        # Search for clang-cl in Visual Studio installations
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (Test-Path $vswhere) {
+            $vsPath = & $vswhere -latest -property installationPath
+            $clangCandidates = @(
+                "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
+                "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
+            )
+            foreach ($candidate in $clangCandidates) {
+                if (Test-Path $candidate) {
+                    Write-Host "Found clang-cl at: $candidate"
+                    $clangDir = Split-Path $candidate
+                    echo "$clangDir" >> $env:GITHUB_PATH
+                    & $candidate --version
+                    exit 0
+                }
+            }
+        }
+
+        # If not found, install LLVM/Clang component via VS Installer
+        Write-Host "clang-cl not found, installing LLVM/Clang component..."
+        $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+        if (Test-Path $vsInstaller) {
+            $vsPath = & $vswhere -latest -property installationPath
+            & $vsInstaller modify --installPath "$vsPath" `
+                --add Microsoft.VisualStudio.Component.VC.Llvm.Clang `
+                --add Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset `
+                --quiet --norestart --wait
+            # Re-search after install
+            foreach ($candidate in $clangCandidates) {
+                if (Test-Path $candidate) {
+                    Write-Host "Found clang-cl at: $candidate"
+                    $clangDir = Split-Path $candidate
+                    echo "$clangDir" >> $env:GITHUB_PATH
+                    & $candidate --version
+                    exit 0
+                }
+            }
+        }
+
+        Write-Error "Failed to find or install clang-cl"
+        exit 1
+
+    - name: Cache vcpkg installed packages (Windows)
+      if: matrix.os-name == 'Windows'
+      id: cache-vcpkg
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ github.workspace }}/vcpkg_installed
+        key: >-
+          vcpkg-${{ runner.os }}-x64-windows-
+          ${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+
+    - name: Install vcpkg dependencies (Windows)
+      if: matrix.os-name == 'Windows' && steps.cache-vcpkg.outputs.cache-hit != 'true'
+      shell: pwsh
+      run: |
+        # Use the pre-installed vcpkg on GitHub-hosted Windows runners
+        $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkgRoot -or -not (Test-Path "$vcpkgRoot\vcpkg.exe")) {
+            # Fallback: bootstrap vcpkg from source
+            git clone https://github.com/microsoft/vcpkg.git "${{ github.workspace }}\vcpkg-tool"
+            & "${{ github.workspace }}\vcpkg-tool\bootstrap-vcpkg.bat" -disableMetrics
+            $vcpkgRoot = "${{ github.workspace }}\vcpkg-tool"
+        }
+        Write-Host "Using vcpkg at: $vcpkgRoot"
+
+        & "$vcpkgRoot\vcpkg.exe" install `
+            --triplet x64-windows `
+            --x-manifest-root="${{ github.workspace }}" `
+            --x-install-root="${{ github.workspace }}\vcpkg_installed" `
+            --overlay-ports="${{ github.workspace }}\vcpkg-overlay\ports"
+
+    - name: Set vcpkg environment (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        $vcpkgRoot = $env:VCPKG_INSTALLATION_ROOT
+        if (-not $vcpkgRoot -or -not (Test-Path "$vcpkgRoot\vcpkg.exe")) {
+            $vcpkgRoot = "${{ github.workspace }}\vcpkg-tool"
+        }
+        $toolchainFile = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
+        $installedDir = "${{ github.workspace }}\vcpkg_installed"
+
+        echo "CMAKE_TOOLCHAIN_FILE=$toolchainFile" >> $env:GITHUB_ENV
+        echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+        echo "VCPKG_INSTALLED_DIR=$installedDir" >> $env:GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=$installedDir\x64-windows" >> $env:GITHUB_ENV
+
+        # Add vcpkg bin dirs to PATH for DLLs at test time
+        echo "$installedDir\x64-windows\bin" >> $env:GITHUB_PATH
+        echo "$installedDir\x64-windows\debug\bin" >> $env:GITHUB_PATH
+
+    # ---- Linux/macOS: C++ dependency cache and build ----
+
+    - name: Cache C++ dependency install
+      if: matrix.os-name != 'Windows'
       id: cache-cpp-deps
       uses: actions/cache@v4
       with:
@@ -229,13 +350,14 @@ jobs:
           ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
 
     - name: Add C++ deps prefix to CMake search path
+      if: matrix.os-name != 'Windows'
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
         echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
     - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
+      if: matrix.os-name != 'Windows' && steps.cache-cpp-deps.outputs.cache-hit != 'true'
       env:
         INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
@@ -245,7 +367,10 @@ jobs:
           ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
           ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
 
-    - name: Configure C++ RelWithDebInfo/Coverage build
+    # ---- C++ configure, build, test ----
+
+    - name: Configure C++ RelWithDebInfo/Coverage build (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       run: |
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
@@ -254,10 +379,34 @@ jobs:
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
 
-    - name: Build C++ RelWithDebInfo/Coverage library
+    - name: Configure C++ Release build (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        cmake -S cpp -B "$env:BUILD_DIR" `
+          -GNinja `
+          -DCMAKE_BUILD_TYPE=Release `
+          -DCMAKE_C_COMPILER=clang-cl `
+          -DCMAKE_CXX_COMPILER=clang-cl `
+          -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+          -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
+          -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
+          -DQDK_UARCH="$env:QDK_UARCH" `
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+          -DQDK_ENABLE_OPENMP=OFF `
+          -DBUILD_TESTING=ON
+
+    - name: Build C++ library (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       run: cmake --build "$BUILD_DIR"
 
+    - name: Build C++ library (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: cmake --build "$env:BUILD_DIR"
+
     - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
+      if: matrix.os-name != 'Windows'
       env:
         OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
       run: |
@@ -304,17 +453,61 @@ jobs:
           exit $CTEST_EXIT_CODE
         fi
 
-    - name: Install C++ library
+    - name: Run C++ tests (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      env:
+        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
+      run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
+
+        Write-Host "=== Running C++ Tests ==="
+        Push-Location "$env:BUILD_DIR"
+        ctest --output-on-failure --verbose --timeout 300 `
+          --output-junit "${{ github.workspace }}\test-results\ctest_results.xml" `
+          -E "MACIS_SERIAL_TEST"
+        $ctestExit = $LASTEXITCODE
+        Pop-Location
+
+        if ($ctestExit -ne 0) {
+            Write-Host "=== Some tests failed (exit code: $ctestExit) ==="
+            exit $ctestExit
+        }
+
+    - name: Install C++ library (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       run: |
         cmake --install "$BUILD_DIR"
 
-    - name: Test C++ installation
+    - name: Install C++ library (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        cmake --install "$env:BUILD_DIR"
+
+    - name: Test C++ installation (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       run: |
         cmake -S examples/language/cpp -B build_example -GNinja -DCMAKE_PREFIX_PATH=${{ github.workspace }}/install
         cmake --build build_example --target all
         echo "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
 
-    - name: Install Python package
+    - name: Test C++ installation (Windows)
+      if: matrix.os-name == 'Windows'
+      shell: pwsh
+      run: |
+        cmake -S examples/language/cpp -B build_example -GNinja `
+          -DCMAKE_C_COMPILER=clang-cl `
+          -DCMAKE_CXX_COMPILER=clang-cl `
+          -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+          -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
+          -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
+          -DCMAKE_PREFIX_PATH="${{ github.workspace }}\install"
+        cmake --build build_example --target all
+        Write-Host "C++ Example Compiled with Pre-Installed QDK/Chemistry-C++ Libraries!"
+
+    - name: Install Python package (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       working-directory: python
       env:
         QDK_CHEMISTRY_ENABLE_COVERAGE: 1
@@ -336,12 +529,43 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
+    - name: Install Python package (Windows)
+      if: matrix.os-name == 'Windows'
+      working-directory: python
+      shell: pwsh
+      env:
+        CMAKE_BUILD_TYPE: Release
+      run: |
+        # Remove CMake files to build Python package without picking the installed library
+        if (Test-Path "${{ github.workspace }}\install\lib\cmake\qdk") {
+            Remove-Item -Recurse -Force "${{ github.workspace }}\install\lib\cmake\qdk"
+        }
+
+        python -m pip install . `
+          -C cmake.define.QDK_UARCH="$env:QDK_UARCH" `
+          -C cmake.define.BUILD_SHARED_LIBS=OFF `
+          -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF `
+          -C cmake.define.QDK_ENABLE_OPENMP=OFF `
+          -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+          -C cmake.define.BUILD_TESTING=OFF `
+          -C cmake.define.CMAKE_C_COMPILER=clang-cl `
+          -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
+          -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+          -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
+          -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
+
+        python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+
+        # Install test dependencies
+        python -m pip install pytest
+
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
+        python -m pip install coverage pytest pytest-cov
 
-    - name: Run Python tests
+    - name: Run Python tests (Linux/macOS)
+      if: matrix.os-name != 'Windows'
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
@@ -383,7 +607,23 @@ jobs:
           exit 1
         fi
 
+    - name: Run Python tests (Windows)
+      if: matrix.os-name == 'Windows'
+      env:
+        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
+      working-directory: python
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path ..\test-results | Out-Null
+
+        pytest `
+          --junitxml=..\test-results\pytest_report.xml `
+          -v `
+          --tb=short
+
     - name: Generate Pybind11 coverage report
+      if: matrix.os-name != 'Windows'
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -406,6 +646,7 @@ jobs:
         cat ../coverage-reports/pybind11_coverage.txt
 
     - name: Generate coverage statistics
+      if: matrix.os-name != 'Windows'
       run: |
         # Extract coverage percentages
         CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
@@ -463,13 +704,14 @@ jobs:
         fi
 
     - name: Comment PR with coverage
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && matrix.os-name != 'Windows'
       uses: thollander/actions-comment-pull-request@v2
       with:
         filePath: pr-comment.md
         comment_tag: coverage-report
 
     - name: Add coverage to job summary
+      if: matrix.os-name != 'Windows'
       run: |
         # Create comprehensive summary with table and detailed reports
         echo "## 📊 Coverage Summary" > coverage-summary.md
@@ -521,7 +763,7 @@ jobs:
         cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
 
     - name: Build documentation
-      if: matrix.python-version == '3.13'
+      if: matrix.python-version == '3.13' && matrix.os-name != 'Windows'
       working-directory: docs
       run: |
         set +e

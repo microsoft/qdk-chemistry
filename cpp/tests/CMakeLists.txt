@@ -74,8 +74,10 @@ function(add_gtest_executable test_source)
 
     if(QDK_CHEMISTRY_ENABLE_COVERAGE)
         # Handle coverage of inline functions
-        target_compile_options(${test_name} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(${test_name} PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+            target_compile_options(${test_name} PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(${test_name} PRIVATE --coverage)
+        endif()
     endif()
 
     # Discover tests automatically

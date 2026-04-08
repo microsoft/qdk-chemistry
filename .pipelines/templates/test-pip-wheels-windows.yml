@@ -1,0 +1,44 @@
+parameters:
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: pythonVersion
+  type: string
+  default: '3.12'
+
+steps:
+- task: UsePythonVersion@0
+  displayName: Use Python ${{ parameters.pythonVersion }}
+  inputs:
+    versionSpec: ${{ parameters.pythonVersion }}
+
+- powershell: |
+    $ErrorActionPreference = "Stop"
+
+    Write-Host "=== Testing Windows wheel ==="
+
+    # Find and install the repaired wheel
+    $wheel = Get-ChildItem "${{ parameters.agentBuildDirectory }}\qdk-chemistry\python\repaired_wheelhouse\qdk_chemistry-*.whl" | Select-Object -First 1
+    if (-not $wheel) {
+        Write-Error "No wheel found in repaired_wheelhouse"
+        exit 1
+    }
+    Write-Host "Installing wheel: $($wheel.FullName)"
+    python -m pip install $wheel.FullName
+
+    # Verify import
+    Write-Host "Verifying import..."
+    python -c "import qdk_chemistry; print(f'qdk_chemistry version: {qdk_chemistry.__version__}')"
+    if ($LASTEXITCODE -ne 0) { throw "Import verification failed" }
+
+    # Run basic tests (non-slow)
+    Write-Host "Installing test dependencies..."
+    python -m pip install pytest
+
+    Write-Host "Running tests..."
+    cd ${{ parameters.agentBuildDirectory }}\qdk-chemistry
+    python -m pytest python/tests/ -m "not slow" --timeout=300 -x -v
+    if ($LASTEXITCODE -ne 0) { throw "Tests failed" }
+
+    Write-Host "=== Windows wheel tests passed ==="
+  displayName: Test wheel (Windows)

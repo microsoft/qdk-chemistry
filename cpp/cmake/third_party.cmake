@@ -2,7 +2,11 @@
 include(DependencyManager)
 
 # Extract QDK_UARCH FLAGS
-set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
+if(MSVC)
+    set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS}")
+else()
+    set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
+endif()
 
 # Save current warning settings
 get_property(_old_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE)
