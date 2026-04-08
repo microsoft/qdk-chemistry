@@ -34,7 +34,7 @@ dependencies = [
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]>=1.26.0",
+  "qdk[jupyter]>=1.27.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0"
 ]
@@ -78,7 +78,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  "pyscf>=2.9.0,<2.12.1"
+  "qdk-chemistry[plugins]",
 ]
 plugins = [
   "pyscf>=2.9.0,<2.12.1"
@@ -86,6 +86,7 @@ plugins = [
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0",
   "qiskit-aer",
+  "qiskit-ibm-runtime>=0.46.1",
   "qiskit-nature",
   "pylatexenc==2.10"
 ]

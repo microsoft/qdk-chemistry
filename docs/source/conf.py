@@ -26,8 +26,7 @@ _repo_root = Path(__file__).resolve().parent.parent.parent
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
     raise FileNotFoundError(
-        f"VERSION file not found at {_version_file}. "
-        "Ensure you have a complete checkout of the repository."
+        f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
 
@@ -112,6 +111,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "qiskit_ibm_runtime",
     "openfermion",
     "cirq",
     "cirq_core",
@@ -206,8 +206,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
-    (r"py:class", r"qsharp._native.*"),
-    (r"py:class", r"qsharp._qsharp.*"),
+    (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
 ]
 
 # Configure output for to-dos
@@ -275,7 +274,6 @@ _MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
 
 def _rewrite_internal_module_path(text: str) -> str:
     """Map internal module paths to their public equivalents."""
-
     rewritten = text
     for old, new in _MODULE_ALIAS_RULES:
         if old in rewritten:
@@ -287,7 +285,6 @@ def normalize_autodoc_signature(
     app, what, name, obj, options, signature, return_annotation
 ):
     """Rewrite signatures/annotations pointing to internal modules."""
-
     new_signature = signature
     new_return = return_annotation
 
@@ -308,7 +305,6 @@ def normalize_autodoc_signature(
 
 def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
-
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
         if rewritten != line:
@@ -524,7 +520,6 @@ def process_breathe_docstring(app, what, name, obj, options, lines):
     additional processing needs.
     """
     # The :cite:`key` syntax works as-is for autodoc docstrings
-    pass
 
 
 def setup(app):

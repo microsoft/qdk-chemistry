@@ -35,11 +35,11 @@ from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
 from qdk_chemistry.utils import Logger
 
 __all__ = [
-    "FactorCliffordFromRz",
-    "FactorPauliFromRotation",
     "MergeZBasisRotations",
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
+    "SubstitutePauli1QRotation",
+    "SubstitutePauli2QRotation",
 ]
 
 
@@ -310,50 +310,122 @@ class SubstituteCliffordRz(TransformationPass):
         return self._settings
 
 
-# Clifford angles indexed by their multiples of π/2 (mod 4).
-_CLIFFORD_TABLE: list[tuple[float, type]] = [
-    (0.0, IGate),  # 0 · π/2
-    (np.pi / 2, SGate),  # 1 · π/2
-    (np.pi, ZGate),  # 2 · π/2
-    (3 * np.pi / 2, SdgGate),  # 3 · π/2  (≡ −π/2 mod 2π)
-]
+class _SubstitutePauliRotationSettings(Settings):
+    r"""Base settings configuration for SubstitutePauli\* passes.
 
-
-class FactorCliffordFromRz(TransformationPass):
-    r"""Factor out the nearest Clifford rotation from an arbitrary Rz gate.
-
-    For every ``Rz(θ)`` in the circuit this pass finds the Clifford angle
-    ``θ_c ∈ {0, π/2, π, 3π/2}`` that is closest to ``θ (mod 2π)`` and
-    replaces the single gate with the two-gate sequence::
-
-        Clifford(θ_c) · Rz(θ − θ_c)
-
-    When ``θ`` is already an exact Clifford angle (within *tolerance*) the
-    residual ``Rz`` vanishes and only the Clifford gate is emitted.
-    Parameterized ``Rz`` gates are left untouched.
-
-    This is useful as a pre-processing step: by pulling out the Clifford
-    component the remaining ``Rz`` rotations are bounded to ``|θ_rem| ≤ π/4``,
-    which can improve subsequent synthesis or error-mitigation passes.
-
-    Example:
-        ``Rz(1.6)`` is closest to ``S = Rz(π/2 ≈ 1.5708)``, so it becomes
-        ``S · Rz(0.0292)``.
+    Settings:
+        equivalent_gate_set (vector<string>): Substitutions to allow (always includes ``"id"``).
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance.
 
     """
 
-    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
-        """Initialize the FactorCliffordFromRz transformation pass.
+    def __init__(self, pauli_gate_names: list[str]):
+        """Initialize _SubstitutePauliRotationSettings.
 
         Args:
-            tolerance: Angle comparison tolerance used to decide whether
-                the residual rotation is negligible (i.e. the original gate
-                is already Clifford).  Default is ``np.finfo(np.float64).eps``.
+            pauli_gate_names: The Pauli gate names (e.g. ``["x", "y", "z"]``).
 
         """
         Logger.trace_entering()
         super().__init__()
-        self._tolerance = tolerance
+        self._set_default("equivalent_gate_set", "vector<string>", ["id", *pauli_gate_names])
+        self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
+
+    def set(self, key: str, value):
+        """Override set to ensure 'id' is always in equivalent_gate_set and duplicates are removed.
+
+        Args:
+            key (str): Setting key to set.
+            value: Value to set.
+
+        """
+        if key == "equivalent_gate_set" and isinstance(value, list):
+            value = list({*value, "id"})
+        Logger.trace_entering()
+        super().set(key, value)
+
+    def update(self, settings_dict: dict):
+        """Override update to ensure 'id' is always in equivalent_gate_set and duplicates are removed.
+
+        Args:
+            settings_dict (dict): Dictionary of settings to update.
+
+        """
+        if "equivalent_gate_set" in settings_dict and isinstance(settings_dict["equivalent_gate_set"], list):
+            settings_dict = {
+                **settings_dict,
+                "equivalent_gate_set": list({*settings_dict["equivalent_gate_set"], "id"}),
+            }
+        Logger.trace_entering()
+        super().update(settings_dict)
+
+
+class SubstitutePauli1QRotationSettings(_SubstitutePauliRotationSettings):
+    """Settings configuration for SubstitutePauli1QRotation.
+
+    SubstitutePauli1QRotation-specific settings:
+        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+
+    """
+
+    def __init__(self):
+        """Initialize SubstitutePauli1QRotationSettings."""
+        Logger.trace_entering()
+        super().__init__(["x", "y", "z"])
+
+
+class SubstitutePauli2QRotationSettings(_SubstitutePauliRotationSettings):
+    """Settings configuration for SubstitutePauli2QRotation.
+
+    SubstitutePauli2QRotation-specific settings:
+        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+
+    """
+
+    def __init__(self):
+        """Initialize SubstitutePauli2QRotationSettings."""
+        Logger.trace_entering()
+        super().__init__(["x", "y", "z"])
+
+
+class _SubstitutePauliRotation(TransformationPass):
+    r"""Base pass that replaces rotation gates at integer multiples of π.
+
+    For a rotation gate :math:`R_P(\theta)`:
+
+    * Even multiples of π (0, 2π, …) → identity (gate removed).
+    * Odd multiples of π (π, 3π, …) → the corresponding Pauli gate(s).
+
+    For 2-qubit rotations the Pauli is applied independently to each qubit.
+    """
+
+    def __init__(
+        self,
+        rotation_gates: dict[str, tuple[type, type]],
+        settings: _SubstitutePauliRotationSettings,
+        equivalent_gate_set: list[str] | None = None,
+        tolerance: float = float(np.finfo(np.float64).eps),
+    ):
+        """Initialize the pass.
+
+        Args:
+            rotation_gates: Gate-name → (Pauli class, Rotation class) mapping this pass handles.
+            settings: Settings instance for this pass.
+            equivalent_gate_set: List of gates to allow substitution with, or None for defaults.
+            tolerance: Angle comparison tolerance.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._rotation_gates = rotation_gates
+        self._settings = settings
+        if equivalent_gate_set is not None:
+            if not isinstance(equivalent_gate_set, list):
+                raise TypeError("equivalent_gate_set must be a list of gate names or None")
+            self._settings.set("equivalent_gate_set", equivalent_gate_set)
+        self._settings.set("tolerance", tolerance)
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Run the pass on the given ``DAGCircuit``.
@@ -362,155 +434,122 @@ class FactorCliffordFromRz(TransformationPass):
             dag: The input ``DAGCircuit`` to transform.
 
         Returns:
-            The transformed ``DAGCircuit`` with factored Clifford rotations.
+            The transformed ``DAGCircuit`` with Pauli substitutions.
 
         """
         Logger.trace_entering()
-        Logger.debug("Running FactorCliffordFromRz pass.")
+        Logger.debug(f"Running {type(self).__name__} pass.")
+
+        equivalent_gate_set = self._settings.get("equivalent_gate_set")
+        tolerance = self._settings.get("tolerance")
+
+        if "id" not in equivalent_gate_set:
+            raise ValueError("Gate 'id' is missing in equivalent_gate_set.")
+        if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
+            raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
 
         for node in dag.op_nodes():
-            if node.op.name != "rz":
+            if node.op.name not in self._rotation_gates:
                 continue
 
             angle = node.op.params[0]
             if isinstance(angle, ParameterExpression):
                 continue
 
-            # Normalise to [0, 2π)
-            angle_mod = float(angle) % (2 * np.pi)
+            pauli_cls, _ = self._rotation_gates[node.op.name]
+            pauli_name = pauli_cls().name  # e.g. "x", "y", "z"
 
-            # Find the nearest Clifford angle
-            best_cliff_angle, best_gate_cls = min(
-                _CLIFFORD_TABLE,
-                key=lambda entry: min(abs(angle_mod - entry[0]), 2 * np.pi - abs(angle_mod - entry[0])),
-            )
-
-            remainder = angle_mod - best_cliff_angle
-            # Wrap remainder into (−π, π]
-            remainder = (remainder + np.pi) % (2 * np.pi) - np.pi
-
-            if abs(remainder) <= self._tolerance:
-                # Exact Clifford — replace with the single Clifford gate
-                dag.substitute_node(node, best_gate_cls(), inplace=True)
-            else:
-                # Factor: Clifford · Rz(remainder)
-                replacement = DAGCircuit()
-                replacement.add_qubits(node.qargs)
-                if not isinstance(best_gate_cls(), IGate):
-                    replacement.apply_operation_back(best_gate_cls(), qargs=node.qargs)
-                replacement.apply_operation_back(RZGate(remainder), qargs=node.qargs)
-                dag.substitute_node_with_dag(node, replacement)
-
-        return dag
-
-
-# Mapping from rotation gate name to (single-qubit Pauli class, rotation gate class).
-_ROTATION_GATE_TABLE: dict[str, tuple[type, type]] = {
-    "rx": (XGate, RXGate),
-    "ry": (YGate, RYGate),
-    "rz": (ZGate, RZGate),
-    "rxx": (XGate, RXXGate),
-    "ryy": (YGate, RYYGate),
-    "rzz": (ZGate, RZZGate),
-}
-
-
-class FactorPauliFromRotation(TransformationPass):
-    r"""Factor out multiples of π from 1- and 2-qubit Pauli rotation gates.
-
-    Every rotation gate :math:`R_P(\theta) = \exp(-i \theta / 2\; P)` satisfies:
-
-    * :math:`R_P(\pi) = -i P` — equivalent to applying the Pauli operator (up to
-      global phase).
-    * :math:`R_P(2\pi) = -I` — identity (up to global phase).
-
-    This pass finds the nearest integer multiple :math:`k` of :math:`\pi` in the
-    gate angle and decomposes::
-
-        R_P(θ)  →  P^(k mod 2)  ·  R_P(θ − kπ)
-
-    where the Pauli part is emitted only when *k* is odd.  When the residual
-    vanishes (the angle was already an exact multiple of :math:`\pi`) only the
-    Pauli gates (or nothing) are emitted.
-
-    Supported gates: ``rx``, ``ry``, ``rz``, ``rxx``, ``ryy``, ``rzz``.
-    Parameterized gates are left untouched.
-
-    For 2-qubit gates such as :math:`R_{XX}(\pi)` the Pauli contribution is
-    the tensor product :math:`X \otimes X`, so the pass emits the
-    corresponding single-qubit Pauli on each qubit independently.
-
-    Example:
-        ``Rzz(π + 0.1)`` → ``Z · Z · Rzz(0.1)`` (Z on each qubit, then small
-        residual rotation).
-
-    """
-
-    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
-        """Initialize the FactorPauliFromRotation transformation pass.
-
-        Args:
-            tolerance: Angle comparison tolerance used to decide whether
-                the residual rotation is negligible.  Default is
-                ``np.finfo(np.float64).eps``.
-
-        """
-        Logger.trace_entering()
-        super().__init__()
-        self._tolerance = tolerance
-
-    def run(self, dag: DAGCircuit) -> DAGCircuit:
-        """Run the pass on the given ``DAGCircuit``.
-
-        Args:
-            dag: The input ``DAGCircuit`` to transform.
-
-        Returns:
-            The transformed ``DAGCircuit`` with factored Pauli rotations.
-
-        """
-        Logger.trace_entering()
-        Logger.debug("Running FactorPauliFromRotation pass.")
-
-        for node in dag.op_nodes():
-            if node.op.name not in _ROTATION_GATE_TABLE:
+            k = round(float(angle) / np.pi)
+            if abs(float(angle) - k * np.pi) > tolerance:
                 continue
 
-            angle = node.op.params[0]
-            if isinstance(angle, ParameterExpression):
-                continue
-
-            # Normalise to [0, 2π)
-            angle_f = float(angle) % (2 * np.pi)
-            pauli_cls, rot_cls = _ROTATION_GATE_TABLE[node.op.name]
-
-            # Nearest integer multiple of π
-            k = round(angle_f / np.pi)
-            remainder = angle_f - k * np.pi
-
-            need_pauli = (k % 2) != 0
-            need_residual = abs(remainder) > self._tolerance
-
-            if not need_pauli and not need_residual:
+            if k % 2 == 0 and "id" in equivalent_gate_set:
                 # Even multiple of π → identity; remove the gate
                 dag.remove_op_node(node)
-                continue
-
-            if not need_pauli and need_residual:
-                # Even multiple of π + small residual → just the reduced rotation
-                dag.substitute_node(node, rot_cls(remainder), inplace=True)
-                continue
-
-            # Odd multiple of π → emit Pauli gate(s), possibly followed by residual
-            replacement = DAGCircuit()
-            replacement.add_qubits(node.qargs)
-            for qubit in node.qargs:
-                replacement.apply_operation_back(pauli_cls(), qargs=[qubit])
-            if need_residual:
-                replacement.apply_operation_back(rot_cls(remainder), qargs=node.qargs)
-            dag.substitute_node_with_dag(node, replacement)
+            elif k % 2 != 0 and pauli_name in equivalent_gate_set:
+                # Odd multiple of π → Pauli gate(s)
+                if len(node.qargs) == 1:
+                    dag.substitute_node(node, pauli_cls(), inplace=True)
+                else:
+                    replacement = DAGCircuit()
+                    replacement.add_qubits(node.qargs)
+                    for qubit in node.qargs:
+                        replacement.apply_operation_back(pauli_cls(), qargs=[qubit])
+                    dag.substitute_node_with_dag(node, replacement)
 
         return dag
+
+    def settings(self) -> Settings:
+        """Get the settings for this pass.
+
+        Returns:
+            The settings object associated with this pass.
+
+        """
+        Logger.trace_entering()
+        return self._settings
+
+
+class SubstitutePauli1QRotation(_SubstitutePauliRotation):
+    r"""Substitute 1-qubit Pauli rotation gates (Rx, Ry, Rz) at integer multiples of π.
+
+    For each gate in {Rx, Ry, Rz}:
+
+    * :math:`R_P(k\pi)` where *k* is even → removed (identity up to global phase).
+    * :math:`R_P(k\pi)` where *k* is odd  → the corresponding Pauli gate (X, Y, or Z).
+    """
+
+    def __init__(
+        self,
+        equivalent_gate_set: list[str] | None = None,
+        tolerance: float = float(np.finfo(np.float64).eps),
+    ):
+        """Initialize SubstitutePauli1QRotation.
+
+        Args:
+            equivalent_gate_set: List of gates to allow substitution with, or None for
+                defaults (``["id", "x", "y", "z"]``).
+            tolerance: Angle comparison tolerance.
+
+        """
+        Logger.trace_entering()
+        super().__init__(
+            {"rx": (XGate, RXGate), "ry": (YGate, RYGate), "rz": (ZGate, RZGate)},
+            SubstitutePauli1QRotationSettings(),
+            equivalent_gate_set,
+            tolerance,
+        )
+
+
+class SubstitutePauli2QRotation(_SubstitutePauliRotation):
+    r"""Substitute 2-qubit Pauli rotation gates (Rxx, Ryy, Rzz) at integer multiples of π.
+
+    For each gate in {Rxx, Ryy, Rzz}:
+
+    * :math:`R_{PP}(k\pi)` where *k* is even → removed (identity up to global phase).
+    * :math:`R_{PP}(k\pi)` where *k* is odd  → the Pauli applied to each qubit (e.g. X⊗X).
+    """
+
+    def __init__(
+        self,
+        equivalent_gate_set: list[str] | None = None,
+        tolerance: float = float(np.finfo(np.float64).eps),
+    ):
+        """Initialize SubstitutePauli2QRotation.
+
+        Args:
+            equivalent_gate_set: List of gates to allow substitution with, or None for
+                defaults (``["id", "x", "y", "z"]``).
+            tolerance: Angle comparison tolerance.
+
+        """
+        Logger.trace_entering()
+        super().__init__(
+            {"rxx": (XGate, RXXGate), "ryy": (YGate, RYYGate), "rzz": (ZGate, RZZGate)},
+            SubstitutePauli2QRotationSettings(),
+            equivalent_gate_set,
+            tolerance,
+        )
 
 
 class RemoveZBasisOnZeroState(TransformationPass):

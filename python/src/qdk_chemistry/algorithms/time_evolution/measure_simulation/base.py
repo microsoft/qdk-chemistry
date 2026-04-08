@@ -62,7 +62,8 @@ class MeasureSimulation(Algorithm):
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
-        basis_gates: list[str] | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
@@ -78,7 +79,8 @@ class MeasureSimulation(Algorithm):
             energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
             device_backend_name: Optional device backend name.
-            basis_gates: Optional list of basis gates to transpile the circuit into before execution.
+            pre_transpilation_passes: Optional list of passes to apply before transpilation.
+            post_transpilation_passes: Optional list of passes to apply after transpilation.
 
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
@@ -131,79 +133,6 @@ class MeasureSimulation(Algorithm):
             encoding=combined_encoding,
         )
 
-    @staticmethod
-    def _transpile_to_basis_gates(circuit: Circuit, basis_gates: list[str]) -> Circuit:
-        """Transpile a Circuit to a target basis gate set using the qdk-chemistry transpiler.
-
-        Args:
-            circuit: The circuit to transpile.
-            basis_gates: Target basis gates (e.g. ``["cx", "rz", "h", "x"]``).
-
-        Returns:
-            A new ``Circuit`` restricted to the requested basis gates.
-
-        """
-        try:
-            from qiskit import qasm3, transpile  # noqa: PLC0415
-            from qiskit.transpiler import PassManager  # noqa: PLC0415
-
-            from qdk_chemistry.plugins.qiskit._interop.transpiler import (  # noqa: PLC0415
-                FactorCliffordFromRz,
-                FactorPauliFromRotation,
-                MergeZBasisRotations,
-                RemoveZBasisOnZeroState,
-                SubstituteCliffordRz,
-            )
-        except ImportError as exc:
-            raise RuntimeError(
-                "Qiskit is required to transpile circuits to the requested basis_gates, "
-                "but it is not installed. Please install the 'qiskit' package to use "
-                "the basis_gates option."
-            ) from exc
-
-        qc = circuit.get_qiskit_circuit()
-
-        pm = PassManager(
-            [
-                FactorCliffordFromRz(),
-                FactorPauliFromRotation(),
-            ]
-        )
-        qc = pm.run(qc)
-
-        qc = transpile(qc, basis_gates=basis_gates, optimization_level=0)
-
-        if (
-            "x" in basis_gates
-            and "y" in basis_gates
-            and "z" in basis_gates
-            and "h" in basis_gates
-            and "s" in basis_gates
-            and "sdg" in basis_gates
-            and "rz" in basis_gates
-        ):
-            # If the basis gates include all Clifford gates, we substitute rz gates with Clifford gates wherever possible
-            pm = PassManager(
-                [
-                    # RemoveZBasisOnZeroState(),
-                    MergeZBasisRotations(),
-                    SubstituteCliffordRz(),
-                ]
-            )
-            qc = pm.run(qc)
-        else:
-            pm = PassManager(
-                [
-                    MergeZBasisRotations(),
-                    RemoveZBasisOnZeroState(),
-                ]
-            )
-            qc = pm.run(qc)
-
-            qc = transpile(qc, basis_gates=basis_gates, optimization_level=3)
-
-        return Circuit(qasm=qasm3.dumps(qc), encoding=circuit.encoding)
-
     def _measure_observable(
         self,
         circuit: Circuit,
@@ -213,6 +142,8 @@ class MeasureSimulation(Algorithm):
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
         energy_result, measurement_data = energy_estimator.run(
@@ -222,6 +153,8 @@ class MeasureSimulation(Algorithm):
             total_shots=shots,
             noise_model=noise,
             device_backend_name=device_backend_name,
+            pre_transpilation_passes=pre_transpilation_passes,
+            post_transpilation_passes=post_transpilation_passes,
         )
         return energy_result, measurement_data
 

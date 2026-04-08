@@ -18,15 +18,7 @@ from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper import PauliSequenceMapper
 from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAndMeasure
 from qdk_chemistry.data import Circuit, QubitHamiltonian
-
-
-def _has_qiskit_aer() -> bool:
-    try:
-        from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
-
-        return QDK_CHEMISTRY_HAS_QISKIT_AER
-    except ImportError:
-        return False
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
 
 
 def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -112,7 +104,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
 
 
 @pytest.mark.skipif(
-    not _has_qiskit_aer(),
+    not QDK_CHEMISTRY_HAS_QISKIT_AER,
     reason="Qiskit Aer not available",
 )
 def test_evolve_and_measure_with_device_backend() -> None:

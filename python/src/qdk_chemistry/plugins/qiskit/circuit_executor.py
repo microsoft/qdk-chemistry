@@ -12,14 +12,19 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 
 from __future__ import annotations
 
-import qiskit_ibm_runtime.fake_provider as _fake_provider
 from qiskit import transpile
-from qiskit.circuit import ClassicalRegister
-from qiskit.result import marginal_counts
+from qiskit.providers.exceptions import QiskitBackendNotFoundError
+from qiskit.transpiler import PassManager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
+import qdk_chemistry.plugins.qiskit as qiskit_plugin
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+
+if qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+    import qiskit_ibm_runtime.fake_provider
+
+import qdk_chemistry.plugins.qiskit._interop.transpiler as _transpiler_module
 from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
@@ -29,9 +34,20 @@ from qdk_chemistry.data import (
 from qdk_chemistry.plugins.qiskit._interop.noise_model import (
     get_noise_model_from_profile,
 )
+from qdk_chemistry.plugins.qiskit._interop.transpiler import *  # noqa: F403
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitAerSimulator", "QiskitAerSimulatorSettings"]
+
+
+def _resolve_passes(names: list[str]) -> list:
+    """Resolve pass names to instances using the transpiler module's __all__."""
+    passes = []
+    for name in names:
+        if name not in _transpiler_module.__all__:
+            raise ValueError(f"Unknown pass '{name}'. Available passes: {_transpiler_module.__all__}")
+        passes.append(getattr(_transpiler_module, name)())
+    return passes
 
 
 class QiskitAerSimulatorSettings(Settings):
@@ -76,6 +92,8 @@ class QiskitAerSimulator(CircuitExecutor):
         shots: int,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the Qiskit Aer Simulator.
 
@@ -84,6 +102,8 @@ class QiskitAerSimulator(CircuitExecutor):
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
             device_backend_name: Optional name of a fake device backend to use for noise modeling.
+            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
+            post_transpilation_passes: Optional list of pass names to apply after transpilation.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
@@ -92,34 +112,33 @@ class QiskitAerSimulator(CircuitExecutor):
         Logger.trace_entering()
         meas_circuit = circuit.get_qiskit_circuit()
         Logger.debug("Qiskit QuantumCircuit loaded.")
+
         if noise is not None and device_backend_name is not None:
             raise ValueError("Cannot specify both a noise model and a device backend. Please choose one or the other.")
 
         opt_level = self._settings.get("transpile_optimization_level")
 
+        if pre_transpilation_passes:
+            meas_circuit = PassManager(
+                _resolve_passes(pre_transpilation_passes),
+            ).run(meas_circuit)
+
         if device_backend_name is not None:
-            # Directly look up the backend class to avoid instantiating all
-            # fake backends (which triggers unrelated warnings).
-            # Try both "FakeManila" and "FakeManilaV2" since naming is inconsistent.
-            class_name = "".join(part.capitalize() for part in device_backend_name.split("_"))
-            backend_class = getattr(_fake_provider, class_name, None) or getattr(
-                _fake_provider, class_name + "V2", None
-            )
-            if backend_class is None:
-                raise ValueError(
-                    f"Unknown device backend '{device_backend_name}'. "
-                    f"Expected a class '{class_name}' or '{class_name}V2' in qiskit_ibm_runtime.fake_provider."
+            if not qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+                raise ImportError(
+                    "The fake_provider module from qiskit_ibm_runtime is required for device backend simulation. "
+                    "Install it with: pip install qiskit-ibm-runtime"
                 )
-            device_backend = backend_class()
 
-            # If circuit has no measurements, add them for all logical qubits
-            if meas_circuit.num_clbits == 0:
-                meas_circuit = meas_circuit.copy()
-                creg = ClassicalRegister(meas_circuit.num_qubits)
-                meas_circuit.add_register(creg)
-                meas_circuit.measure(range(meas_circuit.num_qubits), creg)
-
-            n_clbits = meas_circuit.num_clbits
+            provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
+            try:
+                device_backend = provider.backend(device_backend_name)
+            except QiskitBackendNotFoundError:
+                available = sorted(b.name for b in provider.backends())
+                available_backends = ", ".join(available)
+                raise ValueError(
+                    f"Unknown device backend '{device_backend_name}'. Available backends: {available_backends}"
+                ) from None
 
             backend = AerSimulator.from_backend(device_backend)
             backend.set_options(
@@ -134,13 +153,6 @@ class QiskitAerSimulator(CircuitExecutor):
             )
 
         else:
-            # If circuit has no measurements, add them for all qubits
-            if meas_circuit.num_clbits == 0:
-                meas_circuit = meas_circuit.copy()
-                creg = ClassicalRegister(meas_circuit.num_qubits)
-                meas_circuit.add_register(creg)
-                meas_circuit.measure(range(meas_circuit.num_qubits), creg)
-
             noise_model = get_noise_model_from_profile(noise) if noise else None
             backend = AerSimulator(
                 method=self._settings.get("method"),
@@ -160,11 +172,14 @@ class QiskitAerSimulator(CircuitExecutor):
                     basis_gates=NoiseModel().basis_gates,
                     optimization_level=opt_level,
                 )
+
+        if post_transpilation_passes:
+            transpiled_circuit = PassManager(
+                _resolve_passes(post_transpilation_passes),
+            ).run(transpiled_circuit)
+
         raw_results = backend.run(transpiled_circuit, shots=shots).result()
-        if device_backend_name is not None:
-            counts = marginal_counts(raw_results, indices=list(range(n_clbits))).get_counts()
-        else:
-            counts = raw_results.get_counts()
+        counts = raw_results.get_counts()
         Logger.debug(f"Measurement results obtained: {counts}")
         return CircuitExecutorData(
             bitstring_counts=counts,

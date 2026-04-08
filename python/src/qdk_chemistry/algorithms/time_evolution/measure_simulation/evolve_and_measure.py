@@ -57,7 +57,8 @@ class EvolveAndMeasure(MeasureSimulation):
         energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
-        basis_gates: list[str] | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
@@ -72,7 +73,9 @@ class EvolveAndMeasure(MeasureSimulation):
             circuit_executor: Circuit executor backend.
             energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
-            basis_gates: Optional list of basis gates to transpile the circuit into before execution.
+            device_backend_name: Optional device backend name string to pass to the circuit executor.
+            pre_transpilation_passes: Optional list of passes to apply before transpilation.
+            post_transpilation_passes: Optional list of passes to apply after transpilation.
 
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
@@ -104,7 +107,6 @@ class EvolveAndMeasure(MeasureSimulation):
             evolution_builder=evolution_builder,
             circuit_mapper=circuit_mapper,
             state_prep=state_prep,
-            basis_gates=basis_gates,
         )
 
         measurements = []
@@ -118,6 +120,8 @@ class EvolveAndMeasure(MeasureSimulation):
                     energy_estimator=energy_estimator,
                     noise=noise,
                     device_backend_name=device_backend_name,
+                    pre_transpilation_passes=pre_transpilation_passes,
+                    post_transpilation_passes=post_transpilation_passes,
                 )
             )
         return measurements
@@ -130,7 +134,6 @@ class EvolveAndMeasure(MeasureSimulation):
         circuit_mapper: EvolutionCircuitMapper,
         *,
         state_prep: Circuit | None = None,
-        basis_gates: list[str] | None = None,
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
@@ -140,7 +143,6 @@ class EvolveAndMeasure(MeasureSimulation):
             evolution_builder: Time-evolution builder.
             circuit_mapper: Mapper for time-evolution unitary to circuit.
             state_prep: Optional circuit that prepares the initial state before time evolution.
-            basis_gates: Optional list of basis gates to transpile the circuit into.
 
         Returns:
             The combined evolution circuit.
@@ -160,9 +162,6 @@ class EvolveAndMeasure(MeasureSimulation):
 
         if state_prep is not None:
             circuit = self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)
-
-        if basis_gates is not None:
-            circuit = self._transpile_to_basis_gates(circuit, basis_gates)
 
         self._evolution_circuit = circuit
         return circuit
