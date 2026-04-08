@@ -9,20 +9,15 @@ from __future__ import annotations
 
 import importlib.util
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest, HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import QdkHadamardTest
 from qdk_chemistry.data import Circuit, Structure, TimeEvolutionUnitary
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-
-if TYPE_CHECKING:
-    from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
 
@@ -42,35 +37,6 @@ class HadamardWaterBenchmark:
 
     state_preparation: Circuit
     time_evolution_unitary: TimeEvolutionUnitary
-
-
-def _measure_observable(
-    *,
-    state_preparation: Circuit,
-    time_evolution_unitary: TimeEvolutionUnitary,
-    generator: HadamardTest,
-    test_basis: HadamardTestBasis = HadamardTestBasis.X,
-    shots: int = _SHOTS,
-    mapper: ControlledEvolutionCircuitMapper | None = None,
-    unitary_power: int = _OBSERVABLE_POWER,
-    simulator: CircuitExecutor | None = None,
-) -> float:
-    """Measure the Hadamard-test expectation value for the given basis.
-
-    For ``test_basis=HadamardTestBasis.X``, this equals ``Re(<psi|U|psi>)``; for ``test_basis=HadamardTestBasis.Y``,
-    it corresponds (up to a sign convention) to ``Im(<psi|U|psi>)``.
-    """
-    result = generator.run(
-        state_preparation,
-        time_evolution_unitary,
-        shots=shots,
-        unitary_power=unitary_power,
-        mapper=mapper,
-        simulator=simulator,
-        test_basis=test_basis,
-    )
-    counts = result.bitstring_counts
-    return (counts.get("0", 0) - counts.get("1", 0)) / shots
 
 
 @pytest.fixture(scope="module")
@@ -128,11 +94,14 @@ def test_qiskit_hadamard_generator_measures_water_observable(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Qiskit Hadamard generator reproduces the reference observable for water."""
-    observable_value = _measure_observable(
-        state_preparation=water_hadamard_benchmark.state_preparation,
-        time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
-        generator=QiskitHadamardTest(),
+    result = QiskitHadamardTest().run(
+        water_hadamard_benchmark.state_preparation,
+        water_hadamard_benchmark.time_evolution_unitary,
+        shots=_SHOTS,
+        unitary_power=_OBSERVABLE_POWER,
     )
+    counts = result.bitstring_counts
+    observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
 
     assert np.isclose(observable_value, 0.34, atol=1e-12)
 
@@ -142,11 +111,14 @@ def test_qdk_hadamard_test_measures_water_observable(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the reference observable for water."""
-    observable_value = _measure_observable(
-        state_preparation=water_hadamard_benchmark.state_preparation,
-        time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
-        generator=QdkHadamardTest(),
+    result = QdkHadamardTest().run(
+        water_hadamard_benchmark.state_preparation,
+        water_hadamard_benchmark.time_evolution_unitary,
+        shots=_SHOTS,
+        unitary_power=_OBSERVABLE_POWER,
     )
+    counts = result.bitstring_counts
+    observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
 
     assert np.isclose(observable_value, 0.34, atol=1e-12)
 
@@ -156,12 +128,15 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Qiskit Hadamard generator reproduces the Y-basis reference observable for water."""
-    observable_value = _measure_observable(
-        state_preparation=water_hadamard_benchmark.state_preparation,
-        time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
-        generator=QiskitHadamardTest(),
+    result = QiskitHadamardTest().run(
+        water_hadamard_benchmark.state_preparation,
+        water_hadamard_benchmark.time_evolution_unitary,
+        shots=_SHOTS,
+        unitary_power=_OBSERVABLE_POWER,
         test_basis=HadamardTestBasis.Y,
     )
+    counts = result.bitstring_counts
+    observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
 
     assert np.isclose(observable_value, 0.98, atol=1e-12)
 
@@ -171,12 +146,15 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
-    observable_value = _measure_observable(
-        state_preparation=water_hadamard_benchmark.state_preparation,
-        time_evolution_unitary=water_hadamard_benchmark.time_evolution_unitary,
-        generator=QdkHadamardTest(),
+    result = QdkHadamardTest().run(
+        water_hadamard_benchmark.state_preparation,
+        water_hadamard_benchmark.time_evolution_unitary,
+        shots=_SHOTS,
+        unitary_power=_OBSERVABLE_POWER,
         test_basis=HadamardTestBasis.Y,
     )
+    counts = result.bitstring_counts
+    observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
 
     assert np.isclose(observable_value, 0.98, atol=1e-12)
 
