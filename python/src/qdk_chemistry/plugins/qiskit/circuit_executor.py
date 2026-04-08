@@ -12,13 +12,18 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 
 from __future__ import annotations
 
-import qiskit_ibm_runtime.fake_provider
 from qiskit import transpile
 from qiskit.providers.exceptions import QiskitBackendNotFoundError
+from qiskit.transpiler import PassManager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
+
+if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+    import qiskit_ibm_runtime.fake_provider
+
 from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
@@ -27,6 +32,12 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.qiskit._interop.noise_model import (
     get_noise_model_from_profile,
+)
+from qdk_chemistry.plugins.qiskit._interop.transpiler import (
+    FactorCliffordFromRz,
+    FactorPauliFromRotation,
+    MergeZBasisRotations,
+    SubstituteCliffordRz,
 )
 from qdk_chemistry.utils import Logger
 
@@ -91,19 +102,34 @@ class QiskitAerSimulator(CircuitExecutor):
         Logger.trace_entering()
         meas_circuit = circuit.get_qiskit_circuit()
         Logger.debug("Qiskit QuantumCircuit loaded.")
+
         if noise is not None and device_backend_name is not None:
             raise ValueError("Cannot specify both a noise model and a device backend. Please choose one or the other.")
 
         opt_level = self._settings.get("transpile_optimization_level")
 
+        meas_circuit = PassManager(
+            [
+                FactorCliffordFromRz(),
+                FactorPauliFromRotation(),
+            ]
+        ).run(meas_circuit)
+
         if device_backend_name is not None:
+            if not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+                raise ImportError(
+                    "qiskit_ibm_runtime is required for device backend simulation. "
+                    "Install it with: pip install qiskit-ibm-runtime"
+                )
+
             provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
             try:
                 device_backend = provider.backend(device_backend_name)
             except QiskitBackendNotFoundError:
-                available = [b.name for b in provider.backends()]
+                available = sorted(b.name for b in provider.backends())
+                available_backends = ", ".join(available)
                 raise ValueError(
-                    f"Unknown device backend '{device_backend_name}'. Available backends: {available}"
+                    f"Unknown device backend '{device_backend_name}'. Available backends: {available_backends}"
                 ) from None
 
             backend = AerSimulator.from_backend(device_backend)
@@ -138,6 +164,14 @@ class QiskitAerSimulator(CircuitExecutor):
                     basis_gates=NoiseModel().basis_gates,
                     optimization_level=opt_level,
                 )
+
+        transpiled_circuit = PassManager(
+            [
+                MergeZBasisRotations(),
+                SubstituteCliffordRz(),
+            ]
+        ).run(transpiled_circuit)
+
         raw_results = backend.run(transpiled_circuit, shots=shots).result()
         counts = raw_results.get_counts()
         Logger.debug(f"Measurement results obtained: {counts}")
