@@ -18,10 +18,10 @@ from qiskit.transpiler import PassManager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
+import qdk_chemistry.plugins.qiskit as qiskit_plugin
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
-if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+if qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
     import qiskit_ibm_runtime.fake_provider
 
 from qdk_chemistry.data import (
@@ -116,9 +116,9 @@ class QiskitAerSimulator(CircuitExecutor):
         ).run(meas_circuit)
 
         if device_backend_name is not None:
-            if not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+            if not qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
                 raise ImportError(
-                    "qiskit_ibm_runtime is required for device backend simulation. "
+                    "The fake_provider module from qiskit_ibm_runtime is required for device backend simulation. "
                     "Install it with: pip install qiskit-ibm-runtime"
                 )
 
