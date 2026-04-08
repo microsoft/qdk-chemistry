@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from qiskit import transpile
 from qiskit.providers.exceptions import QiskitBackendNotFoundError
-from qiskit.transpiler import PassManager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
@@ -32,12 +31,6 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.qiskit._interop.noise_model import (
     get_noise_model_from_profile,
-)
-from qdk_chemistry.plugins.qiskit._interop.transpiler import (
-    FactorCliffordFromRz,
-    FactorPauliFromRotation,
-    MergeZBasisRotations,
-    SubstituteCliffordRz,
 )
 from qdk_chemistry.utils import Logger
 
@@ -108,13 +101,6 @@ class QiskitAerSimulator(CircuitExecutor):
 
         opt_level = self._settings.get("transpile_optimization_level")
 
-        meas_circuit = PassManager(
-            [
-                FactorCliffordFromRz(),
-                FactorPauliFromRotation(),
-            ]
-        ).run(meas_circuit)
-
         if device_backend_name is not None:
             if not qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
                 raise ImportError(
@@ -164,13 +150,6 @@ class QiskitAerSimulator(CircuitExecutor):
                     basis_gates=NoiseModel().basis_gates,
                     optimization_level=opt_level,
                 )
-
-        transpiled_circuit = PassManager(
-            [
-                MergeZBasisRotations(),
-                SubstituteCliffordRz(),
-            ]
-        ).run(transpiled_circuit)
 
         raw_results = backend.run(transpiled_circuit, shots=shots).result()
         counts = raw_results.get_counts()
