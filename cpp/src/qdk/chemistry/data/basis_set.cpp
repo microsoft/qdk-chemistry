@@ -341,8 +341,58 @@ BasisSet::BasisSet(const std::string& name,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  // Initialize ECP electrons vector with zeros for each atom
-  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+  // Look up shells from database, matching from_basis_name behavior
+  std::string basis_name_lower = _name;
+  std::transform(basis_name_lower.begin(), basis_name_lower.end(),
+                 basis_name_lower.begin(), ::tolower);
+  _name = basis_name_lower;
+
+  std::vector<Shell> all_basis_shells;
+  std::vector<Shell> all_ecp_shells;
+  std::vector<size_t> all_ecp_electrons;
+  auto nuclear_charges = structure->get_nuclear_charges();
+  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+       ++atom_index) {
+    double nuclear_charge = nuclear_charges[atom_index];
+
+    auto [shells, ecp_shells, ecp_electrons] =
+        detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name_lower,
+                                             atom_index);
+
+    for (const auto& sh : shells) {
+      all_basis_shells.push_back(sh);
+    }
+
+    all_ecp_electrons.push_back(ecp_electrons);
+    for (const auto& sh : ecp_shells) {
+      all_ecp_shells.push_back(sh);
+    }
+  }
+
+  // Sort shells
+  detail::sort_shells_inplace(all_basis_shells);
+  detail::sort_shells_inplace(all_ecp_shells);
+
+  // Organize basis shells by atom index
+  for (const auto& shell : all_basis_shells) {
+    size_t idx = shell.atom_index;
+    if (idx >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(idx + 1);
+    }
+    _shells_per_atom[idx].push_back(shell);
+  }
+
+  // Organize ECP shells by atom index
+  for (const auto& ecp_shell : all_ecp_shells) {
+    size_t idx = ecp_shell.atom_index;
+    if (idx >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(idx + 1);
+    }
+    _ecp_shells_per_atom[idx].push_back(ecp_shell);
+  }
+
+  _ecp_electrons = all_ecp_electrons;
+  _ecp_name = basis_name_lower;
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -563,8 +613,59 @@ BasisSet::BasisSet(const std::string& name, const std::string& aux_name,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  // Initialize ECP electrons vector with zeros for each atom
-  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+  // Look up primary basis shells from database, matching from_basis_name
+  // behavior
+  std::string basis_name_lower = _name;
+  std::transform(basis_name_lower.begin(), basis_name_lower.end(),
+                 basis_name_lower.begin(), ::tolower);
+  _name = basis_name_lower;
+
+  std::vector<Shell> all_basis_shells;
+  std::vector<Shell> all_ecp_shells;
+  std::vector<size_t> all_ecp_electrons;
+  auto nuclear_charges = structure->get_nuclear_charges();
+  for (size_t atom_index = 0; atom_index < nuclear_charges.size();
+       ++atom_index) {
+    double nuclear_charge = nuclear_charges[atom_index];
+
+    auto [shells, ecp_shells, ecp_electrons] =
+        detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name_lower,
+                                             atom_index);
+
+    for (const auto& sh : shells) {
+      all_basis_shells.push_back(sh);
+    }
+
+    all_ecp_electrons.push_back(ecp_electrons);
+    for (const auto& sh : ecp_shells) {
+      all_ecp_shells.push_back(sh);
+    }
+  }
+
+  // Sort shells
+  detail::sort_shells_inplace(all_basis_shells);
+  detail::sort_shells_inplace(all_ecp_shells);
+
+  // Organize basis shells by atom index
+  for (const auto& shell : all_basis_shells) {
+    size_t idx = shell.atom_index;
+    if (idx >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(idx + 1);
+    }
+    _shells_per_atom[idx].push_back(shell);
+  }
+
+  // Organize ECP shells by atom index
+  for (const auto& ecp_shell : all_ecp_shells) {
+    size_t idx = ecp_shell.atom_index;
+    if (idx >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(idx + 1);
+    }
+    _ecp_shells_per_atom[idx].push_back(ecp_shell);
+  }
+
+  _ecp_electrons = all_ecp_electrons;
+  _ecp_name = basis_name_lower;
 
   // Build auxiliary basis set from name
   auto aux_basis =

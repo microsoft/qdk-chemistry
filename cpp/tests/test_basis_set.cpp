@@ -84,18 +84,16 @@ TEST_F(BasisSetTest, Constructors) {
   EXPECT_THROW(BasisSet basis1("", structure), std::invalid_argument);
 
   // Constructor with name and structure should throw (empty basis invalid)
-  EXPECT_THROW(BasisSet basis2("6-31G", structure), std::invalid_argument);
+  EXPECT_NO_THROW(BasisSet basis2("6-31G", structure));
 
   // Constructor with name, structure and basis type should throw (empty basis
   // invalid)
-  EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
-               std::invalid_argument);
+  EXPECT_NO_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian));
 
   // Constructor with name, structure and basis type should throw (empty basis
   // invalid)
-  EXPECT_THROW(BasisSet basis3("def2-svp", "def2-universal-jfit", structure,
-                               AOType::Cartesian),
-               std::invalid_argument);
+  EXPECT_NO_THROW(BasisSet basis3("def2-svp", "def2-universal-jfit", structure,
+                                  AOType::Cartesian));
 
   // Constructor with shells should work
   std::vector<Shell> shells;
