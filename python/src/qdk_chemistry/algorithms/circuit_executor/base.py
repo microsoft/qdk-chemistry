@@ -44,7 +44,9 @@ class CircuitExecutor(Algorithm):
             circuit: The circuit that prepares the initial state.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
-            device_backend_name: Optional name of an IBM device backend to transpile to.
+            device_backend_name: Optional name of an IBM fake device backend
+                from ``qiskit_ibm_runtime.fake_provider`` to transpile to
+                (for example, ``fake_manila``). Requires ``qiskit-ibm-runtime``.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
