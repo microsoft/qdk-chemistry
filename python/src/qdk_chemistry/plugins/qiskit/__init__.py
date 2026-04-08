@@ -17,13 +17,15 @@ _loaded = False
 QDK_CHEMISTRY_HAS_QISKIT = False
 QDK_CHEMISTRY_HAS_QISKIT_NATURE = False
 QDK_CHEMISTRY_HAS_QISKIT_AER = False
+QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = False
 
 
 def load():
     """Load the Qiskit related plugins into QDK/Chemistry."""
     Logger.trace_entering()
     global _loaded  # noqa: PLW0603
-    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE, QDK_CHEMISTRY_HAS_QISKIT_AER  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
@@ -36,6 +38,8 @@ def load():
     if importlib.util.find_spec("qiskit_aer") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_AER = True
         qiskit_aer_load()
+    if importlib.util.find_spec("qiskit_ibm_runtime") is not None:
+        QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = True
 
 
 def qiskit_load():

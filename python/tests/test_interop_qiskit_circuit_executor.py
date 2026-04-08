@@ -8,7 +8,7 @@
 import pytest
 
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
 if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qdk_chemistry.plugins.qiskit.circuit_executor import QiskitAerSimulator
@@ -89,6 +89,7 @@ class TestQiskitAerCircuitExecutor:
         assert counts.get("11", 0) > 0
         assert counts.get("01", 0) + counts.get("10", 0) > 0  # Expect some errors to occur
 
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME, reason="qiskit_ibm_runtime not installed")
     def test_circuit_executor_with_device_backend(self, test_circuit_2: Circuit):
         """Test the Qiskit Aer circuit executor with a device backend name string."""
         executor = QiskitAerSimulator()
