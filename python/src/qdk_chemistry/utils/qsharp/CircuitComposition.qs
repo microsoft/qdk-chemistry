@@ -41,9 +41,8 @@ namespace QDKChemistry.Utils.CircuitComposition {
         targets : Int[]
     ) : Unit {
         if (Length(targets) == 0) {
-            // No target indices: allocate an empty register and do nothing.
-            use qs = Qubit[0];
-            ApplySequential(first, second, qs);
+            // No target indices: do nothing.
+            return ();
         } else {
             // Allocate enough qubits so that all indices in 'targets' are valid.
             let maxTarget = MaxInt(targets);
