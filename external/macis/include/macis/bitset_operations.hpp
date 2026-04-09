@@ -18,7 +18,7 @@
 namespace macis {
 
 // Portable bit-manipulation helpers
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 
 /**
  *  @brief CLZ (count leading zeros) for MSVC
