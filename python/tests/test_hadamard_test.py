@@ -238,3 +238,39 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
             unitary_power=_OBSERVABLE_POWER,
             test_basis=HadamardTestBasis.X,
         )
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+def test_hadamard_test_accepts_explicit_mapper_with_matching_power(
+    water_hadamard_benchmark: HadamardWaterBenchmark,
+) -> None:
+    """Explicit mapper is accepted when mapper power matches unitary_power."""
+    mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence", power=3)
+
+    result = QiskitHadamardTest().run(
+        water_hadamard_benchmark.state_preparation,
+        water_hadamard_benchmark.time_evolution_unitary,
+        shots=7,
+        unitary_power=3,
+        mapper=mapper,
+    )
+
+    assert result.total_shots == 7
+    assert mapper.settings().get("power") == 3
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+def test_hadamard_test_rejects_explicit_mapper_with_mismatched_power(
+    water_hadamard_benchmark: HadamardWaterBenchmark,
+) -> None:
+    """Explicit mapper is rejected when mapper power does not match unitary_power."""
+    mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence", power=2)
+
+    with pytest.raises(ValueError, match="unitary_power must match mapper.settings\\(\\)\\.get\\('power'\\)"):
+        QiskitHadamardTest().run(
+            water_hadamard_benchmark.state_preparation,
+            water_hadamard_benchmark.time_evolution_unitary,
+            shots=7,
+            unitary_power=3,
+            mapper=mapper,
+        )
