@@ -89,7 +89,15 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
   // Cholesky decomposition (rank is bounded by num_aos*(num_aos+1)/2)
   const size_t max_rank = num_aos * (num_aos + 1) / 2;
-  QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
+  QDK_LOGGER().info("Maximum possible Cholesky rank: {}", max_rank);
+
+  // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
+  // This enables reusing ERI column buffers across iterations.
+  size_t max_shell_size = 0;
+  for (size_t s = 0; s < num_shells; ++s) {
+    max_shell_size = std::max(max_shell_size, obs[s].size());
+  }
+  const size_t max_n_cols = max_shell_size * max_shell_size;
 
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
   const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
@@ -145,6 +153,15 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #ifdef _OPENMP
   //  Thread-local active shell pair lists
   std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
+#endif
+
+  // Reusable ERI column buffers to avoid per-iteration reallocations.
+  std::vector<double> eri_col_max(num_aos2 * max_n_cols, 0.0);
+#ifdef _OPENMP
+  std::vector<std::vector<double>> eri_col_threads_max(nthreads);
+  for (int t = 0; t < nthreads; ++t) {
+    eri_col_threads_max[t].resize(num_aos2 * max_n_cols, 0.0);
+  }
 #endif
 
   // Compute diagonal elements for all shell pairs
@@ -242,11 +259,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     const size_t n1_max = obs[s1_max].size();
     const size_t n2_max = obs[s2_max].size();
     const size_t n_cols = n1_max * n2_max;
-    std::vector<double> eri_col(num_aos2 * n_cols, 0.0);
+    const size_t eri_col_used = num_aos2 * n_cols;
+    std::fill_n(eri_col_max.begin(), eri_col_used, 0.0);
 #ifdef _OPENMP
-    std::vector<std::vector<double>> eri_col_threads(nthreads);
     for (int t = 0; t < nthreads; ++t) {
-      eri_col_threads[t].resize(num_aos2 * n_cols, 0.0);
+      std::fill_n(eri_col_threads_max[t].begin(), eri_col_used, 0.0);
     }
 #pragma omp parallel
 #endif
@@ -254,7 +271,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
       // get thread-local eri_col
-      auto& eri_col_local = eri_col_threads[thread_id];
+      auto& eri_col_local = eri_col_threads_max[thread_id];
 #else
       const auto thread_id = 0;
 #endif
@@ -294,7 +311,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 #ifdef _OPENMP
                   eri_col_local[ind_ijkl] += res[ijkl];
 #else
-                  eri_col[ind_ijkl] += res[ijkl];
+                  eri_col_max[ind_ijkl] += res[ijkl];
 #endif
                 }  // l
               }  // k
@@ -307,8 +324,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     // merge thread-local eri_col
 #ifdef _OPENMP
     for (int t = 0; t < nthreads; ++t) {
-      blas::axpy(eri_col.size(), 1.0, eri_col_threads[t].data(), 1,
-                 eri_col.data(), 1);
+      blas::axpy(eri_col_used, 1.0, eri_col_threads_max[t].data(), 1,
+                 eri_col_max.data(), 1);
     }
 #endif
 
@@ -339,7 +356,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       // L_rows^T is current_col x n_cols
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
                  num_aos2, n_cols, current_col, -1.0, L_data.data(), num_aos2,
-                 L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
+                 L_rows.data(), n_cols, 1.0, eri_col_max.data(), num_aos2);
     }
 
     // form new cholesky vector for each index in shell pair avoid redundant
@@ -359,7 +376,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         double Q_max = std::sqrt(1.0 / D_val);
         std::vector<double> L_col_vec(num_aos2);
         // Copy column from eri_col
-        blas::copy(num_aos2, eri_col.data() + local_index * num_aos2, 1,
+        blas::copy(num_aos2, eri_col_max.data() + local_index * num_aos2, 1,
                    L_col_vec.data(), 1);
         // Scale by Q_max
         blas::scal(num_aos2, Q_max, L_col_vec.data(), 1);
@@ -376,7 +393,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
           const size_t global_col_idx = shell_pairs_to_lookup[col];
           const double scale_factor = -L_col[global_col_idx];
-          double* eri_col_ptr = eri_col.data() + col * num_aos2;
+          double* eri_col_ptr = eri_col_max.data() + col * num_aos2;
           blas::axpy(num_aos2, scale_factor, L_col, 1, eri_col_ptr, 1);
         }
 
