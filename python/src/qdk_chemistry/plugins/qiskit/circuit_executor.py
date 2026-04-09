@@ -34,7 +34,6 @@ from qdk_chemistry.data import (
 from qdk_chemistry.plugins.qiskit._interop.noise_model import (
     get_noise_model_from_profile,
 )
-from qdk_chemistry.plugins.qiskit._interop.transpiler import *  # noqa: F403
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitAerSimulator", "QiskitAerSimulatorSettings"]

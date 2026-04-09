@@ -225,6 +225,17 @@ class QdkEnergyEstimator(EnergyEstimator):
                 f"device_backend_name is only supported with 'qiskit_aer_simulator', "
                 f"but circuit_executor is '{circuit_executor.name()}'."
             )
+        if pre_transpilation_passes is not None and circuit_executor.name() != "qiskit_aer_simulator":
+            raise ValueError(
+                f"pre_transpilation_passes is only supported with 'qiskit_aer_simulator', "
+                f"but circuit_executor is '{circuit_executor.name()}'."
+            )
+        if post_transpilation_passes is not None and circuit_executor.name() != "qiskit_aer_simulator":
+            raise ValueError(
+                f"post_transpilation_passes is only supported with 'qiskit_aer_simulator', "
+                f"but circuit_executor is '{circuit_executor.name()}'."
+            )
+
         qubit_hamiltonians = qubit_hamiltonian.group_commuting(qubit_wise=True)
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:

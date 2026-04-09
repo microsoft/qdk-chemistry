@@ -20,12 +20,7 @@ References:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import numpy as np
-
-if TYPE_CHECKING:
-    from qiskit.circuit import QuantumCircuit
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
@@ -527,90 +522,3 @@ class Trotter(TimeEvolutionBuilder):
     def type_name(self) -> str:
         """Return time_evolution_builder as the algorithm type name."""
         return "time_evolution_builder"
-
-
-def encoding_clifford_circuit(
-    qubit_hamiltonians: list[QubitHamiltonian],
-) -> QuantumCircuit:
-    """Build a Clifford circuit from the encoding Clifford of Hamiltonian Pauli generators.
-
-    Collects all non-identity Pauli strings from the given Hamiltonians,
-    computes the encoding Clifford via ``paulimer.encoding_clifford_of``,
-    and synthesises it into a Qiskit :class:`QuantumCircuit` of elementary
-    Clifford gates (H, S, CX).
-
-    The Pauli strings across all Hamiltonians must be mutually commuting
-    (i.e. they form a valid stabilizer group), otherwise ``encoding_clifford_of``
-    will raise an error.
-
-    Args:
-        qubit_hamiltonians: Hamiltonians whose Pauli strings serve as
-            generators for the encoding Clifford.
-
-    Returns:
-        A :class:`~qiskit.circuit.QuantumCircuit` implementing the encoding
-        Clifford in terms of H, S, and CX gates.
-
-    Raises:
-        ValueError: If no Hamiltonians are provided or qubit counts are inconsistent.
-
-    """
-    from paulimer import DensePauli  # noqa: PLC0415
-    from paulimer import encoding_clifford_of as _encoding_clifford_of  # noqa: PLC0415
-
-    if not qubit_hamiltonians:
-        raise ValueError("At least one QubitHamiltonian is required.")
-
-    num_qubits = qubit_hamiltonians[0].num_qubits
-
-    # Collect unique non-identity Pauli generators from all Hamiltonians.
-    seen: set[str] = set()
-    generators: list[DensePauli] = []
-    for qh in qubit_hamiltonians:
-        if qh.num_qubits != num_qubits:
-            raise ValueError("All QubitHamiltonians must have the same number of qubits.")
-        for label in qh.pauli_strings:
-            if label not in seen and any(c != "I" for c in label):
-                seen.add(label)
-                generators.append(DensePauli(label))
-
-    clifford_unitary = _encoding_clifford_of(generators, num_qubits)
-
-    return _clifford_unitary_to_circuit(clifford_unitary)
-
-
-def _clifford_unitary_to_circuit(clifford_unitary) -> QuantumCircuit:
-    """Convert a paulimer ``CliffordUnitary`` to a Qiskit ``QuantumCircuit``.
-
-    Builds a Qiskit :class:`~qiskit.quantum_info.Clifford` from the
-    stabilizer tableau and synthesises it into elementary gates.
-
-    Args:
-        clifford_unitary: A ``paulimer.CliffordUnitary`` instance.
-
-    Returns:
-        A :class:`~qiskit.circuit.QuantumCircuit` of H, S, and CX gates.
-
-    """
-    from qiskit.quantum_info import Clifford  # noqa: PLC0415
-
-    n = clifford_unitary.qubit_count
-    tableau = np.zeros((2 * n, 2 * n + 1), dtype=bool)
-
-    for i in range(n):
-        img_x = clifford_unitary.image_x(i)
-        img_z = clifford_unitary.image_z(i)
-
-        for j in range(n):
-            cx = img_x.characters[j]
-            tableau[i, j] = cx in ("X", "Y")
-            tableau[i, j + n] = cx in ("Z", "Y")
-
-            cz = img_z.characters[j]
-            tableau[i + n, j] = cz in ("X", "Y")
-            tableau[i + n, j + n] = cz in ("Z", "Y")
-
-        tableau[i, 2 * n] = img_x.phase.real < 0
-        tableau[i + n, 2 * n] = img_z.phase.real < 0
-
-    return Clifford(tableau).to_circuit()
