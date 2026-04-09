@@ -72,7 +72,11 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
             The index of the qubit in the Qiskit circuit.
 
         """
-        return pyqir.qubit_id(q)
+        # Use `qubit_id` on older pyqir instances
+        if hasattr(pyqir, "qubit_id"):
+            return pyqir.qubit_id(q)
+        # Newer pyqir versions use the more generic `ptr_id` for both qubits and results
+        return pyqir.ptr_id(q)
 
     def _clbit(self, r: pyqir.Value) -> int:
         """Get circuit classical bit index for a QIR result value.
@@ -84,7 +88,11 @@ class QirToQiskitConverter(pyqir.QirModuleVisitor):
             The index of the classical bit in the Qiskit circuit.
 
         """
-        return pyqir.result_id(r)
+        # Use `result_id` on older pyqir instances
+        if hasattr(pyqir, "result_id"):
+            return pyqir.result_id(r)
+        # Newer pyqir versions use the more generic `ptr_id` for both qubits and results
+        return pyqir.ptr_id(r)
 
     def _angle(self, a: pyqir.Value) -> float:
         """Extract angle value from a QIR constant.
