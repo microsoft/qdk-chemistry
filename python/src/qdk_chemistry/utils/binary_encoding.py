@@ -9,12 +9,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils import CaseInsensitiveStrEnum, Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 if TYPE_CHECKING:
@@ -74,7 +73,7 @@ class NotRefError(ValueError):
     """Raised when a matrix is not in row echelon form (REF)."""
 
 
-class MatrixCompressionType(StrEnum):
+class MatrixCompressionType(CaseInsensitiveStrEnum):
     """Supported operation types for matrix compression."""
 
     X = "X"
@@ -377,7 +376,7 @@ class BinaryEncodingSynthesizer:
         self.batch: list[_BatchElement] = []
         self.batch_index: int = 0
 
-        self.circuit: list[tuple[MatrixCompressionType, tuple[Any, ...]]] = []
+        self.circuit: list[tuple[str, Any]] = []
         self.bijection: list[tuple[int, int]] = []
         self.bad_element_count: int = 0
 
@@ -440,7 +439,7 @@ class BinaryEncodingSynthesizer:
             return sparse_size
         return 1 << (sparse_size.bit_length() - 1)
 
-    def _record(self, op: tuple[MatrixCompressionType, tuple[Any, ...]]):
+    def _record(self, op: tuple[str, Any]):
         """Append an operation and update the tableau.
 
         Args:
@@ -855,7 +854,7 @@ class BinaryEncodingSynthesizer:
             ]
             rest_entries.append((i, changing_controls))
 
-        select_ops: list[tuple[MatrixCompressionType, Any]] = []
+        select_ops: list[tuple[str, Any]] = []
         self._flush_pui_lookup_block(select_ops, dense_size, fixed_controls, rest_entries)
         for op in select_ops:
             self._record(op)
@@ -882,13 +881,14 @@ class BinaryEncodingSynthesizer:
             List of MatrixCompressionOp.
 
         """
-        raw_ops: list[tuple[MatrixCompressionType, Any]] = []
+        raw_ops: list[tuple[str, Any]] = []
 
         for compress_type, qubit_args in self.circuit:
-            if compress_type is MatrixCompressionType.X:
-                raw_ops.append((compress_type, qubit_args[0]))
+            op_type = MatrixCompressionType(compress_type)
+            if op_type is MatrixCompressionType.X:
+                raw_ops.append((op_type, qubit_args[0]))
             else:
-                raw_ops.append((compress_type, qubit_args))
+                raw_ops.append((op_type, qubit_args))
 
         if active_qubit_indices is not None and ancilla_start is not None:
             raw_ops = self._translate_ops(raw_ops, num_local_qubits, active_qubit_indices, ancilla_start)
@@ -899,7 +899,7 @@ class BinaryEncodingSynthesizer:
         return ops
 
     @staticmethod
-    def _to_compression_op(op_type: MatrixCompressionType, op_args: Any) -> MatrixCompressionOp:
+    def _to_compression_op(op_type: str, op_args: Any) -> MatrixCompressionOp:
         """Convert a raw circuit tuple into a MatrixCompressionOp.
 
         Args:
@@ -910,6 +910,7 @@ class BinaryEncodingSynthesizer:
             A MatrixCompressionOp instance.
 
         """
+        op_type = MatrixCompressionType(op_type)
         if op_type is MatrixCompressionType.X:
             return MatrixCompressionOp(op_type, [int(op_args)])
         if op_type in {MatrixCompressionType.CX, MatrixCompressionType.SWAP}:
@@ -929,11 +930,11 @@ class BinaryEncodingSynthesizer:
 
     @staticmethod
     def _translate_ops(
-        ops: list[tuple[MatrixCompressionType, Any]],
+        ops: list[tuple[str, Any]],
         num_local_qubits: int,
         active_qubit_indices: list[int],
         ancilla_start: int,
-    ) -> list[tuple[MatrixCompressionType, Any]]:
+    ) -> list[tuple[str, Any]]:
         """Remap local qubit indices to global topological indices.
 
         Indices below ``num_local_qubits`` are mapped through
@@ -956,8 +957,9 @@ class BinaryEncodingSynthesizer:
                 int(active_qubit_indices[idx]) if idx < num_local_qubits else ancilla_start + (idx - num_local_qubits)
             )
 
-        translated: list[tuple[MatrixCompressionType, Any]] = []
-        for op_type, op_args in ops:
+        translated: list[tuple[str, Any]] = []
+        for compress_type, op_args in ops:
+            op_type = MatrixCompressionType(compress_type)
             if op_type is MatrixCompressionType.X:
                 translated.append((MatrixCompressionType.X, map_idx(int(op_args))))
             elif op_type in {MatrixCompressionType.CX, MatrixCompressionType.SWAP}:
@@ -994,7 +996,7 @@ class BinaryEncodingSynthesizer:
 
     def _flush_pui_lookup_block(
         self,
-        ops: list[tuple[MatrixCompressionType, Any]],
+        ops: list[tuple[str, Any]],
         sbs: int,
         fixed_controls: list[tuple[int, bool]],
         rest_entries: list[tuple[int, list[tuple[int, bool]]]],
@@ -1043,7 +1045,7 @@ class BinaryEncodingSynthesizer:
         sbs: int,
         fixed_controls: list[tuple[int, bool]],
         rest_entries: list[tuple[int, list[tuple[int, bool]]]],
-    ) -> tuple[list[tuple[MatrixCompressionType, Any]], int]:
+    ) -> tuple[list[tuple[str, Any]], int]:
         """Lower one PUI sub-block into lookup ops.
 
         Args:
@@ -1074,9 +1076,8 @@ class BinaryEncodingSynthesizer:
             use_measurement_and=self.measurement_based_uncompute,
         )
 
-        typed_lookup_ops = cast("list[tuple[MatrixCompressionType, Any]]", lookup_ops)
-        gf2x_ops = list(reversed(typed_lookup_ops))
-        and_count = sum(1 for name, _ in typed_lookup_ops if name == "and")
+        gf2x_ops = list(reversed(lookup_ops))
+        and_count = sum(1 for name, _ in lookup_ops if name == "and")
 
         return gf2x_ops, and_count
 
@@ -1211,7 +1212,7 @@ def _lookup_select(
     data_qubits: list[int],
     *,
     use_measurement_and: bool = False,
-) -> list[tuple[MatrixCompressionType, Any]]:
+) -> list[tuple[str, Any]]:
     """Synthesize a lookup-based select or select_and operation for a given truth table.
 
     Args:
@@ -1230,7 +1231,7 @@ def _lookup_select(
     if not table_dict:
         return []
 
-    operations: list[tuple[MatrixCompressionType, Any]] = []
+    operations: list[tuple[str, Any]] = []
 
     n_address = len(address_qubits)
     n_data = len(data_qubits)

@@ -187,6 +187,7 @@ class Circuit(DataClass):
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
+                generation_method=qsharp.CircuitGenerationMethod.Static,
             )
         if self.qasm:
             return qsharp.openqasm.circuit(self.qasm)
