@@ -398,7 +398,7 @@ class SubstitutePauliRotation(TransformationPass):
     def substitute_pauli_rotations(
         self,
         dag: DAGCircuit,
-        rotation_gates: dict[str, tuple[type, type]],
+        rotation_gates: dict[str, tuple],
         equivalent_gate_set: list[str],
         tolerance: float,
     ) -> DAGCircuit:
