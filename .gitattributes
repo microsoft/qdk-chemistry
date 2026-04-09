@@ -1,0 +1,3 @@
+# Patch files must keep LF endings to apply correctly across platforms.
+*.diff text eol=lf
+*.patch text eol=lf
