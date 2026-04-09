@@ -9,7 +9,7 @@
 
 #pragma once
 
-#if defined(_MSC_VER) && !defined(__clang__)
+#if defined(_MSC_VER)
 #include <intrin.h>
 #else
 #include <strings.h>

@@ -245,7 +245,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
               "basis" / (normalized_path + ".json");
     name = normalized_path;
   } else {
-    name = bs_path.stem();
+    name = bs_path.stem().string();
   }
   if (!std::filesystem::exists(bs_path)) {
     auto compressed_path = QDKChemistryConfig::get_resources_dir() /
