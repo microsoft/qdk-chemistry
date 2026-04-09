@@ -1373,29 +1373,33 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
   std::string filename = "test.sparse.hamiltonian.fcidump";
   EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
 
-  std::ifstream file(filename);
-  EXPECT_TRUE(file.is_open());
+  // Scope the ifstream so it closes before remove() — Windows does not
+  // allow deleting a file while a handle is open.
+  {
+    std::ifstream file(filename);
+    EXPECT_TRUE(file.is_open());
 
-  std::stringstream buffer;
-  buffer << file.rdbuf();
-  std::string fcidump_content = buffer.str();
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string fcidump_content = buffer.str();
 
-  // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
-  // (1,1,1,1)), one-body lower triangle in column-major order, then core
-  // energy.
-  const std::string reference_fcidump_contents =
-      "&FCI NORB=2, NELEC=2, MS2=0,\n"
-      "ORBSYM=1,1,\n"
-      "ISYM=1,\n"
-      "&END\n"
-      "      2.0000000000000000e+00    1    1    1    1\n"
-      "      3.0000000000000000e+00    2    2    2    2\n"
-      "      1.0000000000000000e+00    1    1    0    0\n"
-      "      5.0000000000000000e-01    2    1    0    0\n"
-      "      1.0000000000000000e+00    2    2    0    0\n"
-      "      1.5000000000000000e+00    0    0    0    0\n";
+    // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
+    // (1,1,1,1)), one-body lower triangle in column-major order, then core
+    // energy.
+    const std::string reference_fcidump_contents =
+        "&FCI NORB=2, NELEC=2, MS2=0,\n"
+        "ORBSYM=1,1,\n"
+        "ISYM=1,\n"
+        "&END\n"
+        "      2.0000000000000000e+00    1    1    1    1\n"
+        "      3.0000000000000000e+00    2    2    2    2\n"
+        "      1.0000000000000000e+00    1    1    0    0\n"
+        "      5.0000000000000000e-01    2    1    0    0\n"
+        "      1.0000000000000000e+00    2    2    0    0\n"
+        "      1.5000000000000000e+00    0    0    0    0\n";
 
-  EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+    EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+  }
 
   std::filesystem::remove(filename);
 }
@@ -1737,13 +1741,17 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
                                    1);
   });
 
-  // Verify file was created and has correct NORB (should be 2, not 3)
-  std::ifstream file("test_active_space.hamiltonian.fcidump");
-  EXPECT_TRUE(file.is_open());
+  // Verify file was created and has correct NORB (should be 2, not 3).
+  // Scope the ifstream so it closes before remove() — Windows does not
+  // allow deleting a file while a handle is open.
+  {
+    std::ifstream file("test_active_space.hamiltonian.fcidump");
+    EXPECT_TRUE(file.is_open());
 
-  std::string first_line;
-  std::getline(file, first_line);
-  EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+    std::string first_line;
+    std::getline(file, first_line);
+    EXPECT_TRUE(first_line.find("NORB=2") != std::string::npos);
+  }
 
   // Clean up
   std::filesystem::remove("test_active_space.hamiltonian.fcidump");
