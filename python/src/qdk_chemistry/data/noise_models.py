@@ -121,9 +121,9 @@ class QuantumErrorProfile(DataClass):
         name: Name of the quantum error profile.
         description: Description of what the error profile represents.
         errors: Dictionary mapping gate names to their error properties.
-        one_qubit_gates: List of gate names that operate on a single qubit.
-        two_qubit_gates: List of gate names that operate on two qubits.
-        three_qubit_gates: List of gate names that operate on three qubits.
+        one_qubit_gates: Set of gate names that operate on a single qubit.
+        two_qubit_gates: Set of gate names that operate on two qubits.
+        three_qubit_gates: Set of gate names that operate on three qubits.
 
     """
 
@@ -392,15 +392,15 @@ class QuantumErrorProfile(DataClass):
                 gate_name_qdk = "sx_adj"
             elif gate_name_qdk == "measure":
                 gate_name_qdk = "mresetz"
+            try:
+                gate_config = getattr(noise, gate_name_qdk)
+            except AttributeError:
+                raise ValueError(f"Gate {gate_name} is not supported in QDK noise config.") from None
             for error_type, rate in error_rates.items():
-                try:
-                    if error_type == SupportedErrorTypes.DEPOLARIZING_ERROR:
-                        getattr(noise, gate_name_qdk).set_depolarizing(rate)
-                    elif error_type == SupportedErrorTypes.QUBIT_LOSS:
-                        getattr(noise, gate_name_qdk).loss = rate
-                    else:
-                        raise ValueError(f"Error type {error_type} is not currently supported.")
-                except AttributeError:
-                    # Warn and skip unsupported gates
-                    Logger.warn(f"Gate {gate_name} not supported in QDK noise config; skipping.")
+                if error_type == SupportedErrorTypes.DEPOLARIZING_ERROR:
+                    gate_config.set_depolarizing(rate)
+                elif error_type == SupportedErrorTypes.QUBIT_LOSS:
+                    gate_config.loss = rate
+                else:
+                    raise ValueError(f"Error type {error_type} is not currently supported.")
         return noise

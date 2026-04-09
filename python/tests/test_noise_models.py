@@ -7,7 +7,6 @@
 
 import tempfile
 from pathlib import Path
-from unittest.mock import patch
 
 import h5py
 import numpy as np
@@ -557,8 +556,8 @@ def test_noise_model_to_qdk_conversion_correct_gate_name():
     ), "sxdg.loss mismatch"
 
 
-def test_to_qdk_noise_config_warns_on_unsupported_gate():
-    """Test that unsupported gates log a warning and are skipped."""
+def test_to_qdk_noise_config_errors_on_unsupported_gate():
+    """Test that unsupported gates raise a ValueError."""
     # Create a profile with a gate that QDK doesn't support
     profile = QuantumErrorProfile(
         name="test",
@@ -570,11 +569,5 @@ def test_to_qdk_noise_config_warns_on_unsupported_gate():
         },
     )
 
-    with patch("qdk_chemistry.data.noise_models.Logger") as mock_logger:
-        qdk_noise_config = profile.to_qdk_noise_config()
-
-        assert isinstance(qdk_noise_config, NoiseConfig)
-        mock_logger.warn.assert_called_once()
-        warning_message = mock_logger.warn.call_args[0][0]
-        assert "reset" in warning_message.lower()
-        assert "not supported in QDK noise config" in warning_message
+    with pytest.raises(ValueError, match="not supported in QDK noise config"):
+        profile.to_qdk_noise_config()

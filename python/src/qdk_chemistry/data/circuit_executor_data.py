@@ -36,11 +36,11 @@ class CircuitExecutorData(DataClass):
         """Initialize circuit executor data.
 
         Args:
-            bitstring_counts (dict[str, int] | None): Bitstring count dict (clean shots only, 0/1).
-            total_shots (int | None): Total number of shots used for the measurement.
-            executor (str | None): Name of the executor used for the measurement.
-            executor_metadata (Any | None): Metadata associated with the executor.
-            loss_bitstrings (dict[str, int] | None): Bitstring counts for shots where at
+            bitstring_counts: Bitstring count dict (clean shots only, 0/1).
+            total_shots: Total number of shots used for the measurement.
+            executor: Name of the executor used for the measurement.
+            executor_metadata: Metadata associated with the executor.
+            loss_bitstrings: Bitstring counts for shots where at
                 least one qubit was lost. Uses 'L' to mark lost qubits (e.g. '0L10').
 
         """
@@ -96,7 +96,7 @@ class CircuitExecutorData(DataClass):
         """Save the measurement data to an HDF5 group.
 
         Args:
-            group (h5py.Group): HDF5 group or file to write the measurement data to.
+            group: HDF5 group or file to write the measurement data to.
 
         """
         self._add_hdf5_version(group)
@@ -115,7 +115,7 @@ class CircuitExecutorData(DataClass):
         """Create measurement data from a JSON dictionary.
 
         Args:
-            json_data (dict[str, Any]): Dictionary containing the serialized data.
+            json_data: Dictionary containing the serialized data.
 
         Returns:
             CircuitExecutorData: New instance reconstructed from JSON data.
@@ -139,7 +139,7 @@ class CircuitExecutorData(DataClass):
         """Load measurement data from an HDF5 group.
 
         Args:
-            group (h5py.Group): HDF5 group or file containing the data.
+            group: HDF5 group or file containing the data.
 
         Returns:
             CircuitExecutorData: New instance reconstructed from HDF5 data.
