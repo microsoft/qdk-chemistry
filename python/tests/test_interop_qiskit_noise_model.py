@@ -100,15 +100,10 @@ def test_get_noise_model_empty_profile():
     assert len(noise_model.noise_instructions) == 0
 
 
-def test_get_noise_model_qubit_loss_warns(simple_error_profile_with_qubit_loss):
-    """Test that qubit_loss error type emits a warning and is skipped in the Qiskit noise model."""
-    with pytest.warns(UserWarning, match="Unsupported error type.*qubit_loss"):
-        noise_model = get_noise_model_from_profile(simple_error_profile_with_qubit_loss)
-
-    assert isinstance(noise_model, NoiseModel)
-    # Depolarizing errors should still be applied
-    assert "h" in noise_model.noise_instructions
-    assert "cx" in noise_model.noise_instructions
+def test_get_noise_model_qubit_loss_raises(simple_error_profile_with_qubit_loss):
+    """Test that qubit_loss error type raises ValueError in the Qiskit noise model."""
+    with pytest.raises(ValueError, match="Qubit loss error is not currently supported"):
+        get_noise_model_from_profile(simple_error_profile_with_qubit_loss)
 
 
 def test_get_noise_model_mixed_errors_per_gate():
@@ -124,12 +119,8 @@ def test_get_noise_model_mixed_errors_per_gate():
         },
     )
 
-    with pytest.warns(UserWarning, match="Unsupported error type.*qubit_loss"):
-        noise_model = get_noise_model_from_profile(profile)
-
-    assert isinstance(noise_model, NoiseModel)
-    # Depolarizing should still be applied
-    assert "cx" in noise_model.noise_instructions
+    with pytest.raises(ValueError, match="Qubit loss error is not currently supported"):
+        get_noise_model_from_profile(profile)
 
 
 def test_get_noise_model_basis_gates_match_profile():

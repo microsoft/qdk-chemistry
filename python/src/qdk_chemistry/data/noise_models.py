@@ -56,7 +56,7 @@ class SupportedGate(CaseInsensitiveStrEnum):
         """Get a Gate enum value from its string representation.
 
         Args:
-            gate_str (str): String representation of the gate (case-insensitive).
+            gate_str: String representation of the gate (case-insensitive).
 
         Returns:
             SupportedGate: The corresponding SupportedGate enum value.
@@ -118,13 +118,12 @@ class QuantumErrorProfile(DataClass):
     This class provides functionalities to define, load, and save quantum error profiles.
 
     Attributes:
-        name (str): Name of the quantum error profile.
-        description (str): Description of what the error profile represents.
-        errors (dict[SupportedGate, dict[SupportedErrorTypes, float]]): Dictionary mapping gate names
-            to their error properties.
-        one_qubit_gates (list[str]): List of gate names that operate on a single qubit.
-        two_qubit_gates (list[str]): List of gate names that operate on two qubits.
-        three_qubit_gates (list[str]): List of gate names that operate on three qubits.
+        name: Name of the quantum error profile.
+        description: Description of what the error profile represents.
+        errors: Dictionary mapping gate names to their error properties.
+        one_qubit_gates: List of gate names that operate on a single qubit.
+        two_qubit_gates: List of gate names that operate on two qubits.
+        three_qubit_gates: List of gate names that operate on three qubits.
 
     """
 
@@ -146,9 +145,9 @@ class QuantumErrorProfile(DataClass):
         """Initialize a QuantumErrorProfile.
 
         Args:
-            name (str | None): Name of the quantum error profile.
-            description (str | None): Description of what the error profile represents.
-            errors (dict | None): Dictionary mapping gate names to their error properties.
+            name: Name of the quantum error profile.
+            description: Description of what the error profile represents.
+            errors: Dictionary mapping gate names to their error properties.
 
         """
         Logger.trace_entering()
@@ -186,7 +185,7 @@ class QuantumErrorProfile(DataClass):
         """Check equality between two QuantumErrorProfile instances.
 
         Args:
-            other (object): Object to compare with.
+            other: Object to compare with.
 
         Returns:
             bool: True if equal, False otherwise.
@@ -227,7 +226,7 @@ class QuantumErrorProfile(DataClass):
         """Save quantum error profile to YAML file.
 
         Args:
-            yaml_file (str | pathlib.Path): Path to save YAML file.
+            yaml_file: Path to save YAML file.
 
         """
         yaml = YAML()
@@ -245,7 +244,7 @@ class QuantumErrorProfile(DataClass):
         """Load quantum error profile from YAML file.
 
         Args:
-            yaml_file (str | pathlib.Path): Path to YAML file.
+            yaml_file: Path to YAML file.
 
         Returns:
             QuantumErrorProfile: Loaded profile.
@@ -315,7 +314,7 @@ class QuantumErrorProfile(DataClass):
         """Save the QuantumErrorProfile to an HDF5 group.
 
         Args:
-            group (h5py.Group): HDF5 group or file to write the quantum error profile to.
+            group: HDF5 group or file to write the quantum error profile to.
 
         """
         data = self.to_json()
@@ -330,7 +329,7 @@ class QuantumErrorProfile(DataClass):
         """Create a QuantumErrorProfile from a JSON dictionary.
 
         Args:
-            json_data (dict[str, Any]): Dictionary containing the serialized data.
+            json_data: Dictionary containing the serialized data.
 
         Returns:
             QuantumErrorProfile: New instance of the QuantumErrorProfile.
@@ -357,7 +356,7 @@ class QuantumErrorProfile(DataClass):
         """Load a QuantumErrorProfile from an HDF5 group.
 
         Args:
-            group (h5py.Group): HDF5 group or file to read data from.
+            group: HDF5 group or file to read data from.
 
         Returns:
             QuantumErrorProfile: New instance of the QuantumErrorProfile.

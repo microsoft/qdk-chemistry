@@ -31,14 +31,17 @@ class CircuitExecutorData(DataClass):
         total_shots: int,
         executor: str,
         executor_metadata: Any | None = None,
+        loss_bitstrings: dict[str, int] | None = None,
     ) -> None:
         """Initialize circuit executor data.
 
         Args:
-            bitstring_counts (dict[str, int] | None): Bitstring count dict.
+            bitstring_counts (dict[str, int] | None): Bitstring count dict (clean shots only, 0/1).
             total_shots (int | None): Total number of shots used for the measurement.
             executor (str | None): Name of the executor used for the measurement.
             executor_metadata (Any | None): Metadata associated with the executor.
+            loss_bitstrings (dict[str, int] | None): Bitstring counts for shots where at
+                least one qubit was lost. Uses 'L' to mark lost qubits (e.g. '0L10').
 
         """
         Logger.trace_entering()
@@ -46,6 +49,7 @@ class CircuitExecutorData(DataClass):
         self.total_shots = total_shots
         self.executor = executor
         self._executor_metadata = executor_metadata
+        self.loss_bitstrings = loss_bitstrings
         super().__init__()
 
     def get_executor_metadata(self) -> Any | None:
@@ -64,10 +68,13 @@ class CircuitExecutorData(DataClass):
             str: Summary string describing the circuit executor data.
 
         """
-        return (
+        summary = (
             f"Circuit Executor Data\n  Executor: {self.executor}\n  "
             f"Total shots: {self.total_shots}\n  Bitstring counts: {len(self.bitstring_counts)}"
         )
+        if self.loss_bitstrings:
+            summary += f"\n  Loss shots: {sum(self.loss_bitstrings.values())}"
+        return summary
 
     def to_json(self) -> dict[str, Any]:
         """Convert circuit executor data to a dictionary for JSON serialization.
@@ -81,6 +88,8 @@ class CircuitExecutorData(DataClass):
             "total_shots": self.total_shots,
             "executor": self.executor,
         }
+        if self.loss_bitstrings:
+            data["loss_bitstrings"] = self.loss_bitstrings
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -96,6 +105,10 @@ class CircuitExecutorData(DataClass):
         group.create_dataset("bitstring_counts", data=np.array(list(self.bitstring_counts.values()), dtype=np.int64))
         if self.executor is not None:
             group.attrs["executor"] = self.executor
+        if self.loss_bitstrings:
+            loss_group = group.create_group("loss_bitstrings")
+            loss_group.create_dataset("keys", data=np.array(list(self.loss_bitstrings.keys()), dtype="S"))
+            loss_group.create_dataset("counts", data=np.array(list(self.loss_bitstrings.values()), dtype=np.int64))
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "CircuitExecutorData":
@@ -112,11 +125,13 @@ class CircuitExecutorData(DataClass):
         bitstring_counts = json_data.get("bitstring_counts", {})
         total_shots = json_data.get("total_shots", 0)
         executor = json_data.get("executor", "")
+        loss_bitstrings = json_data.get("loss_bitstrings")
 
         return cls(
             bitstring_counts=bitstring_counts,
             total_shots=total_shots,
             executor=executor,
+            loss_bitstrings=loss_bitstrings,
         )
 
     @classmethod
@@ -140,8 +155,18 @@ class CircuitExecutorData(DataClass):
             key.decode("utf-8"): int(count) for key, count in zip(bitstring_keys, bitstring_counts_values, strict=False)
         }
 
+        loss_bitstrings = None
+        if "loss_bitstrings" in group:
+            loss_group = group["loss_bitstrings"]
+            loss_keys = loss_group["keys"][()]
+            loss_counts = loss_group["counts"][()]
+            loss_bitstrings = {
+                key.decode("utf-8"): int(count) for key, count in zip(loss_keys, loss_counts, strict=False)
+            }
+
         return cls(
             bitstring_counts=bitstring_counts,
             total_shots=total_shots,
             executor=executor,
+            loss_bitstrings=loss_bitstrings,
         )

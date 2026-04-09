@@ -87,14 +87,19 @@ class QdkFullStateSimulator(CircuitExecutor):
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
         # Reorder bits in each measurement result to match Little Endian convention
-        # If result is Loss, treat it as "0" in the bitstring
-        bitstrings = ["".join("1" if str(x) == "One" else "0" for x in reversed(one_run)) for one_run in raw_results]
-        counts = dict(Counter(bitstrings))
+        # Use 'L' to mark lost qubits, then separate clean vs loss bitstrings
+        bitstrings = [
+            "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
+            for one_run in raw_results
+        ]
+        clean = [b for b in bitstrings if "L" not in b]
+        lost = [b for b in bitstrings if "L" in b]
         return CircuitExecutorData(
-            bitstring_counts=counts,
+            bitstring_counts=dict(Counter(clean)),
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
+            loss_bitstrings=dict(Counter(lost)) if lost else None,
         )
 
     def name(self) -> str:
@@ -149,28 +154,39 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
-            # If result is Loss, treat it as "0" in the bitstring
+            # Use 'L' to mark lost qubits, then separate clean vs loss bitstrings
             bitstrings = [
-                "".join("1" if str(x) == "One" else "0" for x in reversed(one_run)) for one_run in raw_results
+                "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
+                for one_run in raw_results
             ]
-            bitstring_counts = dict(Counter(bitstrings))
+            clean = [b for b in bitstrings if "L" not in b]
+            lost = [b for b in bitstrings if "L" in b]
+            bitstring_counts = dict(Counter(clean))
+            loss_bitstrings = dict(Counter(lost)) if lost else None
         else:
             qasm = circuit.get_qasm()
             raw_results = sparse_state_run_qasm(
                 qasm,
                 shots=shots,
-                as_bitstring=True,
                 noise=noise_config,
                 seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
             # Reverse the order of bits in each measurement result to match Little Endian convention
-            bitstring_counts = {bitstring[::-1]: count for bitstring, count in Counter(raw_results).items()}
+            bitstrings = [
+                "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
+                for one_run in raw_results
+            ]
+            clean = [b for b in bitstrings if "L" not in b]
+            lost = [b for b in bitstrings if "L" in b]
+            bitstring_counts = dict(Counter(clean))
+            loss_bitstrings = dict(Counter(lost)) if lost else None
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
+            loss_bitstrings=loss_bitstrings,
         )
 
     def name(self) -> str:

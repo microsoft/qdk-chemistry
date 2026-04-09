@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import warnings
-
 from qiskit_aer.noise import NoiseModel, depolarizing_error
 
 from qdk_chemistry.data.noise_models import QuantumErrorProfile, SupportedErrorTypes
@@ -41,13 +39,10 @@ def get_noise_model_from_profile(
                     depolarizing_error(rate, num_qubits),
                     [str(gate)],  # Convert gate to string for Qiskit
                 )
+            elif error_type == SupportedErrorTypes.QUBIT_LOSS:
+                raise ValueError("Qubit loss error is not currently supported in Qiskit noise models.")
             else:
-                warnings.warn(
-                    f"Unsupported error type: {error_type} for gate {gate}. "
-                    "The error contribution will be ignored in this error model.",
-                    category=UserWarning,
-                    stacklevel=2,
-                )
+                raise ValueError(f"Unsupported error type: {error_type}")
     return noise_model
 
 
