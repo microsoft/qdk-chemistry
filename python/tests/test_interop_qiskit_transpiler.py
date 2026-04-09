@@ -20,8 +20,7 @@ if QDK_CHEMISTRY_HAS_QISKIT:
         MergeZBasisRotations,
         RemoveZBasisOnZeroState,
         SubstituteCliffordRz,
-        SubstitutePauli1QRotation,
-        SubstitutePauli2QRotation,
+        SubstitutePauliRotation,
     )
 else:
     # Define placeholders for type checking when Qiskit is not available
@@ -37,8 +36,7 @@ else:
     MergeZBasisRotations = object
     RemoveZBasisOnZeroState = object
     SubstituteCliffordRz = object
-    SubstitutePauli1QRotation = object
-    SubstitutePauli2QRotation = object
+    SubstitutePauliRotation = object
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -147,7 +145,7 @@ def test_remove_z_basis_on_zero_state_preserves_after_x():
 
 
 # ---------------------------------------------------------------------------
-# SubstitutePauli1QRotation tests
+# SubstitutePauliRotation tests — 1-qubit gates
 # ---------------------------------------------------------------------------
 
 
@@ -166,7 +164,7 @@ def test_substitute_pauli_1q_odd_pi(gate_method, angle, expected_gate):
     qc = QuantumCircuit(1)
     getattr(qc, gate_method)(angle, 0)
 
-    result = _run_pass(SubstitutePauli1QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 1
@@ -186,7 +184,7 @@ def test_substitute_pauli_1q_even_pi(gate_method, angle):
     qc = QuantumCircuit(1)
     getattr(qc, gate_method)(angle, 0)
 
-    result = _run_pass(SubstitutePauli1QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     assert result.size() == 0
 
@@ -204,7 +202,7 @@ def test_substitute_pauli_1q_non_pi_unchanged(gate_method, angle):
     qc = QuantumCircuit(1)
     getattr(qc, gate_method)(angle, 0)
 
-    result = _run_pass(SubstitutePauli1QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 1
@@ -217,7 +215,7 @@ def test_substitute_pauli_1q_parameterized_untouched():
     qc = QuantumCircuit(1)
     qc.rz(theta, 0)
 
-    result = _run_pass(SubstitutePauli1QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 1
@@ -232,7 +230,7 @@ def test_substitute_pauli_1q_mixed_circuit():
     qc.rz(np.pi, 0)  # odd → Z
     qc.rx(0.5, 0)  # not a multiple → kept
 
-    result = _run_pass(SubstitutePauli1QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 3
@@ -248,7 +246,7 @@ def test_substitute_pauli_1q_selective_gate_set():
     qc.rz(np.pi, 0)  # would become Z
 
     # Only allow X substitution, not Z
-    result = _run_pass(SubstitutePauli1QRotation(equivalent_gate_set=["id", "x"]), qc)
+    result = _run_pass(SubstitutePauliRotation(equivalent_gate_set=["id", "x"]), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 2
@@ -258,15 +256,15 @@ def test_substitute_pauli_1q_selective_gate_set():
 
 def test_substitute_pauli_1q_settings():
     """Test settings initialization and 'id' auto-inclusion."""
-    p = SubstitutePauli1QRotation(equivalent_gate_set=["x"])
+    p = SubstitutePauliRotation(equivalent_gate_set=["x"])
     assert "id" in p.settings().get("equivalent_gate_set")
 
     with pytest.raises(TypeError):
-        SubstitutePauli1QRotation(equivalent_gate_set="x")
+        SubstitutePauliRotation(equivalent_gate_set="x")
 
 
 # ---------------------------------------------------------------------------
-# SubstitutePauli2QRotation tests
+# SubstitutePauliRotation tests — 2-qubit gates
 # ---------------------------------------------------------------------------
 
 
@@ -284,7 +282,7 @@ def test_substitute_pauli_2q_odd_pi(gate_method, angle, expected_gate):
     qc = QuantumCircuit(2)
     getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(SubstitutePauli2QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 2
@@ -304,7 +302,7 @@ def test_substitute_pauli_2q_even_pi(gate_method, angle):
     qc = QuantumCircuit(2)
     getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(SubstitutePauli2QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     assert result.size() == 0
 
@@ -322,7 +320,7 @@ def test_substitute_pauli_2q_non_pi_unchanged(gate_method, angle):
     qc = QuantumCircuit(2)
     getattr(qc, gate_method)(angle, 0, 1)
 
-    result = _run_pass(SubstitutePauli2QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 1
@@ -335,7 +333,7 @@ def test_substitute_pauli_2q_parameterized_untouched():
     qc = QuantumCircuit(2)
     qc.rzz(theta, 0, 1)
 
-    result = _run_pass(SubstitutePauli2QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     assert len(ops) == 1
@@ -349,7 +347,7 @@ def test_substitute_pauli_2q_mixed_circuit():
     qc.ryy(2 * np.pi, 0, 1)  # even → removed
     qc.rzz(3 * np.pi, 0, 1)  # odd → Z⊗Z
 
-    result = _run_pass(SubstitutePauli2QRotation(), qc)
+    result = _run_pass(SubstitutePauliRotation(), qc)
 
     ops = [instr.operation for instr in result.data]
     names = [op.name for op in ops]

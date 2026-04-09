@@ -38,8 +38,7 @@ __all__ = [
     "MergeZBasisRotations",
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
-    "SubstitutePauli1QRotation",
-    "SubstitutePauli2QRotation",
+    "SubstitutePauliRotation",
 ]
 
 
@@ -310,25 +309,20 @@ class SubstituteCliffordRz(TransformationPass):
         return self._settings
 
 
-class _SubstitutePauliRotationSettings(Settings):
-    r"""Base settings configuration for SubstitutePauli\* passes.
+class SubstitutePauliRotationSettings(Settings):
+    """Settings configuration for SubstitutePauliRotation.
 
-    Settings:
-        equivalent_gate_set (vector<string>): Substitutions to allow (always includes ``"id"``).
-        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance.
+    SubstitutePauliRotation-specific settings:
+        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
 
     """
 
-    def __init__(self, pauli_gate_names: list[str]):
-        """Initialize _SubstitutePauliRotationSettings.
-
-        Args:
-            pauli_gate_names: The Pauli gate names (e.g. ``["x", "y", "z"]``).
-
-        """
+    def __init__(self):
+        """Initialize SubstitutePauliRotationSettings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("equivalent_gate_set", "vector<string>", ["id", *pauli_gate_names])
+        self._set_default("equivalent_gate_set", "vector<string>", ["id", "x", "y", "z"])
         self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
 
     def set(self, key: str, value):
@@ -360,103 +354,87 @@ class _SubstitutePauliRotationSettings(Settings):
         super().update(settings_dict)
 
 
-class SubstitutePauli1QRotationSettings(_SubstitutePauliRotationSettings):
-    """Settings configuration for SubstitutePauli1QRotation.
+class SubstitutePauliRotation(TransformationPass):
+    r"""Substitute Pauli rotation gates at integer multiples of π.
 
-    SubstitutePauli1QRotation-specific settings:
-        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
-        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+    Handles both 1-qubit (Rx, Ry, Rz) and 2-qubit (Rxx, Ryy, Rzz) rotations:
 
-    """
-
-    def __init__(self):
-        """Initialize SubstitutePauli1QRotationSettings."""
-        Logger.trace_entering()
-        super().__init__(["x", "y", "z"])
-
-
-class SubstitutePauli2QRotationSettings(_SubstitutePauliRotationSettings):
-    """Settings configuration for SubstitutePauli2QRotation.
-
-    SubstitutePauli2QRotation-specific settings:
-        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
-        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
-
-    """
-
-    def __init__(self):
-        """Initialize SubstitutePauli2QRotationSettings."""
-        Logger.trace_entering()
-        super().__init__(["x", "y", "z"])
-
-
-class _SubstitutePauliRotation(TransformationPass):
-    r"""Base pass that replaces rotation gates at integer multiples of π.
-
-    For a rotation gate :math:`R_P(\theta)`:
-
-    * Even multiples of π (0, 2π, …) → identity (gate removed).
-    * Odd multiples of π (π, 3π, …) → the corresponding Pauli gate(s).
+    * :math:`R_P(k\pi)` where *k* is even → removed (identity up to global phase).
+    * :math:`R_P(k\pi)` where *k* is odd  → the corresponding Pauli gate(s).
 
     For 2-qubit rotations the Pauli is applied independently to each qubit.
     """
 
     def __init__(
         self,
-        rotation_gates: dict[str, tuple[type, type]],
-        settings: _SubstitutePauliRotationSettings,
         equivalent_gate_set: list[str] | None = None,
         tolerance: float = float(np.finfo(np.float64).eps),
     ):
-        """Initialize the pass.
+        """Initialize SubstitutePauliRotation.
 
         Args:
-            rotation_gates: Gate-name → (Pauli class, Rotation class) mapping this pass handles.
-            settings: Settings instance for this pass.
-            equivalent_gate_set: List of gates to allow substitution with, or None for defaults.
+            equivalent_gate_set: List of gates to allow substitution with, or None for
+                defaults (``["id", "x", "y", "z"]``).
             tolerance: Angle comparison tolerance.
 
         """
         Logger.trace_entering()
         super().__init__()
-        self._rotation_gates = rotation_gates
-        self._settings = settings
+        self._rotation_gates = {
+            "rx": (XGate, RXGate),
+            "ry": (YGate, RYGate),
+            "rz": (ZGate, RZGate),
+            "rxx": (XGate, RXXGate),
+            "ryy": (YGate, RYYGate),
+            "rzz": (ZGate, RZZGate),
+        }
+        self._settings = SubstitutePauliRotationSettings()
         if equivalent_gate_set is not None:
             if not isinstance(equivalent_gate_set, list):
                 raise TypeError("equivalent_gate_set must be a list of gate names or None")
             self._settings.set("equivalent_gate_set", equivalent_gate_set)
         self._settings.set("tolerance", tolerance)
 
-    def run(self, dag: DAGCircuit) -> DAGCircuit:
-        """Run the pass on the given ``DAGCircuit``.
+    def substitute_pauli_rotations(
+        self,
+        dag: DAGCircuit,
+        rotation_gates: dict[str, tuple[type, type]],
+        equivalent_gate_set: list[str],
+        tolerance: float,
+    ) -> DAGCircuit:
+        r"""Replace rotation gates at integer multiples of π with Pauli gates or identity.
+
+        For a rotation gate :math:`R_P(\theta)`:
+
+        * Even multiples of π (0, 2π, …) → identity (gate removed).
+        * Odd multiples of π (π, 3π, …) → the corresponding Pauli gate(s).
+
+        For 2-qubit rotations the Pauli is applied independently to each qubit.
 
         Args:
             dag: The input ``DAGCircuit`` to transform.
+            rotation_gates: Gate-name → (Pauli class, Rotation class) mapping.
+            equivalent_gate_set: List of gate names allowed for substitution.
+            tolerance: Angle comparison tolerance.
 
         Returns:
             The transformed ``DAGCircuit`` with Pauli substitutions.
 
         """
-        Logger.trace_entering()
-        Logger.debug(f"Running {type(self).__name__} pass.")
-
-        equivalent_gate_set = self._settings.get("equivalent_gate_set")
-        tolerance = self._settings.get("tolerance")
-
         if "id" not in equivalent_gate_set:
             raise ValueError("Gate 'id' is missing in equivalent_gate_set.")
         if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
             raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
 
         for node in dag.op_nodes():
-            if node.op.name not in self._rotation_gates:
+            if node.op.name not in rotation_gates:
                 continue
 
             angle = node.op.params[0]
             if isinstance(angle, ParameterExpression):
                 continue
 
-            pauli_cls, _ = self._rotation_gates[node.op.name]
+            pauli_cls, _ = rotation_gates[node.op.name]
             pauli_name = pauli_cls().name  # e.g. "x", "y", "z"
 
             k = round(float(angle) / np.pi)
@@ -479,6 +457,25 @@ class _SubstitutePauliRotation(TransformationPass):
 
         return dag
 
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with Pauli substitutions.
+
+        """
+        Logger.trace_entering()
+        Logger.debug("Running SubstitutePauliRotation pass.")
+        return self.substitute_pauli_rotations(
+            dag,
+            self._rotation_gates,
+            self._settings.get("equivalent_gate_set"),
+            self._settings.get("tolerance"),
+        )
+
     def settings(self) -> Settings:
         """Get the settings for this pass.
 
@@ -488,68 +485,6 @@ class _SubstitutePauliRotation(TransformationPass):
         """
         Logger.trace_entering()
         return self._settings
-
-
-class SubstitutePauli1QRotation(_SubstitutePauliRotation):
-    r"""Substitute 1-qubit Pauli rotation gates (Rx, Ry, Rz) at integer multiples of π.
-
-    For each gate in {Rx, Ry, Rz}:
-
-    * :math:`R_P(k\pi)` where *k* is even → removed (identity up to global phase).
-    * :math:`R_P(k\pi)` where *k* is odd  → the corresponding Pauli gate (X, Y, or Z).
-    """
-
-    def __init__(
-        self,
-        equivalent_gate_set: list[str] | None = None,
-        tolerance: float = float(np.finfo(np.float64).eps),
-    ):
-        """Initialize SubstitutePauli1QRotation.
-
-        Args:
-            equivalent_gate_set: List of gates to allow substitution with, or None for
-                defaults (``["id", "x", "y", "z"]``).
-            tolerance: Angle comparison tolerance.
-
-        """
-        Logger.trace_entering()
-        super().__init__(
-            {"rx": (XGate, RXGate), "ry": (YGate, RYGate), "rz": (ZGate, RZGate)},
-            SubstitutePauli1QRotationSettings(),
-            equivalent_gate_set,
-            tolerance,
-        )
-
-
-class SubstitutePauli2QRotation(_SubstitutePauliRotation):
-    r"""Substitute 2-qubit Pauli rotation gates (Rxx, Ryy, Rzz) at integer multiples of π.
-
-    For each gate in {Rxx, Ryy, Rzz}:
-
-    * :math:`R_{PP}(k\pi)` where *k* is even → removed (identity up to global phase).
-    * :math:`R_{PP}(k\pi)` where *k* is odd  → the Pauli applied to each qubit (e.g. X⊗X).
-    """
-
-    def __init__(
-        self,
-        equivalent_gate_set: list[str] | None = None,
-        tolerance: float = float(np.finfo(np.float64).eps),
-    ):
-        """Initialize SubstitutePauli2QRotation.
-
-        Args:
-            equivalent_gate_set: List of gates to allow substitution with, or None for
-                defaults (``["id", "x", "y", "z"]``).
-            tolerance: Angle comparison tolerance.
-
-        """
-        Logger.trace_entering()
-        super().__init__(
-            {"rxx": (XGate, RXXGate), "ryy": (YGate, RYYGate), "rzz": (ZGate, RZZGate)},
-            SubstitutePauli2QRotationSettings(),
-            equivalent_gate_set,
-            tolerance,
-        )
 
 
 class RemoveZBasisOnZeroState(TransformationPass):
