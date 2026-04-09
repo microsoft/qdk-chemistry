@@ -171,5 +171,5 @@ class EvolveAndMeasure(MeasureSimulation):
         return self._evolution_circuit
 
     def name(self) -> str:
-        """Return ``classical_sampling`` as the algorithm name."""
-        return "classical_sampling"
+        """Return ``evolve_and_measure`` as the algorithm name."""
+        return "evolve_and_measure"
