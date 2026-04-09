@@ -18,6 +18,12 @@ vcpkg_check_features(OUT_FEATURE_OPTIONS OPTIONS
         dynamic-arch   DYNAMIC_ARCH
 )
 
+# If not explicitly configured for a cross build, OpenBLAS wants to run 
+# getarch executables in order to optimize for the target.
+# Adapting this to vcpkg triplets:
+# - install-getarch.diff introduces and uses GETARCH_BINARY_DIR,
+# - architecture and system name are required to match for GETARCH_BINARY_DIR, but
+# - uwp (aka WindowsStore) may run windows getarch.
 string(REPLACE "WindowsStore_" "_" SYSTEM_KEY "${VCPKG_CMAKE_SYSTEM_NAME}_${VCPKG_TARGET_ARCHITECTURE}")
 set(GETARCH_BINARY_DIR "${CURRENT_HOST_INSTALLED_DIR}/manual-tools/${PORT}/${SYSTEM_KEY}")
 if(EXISTS "${GETARCH_BINARY_DIR}")
@@ -29,15 +35,23 @@ else()
     message(STATUS "OpenBLAS native build")
 endif()
 
-# QDK overlay change: BUILD_WITHOUT_LAPACK=OFF to include LAPACK routines.
-# We keep NOFORTRAN=ON since OpenBLAS ships C-translated LAPACK (f2c'd) internally.
-# The C_LAPACK=ON flag tells OpenBLAS to use its embedded C LAPACK implementation.
+if(VCPKG_TARGET_IS_EMSCRIPTEN)
+    # Only the riscv64 kernel with riscv64_generic target is supported.
+    # Cf. https://github.com/OpenMathLib/OpenBLAS/issues/3640#issuecomment-1144029630 et al.
+    list(APPEND OPTIONS
+        -DEMSCRIPTEN_SYSTEM_PROCESSOR=riscv64
+        -DTARGET=RISCV64_GENERIC
+    )
+endif()
+
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
     OPTIONS
         ${OPTIONS}
         "-DCMAKE_PROJECT_INCLUDE=${CURRENT_PORT_DIR}/cmake-project-include.cmake"
         -DBUILD_TESTING=OFF
+        # QDK overlay change: BUILD_WITHOUT_LAPACK=OFF to include LAPACK routines.
+        # C_LAPACK=ON uses OpenBLAS's embedded C-translated LAPACK (no Fortran needed).
         -DBUILD_WITHOUT_LAPACK=OFF
         -DNOFORTRAN=ON
         -DC_LAPACK=ON
@@ -50,9 +64,10 @@ vcpkg_copy_pdbs()
 vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/OpenBLAS)
 vcpkg_fixup_pkgconfig()
 
+# Required from native builds, optional from cross builds.
 if(NOT VCPKG_CROSSCOMPILING OR EXISTS "${CURRENT_PACKAGES_DIR}/bin/getarch${VCPKG_TARGET_EXECUTABLE_SUFFIX}")
     vcpkg_copy_tools(
-        TOOL_NAMES getarch getarch_2nd
+        TOOL_NAMES getarch getarch_2nd 
         DESTINATION "${CURRENT_PACKAGES_DIR}/manual-tools/${PORT}/${SYSTEM_KEY}"
         AUTO_CLEAN
     )
