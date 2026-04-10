@@ -472,11 +472,11 @@ TEST(ClassRegistryTest, PrimitiveKey) {
 TEST(AtomGuessTest, BasisSetMap) {
   // Test that the map correctly identifies equivalent basis sets
   auto mol = std::make_shared<Molecule>();
-  mol->atomic_nums = {1};
+  mol->atomic_nums = {3};
   mol->n_atoms = 1;
-  mol->atomic_charges = {1};
-  mol->total_nuclear_charge = 1;
-  mol->n_electrons = 1;
+  mol->atomic_charges = {3};
+  mol->total_nuclear_charge = 3;
+  mol->n_electrons = 3;
   mol->coords = {{0.0, 0.0, 0.0}};
 
   // Create two identical basis sets
@@ -485,10 +485,10 @@ TEST(AtomGuessTest, BasisSetMap) {
   auto basis2 =
       BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
 
-  // Create same basis set in different shell order
+  // Create same basis set with reversed shell order via JSON round-trip.
+  // Lithium STO-3G has 3 shells, so reversing produces a different ordering that the BasisEqChecker should reject.
   auto basis_json = basis1->to_json();
-  // Reverse the shells
-  std::reverse(basis_json["shells"].begin(), basis_json["shells"].end());
+  std::reverse(basis_json["electron_shells"].begin(), basis_json["electron_shells"].end());
   auto basis3 = BasisSet::from_serialized_json(mol, basis_json);
 
   // Create a different basis set (different basis name)
@@ -518,7 +518,7 @@ TEST(AtomGuessTest, BasisSetMap) {
   EXPECT_NE(it2, basis_map.end());
   EXPECT_TRUE(it2->second.isApprox(RowMajorMatrix::Identity(
       basis2->num_atomic_orbitals, basis2->num_atomic_orbitals)));
-  // Retrieve using basis3 (should not be found)
+  // Retrieve using basis3 (should not be found — shells are reversed)
   auto it3 = basis_map.find(*basis3);
   EXPECT_EQ(it3, basis_map.end());
   // Retrieve using basis4 (should not be found)
