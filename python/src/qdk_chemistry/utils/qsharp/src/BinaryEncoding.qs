@@ -21,7 +21,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     ///   ("CX",     [control, target],           0,  [])
     ///   ("SWAP",   [a, b],                      0,  [])
     ///   ("CCX",    [ctrl1, ctrl2, target],      0,  [])
-    ///   ("MCX",    [target, ctrl0, ctrl1, ...], ctrlStateBitmask, [])
+    ///   ("MCX",    [ctrl0, ctrl1, ..., target], ctrlStateBitmask, [])
     ///   ("SELECT", [addr0..addrN, data0..dataM], numAddrQubits,  data[][])
     struct MatrixCompressionOp {
         name : String,
@@ -55,12 +55,12 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         } elif gate.name == "CCX" {
             CCNOT(qs[gate.qubits[0]], qs[gate.qubits[1]], qs[gate.qubits[2]]);
         } elif gate.name == "MCX" {
-            let target = gate.qubits[0];
             let numControls = Length(gate.qubits) - 1;
+            let target = gate.qubits[numControls];
             mutable controlQubits = [];
             mutable ctrlStateBools = [];
             for i in 0..numControls - 1 {
-                set controlQubits += [qs[gate.qubits[1 + i]]];
+                set controlQubits += [qs[gate.qubits[i]]];
                 set ctrlStateBools += [((gate.controlState >>> i) &&& 1) == 1];
             }
             ApplyControlledOnBitString(ctrlStateBools, X, controlQubits, qs[target]);

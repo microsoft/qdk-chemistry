@@ -102,8 +102,8 @@ class MatrixCompressionOp:
 
     def __post_init__(self):
         """Validate the MatrixCompressionOp parameters."""
-        if self.name == MatrixCompressionType.SELECT and not self.lookup_data:
-            raise ValueError("lookup_data must be provided for SELECT operations")
+        if self.name in {MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND} and not self.lookup_data:
+            raise ValueError(f"lookup_data must be provided for {self.name} operations")
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize to a camelCase dict matching the Q# ``MatrixCompressionOp`` struct."""
@@ -178,13 +178,17 @@ class RefTableau:
 
         """
         self.data = np.asarray(data, dtype=np.int8)
-        assert self.data.ndim == 2
+        if self.data.ndim != 2:
+            raise ValueError("Input data must be a 2-dimensional array")
 
         _check_ref(self.data)
 
         self.num_rows, self.num_cols = self.data.shape
         self.dense_size = _dense_qubits_size(self.num_cols)
-        assert self.dense_size < self.num_rows
+        if self.dense_size >= self.num_rows:
+            raise ValueError(
+                f"Dense size ({self.dense_size}) must be strictly less than number of rows ({self.num_rows})"
+            )
 
         self._tmp_row = np.zeros(self.num_cols, dtype=np.int8)
         self.pivots = self.identify_pivots()
@@ -923,9 +927,9 @@ class BinaryEncodingSynthesizer:
             qubits = [int(q) for q in addr_qubits] + [int(q) for q in dat_qubits]
             return MatrixCompressionOp(op_type, qubits, control_state=len(addr_qubits), lookup_data=data_table)
         if op_type is MatrixCompressionType.MCX:
-            controls, _, target_qubit = op_args
+            controls, control_state, target_qubit = op_args
             qubits = [int(q) for q in controls] + [int(target_qubit)]
-            return MatrixCompressionOp(op_type, qubits, control_state=len(controls))
+            return MatrixCompressionOp(op_type, qubits, control_state=control_state)
         raise ValueError(f"Unknown op type: {op_type}")
 
     @staticmethod

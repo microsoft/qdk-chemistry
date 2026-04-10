@@ -7,7 +7,6 @@
 from pathlib import Path
 
 import qdk
-import qsharp
 from qdk import init as qdk_init
 from qsharp._qsharp import get_config as get_qdk_profile_config
 
@@ -19,7 +18,7 @@ _QS_DIR = Path(__file__).parent
 
 # Ensure the Q# interpreter uses Adaptive_RIF
 qdk_config = get_qdk_profile_config()
-_target_profile = qsharp.TargetProfile.Adaptive_RIF
+_target_profile = qdk.TargetProfile.Adaptive_RIF
 
 if qdk_config.get_target_profile() != "adaptive_rif":
     Logger.debug(
