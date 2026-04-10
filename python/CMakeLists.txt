@@ -85,6 +85,19 @@ find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)
+# When the vcpkg toolchain is active its find_package wrapper may not search the isolated build environment where pip
+# installed pybind11. Ask pybind11 itself for its CMake config directory so the wrapper can find it.
+if(NOT pybind11_DIR)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
+    OUTPUT_VARIABLE _pybind11_cmakedir
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE _pybind11_result)
+  if(_pybind11_result EQUAL 0 AND _pybind11_cmakedir)
+    set(pybind11_DIR "${_pybind11_cmakedir}" CACHE PATH "" FORCE)
+  endif()
+endif()
 find_package(pybind11 REQUIRED)
 
 # Create the Python extension module

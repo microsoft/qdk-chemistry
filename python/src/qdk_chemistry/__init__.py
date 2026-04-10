@@ -9,6 +9,22 @@ from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _get_version
 from pathlib import Path
 
+# On Windows, native DLL dependencies (OpenBLAS, HDF5, etc.) may not be on the default DLL search path.
+# Register additional directories *before* any import of the C++ extension module (_core).
+import os as _os
+import sys as _sys
+
+if _sys.platform == "win32":
+    # Allow users / CI to point to extra DLL directories via a semicolon-
+    # separated environment variable (e.g. the vcpkg bin directory).
+    _dll_dirs = _os.environ.get("QDK_DLL_DIR", "")
+    _dll_dir_handles = []
+    for _d in _dll_dirs.split(";"):
+        _d = _d.strip()
+        if _d and _os.path.isdir(_d):
+            _dll_dir_handles.append(_os.add_dll_directory(_d))
+    del _dll_dirs
+
 try:
     __version__ = _get_version("qdk-chemistry")
 except _PackageNotFoundError:

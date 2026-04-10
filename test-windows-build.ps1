@@ -286,7 +286,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 4 2>&1 *> cpp/build/build.log
+    cmake --build "$BuildDir" --parallel 6 2>&1 *> cpp/build/build.log
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
     Write-Host "C++ build succeeded." -ForegroundColor Green
 
@@ -306,7 +306,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 4: Install C++ library ===" -ForegroundColor Yellow
-    cmake --install "$BuildDir" --prefix "$InstallDir" 2>&1 *> cpp/build/install.log
+    cmake --install "$BuildDir" --prefix "$InstallDir"
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake install failed"; exit 1 }
     Write-Host "C++ library installed to $InstallDir" -ForegroundColor Green
 
@@ -322,15 +322,24 @@ if (-not $SkipPython) {
     Write-Host "=== Step 5: Install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
-    python -m pip install . `
-        -C cmake.define.QDK_UARCH="$QDK_UARCH" `
-        -C cmake.define.BUILD_SHARED_LIBS=OFF `
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF `
-        -C cmake.define.QDK_ENABLE_OPENMP=OFF `
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
-        -C cmake.define.BUILD_TESTING=OFF `
+    # Set QDK_DLL_DIR so the qdk_chemistry package can find vcpkg DLL
+    # dependencies (openblas.dll, hdf5.dll, etc.) at import time.
+    $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
+    Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
+
+    if (-not (Test-Path .\venv)) {
+        uv venv .\venv
+    }
+    .\venv\Scripts\activate
+    # Do not install:
+    # - plugins: pyscf does not build on Windows
+    # - jupyter: requires plugins
+    uv pip install .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
+        -C cmake.args=-GNinja `
+        -C cmake.define.CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH;$InstallDir" `
         -C cmake.define.CMAKE_C_COMPILER=clang-cl `
         -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
+        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=6 `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
         -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
         -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
@@ -343,7 +352,7 @@ if (-not $SkipPython) {
     if (-not $SkipTests) {
         Write-Host ""
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
-        python -m pip install pytest --quiet
+        # python -m pip install pytest --quiet
         pytest -v --tb=short
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {
