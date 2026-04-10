@@ -70,21 +70,31 @@ if(MSVC)
         -Wno-disabled-macro-expansion
         -Wno-old-style-cast
         -Wno-missing-prototypes
+        -Wno-missing-noreturn
         -Wno-float-conversion
         -Wno-format-nonliteral
         -Wno-switch-default
         -Wno-switch-enum
         -Wno-cast-qual
+        -Wno-cast-function-type-strict
+        -Wno-implicit-float-conversion
+        -Wno-double-promotion
         -Wno-undefined-func-template
         -Wno-deprecated-declarations
         -Wno-extra-semi-stmt
         -Wno-unused-macros
-        -Wno-unused-parameter
+        -Wno-unused-variable
         -Wno-shorten-64-to-32
         -Wno-reserved-macro-identifier
         -Wno-macro-redefined
         -Wno-inconsistent-missing-destructor-override
         -Wno-suggest-destructor-override
+        -Wno-vla-cxx-extension
+        -Wno-exit-time-destructors
+        -Wno-global-constructors
+        -Wno-undef
+        -Wno-reserved-identifier
+        -Wno-float-equal
     )
     # lapackpp's lartg.cc uses std::complex without #include <complex>.
     # On libstdc++ it's transitively included; on MSVC STL it isn't.
@@ -182,19 +192,27 @@ add_library(chemistry)
 if(MSVC)
     target_compile_options(chemistry PRIVATE
         -Wunused-parameter
+        -Wunused-variable
         -Wsign-conversion
         -Wfloat-conversion
+        -Wimplicit-float-conversion
+        -Wdouble-promotion
         -Wold-style-cast
         -Wextra-semi
         -Wextra-semi-stmt
         -Wmissing-prototypes
+        -Wmissing-noreturn
         -Wshorten-64-to-32
         -Wcast-qual
         -Wswitch-default
         -Wswitch-enum
         -Wformat-nonliteral
+        -Wdeprecated-declarations
         -Winconsistent-missing-destructor-override
         -Wsuggest-destructor-override
+        -Wundef
+        -Wreserved-identifier
+        -Wfloat-equal
     )
 endif()
 add_subdirectory(src/qdk/chemistry/data)
