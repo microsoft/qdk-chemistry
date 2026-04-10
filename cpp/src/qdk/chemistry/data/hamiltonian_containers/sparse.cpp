@@ -93,7 +93,7 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           type),
       _one_body_sparse(_to_sparse(one_body_integrals)),
       _two_body_map(_to_map(two_body_integrals,
-                            static_cast<int>(one_body_integrals.rows()))) {}
+                            static_cast<size_t>(one_body_integrals.rows()))) {}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals, double core_energy,
