@@ -39,7 +39,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
                   requires_openfermion, is_slow)
 
     """
-    content = example_file.read_text()
+    content = example_file.read_text(encoding="utf-8")
 
     requires_pyscf = False
     requires_qiskit = False
