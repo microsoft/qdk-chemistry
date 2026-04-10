@@ -114,7 +114,7 @@ void MP2Container::_compute_t1_amplitudes() const {
   auto [n_alpha, n_beta] = get_active_num_electrons();
 
   // Get active space size
-  int active_space_size = get_orbitals()->get_num_molecular_orbitals();
+  size_t active_space_size = get_orbitals()->get_num_molecular_orbitals();
   if (get_orbitals()->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         get_orbitals()->get_active_space_indices();
@@ -152,7 +152,7 @@ void MP2Container::_compute_t2_amplitudes() const {
   }
 
   // Get active space size
-  int active_space_size = get_orbitals()->get_num_molecular_orbitals();
+  size_t active_space_size = get_orbitals()->get_num_molecular_orbitals();
   if (get_orbitals()->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         get_orbitals()->get_active_space_indices();
