@@ -26,16 +26,28 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 
 def test_profile_dumping(simple_error_profile):
     """Test dumping quantum error profile to YAML."""
-    with tempfile.NamedTemporaryFile() as tmp_file:
-        simple_error_profile.to_yaml_file(tmp_file.name)
+    # NOTE: Use delete=False so the file handle is closed when the with-block exits, allowing C++ code to open it.
+    # On Windows the default (delete=True) keeps an exclusive lock on the file. We delete the file manually in `finally`
+    # via Path.unlink(). This pattern is used throughout the test suite.
+    # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        filename = tmp_file.name
+    try:
+        simple_error_profile.to_yaml_file(filename)
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_yaml_save_and_load_equivalence(simple_error_profile):
     """Test that a saved error profile gives the same values on loading."""
-    with tempfile.NamedTemporaryFile() as tmp_file:
-        simple_error_profile.to_yaml_file(tmp_file.name)
-        loaded_profile = QuantumErrorProfile.from_yaml_file(tmp_file.name)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        filename = tmp_file.name
+    try:
+        simple_error_profile.to_yaml_file(filename)
+        loaded_profile = QuantumErrorProfile.from_yaml_file(filename)
         assert simple_error_profile == loaded_profile
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_basis_gates(simple_error_profile):

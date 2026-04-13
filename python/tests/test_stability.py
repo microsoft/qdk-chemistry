@@ -8,6 +8,7 @@
 import pickle
 import tempfile
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -104,8 +105,14 @@ class TestStabilityResultIO:
         )
 
         # Test file-based serialization
-        with tempfile.NamedTemporaryFile(suffix=".stability_result.json") as tmp:
+        # NOTE: Use delete=False so the file handle is closed when the with-block exits, allowing C++ code to open it.
+        # On Windows the default (delete=True) keeps an exclusive lock on the file. We delete the file manually in `finally`
+        # via Path.unlink(). This pattern is used throughout the test suite.
+        # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
+        with tempfile.NamedTemporaryFile(suffix=".stability_result.json", delete=False) as tmp:
             filename = tmp.name
+
+        try:
             result_out.to_json_file(filename)
 
             result_file = StabilityResult.from_json_file(filename)
@@ -125,56 +132,62 @@ class TestStabilityResultIO:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+        finally:
+            Path(filename).unlink(missing_ok=True)
 
     def test_stability_result_hdf5_serialization(self):
         """Test HDF5 serialization and deserialization."""
         result_out = self.create_test_stability_result()
 
+        with tempfile.NamedTemporaryFile(suffix=".stability_result.h5", delete=False) as tmp:
+            filename = tmp.name
+
         try:
-            with tempfile.NamedTemporaryFile(suffix=".stability_result.h5") as tmp:
-                filename = tmp.name
-                result_out.to_hdf5_file(filename)
+            result_out.to_hdf5_file(filename)
 
-                result_in = StabilityResult.from_hdf5_file(filename)
+            result_in = StabilityResult.from_hdf5_file(filename)
 
-                # Verify data preservation
-                assert result_in.is_internal_stable() == result_out.is_internal_stable()
-                assert result_in.is_external_stable() == result_out.is_external_stable()
-                assert np.allclose(
-                    result_out.get_internal_eigenvalues(),
-                    result_in.get_internal_eigenvalues(),
-                    rtol=float_comparison_relative_tolerance,
-                    atol=float_comparison_absolute_tolerance,
-                )
-                assert np.allclose(
-                    result_out.get_external_eigenvalues(),
-                    result_in.get_external_eigenvalues(),
-                    rtol=float_comparison_relative_tolerance,
-                    atol=float_comparison_absolute_tolerance,
-                )
-                assert np.allclose(
-                    result_out.get_internal_eigenvectors(),
-                    result_in.get_internal_eigenvectors(),
-                    rtol=float_comparison_relative_tolerance,
-                    atol=float_comparison_absolute_tolerance,
-                )
-                assert np.allclose(
-                    result_out.get_external_eigenvectors(),
-                    result_in.get_external_eigenvectors(),
-                    rtol=float_comparison_relative_tolerance,
-                    atol=float_comparison_absolute_tolerance,
-                )
+            # Verify data preservation
+            assert result_in.is_internal_stable() == result_out.is_internal_stable()
+            assert result_in.is_external_stable() == result_out.is_external_stable()
+            assert np.allclose(
+                result_out.get_internal_eigenvalues(),
+                result_in.get_internal_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result_out.get_external_eigenvalues(),
+                result_in.get_external_eigenvalues(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result_out.get_internal_eigenvectors(),
+                result_in.get_internal_eigenvectors(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                result_out.get_external_eigenvectors(),
+                result_in.get_external_eigenvectors(),
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
         except RuntimeError as e:
             pytest.skip(f"HDF5 test skipped - {e!s}")
+        finally:
+            Path(filename).unlink(missing_ok=True)
 
     def test_stability_result_file_io_generic(self):
         """Test generic file I/O methods for StabilityResult."""
         result = self.create_test_stability_result()
 
         # Test JSON file I/O
-        with tempfile.NamedTemporaryFile(suffix=".stability_result.json") as tmp_json:
+        with tempfile.NamedTemporaryFile(suffix=".stability_result.json", delete=False) as tmp_json:
             json_filename = tmp_json.name
 
+        try:
             # Save using generic method
             result.to_file(json_filename, "json")
 
@@ -198,11 +211,14 @@ class TestStabilityResultIO:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+        finally:
+            Path(json_filename).unlink(missing_ok=True)
 
         # Test HDF5 file I/O
-        with tempfile.NamedTemporaryFile(suffix=".stability_result.h5") as tmp_hdf5:
+        with tempfile.NamedTemporaryFile(suffix=".stability_result.h5", delete=False) as tmp_hdf5:
             hdf5_filename = tmp_hdf5.name
 
+        try:
             # Save using generic method
             result.to_file(hdf5_filename, "hdf5")
 
@@ -226,6 +242,8 @@ class TestStabilityResultIO:
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+        finally:
+            Path(hdf5_filename).unlink(missing_ok=True)
 
         # Test unsupported file type
         with pytest.raises(ValueError, match="Unsupported file type"):
@@ -273,12 +291,16 @@ class TestStabilityResultIO:
         assert from_json.external_size() == empty_result.external_size()
 
         # Test file I/O with empty data
-        with tempfile.NamedTemporaryFile(suffix=".stability_result.json") as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".stability_result.json", delete=False) as tmp:
             filename = tmp.name
+
+        try:
             empty_result.to_json_file(filename)
             empty_from_file = StabilityResult.from_json_file(filename)
             assert empty_from_file.is_stable()
             assert empty_from_file.empty()  # Method call, not property
+        finally:
+            Path(filename).unlink(missing_ok=True)
 
     def test_stability_result_pickle_serialization_and_repr(self):
         """Test pickle serialization support and string representation for StabilityResult."""
