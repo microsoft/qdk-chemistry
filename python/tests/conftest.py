@@ -6,10 +6,17 @@
 # --------------------------------------------------------------------------------------------
 
 import os
+import sys
 
 # Disable telemetry before any qdk_chemistry imports.
 # Uses setdefault so an explicit env override is still respected.
 os.environ.setdefault("QSHARP_PYTHON_TELEMETRY", "false")
+
+# Ensure UTF-8 output on all platforms, especially Windows (for circuit diagrams with special characters)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 import platform as plt
 import sys

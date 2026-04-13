@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -48,6 +51,45 @@ def test_yaml_save_and_load_equivalence(simple_error_profile):
         assert simple_error_profile == loaded_profile
     finally:
         Path(filename).unlink(missing_ok=True)
+
+
+def test_yaml_unicode_round_trip_and_stdout(tmp_path):
+    """Test Unicode YAML round-trip and subprocess stdout decoding."""
+    script_path = tmp_path / "utf8_roundtrip.py"
+    yaml_path = tmp_path / "unicode.quantum_error_profile.yaml"
+    script_path.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "from qdk_chemistry.data.noise_models import QuantumErrorProfile",
+                "",
+                "yaml_path = Path(sys.argv[1])",
+                "profile = QuantumErrorProfile(",
+                "    name='φ-profile Å',",
+                "    description='ΔE αβγ 你好',",
+                "    errors={'h': {'type': 'depolarizing_error', 'rate': 0.01, 'num_qubits': 1}},",
+                ")",
+                "profile.to_yaml_file(yaml_path)",
+                "loaded = QuantumErrorProfile.from_yaml_file(yaml_path)",
+                "assert loaded.name == 'φ-profile Å'",
+                "assert loaded.description == 'ΔE αβγ 你好'",
+                "print('UTF-8 ok: φ Å ΔE αβγ 你好')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(script_path), str(yaml_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+
+    assert "UTF-8 ok: φ Å ΔE αβγ 你好" in result.stdout
 
 
 def test_basis_gates(simple_error_profile):

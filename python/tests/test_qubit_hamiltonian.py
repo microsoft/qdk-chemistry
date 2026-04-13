@@ -453,7 +453,7 @@ class TestQubitHamiltonianSerialization:
         qubit_hamiltonian.to_json_file(str(filename))
 
         # Verify the file can be read
-        with open(filename) as f:
+        with open(filename, encoding="utf-8") as f:
             data = json.load(f)
 
         assert "pauli_strings" in data

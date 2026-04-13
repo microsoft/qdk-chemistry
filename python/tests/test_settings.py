@@ -569,7 +569,7 @@ class TestSettings:
             assert Path(json_file).exists()
 
             # Verify file content
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
@@ -649,7 +649,7 @@ class TestSettings:
             assert Path(json_file).exists()
 
             # Verify content
-            with open(json_file) as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["method"] == "hf"
             assert data["max_iterations"] == 100
@@ -824,7 +824,7 @@ class TestSettings:
             settings.to_json_file(json_file2)
 
             # Files should be identical
-            with open(json_file1) as f1, open(json_file2) as f2:
+            with open(json_file1, encoding="utf-8") as f1, open(json_file2, encoding="utf-8") as f2:
                 assert f1.read() == f2.read()
 
             # Load with both methods and verify consistency
