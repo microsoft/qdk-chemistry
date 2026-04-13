@@ -326,6 +326,7 @@ if (-not $SkipPython) {
     # dependencies (openblas.dll, hdf5.dll, etc.) at import time.
     $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
     Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
 
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
@@ -334,12 +335,11 @@ if (-not $SkipPython) {
     # Do not install:
     # - plugins: pyscf does not build on Windows
     # - jupyter: requires plugins
-    uv pip install .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
+    uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
         -C cmake.args=-GNinja `
         -C cmake.define.CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH;$InstallDir" `
         -C cmake.define.CMAKE_C_COMPILER=clang-cl `
         -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
-        -C cmake.define.CMAKE_BUILD_PARALLEL_LEVEL=6 `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
         -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
         -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
