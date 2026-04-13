@@ -7,6 +7,7 @@
 #include <mutex>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/stdout_fd_sink.hpp>
 #include <source_location>
 #include <sstream>
 #include <string>
@@ -197,7 +198,13 @@ static void apply_spdlog_global_level_and_flush_policy(
 
 static void init_global_logger() {
   try {
+#ifdef _WIN32
+    auto sink = std::make_shared<stdout_fd_sink>();
+    g_logger = std::make_shared<spdlog::logger>("qdk-chemistry", sink);
+    spdlog::register_logger(g_logger);
+#else
     g_logger = spdlog::stdout_color_mt("qdk-chemistry");
+#endif
   } catch (const spdlog::spdlog_ex&) {
     g_logger = spdlog::get("qdk-chemistry");
   }
