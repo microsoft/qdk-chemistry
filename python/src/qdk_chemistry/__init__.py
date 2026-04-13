@@ -5,14 +5,20 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
-from importlib.metadata import version as _get_version
-from pathlib import Path
-
 # On Windows, native DLL dependencies (OpenBLAS, HDF5, etc.) may not be on the default DLL search path.
 # Register additional directories *before* any import of the C++ extension module (_core).
 import os as _os
 import sys as _sys
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _get_version
+from pathlib import Path
+
+# Ensure UTF-8 encoding for stdout/stderr on all platforms (especially Windows).
+# Q# circuit diagrams contain special characters that cannot be encoded in Windows' default cp1252 encoding.
+if hasattr(_sys.stdout, "reconfigure"):
+    _sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(_sys.stderr, "reconfigure"):
+    _sys.stderr.reconfigure(encoding="utf-8")
 
 if _sys.platform == "win32":
     # Allow users / CI to point to extra DLL directories via a semicolon-
@@ -30,7 +36,7 @@ try:
 except _PackageNotFoundError:
     # Fallback for development/uninstalled use - read from VERSION file
     try:
-        __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
+        __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text(encoding="utf-8").strip()
     except (OSError, UnicodeDecodeError):
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
         __version__ = "0.0.0.dev0"
@@ -149,7 +155,7 @@ def _is_placeholder_stub(stub_file: Path) -> bool:
     if not stub_file.exists():
         return True
     try:
-        content = stub_file.read_text()
+        content = stub_file.read_text(encoding="utf-8")
         return "placeholder" in content.lower()
     except (OSError, PermissionError):
         return False
@@ -165,7 +171,7 @@ def _update_stub_references(stub_file: Path) -> None:
     Also adds necessary imports if they don't exist.
     """
     try:
-        content = stub_file.read_text()
+        content = stub_file.read_text(encoding="utf-8")
         original_content = content
         needs_data_import = False
         needs_algorithms_import = False
@@ -213,7 +219,7 @@ def _update_stub_references(stub_file: Path) -> None:
                 lines[import_section_end:import_section_end] = new_imports
                 content = "\n".join(lines)
 
-            stub_file.write_text(content)
+            stub_file.write_text(content, encoding="utf-8")
     except (OSError, PermissionError):
         pass  # Skip files that can't be read/written
 
@@ -257,6 +263,7 @@ def _generate_stubs_on_first_import() -> None:
                 check=False,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 cwd=str(chemistry_dir),
             )
 
@@ -377,7 +384,7 @@ def _generate_registry_stubs() -> None:
         )
 
         overload_code = "\n".join(overloads)
-        stub_file.write_text(overload_code)
+        stub_file.write_text(overload_code, encoding="utf-8")
 
     except (ImportError, AttributeError, RuntimeError, OSError) as e:
         # Log but don't fail - type stubs are optional

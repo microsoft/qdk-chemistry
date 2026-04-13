@@ -146,8 +146,10 @@ class TestExampleScripts(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            encoding="utf-8",
             timeout=360,
             cwd=example_file.parent,
+            env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
         assert result.returncode == 0, (

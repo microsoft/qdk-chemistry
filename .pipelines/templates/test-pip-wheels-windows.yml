@@ -17,6 +17,9 @@ steps:
 
     Write-Host "=== Testing Windows wheel ==="
 
+    # Set UTF-8 encoding for Python I/O (for circuit diagrams with special characters)
+    $env:PYTHONIOENCODING = "utf-8"
+
     # Find and install the repaired wheel
     $wheel = Get-ChildItem "${{ parameters.agentBuildDirectory }}\qdk-chemistry\python\repaired_wheelhouse\qdk_chemistry-*.whl" | Select-Object -First 1
     if (-not $wheel) {

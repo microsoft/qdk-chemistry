@@ -25,6 +25,7 @@ steps:
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -e QSHARP_PYTHON_TELEMETRY=false \
+        -e PYTHONIOENCODING=utf-8 \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
@@ -38,7 +39,7 @@ steps:
   - script: |
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
-      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+      PYTHONIOENCODING=utf-8 bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }} \
                                                         ${{ parameters.pyenvVersion }}
     displayName: Test wheel (native)

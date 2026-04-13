@@ -73,7 +73,7 @@ def generate_cubefiles_from_orbitals(
         cubegen.orbital(mol, outfile=outfile_name, coeff=coeff, nx=nx, ny=ny, nz=nz, margin=margin)
 
         if output_folder is None:
-            with open(outfile_name) as f:
+            with open(outfile_name, encoding="utf-8") as f:
                 assert isinstance(cubefile_paths, dict)
                 cubefile_paths[label.replace(".cube", "")] = f.read()
             os.remove(outfile_name)

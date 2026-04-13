@@ -569,6 +569,7 @@ jobs:
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
+        PYTHONIOENCODING: utf-8
       working-directory: python
       run: |
         set -e
@@ -612,6 +613,7 @@ jobs:
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
+        PYTHONIOENCODING: utf-8
       working-directory: python
       shell: pwsh
       run: |
