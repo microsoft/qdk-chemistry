@@ -24,17 +24,17 @@ namespace macis {
  *  @brief CLZ (count leading zeros) for MSVC
  */
 inline auto clz(unsigned int i) {
-    unsigned long idx;
-    _BitScanReverse(&idx, i);
-    return 31 - static_cast<int>(idx);
+  unsigned long idx;
+  _BitScanReverse(&idx, i);
+  return 31 - static_cast<int>(idx);
 }
 inline auto clz(unsigned long int i) {
-    return clz(static_cast<unsigned int>(i));
+  return clz(static_cast<unsigned int>(i));
 }
 inline auto clz(unsigned long long int i) {
-    unsigned long idx;
-    _BitScanReverse64(&idx, i);
-    return 63 - static_cast<int>(idx);
+  unsigned long idx;
+  _BitScanReverse64(&idx, i);
+  return 63 - static_cast<int>(idx);
 }
 
 /**
@@ -43,14 +43,14 @@ inline auto clz(unsigned long long int i) {
  *  Returns the position of the first set bit (1-indexed), or 0 if none.
  */
 inline int macis_ffsl(unsigned long i) {
-    unsigned long idx;
-    if (_BitScanForward(&idx, i)) return static_cast<int>(idx) + 1;
-    return 0;
+  unsigned long idx;
+  if (_BitScanForward(&idx, i)) return static_cast<int>(idx) + 1;
+  return 0;
 }
 inline int macis_ffsll(unsigned long long i) {
-    unsigned long idx;
-    if (_BitScanForward64(&idx, i)) return static_cast<int>(idx) + 1;
-    return 0;
+  unsigned long idx;
+  if (_BitScanForward64(&idx, i)) return static_cast<int>(idx) + 1;
+  return 0;
 }
 
 #else  // GCC/Clang

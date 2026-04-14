@@ -486,9 +486,11 @@ TEST(AtomGuessTest, BasisSetMap) {
       BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
 
   // Create same basis set with reversed shell order via JSON round-trip.
-  // Lithium STO-3G has 3 shells, so reversing produces a different ordering that the BasisEqChecker should reject.
+  // Lithium STO-3G has 3 shells, so reversing produces a different ordering
+  // that the BasisEqChecker should reject.
   auto basis_json = basis1->to_json();
-  std::reverse(basis_json["electron_shells"].begin(), basis_json["electron_shells"].end());
+  std::reverse(basis_json["electron_shells"].begin(),
+               basis_json["electron_shells"].end());
   auto basis3 = BasisSet::from_serialized_json(mol, basis_json);
 
   // Create a different basis set (different basis name)

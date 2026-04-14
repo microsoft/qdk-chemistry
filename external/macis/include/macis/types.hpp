@@ -71,16 +71,16 @@ using wavefunction_iterator_t = typename std::vector<std::bitset<N> >::iterator;
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)
-#pragma warning(disable: 4146)  // unary minus on unsigned
+#pragma warning(disable : 4146)  // unary minus on unsigned
 // MSVC does not support __uint128_t; use a struct-based polyfill
 struct uint128_t {
-    uint64_t lo;
-    uint64_t hi;
-    uint128_t() : lo(0), hi(0) {}
-    uint128_t(uint64_t v) : lo(v), hi(0) {}
-    bool operator<(const uint128_t& o) const {
-        return hi < o.hi || (hi == o.hi && lo < o.lo);
-    }
+  uint64_t lo;
+  uint64_t hi;
+  uint128_t() : lo(0), hi(0) {}
+  uint128_t(uint64_t v) : lo(v), hi(0) {}
+  bool operator<(const uint128_t& o) const {
+    return hi < o.hi || (hi == o.hi && lo < o.lo);
+  }
 };
 #pragma warning(pop)
 #else
