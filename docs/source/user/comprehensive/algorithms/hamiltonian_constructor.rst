@@ -135,7 +135,7 @@ A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
 The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are transformed to the MO basis.
 The output Hamiltonian stores the MO three-center integrals directly in a ``CholeskyHamiltonianContainer``, avoiding expansion to the full four-center representation.
-Additionally, the original AO Cholesky vectors is preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
+Additionally, the original AO Cholesky vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
 Four-center integrals are lazily computed from the three-center integrals on demand.
 
 .. rubric:: Settings

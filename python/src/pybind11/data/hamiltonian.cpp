@@ -368,16 +368,31 @@ Raises:
   // AO Cholesky vectors access
   cholesky_container.def(
       "get_ao_cholesky_vectors",
-      [](const CholeskyHamiltonianContainer& self)
-          -> std::optional<Eigen::MatrixXd> {
-        return self.get_ao_cholesky_vectors();
+      [](const CholeskyHamiltonianContainer& self) -> py::object {
+        const auto& opt = self.get_ao_cholesky_vectors();
+        if (!opt) return py::none();
+        const Eigen::MatrixXd& mat = *opt;
+        // Return a zero-copy view. We tie lifetime to self via
+        // py::return_value_policy semantics by passing a capsule that
+        // prevents GC.  The reference is valid as long as the container
+        // (and thus `self`) is alive; pybind11's prevent-gc mechanism
+        // handles that through the `self` capture in the keep-alive.
+        return py::array_t<double>(
+            {mat.rows(), mat.cols()},  // shape
+            {static_cast<py::ssize_t>(sizeof(double)),
+             static_cast<py::ssize_t>(mat.rows()) *
+                 static_cast<py::ssize_t>(sizeof(double))},  // strides
+                                                             // (col-major)
+            mat.data(),                                      // data pointer
+            py::cast(self));  // prevent GC of self while array is alive
       },
       R"(
-Get the optional AO Cholesky vectors.
+Get the optional AO Cholesky vectors (zero-copy view).
 
 Returns:
     numpy.ndarray or None: AO Cholesky vectors matrix [nao^2 x nchol],
-    or None if not stored.
+    or None if not stored. The returned array shares memory with the
+    internal storage and should not be modified.
 )");
 
   // Two-body integral access (lazily computed from three-center integrals)

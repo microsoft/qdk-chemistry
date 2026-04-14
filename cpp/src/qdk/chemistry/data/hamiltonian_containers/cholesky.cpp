@@ -344,7 +344,7 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
   if (has_two_body_integrals()) {
     j["has_two_body_integrals"] = true;
 
-    // Store as object {"aa": [...], "ab": [...], "bb": [...]}
+    // Store as object {"aa": [...], "bb": [...]}
     nlohmann::json two_body_obj;
 
     // Store aa
@@ -358,18 +358,20 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
       three_center_aa_vec.push_back(row);
     }
     two_body_obj["aa"] = three_center_aa_vec;
-    // Store bb
-    std::vector<std::vector<double>> three_center_bb_vec;
-    for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
-           ++j_idx) {
-        row.push_back((*_three_center_integrals.second)(i, j_idx));
-      }
-      three_center_bb_vec.push_back(row);
-    }
-    two_body_obj["bb"] = three_center_bb_vec;
 
+    if (is_unrestricted()) {
+      // Store bb
+      std::vector<std::vector<double>> three_center_bb_vec;
+      for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
+        std::vector<double> row;
+        for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
+             ++j_idx) {
+          row.push_back((*_three_center_integrals.second)(i, j_idx));
+        }
+        three_center_bb_vec.push_back(row);
+      }
+      two_body_obj["bb"] = three_center_bb_vec;
+    }
     j["three_center_integrals"] = two_body_obj;
   } else {
     j["has_two_body_integrals"] = false;
@@ -504,13 +506,20 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
             "keys");
       }
 
-      if (!two_body_obj.contains("aa") || !two_body_obj.contains("bb")) {
+      if (!two_body_obj.contains("aa")) {
         throw std::runtime_error(
-            "three_center_integrals must contain aa and bb keys");
+            "three_center_integrals must contain at least aa key");
       }
 
       three_center_aa = load_matrix(two_body_obj["aa"]);
-      three_center_bb = load_matrix(two_body_obj["bb"]);
+      if (!is_restricted_data) {
+        if (!two_body_obj.contains("bb")) {
+          throw std::runtime_error(
+              "three_center_integrals must contain bb key for unrestricted "
+              "Hamiltonian");
+        }
+        three_center_bb = load_matrix(two_body_obj["bb"]);
+      }
     }
 
     // Load inactive Fock matrix

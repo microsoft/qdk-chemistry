@@ -186,7 +186,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to const Hamiltonian loaded from group
+   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * group
    * @throws std::runtime_error if I/O error occurs
    */
   static std::unique_ptr<CholeskyHamiltonianContainer> from_hdf5(
@@ -195,7 +196,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Unique pointer to const Hamiltonian loaded from JSON
+   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * JSON
    * @throws std::runtime_error if JSON is malformed
    */
   static std::unique_ptr<CholeskyHamiltonianContainer> from_json(

@@ -960,7 +960,7 @@ TEST_F(HamiltonianTest, CholeskyContainerConstruction) {
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  // Create cholesky vectors (2x2 AO basis, 3 cholesky vectors)
+  // Create cholesky vectors (2x2 MO basis, 3 cholesky vectors)
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
   // Test restricted constructor

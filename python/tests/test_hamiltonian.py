@@ -1102,6 +1102,15 @@ class TestCholeskyHamiltonian:
         h_roundtrip = Hamiltonian.from_json(h.to_json())
         assert h_roundtrip.get_container_type() == "cholesky"
 
+        roundtrip_data = json.loads(h_roundtrip.to_json())
+        assert "ao_cholesky_vectors" in roundtrip_data["container"]
+        assert np.allclose(
+            np.array(roundtrip_data["container"]["ao_cholesky_vectors"]),
+            ao_vecs,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
 
 def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""
