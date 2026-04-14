@@ -18,6 +18,12 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
+# Use non-interactive matplotlib backend to avoid Tk/display dependencies in tests.
+# Must be set before any matplotlib.pyplot import.
+import matplotlib
+
+matplotlib.use("Agg")
+
 import platform as plt
 import sys
 import tempfile
