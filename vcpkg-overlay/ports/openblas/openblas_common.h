@@ -1,13 +1,18 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
 #pragma once
 #include "openblas/openblas_config.h"
 
-#if defined(OPENBLAS_OS_WINNT) || defined(OPENBLAS_OS_CYGWIN_NT) || defined(OPENBLAS_OS_INTERIX)
+#if defined(OPENBLAS_OS_WINNT) || defined(OPENBLAS_OS_CYGWIN_NT) || \
+    defined(OPENBLAS_OS_INTERIX)
 #define OPENBLAS_WINDOWS_ABI
 #define OPENBLAS_OS_WINDOWS
 
 #ifdef DOUBLE
 #define DOUBLE_DEFINED DOUBLE
-#undef  DOUBLE
+#undef DOUBLE
 #endif
 #endif
 
@@ -18,11 +23,10 @@
 #define BLASFUNC(FUNC) FUNC
 #endif
 
-
 #ifdef OPENBLAS_QUAD_PRECISION
 typedef struct {
   unsigned long x[2];
-}  xdouble;
+} xdouble;
 #elif defined OPENBLAS_EXPRECISION
 #define xdouble long double
 #else
@@ -44,15 +48,14 @@ typedef int blasint;
 #endif
 
 #if defined(XDOUBLE) || defined(DOUBLE)
-#define FLOATRET	FLOAT
+#define FLOATRET FLOAT
 #else
 #ifdef NEED_F2CCONV
-#define FLOATRET	double
+#define FLOATRET double
 #else
-#define FLOATRET	float
+#define FLOATRET float
 #endif
 #endif
-
 
 /* Inclusion of a standard header file is needed for definition of __STDC_*
    predefined macros with some compilers (e.g. GCC 4.7 on Linux).  This occurs
