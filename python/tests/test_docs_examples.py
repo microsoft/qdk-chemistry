@@ -11,6 +11,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import ClassVar
 
 from qdk_chemistry.plugins.qiskit import (
@@ -141,6 +142,7 @@ class TestExampleScripts(unittest.TestCase):
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
+        tmpdir = TemporaryDirectory(dir=example_file.parent.parent)
         result = subprocess.run(
             [sys.executable, str(example_file)],
             check=False,
@@ -148,13 +150,14 @@ class TestExampleScripts(unittest.TestCase):
             text=True,
             encoding="utf-8",
             timeout=360,
-            cwd=example_file.parent,
+            cwd=tmpdir.name,
             env={**os.environ, "PYTHONIOENCODING": "utf-8"},
         )
 
-        assert result.returncode == 0, (
-            f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}"
-        )
+        if result.returncode == 0:
+            tmpdir.cleanup()
+        else:
+            self.fail(f"Example {example_file.name} failed:\nSTDOUT:\n{result.stdout}\nSTDERR:\n{result.stderr}")
 
 
 # Dynamically create test methods for each example file
