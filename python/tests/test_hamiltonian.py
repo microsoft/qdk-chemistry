@@ -1080,8 +1080,7 @@ class TestCholeskyHamiltonian:
         orbitals = create_test_orbitals(2)
 
         container = CholeskyHamiltonianContainer(
-            one_body, three_center, orbitals, 1.0, np.array([]),
-            ao_cholesky_vectors=ao_vecs
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         result = container.get_ao_cholesky_vectors()
         assert result is not None
@@ -1096,8 +1095,7 @@ class TestCholeskyHamiltonian:
         orbitals = create_test_orbitals(2)
 
         container = CholeskyHamiltonianContainer(
-            one_body, three_center, orbitals, 1.0, np.array([]),
-            ao_cholesky_vectors=ao_vecs
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         h = Hamiltonian(container)
 
