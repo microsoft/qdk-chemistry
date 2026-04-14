@@ -24,7 +24,9 @@ Exposed classes are:
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
+- :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
+- :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
@@ -41,6 +43,7 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
+- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
 - :class:`TimeEvolutionUnitary`: Time evolution unitary.
 - :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -76,6 +79,7 @@ from qdk_chemistry._core.data import (
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
+    LatticeGraph,
     ModelOrbitals,
     MP2Container,
     Orbitals,
@@ -90,6 +94,7 @@ from qdk_chemistry._core.data import (
     SettingValue,
     Shell,
     SlaterDeterminantContainer,
+    SparseHamiltonianContainer,
     SpinChannel,
     StabilityResult,
     Structure,
@@ -102,10 +107,12 @@ from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
+from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -135,9 +142,11 @@ __all__ = [
     "Element",
     "EncodingMismatchError",
     "EnergyExpectationResult",
+    "FermionModeOrder",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
+    "LatticeGraph",
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
@@ -160,9 +169,11 @@ __all__ = [
     "SettingsAreLockedError",
     "Shell",
     "SlaterDeterminantContainer",
+    "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
     "Structure",
+    "Symmetries",
     "TimeEvolutionUnitary",
     "TimeEvolutionUnitaryContainer",
     "Wavefunction",

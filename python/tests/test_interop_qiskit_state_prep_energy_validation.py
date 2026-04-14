@@ -9,21 +9,26 @@ from itertools import combinations
 
 import numpy as np
 import pytest
-from qiskit import qasm3, transpile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.data import Circuit
-from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+if QDK_CHEMISTRY_HAS_QISKIT:
+    from qiskit import transpile
+    from qiskit.quantum_info import SparsePauliOp
 
 if QDK_CHEMISTRY_HAS_QISKIT_AER:
     from qiskit_aer import AerSimulator
     from qiskit_aer.primitives import EstimatorV2 as AerEstimator
 
 
-pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available")
+pytestmark = pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"
+)
 
 
 def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamiltonian_4e4o, ref_energy_4e4o):
@@ -40,17 +45,21 @@ def test_energy_agreement_between_state_prep_methods(wavefunction_4e4o, hamilton
         "state_prep", algorithm_name="qiskit_regular_isometry", transpile_optimization_level=1, basis_gates=basis_gates
     )
 
-    sparse_gf2x_circuit = qasm3.loads(sparse_prep_gf2x.run(wavefunction_4e4o).get_qasm())
-    regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o).get_qasm())
+    sparse_gf2x_circuit = sparse_prep_gf2x.run(wavefunction_4e4o).get_qiskit_circuit()
+    regular_circuit = regular_prep.run(wavefunction_4e4o).get_qiskit_circuit()
 
     # Create estimator and calculate energy for both circuits
     estimator = AerEstimator()
 
-    sparse_gf2x_job = estimator.run([(sparse_gf2x_circuit, hamiltonian_4e4o.pauli_ops)])
+    sparse_gf2x_job = estimator.run(
+        [(sparse_gf2x_circuit, SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients))]
+    )
     result = sparse_gf2x_job.result()
     sparse_gf2x_energy = result[0].data.evs
 
-    regular_job = estimator.run([(regular_circuit, hamiltonian_4e4o.pauli_ops)])
+    regular_job = estimator.run(
+        [(regular_circuit, SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients))]
+    )
     result = regular_job.result()
     regular_energy = result[0].data.evs
 
@@ -72,12 +81,20 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
         transpile_optimization_level=1,
     )
 
-    # Create circuit qasm and convert to QuantumCircuit
-    circuit = qasm3.loads(sparse_prep.run(wavefunction_10e6o).get_qasm())
+    qiskit_sparse_prep = create(
+        "state_prep",
+        algorithm_name="sparse_isometry_gf2x",
+        basis_gates=["cx", "rz", "ry", "rx", "h", "x", "z"],
+        transpile_optimization_level=1,
+        dense_preparation_method="qiskit",
+    )
+
+    circuit = sparse_prep.run(wavefunction_10e6o).get_qiskit_circuit()
+    qiskit_prep_circuit = qiskit_sparse_prep.run(wavefunction_10e6o).get_qiskit_circuit()
 
     # Calculate circuit energy using the estimator
     estimator = AerEstimator()
-    job = estimator.run([(circuit, hamiltonian_10e6o.pauli_ops)])
+    job = estimator.run([(circuit, SparsePauliOp(hamiltonian_10e6o.pauli_strings, hamiltonian_10e6o.coefficients))])
     result = job.result()
     circuit_energy = result[0].data.evs
     # Basic validation: energy should be negative
@@ -89,6 +106,19 @@ def test_sparse_isometry_gf2x_energy_validation(wavefunction_10e6o, hamiltonian_
     ), (
         f"For 10e6o f2 wavefunction, circuit energy should match "
         f"reference energy. Got energy difference: {energy_diff:.8f} Hartree"
+    )
+
+    job_2 = estimator.run(
+        [(qiskit_prep_circuit, SparsePauliOp(hamiltonian_10e6o.pauli_strings, hamiltonian_10e6o.coefficients))]
+    )
+    result_2 = job_2.result()
+    qiskit_circuit_energy = result_2[0].data.evs
+    energy_diff_qiskit = abs(qiskit_circuit_energy - ref_energy_10e6o)
+    assert np.isclose(
+        energy_diff_qiskit, 0, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
+    ), (
+        f"For 10e6o f2 wavefunction, sparse isometry with qiskit dense prep circuit energy should match "
+        f"reference energy. Got energy difference: {energy_diff_qiskit:.8f} Hartree"
     )
 
 
@@ -108,8 +138,8 @@ def test_sparse_isometry_gf2x_circuit_efficiency(wavefunction_4e4o):
     )
 
     # Create circuits using both methods
-    transpiled_sparse_circuit = qasm3.loads(sparse_prep.run(wavefunction_4e4o).get_qasm())
-    transpiled_regular_circuit = qasm3.loads(regular_prep.run(wavefunction_4e4o).get_qasm())
+    transpiled_sparse_circuit = sparse_prep.run(wavefunction_4e4o).get_qiskit_circuit()
+    transpiled_regular_circuit = regular_prep.run(wavefunction_4e4o).get_qiskit_circuit()
 
     # Compare circuit metrics
     sparse_depth = transpiled_sparse_circuit.depth()
@@ -139,7 +169,7 @@ def get_bitstring(circuit: Circuit) -> str:
 
     """
     # Add measurements
-    meas_circuit = qasm3.loads(circuit.get_qasm())
+    meas_circuit = circuit.get_qiskit_circuit()
     meas_circuit.measure_all()
 
     # Simulate

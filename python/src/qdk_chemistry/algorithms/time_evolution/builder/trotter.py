@@ -1,4 +1,17 @@
-"""QDK/Chemistry implementation of the Trotter decomposition Builder."""
+r"""QDK/Chemistry implementation of the Trotter decomposition Builder.
+
+References:
+    Childs, A. M., et al. "Theory of Trotter Error with Commutator
+    Scaling." *Physical Review X* 11.1 (2021): 011020.
+
+    Strang, G. "On the construction and comparison of difference
+    schemes." SIAM Journal on Numerical Analysis 5.3 (1968): 506-517.
+
+    Suzuki, M. "General theory of higher-order decomposition of
+    exponential operators and symplectic integrators."
+    Physics Letters A 165.5-6 (1992): 387-395.
+
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -15,6 +28,7 @@ from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["Trotter", "TrotterSettings"]
 
@@ -138,16 +152,26 @@ class Trotter(TimeEvolutionBuilder):
             TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
         """
-        if self._settings.get("order") == 1:
-            return self._first_order_trotter(qubit_hamiltonian, time)
-        raise NotImplementedError("Only first-order Trotter decomposition is currently supported.")
+        order = self._settings.get("order")
+        if order in {1, 2} or (order > 2 and order % 2 == 0):
+            return self._trotter(qubit_hamiltonian, time)
+        raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
-    def _first_order_trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using first-order Trotter decomposition.
+    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+        r"""Construct the time evolution unitary using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
         :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of divisions.
+
+        The Second Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
+        by decomposing the Hamiltonian H into a sum of terms and using the product formula:
+        :math:`e^{-iHt} \approx \left[\prod_{i=1}^{L-1} e^{-iH_i t/2n}e^{-iH_L t/n}\prod_{i=L-1}^{1}
+        e^{-iH_i t/2n}\right]^n`, where n is the number of divisions (See Strang (1968)).
+
+        Higher order Trotter methods are constructed using the recursive Suzuki method, which builds order 2k formulas
+        as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,
+        where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -157,10 +181,11 @@ class Trotter(TimeEvolutionBuilder):
             TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
 
         """
+        weight_threshold = self._settings.get("weight_threshold")
+
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
 
         delta = time / num_divisions
-        weight_threshold = self._settings.get("weight_threshold")
 
         terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
@@ -190,6 +215,7 @@ class Trotter(TimeEvolutionBuilder):
 
         order = self._settings.get("order")
         weight_threshold = self._settings.get("weight_threshold")
+
         error_bound = self._settings.get("error_bound")
         if error_bound == "commutator":
             auto = trotter_steps_commutator(
@@ -199,6 +225,7 @@ class Trotter(TimeEvolutionBuilder):
                 order=order,
                 weight_threshold=weight_threshold,
             )
+
         else:
             auto = trotter_steps_naive(
                 hamiltonian=qubit_hamiltonian,
@@ -214,9 +241,13 @@ class Trotter(TimeEvolutionBuilder):
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Trotter step into exponentiated Pauli terms.
 
+        The order of the Trotter decomposition is taken from the settings associated
+        with this builder.
+
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
+
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
@@ -228,11 +259,89 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=atol):
+        order = self._settings.get("order")
+
+        coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
+        # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
+        # there is nothing to decompose; return the empty list of terms.
+        if not coeffs:
+            Logger.warn("No coefficients above the tolerance; returning empty term list.")
+            return terms
+
+        if order == 1:
+            for label, coeff in coeffs:
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        # order = 2 or order = 2k with k>1
+        else:
+            # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
+            for label, coeff in coeffs[:-1]:
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time / 2
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            # e^{-iH_L t/n}
+            label, coeff = coeffs[-1]
             mapping = self._pauli_label_to_map(label)
             angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
 
+            # \prod_{i=L-1}^1 e^{-iH_i t/(2n)}
+            for label, coeff in reversed(coeffs[:-1]):
+                mapping = self._pauli_label_to_map(label)
+                angle = coeff * time / 2
+                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+
+            # Construct order 2k formula bottom up dynamic-programming style
+            if order > 2:
+                step_terms = terms.copy()
+                for k in range(2, int(order / 2) + 1):
+                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+                    new_terms = []
+
+                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
+                    for _ in range(2):
+                        for term in step_terms:
+                            new_terms.append(
+                                ExponentiatedPauliTerm(
+                                    pauli_term=term.pauli_term,
+                                    angle=term.angle * u_k,
+                                )
+                            )
+                    # S_{2k-2}((1-4u_k) t)
+                    for term in step_terms:
+                        new_terms.append(
+                            ExponentiatedPauliTerm(
+                                pauli_term=term.pauli_term,
+                                angle=term.angle * (1 - 4 * u_k),
+                            )
+                        )
+
+                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
+                    for _ in range(2):
+                        for term in step_terms:
+                            new_terms.append(
+                                ExponentiatedPauliTerm(
+                                    pauli_term=term.pauli_term,
+                                    angle=term.angle * u_k,
+                                )
+                            )
+
+                    step_terms = new_terms
+                terms = step_terms
+
+            # Merge adjacent terms with the same pauli_term by summing angles.
+            merged_terms: list[ExponentiatedPauliTerm] = []
+            for term in terms:
+                if merged_terms and merged_terms[-1].pauli_term == term.pauli_term:
+                    last = merged_terms[-1]
+                    merged_terms[-1] = ExponentiatedPauliTerm(
+                        pauli_term=last.pauli_term,
+                        angle=last.angle + term.angle,
+                    )
+                else:
+                    merged_terms.append(term)
+            terms = merged_terms
         return terms
 
     def name(self) -> str:

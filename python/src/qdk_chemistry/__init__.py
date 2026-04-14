@@ -26,16 +26,33 @@ import subprocess
 import sys
 import warnings
 
+from qdk import TargetProfile
+from qdk import init as qdk_init
+from qsharp._qsharp import get_config as get_qdk_profile_config
+
 # Import some tools for convenience
 import qdk_chemistry.constants
 from qdk_chemistry._core import QDKChemistryConfig
-from qdk_chemistry.utils import telemetry_events
+from qdk_chemistry.utils import Logger, telemetry_events
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 
 if TELEMETRY_ENABLED:
     telemetry_events.on_qdk_chemistry_import()
 
 _DOCS_MODE = os.getenv("QDK_CHEMISTRY_DOCS", "0") == "1"
+
+# Initialize Q# interpreter
+qdk_config = get_qdk_profile_config()
+_QDK_INTERPRETER_PROFILE = qdk_config.get_target_profile()
+if _QDK_INTERPRETER_PROFILE == "unrestricted":  # Default by Q# if not set
+    qdk_init(target_profile=TargetProfile.Base)
+    new_config = get_qdk_profile_config()
+    _QDK_INTERPRETER_PROFILE = new_config.get_target_profile()
+    Logger.debug(
+        f"QDK interpreter profile initialized to '{_QDK_INTERPRETER_PROFILE}'. "
+        "If you imported Q# code before this module was loaded, please re-import it, "
+        "or set your target profile before importing qdk_chemistry."
+    )
 
 
 def _setup_resources() -> None:
@@ -105,6 +122,10 @@ def _import_plugins() -> None:
         import qdk_chemistry.plugins.qiskit as qiskit_plugin  # noqa: PLC0415
 
         qiskit_plugin.load()
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
+
+        openfermion_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:

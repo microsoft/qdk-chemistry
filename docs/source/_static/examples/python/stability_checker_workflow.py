@@ -148,7 +148,7 @@ print(f"Final stability status: {is_stable}")
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print("available backend choices for scf_solver and stability_checker:")
 print(registry.available("stability_checker"))

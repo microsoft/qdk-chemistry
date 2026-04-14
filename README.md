@@ -1,18 +1,17 @@
 # Microsoft Quantum Development Kit for Chemistry (QDK/Chemistry)
 
 QDK/Chemistry is an open-source C++ and Python package within the [Microsoft Quantum Development Kit (QDK)](https://github.com/microsoft/qdk).
-It provides an end-to-end toolkit for quantum chemistry:  from molecular setup and Hamiltonian generation to quantum algorithm execution and results analysis.
-Designed for seamless integration with existing Python and chemistry workflows, QDK Chemistry enables researchers to simulate and run problems on near-term quantum hardware, explore strongly correlated systems, and advance toward practical quantum chemistry applications.
+It provides an end-to-end toolkit for quantum chemistry: from molecular setup and classical electronic structure through quantum algorithm execution and simulation.
+Designed as both a **development platform** and a **composable framework**, QDK/Chemistry enables researchers to assemble modular quantum–classical pipelines, explore strongly correlated systems, and advance toward practical quantum chemistry applications on near-term and fault-tolerant quantum computers.
 
 ## Overview
 
-QDK/Chemistry provides a comprehensive suite of tools for:
+QDK/Chemistry bridges classical computational chemistry with quantum computing by providing every stage of the quantum applications pipeline in a single, modular toolkit:
 
-- Molecular structure representation and manipulation
-- Molecular orbital calculations and analysis
-- Basis set management
-- Configuration and settings management
-- High-performance quantum algorithms
+- **Quantum algorithms**: a growing collection of chemistry-aware quantum algorithms, with composable building blocks for constructing higher-level quantum workflows
+- **Classical electronic structure**: production-quality classical methods that generate the high-quality inputs quantum algorithms require
+- **Composable architecture**: a plugin system that lets users assemble custom pipelines from interchangeable components, mixing native high-performance C++ backends with established community packages
+- **Multiple quantum backends**: execute circuits on a variety of simulators through a unified interface that decouples algorithm development from backend selection
 
 ## Documentation
 
@@ -20,6 +19,7 @@ QDK/Chemistry provides a comprehensive suite of tools for:
 - **C++ API**: Headers in `cpp/include/` contain comprehensive Doxygen documentation
 - **Python API**: All methods include detailed docstrings with Parameters, Returns, Raises, and Examples sections
 - **Examples**: See the `examples/` directory and [documentation](https://microsoft.github.io/qdk-chemistry/index.html) for usage examples
+- **Reference data and companion materials**: Curated simulation datasets, molecular benchmarks, and related assets are available at [microsoft/qdk-chemistry-data](https://github.com/microsoft/qdk-chemistry-data)
 
 ## Project Structure
 
@@ -39,7 +39,12 @@ qdk-chemistry/
 
 ## Installing
 
-Detailed instructions for installing QDK/Chemistry can be found in [INSTALL.md](./INSTALL.md)
+```bash
+python3 -m venv venv && source venv/bin/activate
+python3 -m pip install 'qdk-chemistry[all]'
+```
+
+The `[all]` extra pulls in all optional dependencies so that examples and tests work without chasing missing packages. For other installation methods (Dev Container, building from source) and platform-specific notes, see [INSTALL.md](./INSTALL.md).
 
 ## Telemetry
 

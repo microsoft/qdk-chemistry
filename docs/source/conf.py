@@ -26,8 +26,7 @@ _repo_root = Path(__file__).resolve().parent.parent.parent
 _version_file = _repo_root / "VERSION"
 if not _version_file.exists():
     raise FileNotFoundError(
-        f"VERSION file not found at {_version_file}. "
-        "Ensure you have a complete checkout of the repository."
+        f"VERSION file not found at {_version_file}. Ensure you have a complete checkout of the repository."
     )
 release = _version_file.read_text().strip()
 
@@ -109,8 +108,12 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qdk_chemistry.libchemistry",
     "qdk_chemistry.libsparsexx",
     "pybind11_builtins",
+    "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "openfermion",
+    "cirq",
+    "cirq_core",
     "h5py",
 ]
 
@@ -150,6 +153,7 @@ primary_domain = "py"  # Set Python as the primary documentation domain
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "qiskit": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
 
@@ -175,6 +179,9 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r".*::value"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
+    # constants:: symbols imported via `using namespace codata_XXXX` inside
+    # a #if block — Doxygen/Breathe cannot resolve them.
+    (r"cpp:identifier", r".*constants::.*"),
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
@@ -182,19 +189,23 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
     (r"cpp:identifier", r"SupportedSettingType<.*>"),
+    (r"py:class", r"scipy.*"),
     (r"py:class", r"h5py.*"),
     (r"py:class", r"numpy.*"),
     (r"py:class", r"pathlib.*"),
     (r"py:class", r"pyscf.*"),
+    (r"py:class", r"pyqir.*"),
+    (r"py:class", r"^Module$"),
     (r"py:class", r"qiskit.*"),
     (r"py:class", r"qiskit_aer.*"),
+    (r"py:class", r"openfermion.*"),
+    (r"py:class", r"cirq.*"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
-    (r"py:class", r"qsharp._native.*"),
-    (r"py:class", r"qsharp._qsharp.*"),
+    (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
 ]
 
 # Configure output for to-dos
@@ -262,7 +273,6 @@ _MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
 
 def _rewrite_internal_module_path(text: str) -> str:
     """Map internal module paths to their public equivalents."""
-
     rewritten = text
     for old, new in _MODULE_ALIAS_RULES:
         if old in rewritten:
@@ -274,7 +284,6 @@ def normalize_autodoc_signature(
     app, what, name, obj, options, signature, return_annotation
 ):
     """Rewrite signatures/annotations pointing to internal modules."""
-
     new_signature = signature
     new_return = return_annotation
 
@@ -295,7 +304,6 @@ def normalize_autodoc_signature(
 
 def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
-
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
         if rewritten != line:
@@ -511,7 +519,6 @@ def process_breathe_docstring(app, what, name, obj, options, lines):
     additional processing needs.
     """
     # The :cite:`key` syntax works as-is for autodoc docstrings
-    pass
 
 
 def setup(app):

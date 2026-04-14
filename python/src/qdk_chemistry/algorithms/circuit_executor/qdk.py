@@ -6,6 +6,7 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 
 Supported QDK backends include:
     * QDK Full State Simulator
+    * QDK Sparse State Simulator
 """
 
 # --------------------------------------------------------------------------------------------
@@ -15,8 +16,9 @@ Supported QDK backends include:
 from collections import Counter
 from typing import Literal
 
-from qdk.openqasm import compile as compile_qir
+import qsharp
 from qsharp._simulation import run_qir
+from qsharp.openqasm import run as sparse_state_run_qasm
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
@@ -41,7 +43,11 @@ class QdkFullStateSimulatorSettings(Settings):
 class QdkFullStateSimulator(CircuitExecutor):
     """QDK Full State Simulator circuit executor implementation."""
 
-    def __init__(self, simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu", seed: int = 42) -> None:
+    def __init__(
+        self,
+        simulator_type: Literal["cpu", "gpu", "clifford"] = "cpu",
+        seed: int = 42,
+    ) -> None:
         """Initialize the QDK Full State Simulator circuit executor.
 
         Args:
@@ -73,14 +79,15 @@ class QdkFullStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-        qir = compile_qir(circuit.qasm)
+        qir = circuit.get_qir()
         Logger.debug("QIR compiled")
         noise_config = noise.to_qdk_noise_config() if noise is not None else None
         raw_results = run_qir(
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
-        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in one_run) for one_run in raw_results]
+        # Reorder bits in each measurement result to match Little Endian convention
+        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results]
         counts = dict(Counter(bitstrings))
         return CircuitExecutorData(
             bitstring_counts=counts,
@@ -92,3 +99,77 @@ class QdkFullStateSimulator(CircuitExecutor):
     def name(self) -> str:
         """Return the algorithm name as qdk_full_state_simulator."""
         return "qdk_full_state_simulator"
+
+
+class QdkSparseStateSimulatorSettings(Settings):
+    """Settings for the QDK Sparse State Simulator circuit executor."""
+
+    def __init__(self) -> None:
+        """Initialize QDK Sparse State Simulator settings."""
+        Logger.trace_entering()
+        super().__init__()
+        self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
+
+
+class QdkSparseStateSimulator(CircuitExecutor):
+    """QDK Sparse State Simulator circuit executor implementation."""
+
+    def __init__(self) -> None:
+        """Initialize the QDK Sparse State Simulator circuit executor."""
+        Logger.trace_entering()
+        super().__init__()
+        self._settings = QdkSparseStateSimulatorSettings()
+
+    def _run_impl(
+        self,
+        circuit: Circuit,
+        shots: int,
+        noise: QuantumErrorProfile | None = None,
+    ) -> CircuitExecutorData:
+        """Execute the given quantum circuit using the QDK Sparse State Simulator.
+
+        Args:
+            circuit: The quantum circuit to execute.
+            shots: The number of shots to execute the circuit.
+            noise: Optional noise profile to apply during execution.
+
+        Returns:
+            CircuitExecutorData: Object containing the results of the circuit execution.
+
+        """
+        Logger.trace_entering()
+
+        if noise is not None:
+            raise NotImplementedError("Gate specific noise is not yet supported for the QDK Sparse State Simulator. ")
+        if circuit._qsharp_factory is not None:  # noqa: SLF001
+            raw_results = qsharp.run(
+                circuit._qsharp_factory.program,  # noqa: SLF001
+                shots,
+                *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
+            )
+            Logger.debug(f"Measurement results obtained: {raw_results}")
+            bitstrings = [
+                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
+            ]
+            bitstring_counts = dict(Counter(bitstrings))
+        else:
+            qasm = circuit.get_qasm()
+            raw_results = sparse_state_run_qasm(
+                qasm,
+                shots=shots,
+                as_bitstring=True,
+                seed=self._settings.get("seed"),
+            )
+            Logger.debug(f"Measurement results obtained: {raw_results}")
+            # Reverse the order of bits in each measurement result to match Little Endian convention
+            bitstring_counts = {bitstring[::-1]: count for bitstring, count in Counter(raw_results).items()}
+        return CircuitExecutorData(
+            bitstring_counts=bitstring_counts,
+            total_shots=shots,
+            executor=self.name(),
+            executor_metadata=raw_results,
+        )
+
+    def name(self) -> str:
+        """Return the algorithm name as qdk_sparse_state_simulator."""
+        return "qdk_sparse_state_simulator"

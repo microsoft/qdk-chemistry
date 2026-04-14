@@ -65,7 +65,7 @@ The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algori
 Creating a Hamiltonian object
 -----------------------------
 
-The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for most users), or it can be created directly with the appropriate integral data.
+The :class:`~qdk_chemistry.data.Hamiltonian` object is typically created using the :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm (recommended approach for molecular systems), the :doc:`model Hamiltonian <../model_hamiltonians>` builders (for lattice models such as Hubbard or PPP), or directly with the appropriate integral data.
 Once properly constructed with all required data, the Hamiltonian object should be considered constant and not modified:
 
 .. tab:: C++ API
@@ -173,8 +173,8 @@ Related classes
 ---------------
 
 - :doc:`Orbitals <orbitals>`: Molecular orbital information used to construct the Hamiltonian
-- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians -
-  **primary tool** for generating Hamiltonian objects from molecular data
+- :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>`: Algorithm for constructing Hamiltonians from molecular data
+- :doc:`Model Hamiltonians <../model_hamiltonians>`: Constructing Hamiltonians from lattice models (Hückel, Hubbard, PPP)
 - :doc:`../algorithms/mc_calculator`: Uses the Hamiltonian for correlation calculations
 - :class:`~qdk_chemistry.data.Wavefunction`: Represents the solution of the Hamiltonian eigenvalue problem
 - :doc:`Active space methods <../algorithms/active_space>`: Selection and use of active spaces with the Hamiltonian

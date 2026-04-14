@@ -41,15 +41,57 @@ parameters:
 - name: macBuild
   type: string
   default: OFF
+- name: devTag
+  type: string
+  default: 'None'
+
 steps:
 - checkout: self
   persistCredentials: true
   path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
 
 - task: PipAuthenticate@1
   displayName: Pip Authenticate
   inputs:
     artifactFeeds: ""
+
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - script: |
+      echo "=== Disk space before cleanup ==="
+      df -h
+
+      # Remove unnecessary large packages commonly present on GitHub runners
+      sudo rm -rf /usr/share/dotnet || true
+      sudo rm -rf /usr/local/lib/android || true
+      sudo rm -rf /opt/ghc || true
+      sudo rm -rf /opt/hostedtoolcache/go || true
+      sudo rm -rf /opt/hostedtoolcache/Ruby || true
+
+      # Clean apt cache
+      sudo apt-get clean || true
+
+      echo "=== Disk space after cleanup ==="
+      df -h
+
+      echo "Workspace path: $(Agent.BuildDirectory)"
+      echo "Space available:"
+      df -h "$(Agent.BuildDirectory)"
+    displayName: Free up disk space (Linux)
+
+
+# Check if user provided a development tag for release and validate before building wheels.
+# If a development tag is provided and is valid, the VERSION file in the top level directory
+# will be updated to include the dev tag before publishing to PyPI.
+- script: |
+    set -e
+    python3 $(Agent.BuildDirectory)/qdk-chemistry/.pipelines/pip-scripts/versioning.py \
+    --version-file $(Agent.BuildDirectory)/qdk-chemistry/VERSION \
+    --dev-tag ${{ parameters.devTag }}
+    cat $(Agent.BuildDirectory)/qdk-chemistry/VERSION
+  displayName: Validate/Set Development Version for Wheels
+  condition: ne('${{ parameters.devTag }}', 'None')
 
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |

@@ -17,10 +17,12 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <sstream>
 
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
@@ -155,7 +157,7 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
       std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
 
   // Create a non-empty inactive Fock matrix
-  Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
+  Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(4, 4);
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
       one_body, two_body, orbitals_with_inactive, core_energy,
       non_empty_inactive_fock));
@@ -166,6 +168,13 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   EXPECT_TRUE(h.has_inactive_fock_matrix());
   EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 4);
   EXPECT_EQ(h.get_core_energy(), 1.5);
+
+  Eigen::MatrixXd wrong_dim_inactive_fock = Eigen::MatrixXd::Identity(2, 2);
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, orbitals_with_inactive, core_energy,
+          wrong_dim_inactive_fock)),
+      std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, MoveConstructor) {
@@ -615,8 +624,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -635,8 +644,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
                      coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
                      std::nullopt, basis_set,
                      std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(alpha_inactive_indices),
                                      std::move(beta_active_indices),
+                                     std::move(alpha_inactive_indices),
                                      std::move(beta_inactive_indices)));
                  hc->run(orbitals);
                }),
@@ -710,8 +719,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
             basis_set,
             std::make_tuple(std::move(alpha_active_indices),
-                            std::move(alpha_inactive_indices),
                             std::move(beta_active_indices),
+                            std::move(alpha_inactive_indices),
                             std::move(beta_inactive_indices)));
         hc->run(orbitals);
       },
@@ -748,9 +757,10 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
         large_basis_set,
-        std::make_tuple(
-            std::move(alpha_active_indices), std::move(alpha_inactive_indices),
-            std::move(beta_active_indices), std::move(beta_inactive_indices)));
+        std::make_tuple(std::move(alpha_active_indices),
+                        std::move(beta_active_indices),
+                        std::move(alpha_inactive_indices),
+                        std::move(beta_inactive_indices)));
     auto hamiltonian = hc->run(orbitals);
     EXPECT_TRUE(hamiltonian->has_one_body_integrals());
     EXPECT_TRUE(hamiltonian->has_two_body_integrals());
@@ -857,6 +867,13 @@ TEST_F(HamiltonianConstructorTest, CholeskyFactory) {
 
   auto cholesky_hc = HamiltonianConstructorFactory::create("qdk_cholesky");
   EXPECT_EQ(cholesky_hc->name(), "qdk_cholesky");
+
+  // Test default eri_threshold
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-12);
+
+  // Test setting eri_threshold
+  EXPECT_NO_THROW(cholesky_hc->settings().set("eri_threshold", 1e-10));
+  EXPECT_DOUBLE_EQ(cholesky_hc->settings().get<double>("eri_threshold"), 1e-10);
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
@@ -1068,6 +1085,330 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianTest, SparseContainerConstructionWithTwoBody) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 2.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.has_orbitals());
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_FALSE(h.is_unrestricted());
+}
+
+TEST_F(HamiltonianTest, SparseContainerConstructionOneBodyOnly) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(sparse_one_body, 0.0));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), 0.0);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianTest, SparseContainerConstructionFromDense) {
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                             core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_TRUE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+  EXPECT_EQ(h.get_orbitals()->get_num_molecular_orbitals(), 2);
+}
+
+TEST_F(HamiltonianTest, SparseContainerConstructionFromDenseOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  EXPECT_TRUE(h.has_one_body_integrals());
+  EXPECT_FALSE(h.has_two_body_integrals());
+  EXPECT_TRUE(h.is_restricted());
+  EXPECT_DOUBLE_EQ(h.get_core_energy(), core_energy);
+  EXPECT_EQ(h.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianTest, SparseContainerClone) {
+  Hamiltonian h1(std::make_unique<SparseHamiltonianContainer>(
+      one_body, two_body, core_energy));
+
+  // Copy constructor uses clone() internally
+  Hamiltonian h2(h1);
+
+  EXPECT_EQ(h2.get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), h1.get_core_energy());
+
+  auto [h1_one_alpha, h1_one_beta2] = h1.get_one_body_integrals();
+  auto [h2_one_alpha2, h2_one_beta2] = h2.get_one_body_integrals();
+  EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha2));
+  EXPECT_TRUE(h1_one_beta2.isApprox(h2_one_beta2));
+
+  auto [h1_two_aaaa, h1_two_aabb, h1_two_bbbb] = h1.get_two_body_integrals();
+  auto [h2_two_aaaa, h2_two_aabb, h2_two_bbbb] = h2.get_two_body_integrals();
+  EXPECT_TRUE(h1_two_aaaa.isApprox(h2_two_aaaa));
+  // Restricted: all channels are the same
+  EXPECT_TRUE(h1_two_aabb.isApprox(h2_two_aabb));
+  EXPECT_TRUE(h1_two_bbbb.isApprox(h2_two_bbbb));
+}
+
+TEST_F(HamiltonianTest, SparseContainerMoveConstructor) {
+  Hamiltonian h1(std::make_unique<SparseHamiltonianContainer>(
+      one_body, two_body, core_energy));
+  Hamiltonian h2(std::move(h1));
+
+  EXPECT_TRUE(h2.has_one_body_integrals());
+  EXPECT_TRUE(h2.has_two_body_integrals());
+  EXPECT_TRUE(h2.has_orbitals());
+  EXPECT_EQ(h2.get_orbitals()->get_num_molecular_orbitals(), 2);
+  EXPECT_DOUBLE_EQ(h2.get_core_energy(), core_energy);
+  EXPECT_EQ(h2.get_container_type(), "sparse");
+}
+
+TEST_F(HamiltonianTest, SparseContainerTwoBodyElementAccess) {
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 1.0;
+  two_body_map[{0, 0, 0, 1}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 4.0;
+  two_body_map[{0, 1, 1, 0}] = 5.0;
+
+  Eigen::SparseMatrix<double> sp_one_body(2, 2);
+  sp_one_body.insert(0, 0) = 1.0;
+  sp_one_body.insert(1, 1) = 1.0;
+  sp_one_body.makeCompressed();
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sp_one_body, two_body_map, 0.0));
+
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0), 1.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
+  // Non-stored entries return 0
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+}
+
+TEST_F(HamiltonianTest, SparseContainerSparseAccessors) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  auto container = std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy);
+  const auto& ref = *container;
+
+  // sparse-specific accessors
+  EXPECT_DOUBLE_EQ(ref.one_body_element(0, 0), 1.0);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(0, 1), 0.5);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(1, 0), 0.5);
+  EXPECT_DOUBLE_EQ(ref.one_body_element(1, 1), 1.0);
+
+  const auto& h2_map = ref.sparse_two_body_integrals();
+  EXPECT_EQ(h2_map.size(), 2u);
+  EXPECT_DOUBLE_EQ(h2_map.at({0, 0, 0, 0}), 2.0);
+  EXPECT_DOUBLE_EQ(h2_map.at({1, 1, 1, 1}), 3.0);
+
+  const auto& h1_sp = ref.sparse_one_body_integrals();
+  EXPECT_EQ(h1_sp.nonZeros(), 4);
+}
+
+TEST_F(HamiltonianTest, SparseContainerGetContainerTypedAccess) {
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                             core_energy));
+
+  EXPECT_TRUE(h.has_container_type<SparseHamiltonianContainer>());
+  EXPECT_FALSE(h.has_container_type<CanonicalFourCenterHamiltonianContainer>());
+  EXPECT_FALSE(h.has_container_type<CholeskyHamiltonianContainer>());
+
+  EXPECT_NO_THROW({
+    const auto& container = h.get_container<SparseHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "sparse");
+  });
+
+  EXPECT_THROW(h.get_container<CanonicalFourCenterHamiltonianContainer>(),
+               std::bad_cast);
+}
+
+TEST_F(HamiltonianTest, SparseContainerJSONSerialization) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  nlohmann::json j = h.to_json();
+  EXPECT_EQ(j["container"]["container_type"], "sparse");
+  EXPECT_DOUBLE_EQ(j["container"]["core_energy"].get<double>(), core_energy);
+  EXPECT_TRUE(j["container"]["has_one_body_integrals"].get<bool>());
+  EXPECT_TRUE(j["container"]["has_two_body_integrals"].get<bool>());
+
+  // Round-trip
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->is_restricted());
+
+  // Verify integral round-trip
+  auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
+  auto [hl_one_alpha, hl_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(h_one_alpha.isApprox(hl_one_alpha, testing::json_tolerance));
+  EXPECT_TRUE(h_one_beta.isApprox(hl_one_beta, testing::json_tolerance));
+
+  auto [h_two_aaaa, h_two_aabb, h_two_bbbb] = h.get_two_body_integrals();
+  auto [hl_two_aaaa, hl_two_aabb, hl_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::json_tolerance));
+}
+
+TEST_F(HamiltonianTest, SparseContainerJSONSerializationOneBodyOnly) {
+  Hamiltonian h(
+      std::make_unique<SparseHamiltonianContainer>(one_body, core_energy));
+
+  nlohmann::json j = h.to_json();
+  EXPECT_EQ(j["container"]["container_type"], "sparse");
+  EXPECT_FALSE(j["container"]["has_two_body_integrals"].get<bool>());
+
+  auto h_loaded = Hamiltonian::from_json(j);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_FALSE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5Serialization) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  std::string filename = "test.sparse.hamiltonian.h5";
+  h.to_hdf5_file(filename);
+  EXPECT_TRUE(std::filesystem::exists(filename));
+
+  auto h_loaded = Hamiltonian::from_hdf5_file(filename);
+  EXPECT_EQ(h_loaded->get_container_type(), "sparse");
+  EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), core_energy);
+  EXPECT_TRUE(h_loaded->has_one_body_integrals());
+  EXPECT_TRUE(h_loaded->has_two_body_integrals());
+  EXPECT_TRUE(h_loaded->is_restricted());
+
+  // Verify integral round-trip
+  auto [h_one_alpha, h_one_beta] = h.get_one_body_integrals();
+  auto [hl_one_alpha, hl_one_beta] = h_loaded->get_one_body_integrals();
+  EXPECT_TRUE(h_one_alpha.isApprox(hl_one_alpha, testing::hdf5_tolerance));
+
+  auto [h_two_aaaa, h_two_aabb, h_two_bbbb] = h.get_two_body_integrals();
+  auto [hl_two_aaaa, hl_two_aabb, hl_two_bbbb] =
+      h_loaded->get_two_body_integrals();
+  EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::hdf5_tolerance));
+
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(0, 1) = 0.5;
+  sparse_one_body.insert(1, 0) = 0.5;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  SparseHamiltonianContainer::TwoBodyMap two_body_map;
+  two_body_map[{0, 0, 0, 0}] = 2.0;
+  two_body_map[{1, 1, 1, 1}] = 3.0;
+
+  Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body, two_body_map, core_energy));
+
+  std::string filename = "test.sparse.hamiltonian.fcidump";
+  EXPECT_NO_THROW(h.to_fcidump_file(filename, 1, 1));
+
+  std::ifstream file(filename);
+  EXPECT_TRUE(file.is_open());
+
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  std::string fcidump_content = buffer.str();
+
+  // Two-body integrals from sparse map (sorted by key: (0,0,0,0) then
+  // (1,1,1,1)), one-body lower triangle in column-major order, then core
+  // energy.
+  const std::string reference_fcidump_contents =
+      "&FCI NORB=2, NELEC=2, MS2=0,\n"
+      "ORBSYM=1,1,\n"
+      "ISYM=1,\n"
+      "&END\n"
+      "      2.0000000000000000e+00    1    1    1    1\n"
+      "      3.0000000000000000e+00    2    2    2    2\n"
+      "      1.0000000000000000e+00    1    1    0    0\n"
+      "      5.0000000000000000e-01    2    1    0    0\n"
+      "      1.0000000000000000e+00    2    2    0    0\n"
+      "      1.5000000000000000e+00    0    0    0    0\n";
+
+  EXPECT_EQ(fcidump_content, reference_fcidump_contents);
+
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest, SparseContainerIsValid) {
+  // Valid container with two-body
+  auto c1 = std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                         core_energy);
+  EXPECT_TRUE(c1->is_valid());
+
+  // One-body only is also valid
+  auto c2 = std::make_unique<SparseHamiltonianContainer>(one_body, core_energy);
+  EXPECT_TRUE(c2->is_valid());
 }
 
 TEST_F(HamiltonianTest, UnrestrictedConstructor) {
@@ -1381,13 +1722,14 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
 
   Eigen::VectorXd two_body_2x2 = 2 * Eigen::VectorXd::Ones(16);  // 2^4 = 16
 
-  // Create appropriate inactive Fock matrix for the inactive space
-  Eigen::MatrixXd inactive_fock_2x2 = Eigen::MatrixXd::Zero(2, 2);
+  // Create appropriate inactive Fock matrix for the inactive space, size must
+  // match total number of orbitals (3x3) (see orbitals_with_active_space).
+  Eigen::MatrixXd inactive_fock_3x3 = Eigen::MatrixXd::Zero(3, 3);
 
   Hamiltonian h_active_space(
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body_2x2, two_body_2x2, orbitals_with_active_space, core_energy,
-          inactive_fock_2x2));
+          inactive_fock_3x3));
 
   // Should successfully write FCIDUMP using active space dimensions
   EXPECT_NO_THROW({

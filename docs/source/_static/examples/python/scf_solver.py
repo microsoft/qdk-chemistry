@@ -58,7 +58,7 @@ E_scf3, wfn3 = scf_solver.run(
 
 ################################################################################
 # start-cell-list-implementations
-from qdk_chemistry.algorithms import registry  # noqa: E402
+from qdk_chemistry.algorithms import registry
 
 print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
 # end-cell-list-implementations
@@ -66,8 +66,8 @@ print(registry.available("scf_solver"))  # ['pyscf', 'qdk']
 
 ################################################################################
 # start-cell-pyscf-example
-from qdk_chemistry.algorithms import create  # noqa: E402
-from qdk_chemistry.data import Structure  # noqa: E402
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import Structure
 
 # Create and configure the PySCF solver
 solver = create("scf_solver", "pyscf")

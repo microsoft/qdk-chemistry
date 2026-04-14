@@ -4,6 +4,29 @@ Algorithm classes
 QDK/Chemistry provides a comprehensive set of algorithm classes which express core methodological primitives for quantum and classical chemistry calculations.
 All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowing you to create instances by name and configured through a unified :doc:`settings <settings>` interface.
 
+.. toctree::
+   :maxdepth: 1
+   :caption: Contents
+
+   factory_pattern
+   settings
+   active_space
+   energy_estimator
+   hamiltonian_constructor
+   localizer
+   mc_calculator
+   mcscf
+   pmc
+   qubit_mapper
+   scf_solver
+   stability_checker
+   state_preparation
+   phase_estimation
+   time_evolution_builder
+   circuit_mapper
+   circuit_executor
+
+
 Quick reference
 ---------------
 
@@ -49,23 +72,19 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StabilityChecker <stability_checker>`
      - :term:`SCF` stability analysis
      - Orbitals → Stability
+   * - :doc:`PhaseEstimation <phase_estimation>`
+     - Quantum phase estimation
+     - Circuit + QubitHamiltonian → QpeResult
+   * - :doc:`TimeEvolutionBuilder <time_evolution_builder>`
+     - Hamiltonian simulation unitaries
+     - QubitHamiltonian → TimeEvolutionUnitary
+   * - :doc:`ControlledEvolutionCircuitMapper <circuit_mapper>`
+     - Controlled-unitary circuit synthesis
+     - TimeEvolutionUnitary → Circuit
+   * - :doc:`CircuitExecutor <circuit_executor>`
+     - Quantum circuit execution
+     - Circuit → CircuitExecutorData
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Contents
-
-   factory_pattern
-   settings
-   active_space
-   energy_estimator
-   hamiltonian_constructor
-   localizer
-   mc_calculator
-   mcscf
-   qubit_mapper
-   scf_solver
-   stability_checker
-   state_preparation
 
 Discovering implementations
 ---------------------------

@@ -88,7 +88,11 @@ python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
 
 # Install the wheel in the clean environment
 cd "$PYTHON_DIR"
-python3 -m pip install pytest pyscf
+
+# Install testing/optional dependencies
+python3 -m pip install pytest "pyscf>=2.9.0,<2.12.1"
+
+# Install built wheel into fresh venv
 pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 
 # Install qiskit-extras if supported (not available on Python 3.14+)
@@ -96,10 +100,13 @@ pip3 install repaired_wheelhouse/qdk_chemistry*.whl
 PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
 if [ "$PYTHON_MINOR" -lt 14 ]; then
     echo "Installing qiskit-extras..."
-    python3 -m pip install qiskit-aer qiskit-nature
+    python3 -m pip install qiskit-aer qiskit-nature "openfermion>=1.0.0" qiskit_qasm3_import "pylatexenc==2.10"
 else
-    echo "Skipping qiskit-extras (not supported on Python 3.14+)"
+    echo "Skipping qiskit-extras and openfermion (not supported on Python 3.14+)"
 fi
+
+# Disable telemetry during testing
+export QSHARP_PYTHON_TELEMETRY=false
 
 # Run pytest suite
 echo '=== Running pytest suite ==='

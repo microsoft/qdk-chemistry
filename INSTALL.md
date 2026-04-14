@@ -1,143 +1,253 @@
 # Installation Instructions for QDK/Chemistry
 
-This file contains instructions for how to configure, build, and install QDK/Chemistry via
-several common methods, outlined below.
-You only need to choose one of the methods below for installation.
+## Choose Your Installation Path
 
-To run the examples with any of these installation methods, we recommend cloning the GitHub repository and navigating to the repository directory for subsequent steps:
+QDK/Chemistry can be installed in three ways:
 
-```bash
-git clone https://github.com/microsoft/qdk-chemistry.git
-cd qdk-chemistry
-```
+| Goal | Method | Time |
+|------|--------|------|
+| **Use QDK/Chemistry in your own project** | [Install from PyPI](#install-from-pypi) | ~2 minutes |
+| **Develop or contribute to QDK/Chemistry** | [VS Code Dev Container](#using-the-vscode-dev-container) | ~30-120 min (one-time build) |
+| **Build everything from source** | [Build from Source](#building-from-source) | ~30-60 min |
 
-## Pip Wheel Installation
+Most users should start with the PyPI install.
 
-**Note**: Before using pip to install QDK/Chemistry, ensure that Python 3.10+ and pip are installed on your system. On Ubuntu/Debian, you may need to install `python3-pip` and `python3-venv` first. See the [System Dependencies](#system-dependencies) section for more details.
+---
 
-**Note**:  We strongly recommend using a virtual environment when installing QDK/Chemistry via pip to avoid conflicts with other installed packages.
-For example, on Windows Subsystem Linux (WSL), Linux, or macOS, you can create and activate a virtual environment as follows:
+## Install from PyPI
+
+### Prerequisites
+
+- Python 3.10 or newer
+- pip (on Ubuntu/Debian you may need `sudo apt install python3-pip python3-venv`)
+- Supported platforms:
+  - Linux: x86_64, arm64
+  - macOS: arm64 (Apple Silicon)
+  - Windows: x86_64 and arm64 via [WSL](https://learn.microsoft.com/windows/wsl/install)
+
+### Step 1: Create a virtual environment
+
+Use a virtual environment to avoid conflicts with other packages:
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-QDK/Chemistry is distributed as the `qdk-chemistry` Python library through PyPI.
-To install the package, run the following command in a terminal:
+### Step 2: Install the package
+
+For most users, **`[all]` is the recommended install target**. It pulls in all optional dependencies so that examples and tests work without chasing missing packages:
+
+```bash
+python3 -m pip install 'qdk-chemistry[all]'
+```
+
+> **Tip:** `[all]` is the path of least resistance if you're just getting started.
+> You can always switch to a slimmer install later.
+
+If you prefer a minimal install (core library only, no optional backends):
 
 ```bash
 python3 -m pip install qdk-chemistry
 ```
 
-The pip installation of QDK/Chemistry currently has the following system requirements:
+> **NOTE:** The `all` and `qiskit-extras` extras are not supported on Python 3.14 because Qiskit does not yet publish Python 3.14 wheels. See the [Optional Extras](#optional-extras) table below for details and alternative install targets.
 
-- Python 3.10+
-- OS Support:
-  - Windows via [the Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/windows/wsl/install)
-    - x86_64
-    - arm64
-  - Linux
-    - x86_64
-    - arm64
-  - macOS
-    - arm64
+### Step 3: Verify the installation
+
+```bash
+python3 -c "import qdk_chemistry; print(qdk_chemistry.__version__)"
+```
+
+### Step 4: Clone the repository (for examples and tests)
+
+The examples and test suite live in the source repository. Clone it and check out the branch that matches your installed version:
+
+```bash
+pip show qdk-chemistry          # check your installed version
+git clone https://github.com/microsoft/qdk-chemistry.git
+cd qdk-chemistry
+git checkout stable/1.1          # match major.minor to your version
+```
+
+> **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Always use the `stable/major.minor` branch for examples.
+
+Some examples require additional packages not included in any extra. See the [examples README](examples/README.md) for per-example requirements.
 
 ### Optional Extras
 
-QDK/Chemistry supports optional extras for extended functionality. These can be installed using pip's extras syntax:
-
-```bash
-python -m pip install 'qdk-chemistry[extra1,extra2]'
-```
-
-The following extras are available:
+If you chose the minimal `pip install qdk-chemistry` above, you can add specific extras as needed:
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
-| `jupyter` | Jupyter notebook support | ipykernel, pandas, pyscf |
+| `jupyter` | Jupyter notebook support | ipykernel, pandas |
 | `plugins` | Third-party quantum chemistry backends | PySCF |
-| `qiskit-extras` | Optional Qiskit ecosystem packages | qiskit-aer, qiskit-nature |
+| `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
+| `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `all` | All of the above | All optional dependencies |
+| `all` | **All of the above** | All optional dependencies |
 
-**Note:** The `qiskit-extras` and `all` extras are not currently supported on Python 3.14, since `all` includes `qiskit-extras`.
-
-For example, to install with PySCF support and development tools:
+Install one or more extras with:
 
 ```bash
 python3 -m pip install 'qdk-chemistry[plugins,dev]'
 ```
 
-To install with all optional Qiskit ecosystem packages:
-
-```bash
-python -m pip install 'qdk-chemistry[qiskit-extras]'
-```
-
-To install everything:
-
-```bash
-python -m pip install 'qdk-chemistry[all]'
-```
-
-To run the OpenFermion integration example tests, you will also need to install `openfermion` and `rdkit`:
-
-```bash
-python3 -m pip install openfermion rdkit
-```
-
-Installing with the `dev` option allows you to run the tests in the `python/tests` directory of the source repository you cloned above.
+Installing with the `dev` extra lets you run the test suite (you need to clone the repository first; see [Step 4](#step-4-clone-the-repository-for-examples-and-tests)):
 
 ```bash
 pytest python/tests
 ```
 
+---
+
 ## Using the VSCode Dev Container
 
-The easiest way to get started with QDK/Chemistry development is to use the provided VS Code Dev Container. The container definition and VSCode files provided in the Git repository will build a development environment (Docker container with Python virtual environment) from scratch.
+The VS Code Dev Container gives you a ready-made development environment. It builds a Docker container with all C++ and Python dependencies pre-installed.
 
-To get started:
+### Step 1: Clone the repository
 
-1. Open the repository folder in VS Code
-2. When prompted, click "Reopen in Container" (or use the Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P` and select "Dev Containers: Reopen in Container")
-3. VS Code will build and start the development container automatically
+```bash
+git clone https://github.com/microsoft/qdk-chemistry.git
+```
 
-Alternatively, you can click the green button in the bottom-left corner of VS Code and select "Reopen in Container" from the menu.
+### Step 2: Open in VS Code and reopen in the container
 
-**NOTES:**
+1. Open the `qdk-chemistry` folder in VS Code
+2. When prompted, click **"Reopen in Container"** (or use the Command Palette: `Ctrl+Shift+P` / `Cmd+Shift+P` → "Dev Containers: Reopen in Container")
+3. VS Code will build and start the development container
 
-- Building the development environment can take some time, on slower systems this can be up to two hours.
-- Using a VS Code Dev Container may require elevated permissions on the current system to allow for Docker usage.
-- You will likely need to restart VS Code and the Dev Container (reopening in the container) before running examples.  The restart will load the Python virtual environment into the container.
+Alternatively, click the green button in the bottom-left corner of VS Code and select "Reopen in Container".
+
+### Step 3: Restart VS Code
+
+After the initial build, restart VS Code and reopen in the container to ensure the Python virtual environment is properly loaded.
+
+**NOTE:**
+
+- The first build can take up to two hours on slower systems.
+- Docker must be available on your system (may require elevated permissions).
+- Subsequent launches reuse the built container and are fast.
+
+---
+
+## Dependencies (for Source Builds)
+
+> **NOTE:** If you are installing from PyPI, skip this section. pip handles all dependencies automatically.
+
+**Disclaimer**: The list of dependencies listed here denotes the *direct* software dependencies of QDK/Chemistry. Each may have dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries track the full dependency graph. Please refer to linked dependency documentation for their respective dependency trees.
+
+### System Dependencies
+
+These must be installed before starting a from-source build. See [Managed Dependencies](#managed-dependencies) for dependencies that the build system handles automatically.
+
+QDK/Chemistry requires both a C and a C++ compiler supporting the ISO C++20 standard. See [this reference](https://en.cppreference.com/w/cpp/compiler_support/20) to check your compiler's C++20 support.
+
+| Compiler Family | Tested Versions |
+|-----------------|----------|
+| GNU  | 13+ |
+| AppleClang | 17+ |
+
+**NOTE**: Before installing dependencies on Ubuntu/Debian, update package indices with:
+
+```bash
+sudo apt update
+```
+
+For Fedora/RHEL systems, update package metadata with:
+
+```bash
+sudo dnf makecache
+```
+
+| Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
+|------------|-------------|--------------------|-----------------|-----------------|---------|
+| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` |
+| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
+| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
+| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
+| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`|
+| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` |
+
+See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
+
+#### Quick install (Ubuntu/Debian)
+
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv cmake libeigen3-dev \
+    libopenblas-dev libhdf5-serial-dev libboost-all-dev
+```
+
+### Managed Dependencies
+
+These dependencies are automatically downloaded and built by the CMake build system if not found. Pre-installing them is optional but **strongly encouraged** for faster rebuilds. See the [C++ configuration section](#configuring-the-c-library) for how to point the build system at pre-installed locations.
+
+| Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat |
+|------------|-------------|--------------------|-----------------|-----------------|---------|
+| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` |
+| Libint2 | A C++ library for molecular integral evaluation | v2.9.0 | [source](https://github.com/evaleev/libint) | N/A | N/A |
+| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A |
+| GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A |
+| MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A |
+
+**NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
+
+**NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
+
+### Note on LAPACK Usage
+
+BLAS (Basic Linear Algebra Subroutines) and LAPACK (Linear Algebra Package) are API standards for libraries implementing linear algebra operations such as matrix multiplication and matrix decomposition. These operations are compute intensive and require careful optimization on modern architectures to achieve optimal performance. As such, we require users have a LAPACK (and transitively BLAS) installation in their environment rather than providing stock implementations. Below are commonly used LAPACK libraries that are regularly tested with QDK/Chemistry.
+
+| Library | Description | Installation Instructions |
+|---------|-------------|-------------------|
+| Intel MKL | A highly optimized BLAS/LAPACK library targeting Intel CPUs | [Intel Documentation](https://www.intel.com/content/www/us/en/docs/onemkl/get-started-guide/2023-0/overview.html) |
+| AMD AOCL | A highly optimized BLAS/LAPACK library targeting AMD CPUs | [AMD Documentation](https://github.com/amd/aocl) |
+| OpenBLAS | A high performance, cross-platform, open-source BLAS/LAPACK library | [OpenBLAS Documentation](https://github.com/OpenMathLib/OpenBLAS) |
+| BLIS / FLAME | A set of high performance, cross-platform, open source BLAS (BLIS) and LAPACK (FLAME) libraries. BLIS may also be combined with NETLIB-LAPACK to provide LAPACK functionality | [BLIS](https://github.com/flame/blis) and [FLAME](https://github.com/flame/libflame) Documentation |
+| NETLIB | Reference implementation of the BLAS / LAPACK standards. Generic but sub-optimal | [NETLIB Documentation](https://netlib.org/) |
+
+---
 
 ## Building from Source
 
-### Operating System Specific Notes
+Build from source if you need to modify the C++ core, work with unreleased features on `main`, or target a non-standard platform.
 
-**Linux**: We would recommend a Debian distribution due to the broad number of scientific computing packages available through apt. You may need to build certain dependencies from source (e.g. Eigen3, nlohmann-json) if using a distribution with more limited package availability.
+### Step 1: Check your platform
 
-**Windows**: We do not currently provide native Windows support for building qdk-chemistry. If building the package on Windows, you will need to use the Windows Subsystem for Linux (WSL). Microsoft's [official installation instructions for WSL](https://learn.microsoft.com/en-us/windows/wsl/install) can guide you through the process of setting up WSL if you do not have it installed.
+**Linux**: A Debian-based distribution is recommended for the broadest package availability. Other distributions may require building some dependencies (e.g. Eigen3, nlohmann-json) from source.
 
-**macOS**: To build qdk-chemistry on macOS, you will need the latest version of Xcode installed. If you do not already have it installed, it can be downloaded from the [App Store](https://apps.apple.com/us/app/xcode/id497799835?mt=12).
+**Windows**: Native Windows builds are not supported. Use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
 
-### Building the Python Package
+**macOS**: The latest version of [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) must be installed.
 
-The easiest way to build and install the QDK/Chemistry python package from source is via `pip`.
+### Step 2: Install system dependencies
 
-**NOTE:** If the C++ library has not been installed, these instructions will automatically build the C++ library as a part of the python package build. For developers, it is strongly encouraged that you build and install the C++ library first to avoid long build times. See [these instructions](#linking-to-an-existing-c-installation) for details on how to link the python package to an existing C++ installation.
+All from-source builds require the dependencies listed in the [Dependencies](#dependencies-for-source-builds) section above. Install those before proceeding.
 
-1. Ensure all system dependencies are installed. See [System Dependencies](#system-dependencies) for details.
-2. (Optional) Set any desired environment variables to control the C++ build. See [Environment Variables for the Python Build](#environment-variables-for-the-python-build) for details.
-3. From the root of the QDK/Chemistry repository, run the following commands:
+### Step 3: Clone the repository
 
 ```bash
-cd qdk-chemistry/python
-python3 -m pip install .
-pytest tests/
+git clone https://github.com/microsoft/qdk-chemistry.git
+cd qdk-chemistry
 ```
 
-**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install .` to perform a single-threaded C++ library build.
+### Step 4: Build the Python package
+
+The simplest way to build from source is via `pip`. If the C++ library hasn't been separately installed, pip builds it automatically.
+
+> **Tip:** **`[all]` is the recommended install target here too.** It pulls in all optional dependencies so examples and tests work without extra steps. See the [Optional Extras](#optional-extras) table for details and platform-specific exclusions.
+
+```bash
+cd python
+python3 -m pip install '.[all]'
+pytest tests/
+cd ..
+```
+
+**NOTE:** Building this Python package may require significant memory, since the C++ library build uses all available threads by default and some compilations can consume around 3 GB of RAM. To avoid running out of memory, set `CMAKE_BUILD_PARALLEL_LEVEL` to a reasonably small value. For example, use: `CMAKE_BUILD_PARALLEL_LEVEL=1 python3 -m pip install '.[all]'` to perform a single-threaded C++ library build.
+
+> **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the pybind11 bindings.
 
 #### Accelerating Rebuilds with Build Caching
 
@@ -225,75 +335,3 @@ Lists in CMake are stored as semicolon delimited strings. On the command line, L
 ```bash
 cmake [...] -DCMAKE_PREFIX_PATH="/opt/openblas;/opt/hdf5"
 ```
-
-## Dependencies
-
-**Disclaimer**: The list of dependencies listed in this file denotes the *direct* software dependencies of QDK/Chemistry. Each of these dependencies may come with dependencies of their own. The Component Governance Manifests for the [C++](cpp/manifest/qdk-chemistry/cgmanifest.json) and [Python](python/manifest/cgmanifest.json) libraries keep track of our current understanding of the complete dependency graph of QDK/Chemistry, but are subject to inaccuracies given changes in upstream dependencies. Please refer to the documentation of linked dependencies for more information of their respective dependency trees.
-
-### System Dependencies
-
-This section details the QDK/Chemistry dependencies which must be installed prior to
-starting from-source builds, as they are not managed by the build system. See [Managed Dependencies](#managed-dependencies) for a discussion on the dependencies which are managed by the C++ build system. See the [C++ configuration section](#configuring-the-c-library) for
-instructions on how to notify the build system where dependencies have been installed.
-
-QDK/Chemistry requires both a C and a C++ compiler to be installed. Additionally, the C++ compiler must support the ISO C++20 standard. See [this website](https://en.cppreference.com/w/cpp/compiler_support/20) to determine if your compiler admits appropriate C++20 support. Below is a table of the compilers and versions tested for the full-stack QDK/Chemistry build.
-
-| Compiler Family | Versions |
-|-----------------|----------|
-| GNU  | 13+ |
-| AppleClang | 17+ |
-
-Additionally, QDK/Chemistry requires the following software dependencies:
-
-**Note**: Before installing dependencies on Ubuntu/Debian, update package indices with:
-
-```bash
-sudo apt update
-```
-
-For Fedora/RHEL systems, update package metadata with:
-
-```bash
-sudo dnf makecache
-```
-
-| Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat |
-|------------|-------------|--------------------|-----------------|-----------------|---------|
-| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` |
-| Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` |
-| LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`|
-| HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`|
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` |
-
-See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
-
-### Managed Dependencies
-
-Other than the system dependencies outlined [above](#system-dependencies), QDK/Chemistry has a number of other dependencies which, if left unspecified, will be automatically handled by the build system
-when compiling the top-level C++ library. For active developers, it is strongly suggested that one has these dependencies pre-installed to lower build times. As with the system
-dependencies, see the [C++ build instructions](#configuring-the-c-library) for guidance on how to notify the build system of install locations for locally built dependencies.
-
-| Dependency | Description | Tested Versions | Source Location | Ubuntu / Debian | Redhat |
-|------------|-------------|--------------------|-----------------|-----------------|---------|
-| nlohmann/json | A C++ library for JSON manipulation | v3.12.0 | [source](https://github.com/nlohmann/json) | `apt install nlohmann-json3-dev` | `dnf install json-devel` |
-| Libint2 | A C++ library for molecular integral evaluation | v2.9.0 | [source](https://github.com/evaleev/libint) | N/A | N/A |
-| Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A |
-| GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A |
-| MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A |
-
-**NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. Example CMake invocations for these libraries may be found in [install-libint2.sh](.pipelines/install-scripts/install-libint2.sh) and [install-gauxc.sh](.pipelines/install-scripts/install-gauxc.sh), respectively.
-
-**NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries it's own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
-
-### Note on LAPACK Usage
-
-BLAS (Basic Linear Algebra Subroutines) and LAPACK (Linear Algebra Package) are API standards for libraries implementing linear algebra operations such as matrix multiplication and matrix decomposition. These operations are compute intensive and require careful optimization on modern architectures to achieve optimal performance. As such, we require users have a LAPACK (and transitively BLAS) installation in their environment rather than providing stock implementations. Below are a list of commonly used LAPACK libraries that are regularly tested with QDK/Chemistry.
-
-| Library | Description | Installation Instructions |
-|---------|-------------|-------------------|
-| Intel MKL | A highly optimized BLAS/LAPACK library targeting Intel CPUs | [Intel Documentation](https://www.intel.com/content/www/us/en/docs/onemkl/get-started-guide/2023-0/overview.html) |
-| AMD AOCL | A highly optimized BLAS/LAPACK library targeting AMD CPUs | [AMD Documentation](https://github.com/amd/aocl) |
-| OpenBLAS | A high performance, cross-platform, open-source BLAS/LAPACK library | [OpenBLAS Documentation](https://github.com/OpenMathLib/OpenBLAS) |
-| BLIS / FLAME | A set of high performance, cross-platform, open source BLAS (BLIS) and LAPACK (FLAME) libraries. BLIS may also be combined with NETLIB-LAPACK to provide LAPACK functionality | [BLIS](https://github.com/flame/blis) and [FLAME](https://github.com/flame/libflame) Documentation |
-| NETLIB | Reference implementation of the BLAS / LAPACK standards. Generic but sub-optimal | [NETLIB Documentation](https://netlib.org/) |

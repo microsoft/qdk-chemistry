@@ -15,6 +15,7 @@ import numpy as np
 
 try:
     from qiskit import qasm3, transpile
+    from qiskit.quantum_info import SparsePauliOp
 except ImportError as ex:
     raise ImportError(
         "Qiskit and Qiskit-Aer must be installed to run this example. "
@@ -82,7 +83,9 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
 qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
 
-qubit_pauli_op = qubit_hamiltonian.pauli_ops
+qubit_pauli_op = SparsePauliOp(
+    qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients
+)
 num_spin_orbitals = qubit_hamiltonian.num_qubits
 
 top_configurations = casci_wavefunction.get_top_determinants(max_determinants=2)
@@ -92,7 +95,7 @@ E_sparse, sparse_wavefunction = pmc.run(
 )
 
 sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
-state_prep = qasm3.loads(sparse_state_prep.run(sparse_wavefunction).get_qasm())
+state_prep = sparse_state_prep.run(sparse_wavefunction).get_qiskit_circuit()
 state_prep = transpile(
     state_prep,
     basis_gates=["cx", "rz", "h", "x", "s", "sdg"],

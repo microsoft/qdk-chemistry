@@ -4,6 +4,18 @@ cmake_minimum_required(VERSION 3.15)
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
 file(READ "${_VERSION_FILE}" QDK_VERSION)
 string(STRIP "${QDK_VERSION}" QDK_VERSION)
+
+# Strip prerelease/dev suffixes for development PyPI release (e.g. .dev0, .rc1)
+# Keeps only the leading numeric core: X, X.Y, or X.Y.Z
+set(QDK_VERSION_RAW "${QDK_VERSION}")
+string(REGEX MATCH "^[0-9]+(\\.[0-9]+)?(\\.[0-9]+)?" QDK_VERSION "${QDK_VERSION_RAW}")
+
+if(NOT QDK_VERSION)
+    message(FATAL_ERROR "Invalid VERSION for CMake project: '${QDK_VERSION_RAW}'. ")
+else()
+    message(STATUS "Project version: ${QDK_VERSION}")
+endif()
+
 # Re-run CMake configure when the VERSION file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_VERSION_FILE}")
 
@@ -91,6 +103,7 @@ pybind11_add_module(_core
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/serialization.cpp
+    src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp
     src/pybind11/algorithms/mc.cpp
@@ -105,6 +118,7 @@ pybind11_add_module(_core
     src/pybind11/utils/logger.cpp
     src/pybind11/utils/valence_space.cpp
     src/pybind11/utils/orbital_rotation.cpp
+    src/pybind11/utils/model_hamiltonians.cpp
     src/pybind11/constants.cpp
     src/pybind11/qdk_scf_config.cpp
     src/pybind11/module.cpp
