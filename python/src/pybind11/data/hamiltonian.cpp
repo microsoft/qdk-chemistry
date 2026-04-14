@@ -365,6 +365,21 @@ Raises:
 )",
       py::return_value_policy::reference_internal);
 
+  // AO Cholesky vectors access
+  cholesky_container.def(
+      "get_ao_cholesky_vectors",
+      [](const CholeskyHamiltonianContainer& self)
+          -> std::optional<Eigen::MatrixXd> {
+        return self.get_ao_cholesky_vectors();
+      },
+      R"(
+Get the optional AO Cholesky vectors.
+
+Returns:
+    numpy.ndarray or None: AO Cholesky vectors matrix [nao^2 x nchol],
+    or None if not stored.
+)");
+
   // Two-body integral access (lazily computed from three-center integrals)
   bind_getter_as_property(cholesky_container, "get_two_body_integrals",
                           &CholeskyHamiltonianContainer::get_two_body_integrals,

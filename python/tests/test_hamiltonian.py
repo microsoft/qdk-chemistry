@@ -1061,6 +1061,49 @@ class TestCholeskyHamiltonian:
             h_unrestricted.get_one_body_integrals()[1], h_unrestricted_json.get_one_body_integrals()[1]
         )
 
+    def test_ao_cholesky_vectors_absent_by_default(self):
+        """Test that AO Cholesky vectors are None when not provided."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(20)
+        three_center = rng.random((4, 10))
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
+        assert container.get_ao_cholesky_vectors() is None
+
+    def test_ao_cholesky_vectors_present(self):
+        """Test construction with AO Cholesky vectors and retrieval."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(21)
+        three_center = rng.random((4, 10))
+        ao_vecs = rng.random((9, 5))  # e.g. 3^2 AOs, 5 Cholesky vectors
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(
+            one_body, three_center, orbitals, 1.0, np.array([]),
+            ao_cholesky_vectors=ao_vecs
+        )
+        result = container.get_ao_cholesky_vectors()
+        assert result is not None
+        np.testing.assert_array_almost_equal(result, ao_vecs)
+
+    def test_ao_cholesky_vectors_roundtrip_json(self):
+        """Test that AO Cholesky vectors survive JSON round-trip."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(22)
+        three_center = rng.random((4, 10))
+        ao_vecs = rng.random((9, 5))
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(
+            one_body, three_center, orbitals, 1.0, np.array([]),
+            ao_cholesky_vectors=ao_vecs
+        )
+        h = Hamiltonian(container)
+
+        h_roundtrip = Hamiltonian.from_json(h.to_json())
+        assert h_roundtrip.get_container_type() == "cholesky"
+
 
 def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""

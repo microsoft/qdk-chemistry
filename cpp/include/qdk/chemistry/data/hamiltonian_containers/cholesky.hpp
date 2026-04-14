@@ -26,6 +26,8 @@ namespace qdk::chemistry::data {
  * contains:
  * - Three-center two-electron integrals (electron-electron repulsion) in MO
  * representation.
+ * - Optionally, AO Cholesky vectors for potential reuse in further
+ * transformations.
  *
  */
 class CholeskyHamiltonianContainer : public HamiltonianContainer {
@@ -136,7 +138,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get the optional AO Cholesky vectors
    * @return Const reference to the optional AO Cholesky vectors matrix
-   * [nao^2 x nchol]. Empty if not stored.
+   * [nao^2 x nchol]. Contains std::nullopt if AO Cholesky vectors were not
+   * provided at construction.
    */
   const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
 
