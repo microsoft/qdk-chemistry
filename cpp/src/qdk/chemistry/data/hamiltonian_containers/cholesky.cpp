@@ -27,11 +27,13 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
-    const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
+    const Eigen::MatrixXd& inactive_fock_matrix,
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _three_center_integrals(
-          make_restricted_three_center_integrals(three_center_integrals)) {
+          make_restricted_three_center_integrals(three_center_integrals)),
+      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -51,13 +53,15 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& three_center_integrals_bb,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
-    const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
+    const Eigen::MatrixXd& inactive_fock_matrix_beta,
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
       _three_center_integrals(
           std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
-          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)) {
+          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)),
+      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -76,13 +80,14 @@ std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
   if (is_restricted()) {
     return std::make_unique<CholeskyHamiltonianContainer>(
         *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
-        _core_energy, *_inactive_fock_matrix.first, _type);
+        _core_energy, *_inactive_fock_matrix.first, _ao_cholesky_vectors,
+        _type);
   }
   return std::make_unique<CholeskyHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *_three_center_integrals.first, *_three_center_integrals.second,
       _orbitals, _core_energy, *_inactive_fock_matrix.first,
-      *_inactive_fock_matrix.second, _type);
+      *_inactive_fock_matrix.second, _ao_cholesky_vectors, _type);
 }
 
 std::string CholeskyHamiltonianContainer::get_container_type() const {
@@ -161,6 +166,12 @@ CholeskyHamiltonianContainer::get_three_center_integrals() const {
   }
   return std::make_pair(std::cref(*_three_center_integrals.first),
                         std::cref(*_three_center_integrals.second));
+}
+
+const std::optional<Eigen::MatrixXd>&
+CholeskyHamiltonianContainer::get_ao_cholesky_vectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ao_cholesky_vectors;
 }
 
 double CholeskyHamiltonianContainer::get_two_body_element(
@@ -404,6 +415,17 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
     j["has_orbitals"] = false;
   }
 
+  if (_ao_cholesky_vectors) {
+    std::vector<std::vector<double>> ao_cholesky_vectors_vec;
+    for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _ao_cholesky_vectors->cols(); ++j_idx) {
+        row.push_back((*_ao_cholesky_vectors)(i, j_idx));
+      }
+      ao_cholesky_vectors_vec.push_back(row);
+    }
+    j["ao_cholesky_vectors"] = ao_cholesky_vectors_vec;
+  }
   return j;
 }
 
@@ -537,18 +559,24 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
       }
     }
 
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
+    if (j.contains("ao_cholesky_vectors")) {
+      ao_cholesky_vectors = load_matrix(j["ao_cholesky_vectors"]);
+    }
+
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
       return std::make_unique<CholeskyHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, type);
+          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<CholeskyHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
-          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
+          std::move(ao_cholesky_vectors), type);
     }
 
   } catch (const std::exception& e) {
@@ -742,6 +770,10 @@ void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
       _orbitals->to_hdf5(orbitals_group);
     }
 
+    if (_ao_cholesky_vectors) {
+      save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
+    }
+
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -849,17 +881,25 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
           load_matrix_from_group(group, "inactive_fock_matrix_beta");
     }
 
+    // Load AO Cholesky vectors
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
+    if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
+      ao_cholesky_vectors =
+          load_matrix_from_group(group, "ao_cholesky_vectors");
+    }
+
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       return std::make_unique<CholeskyHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, type);
+          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<CholeskyHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
-          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta, type);
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
+          std::move(ao_cholesky_vectors), type);
     }
 
   } catch (const H5::Exception& e) {

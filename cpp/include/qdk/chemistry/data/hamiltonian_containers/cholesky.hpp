@@ -42,6 +42,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    * energy)
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
+   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -51,6 +53,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix,
+      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -74,6 +77,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    * the selected active space
    * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
    * selected active space
+   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -86,6 +91,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
+      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -126,6 +132,13 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    */
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
+
+  /**
+   * @brief Get the optional AO Cholesky vectors
+   * @return Const reference to the optional AO Cholesky vectors matrix
+   * [nao^2 x nchol]. Empty if not stored.
+   */
+  const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
 
   /**
    * @brief Get specific four-center two-electron integral element
@@ -227,6 +240,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
+
+  /** Optional AO Cholesky vectors for potential reuse */
+  const std::optional<Eigen::MatrixXd> _ao_cholesky_vectors;
 
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>

@@ -88,7 +88,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
@@ -112,7 +112,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
@@ -1016,9 +1016,10 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
 
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body, L_mo, orbitals, core_energy, inactive_fock));
+      one_body, L_mo, orbitals, core_energy, inactive_fock, L_ao));
 
   // Test JSON conversion
   nlohmann::json j = h.to_json();
@@ -1027,9 +1028,7 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
   EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
   EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
-  // TODO: Update test once optional AO Cholesky vectors are included in JSON
-  // serialization
-  EXPECT_FALSE(j["container"].contains("has_ao_cholesky_vectors"));
+  EXPECT_TRUE(j["container"].contains("ao_cholesky_vectors"));
 
   // Test deserialization
   auto h_loaded = Hamiltonian::from_json(j);

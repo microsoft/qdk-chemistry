@@ -806,11 +806,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd H_active(nactive, nactive);
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
-      if (!_settings->get<bool>("store_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-                H_active, moeri_aaaa, orbitals,
-                structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+            std::make_unique<data::CholeskyHamiltonianContainer>(
+                H_active, L_mo, orbitals,
+                structure->calculate_nuclear_repulsion_energy(), dummy_fock,
+                L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -824,13 +825,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       H_active_beta = Cb_active.transpose() * H_full * Cb_active;
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
-      if (!_settings->get<bool>("store_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-                H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb,
-                moeri_bbbb, orbitals,
+            std::make_unique<data::CholeskyHamiltonianContainer>(
+                H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
                 structure->calculate_nuclear_repulsion_energy(),
-                dummy_fock_alpha, dummy_fock_beta));
+                dummy_fock_alpha, dummy_fock_beta, Eigen::MatrixXd(L_ao)));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -894,12 +894,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (!_settings->get<bool>("store_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
+          std::make_unique<data::CholeskyHamiltonianContainer>(
+              H_active, L_mo, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive));
+              F_inactive, Eigen::MatrixXd(L_ao)));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -1006,13 +1006,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (!_settings->get<bool>("store_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals,
+          std::make_unique<data::CholeskyHamiltonianContainer>(
+              H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive_alpha, F_inactive_beta));
+              F_inactive_alpha, F_inactive_beta, Eigen::MatrixXd(L_ao)));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(

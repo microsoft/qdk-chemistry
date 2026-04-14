@@ -271,7 +271,7 @@ Examples:
   cholesky_container.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
-               HamiltonianType>(),
+               std::optional<Eigen::MatrixXd>, HamiltonianType>(),
       R"(
 Constructor for restricted active space Hamiltonian with Cholesky-decomposed integrals.
 
@@ -282,6 +282,8 @@ Args:
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
+    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+        for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
@@ -296,6 +298,7 @@ Examples:
       py::arg("one_body_integrals"), py::arg("three_center_integrals"),
       py::arg("orbitals"), py::arg("core_energy"),
       py::arg("inactive_fock_matrix"),
+      py::arg("ao_cholesky_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
@@ -303,7 +306,8 @@ Examples:
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, HamiltonianType>(),
+               const Eigen::MatrixXd&, std::optional<Eigen::MatrixXd>,
+               HamiltonianType>(),
       R"(
 Constructor for unrestricted active space Hamiltonian with Cholesky-decomposed integrals.
 
@@ -318,6 +322,8 @@ Args:
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
+    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+        for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
@@ -339,6 +345,7 @@ Examples:
       py::arg("three_center_integrals_bb"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
       py::arg("inactive_fock_matrix_beta"),
+      py::arg("ao_cholesky_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Three-center integral access
