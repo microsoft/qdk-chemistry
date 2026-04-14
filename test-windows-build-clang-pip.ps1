@@ -1,32 +1,27 @@
-# test-windows-build.ps1
-# Local script to reproduce the GitHub Actions Windows build workflow.
+# test-windows-build-clang-pip.ps1
+# Local script to build and test the QDK Chemistry Python package on Windows using Clang and pip.
+# pip (via scikit-build-core) handles the full C++ and Python build in one step.
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
-#   .\test-windows-build.ps1                  # Full build (install deps + C++ + Python)
-#   .\test-windows-build.ps1 -SkipPrereqs     # Skip prerequisite installation
-#   .\test-windows-build.ps1 -SkipCpp         # Skip C++ build, only do Python
-#   .\test-windows-build.ps1 -SkipConfigure   # Skip CMake configure, incremental build only
-#   .\test-windows-build.ps1 -SkipPython      # Skip Python build, only do C++
-#   .\test-windows-build.ps1 -SkipTests       # Skip test runs
+#   .\test-windows-build-clang-pip.ps1                  # Full build (install deps + build + test)
+#   .\test-windows-build-clang-pip.ps1 -SkipPrereqs     # Skip prerequisite installation
+#   .\test-windows-build-clang-pip.ps1 -SkipBuild       # Skip build, only run tests
+#   .\test-windows-build-clang-pip.ps1 -SkipTests       # Skip test runs
 
 param(
     [switch]$SkipPrereqs,
-    [switch]$SkipCpp,
-    [switch]$SkipConfigure,
-    [switch]$SkipPython,
+    [switch]$SkipBuild,
     [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = $PSScriptRoot
-$BuildDir = "$RepoRoot\cpp\build"
-$InstallDir = "$RepoRoot\install"
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 $QDK_UARCH = "x86-64-v3"
 
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  QDK Chemistry - Windows Local Build Test  " -ForegroundColor Cyan
+Write-Host "  QDK Chemistry - Windows Build (pip)       " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Repo root: $RepoRoot"
 Write-Host ""
@@ -193,6 +188,17 @@ if (-not $SkipPrereqs) {
     $env:CMAKE_PREFIX_PATH = "$VcpkgInstalledDir\x64-windows"
     $env:PATH = "$VcpkgInstalledDir\x64-windows\bin;$VcpkgInstalledDir\x64-windows\debug\bin;$env:PATH"
 
+    # --- 0f. uv (Python package manager) ---
+    if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+        Write-Host "uv not found. Installing..." -ForegroundColor Magenta
+        Invoke-RestMethod https://astral.sh/uv/install.ps1 | Invoke-Expression
+        if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+            Write-Error "uv installation failed. Install manually: https://docs.astral.sh/uv/getting-started/installation/"
+            exit 1
+        }
+    }
+    Write-Host "Using uv: $(Get-Command uv | Select-Object -ExpandProperty Source)  ($(uv --version))" -ForegroundColor Green
+
 } else {
     Write-Host "=== Skipping prerequisites (reusing previous environment) ===" -ForegroundColor DarkGray
 
@@ -251,93 +257,47 @@ Write-Host "  clang-cl:        $(Get-Command clang-cl | Select-Object -ExpandPro
 Write-Host "  cmake:           $(Get-Command cmake | Select-Object -ExpandProperty Source)"
 Write-Host "  ninja:           $(Get-Command ninja | Select-Object -ExpandProperty Source)"
 Write-Host "  python:          $(Get-Command python | Select-Object -ExpandProperty Source)  ($(python --version 2>&1))"
+Write-Host "  uv:              $(Get-Command uv | Select-Object -ExpandProperty Source)  ($(uv --version 2>&1))"
 Write-Host "  TOOLCHAIN_FILE:  $env:CMAKE_TOOLCHAIN_FILE"
 Write-Host "  VCPKG_TRIPLET:   $env:VCPKG_TARGET_TRIPLET"
 Write-Host "  VCPKG_INSTALLED: $env:VCPKG_INSTALLED_DIR"
 Write-Host ""
 
 # ==========================================================================
-# STEP 1 - C++ Build
+# STEP 1 - Build and install Python package (C++ is built by scikit-build-core)
 # ==========================================================================
-if (-not $SkipCpp) {
-    if (-not $SkipConfigure) {
-        Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
-        cmake -S cpp -B "$BuildDir" `
-            -GNinja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_INSTALL_PREFIX="$InstallDir" `
-            -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
-            -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
-            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
-            -DQDK_UARCH="$QDK_UARCH" `
-            -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
-            -DQDK_ENABLE_OPENMP=OFF `
-            -DBUILD_TESTING=ON
-        if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
-    } else {
-        Write-Host "=== Step 1: Skipping configure (incremental build) ===" -ForegroundColor DarkGray
-        if (-not (Test-Path "$BuildDir\build.ninja")) {
-            Write-Error "No existing build found at $BuildDir. Run without -SkipConfigure first."
-            exit 1
-        }
-    }
-
-    Write-Host ""
-    Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 6 2>&1 *> cpp/build/build.log
-    if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
-    Write-Host "C++ build succeeded." -ForegroundColor Green
-
-    if (-not $SkipTests) {
-        Write-Host ""
-        Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
-        Push-Location "$BuildDir"
-        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST"
-        $ctestExit = $LASTEXITCODE
-        Pop-Location
-        if ($ctestExit -ne 0) {
-            Write-Warning "Some C++ tests failed (exit code: $ctestExit)"
-        } else {
-            Write-Host "All C++ tests passed." -ForegroundColor Green
-        }
-    }
-
-    Write-Host ""
-    Write-Host "=== Step 4: Install C++ library ===" -ForegroundColor Yellow
-    cmake --install "$BuildDir" --prefix "$InstallDir"
-    if ($LASTEXITCODE -ne 0) { Write-Error "CMake install failed"; exit 1 }
-    Write-Host "C++ library installed to $InstallDir" -ForegroundColor Green
-
-} else {
-    Write-Host "=== Skipping C++ build ===" -ForegroundColor DarkGray
-}
-
-# ==========================================================================
-# STEP 2 - Python Build
-# ==========================================================================
-if (-not $SkipPython) {
-    Write-Host ""
-    Write-Host "=== Step 5: Install Python package ===" -ForegroundColor Yellow
+if (-not $SkipBuild) {
+    Write-Host "=== Step 1: Build and install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
     # Set QDK_DLL_DIR so the qdk_chemistry package can find vcpkg DLL
     # dependencies (openblas.dll, hdf5.dll, etc.) at import time.
     $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
     Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
 
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
     .\venv\Scripts\activate
+
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
+    $env:CMAKE_C_FLAGS="/Os"
+    $env:CMAKE_CXX_FLAGS="/Os"
+
+    # pip drives the full build: scikit-build-core invokes CMake to compile the
+    # C++ library and pybind11 bindings, then packages everything into a wheel.
     # Do not install:
     # - plugins: pyscf does not build on Windows
     # - jupyter: requires plugins
     uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
         -C cmake.args=-GNinja `
-        -C cmake.define.CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH;$InstallDir" `
+        -C cmake.define.QDK_UARCH="$QDK_UARCH" `
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF `
+        -C cmake.define.QDK_ENABLE_OPENMP=OFF `
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+        -C cmake.define.BUILD_SHARED_LIBS=OFF `
+        -C cmake.define.BUILD_TESTING=OFF `
+        -C cmake.define.CMAKE_BUILD_TYPE=Release `
         -C cmake.define.CMAKE_C_COMPILER=clang-cl `
         -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
@@ -349,22 +309,34 @@ if (-not $SkipPython) {
     if ($LASTEXITCODE -ne 0) { Pop-Location; Write-Error "Python import check failed"; exit 1 }
     Write-Host "Python package installed successfully." -ForegroundColor Green
 
-    if (-not $SkipTests) {
-        Write-Host ""
-        Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
-        # python -m pip install pytest --quiet
-        pytest -v --tb=short
-        $pytestExit = $LASTEXITCODE
-        if ($pytestExit -ne 0) {
-            Write-Warning "Some Python tests failed (exit code: $pytestExit)"
-        } else {
-            Write-Host "All Python tests passed." -ForegroundColor Green
-        }
-    }
-
     Pop-Location
 } else {
-    Write-Host "=== Skipping Python build ===" -ForegroundColor DarkGray
+    Write-Host "=== Skipping build ===" -ForegroundColor DarkGray
+}
+
+# ==========================================================================
+# STEP 2 - Run Python tests
+# ==========================================================================
+if (-not $SkipTests) {
+    Write-Host ""
+    Write-Host "=== Step 2: Run Python tests ===" -ForegroundColor Yellow
+    Push-Location "$RepoRoot\python"
+
+    # Ensure venv is activated
+    if (Test-Path .\venv\Scripts\activate.ps1) {
+        .\venv\Scripts\activate
+    }
+
+    pytest -v --tb=short
+    $pytestExit = $LASTEXITCODE
+    Pop-Location
+    if ($pytestExit -ne 0) {
+        Write-Warning "Some Python tests failed (exit code: $pytestExit)"
+    } else {
+        Write-Host "All Python tests passed." -ForegroundColor Green
+    }
+} else {
+    Write-Host "=== Skipping tests ===" -ForegroundColor DarkGray
 }
 
 Write-Host ""
