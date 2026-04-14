@@ -768,16 +768,18 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     output_matrix.noalias() = L_left * L_right.transpose();
   };
 
+  Eigen::MatrixXd L_mo;
+  Eigen::MatrixXd L_mo_alpha;
+  Eigen::MatrixXd L_mo_beta;
+
   if (is_restricted_calc) {
     // Transform to MO
-    Eigen::MatrixXd L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
     reconstruct_eris(L_mo, L_mo, moeri_aaaa);
   } else {
     // Transform to MO (Alpha and Beta)
-    Eigen::MatrixXd L_mo_alpha =
-        detail::transform_cholesky_to_mo(L_ao, Ca_active);
-    Eigen::MatrixXd L_mo_beta =
-        detail::transform_cholesky_to_mo(L_ao, Cb_active);
+    L_mo_alpha = detail::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo_beta = detail::transform_cholesky_to_mo(L_ao, Cb_active);
 
     reconstruct_eris(L_mo_alpha, L_mo_alpha, moeri_aaaa);  // (aaaa)
     reconstruct_eris(L_mo_beta, L_mo_beta, moeri_bbbb);    // (bbbb)
@@ -812,9 +814,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock,
-              L_ao));
+              H_active, L_mo, orbitals,
+              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -833,9 +834,9 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals, structure->calculate_nuclear_repulsion_energy(),
-              dummy_fock_alpha, dummy_fock_beta, L_ao));
+              H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
+              structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
+              dummy_fock_beta));
     }
   }
 
@@ -902,9 +903,9 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active, moeri_aaaa, orbitals,
+            H_active, L_mo, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive, L_ao));
+            F_inactive));
   } else {
     // Unrestricted case
 
@@ -1015,10 +1016,9 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-            orbitals,
+            H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive_alpha, F_inactive_beta, L_ao));
+            F_inactive_alpha, F_inactive_beta));
   }
 }
 }  // namespace qdk::chemistry::algorithms::microsoft
