@@ -1,3 +1,2 @@
-# Patch files must keep LF endings to apply correctly across platforms.
-*.diff text eol=lf
-*.patch text eol=lf
+# Normalize all text files to LF in the repo and working copy.
+* text=auto eol=lf
