@@ -231,6 +231,20 @@ Examples:
   // -----------------------------------------------------------------------
   basis_set.def(
       py::init([](py::args args, py::kwargs kwargs) -> BasisSet {
+        // --- Helper: check whether a Python type name equals a target -----
+        auto type_name = [](const py::object& obj) -> std::string {
+          return py::str(obj.get_type().attr("__name__")).cast<std::string>();
+        };
+
+        // --- Helper: true when any Shell in a py::list has rpowers --------
+        // ECP shells carry rpowers; auxiliary shells do not.
+        auto list_has_ecp_shells = [](const py::list& lst) -> bool {
+          for (auto& item : lst) {
+            if (item.cast<Shell>().has_radial_powers()) return true;
+          }
+          return false;
+        };
+
         // --- Collect positional args into a mutable vector ----------------
         std::vector<py::object> a;
         a.reserve(args.size());
@@ -238,27 +252,23 @@ Examples:
           a.push_back(args[i].cast<py::object>());
 
         // If last positional arg is AOType, pop it.
-        // We check if the Python type name matches "AOType" to avoid
-        // accidentally casting e.g. an int or Structure.
         AOType ao = AOType::Spherical;
-        if (!a.empty()) {
-          std::string tname =
-              py::str(a.back().get_type().attr("__name__")).cast<std::string>();
-          if (tname == "AOType") {
-            ao = a.back().cast<AOType>();
-            a.pop_back();
-          }
+        if (!a.empty() && type_name(a.back()) == "AOType") {
+          ao = a.back().cast<AOType>();
+          a.pop_back();
         }
         // Keyword override
         if (kwargs.contains("atomic_orbital_type"))
           ao = kwargs["atomic_orbital_type"].cast<AOType>();
 
-        // --- Support fully-keyword calls ----------------------------------
-        // BasisSet(name=..., shells=..., atomic_orbital_type=...)
-        if (a.empty() && kwargs.contains("name") && kwargs.contains("shells")) {
-          auto name = kwargs["name"].cast<std::string>();
-          auto shells = to_shell_vec(kwargs["shells"].cast<py::list>());
-          return BasisSet(name, shells, ao);
+        // --- Merge keyword args into positional vector --------------------
+        // Supports mixed calls like BasisSet("name", shells=shells) by
+        // pulling recognised kwargs into the positional vector when the
+        // corresponding slot is not yet filled.
+        // Expected positional order: name, shells, ...
+        if (a.size() >= 1 && py::isinstance<py::str>(a[0]) &&
+            a.size() < 2 && kwargs.contains("shells")) {
+          a.push_back(kwargs["shells"].cast<py::object>());
         }
 
         const size_t n = a.size();
@@ -266,6 +276,13 @@ Examples:
         // Copy constructor: BasisSet(other)
         if (n == 1 && py::isinstance<BasisSet>(a[0]))
           return BasisSet(a[0].cast<const BasisSet&>());
+
+        // --- Fully-keyword calls ------------------------------------------
+        if (n == 0 && kwargs.contains("name") && kwargs.contains("shells")) {
+          auto name = kwargs["name"].cast<std::string>();
+          auto shells = to_shell_vec(kwargs["shells"].cast<py::list>());
+          return BasisSet(name, shells, ao);
+        }
 
         if (n < 2 || !py::isinstance<py::str>(a[0]) ||
             !py::isinstance<py::list>(a[1]))
@@ -283,11 +300,25 @@ Examples:
         if (n == 3 && py::isinstance<Structure>(a[2]))
           return BasisSet(name, shells, a[2].cast<Structure>(), ao);
 
-        // (name, shells, aux_shells, structure)
+        // (name, shells, <list>, structure)  -- n==4
+        // Disambiguate: if shells in a[2] have rpowers → ECP path (needs
+        // ecp_electrons); if not → auxiliary path.
+        // C++ has no (name, shells, ecp_shells, structure) constructor, so
+        // ECP shells at n==4 use an empty ecp_electrons vector via the
+        // 5-arg ECP constructor.
         if (n == 4 && py::isinstance<py::list>(a[2]) &&
-            py::isinstance<Structure>(a[3]))
-          return BasisSet(name, shells, to_shell_vec(a[2].cast<py::list>()),
+            py::isinstance<Structure>(a[3])) {
+          auto extra = a[2].cast<py::list>();
+          if (list_has_ecp_shells(extra)) {
+            // ECP shells without explicit ecp_electrons → supply empty vec
+            return BasisSet(name, shells, to_shell_vec(extra),
+                            std::vector<size_t>(),
+                            a[3].cast<Structure>(), ao);
+          }
+          // Auxiliary shells
+          return BasisSet(name, shells, to_shell_vec(extra),
                           a[3].cast<Structure>(), ao);
+        }
 
         if (n == 5) {
           if (py::isinstance<py::str>(a[2])) {
