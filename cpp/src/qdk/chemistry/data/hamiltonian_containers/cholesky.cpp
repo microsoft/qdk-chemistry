@@ -3,9 +3,14 @@
 // license information.
 
 #include <algorithm>
+#include <blas.hh>
+#include <cstddef>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <limits>
 #include <macis/util/fcidump.hpp>
+#include <memory>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -20,34 +25,53 @@ namespace qdk::chemistry::data {
 
 CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
-    const Eigen::VectorXd& two_body_integrals,
+    const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
-    const Eigen::MatrixXd& inactive_fock_matrix, const Eigen::MatrixXd& L_ao,
-    HamiltonianType type)
-    : CanonicalFourCenterHamiltonianContainer(
-          one_body_integrals, two_body_integrals, orbitals, core_energy,
-          inactive_fock_matrix, type),
-      _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
+    const Eigen::MatrixXd& inactive_fock_matrix,
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
+                           inactive_fock_matrix, type),
+      _three_center_integrals(
+          make_restricted_three_center_integrals(three_center_integrals)),
+      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
+  if (!is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
 }
 
 CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals_alpha,
     const Eigen::MatrixXd& one_body_integrals_beta,
-    const Eigen::VectorXd& two_body_integrals_aaaa,
-    const Eigen::VectorXd& two_body_integrals_aabb,
-    const Eigen::VectorXd& two_body_integrals_bbbb,
+    const Eigen::MatrixXd& three_center_integrals_aa,
+    const Eigen::MatrixXd& three_center_integrals_bb,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta,
-    const Eigen::MatrixXd& L_ao, HamiltonianType type)
-    : CanonicalFourCenterHamiltonianContainer(
-          one_body_integrals_alpha, one_body_integrals_beta,
-          two_body_integrals_aaaa, two_body_integrals_aabb,
-          two_body_integrals_bbbb, orbitals, core_energy,
-          inactive_fock_matrix_alpha, inactive_fock_matrix_beta, type),
-      _ao_cholesky_vectors(std::make_shared<Eigen::MatrixXd>(L_ao)) {
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
+                           orbitals, core_energy, inactive_fock_matrix_alpha,
+                           inactive_fock_matrix_beta, type),
+      _three_center_integrals(
+          std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
+          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)),
+      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
+  if (!is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
 }
 
 std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
@@ -55,16 +79,15 @@ std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
     return std::make_unique<CholeskyHamiltonianContainer>(
-        *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first,
-        *_ao_cholesky_vectors, _type);
+        *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
+        _core_energy, *_inactive_fock_matrix.first, _ao_cholesky_vectors,
+        _type);
   }
   return std::make_unique<CholeskyHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
-      *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
-      *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second,
-      *_ao_cholesky_vectors, _type);
+      *_three_center_integrals.first, *_three_center_integrals.second,
+      _orbitals, _core_energy, *_inactive_fock_matrix.first,
+      *_inactive_fock_matrix.second, _ao_cholesky_vectors, _type);
 }
 
 std::string CholeskyHamiltonianContainer::get_container_type() const {
@@ -72,32 +95,339 @@ std::string CholeskyHamiltonianContainer::get_container_type() const {
   return "cholesky";
 }
 
-nlohmann::json CholeskyHamiltonianContainer::to_json() const {
+std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+           const Eigen::VectorXd&>
+CholeskyHamiltonianContainer::get_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!has_two_body_integrals()) {
+    throw std::runtime_error("Three-center integrals are not set");
+  }
+
+  // Lazily build and cache the four-center integrals on first access
+  if (!std::get<0>(_cached_four_center_integrals)) {
+    _build_four_center_cache();
+  }
+
+  return std::make_tuple(
+      std::cref(*std::get<0>(_cached_four_center_integrals)),
+      std::cref(*std::get<1>(_cached_four_center_integrals)),
+      std::cref(*std::get<2>(_cached_four_center_integrals)));
+}
+
+void CholeskyHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
-  // Start with base class serialization
-  nlohmann::json j = CanonicalFourCenterHamiltonianContainer::to_json();
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  size_t norb2 = norb * norb;
+  size_t norb4 = norb2 * norb2;
 
-  // Override container type
+  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_Q L_ij,Q *
+  // R_Q,kl, where L and R are column-major, and (ij|kl) is row-major
+  auto build_four_center =
+      [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
+          std::shared_ptr<const Eigen::MatrixXd> three_center_right)
+      -> std::shared_ptr<Eigen::VectorXd> {
+    // Allocate output vector
+    auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
+
+    size_t naux = three_center_left->cols();
+
+    // To make the resulting four-center integrals compatible with the row major
+    // storage, we calculate (kl|ij) = sum_Q R_kl,Q * L_Q,ij and store the
+    // result in col-major order, effectively (ij|kl) in row-major order.
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               norb2, norb2, naux, 1.0, three_center_right->data(), norb2,
+               three_center_left->data(), norb2, 0.0, four_center->data(),
+               norb2);
+    return four_center;
+  };
+
+  // Build four-center integrals from three-center
+  auto aaaa = build_four_center(_three_center_integrals.first,
+                                _three_center_integrals.first);
+
+  if (is_restricted()) {
+    _cached_four_center_integrals = std::make_tuple(aaaa, aaaa, aaaa);
+  } else {
+    auto aabb = build_four_center(_three_center_integrals.first,
+                                  _three_center_integrals.second);
+    auto bbbb = build_four_center(_three_center_integrals.second,
+                                  _three_center_integrals.second);
+    _cached_four_center_integrals =
+        std::make_tuple(std::move(aaaa), std::move(aabb), std::move(bbbb));
+  }
+}
+
+std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+CholeskyHamiltonianContainer::get_three_center_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!has_two_body_integrals()) {
+    throw std::runtime_error("Three-center two-body integrals are not set");
+  }
+  return std::make_pair(std::cref(*_three_center_integrals.first),
+                        std::cref(*_three_center_integrals.second));
+}
+
+const std::optional<Eigen::MatrixXd>&
+CholeskyHamiltonianContainer::get_ao_cholesky_vectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _ao_cholesky_vectors;
+}
+
+double CholeskyHamiltonianContainer::get_two_body_element(
+    unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (!has_two_body_integrals()) {
+    throw std::runtime_error("Two-body integrals are not set");
+  }
+
+  size_t norb = _orbitals->get_active_space_indices().first.size();
+  if (i >= norb || j >= norb || k >= norb || l >= norb) {
+    throw std::out_of_range("Orbital index out of range");
+  }
+
+  if (!std::get<0>(_cached_four_center_integrals)) {
+    _build_four_center_cache();
+  }
+
+  size_t ij = i * norb + j;
+  size_t kl = k * norb + l;
+
+  // Select the appropriate integral based on spin channel
+  switch (channel) {
+    case SpinChannel::aaaa:
+      return (*std::get<0>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
+    case SpinChannel::aabb:
+      return (*std::get<1>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
+    case SpinChannel::bbbb:
+      return (*std::get<2>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
+
+    default:
+      throw std::invalid_argument("Invalid spin channel");
+  }
+}
+
+bool CholeskyHamiltonianContainer::has_two_body_integrals() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _three_center_integrals.first != nullptr &&
+         _three_center_integrals.first->size() > 0;
+}
+
+bool CholeskyHamiltonianContainer::is_restricted() const {
+  QDK_LOG_TRACE_ENTERING();
+  // Hamiltonian is restricted if alpha and beta components point to the same
+  // data
+  return (_one_body_integrals.first == _one_body_integrals.second) &&
+         (_three_center_integrals.first == _three_center_integrals.second) &&
+         (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
+          (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
+}
+
+bool CholeskyHamiltonianContainer::is_valid() const {
+  QDK_LOG_TRACE_ENTERING();
+  // Check if essential data is present
+  if (!has_one_body_integrals() || !has_two_body_integrals()) {
+    return false;
+  }
+
+  // Check dimension consistency
+  try {
+    validate_integral_dimensions();
+  } catch (const std::exception&) {
+    return false;
+  }
+
+  return true;
+}
+
+void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
+  QDK_LOG_TRACE_ENTERING();
+  // Check alpha one-body integrals
+  HamiltonianContainer::validate_integral_dimensions();
+
+  if (!has_two_body_integrals()) {
+    return;
+  }
+
+  // Check two-body integrals dimensions
+  // Three-center integrals have shape [n_orb_pairs x n_aux] where n_orb_pairs =
+  // norb^2
+  auto norb_alpha = _one_body_integrals.first->rows();
+  auto orb_pair_size = norb_alpha * norb_alpha;
+
+  // Check alpha-alpha integrals - rows should equal orb_pair_size
+  if (static_cast<size_t>(_three_center_integrals.first->rows()) !=
+      orb_pair_size) {
+    throw std::invalid_argument(
+        "Alpha-alpha three-center integrals rows (" +
+        std::to_string(_three_center_integrals.first->rows()) +
+        ") does not match expected orb_pair size (" +
+        std::to_string(orb_pair_size) + " for " + std::to_string(norb_alpha) +
+        " orbitals)");
+  }
+
+  // Check beta-beta integrals (if different from alpha-alpha)
+  if (_three_center_integrals.second != _three_center_integrals.first) {
+    if (static_cast<size_t>(_three_center_integrals.second->rows()) !=
+            orb_pair_size ||
+        static_cast<size_t>(_three_center_integrals.second->cols()) !=
+            static_cast<size_t>(_three_center_integrals.first->cols())) {
+      throw std::invalid_argument(
+          "Beta three-center integrals size does not match with Alpha");
+    }
+  }
+}
+
+std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
+CholeskyHamiltonianContainer::make_restricted_three_center_integrals(
+    const Eigen::MatrixXd& integrals) {
+  QDK_LOG_TRACE_ENTERING();
+  auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
+  return std::make_pair(shared_integrals, shared_integrals);
+}
+
+nlohmann::json CholeskyHamiltonianContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j;
+
+  // Store version first
+  j["version"] = SERIALIZATION_VERSION;
+
+  // Store container type
   j["container_type"] = get_container_type();
 
-  // Store ao cholesky vectors (Cholesky-specific data)
-  if (_ao_cholesky_vectors != nullptr && _ao_cholesky_vectors->size() > 0) {
-    j["has_ao_cholesky_vectors"] = true;
-    // Store ao cholesky vectors
-    std::vector<std::vector<double>> L_ao_vec;
+  // Store metadata
+  j["core_energy"] = _core_energy;
+  j["type"] =
+      (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
+
+  // Store restrictedness information
+  j["is_restricted"] = is_restricted();
+
+  // Store one-body integrals
+  if (has_one_body_integrals()) {
+    j["has_one_body_integrals"] = true;
+
+    // Store alpha one-body integrals
+    std::vector<std::vector<double>> one_body_alpha_vec;
+    for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _one_body_integrals.first->cols(); ++j_idx) {
+        row.push_back((*_one_body_integrals.first)(i, j_idx));
+      }
+      one_body_alpha_vec.push_back(row);
+    }
+    j["one_body_integrals_alpha"] = one_body_alpha_vec;
+
+    // Store beta one-body integrals (only if unrestricted)
+    if (is_unrestricted()) {
+      std::vector<std::vector<double>> one_body_beta_vec;
+      for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
+        std::vector<double> row;
+        for (int j_idx = 0; j_idx < _one_body_integrals.second->cols();
+             ++j_idx) {
+          row.push_back((*_one_body_integrals.second)(i, j_idx));
+        }
+        one_body_beta_vec.push_back(row);
+      }
+      j["one_body_integrals_beta"] = one_body_beta_vec;
+    }
+  } else {
+    j["has_one_body_integrals"] = false;
+  }
+
+  // Store two-body integrals
+  if (has_two_body_integrals()) {
+    j["has_two_body_integrals"] = true;
+
+    // Store as object {"aa": [...], "bb": [...]}
+    nlohmann::json two_body_obj;
+
+    // Store aa
+    std::vector<std::vector<double>> three_center_aa_vec;
+    for (int i = 0; i < _three_center_integrals.first->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _three_center_integrals.first->cols();
+           ++j_idx) {
+        row.push_back((*_three_center_integrals.first)(i, j_idx));
+      }
+      three_center_aa_vec.push_back(row);
+    }
+    two_body_obj["aa"] = three_center_aa_vec;
+
+    if (is_unrestricted()) {
+      // Store bb
+      std::vector<std::vector<double>> three_center_bb_vec;
+      for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
+        std::vector<double> row;
+        for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
+             ++j_idx) {
+          row.push_back((*_three_center_integrals.second)(i, j_idx));
+        }
+        three_center_bb_vec.push_back(row);
+      }
+      two_body_obj["bb"] = three_center_bb_vec;
+    }
+    j["three_center_integrals"] = two_body_obj;
+  } else {
+    j["has_two_body_integrals"] = false;
+  }
+
+  // Store inactive Fock matrix
+  if (has_inactive_fock_matrix()) {
+    j["has_inactive_fock_matrix"] = true;
+    // Store alpha inactive Fock matrix
+    std::vector<std::vector<double>> inactive_fock_alpha_vec;
+    for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
+      std::vector<double> row;
+      for (int j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
+           ++j_idx) {
+        row.push_back((*_inactive_fock_matrix.first)(i, j_idx));
+      }
+      inactive_fock_alpha_vec.push_back(row);
+    }
+    j["inactive_fock_matrix_alpha"] = inactive_fock_alpha_vec;
+
+    // Store beta inactive Fock matrix (only if unrestricted)
+    if (is_unrestricted()) {
+      std::vector<std::vector<double>> inactive_fock_beta_vec;
+      for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
+        std::vector<double> row;
+        for (int j_idx = 0; j_idx < _inactive_fock_matrix.second->cols();
+             ++j_idx) {
+          row.push_back((*_inactive_fock_matrix.second)(i, j_idx));
+        }
+        inactive_fock_beta_vec.push_back(row);
+      }
+      j["inactive_fock_matrix_beta"] = inactive_fock_beta_vec;
+    }
+  } else {
+    j["has_inactive_fock_matrix"] = false;
+  }
+
+  // Store orbital data
+  if (has_orbitals()) {
+    j["has_orbitals"] = true;
+    j["orbitals"] = _orbitals->to_json();
+  } else {
+    j["has_orbitals"] = false;
+  }
+
+  if (_ao_cholesky_vectors) {
+    std::vector<std::vector<double>> ao_cholesky_vectors_vec;
     for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
       std::vector<double> row;
       for (int j_idx = 0; j_idx < _ao_cholesky_vectors->cols(); ++j_idx) {
         row.push_back((*_ao_cholesky_vectors)(i, j_idx));
       }
-      L_ao_vec.push_back(row);
+      ao_cholesky_vectors_vec.push_back(row);
     }
-    j["ao_cholesky_vectors"] = L_ao_vec;
-  } else {
-    j["has_ao_cholesky_vectors"] = false;
+    j["ao_cholesky_vectors"] = ao_cholesky_vectors_vec;
   }
-
   return j;
 }
 
@@ -130,31 +460,19 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
     auto load_matrix =
         [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
       auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      if (matrix_vec.empty()) {
-        return Eigen::MatrixXd(0, 0);
-      }
-
-      Eigen::MatrixXd matrix(matrix_vec.size(), matrix_vec[0].size());
-      for (Eigen::Index i = 0; i < matrix.rows(); ++i) {
-        if (static_cast<Eigen::Index>(matrix_vec[i].size()) != matrix.cols()) {
+      int rows = matrix_vec.size();
+      int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      Eigen::MatrixXd matrix(rows, cols);
+      for (int i = 0; i < rows; ++i) {
+        if (static_cast<int>(matrix_vec[i].size()) != cols) {
           throw std::runtime_error(
               "Matrix rows have inconsistent column counts");
         }
-        matrix.row(i) =
-            Eigen::VectorXd::Map(matrix_vec[i].data(), matrix.cols());
+        for (int j_idx = 0; j_idx < cols; ++j_idx) {
+          matrix(i, j_idx) = matrix_vec[i][j_idx];
+        }
       }
       return matrix;
-    };
-
-    // Helper function to load vector from JSON
-    auto load_vector =
-        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
-      auto vector_vec = vector_json.get<std::vector<double>>();
-      Eigen::VectorXd vector(vector_vec.size());
-      for (size_t i = 0; i < vector_vec.size(); ++i) {
-        vector(i) = vector_vec[i];
-      }
-      return vector;
     };
 
     // Load one-body integrals
@@ -174,28 +492,34 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
     }
 
     // Load two-body integrals
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    Eigen::MatrixXd three_center_aa, three_center_bb;
     bool has_two_body = j.value("has_two_body_integrals", false);
     if (has_two_body) {
-      if (!j.contains("two_body_integrals")) {
+      if (!j.contains("three_center_integrals")) {
         throw std::runtime_error("Two-body integrals data not found in JSON");
       }
 
-      auto two_body_obj = j["two_body_integrals"];
+      auto two_body_obj = j["three_center_integrals"];
       if (!two_body_obj.is_object()) {
         throw std::runtime_error(
-            "two_body_integrals must be an object with aaaa, aabb, bbbb keys");
+            "three_center_integrals must be an object with aa, bb "
+            "keys");
       }
 
-      if (!two_body_obj.contains("aaaa") || !two_body_obj.contains("aabb") ||
-          !two_body_obj.contains("bbbb")) {
+      if (!two_body_obj.contains("aa")) {
         throw std::runtime_error(
-            "two_body_integrals must contain aaaa, aabb, and bbbb keys");
+            "three_center_integrals must contain at least aa key");
       }
 
-      two_body_aaaa = load_vector(two_body_obj["aaaa"]);
-      two_body_aabb = load_vector(two_body_obj["aabb"]);
-      two_body_bbbb = load_vector(two_body_obj["bbbb"]);
+      three_center_aa = load_matrix(two_body_obj["aa"]);
+      if (!is_restricted_data) {
+        if (!two_body_obj.contains("bb")) {
+          throw std::runtime_error(
+              "three_center_integrals must contain bb key for unrestricted "
+              "Hamiltonian");
+        }
+        three_center_bb = load_matrix(two_body_obj["bb"]);
+      }
     }
 
     // Load inactive Fock matrix
@@ -219,15 +543,6 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
       throw std::runtime_error("Hamiltonian JSON must include orbitals data");
     }
     auto orbitals = Orbitals::from_json(j["orbitals"]);
-
-    // Load ao cholesky vectors
-    Eigen::MatrixXd L_ao;
-    bool has_ao_cholesky_vectors = j.value("has_ao_cholesky_vectors", false);
-    if (has_ao_cholesky_vectors) {
-      if (j.contains("ao_cholesky_vectors")) {
-        L_ao = load_matrix(j["ao_cholesky_vectors"]);
-      }
-    }
 
     // Validate consistency: if orbitals have inactive indices,
     // then inactive fock matrix must be present
@@ -253,19 +568,24 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
       }
     }
 
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
+    if (j.contains("ao_cholesky_vectors")) {
+      ao_cholesky_vectors = load_matrix(j["ao_cholesky_vectors"]);
+    }
+
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
       return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, L_ao, type);
+          one_body_alpha, three_center_aa, orbitals, core_energy,
+          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, L_ao, type);
+          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
+          std::move(ao_cholesky_vectors), type);
     }
 
   } catch (const std::exception& e) {
@@ -277,24 +597,79 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
 void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    // Start with base class serialization
-    CanonicalFourCenterHamiltonianContainer::to_hdf5(group);
-
-    // Override container type attribute
+    // Save version first
     H5::DataSpace scalar_space(H5S_SCALAR);
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
-    // Remove and recreate container_type attribute with correct value
-    if (group.attrExists("container_type")) {
-      group.removeAttr("container_type");
-    }
+    H5::Attribute version_attr =
+        group.createAttribute("version", string_type, scalar_space);
+    std::string version_str = SERIALIZATION_VERSION;
+    version_attr.write(string_type, version_str);
+
+    // Add container type attribute
     H5::Attribute container_type_attr =
         group.createAttribute("container_type", string_type, scalar_space);
     std::string container_type_str = get_container_type();
     container_type_attr.write(string_type, container_type_str);
 
-    // Save ao cholesky vectors (Cholesky-specific data)
-    if (_ao_cholesky_vectors != nullptr && _ao_cholesky_vectors->size() > 0) {
+    // Save metadata
+    H5::Group metadata_group = group.createGroup("metadata");
+
+    // Save core energy
+    H5::Attribute core_energy_attr = metadata_group.createAttribute(
+        "core_energy", H5::PredType::NATIVE_DOUBLE, scalar_space);
+    core_energy_attr.write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
+
+    // Save Hamiltonian type
+    std::string type_str =
+        (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
+    H5::StrType type_string_type(H5::PredType::C_S1, type_str.length() + 1);
+    H5::Attribute type_attr =
+        metadata_group.createAttribute("type", type_string_type, scalar_space);
+    type_attr.write(type_string_type, type_str.c_str());
+
+    // Save restrictedness information
+    hbool_t is_restricted_flag = is_restricted() ? 1 : 0;
+    H5::Attribute restricted_attr = metadata_group.createAttribute(
+        "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
+    restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
+
+    // Save integrals data
+    if (has_one_body_integrals()) {
+      save_matrix_to_group(group, "one_body_integrals_alpha",
+                           *_one_body_integrals.first);
+      if (is_unrestricted()) {
+        save_matrix_to_group(group, "one_body_integrals_beta",
+                             *_one_body_integrals.second);
+      }
+    }
+
+    if (has_two_body_integrals()) {
+      save_matrix_to_group(group, "three_center_integrals_aa",
+                           *_three_center_integrals.first);
+      if (is_unrestricted()) {
+        save_matrix_to_group(group, "three_center_integrals_bb",
+                             *_three_center_integrals.second);
+      }
+    }
+
+    // Save inactive Fock matrix
+    if (has_inactive_fock_matrix()) {
+      save_matrix_to_group(group, "inactive_fock_matrix_alpha",
+                           *_inactive_fock_matrix.first);
+      if (is_unrestricted()) {
+        save_matrix_to_group(group, "inactive_fock_matrix_beta",
+                             *_inactive_fock_matrix.second);
+      }
+    }
+
+    // Save nested orbitals data using HDF5 group
+    if (_orbitals) {
+      H5::Group orbitals_group = group.createGroup("orbitals");
+      _orbitals->to_hdf5(orbitals_group);
+    }
+
+    if (_ao_cholesky_vectors) {
       save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
     }
 
@@ -363,7 +738,7 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
 
     // Load integral data based on restrictedness
     Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
+    Eigen::MatrixXd three_center_aa, three_center_bb;
     Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
 
     // Load one-body integrals
@@ -379,19 +754,16 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
     }
 
     // Load two-body integrals
-    if (dataset_exists_in_group(group, "two_body_integrals_aaaa")) {
-      two_body_aaaa = load_vector_from_group(group, "two_body_integrals_aaaa");
+    if (dataset_exists_in_group(group, "three_center_integrals_aa")) {
+      three_center_aa =
+          load_matrix_from_group(group, "three_center_integrals_aa");
     }
 
-    // For unrestricted, load aabb and bbbb separately
+    // For unrestricted, load bb separately
     if (!is_restricted_data) {
-      if (dataset_exists_in_group(group, "two_body_integrals_aabb")) {
-        two_body_aabb =
-            load_vector_from_group(group, "two_body_integrals_aabb");
-      }
-      if (dataset_exists_in_group(group, "two_body_integrals_bbbb")) {
-        two_body_bbbb =
-            load_vector_from_group(group, "two_body_integrals_bbbb");
+      if (dataset_exists_in_group(group, "three_center_integrals_bb")) {
+        three_center_bb =
+            load_matrix_from_group(group, "three_center_integrals_bb");
       }
     }
 
@@ -408,24 +780,25 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
           load_matrix_from_group(group, "inactive_fock_matrix_beta");
     }
 
-    // load ao cholesky vectors
-    Eigen::MatrixXd L_ao;
+    // Load AO Cholesky vectors
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
     if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
-      L_ao = load_matrix_from_group(group, "ao_cholesky_vectors");
+      ao_cholesky_vectors =
+          load_matrix_from_group(group, "ao_cholesky_vectors");
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, L_ao, type);
+          one_body_alpha, three_center_aa, orbitals, core_energy,
+          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, L_ao, type);
+          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
+          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
+          std::move(ao_cholesky_vectors), type);
     }
 
   } catch (const H5::Exception& e) {
