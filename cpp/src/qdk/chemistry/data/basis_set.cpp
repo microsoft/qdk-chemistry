@@ -352,10 +352,11 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const std::vector<Shell>& ecp_shells, const std::vector<size_t>& ecp_electrons,
+                   const std::vector<Shell>& ecp_shells,
+                   const std::vector<size_t>& ecp_electrons,
                    const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(name, shells, ecp_shells, ecp_electrons, std::make_shared<Structure>(structure),
-               atomic_orbital_type) {
+    : BasisSet(name, shells, ecp_shells, ecp_electrons,
+               std::make_shared<Structure>(structure), atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -482,8 +483,8 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) && 
-    ecp_electrons.size() != structure->get_num_atoms()) {
+  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) &&
+      ecp_electrons.size() != structure->get_num_atoms()) {
     throw std::invalid_argument(
         "ECP electrons vector size must match number of atoms");
   }
@@ -516,7 +517,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
 }
-
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::string& aux_name,
@@ -572,7 +572,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 }
 
-
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::string& ecp_name,
                    const std::vector<Shell>& ecp_shells,
@@ -605,8 +604,8 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) && 
-    ecp_electrons.size() != structure->get_num_atoms()) {
+  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) &&
+      ecp_electrons.size() != structure->get_num_atoms()) {
     throw std::invalid_argument(
         "ECP electrons vector size must match number of atoms");
   }
@@ -910,18 +909,17 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
 
   return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
                                     all_ecp_shells, all_ecp_electrons,
-                                    aux_name_lower, all_aux_shells,
-                                    structure, atomic_orbital_type);
+                                    aux_name_lower, all_aux_shells, structure,
+                                    atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
     const std::map<std::string, std::string>& element_to_basis_map,
     const std::map<std::string, std::string>& element_to_aux_basis_map,
     const Structure& structure, AOType atomic_orbital_type) {
-  return BasisSet::from_element_map(element_to_basis_map,
-                                    element_to_aux_basis_map,
-                                    std::make_shared<Structure>(structure),
-                                    atomic_orbital_type);
+  return BasisSet::from_element_map(
+      element_to_basis_map, element_to_aux_basis_map,
+      std::make_shared<Structure>(structure), atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
@@ -1032,8 +1030,8 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   return std::make_shared<BasisSet>(
       std::string(BasisSet::custom_name), all_basis_shells,
       std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
-      std::string(BasisSet::custom_name), all_aux_shells,
-      structure, atomic_orbital_type);
+      std::string(BasisSet::custom_name), all_aux_shells, structure,
+      atomic_orbital_type);
 }
 
 BasisSet::BasisSet(const BasisSet& other)
@@ -1225,8 +1223,7 @@ const Shell& BasisSet::get_aux_shell(size_t shell_index) const {
   size_t total_aux_shells = get_num_aux_shells();
   if (shell_index >= total_aux_shells) {
     throw std::out_of_range("Auxiliary shell index " +
-                            std::to_string(shell_index) +
-                            " out of range [0, " +
+                            std::to_string(shell_index) + " out of range [0, " +
                             std::to_string(total_aux_shells) + ")");
   }
 
@@ -1591,7 +1588,8 @@ std::string BasisSet::get_summary() const {
     }
     oss << "\n";
   }
-  oss << "Contains auxiliary basis: " << (has_aux_basis() ? "Yes" : "No") << "\n";
+  oss << "Contains auxiliary basis: " << (has_aux_basis() ? "Yes" : "No")
+      << "\n";
   if (has_aux_basis()) {
     oss << "Auxiliary basis name: " << _aux_name << "\n";
     oss << "Number of auxiliary shells: " << get_num_aux_shells() << "\n";
@@ -2302,8 +2300,7 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
 
         if (aux_shell_group.nameExists("exponents") &&
             aux_shell_group.nameExists("coefficients")) {
-          H5::DataSet aux_exponents =
-              aux_shell_group.openDataSet("exponents");
+          H5::DataSet aux_exponents = aux_shell_group.openDataSet("exponents");
           H5::DataSet aux_coefficients =
               aux_shell_group.openDataSet("coefficients");
 
@@ -2332,8 +2329,7 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
           for (unsigned j = 0; j < num_prims; ++j) {
             if (aux_prim_offset + j < aux_all_exponents.size()) {
               shell_exponents(j) = aux_all_exponents[aux_prim_offset + j];
-              shell_coefficients(j) =
-                  aux_all_coefficients[aux_prim_offset + j];
+              shell_coefficients(j) = aux_all_coefficients[aux_prim_offset + j];
             }
           }
           aux_prim_offset += num_prims;

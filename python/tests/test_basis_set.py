@@ -331,7 +331,6 @@ def test_summary():
     assert "Auxiliary" in summary_with_aux
 
 
-
 def test_json_serialization():
     """Test JSON serialization and deserialization."""
     # Create a basis set with data
@@ -343,10 +342,7 @@ def test_json_serialization():
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    aux_shells = [
-        Shell(0, OrbitalType.S, [2.0], [1.0]), 
-        Shell(0, OrbitalType.D, [0.3], [0.5])
-    ]
+    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.D, [0.3], [0.5])]
     basis_out = BasisSet("STO-3G", shells, "aux-fit", aux_shells, structure)
 
     # Test direct JSON conversion
@@ -383,7 +379,6 @@ def test_json_serialization():
         Path(filename).unlink()
 
 
-
 def test_hdf5_serialization():
     """Test HDF5 serialization and deserialization."""
     # Create a basis set with data
@@ -395,9 +390,7 @@ def test_hdf5_serialization():
         Shell(0, OrbitalType.S, [1.0], [1.0]),
         Shell(0, OrbitalType.P, [0.5], [1.0]),
     ]
-    aux_shells = [
-            Shell(0, OrbitalType.S, [2.0], [1.0]), 
-            Shell(0, OrbitalType.P, [0.8], [0.7])]
+    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.P, [0.8], [0.7])]
     basis_out = BasisSet("cc-pVDZ", shells, "aux-fit", aux_shells, structure, AOType.Spherical)
 
     try:
@@ -415,7 +408,6 @@ def test_hdf5_serialization():
         assert basis_in.get_aux_name() == "aux-fit"
         assert basis_in.get_num_aux_shells() == 2
 
-
     except RuntimeError as e:
         pytest.skip(f"HDF5 test skipped - {e!s}")
     finally:
@@ -423,12 +415,6 @@ def test_hdf5_serialization():
             with contextlib.suppress(FileNotFoundError):
                 Path(filename).unlink()
 
-
-
-def test_error_handling():
-    """Test error handling for invalid operations."""
-    # Create a minimal shell for testing empty functions
-    shell = Shell(0, OrbitalType.S, [1.0], [1.0])
 
 def test_error_handling():
     """Test error handling for invalid operations."""
@@ -1343,6 +1329,7 @@ def test_auxiliary_basis_set_serialization():
         assert loaded_basis.has_aux_basis()
         assert loaded_basis.get_aux_name() == "aux_basis"
 
+
 def test_basis_set_ecp_shells_copy():
     """Test that ECP shells are properly copied."""
     # Create structure and shells
@@ -1554,7 +1541,6 @@ def test_basis_set_data_type_name():
     """Test that BasisSet has the correct _data_type_name class attribute."""
     assert hasattr(BasisSet, "_data_type_name")
     assert BasisSet._data_type_name == "basis_set"
-
 
 
 def test_auxiliary_basis_set_accessors():

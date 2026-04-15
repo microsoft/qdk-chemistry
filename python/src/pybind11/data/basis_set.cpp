@@ -266,8 +266,8 @@ Examples:
         // pulling recognised kwargs into the positional vector when the
         // corresponding slot is not yet filled.
         // Expected positional order: name, shells, ...
-        if (a.size() >= 1 && py::isinstance<py::str>(a[0]) &&
-            a.size() < 2 && kwargs.contains("shells")) {
+        if (a.size() >= 1 && py::isinstance<py::str>(a[0]) && a.size() < 2 &&
+            kwargs.contains("shells")) {
           a.push_back(kwargs["shells"].cast<py::object>());
         }
 
@@ -293,8 +293,7 @@ Examples:
         auto shells = to_shell_vec(a[1].cast<py::list>());
 
         // (name, shells)
-        if (n == 2)
-          return BasisSet(name, shells, ao);
+        if (n == 2) return BasisSet(name, shells, ao);
 
         // (name, shells, structure)
         if (n == 3 && py::isinstance<Structure>(a[2]))
@@ -312,8 +311,7 @@ Examples:
           if (list_has_ecp_shells(extra)) {
             // ECP shells without explicit ecp_electrons → supply empty vec
             return BasisSet(name, shells, to_shell_vec(extra),
-                            std::vector<size_t>(),
-                            a[3].cast<Structure>(), ao);
+                            std::vector<size_t>(), a[3].cast<Structure>(), ao);
           }
           // Auxiliary shells
           return BasisSet(name, shells, to_shell_vec(extra),
@@ -328,8 +326,7 @@ Examples:
                             a[4].cast<Structure>(), ao);
           }
           // (name, shells, ecp_shells, ecp_electrons, structure)
-          return BasisSet(name, shells,
-                          to_shell_vec(a[2].cast<py::list>()),
+          return BasisSet(name, shells, to_shell_vec(a[2].cast<py::list>()),
                           a[3].cast<std::vector<size_t>>(),
                           a[4].cast<Structure>(), ao);
         }
@@ -344,12 +341,11 @@ Examples:
         // (name, shells, ecp_name, ecp_shells, ecp_electrons,
         //  aux_name, aux_shells, structure)
         if (n == 8 && py::isinstance<py::str>(a[2]))
-          return BasisSet(name, shells, a[2].cast<std::string>(),
-                          to_shell_vec(a[3].cast<py::list>()),
-                          a[4].cast<std::vector<size_t>>(),
-                          a[5].cast<std::string>(),
-                          to_shell_vec(a[6].cast<py::list>()),
-                          a[7].cast<Structure>(), ao);
+          return BasisSet(
+              name, shells, a[2].cast<std::string>(),
+              to_shell_vec(a[3].cast<py::list>()),
+              a[4].cast<std::vector<size_t>>(), a[5].cast<std::string>(),
+              to_shell_vec(a[6].cast<py::list>()), a[7].cast<Structure>(), ao);
 
         throw py::type_error(
             "No matching BasisSet constructor for the given arguments");
@@ -1151,8 +1147,7 @@ Examples:
   basis_set.def_static(
       "from_basis_name",
       py::overload_cast<const std::string&, const std::string&,
-                        const Structure&, AOType>(
-          &BasisSet::from_basis_name),
+                        const Structure&, AOType>(&BasisSet::from_basis_name),
       R"(
 Create a basis set by name with an auxiliary basis for a molecular structure.
 
@@ -1172,8 +1167,7 @@ Examples:
     >>> basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", structure)
     >>> print(f"Aux shells: {basis.get_num_aux_shells()}")
 )",
-      py::arg("basis_name"), py::arg("aux_basis_name"),
-      py::arg("structure"),
+      py::arg("basis_name"), py::arg("aux_basis_name"), py::arg("structure"),
       py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
       "from_element_map",
@@ -1230,8 +1224,7 @@ Examples:
     >>> basis = BasisSet.from_element_map(basis_map, aux_map, structure)
 )",
       py::arg("element_to_basis_map"), py::arg("element_to_aux_basis_map"),
-      py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical);
+      py::arg("structure"), py::arg("atomic_orbital_type") = AOType::Spherical);
   basis_set.def_static(
       "from_index_map",
       py::overload_cast<const std::map<size_t, std::string>&, const Structure&,
@@ -1266,8 +1259,8 @@ Examples:
   basis_set.def_static(
       "from_index_map",
       py::overload_cast<const std::map<size_t, std::string>&,
-                        const std::map<size_t, std::string>&,
-                        const Structure&, AOType>(&BasisSet::from_index_map),
+                        const std::map<size_t, std::string>&, const Structure&,
+                        AOType>(&BasisSet::from_index_map),
       R"(
 Create a basis set with different basis sets and auxiliary basis sets per atom index.
 
@@ -1287,8 +1280,7 @@ Examples:
     >>> basis = BasisSet.from_index_map(basis_map, aux_map, structure)
 )",
       py::arg("index_to_basis_map"), py::arg("index_to_aux_basis_map"),
-      py::arg("structure"),
-      py::arg("atomic_orbital_type") = AOType::Spherical);
+      py::arg("structure"), py::arg("atomic_orbital_type") = AOType::Spherical);
 
   // Utility functions (static methods);
   basis_set.def_static("orbital_type_to_string",

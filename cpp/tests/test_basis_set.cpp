@@ -86,7 +86,8 @@ TEST_F(BasisSetTest, Constructors) {
   // // Constructor with name and structure should throw (empty basis invalid)
   // EXPECT_THROW(BasisSet basis2("6-31G", structure), std::invalid_argument);
 
-  // // Constructor with name, structure and basis type should throw (empty basis
+  // // Constructor with name, structure and basis type should throw (empty
+  // basis
   // // invalid)
   // EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
   //              std::invalid_argument);
@@ -396,7 +397,8 @@ TEST_F(BasisSetTest, Validation) {
   Structure structure(coords, symbols);
 
   // // Empty basis is invalid
-  // EXPECT_THROW(BasisSet empty_basis("test", structure), std::invalid_argument);
+  // EXPECT_THROW(BasisSet empty_basis("test", structure),
+  // std::invalid_argument);
 
   // Add a shell
   std::vector<Shell> shells;
@@ -973,7 +975,6 @@ TEST_F(BasisSetTest, ECPShellValidation) {
   Shell regular_shell(0, OrbitalType::S, exponents, coefficients);
   EXPECT_FALSE(regular_shell.has_radial_powers());
 }
-
 
 TEST_F(BasisSetTest, ECPHDF5Serialization) {
   // Test HDF5 serialization with ECP data
@@ -1894,8 +1895,7 @@ TEST_F(BasisSetTest, AuxiliaryBasisFromShellsConstructor) {
   aux_shells.emplace_back(
       Shell(2, OrbitalType::S, std::vector{3.0}, std::vector{1.5}));
 
-  BasisSet basis("test-with-aux-shells", shells, aux_shells,
-                 *structure);
+  BasisSet basis("test-with-aux-shells", shells, aux_shells, *structure);
 
   EXPECT_EQ("test-with-aux-shells", basis.get_name());
   EXPECT_EQ(3u, basis.get_num_shells());
@@ -2022,8 +2022,7 @@ TEST_F(BasisSetTest, AuxiliaryBasisCopyConstructorAndAssignment) {
 
   assigned = original;
   EXPECT_TRUE(assigned.has_aux_basis());
-  EXPECT_EQ(original.get_num_aux_shells(),
-            assigned.get_num_aux_shells());
+  EXPECT_EQ(original.get_num_aux_shells(), assigned.get_num_aux_shells());
 }
 
 TEST_F(BasisSetTest, AuxiliaryBasisJSONSerialization) {
@@ -2151,7 +2150,6 @@ TEST_F(BasisSetTest, FromBasisNameWithAuxSCFComparison) {
   EXPECT_TRUE(basis_with_aux->has_aux_basis());
 }
 
-
 TEST_F(BasisSetTest, AuxiliaryShellDataAccessors) {
   // Construct a 2-atom structure with known aux shells and verify every
   // accessor that returns shell data.
@@ -2221,7 +2219,6 @@ TEST_F(BasisSetTest, AuxiliaryShellDataAccessors) {
   EXPECT_EQ(OrbitalType::D, s2.orbital_type);
   EXPECT_EQ(1u, s2.atom_index);
 }
-
 
 TEST_F(BasisSetTest, AuxShellDataIntegrityJSONRoundTrip) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}};
@@ -2410,7 +2407,8 @@ TEST_F(BasisSetTest, SharedPtrStructureConstructors) {
   EXPECT_TRUE(b2.has_ecp_shells());
   EXPECT_TRUE(b2.has_structure());
 
-  // Constructor: (name, shells, ecp_name, ecp_shells, ecp_electrons, shared_ptr)
+  // Constructor: (name, shells, ecp_name, ecp_shells, ecp_electrons,
+  // shared_ptr)
   BasisSet b3("sp3", shells, "ecp", ecp_shells, ecp_electrons, structure);
   EXPECT_EQ("ecp", b3.get_ecp_name());
   EXPECT_TRUE(b3.has_structure());
@@ -2436,7 +2434,6 @@ TEST_F(BasisSetTest, SharedPtrStructureConstructors) {
   EXPECT_TRUE(b6.has_aux_basis());
   EXPECT_TRUE(b6.has_structure());
 }
-
 
 TEST_F(BasisSetTest, MoveConstructorAndAssignment) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}, {1.4, 0.0, 0.0}};
@@ -2473,7 +2470,6 @@ TEST_F(BasisSetTest, MoveConstructorAndAssignment) {
   EXPECT_EQ("aux2", target.get_aux_name());
 }
 
-
 TEST_F(BasisSetTest, AuxiliaryShellErrorPaths) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"H"};
@@ -2496,7 +2492,6 @@ TEST_F(BasisSetTest, AuxiliaryShellErrorPaths) {
   EXPECT_EQ(0u, no_aux.get_num_aux_shells());
   EXPECT_TRUE(no_aux.get_aux_shells().empty());
 }
-
 
 TEST_F(BasisSetTest, AuxiliaryBasisCartesianAOType) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
