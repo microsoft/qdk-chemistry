@@ -247,7 +247,7 @@ class BasisSet : public DataClass,
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure The molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -264,7 +264,7 @@ class BasisSet : public DataClass,
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure Shared pointer to the molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -282,7 +282,7 @@ class BasisSet : public DataClass,
    * @param ecp_name Name of the ECP basis set
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure The molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -299,7 +299,7 @@ class BasisSet : public DataClass,
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_name Name of the ECP basis set
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure Shared pointer to the molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -373,7 +373,7 @@ class BasisSet : public DataClass,
    * @param ecp_name Name of the ECP basis set
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   *        atom
+   *        atom, atoms ordered same as in the structure
    * @param aux_name Name of the auxiliary basis set
    * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
    * @param structure The molecular structure
@@ -394,7 +394,7 @@ class BasisSet : public DataClass,
    * @param ecp_name Name of the ECP basis set
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   *        atom
+   *        atom, atoms ordered same as in the structure
    * @param aux_name Name of the auxiliary basis set
    * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
    * @param structure Shared pointer to the molecular structure
