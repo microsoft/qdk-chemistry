@@ -298,8 +298,7 @@ HamiltonianContainer::make_restricted_inactive_fock_matrix(
 }
 
 void HamiltonianContainer::to_fcidump_file(const std::string& filename,
-                                           size_t nalpha,
-                                           size_t nbeta) const {
+                                           size_t nalpha, size_t nbeta) const {
   QDK_LOG_TRACE_ENTERING();
 
   if (is_unrestricted()) {

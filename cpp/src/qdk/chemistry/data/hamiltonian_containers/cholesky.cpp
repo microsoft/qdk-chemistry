@@ -153,8 +153,8 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
                                   _three_center_integrals.second);
     auto bbbb = build_four_center(_three_center_integrals.second,
                                   _three_center_integrals.second);
-    _cached_four_center_integrals = std::make_tuple(std::move(aaaa), std::move(aabb),
-                                                    std::move(bbbb));
+    _cached_four_center_integrals =
+        std::make_tuple(std::move(aaaa), std::move(aabb), std::move(bbbb));
   }
 }
 
