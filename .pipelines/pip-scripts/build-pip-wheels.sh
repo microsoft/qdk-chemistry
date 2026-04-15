@@ -74,8 +74,18 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
+    # If we find x86 Homebrew in its expected location, disable it to prevent conflicts with arm64 Brew packages
+    if [ -d /usr/local/Cellar ]; then
+        mv /usr/local/Cellar /usr/local/Cellar_DISABLED
+    fi
+
+    echo "Updating Homebrew..."
     arch -arm64 brew update
+
+    echo "Upgrading Homebrew packages..."
     arch -arm64 brew upgrade
+
+    echo "Installing Homebrew dependencies..."
     arch -arm64 brew install \
         ninja \
         eigen \
@@ -95,6 +105,7 @@ wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/release
 echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
 tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
 rm hdf5-${HDF5_VERSION}.tar.bz2
+if [ -d hdf5 ]; then rm -rf hdf5; fi
 mv hdf5-${HDF5_VERSION} hdf5
 echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
@@ -109,9 +120,10 @@ export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe302171
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
+if [ -d "$PYENV_ROOT" ]; then rm -rf "$PYENV_ROOT"; fi
 mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
 rm pyenv.zip
-"$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
+"$PYENV_ROOT/bin/pyenv" install --patch ${PYTHON_VERSION}
 "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
 export PATH="$PYENV_ROOT/shims:$PATH"
