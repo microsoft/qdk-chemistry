@@ -133,7 +133,10 @@ QDK Cholesky
 
 A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
-The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are then transformed to the molecular one- and two-electron integrals.
+The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are transformed to the MO basis.
+The output Hamiltonian stores the MO three-center integrals directly in a ``CholeskyHamiltonianContainer``, avoiding expansion to the full four-center representation.
+Additionally, the original AO Cholesky vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
+Four-center integrals are lazily computed from the three-center integrals on demand.
 
 .. rubric:: Settings
 
@@ -153,9 +156,9 @@ The decomposition represents the four-center ERIs as products of three-center in
    * - ``eri_threshold``
      - float
      - ERI screening threshold for skipping negligible shell quartets during Cholesky decomposition. Default: 1e-12
-   * - ``store_cholesky_vectors``
+   * - ``store_ao_cholesky_vectors``
      - bool
-     - Whether to store the AO Cholesky vectors in the output Hamiltonian container for potential reuse. Default: false
+     - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
 
 Related classes
 ---------------
