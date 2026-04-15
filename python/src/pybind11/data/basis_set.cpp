@@ -353,7 +353,8 @@ Examples:
       R"(
 BasisSet constructor.
 
-Supported signatures (atomic_orbital_type is always optional, default Spherical):
+Supported signatures (atomic_orbital_type is always optional, default Spherical)::
+
     BasisSet(other: BasisSet)
     BasisSet(name, shells)
     BasisSet(name, shells, structure)
