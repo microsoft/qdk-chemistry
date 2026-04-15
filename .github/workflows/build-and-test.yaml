@@ -252,6 +252,8 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
+          -DQDK_CHEMISTRY_ENABLE_MPI=OFF \
+          -DQDK_ENABLE_OPENMP=ON \
           -DBUILD_TESTING=ON
 
     - name: Build C++ RelWithDebInfo/Coverage library
