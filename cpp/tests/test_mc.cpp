@@ -360,3 +360,75 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
   auto [E_sci, wfn_sci] = mc->run(ham, 4, 1);
   EXPECT_NEAR(E_sci, -54.385428499370562, testing::ci_energy_tolerance);
 }
+
+/**
+ * @brief Test CAS single-determinant edge case (dets.size() == 1).
+ *
+ * Water/STO-3G with a 1-orbital active space: CAS(1,1) in orbital 4 (HOMO)
+ * with 4 inactive occupied orbitals gives C(1,1)*C(1,1) = 1 determinant,
+ * exercising the trivial diagonal branch. Energy must equal HF.
+ */
+TEST_F(MCTest, Water_STO3G_CAS_SingleDet) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+
+  // CAS(1,1) in 1 orbital: active = {4}, inactive = {0,1,2,3}
+  auto orbitals_with_active_space =
+      testing::with_active_space(wfn_HF->get_orbitals(), std::vector<size_t>{4},
+                                 std::vector<size_t>{0, 1, 2, 3});
+  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_cas");
+  auto [E_cas, wfn_cas] = mc->run(ham, 1, 1);
+  EXPECT_EQ(wfn_cas->size(), 1);
+  EXPECT_NEAR(E_cas, E_HF, testing::ci_energy_tolerance);
+}
+
+/**
+ * @brief Test CAS iterative solver path by lowering the dimension cutoff.
+ *
+ * Water/STO-3G FCI has 441 determinants, which normally hits the dense path
+ * (cutoff = 2000). Setting iterative_solver_dimension_cutoff = 10 forces
+ * the Davidson/iterative solver. The energy must match the dense result.
+ */
+TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+
+  // Force the iterative solver by setting cutoff below 441
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_cas");
+  mc->settings().set("iterative_solver_dimension_cutoff",
+                     static_cast<int64_t>(10));
+  auto [E_fci, wfn_fci] = mc->run(ham, 5, 5);
+
+  EXPECT_NEAR(E_fci - ham->get_core_energy(), -8.301534669468e+01,
+              testing::ci_energy_tolerance);
+  EXPECT_EQ(wfn_fci->size(), 441);
+}
+
+/**
+ * @brief Verify the iterative_solver_dimension_cutoff default and constraints.
+ */
+TEST_F(MCTest, MCSettings_IterativeSolverDimensionCutoff) {
+  MultiConfigurationSettings mc_settings;
+  EXPECT_EQ(mc_settings.get<int64_t>("iterative_solver_dimension_cutoff"),
+            2000);
+
+  // Can override
+  mc_settings.set("iterative_solver_dimension_cutoff",
+                  static_cast<int64_t>(500));
+  EXPECT_EQ(mc_settings.get<int64_t>("iterative_solver_dimension_cutoff"), 500);
+}

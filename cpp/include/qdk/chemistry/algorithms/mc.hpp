@@ -50,6 +50,13 @@ class MultiConfigurationSettings : public data::Settings {
                          "Maximum number of Davidson iterations",
                          qdk::chemistry::data::BoundConstraint<int64_t>{
                              1, std::numeric_limits<int64_t>::max()});
+    // Matrix size cutoff for using dense vs iterative eigensolver.
+    // If the number of determinants is at or below this value, dense
+    // diagonalization is used; otherwise the iterative (Davidson) solver.
+    set_default<int64_t>("iterative_solver_dimension_cutoff", 2000,
+                         "Matrix size cutoff for using iterative eigensolver",
+                         qdk::chemistry::data::BoundConstraint<int64_t>{
+                             1, std::numeric_limits<int64_t>::max()});
   }
 
   /**
