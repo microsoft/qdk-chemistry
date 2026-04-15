@@ -467,8 +467,9 @@ void generate_constraint_singles_contributions_ss(
  * @param[in] occ_same Occupied orbital indices for the same spin
  * @param[in] occ_othr Occupied orbital indices for the opposite spin
  * @param[in] eps Orbital energies for the same spin
- * @param[in] G Same-spin two-electron integral tensor
- * @param[in] LDG Leading dimension of G tensor
+ * @param[in] V Two-electron integral tensor used to build same-spin
+ * antisymmetrized terms on the fly
+ * @param[in] LDV Leading dimension of V tensor
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
@@ -486,8 +487,8 @@ template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_ss(
     double coeff, WfnType det, ConType constraint,
     const std::vector<uint32_t>& occ_same,
-    const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
-    const size_t LDG, double h_el_tol, double root_diag, double E0,
+    const std::vector<uint32_t>& occ_othr, const double* eps, const double* V,
+    const size_t LDV, double h_el_tol, double root_diag, double E0,
     HamiltonianGeneratorBase<double>& ham_gen,
     asci_contrib_container<WfnType>& asci_contributions,
     std::vector<typename ConType::constraint_type>& O_buf,
@@ -502,12 +503,11 @@ void generate_constraint_doubles_contributions_ss(
   const auto nv_pairs = V_buf.size();
   if (!no_pairs or !nv_pairs) return;
 
-  const size_t LDG2 = LDG * LDG;
+  const size_t LDV2 = LDV * LDV;
   for (int _ij = 0; _ij < no_pairs; ++_ij) {
     const auto ij = O_buf[_ij];
     const auto i = ffs(ij) - 1;
     const auto j = fls(ij);
-    const auto G_ij = G + (j + i * LDG2) * LDG;
     const auto ex_ij =
         wfn_traits::template single_excitation_no_check<Spin::Alpha>(
             det, i, j);  // det ^ ij;
@@ -516,7 +516,11 @@ void generate_constraint_doubles_contributions_ss(
       const auto a = ffs(ab) - 1;
       const auto b = fls(ab);
 
-      const auto G_aibj = G_ij[b + a * LDG2];
+      const auto jb = b + j * LDV;
+      const auto ib = b + i * LDV;
+      const auto V_aibj = (V + (a + i * LDV) * LDV2)[jb];
+      const auto V_ajbi = (V + (a + j * LDV) * LDV2)[ib];
+      const auto G_aibj = V_aibj - V_ajbi;
 
       // Early Exit
       if (std::abs(coeff * G_aibj) < h_el_tol) continue;
@@ -555,15 +559,15 @@ template <typename WfnType, typename ConType>
 void generate_constraint_doubles_contributions_ss(
     double coeff, WfnType det, ConType constraint,
     const std::vector<uint32_t>& occ_same,
-    const std::vector<uint32_t>& occ_othr, const double* eps, const double* G,
-    const size_t LDG, double h_el_tol, double root_diag, double E0,
+    const std::vector<uint32_t>& occ_othr, const double* eps, const double* V,
+    const size_t LDV, double h_el_tol, double root_diag, double E0,
     HamiltonianGeneratorBase<double>& ham_gen,
     asci_contrib_container<WfnType>& asci_contributions) {
   using constraint_type = typename ConType::constraint_type;
   std::vector<constraint_type> O_buf, V_buf;
   std::vector<uint32_t> virt_ind_buf, occ_ind_buf;
   generate_constraint_doubles_contributions_ss(
-      coeff, det, constraint, occ_same, occ_othr, eps, G, LDG, h_el_tol,
+      coeff, det, constraint, occ_same, occ_othr, eps, V, LDV, h_el_tol,
       root_diag, E0, ham_gen, asci_contributions, O_buf, V_buf, virt_ind_buf,
       occ_ind_buf);
 }

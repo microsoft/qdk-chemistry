@@ -38,7 +38,6 @@ namespace macis {
  * @param[in] T_pq One-electron integral matrix (kinetic + nuclear attraction)
  * @param[in] G_red Reduced two-electron repulsion integrals (same-spin)
  * @param[in] V_red Reduced two-electron exchange integrals (same-spin)
- * @param[in] G_pqrs Full two-electron repulsion integral tensor (same-spin)
  * @param[in] V_pqrs Full two-electron repulsion integral tensor (opposite-spin)
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution
@@ -63,8 +62,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                            wavefunction_iterator_t<N> cdets_end,
                            const double E_ASCI, const std::vector<double>& C,
                            size_t norb, const double* T_pq, const double* G_red,
-                           const double* V_red, const double* G_pqrs,
-                           const double* V_pqrs,
+                           const double* V_red, const double* V_pqrs,
                            HamiltonianGenerator<wfn_t<N>>& ham_gen,
                            MPI_Comm comm) {
   using clock_type = std::chrono::high_resolution_clock;
@@ -322,7 +320,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
             // AABB excitations
@@ -341,7 +339,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
                   ham_gen, asci_pairs);
 
               // No excitation (push inf to remove from list)
@@ -456,7 +454,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
 
             // AABB excitations
@@ -475,7 +473,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
                   ham_gen, asci_pairs);
 
               // No excitation (push inf to remove from list)

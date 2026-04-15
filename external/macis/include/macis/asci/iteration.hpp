@@ -120,7 +120,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
-                    ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
+                    ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
   std::sort(wfn.begin(), wfn.end(), wfn_comp{});
 

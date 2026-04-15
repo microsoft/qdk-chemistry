@@ -781,8 +781,10 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
                                        Eigen::VectorXd& output) {
     output.resize(moeri_size);
     size_t n = L_left.rows();  // n_mo * n_mo
-    Eigen::Map<Eigen::MatrixXd> output_matrix(output.data(), n, n);
-    output_matrix.noalias() = L_left * L_right.transpose();
+    size_t k = L_left.cols();  // num_cholesky_vectors
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+               n, n, k, 1.0, L_left.data(), n,
+               L_right.data(), n, 0.0, output.data(), n);
   };
 
   if (is_restricted_calc) {

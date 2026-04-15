@@ -218,7 +218,6 @@ struct ASCISettings {
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @return Container of ASCI contributions with their associated scores
@@ -228,8 +227,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+  const double* G_red, const double* V_red, const double* V_pqrs,
+  HamiltonianGenerator<wfn_t<N>>& ham_gen) {
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
   using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
@@ -277,13 +276,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<Spin::Alpha>(
           coeff, state, state_alpha, state_beta, occ_alpha, vir_alpha, occ_beta,
-          eps_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_alpha.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - BBBB
       append_ss_doubles_asci_contributions<Spin::Beta>(
           coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
-          eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - AABB
@@ -343,7 +342,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
@@ -355,8 +353,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
+    const double* G_red, const double* V_red, const double* V_pqrs,
     HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -628,7 +625,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
+              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
                 V_buf, virt_ind_buf, occ_ind_buf);
 
@@ -648,7 +645,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
                   ham_gen, working_pairs);
 
               // No excitation (push inf to remove from list)
@@ -779,7 +776,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
@@ -791,8 +787,7 @@ std::vector<wfn_t<N>> asci_search(
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
+    const double* G_red, const double* V_red, const double* V_pqrs,
     HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -877,7 +872,7 @@ std::vector<wfn_t<N>> asci_search(
   asci_contrib_container<wfn_t<N>> asci_pairs;
   asci_pairs = asci_contributions_constraint(
       asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq,
-      G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+      G_red, V_red, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
   auto pairs_en = clock_type::now();
 
   {
