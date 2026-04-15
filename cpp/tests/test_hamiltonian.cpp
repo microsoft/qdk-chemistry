@@ -2229,7 +2229,6 @@ class DummyHamiltonianContainer : public HamiltonianContainer {
   bool is_restricted() const override { return true; }
   nlohmann::json to_json() const override { return {}; }
   void to_hdf5(H5::Group&) const override {}
-  void to_fcidump_file(const std::string&, size_t, size_t) const override {}
   bool is_valid() const override { return true; }
 };
 

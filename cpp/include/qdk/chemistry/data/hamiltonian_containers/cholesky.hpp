@@ -19,7 +19,7 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CholeskyHamiltonianContainer
- * @brief Contains a molecular Hamiltonian using three-center
+ * @brief Contains a molecular Hamiltonian expressed using three-center
  * integrals.
  *
  * In addition to those contained in HamiltonianContainer, this subclass also
@@ -110,7 +110,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g.,
-   * "canonical_four_center", "cholesky")
+   * "cholesky")
    */
   std::string get_container_type() const override final;
 
@@ -204,16 +204,6 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       const nlohmann::json& j);
 
   /**
-   * @brief Save Hamiltonian to an FCIDUMP file
-   * @param filename Path to FCIDUMP file to create/overwrite
-   * @param nalpha Number of alpha electrons
-   * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
-   */
-  void to_fcidump_file(const std::string& filename, size_t nalpha,
-                       size_t nbeta) const override final;
-
-  /**
    * @brief Check if the Hamiltonian data is complete and consistent
    * @return True if all required data is set and dimensions are consistent
    */
@@ -235,9 +225,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    * Uses shared_ptr so restricted case can share the same data for all
    * channels.
    */
-  mutable std::optional<std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                                   std::shared_ptr<Eigen::VectorXd>,
-                                   std::shared_ptr<Eigen::VectorXd>>>
+  mutable std::tuple<std::shared_ptr<Eigen::VectorXd>,
+                     std::shared_ptr<Eigen::VectorXd>,
+                     std::shared_ptr<Eigen::VectorXd>>
       _cached_four_center_integrals;
 
   /** Build four-center integrals from three-center integrals and cache them */

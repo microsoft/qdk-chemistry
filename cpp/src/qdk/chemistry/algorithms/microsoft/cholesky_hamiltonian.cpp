@@ -781,7 +781,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
             std::make_unique<data::CholeskyHamiltonianContainer>(
                 H_active, L_mo, orbitals,
                 structure->calculate_nuclear_repulsion_energy(), dummy_fock,
-                Eigen::MatrixXd(L_ao)));
+                L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -800,7 +800,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
             std::make_unique<data::CholeskyHamiltonianContainer>(
                 H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
                 structure->calculate_nuclear_repulsion_energy(),
-                dummy_fock_alpha, dummy_fock_beta, Eigen::MatrixXd(L_ao)));
+                dummy_fock_alpha, dummy_fock_beta, L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -869,7 +869,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
           std::make_unique<data::CholeskyHamiltonianContainer>(
               H_active, L_mo, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive, Eigen::MatrixXd(L_ao)));
+              F_inactive, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
@@ -981,7 +981,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
           std::make_unique<data::CholeskyHamiltonianContainer>(
               H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive_alpha, F_inactive_beta, Eigen::MatrixXd(L_ao)));
+              F_inactive_alpha, F_inactive_beta, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(

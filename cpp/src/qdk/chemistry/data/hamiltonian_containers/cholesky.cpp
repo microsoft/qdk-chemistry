@@ -104,14 +104,14 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
   }
 
   // Lazily build and cache the four-center integrals on first access
-  if (!_cached_four_center_integrals) {
+  if (!std::get<0>(_cached_four_center_integrals)) {
     _build_four_center_cache();
   }
 
   return std::make_tuple(
-      std::cref(*std::get<0>(*_cached_four_center_integrals)),
-      std::cref(*std::get<1>(*_cached_four_center_integrals)),
-      std::cref(*std::get<2>(*_cached_four_center_integrals)));
+      std::cref(*std::get<0>(_cached_four_center_integrals)),
+      std::cref(*std::get<1>(_cached_four_center_integrals)),
+      std::cref(*std::get<2>(_cached_four_center_integrals)));
 }
 
 void CholeskyHamiltonianContainer::_build_four_center_cache() const {
@@ -147,14 +147,14 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
                                 _three_center_integrals.first);
 
   if (is_restricted()) {
-    _cached_four_center_integrals.emplace(aaaa, aaaa, aaaa);
+    _cached_four_center_integrals = std::make_tuple(aaaa, aaaa, aaaa);
   } else {
     auto aabb = build_four_center(_three_center_integrals.first,
                                   _three_center_integrals.second);
     auto bbbb = build_four_center(_three_center_integrals.second,
                                   _three_center_integrals.second);
-    _cached_four_center_integrals.emplace(std::move(aaaa), std::move(aabb),
-                                          std::move(bbbb));
+    _cached_four_center_integrals = std::make_tuple(std::move(aaaa), std::move(aabb),
+                                                    std::move(bbbb));
   }
 }
 
@@ -187,7 +187,7 @@ double CholeskyHamiltonianContainer::get_two_body_element(
     throw std::out_of_range("Orbital index out of range");
   }
 
-  if (!_cached_four_center_integrals) {
+  if (!std::get<0>(_cached_four_center_integrals)) {
     _build_four_center_cache();
   }
 
@@ -197,14 +197,14 @@ double CholeskyHamiltonianContainer::get_two_body_element(
   // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aaaa:
-      return (*std::get<0>(*_cached_four_center_integrals))(ij * norb * norb +
-                                                            kl);
+      return (*std::get<0>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
     case SpinChannel::aabb:
-      return (*std::get<1>(*_cached_four_center_integrals))(ij * norb * norb +
-                                                            kl);
+      return (*std::get<1>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
     case SpinChannel::bbbb:
-      return (*std::get<2>(*_cached_four_center_integrals))(ij * norb * norb +
-                                                            kl);
+      return (*std::get<2>(_cached_four_center_integrals))(ij * norb * norb +
+                                                           kl);
 
     default:
       throw std::invalid_argument("Invalid spin channel");
@@ -592,116 +592,6 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
     throw std::runtime_error("Failed to parse Hamiltonian from JSON: " +
                              std::string(e.what()));
   }
-}
-
-void CholeskyHamiltonianContainer::to_fcidump_file(const std::string& filename,
-                                                   size_t nalpha,
-                                                   size_t nbeta) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  if (is_unrestricted()) {
-    throw std::runtime_error(
-        "FCIDUMP format is not supported for unrestricted Hamiltonians.");
-  }
-
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
-  }
-
-  size_t num_molecular_orbitals;
-  if (has_orbitals()) {
-    if (_orbitals->has_active_space()) {
-      auto active_indices = _orbitals->get_active_space_indices();
-      size_t n_active_alpha = active_indices.first.size();
-      size_t n_active_beta = active_indices.second.size();
-
-      if (n_active_alpha != n_active_beta) {
-        throw std::invalid_argument(
-            "For restricted Hamiltonian, alpha and beta active spaces must "
-            "have same size");
-      }
-      num_molecular_orbitals = n_active_alpha;
-    } else {
-      num_molecular_orbitals = _orbitals->get_num_molecular_orbitals();
-    }
-  } else {
-    throw std::runtime_error("Orbitals are not set");
-  }
-
-  const size_t nelec = nalpha + nbeta;
-  const size_t num_molecular_orbitals2 =
-      num_molecular_orbitals * num_molecular_orbitals;
-  const size_t num_molecular_orbitals3 =
-      num_molecular_orbitals2 * num_molecular_orbitals;
-  const double print_thresh = std::numeric_limits<double>::epsilon();
-
-  // C1 symmetry
-  std::string orb_string;
-  for (size_t i = 0; i < num_molecular_orbitals - 1; ++i) {
-    orb_string += "1,";
-  }
-  orb_string += "1";
-
-  // Write header
-  file << "&FCI ";
-  file << "NORB=" << num_molecular_orbitals << ", ";
-  file << "NELEC=" << nelec << ", ";
-  file << "MS2=" << (nalpha - nbeta) << ",\n";
-  file << "ORBSYM=" << orb_string << ",\n";
-  file << "ISYM=1,\n";
-  file << "&END\n";
-
-  auto formatted_line = [&](size_t i, size_t j, size_t k, size_t l,
-                            double val) {
-    if (std::abs(val) < print_thresh) return;
-
-    file << std::setw(28) << std::scientific << std::setprecision(16)
-         << std::right << val << " ";
-    file << std::setw(4) << i << " ";
-    file << std::setw(4) << j << " ";
-    file << std::setw(4) << k << " ";
-    file << std::setw(4) << l;
-  };
-
-  // Get the lazily-computed four-center integrals
-  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
-
-  auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri =
-        eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-                 k * num_molecular_orbitals + l);
-
-    formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
-    file << "\n";
-  };
-
-  auto write_1body = [&](size_t i, size_t j) {
-    auto hel = (*_one_body_integrals.first)(i, j);
-
-    formatted_line(i + 1, j + 1, 0, 0, hel);
-    file << "\n";
-  };
-
-  // Write permutationally unique MO ERIs
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
-          }
-        }
-    }
-
-  // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
-    }
-
-  // Write core energy
-  formatted_line(0, 0, 0, 0, _core_energy);
 }
 
 void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
