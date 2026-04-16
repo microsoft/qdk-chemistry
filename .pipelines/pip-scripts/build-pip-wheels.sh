@@ -74,11 +74,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
-    # If we find x86 Homebrew in its expected location, disable it to prevent conflicts with arm64 Homebrew packages
-    if [ -d /usr/local/Cellar ]; then
-        mv /usr/local/Cellar /usr/local/Cellar_DISABLED
-    fi
-
     echo "Updating Homebrew..."
     arch -arm64 brew update
 
