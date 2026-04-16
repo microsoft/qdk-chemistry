@@ -87,19 +87,41 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
       [norbs](
           const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
         using VecType = std::decay_t<decltype(vec)>;
+
+        // Validate norbs^4 matches vector size with overflow checking
+        if (norbs > 0) {
+          size_t norbs2_check = norbs * norbs;
+          if (norbs2_check / norbs != norbs) {
+            throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
+                                      std::to_string(norbs));
+          }
+          size_t norbs4_check = norbs2_check * norbs2_check;
+          if (norbs4_check / norbs2_check != norbs2_check) {
+            throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
+                                      std::to_string(norbs));
+          }
+          if (static_cast<size_t>(vec.size()) != norbs4_check) {
+            throw std::invalid_argument("Vector size (" +
+                                        std::to_string(vec.size()) +
+                                        ") does not match norbs^4 (" +
+                                        std::to_string(norbs4_check) + ")");
+          }
+        }
+
         VecType output(vec.size());
         output.setZero();
+
+        const size_t norbs2 = norbs * norbs;
+        const size_t norbs3 = norbs2 * norbs;
 
         for (size_t i = 0; i < norbs; ++i)
           for (size_t j = 0; j < norbs; ++j)
             for (size_t k = 0; k < norbs; ++k)
               for (size_t l = 0; l < norbs; ++l) {
                 Eigen::Index new_index = static_cast<Eigen::Index>(
-                    k * norbs * norbs * norbs + l * norbs * norbs + i * norbs +
-                    j);
+                    k * norbs3 + l * norbs2 + i * norbs + j);
                 Eigen::Index index = static_cast<Eigen::Index>(
-                    i * norbs * norbs * norbs + j * norbs * norbs + k * norbs +
-                    l);
+                    i * norbs3 + j * norbs2 + k * norbs + l);
                 output(new_index) = vec(index);
               }
         return make_shared<ContainerTypes::VectorVariant>(
