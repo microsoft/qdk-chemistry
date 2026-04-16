@@ -9,6 +9,7 @@
 #include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -581,16 +582,8 @@ double SparseHamiltonianContainer::one_body_element(int i, int j) const {
 void SparseHamiltonianContainer::_materialize_dense_two_body() const {
   size_t n = _orbitals->get_num_molecular_orbitals();
   size_t n2 = n * n;
-  if (n > 0 && n2 / n != n) {
-    throw std::overflow_error("n^4 overflows size_t for n = " +
-                              std::to_string(n));
-  }
   size_t n3 = n2 * n;
-  size_t n4 = n2 * n2;
-  if (n2 > 0 && n4 / n2 != n2) {
-    throw std::overflow_error("n^4 overflows size_t for n = " +
-                              std::to_string(n));
-  }
+  size_t n4 = utils::checked_n4(n);
   _two_body_dense_cache = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n4));
   for (const auto& [idx, val] : _two_body_map) {
     const auto& [p, q, r, s] = idx;
@@ -619,16 +612,7 @@ Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(
 SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
     const Eigen::VectorXd& v, size_t n) {
   TwoBodyMap m;
-  size_t n2 = n * n;
-  if (n > 0 && n2 / n != n) {
-    throw std::overflow_error("n^4 overflows size_t for n = " +
-                              std::to_string(n));
-  }
-  size_t n4 = n2 * n2;
-  if (n2 > 0 && n4 / n2 != n2) {
-    throw std::overflow_error("n^4 overflows size_t for n = " +
-                              std::to_string(n));
-  }
+  size_t n4 = utils::checked_n4(n);
   if (n == 0) {
     if (v.size() != 0) {
       throw std::invalid_argument(
@@ -643,6 +627,7 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
                                 " elements for n = " + std::to_string(n) +
                                 ", got " + std::to_string(v.size()));
   }
+  size_t n2 = n * n;
   size_t n3 = n2 * n;
   for (size_t p = 0; p < n; ++p)
     for (size_t q = 0; q < n; ++q)

@@ -16,6 +16,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
@@ -89,29 +90,12 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
         using VecType = std::decay_t<decltype(vec)>;
 
         // Validate norbs^4 matches vector size with overflow checking
-        if (norbs == 0) {
-          if (static_cast<size_t>(vec.size()) != 0) {
-            throw std::invalid_argument("Vector size (" +
-                                        std::to_string(vec.size()) +
-                                        ") does not match norbs^4 (0)");
-          }
-        } else {
-          size_t norbs2_check = norbs * norbs;
-          if (norbs2_check / norbs != norbs) {
-            throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
-                                      std::to_string(norbs));
-          }
-          size_t norbs4_check = norbs2_check * norbs2_check;
-          if (norbs4_check / norbs2_check != norbs2_check) {
-            throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
-                                      std::to_string(norbs));
-          }
-          if (static_cast<size_t>(vec.size()) != norbs4_check) {
-            throw std::invalid_argument("Vector size (" +
-                                        std::to_string(vec.size()) +
-                                        ") does not match norbs^4 (" +
-                                        std::to_string(norbs4_check) + ")");
-          }
+        size_t norbs4_check = utils::checked_n4(norbs);
+        if (static_cast<size_t>(vec.size()) != norbs4_check) {
+          throw std::invalid_argument("Vector size (" +
+                                      std::to_string(vec.size()) +
+                                      ") does not match norbs^4 (" +
+                                      std::to_string(norbs4_check) + ")");
         }
 
         VecType output(vec.size());

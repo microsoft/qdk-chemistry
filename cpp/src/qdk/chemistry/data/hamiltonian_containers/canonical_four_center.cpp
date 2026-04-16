@@ -8,6 +8,7 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -185,18 +186,7 @@ void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
 
   // Check two-body integrals dimensions
   size_t norb_alpha = _one_body_integrals.first->rows();
-  size_t norb2 = norb_alpha * norb_alpha;
-  if (norb_alpha > 0 && norb2 / norb_alpha != norb_alpha) {
-    throw std::overflow_error(
-        "norb_alpha^4 overflows size_t for norb_alpha = " +
-        std::to_string(norb_alpha));
-  }
-  size_t expected_size = norb2 * norb2;
-  if (norb2 > 0 && expected_size / norb2 != norb2) {
-    throw std::overflow_error(
-        "norb_alpha^4 overflows size_t for norb_alpha = " +
-        std::to_string(norb_alpha));
-  }
+  size_t expected_size = utils::checked_n4(norb_alpha);
 
   // Check alpha-alpha integrals
   if (static_cast<size_t>(std::get<0>(_two_body_integrals)->size()) !=
