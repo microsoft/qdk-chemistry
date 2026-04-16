@@ -629,6 +629,20 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
     throw std::overflow_error("n^4 overflows size_t for n = " +
                               std::to_string(n));
   }
+  if (n == 0) {
+    if (v.size() != 0) {
+      throw std::invalid_argument(
+          "Invalid two-body tensor size: expected 0 elements for n = 0, got " +
+          std::to_string(v.size()));
+    }
+    return m;
+  }
+  if (static_cast<size_t>(v.size()) != n4) {
+    throw std::invalid_argument("Invalid two-body tensor size: expected " +
+                                std::to_string(n4) +
+                                " elements for n = " + std::to_string(n) +
+                                ", got " + std::to_string(v.size()));
+  }
   size_t n3 = n2 * n;
   for (size_t p = 0; p < n; ++p)
     for (size_t q = 0; q < n; ++q)

@@ -89,7 +89,13 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
         using VecType = std::decay_t<decltype(vec)>;
 
         // Validate norbs^4 matches vector size with overflow checking
-        if (norbs > 0) {
+        if (norbs == 0) {
+          if (static_cast<size_t>(vec.size()) != 0) {
+            throw std::invalid_argument("Vector size (" +
+                                        std::to_string(vec.size()) +
+                                        ") does not match norbs^4 (0)");
+          }
+        } else {
           size_t norbs2_check = norbs * norbs;
           if (norbs2_check / norbs != norbs) {
             throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
@@ -479,6 +485,25 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   }
 
   size_t norbs = static_cast<size_t>(one_rdm_aa.rows());
+
+  // Validate 2-RDM size matches norbs^4
+  {
+    size_t norbs2 = norbs * norbs;
+    if (norbs > 0 && norbs2 / norbs != norbs) {
+      throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
+                                std::to_string(norbs));
+    }
+    size_t norbs4 = norbs2 * norbs2;
+    if (norbs2 > 0 && norbs4 / norbs2 != norbs2) {
+      throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
+                                std::to_string(norbs));
+    }
+    if (static_cast<size_t>(two_rdm_ab.size()) != norbs4) {
+      throw std::invalid_argument(
+          "2-RDM size (" + std::to_string(two_rdm_ab.size()) +
+          ") does not match norbs^4 (" + std::to_string(norbs4) + ")");
+    }
+  }
 
   // Lambda function to get the two-body RDM element
   auto get_active_two_rdm_element = [&two_rdm_ab, norbs](size_t i, size_t j,
