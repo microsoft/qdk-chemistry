@@ -74,7 +74,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
-    # If we find x86 Homebrew in its expected location, disable it to prevent conflicts with arm64 Brew packages
+    # If we find x86 Homebrew in its expected location, disable it to prevent conflicts with arm64 Homebrew packages
     if [ -d /usr/local/Cellar ]; then
         mv /usr/local/Cellar /usr/local/Cellar_DISABLED
     fi
@@ -94,9 +94,9 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         cmake \
         gcc \
         boost \
-        pybind11
+        pybind11 \
+        pyenv
     export CMAKE_PREFIX_PATH="/opt/homebrew"
-    export PYENV_ROOT="$PWD/.pyenv"
 fi
 
 echo "Downloading HDF5 $HDF5_VERSION..."
@@ -115,20 +115,28 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python
 # when building with a non-system Python version.
-echo "Installing pyenv ${PYENV_VERSION}..."
-export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
-wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
-echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
-unzip -q pyenv.zip
-if [ -d "$PYENV_ROOT" ]; then rm -rf "$PYENV_ROOT"; fi
-mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
-rm pyenv.zip
-"$PYENV_ROOT/bin/pyenv" install --patch ${PYTHON_VERSION}
-"$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
-export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
-export PATH="$PYENV_ROOT/shims:$PATH"
+if [ "$MAC_BUILD" == "OFF" ]; then
+    # Build pyenv from source that we can trust on Linux wheels
+    echo "Installing pyenv ${PYENV_VERSION}..."
+    export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+    wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
+    echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
+    unzip -q pyenv.zip
+    if [ -d "$PYENV_ROOT" ]; then rm -rf "$PYENV_ROOT"; fi
+    mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
+    rm pyenv.zip
+    "$PYENV_ROOT/bin/pyenv" install --patch ${PYTHON_VERSION}
+    "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
+    export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
+    export PATH="$PYENV_ROOT/shims:$PATH"
+elif [ "$MAC_BUILD" == "ON" ]; then
+    # Our macOS runners ship with a trusted pyenv pre-installed
+    echo "Using pyenv @ $(pyenv --version)"
+    pyenv install --patch ${PYTHON_VERSION}
+    pyenv global ${PYTHON_VERSION}
+fi
 
-python3 --version
+echo "using Python @ $(python3 --version)"
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
