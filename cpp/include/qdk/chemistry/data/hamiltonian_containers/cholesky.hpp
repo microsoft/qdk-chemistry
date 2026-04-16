@@ -8,89 +8,79 @@
 #include <Eigen/Dense>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "canonical_four_center.hpp"
-
 namespace qdk::chemistry::data {
 
 /**
  * @class CholeskyHamiltonianContainer
- * @brief Contains a molecular Hamiltonian and AO Cholesky vectors
+ * @brief Contains a molecular Hamiltonian expressed using three-center
+ * integrals.
  *
- * This class stores molecular Hamiltonian data for quantum chemistry
- * calculations, specifically designed for active space methods. It contains:
- * - One-electron integrals (kinetic + nuclear attraction) in MO representation
- * - Two-electron integrals (electron-electron repulsion) in MO representation
- * - Cholesky vectors in AO representation for reconstructing integrals
- * - Molecular orbital information for the active space
- * - Inactive Fock matrix
- * - Core energy contributions from inactive orbitals and nuclear repulsion
+ * In addition to those contained in HamiltonianContainer, this subclass also
+ * contains:
+ * - Three-center two-electron integrals (electron-electron repulsion) in MO
+ * representation.
+ * - Optionally, AO Cholesky vectors for potential reuse in further
+ * transformations.
  *
- * This class implies that all inactive orbitals are fully occupied for the
- * purpose of computing the core energy and inactive Fock matrix.
- *
- * The Hamiltonian is immutable after construction, meaning all data must be
- * provided during construction and cannot be modified afterwards. The
- * Hamiltonian supports both restricted and unrestricted calculations and
- * integrates with the broader quantum chemistry framework for active space
- * methods.
  */
-// TODO: Change Cholesky container to only store MO cholesky vectors and
-// optionally AO cholesky vecs. Make two body ints evaluated on request
-class CholeskyHamiltonianContainer
-    : public CanonicalFourCenterHamiltonianContainer {
+class CholeskyHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for restricted Cholesky Hamiltonian
-   *
-   * Creates a restricted Hamiltonian where alpha and beta spin components
-   * share the same integrals.
+   * @brief Constructor for active space Hamiltonian with three center integrals
+   * (ij|Q)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
+   * @param three_center_integrals Three-center two-electron integrals in MO
+   * basis [(norb x norb) x naux]
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
-   * @param L_ao AO Cholesky vectors for reconstructing integrals
+   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
-      const Eigen::VectorXd& two_body_integrals,
+      const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
-      const Eigen::MatrixXd& inactive_fock_matrix, const Eigen::MatrixXd& L_ao,
+      const Eigen::MatrixXd& inactive_fock_matrix,
+      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for unrestricted Cholesky Hamiltonian
-   *
-   * Creates an unrestricted Hamiltonian with separate alpha and beta spin
-   * components.
+   * @brief Constructor for active space Hamiltonian with three center integrals
+   * using separate spin components
    *
    * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
    * basis
    * @param one_body_integrals_beta One-electron integrals for beta spin in MO
    * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
+   * @param three_center_integrals_aa Three-center two-electron alpha-alpha
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
+   * @param three_center_integrals_bb Three-center two-electron beta-beta
+   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
+   * order
    * @param orbitals Shared pointer to molecular orbital data for the system
    * @param core_energy Core energy (nuclear repulsion + inactive orbital
    * energy)
-   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin
-   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin
-   * @param L_ao AO Cholesky vectors for reconstructing integrals
+   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
+   * the selected active space
+   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
+   * selected active space
+   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -98,19 +88,18 @@ class CholeskyHamiltonianContainer
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
-      const Eigen::VectorXd& two_body_integrals_aaaa,
-      const Eigen::VectorXd& two_body_integrals_aabb,
-      const Eigen::VectorXd& two_body_integrals_bbbb,
+      const Eigen::MatrixXd& three_center_integrals_aa,
+      const Eigen::MatrixXd& three_center_integrals_bb,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
-      const Eigen::MatrixXd& L_ao,
+      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Destructor
    */
-  ~CholeskyHamiltonianContainer() = default;
+  ~CholeskyHamiltonianContainer() override = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -120,9 +109,66 @@ class CholeskyHamiltonianContainer
 
   /**
    * @brief Get the type of the underlying container
-   * @return String "cholesky" identifying this container type
+   * @return String identifying the container type (e.g.,
+   * "cholesky")
    */
   std::string get_container_type() const override final;
+
+  /**
+   * @brief Get four-center two-electron integrals in MO basis for all spin
+   * channels
+   * @return Tuple of references to (aaaa, aabb, bbbb) four-center two-electron
+   * integrals vectors
+   * @throws std::runtime_error if integrals are not set
+   */
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override;
+
+  /**
+   * @brief Get three-center integrals in MO basis for all spin channels
+   * @return Pair of references to (aa, bb) three-center two-electron
+   * integrals matrices, where each matrix is of dimension [(norb x norb) x
+   * naux], with the (norb x norb) part stored in row-major order
+   * @throws std::runtime_error if integrals are not set
+   */
+  std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
+  get_three_center_integrals() const;
+
+  /**
+   * @brief Get the optional AO Cholesky vectors
+   * @return Const reference to the optional AO Cholesky vectors matrix
+   * [nao^2 x nchol]. Contains std::nullopt if AO Cholesky vectors were not
+   * provided at construction.
+   */
+  const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
+
+  /**
+   * @brief Get specific four-center two-electron integral element
+   * @param i First orbital index
+   * @param j Second orbital index
+   * @param k Third orbital index
+   * @param l Fourth orbital index
+   * @param channel Spin channel to query (aaaa, aabb, or bbbb), defaults to
+   * aaaa
+   * @return Four-center two-electron integral (ij|kl)
+   * @throws std::out_of_range if indices are invalid
+   */
+  double get_two_body_element(
+      unsigned i, unsigned j, unsigned k, unsigned l,
+      SpinChannel channel = SpinChannel::aaaa) const override;
+
+  /**
+   * @brief Check if two-body integrals are available
+   * @return True if two-body integrals are set
+   */
+  bool has_two_body_integrals() const override;
+
+  /**
+   * @brief Check if the Hamiltonian is restricted
+   * @return True if alpha and beta integrals are identical
+   */
+  bool is_restricted() const override final;
 
   /**
    * @brief Convert Hamiltonian to JSON
@@ -140,8 +186,9 @@ class CholeskyHamiltonianContainer
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to CholeskyHamiltonianContainer loaded from group
-   * @throws std::runtime_error if I/O error occurs or data is malformed
+   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * group
+   * @throws std::runtime_error if I/O error occurs
    */
   static std::unique_ptr<CholeskyHamiltonianContainer> from_hdf5(
       H5::Group& group);
@@ -149,15 +196,55 @@ class CholeskyHamiltonianContainer
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Unique pointer to CholeskyHamiltonianContainer loaded from JSON
-   * @throws std::runtime_error if JSON is malformed or missing required fields
+   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * JSON
+   * @throws std::runtime_error if JSON is malformed
    */
   static std::unique_ptr<CholeskyHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
+  /**
+   * @brief Check if the Hamiltonian data is complete and consistent
+   * @return True if all required data is set and dimensions are consistent
+   */
+  bool is_valid() const override final;
+
  private:
-  // AO Cholesky vectors for integral reconstruction
-  const std::shared_ptr<Eigen::MatrixXd> _ao_cholesky_vectors;
+  /**
+   * Three-center integrals in MO basis, where each channel is stored as a
+   * matrix of dimension [(norb x norb) x naux] where norb x norb is stored in
+   * row major order
+   */
+  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                  std::shared_ptr<Eigen::MatrixXd>>
+      _three_center_integrals;
+
+  /**
+   * Lazily computed four-center integrals cache (built on first access).
+   * Stores (aaaa, aabb, bbbb) as flattened arrays [norb^4].
+   * Uses shared_ptr so restricted case can share the same data for all
+   * channels.
+   */
+  mutable std::tuple<std::shared_ptr<Eigen::VectorXd>,
+                     std::shared_ptr<Eigen::VectorXd>,
+                     std::shared_ptr<Eigen::VectorXd>>
+      _cached_four_center_integrals;
+
+  /** Build four-center integrals from three-center integrals and cache them */
+  void _build_four_center_cache() const;
+
+  /** Validation helper for integral dimensions */
+  void validate_integral_dimensions() const override final;
+
+  /** Optional AO Cholesky vectors for potential reuse */
+  const std::optional<Eigen::MatrixXd> _ao_cholesky_vectors;
+
+  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
+                   std::shared_ptr<Eigen::MatrixXd>>
+  make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
+
+  /** Serialization version */
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 }  // namespace qdk::chemistry::data
