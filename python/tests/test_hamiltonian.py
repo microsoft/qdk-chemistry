@@ -607,12 +607,11 @@ class TestCholeskyHamiltonian:
         """Test construction of Cholesky Hamiltonian."""
         one_body = np.eye(2)
         rng = np.random.default_rng(0)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))  # 4 = 2^2 AOs, 10 vectors
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
 
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
         assert isinstance(h, Hamiltonian)
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
@@ -622,23 +621,21 @@ class TestCholeskyHamiltonian:
         """Test Hamiltonian size properties."""
         one_body = np.eye(3)
         rng = np.random.default_rng(1)
-        two_body = rng.random(3**4)
         cholesky_vecs = rng.random((9, 15))  # 9 = 3^2 AOs, 15 vectors
         orbitals = create_test_orbitals(3)
 
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
         assert h.get_orbitals().get_num_molecular_orbitals() == 3
 
     def test_full_constructor(self):
         """Test full constructor with all parameters."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(0)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
 
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
         assert h.has_orbitals()
@@ -649,18 +646,12 @@ class TestCholeskyHamiltonian:
         assert np.array_equal(aa, one_body)
         assert np.array_equal(bb, one_body)
 
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
-
     def test_one_body_integrals(self):
         """Test one-body integral access."""
         one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
-        two_body = np.zeros(2**4)
         cholesky_vecs = np.random.default_rng(2).random((4, 8))
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
         assert h.has_one_body_integrals()
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
 
@@ -668,47 +659,37 @@ class TestCholeskyHamiltonian:
         """Test two-body integral access."""
         one_body = np.eye(2)
         rng = np.random.default_rng(1)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
         assert h.has_two_body_integrals()
-        # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        # For restricted case, all should be the same and equal to two_body
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
 
     def test_two_body_element_access(self):
         """Test individual two-body element access."""
         one_body = np.eye(2)
         rng = np.random.default_rng(3)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
         val = h.get_two_body_element(0, 1, 1, 0)
         assert isinstance(val, float)
 
     def test_active_space_management(self):
         """Test core energy handling."""
         one_body = np.eye(3)
-        two_body = np.zeros(3**4)
         cholesky_vecs = np.random.default_rng(4).random((9, 15))
         orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 2.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 2.5, np.array([])))
         assert h.get_core_energy() == 2.5
 
     def test_json_serialization(self):
         """Test JSON serialization and deserialization."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
@@ -761,11 +742,10 @@ class TestCholeskyHamiltonian:
         """Test JSON file I/O."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             filename = f.name
@@ -818,11 +798,10 @@ class TestCholeskyHamiltonian:
         """Test HDF5 file I/O."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -875,11 +854,10 @@ class TestCholeskyHamiltonian:
         """Test generic file I/O with format specification."""
         one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
         rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
         cholesky_vecs = rng.random((4, 10))
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
 
         # Test JSON format
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
@@ -919,10 +897,9 @@ class TestCholeskyHamiltonian:
         """Test that Cholesky Hamiltonian can be pickled and unpickled correctly."""
         one_body = np.eye(3)
         rng = np.random.default_rng(5)
-        two_body = rng.random(3**4)
         cholesky_vecs = rng.random((9, 15))
         orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([]), cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
 
         # Test pickling round-trip
         pickled_data = pickle.dumps(h)
@@ -967,11 +944,10 @@ class TestCholeskyHamiltonian:
         rng = np.random.default_rng(42)
         one_body = rng.random((3, 3))
         one_body = 0.5 * (one_body + one_body.T)  # Make symmetric
-        two_body = rng.random(3**4)
         cholesky_vecs = rng.random((9, 15))
         inactive_fock = rng.random((3, 3))
 
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock, cholesky_vecs))
+        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.0, inactive_fock))
 
         # Verify Hamiltonian properties
         assert h.is_restricted()
@@ -984,11 +960,6 @@ class TestCholeskyHamiltonian:
         # Verify integral access
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
         assert np.array_equal(h.get_one_body_integrals()[1], one_body)
-
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
 
     def test_unrestricted_hamiltonian_construction(self):
         """Test unrestricted Cholesky Hamiltonian construction and properties."""
@@ -1006,10 +977,8 @@ class TestCholeskyHamiltonian:
         rng = np.random.default_rng(123)
         one_body_alpha = np.array([[1.0, 0.2], [0.2, 1.5]])
         one_body_beta = np.array([[1.1, 0.3], [0.3, 1.6]])
-        two_body_aaaa = rng.random(2**4)
-        two_body_aabb = rng.random(2**4)
-        two_body_bbbb = rng.random(2**4)
-        cholesky_vecs = rng.random((4, 10))
+        cholesky_vecs_aa = rng.random((4, 10))
+        cholesky_vecs_bb = rng.random((4, 10))
         inactive_fock_alpha = np.array([[0.5, 0.1], [0.1, 0.7]])
         inactive_fock_beta = np.array([[0.6, 0.2], [0.2, 0.8]])
 
@@ -1017,14 +986,12 @@ class TestCholeskyHamiltonian:
             CholeskyHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
-                two_body_aaaa,
-                two_body_aabb,
-                two_body_bbbb,
+                cholesky_vecs_aa,
+                cholesky_vecs_bb,
                 orbitals,
                 2.0,
                 inactive_fock_alpha,
                 inactive_fock_beta,
-                cholesky_vecs,
             )
         )
 
@@ -1039,10 +1006,6 @@ class TestCholeskyHamiltonian:
         # Verify separate alpha/beta integral access
         assert np.array_equal(h.get_one_body_integrals()[0], one_body_alpha)
         assert np.array_equal(h.get_one_body_integrals()[1], one_body_beta)
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body_aaaa)
-        assert np.array_equal(aabb, two_body_aabb)
-        assert np.array_equal(bbbb, two_body_bbbb)
 
     def test_unrestricted_vs_restricted_serialization(self):
         """Test that restricted/unrestricted nature is preserved in serialization."""
@@ -1052,10 +1015,9 @@ class TestCholeskyHamiltonian:
         orbitals_restricted = Orbitals(coeffs, None, None, basis_set)
 
         one_body = np.array([[1.0, 0.1], [0.1, 1.0]])
-        two_body = np.ones(16) * 0.5
         cholesky_vecs = np.random.default_rng(6).random((4, 8))
         h_restricted = Hamiltonian(
-            CholeskyHamiltonianContainer(one_body, two_body, orbitals_restricted, 1.0, np.eye(2), cholesky_vecs)
+            CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals_restricted, 1.0, np.eye(2))
         )
 
         # Test unrestricted Hamiltonian
@@ -1065,22 +1027,18 @@ class TestCholeskyHamiltonian:
 
         one_body_alpha = np.array([[1.0, 0.1], [0.1, 1.0]])
         one_body_beta = np.array([[1.1, 0.2], [0.2, 1.1]])
-        two_body_aaaa = np.ones(16) * 1.0
-        two_body_aabb = np.ones(16) * 2.0
-        two_body_bbbb = np.ones(16) * 3.0
-        cholesky_vecs_unres = np.random.default_rng(7).random((4, 8))
+        cholesky_vecs_aa = np.random.default_rng(7).random((4, 8))
+        cholesky_vecs_bb = np.random.default_rng(7).random((4, 8))
         h_unrestricted = Hamiltonian(
             CholeskyHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
-                two_body_aaaa,
-                two_body_aabb,
-                two_body_bbbb,
+                cholesky_vecs_aa,
+                cholesky_vecs_bb,
                 orbitals_unrestricted,
                 2.0,
                 np.eye(2),
                 np.eye(2),
-                cholesky_vecs_unres,
             )
         )
 
@@ -1101,6 +1059,56 @@ class TestCholeskyHamiltonian:
         )
         assert np.array_equal(
             h_unrestricted.get_one_body_integrals()[1], h_unrestricted_json.get_one_body_integrals()[1]
+        )
+
+    def test_ao_cholesky_vectors_absent_by_default(self):
+        """Test that AO Cholesky vectors are None when not provided."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(20)
+        three_center = rng.random((4, 10))
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
+        assert container.get_ao_cholesky_vectors() is None
+
+    def test_ao_cholesky_vectors_present(self):
+        """Test construction with AO Cholesky vectors and retrieval."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(21)
+        three_center = rng.random((4, 10))
+        ao_vecs = rng.random((9, 5))  # e.g. 3^2 AOs, 5 Cholesky vectors
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
+        )
+        result = container.get_ao_cholesky_vectors()
+        assert result is not None
+        np.testing.assert_array_almost_equal(result, ao_vecs)
+
+    def test_ao_cholesky_vectors_roundtrip_json(self):
+        """Test that AO Cholesky vectors survive JSON round-trip."""
+        one_body = np.eye(2)
+        rng = np.random.default_rng(22)
+        three_center = rng.random((4, 10))
+        ao_vecs = rng.random((9, 5))
+        orbitals = create_test_orbitals(2)
+
+        container = CholeskyHamiltonianContainer(
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
+        )
+        h = Hamiltonian(container)
+
+        h_roundtrip = Hamiltonian.from_json(h.to_json())
+        assert h_roundtrip.get_container_type() == "cholesky"
+
+        roundtrip_data = json.loads(h_roundtrip.to_json())
+        assert "ao_cholesky_vectors" in roundtrip_data["container"]
+        assert np.allclose(
+            np.array(roundtrip_data["container"]["ao_cholesky_vectors"]),
+            ao_vecs,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
         )
 
 
