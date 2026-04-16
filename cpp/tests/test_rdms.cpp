@@ -844,26 +844,32 @@ TEST(TransposeOverflowValidation, SizeMismatchThrows) {
   // norbs=2 expects vec.size()==16, pass a vector of size 10
   Eigen::VectorXd bad_vec = Eigen::VectorXd::Zero(10);
   ContainerTypes::VectorVariant bad_variant = bad_vec;
-  EXPECT_THROW(detail::transpose_ijkl_klij_vector_variant(bad_variant, 2),
+  EXPECT_THROW(qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+                   bad_variant, 2),
                std::invalid_argument);
 }
 
 TEST(TransposeOverflowValidation, ZeroNorbsNonEmptyVectorThrows) {
   Eigen::VectorXd non_empty = Eigen::VectorXd::Zero(5);
   ContainerTypes::VectorVariant variant = non_empty;
-  EXPECT_THROW(detail::transpose_ijkl_klij_vector_variant(variant, 0),
+  EXPECT_THROW(qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(
+                   variant, 0),
                std::invalid_argument);
 }
 
 TEST(TransposeOverflowValidation, ZeroNorbsEmptyVectorSucceeds) {
   Eigen::VectorXd empty_vec(0);
   ContainerTypes::VectorVariant variant = empty_vec;
-  EXPECT_NO_THROW(detail::transpose_ijkl_klij_vector_variant(variant, 0));
+  EXPECT_NO_THROW(
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(variant,
+                                                                       0));
 }
 
 TEST(TransposeOverflowValidation, CorrectSizeSucceeds) {
   // norbs=2 expects 16 elements
   Eigen::VectorXd vec = Eigen::VectorXd::Random(16);
   ContainerTypes::VectorVariant variant = vec;
-  EXPECT_NO_THROW(detail::transpose_ijkl_klij_vector_variant(variant, 2));
+  EXPECT_NO_THROW(
+      qdk::chemistry::data::detail::transpose_ijkl_klij_vector_variant(variant,
+                                                                       2));
 }
