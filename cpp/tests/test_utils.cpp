@@ -14,7 +14,6 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
-#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 #include <stdexcept>
