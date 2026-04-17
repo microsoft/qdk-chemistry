@@ -23,7 +23,7 @@ from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -141,7 +141,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         """Construct the time evolution unitary using Trotter decomposition.
 
         Args:
@@ -149,7 +149,7 @@ class Trotter(TimeEvolutionBuilder):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The time evolution unitary built by the Trotter decomposition.
 
         """
         order = self._settings.get("order")
@@ -157,7 +157,7 @@ class Trotter(TimeEvolutionBuilder):
             return self._trotter(qubit_hamiltonian, time)
         raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
-    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         r"""Construct the time evolution unitary using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
@@ -178,7 +178,7 @@ class Trotter(TimeEvolutionBuilder):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The time evolution unitary built by the Trotter decomposition.
 
         """
         weight_threshold = self._settings.get("weight_threshold")
@@ -197,7 +197,7 @@ class Trotter(TimeEvolutionBuilder):
             num_qubits=num_qubits,
         )
 
-        return TimeEvolutionUnitary(container=container)
+        return UnitaryRepresentation(container=container)
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
         """Determine the number of Trotter divisions to use.
@@ -349,5 +349,5 @@ class Trotter(TimeEvolutionBuilder):
         return "trotter"
 
     def type_name(self) -> str:
-        """Return time_evolution_builder as the algorithm type name."""
-        return "time_evolution_builder"
+        """Return unitary_builder as the algorithm type name."""
+        return "unitary_builder"

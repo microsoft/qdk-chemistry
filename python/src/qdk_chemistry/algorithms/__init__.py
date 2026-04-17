@@ -51,8 +51,11 @@ from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder, UnitaryBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
+    ControlledCircuitMapper,
+    ControlledEvolutionCircuitMapper,
+)
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
@@ -60,6 +63,7 @@ __all__ = [
     # Classes
     "ActiveSpaceSelector",
     "CircuitExecutor",
+    "ControlledCircuitMapper",
     "ControlledEvolutionCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
@@ -90,6 +94,7 @@ __all__ = [
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",
+    "UnitaryBuilder",
     # Factory functions
     "available",
     "create",

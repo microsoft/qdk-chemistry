@@ -26,7 +26,7 @@ from __future__ import annotations
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -198,7 +198,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         r"""Construct the time evolution unitary using partially randomized product formula.
 
         The algorithm:
@@ -211,7 +211,7 @@ class PartiallyRandomized(QDrift):
             time: The total evolution time (δ in the formula).
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the
+            UnitaryRepresentation: The time evolution unitary built by the
                 partially randomized method.
 
         """
@@ -229,7 +229,7 @@ class PartiallyRandomized(QDrift):
 
         if len(real_terms) == 0:
             # Identity evolution
-            return TimeEvolutionUnitary(
+            return UnitaryRepresentation(
                 container=PauliProductFormulaContainer(
                     step_terms=[],
                     step_reps=1,
@@ -291,7 +291,7 @@ class PartiallyRandomized(QDrift):
                 random_part_terms = self._merge_duplicate_terms(random_part_terms, commute_fn=commute_fn)
             all_terms.extend(random_part_terms)
 
-        return TimeEvolutionUnitary(
+        return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
                 step_terms=all_terms,
                 step_reps=1,
@@ -326,5 +326,5 @@ class PartiallyRandomized(QDrift):
         return "partially_randomized"
 
     def type_name(self) -> str:
-        """Return time_evolution_builder as the algorithm type name."""
-        return "time_evolution_builder"
+        """Return unitary_builder as the algorithm type name."""
+        return "unitary_builder"

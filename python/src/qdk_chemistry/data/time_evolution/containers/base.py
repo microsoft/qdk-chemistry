@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution container base module."""
+"""QDK/Chemistry unitary container base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,11 +12,11 @@ import h5py
 
 from qdk_chemistry.data.base import DataClass
 
-__all__: list[str] = ["TimeEvolutionUnitaryContainer"]
+__all__: list[str] = ["UnitaryContainer", "TimeEvolutionUnitaryContainer"]
 
 
-class TimeEvolutionUnitaryContainer(DataClass):
-    """Abstract class for a time evolution unitary container."""
+class UnitaryContainer(DataClass):
+    """Abstract class for a unitary container."""
 
     # Class attribute for filename validation
     _data_type_name = "time_evolution_unitary"
@@ -64,35 +64,39 @@ class TimeEvolutionUnitaryContainer(DataClass):
 
     @classmethod
     @abstractmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitaryContainer":
-        """Create TimeEvolutionUnitaryContainer from a JSON dictionary.
+    def from_json(cls, json_data: dict[str, Any]) -> "UnitaryContainer":
+        """Create UnitaryContainer from a JSON dictionary.
 
         Args:
             json_data: Dictionary containing the serialized data
 
         Returns:
-            TimeEvolutionUnitaryContainer
+            UnitaryContainer
 
         """
 
     @classmethod
     @abstractmethod
-    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitaryContainer":
+    def from_hdf5(cls, group: h5py.Group) -> "UnitaryContainer":
         """Load an instance from an HDF5 group.
 
         Args:
             group: HDF5 group or file to read data from
 
         Returns:
-            TimeEvolutionUnitaryContainer
+            UnitaryContainer
 
         """
 
     @abstractmethod
     def get_summary(self) -> str:
-        """Get summary of time evolution unitary.
+        """Get summary of unitary container.
 
         Returns:
-            str: Summary string describing the TimeEvolutionUnitaryContainer's contents and properties
+            str: Summary string describing the UnitaryContainer's contents and properties
 
         """
+
+
+# Backward-compatible alias
+TimeEvolutionUnitaryContainer = UnitaryContainer

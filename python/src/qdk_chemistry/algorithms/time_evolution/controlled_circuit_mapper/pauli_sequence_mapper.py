@@ -14,10 +14,10 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
+from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledUnitary
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledEvolutionCircuitMapper
+from .base import ControlledCircuitMapper
 
 __all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
 
@@ -37,7 +37,7 @@ class PauliSequenceMapperSettings(Settings):
         self._set_default("power", "int", 1, "The power of the controlled unitary to be constructed.")
 
 
-class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
+class PauliSequenceMapper(ControlledCircuitMapper):
     r"""Controlled evolution circuit mapper using Pauli product formula term sequences.
 
     Given a time-evolution operator expressed as a Pauli product formula
@@ -76,11 +76,11 @@ class PauliSequenceMapper(ControlledEvolutionCircuitMapper):
         return "pauli_sequence"
 
     def type_name(self) -> str:
-        """Return controlled_evolution_circuit_mapper as the algorithm type name."""
-        return "controlled_evolution_circuit_mapper"
+        """Return controlled_circuit_mapper as the algorithm type name."""
+        return "controlled_circuit_mapper"
 
     def _run_impl(
-        self, controlled_evolution: ControlledTimeEvolutionUnitary, target_indices: Sequence[int] | None = None
+        self, controlled_evolution: ControlledUnitary, target_indices: Sequence[int] | None = None
     ) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled time evolution unitary.
 

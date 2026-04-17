@@ -113,10 +113,10 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
+from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary, UnitaryRepresentation
+from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer, UnitaryContainer
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
+from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary, ControlledUnitary
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -136,6 +136,7 @@ __all__ = [
     "Configuration",
     "ConfigurationSet",
     "ControlledTimeEvolutionUnitary",
+    "ControlledUnitary",
     "CoupledClusterContainer",
     "DataClass",
     "ElectronicStructureSettings",
@@ -176,6 +177,8 @@ __all__ = [
     "Symmetries",
     "TimeEvolutionUnitary",
     "TimeEvolutionUnitaryContainer",
+    "UnitaryContainer",
+    "UnitaryRepresentation",
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",

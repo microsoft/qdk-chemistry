@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import TimeEvolutionBuilderFactory
+from .base import TimeEvolutionBuilderFactory, UnitaryBuilderFactory
 from .partially_randomized import PartiallyRandomized, PartiallyRandomizedSettings
 from .qdrift import QDrift, QDriftSettings
 from .trotter import Trotter, TrotterSettings
@@ -18,4 +18,5 @@ __all__ = [
     "TimeEvolutionBuilderFactory",
     "Trotter",
     "TrotterSettings",
+    "UnitaryBuilderFactory",
 ]

@@ -15,11 +15,11 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
-    ControlledTimeEvolutionUnitary,
+    ControlledUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -41,10 +41,18 @@ class IterativePhaseEstimationSettings(PhaseEstimationSettings):
         """Initialize the settings for Iterative Phase Estimation.
 
         Args:
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
+                defaults to 0.0; user needs to set a valid value.
             shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
         super().__init__()
+        self._set_default(
+            "evolution_time",
+            "float",
+            0.0,
+            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
         self._set_default(
             "shots_per_bit",
             "int",
@@ -72,7 +80,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, evolution_time=evolution_time)
+        super().__init__(num_bits=num_bits)
         self._settings = IterativePhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)
@@ -84,8 +92,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
+        evolution_builder: UnitaryBuilder,
+        circuit_mapper: ControlledCircuitMapper,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -94,8 +102,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: The state preparation circuit.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            evolution_builder: The unitary builder to use.
+            circuit_mapper: The controlled circuit mapper to use.
             circuit_executor: The executor to run quantum circuits.
             noise: The quantum error profile to simulate noise, defaults to None.
 
@@ -156,8 +164,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
+        evolution_builder: UnitaryBuilder,
+        circuit_mapper: ControlledCircuitMapper,
         iteration: int,
         total_iterations: int,
         phase_correction: float = 0.0,
@@ -167,8 +175,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            evolution_builder: The unitary builder to use.
+            circuit_mapper: The controlled circuit mapper to use.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.
@@ -183,7 +191,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         time_evolution_unitary = self._create_time_evolution(
             qubit_hamiltonian, self.settings().get("evolution_time"), evolution_builder
         )
-        controlled_evolution = ControlledTimeEvolutionUnitary(
+        controlled_evolution = ControlledUnitary(
             time_evolution_unitary=time_evolution_unitary, control_indices=[0]
         )
         power = 2 ** (total_iterations - iteration - 1)

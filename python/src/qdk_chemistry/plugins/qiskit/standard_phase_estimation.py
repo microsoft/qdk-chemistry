@@ -19,11 +19,11 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
-    ControlledTimeEvolutionUnitary,
+    ControlledUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -40,11 +40,19 @@ class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
         """Initialize the settings for Qiskit Standard Phase Estimation.
 
         Args:
+            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
+                defaults to 0.0; user needs to set a valid value.
             qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
             shots: The number of shots to execute the circuit.
 
         """
         super().__init__()
+        self._set_default(
+            "evolution_time",
+            "float",
+            0.0,
+            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
         self._set_default(
             "qft_do_swaps",
             "bool",
@@ -76,7 +84,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, evolution_time=evolution_time)
+        super().__init__(num_bits=num_bits)
         self._settings = QiskitStandardPhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("evolution_time", evolution_time)
@@ -89,8 +97,8 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
+        evolution_builder: UnitaryBuilder,
+        circuit_mapper: ControlledCircuitMapper,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -99,8 +107,8 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            evolution_builder: The unitary builder to use.
+            circuit_mapper: The controlled circuit mapper to use.
             circuit_executor: The executor to run quantum circuits.
             noise: The quantum error profile to simulate noise, defaults to None.
 
@@ -135,16 +143,16 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
+        evolution_builder: UnitaryBuilder,
+        circuit_mapper: ControlledCircuitMapper,
     ) -> Circuit:
         """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            evolution_builder: The unitary builder to use.
+            circuit_mapper: The controlled circuit mapper to use.
 
         Returns:
             The constructed QPE quantum circuit.
@@ -201,8 +209,8 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         *,
         time: float,
         power: int,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
+        evolution_builder: UnitaryBuilder,
+        circuit_mapper: ControlledCircuitMapper,
     ) -> None:
         """Apply the controlled time evolution unitary to the circuit.
 
@@ -213,8 +221,8 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             target_qubits: List of target qubits.
             time: The evolution time.
             power: The power to which the controlled evolution unitary is raised.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            evolution_builder: The unitary builder to use.
+            circuit_mapper: The controlled circuit mapper to use.
 
         """
         time_evol_unitary = self._create_time_evolution(
@@ -222,7 +230,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             time=time,
             evolution_builder=evolution_builder,
         )
-        ctrl_time_evol = ControlledTimeEvolutionUnitary(
+        ctrl_time_evol = ControlledUnitary(
             time_evolution_unitary=time_evol_unitary,
             control_indices=[0],
         )

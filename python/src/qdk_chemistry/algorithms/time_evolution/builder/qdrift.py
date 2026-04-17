@@ -19,7 +19,7 @@ References:
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -159,7 +159,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         r"""Construct the time evolution unitary using qDRIFT randomized sampling.
 
         The qDRIFT method approximates :math:`e^{-iHt}` by:
@@ -173,7 +173,7 @@ class QDrift(TimeEvolutionBuilder):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by qDRIFT sampling.
+            UnitaryRepresentation: The time evolution unitary built by qDRIFT sampling.
 
         """
         seed: int = self._settings.get("seed")
@@ -205,7 +205,7 @@ class QDrift(TimeEvolutionBuilder):
             commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
             terms = self._merge_duplicate_terms(terms, commute_fn=commute_fn)
 
-        return TimeEvolutionUnitary(
+        return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
                 step_terms=terms,
                 step_reps=1,  # All samples are already in the terms list
@@ -345,5 +345,5 @@ class QDrift(TimeEvolutionBuilder):
         return "qdrift"
 
     def type_name(self) -> str:
-        """Return time_evolution_builder as the algorithm type name."""
-        return "time_evolution_builder"
+        """Return unitary_builder as the algorithm type name."""
+        return "unitary_builder"
