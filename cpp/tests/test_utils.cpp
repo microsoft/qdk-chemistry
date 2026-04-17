@@ -424,7 +424,7 @@ TEST(CheckedN4, LargeValidValue) {
 }
 
 TEST(CheckedN4, OverflowThrows) {
-  // size_t is at least 64 bits; 2^16 + 1 = 65537, 65537^4 > 2^64
+  // 65537^4 > max(size_t) on both 32-bit and 64-bit platforms
   size_t huge = size_t{1} << 16 | 1;
   EXPECT_THROW(qdk::chemistry::utils::checked_n4(huge), std::overflow_error);
 }

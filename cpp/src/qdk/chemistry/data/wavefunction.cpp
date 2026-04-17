@@ -471,22 +471,11 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   size_t norbs = static_cast<size_t>(one_rdm_aa.rows());
 
   // Validate 2-RDM size matches norbs^4
-  {
-    size_t norbs2 = norbs * norbs;
-    if (norbs > 0 && norbs2 / norbs != norbs) {
-      throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
-                                std::to_string(norbs));
-    }
-    size_t norbs4 = norbs2 * norbs2;
-    if (norbs2 > 0 && norbs4 / norbs2 != norbs2) {
-      throw std::overflow_error("norbs^4 overflows size_t for norbs = " +
-                                std::to_string(norbs));
-    }
-    if (static_cast<size_t>(two_rdm_ab.size()) != norbs4) {
-      throw std::invalid_argument(
-          "2-RDM size (" + std::to_string(two_rdm_ab.size()) +
-          ") does not match norbs^4 (" + std::to_string(norbs4) + ")");
-    }
+  size_t norbs4 = utils::checked_n4(norbs);
+  if (static_cast<size_t>(two_rdm_ab.size()) != norbs4) {
+    throw std::invalid_argument(
+        "2-RDM size (" + std::to_string(two_rdm_ab.size()) +
+        ") does not match norbs^4 (" + std::to_string(norbs4) + ")");
   }
 
   // Lambda function to get the two-body RDM element
