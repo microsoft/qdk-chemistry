@@ -27,6 +27,28 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
 
+def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, int] | None]:
+    """Convert raw measurement results into bitstring counts, separating clean and lost shots.
+
+    Reorders bits to Little Endian convention and uses 'L' to mark lost qubits.
+
+    Args:
+        raw_results: Raw measurement results from the simulator.
+
+    Returns:
+        A tuple of (bitstring_counts, loss_bitstrings). loss_bitstrings is None
+        if no shots experienced qubit loss.
+
+    """
+    bitstrings = [
+        "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
+        for one_run in raw_results
+    ]
+    clean = [b for b in bitstrings if "L" not in b]
+    lost = [b for b in bitstrings if "L" in b]
+    return dict(Counter(clean)), dict(Counter(lost)) if lost else None
+
+
 class QdkFullStateSimulatorSettings(Settings):
     """Settings for the QDK Full State Simulator circuit executor."""
 
@@ -86,20 +108,13 @@ class QdkFullStateSimulator(CircuitExecutor):
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
         Logger.debug(f"Measurement results obtained: {raw_results}")
-        # Reorder bits in each measurement result to match Little Endian convention
-        # Use 'L' to mark lost qubits, then separate clean vs loss bitstrings
-        bitstrings = [
-            "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
-            for one_run in raw_results
-        ]
-        clean = [b for b in bitstrings if "L" not in b]
-        lost = [b for b in bitstrings if "L" in b]
+        bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
-            bitstring_counts=dict(Counter(clean)),
+            bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
-            loss_bitstrings=dict(Counter(lost)) if lost else None,
+            loss_bitstrings=loss_bitstrings,
         )
 
     def name(self) -> str:
@@ -154,15 +169,7 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
-            # Use 'L' to mark lost qubits, then separate clean vs loss bitstrings
-            bitstrings = [
-                "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
-                for one_run in raw_results
-            ]
-            clean = [b for b in bitstrings if "L" not in b]
-            lost = [b for b in bitstrings if "L" in b]
-            bitstring_counts = dict(Counter(clean))
-            loss_bitstrings = dict(Counter(lost)) if lost else None
+            bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         else:
             qasm = circuit.get_qasm()
             raw_results = sparse_state_run_qasm(
@@ -172,15 +179,7 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 seed=self._settings.get("seed"),
             )
             Logger.debug(f"Measurement results obtained: {raw_results}")
-            # Reverse the order of bits in each measurement result to match Little Endian convention
-            bitstrings = [
-                "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
-                for one_run in raw_results
-            ]
-            clean = [b for b in bitstrings if "L" not in b]
-            lost = [b for b in bitstrings if "L" in b]
-            bitstring_counts = dict(Counter(clean))
-            loss_bitstrings = dict(Counter(lost)) if lost else None
+            bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
             total_shots=shots,

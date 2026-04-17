@@ -10,6 +10,7 @@ import pytest
 from qdk_chemistry.algorithms.circuit_executor.qdk import (
     QdkFullStateSimulator,
     QdkSparseStateSimulator,
+    _process_raw_results,
 )
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
 
@@ -228,3 +229,28 @@ class TestQdkSparseStateCircuitExecutor:
         clean_total = sum(result.bitstring_counts.values())
         loss_total = sum(result.loss_bitstrings.values())
         assert clean_total + loss_total == 1000
+
+
+class TestProcessRawResults:
+    """Tests for the _process_raw_results helper."""
+
+    def test_all_clean(self):
+        """All shots are clean (no loss)."""
+        raw = [["One", "Zero"], ["One", "Zero"], ["Zero", "One"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {"01": 2, "10": 1}
+        assert loss is None
+
+    def test_all_loss(self):
+        """Every shot contains at least one lost qubit."""
+        raw = [["Loss", "Zero"], ["One", "Loss"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {}
+        assert loss == {"0L": 1, "L1": 1}
+
+    def test_mixed_clean_and_loss(self):
+        """Mix of clean and loss shots."""
+        raw = [["One", "Zero"], ["Loss", "One"], ["Zero", "Zero"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {"01": 1, "00": 1}
+        assert loss == {"1L": 1}
