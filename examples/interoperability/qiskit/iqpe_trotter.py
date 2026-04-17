@@ -119,8 +119,8 @@ iqpe = create(
     shots_per_bit=SHOTS_PER_BIT,
 )
 aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
-evolution_builder = create("time_evolution_builder", "trotter")
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+unitary_builder = create("unitary_builder", "trotter")
+circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
 
 
 Logger.info("\n=== Running iterative phase estimation (Trotterized) ===")
@@ -132,7 +132,7 @@ result = iqpe.run(
     state_preparation=Circuit(qasm3.dumps(state_prep)),
     qubit_hamiltonian=qubit_hamiltonian,
     circuit_executor=aer_simulator,
-    evolution_builder=evolution_builder,
+    unitary_builder=unitary_builder,
     circuit_mapper=circuit_mapper,
 )
 

@@ -172,7 +172,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         for ancilla_idx in range(num_bits):
             power = 2**ancilla_idx
-            self._append_controlled_evolution(
+            self._append_controlled_unitary(
                 circuit=qc,
                 qubit_hamiltonian=qubit_hamiltonian,
                 time=self._settings.get("evolution_time"),
@@ -192,7 +192,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         return Circuit(qasm3.dumps(qc))
 
-    def _append_controlled_evolution(
+    def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
         qubit_hamiltonian: QubitHamiltonian,
@@ -204,7 +204,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         unitary_builder: UnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
     ) -> None:
-        """Apply the controlled time evolution unitary to the circuit.
+        """Apply the controlled unitary to the circuit.
 
         Args:
             circuit: The quantum circuit to modify.
@@ -212,25 +212,25 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             time: The evolution time.
-            power: The power to which the controlled evolution unitary is raised.
+            power: The power to which the controlled unitary is raised.
             unitary_builder: The unitary builder to use.
             circuit_mapper: The controlled circuit mapper to use.
 
         """
-        time_evol_unitary = self._create_time_evolution(
+        unitary_rep = self._create_unitary(
             qubit_hamiltonian=qubit_hamiltonian,
             time=time,
             unitary_builder=unitary_builder,
         )
-        ctrl_time_evol = ControlledUnitary(
-            time_evolution_unitary=time_evol_unitary,
+        ctrl_unitary = ControlledUnitary(
+            unitary=unitary_rep,
             control_indices=[0],
         )
 
-        ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
-            controlled_evolution=ctrl_time_evol, power=power, circuit_mapper=circuit_mapper
+        ctrl_unitary_circuit = self._create_controlled_circuit(
+            controlled_unitary=ctrl_unitary, power=power, circuit_mapper=circuit_mapper
         )
-        cu_circuit = ctrl_time_evol_circuit.get_qiskit_circuit()
+        cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)

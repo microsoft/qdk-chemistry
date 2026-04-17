@@ -142,14 +142,14 @@ class Trotter(UnitaryBuilder):
         self._settings.set("weight_threshold", weight_threshold)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
-        """Construct the time evolution unitary using Trotter decomposition.
+        """Construct the unitary representation using Trotter decomposition.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
             time: The total evolution time.
 
         Returns:
-            UnitaryRepresentation: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
         order = self._settings.get("order")
@@ -158,7 +158,7 @@ class Trotter(UnitaryBuilder):
         raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
     def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
-        r"""Construct the time evolution unitary using the Trotter decomposition.
+        r"""Construct the unitary representation using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
@@ -178,7 +178,7 @@ class Trotter(UnitaryBuilder):
             time: The total evolution time.
 
         Returns:
-            UnitaryRepresentation: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
         weight_threshold = self._settings.get("weight_threshold")
@@ -345,7 +345,7 @@ class Trotter(UnitaryBuilder):
         return terms
 
     def name(self) -> str:
-        """Return the name of the time evolution unitary builder."""
+        """Return the name of the unitary builder."""
         return "trotter"
 
     def type_name(self) -> str:

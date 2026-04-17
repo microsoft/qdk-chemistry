@@ -134,9 +134,9 @@ class ControlledUnitary(DataClass):
             str: Summary string describing the ControlledUnitary's contents and properties
 
         """
-        line = "Controlled Time Evolution Unitary:\n"
+        line = "Controlled Unitary:\n"
         line += f"  Control Indices: {self.control_indices}\n"
-        line += "  Time Evolution Unitary Summary:\n"
+        line += "  Unitary Summary:\n"
         teu_summary = self.unitary.get_summary()
         teu_summary_indented = "\n".join("    " + summary_line for summary_line in teu_summary.splitlines())
         line += teu_summary_indented

@@ -15,7 +15,7 @@ from qdk_chemistry.data import ControlledUnitary, UnitaryRepresentation, Unitary
 class MockUnitaryContainer(UnitaryContainer):
     """Mock implementation of UnitaryContainer for testing purposes."""
 
-    _data_type_name = "mock_time_evolution_unitary_container"
+    _data_type_name = "mock_unitary_container"
     _serialization_version = "0.1.0"
 
     def __init__(self, num_qubits: int):
@@ -25,12 +25,12 @@ class MockUnitaryContainer(UnitaryContainer):
 
     @property
     def type(self) -> str:
-        """Get the type of the time evolution unitary container."""
+        """Get the type of the unitary container."""
         return "mock"
 
     @property
     def num_qubits(self) -> int:
-        """Get the number of qubits the time evolution unitary acts on."""
+        """Get the number of qubits the unitary acts on."""
         return self._num_qubits
 
     def to_json(self) -> dict[str, Any]:
@@ -49,10 +49,10 @@ class MockUnitaryContainer(UnitaryContainer):
 
     def get_summary(self) -> str:
         """Get a summary string for the mock container."""
-        return f"Mock Time Evolution Unitary with {self._num_qubits} qubits"
+        return f"Mock Unitary with {self._num_qubits} qubits"
 
 
-def create_mock_time_evolution_unitary(num_qubits: int) -> UnitaryRepresentation:
+def create_mock_unitary(num_qubits: int) -> UnitaryRepresentation:
     """Create a mock UnitaryRepresentation for testing."""
     container = MockUnitaryContainer(num_qubits=num_qubits)
     return UnitaryRepresentation(container=container)
@@ -63,8 +63,8 @@ class TestControlledUnitary:
 
     def test_basic_properties(self):
         """Test basic properties of ControlledUnitary."""
-        teu = create_mock_time_evolution_unitary(num_qubits=4)
-        cteu = ControlledUnitary(teu, control_indices=[1])
+        unitary_rep = create_mock_unitary(num_qubits=4)
+        cteu = ControlledUnitary(unitary_rep, control_indices=[1])
 
         assert cteu.control_indices == [1]
         assert cteu.get_num_total_qubits() == 5
@@ -72,17 +72,17 @@ class TestControlledUnitary:
 
     def test_to_json_serialization(self):
         """Test JSON serialization."""
-        teu = create_mock_time_evolution_unitary(num_qubits=6)
-        cteu = ControlledUnitary(teu, control_indices=[2])
+        unitary_rep = create_mock_unitary(num_qubits=6)
+        cteu = ControlledUnitary(unitary_rep, control_indices=[2])
 
         json_data = cteu.to_json()
-        assert "time_evolution_unitary" in json_data
+        assert "unitary" in json_data
         assert json_data["control_indices"] == [2]
 
     def test_to_hdf5_roundtrip(self, tmp_path):
         """Test HDF5 serialization and deserialization."""
-        teu = create_mock_time_evolution_unitary(num_qubits=8)
-        cteu = ControlledUnitary(teu, control_indices=[0])
+        unitary_rep = create_mock_unitary(num_qubits=8)
+        cteu = ControlledUnitary(unitary_rep, control_indices=[0])
 
         file_path = tmp_path / "cte_unitary.h5"
 
@@ -96,16 +96,16 @@ class TestControlledUnitary:
             control_indices = grp.attrs["control_indices"]
             assert list(control_indices) == [0]
 
-            teu_group = grp["time_evolution_unitary"]
-            num_qubits = teu_group.attrs["num_qubits"]
+            unitary_group = grp["unitary"]
+            num_qubits = unitary_group.attrs["num_qubits"]
             assert num_qubits == 8
 
     def test_summary_format(self):
         """Test the summary format of ControlledUnitary."""
-        teu = create_mock_time_evolution_unitary(num_qubits=3)
-        cteu = ControlledUnitary(teu, control_indices=[5])
+        unitary_rep = create_mock_unitary(num_qubits=3)
+        cteu = ControlledUnitary(unitary_rep, control_indices=[5])
 
         summary = cteu.get_summary()
-        assert "Controlled Time Evolution Unitary" in summary
+        assert "Controlled Unitary" in summary
         assert "Control Indices: [5]" in summary
-        assert "Mock Time Evolution Unitary" in summary
+        assert "Mock Unitary" in summary

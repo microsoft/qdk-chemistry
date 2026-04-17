@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution pauli product formula container module."""
+"""QDK/Chemistry pauli product formula container module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -74,17 +74,17 @@ class PauliProductFormulaContainer(UnitaryContainer):
 
     @property
     def type(self) -> str:
-        """Get the type of the time evolution unitary container.
+        """Get the type of the unitary container.
 
         Returns:
-            The type of the time evolution unitary container.
+            The type of the unitary container.
 
         """
         return "pauli_product_formula"
 
     @property
     def num_qubits(self) -> int:
-        """Get the number of qubits the time evolution unitary acts on.
+        """Get the number of qubits the unitary acts on.
 
         Returns:
             The number of qubits.

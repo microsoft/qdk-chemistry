@@ -1,4 +1,4 @@
-"""QDK/Chemistry sequence structure controlled evolution circuit mapper."""
+"""QDK/Chemistry sequence structure controlled circuit mapper."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -55,7 +55,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
-        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
+        * Requires a ``PauliProductFormulaContainer`` for the unitary.
 
     """
 
@@ -80,42 +80,42 @@ class PauliSequenceMapper(ControlledCircuitMapper):
         return "controlled_circuit_mapper"
 
     def _run_impl(
-        self, controlled_evolution: ControlledUnitary, target_indices: Sequence[int] | None = None
+        self, controlled_unitary: ControlledUnitary, target_indices: Sequence[int] | None = None
     ) -> Circuit:
-        r"""Construct a quantum circuit implementing the controlled time evolution unitary.
+        r"""Construct a quantum circuit implementing the controlled unitary.
 
         Args:
-            controlled_evolution: The controlled time evolution unitary containing the Hamiltonian
+            controlled_unitary: The controlled unitary containing the Hamiltonian
             and evolution parameters.
             target_indices: Indices of the target qubits in the circuit. If None, defaults to all
-            qubits except the control qubits at controlled_evolution.control_indices.
+            qubits except the control qubits at controlled_unitary.control_indices.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled unitary :math:`U^{\text{power}}`
             where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
 
         Raises:
-            ValueError: If the time evolution unitary container type is not supported.
+            ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
 
         """
-        unitary_container = controlled_evolution.time_evolution_unitary.get_container()
+        unitary_container = controlled_unitary.unitary.get_container()
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
-                f"The {controlled_evolution.get_unitary_container_type()} container type is not supported. "
-                "PauliSequenceMapper only supports PauliProductFormula container for time evolution unitary."
+                f"The {controlled_unitary.get_unitary_container_type()} container type is not supported. "
+                "PauliSequenceMapper only supports PauliProductFormula container for the unitary."
             )
 
-        if len(controlled_evolution.control_indices) != 1:
+        if len(controlled_unitary.control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
-        total_qubits = controlled_evolution.get_num_total_qubits()
+        total_qubits = controlled_unitary.get_num_total_qubits()
 
         if target_indices is None:
-            target_indices = [i for i in range(total_qubits) if i not in controlled_evolution.control_indices]
+            target_indices = [i for i in range(total_qubits) if i not in controlled_unitary.control_indices]
         else:
             target_indices_set = set(target_indices)
-            control_indices_set = set(controlled_evolution.control_indices)
+            control_indices_set = set(controlled_unitary.control_indices)
             if target_indices_set & control_indices_set:
                 raise ValueError("target_indices and control_indices must not overlap.")
             if target_indices_set | control_indices_set != set(range(total_qubits)):
@@ -144,7 +144,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
             pauliExponents=flattened_pauli_terms,
             pauliCoefficients=flattened_angles,
             repetitions=power,
-            control=controlled_evolution.control_indices[0],
+            control=controlled_unitary.control_indices[0],
             systems=target_indices,
         )
 
@@ -153,6 +153,6 @@ class PauliSequenceMapper(ControlledCircuitMapper):
             parameter=vars(controlled_evo_params),
         )
 
-        controlled_evolution_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(controlled_evo_params)
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_evolution_op)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

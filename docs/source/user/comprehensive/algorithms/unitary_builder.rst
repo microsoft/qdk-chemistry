@@ -1,33 +1,33 @@
 Time evolution builder
 ======================
 
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and a time parameter as input and produces a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` as output.
+The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}`.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and a time parameter as input and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Hamiltonian simulation — constructing the unitary :math:`U(t) = e^{-iHt}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
 QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
 These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
-The resulting :class:`~qdk_chemistry.data.TimeEvolutionUnitary` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
 
 
-Using the TimeEvolutionBuilder
+Using the UnitaryBuilder
 ------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
 
 This section demonstrates how to create, configure, and run a time evolution builder.
-The ``run`` method returns a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., :doc:`PhaseEstimation <phase_estimation>`).
+The ``run`` method returns a :class:`~qdk_chemistry.data.UnitaryRepresentation` object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., :doc:`PhaseEstimation <phase_estimation>`).
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` requires the following inputs:
+The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` requires the following inputs:
 
 QubitHamiltonian
    A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
@@ -40,7 +40,7 @@ Time
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
@@ -52,7 +52,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
       :language: python
       :start-after: # start-cell-configure-trotter
       :end-before: # end-cell-configure-trotter
@@ -61,7 +61,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
@@ -69,12 +69,12 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` provides a unified interface for Hamiltonian simulation methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
@@ -149,14 +149,14 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.TimeEvolutionUnitary`: Output data class wrapping the exponentiated Pauli sequence
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli sequence
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
 - :doc:`PhaseEstimation <phase_estimation>`: One consumer of time-evolution unitaries
 
 Further reading
 ---------------
 
-- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/time_evolution_builder.py>`_ script.
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/unitary_builder.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Quantum phase estimation algorithms
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - :doc:`Settings <settings>`: Configuration settings for algorithms

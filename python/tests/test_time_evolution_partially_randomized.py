@@ -51,9 +51,9 @@ class TestPartiallyRandomizedBasics:
 
 
 class TestPartiallyRandomizedConstruction:
-    """Tests for PartiallyRandomized time evolution construction."""
+    """Tests for PartiallyRandomized construction."""
 
-    def test_returns_time_evolution_unitary(self):
+    def test_returns_unitary_representation(self):
         """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],

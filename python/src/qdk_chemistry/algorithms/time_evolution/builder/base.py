@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution unitary builder abstractions."""
+"""QDK/Chemistry unitary builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

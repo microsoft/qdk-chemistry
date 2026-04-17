@@ -180,7 +180,7 @@ class TestPauliSequenceMapper:
         circuit = mapper.run(controlled_unitary)
 
         # Extract angles from the container
-        container = controlled_unitary.time_evolution_unitary.get_container()
+        container = controlled_unitary.unitary.get_container()
         angle_x = container.step_terms[0].angle
         angle_z = container.step_terms[1].angle
 

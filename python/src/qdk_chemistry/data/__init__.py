@@ -15,7 +15,7 @@ Exposed classes are:
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
-- :class:`ControlledUnitary`: Controlled time evolution unitary.
+- :class:`ControlledUnitary`: Controlled unitary.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
@@ -32,7 +32,7 @@ Exposed classes are:
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
-- :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of time evolution unitary.
+- :class:`PauliProductFormulaContainer`: Container for Pauli product formula representation of a unitary.
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
@@ -44,8 +44,8 @@ Exposed classes are:
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
-- :class:`UnitaryRepresentation`: Time evolution unitary.
-- :class:`UnitaryContainer`: Abstract base class for different time evolution unitary representation.
+- :class:`UnitaryRepresentation`: Unitary representation.
+- :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).

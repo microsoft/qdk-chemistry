@@ -1,4 +1,4 @@
-"""QDK/Chemistry controlled time evolution unitary circuit mapper abstractions."""
+"""QDK/Chemistry controlled circuit mapper abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

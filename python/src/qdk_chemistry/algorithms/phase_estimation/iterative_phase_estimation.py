@@ -171,7 +171,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             circuit_mapper: The controlled unitary circuit mapper to use.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
-            phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.
+            phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
 
         Returns:
             A quantum circuit implementing one IQPE iteration.
@@ -180,36 +180,36 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        time_evolution_unitary = self._create_time_evolution(
+        unitary_rep = self._create_unitary(
             qubit_hamiltonian, self.settings().get("evolution_time"), unitary_builder
         )
-        controlled_evolution = ControlledUnitary(
-            time_evolution_unitary=time_evolution_unitary, control_indices=[0]
+        controlled_unitary = ControlledUnitary(
+            unitary=unitary_rep, control_indices=[0]
         )
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(controlled_evolution, power, circuit_mapper)
+        ctrl_unitary_circuit = self._create_controlled_circuit(controlled_unitary, power, circuit_mapper)
 
-        if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
+        if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
+                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
             )
 
-        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
-            return self._create_circuit_from_qiskit(state_preparation, ctrl_evol_circuit, phase_correction)
+        if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
+            return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
 
         raise RuntimeError(
             "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
         )
 
     def _create_circuit_from_qsharp_op(
-        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float, num_system_qubits: int
+        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float, num_system_qubits: int
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
         Args:
             state_preparation: Circuit object containing a Q# operation for state preparation.
-            controlled_evolution: Circuit object containing a Q# operation for the controlled time evolution.
-            phase_correction: Feedback phase angle to apply before controlled evolution.
+            controlled_unitary_circuit: Circuit object containing a Q# operation for the controlled unitary.
+            phase_correction: Feedback phase angle to apply before controlled unitary.
             num_system_qubits: Number of system qubits.
 
         Returns:
@@ -217,10 +217,10 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_evol_op = controlled_evolution._qsharp_op  # noqa: SLF001
+        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
         iterative_parameters = {
             "statePrep": state_prep_op,
-            "repControlledEvolution": ctrl_evol_op,
+            "repControlledEvolution": ctrl_unitary_op,
             "accumulatePhase": phase_correction,
             "control": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
@@ -233,14 +233,14 @@ class IterativePhaseEstimation(PhaseEstimation):
         )
 
     def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_evolution: Circuit, phase_correction: float
+        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float
     ) -> Circuit:
         """Create a Circuit object from Qiskit QuantumCircuit objects.
 
         Args:
             state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
-            controlled_evolution: Circuit object containing a Qiskit QuantumCircuit for the controlled time evolution.
-            phase_correction: Feedback phase angle to apply before controlled evolution.
+            controlled_unitary_circuit: Circuit object containing a Qiskit QuantumCircuit for the controlled unitary.
+            phase_correction: Feedback phase angle to apply before controlled unitary.
 
         Returns:
             A Circuit object representing the IQPE iteration.
@@ -249,7 +249,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
-        ctrl_evol_qc = controlled_evolution.get_qiskit_circuit()
+        ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
         # Parse the state preparation circuit from QASM
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
@@ -264,8 +264,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         if phase_correction:
             circuit.rz(phase_correction, control)
 
-        # Append the controlled evolution circuit
-        circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
+        # Append the controlled unitary circuit
+        circuit.append(ctrl_unitary_qc.to_gate(), [control, *target_qubits])
         circuit.h(control)
         circuit.measure(control, classical[0])
 

@@ -145,7 +145,7 @@ class PartiallyRandomized(QDrift):
         ...     num_random_samples=200,
         ...     trotter_order=2,
         ... )
-        >>> time_evolution = builder.run(qubit_hamiltonian, time=1.0)
+        >>> unitary_rep = builder.run(qubit_hamiltonian, time=1.0)
 
     References:
         Günther, J., Witteveen, F., et al. Phase estimation with partially
@@ -199,7 +199,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("commutation_type", commutation_type)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
-        r"""Construct the time evolution unitary using partially randomized product formula.
+        r"""Construct the unitary representation using partially randomized product formula.
 
         The algorithm:
         1. Sort Hamiltonian terms by coefficient magnitude
@@ -211,7 +211,7 @@ class PartiallyRandomized(QDrift):
             time: The total evolution time (δ in the formula).
 
         Returns:
-            UnitaryRepresentation: The time evolution unitary built by the
+            UnitaryRepresentation: The unitary representation built by the
                 partially randomized method.
 
         """
@@ -322,7 +322,7 @@ class PartiallyRandomized(QDrift):
         return num_deterministic
 
     def name(self) -> str:
-        """Return the name of the time evolution unitary builder."""
+        """Return the name of the unitary builder."""
         return "partially_randomized"
 
     def type_name(self) -> str:

@@ -67,9 +67,9 @@ class TestQDriftBasics:
 
 
 class TestQDriftConstruction:
-    """Tests for QDrift time evolution construction."""
+    """Tests for QDrift construction."""
 
-    def test_returns_time_evolution_unitary(self):
+    def test_returns_unitary_representation(self):
         """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(num_samples=10, seed=42)

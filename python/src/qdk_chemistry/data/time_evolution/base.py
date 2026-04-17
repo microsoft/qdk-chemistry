@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution base module."""
+"""QDK/Chemistry unitary representation base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

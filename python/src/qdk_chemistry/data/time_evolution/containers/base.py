@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution container base module."""
+"""QDK/Chemistry unitary container base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -19,7 +19,7 @@ class UnitaryContainer(DataClass):
     """Abstract class for a unitary container."""
 
     # Class attribute for filename validation
-    _data_type_name = "time_evolution_unitary"
+    _data_type_name = "unitary_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -27,17 +27,17 @@ class UnitaryContainer(DataClass):
     @property
     @abstractmethod
     def type(self) -> str:
-        """Get the type of the time evolution unitary container.
+        """Get the type of the unitary container.
 
         Returns:
-            The type of the time evolution unitary container.
+            The type of the unitary container.
 
         """
 
     @property
     @abstractmethod
     def num_qubits(self) -> int:
-        """Get the number of qubits the time evolution unitary acts on.
+        """Get the number of qubits the unitary acts on.
 
         Returns:
             The number of qubits.

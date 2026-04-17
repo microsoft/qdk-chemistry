@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution constructor module."""
+"""QDK/Chemistry unitary builder module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

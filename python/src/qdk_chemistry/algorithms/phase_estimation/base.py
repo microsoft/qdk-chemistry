@@ -107,15 +107,15 @@ class PhaseEstimation(Algorithm):
     def _create_unitary(
         self, qubit_hamiltonian: QubitHamiltonian, time: float, unitary_builder: UnitaryBuilder
     ) -> UnitaryRepresentation:
-        """Create the time evolution circuit for the given Hamiltonian and power.
+        """Create the unitary representation for the given Hamiltonian.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
             time: The evolution time.
-            unitary_builder: The time evolution builder to use.
+            unitary_builder: The unitary builder to use.
 
         Returns:
-            The time evolution unitary circuit.
+            The unitary representation.
 
         """
         return unitary_builder.run(qubit_hamiltonian, time)
@@ -126,15 +126,15 @@ class PhaseEstimation(Algorithm):
         power: int,
         circuit_mapper: ControlledCircuitMapper,
     ) -> Circuit:
-        """Create the controlled time evolution circuit for the given Hamiltonian and power.
+        """Create the controlled circuit for the given Hamiltonian and power.
 
         Args:
-            controlled_unitary: The controlled time evolution unitary.
+            controlled_unitary: The controlled unitary.
             power: The power to which the controlled unitary should be raised.
-            circuit_mapper: The controlled evolution circuit mapper to use.
+            circuit_mapper: The controlled circuit mapper to use.
 
         Returns:
-            The controlled time evolution circuit.
+            The controlled circuit.
 
         """
         # Create a new instance of the mapper to avoid setting lock
