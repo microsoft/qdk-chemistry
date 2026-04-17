@@ -141,7 +141,7 @@ bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant);
  */
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
-                                   int norbs);
+                                   size_t norbs);
 
 /**
  * @brief Consolidate duplicate determinants by summing their coefficients

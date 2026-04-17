@@ -185,10 +185,10 @@ void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
 
   // Check two-body integrals dimensions
   size_t norb_alpha = _one_body_integrals.first->rows();
-  unsigned expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
+  size_t expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
 
   // Check alpha-alpha integrals
-  if (static_cast<unsigned>(std::get<0>(_two_body_integrals)->size()) !=
+  if (static_cast<size_t>(std::get<0>(_two_body_integrals)->size()) !=
       expected_size) {
     throw std::invalid_argument(
         "Alpha-alpha two-body integrals size (" +
@@ -199,7 +199,7 @@ void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
 
   // Check alpha-beta integrals (if different from alpha-alpha)
   if (std::get<1>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<1>(_two_body_integrals)->size()) !=
+    if (static_cast<size_t>(std::get<1>(_two_body_integrals)->size()) !=
         expected_size) {
       throw std::invalid_argument(
           "Alpha-beta two-body integrals size mismatch");
@@ -208,7 +208,7 @@ void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
 
   // Check beta-beta integrals (if different from alpha-alpha)
   if (std::get<2>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<unsigned>(std::get<2>(_two_body_integrals)->size()) !=
+    if (static_cast<size_t>(std::get<2>(_two_body_integrals)->size()) !=
         expected_size) {
       throw std::invalid_argument("Beta-beta two-body integrals size mismatch");
     }

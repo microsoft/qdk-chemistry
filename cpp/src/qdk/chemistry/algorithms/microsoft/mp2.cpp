@@ -83,12 +83,12 @@ double MP2Calculator::calculate_restricted_mp2_energy(
         "Orbital energies are required for MP2 calculation");
   }
 
-  int active_space_size;
+  size_t active_space_size;
   if (orbitals->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         orbitals->get_active_space_indices();
     active_space_size = active_space_ind_alpha.size();
-    int active_space_size_beta = active_space_ind_beta.size();
+    size_t active_space_size_beta = active_space_ind_beta.size();
     if (active_space_size_beta != active_space_size) {
       throw std::runtime_error(
           "Active space sizes of alpha and beta should be the same");
@@ -154,12 +154,12 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
         "Orbital energies are required for MP2 calculation");
   }
 
-  int active_space_size;
+  size_t active_space_size;
   if (orbitals->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         orbitals->get_active_space_indices();
     active_space_size = active_space_ind_alpha.size();
-    int active_space_size_beta = active_space_ind_beta.size();
+    size_t active_space_size_beta = active_space_ind_beta.size();
     if (active_space_size_beta != active_space_size) {
       throw std::runtime_error(
           "Active space sizes of alpha and beta should be the same");

@@ -93,7 +93,7 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           type),
       _one_body_sparse(_to_sparse(one_body_integrals)),
       _two_body_map(_to_map(two_body_integrals,
-                            static_cast<int>(one_body_integrals.rows()))) {}
+                            static_cast<size_t>(one_body_integrals.rows()))) {}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals, double core_energy,
@@ -579,13 +579,15 @@ double SparseHamiltonianContainer::one_body_element(int i, int j) const {
 }
 
 void SparseHamiltonianContainer::_materialize_dense_two_body() const {
-  int n = _orbitals->get_num_molecular_orbitals();
-  int n2 = n * n;
-  int n3 = n2 * n;
-  _two_body_dense_cache = Eigen::VectorXd::Zero(n * n * n * n);
+  size_t n = _orbitals->get_num_molecular_orbitals();
+  size_t n2 = n * n;
+  size_t n3 = n2 * n;
+  _two_body_dense_cache =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n * n * n * n));
   for (const auto& [idx, val] : _two_body_map) {
     const auto& [p, q, r, s] = idx;
-    _two_body_dense_cache(p * n3 + q * n2 + r * n + s) = val;
+    _two_body_dense_cache(
+        static_cast<Eigen::Index>(p * n3 + q * n2 + r * n + s)) = val;
   }
   _two_body_dense_valid = true;
 }
@@ -607,15 +609,16 @@ Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(
 }
 
 SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
-    const Eigen::VectorXd& v, int n) {
+    const Eigen::VectorXd& v, size_t n) {
   TwoBodyMap m;
-  int n2 = n * n;
-  int n3 = n2 * n;
-  for (int p = 0; p < n; ++p)
-    for (int q = 0; q < n; ++q)
-      for (int r = 0; r < n; ++r)
-        for (int s = 0; s < n; ++s) {
-          double val = v(p * n3 + q * n2 + r * n + s);
+  size_t n2 = n * n;
+  size_t n3 = n2 * n;
+  for (size_t p = 0; p < n; ++p)
+    for (size_t q = 0; q < n; ++q)
+      for (size_t r = 0; r < n; ++r)
+        for (size_t s = 0; s < n; ++s) {
+          double val =
+              v(static_cast<Eigen::Index>(p * n3 + q * n2 + r * n + s));
           if (val != 0.0) m[{p, q, r, s}] = val;
         }
   return m;
