@@ -139,14 +139,14 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
 
     return iqpe.run(
         qubit_hamiltonian=problem.hamiltonian,
         state_preparation=state_prep_circuit,
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
     )
 
 
@@ -165,14 +165,14 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
 
     return qpe.run(
         qubit_hamiltonian=problem.hamiltonian,
         state_preparation=problem.state_prep,
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
     )
 
 
@@ -221,14 +221,14 @@ def _run_iterative_with_parameters(
     iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
 
     return iqpe.run(
         qubit_hamiltonian=hamiltonian,
         state_preparation=Circuit(qsharp_factory=qsharp_factories, qsharp_op=qsharp_op),
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
     )
 
 
@@ -472,7 +472,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
@@ -483,7 +483,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
         noise=error_profile,
     )
 
@@ -526,7 +526,7 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
 
     with pytest.raises(ValueError, match="No iteration circuits have been generated"):
         iqpe.get_circuits()
@@ -536,7 +536,7 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
         state_preparation=two_qubit_phase_problem.state_prep,
         circuit_executor=simulator,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
     )
 
     assert len(iqpe.get_circuits()) == two_qubit_phase_problem.num_bits
@@ -615,14 +615,14 @@ def test_create_iteration_circuit_power_calculation() -> None:
     state_prep.h(0)
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("unitary_builder", "trotter")
 
     iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
     iter_0_circuit = iqpe.create_iteration_circuit(
         state_preparation=state_prep_circuit,
         qubit_hamiltonian=hamiltonian,
         circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
+        unitary_builder=unitary_builder,
         iteration=0,
         total_iterations=5,
     )

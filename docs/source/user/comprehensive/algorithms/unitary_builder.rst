@@ -1,7 +1,7 @@
-Time evolution builder
+Unitary builder
 ======================
 
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}`.
+The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and a time parameter as input and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
@@ -149,7 +149,7 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli sequence
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or linear combinations of unitaries
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
 - :doc:`PhaseEstimation <phase_estimation>`: One consumer of time-evolution unitaries
 

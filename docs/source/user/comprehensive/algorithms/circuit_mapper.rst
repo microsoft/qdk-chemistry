@@ -1,5 +1,5 @@
-Controlled evolution circuit mapper
-====================================
+Controlled circuit mapper
+=========================
 
 The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` algorithm in QDK/Chemistry converts a :class:`~qdk_chemistry.data.UnitaryRepresentation` into a *controlled* quantum circuit.
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.ControlledUnitary` as input and produces a :class:`~qdk_chemistry.data.Circuit` as output.
@@ -117,7 +117,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.ControlledUnitary`: Input — pairs a unitary with control qubit indices
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: The underlying time-evolution unitary
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: The underlying unitary representation
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit
 - :doc:`UnitaryBuilder <unitary_builder>`: Produces the :class:`~qdk_chemistry.data.UnitaryRepresentation` that this mapper consumes
 

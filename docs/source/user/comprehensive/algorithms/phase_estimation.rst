@@ -66,7 +66,7 @@ QubitHamiltonian
 
 Unitary builder
    An algorithm that constructs the unitary operator :math:`U` whose eigenphase is to be measured.
-   For chemistry applications this is typically a :doc:`UnitaryBuilder <unitary_builder>` that approximates :math:`U(t) = e^{-iHt}`.
+   For chemistry applications this is typically a :doc:`UnitaryBuilder <unitary_builder>` that approximates :math:`U(t) = e^{-iHt}` or :math:`U = \frac{H}{\|H\|}`.
    The builder produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` which is then converted to a controlled circuit.
 
 ControlledCircuitMapper
@@ -248,7 +248,7 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/phase_estimation.py>`_ script.
-- :doc:`UnitaryBuilder <unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition
+- :doc:`UnitaryBuilder <unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition or block-encoding methods
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`ControlledCircuitMapper <circuit_mapper>`: Controlled-unitary circuit synthesis
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits
