@@ -40,8 +40,11 @@ class CircuitExecutorData(DataClass):
             total_shots: Total number of shots used for the measurement.
             executor: Name of the executor used for the measurement.
             executor_metadata: Metadata associated with the executor.
-            loss_bitstrings: Bitstring counts for shots where at
-                least one qubit was lost. Uses 'L' to mark lost qubits (e.g. '0L10').
+            loss_bitstrings: Bitstring counts for shots affected by
+                qubit loss, an error channel in which a qubit is lost
+                and its measurement outcome is undefined. These shots are
+                separated from ``bitstring_counts``. Uses 'L' to mark lost qubits
+                (e.g. '0L10' means the second qubit was lost).
 
         """
         Logger.trace_entering()

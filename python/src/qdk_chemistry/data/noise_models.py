@@ -117,14 +117,6 @@ class QuantumErrorProfile(DataClass):
 
     This class provides functionalities to define, load, and save quantum error profiles.
 
-    Attributes:
-        name: Name of the quantum error profile.
-        description: Description of what the error profile represents.
-        errors: Dictionary mapping gate names to their error properties.
-        one_qubit_gates: Set of gate names that operate on a single qubit.
-        two_qubit_gates: Set of gate names that operate on two qubits.
-        three_qubit_gates: Set of gate names that operate on three qubits.
-
     """
 
     # Class attribute for filename validation
