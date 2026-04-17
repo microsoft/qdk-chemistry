@@ -123,6 +123,14 @@ option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
 # Enable OpenMP by default, except on Apple platforms with AppleClang
+# On Windows with clang-cl, CMake resolves OpenMP to:
+#   OpenMP_CXX_FLAGS = -Xclang -fopenmp
+#   OpenMP_libomp_LIBRARY = .../VC/Tools/MSVC/.../lib/x64/libomp.lib
+# This uses LLVM's libomp runtime (not MSVC's vcomp*.dll). libomp.dll must
+# be present at runtime alongside the built binaries. It is found in:
+#   %VS_INSTALL_DIR%\VC\Tools\Llvm\x64\bin\libomp.dll
+# Note: GauXC has GAUXC_ENABLE_OPENMP=OFF on Windows (see third_party.cmake)
+# to avoid NaN/divergence issues in its XC integrator under libomp.
 cmake_dependent_option(QDK_ENABLE_OPENMP
     "Enable OpenMP support" ON
     "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)

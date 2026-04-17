@@ -275,15 +275,11 @@ if (-not $SkipBuild) {
     $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
     Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
 
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
     .\venv\Scripts\activate
-
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
-    $env:CMAKE_C_FLAGS="/Os"
-    $env:CMAKE_CXX_FLAGS="/Os"
-
     # pip drives the full build: scikit-build-core invokes CMake to compile the
     # C++ library and pybind11 bindings, then packages everything into a wheel.
     # Do not install:
@@ -293,7 +289,7 @@ if (-not $SkipBuild) {
         -C cmake.args=-GNinja `
         -C cmake.define.QDK_UARCH="$QDK_UARCH" `
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF `
-        -C cmake.define.QDK_ENABLE_OPENMP=OFF `
+        -C cmake.define.QDK_ENABLE_OPENMP=ON `
         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
         -C cmake.define.BUILD_SHARED_LIBS=OFF `
         -C cmake.define.BUILD_TESTING=OFF `
@@ -327,6 +323,7 @@ if (-not $SkipTests) {
         .\venv\Scripts\activate
     }
 
+    $env:OMP_NUM_THREADS = 8
     pytest -v --tb=short
     $pytestExit = $LASTEXITCODE
     Pop-Location
