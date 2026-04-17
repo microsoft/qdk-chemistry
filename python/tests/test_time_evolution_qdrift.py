@@ -52,7 +52,7 @@ class TestQDriftBasics:
     def test_type_name(self):
         """Test the type_name method of QDrift."""
         builder = QDrift()
-        assert builder.type_name() == "time_evolution_builder"
+        assert builder.type_name() == "unitary_builder"
 
     def test_can_create_via_registry(self):
         """Test that QDrift can be created via the algorithm registry."""

@@ -48,9 +48,9 @@ class TestRegistryShowDefault:
             "state_prep",
             "qubit_mapper",
             "circuit_executor",
-            "controlled_evolution_circuit_mapper",
+            "controlled_circuit_mapper",
             "phase_estimation",
-            "time_evolution_builder",
+            "unitary_builder",
             "circuit_executor",
         ]
 
@@ -102,15 +102,19 @@ class TestRegistryShowDefault:
         assert isinstance(default_phase_estimation, str)
         assert default_phase_estimation == "iterative"
 
-        # Test for time evolution builder
-        default_time_evolution_builder = registry.show_default("time_evolution_builder")
-        assert isinstance(default_time_evolution_builder, str)
-        assert default_time_evolution_builder == "trotter"
+        # Test for unitary builder (new name)
+        default_unitary_builder = registry.show_default("unitary_builder")
+        assert isinstance(default_unitary_builder, str)
+        assert default_unitary_builder == "trotter"
 
-        # Test for controlled evolution circuit mapper
-        default_controlled_evolution_circuit_mapper = registry.show_default("controlled_evolution_circuit_mapper")
-        assert isinstance(default_controlled_evolution_circuit_mapper, str)
-        assert default_controlled_evolution_circuit_mapper == "pauli_sequence"
+        # Test for controlled circuit mapper (new name)
+        default_controlled_circuit_mapper = registry.show_default("controlled_circuit_mapper")
+        assert isinstance(default_controlled_circuit_mapper, str)
+        assert default_controlled_circuit_mapper == "pauli_sequence"
+
+        # Test backward compat aliases still work
+        assert registry.show_default("time_evolution_builder") == "trotter"
+        assert registry.show_default("controlled_evolution_circuit_mapper") == "pauli_sequence"
 
     def test_show_default_returns_empty_string_for_unknown_type(self):
         """Test that show_default returns empty string for unknown algorithm type."""

@@ -27,7 +27,7 @@ class TestPartiallyRandomizedBasics:
     def test_type_name(self):
         """Test the type_name method of PartiallyRandomized."""
         builder = PartiallyRandomized()
-        assert builder.type_name() == "time_evolution_builder"
+        assert builder.type_name() == "unitary_builder"
 
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
