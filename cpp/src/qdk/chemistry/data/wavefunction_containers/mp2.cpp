@@ -114,7 +114,7 @@ void MP2Container::_compute_t1_amplitudes() const {
   auto [n_alpha, n_beta] = get_active_num_electrons();
 
   // Get active space size
-  int active_space_size = get_orbitals()->get_num_molecular_orbitals();
+  size_t active_space_size = get_orbitals()->get_num_molecular_orbitals();
   if (get_orbitals()->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         get_orbitals()->get_active_space_indices();
@@ -152,7 +152,7 @@ void MP2Container::_compute_t2_amplitudes() const {
   }
 
   // Get active space size
-  int active_space_size = get_orbitals()->get_num_molecular_orbitals();
+  size_t active_space_size = get_orbitals()->get_num_molecular_orbitals();
   if (get_orbitals()->has_active_space()) {
     const auto& [active_space_ind_alpha, active_space_ind_beta] =
         get_orbitals()->get_active_space_indices();
@@ -164,13 +164,14 @@ void MP2Container::_compute_t2_amplitudes() const {
     const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
     Eigen::VectorXd eps_active_alpha(active_space_size);
     Eigen::VectorXd eps_active_beta(active_space_size);
+    Eigen::Index active_size_idx = static_cast<Eigen::Index>(active_space_size);
     if (get_orbitals()->has_active_space()) {
       const auto& [active_space_ind_alpha, active_space_ind_beta] =
           get_orbitals()->get_active_space_indices();
-      for (int i = 0; i < active_space_size; ++i) {
+      for (Eigen::Index i = 0; i < active_size_idx; ++i) {
         eps_active_alpha[i] = eps_alpha[active_space_ind_alpha[i]];
       }
-      for (int i = 0; i < active_space_size; ++i) {
+      for (Eigen::Index i = 0; i < active_size_idx; ++i) {
         eps_active_beta[i] = eps_beta[active_space_ind_beta[i]];
       }
     } else {
@@ -231,10 +232,11 @@ void MP2Container::_compute_t2_amplitudes() const {
 
     Eigen::VectorXd eps_active_alpha(active_space_size);
 
+    Eigen::Index active_size_idx = static_cast<Eigen::Index>(active_space_size);
     if (get_orbitals()->has_active_space()) {
       const auto& [active_space_ind_alpha, active_space_ind_beta] =
           get_orbitals()->get_active_space_indices();
-      for (int i = 0; i < active_space_size; ++i) {
+      for (Eigen::Index i = 0; i < active_size_idx; ++i) {
         eps_active_alpha[i] = eps_alpha[active_space_ind_alpha[i]];
       }
     } else {
