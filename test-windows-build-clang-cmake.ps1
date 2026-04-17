@@ -274,8 +274,6 @@ Write-Host ""
 if (-not $SkipCpp) {
     if (-not $SkipConfigure) {
         Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
-        $env:CMAKE_C_FLAGS="/Os"
-        $env:CMAKE_CXX_FLAGS="/Os"
         cmake -S cpp -B "$BuildDir" `
             -GNinja `
             -DCMAKE_BUILD_TYPE=Release `
@@ -287,7 +285,7 @@ if (-not $SkipCpp) {
             -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
             -DQDK_UARCH="$QDK_UARCH" `
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
-            -DQDK_ENABLE_OPENMP=OFF `
+            -DQDK_ENABLE_OPENMP=ON `
             -DBUILD_TESTING=ON
         if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
     } else {
@@ -308,6 +306,7 @@ if (-not $SkipCpp) {
         Write-Host ""
         Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
         Push-Location "$BuildDir"
+        $env:OMP_NUM_THREADS = 4
         ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST"
         $ctestExit = $LASTEXITCODE
         Pop-Location
@@ -341,14 +340,10 @@ if (-not $SkipPython) {
     $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
     Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
 
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
-
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
-    $env:CMAKE_C_FLAGS="/Os"
-    $env:CMAKE_CXX_FLAGS="/Os"
-
     .\venv\Scripts\activate
     # Do not install:
     # - plugins: pyscf does not build on Windows
@@ -370,7 +365,7 @@ if (-not $SkipPython) {
     if (-not $SkipTests) {
         Write-Host ""
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
-        # python -m pip install pytest --quiet
+        $env:OMP_NUM_THREADS = 8
         pytest -v --tb=short
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {
