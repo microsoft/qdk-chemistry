@@ -18,7 +18,7 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
 from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
@@ -73,7 +73,7 @@ class TrotterSettings(Settings):
         )
 
 
-class Trotter(TimeEvolutionBuilder):
+class Trotter(UnitaryBuilder):
     """Trotter decomposition builder."""
 
     def __init__(

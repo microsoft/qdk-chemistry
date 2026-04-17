@@ -1,4 +1,4 @@
-"""QDK/Chemistry controlled circuit mapper abstractions."""
+"""QDK/Chemistry controlled time evolution unitary circuit mapper abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,12 +11,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledUnitary
 
-__all__: list[str] = [
-    "ControlledCircuitMapper",
-    "ControlledCircuitMapperFactory",
-    "ControlledEvolutionCircuitMapper",
-    "ControlledEvolutionCircuitMapperFactory",
-]
+__all__: list[str] = ["ControlledCircuitMapper", "ControlledCircuitMapperFactory"]
 
 
 class ControlledCircuitMapper(Algorithm):
@@ -27,16 +22,17 @@ class ControlledCircuitMapper(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, controlled_evolution: ControlledUnitary, *args, **kwargs) -> Circuit:
+    def _run_impl(self, controlled_unitary: ControlledUnitary, *args, **kwargs) -> Circuit:
         """Construct a Circuit representing the controlled unitary for the given ControlledUnitary.
 
         Args:
-            controlled_evolution: The controlled unitary.
-            *args: Positional arguments.
+            controlled_unitary: The controlled unitary.
+            *args: Positional arguments, where the first argument is expected to be the
+                controlled unitary.
             **kwargs: Additional keyword arguments for concrete implementation.
 
         Returns:
-            Circuit: A Circuit representing the controlled unitary.
+            Circuit: A Circuit representing the controlled unitary for the given ControlledUnitary.
 
         """
 
@@ -51,8 +47,3 @@ class ControlledCircuitMapperFactory(AlgorithmFactory):
     def default_algorithm_name(self) -> str:
         """Return pauli_sequence as the default algorithm name."""
         return "pauli_sequence"
-
-
-# Backward-compatible aliases
-ControlledEvolutionCircuitMapper = ControlledCircuitMapper
-ControlledEvolutionCircuitMapperFactory = ControlledCircuitMapperFactory

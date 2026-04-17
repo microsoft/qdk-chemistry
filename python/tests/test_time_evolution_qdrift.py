@@ -10,7 +10,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift, QDriftSettings
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -56,12 +56,12 @@ class TestQDriftBasics:
 
     def test_can_create_via_registry(self):
         """Test that QDrift can be created via the algorithm registry."""
-        builder = create("time_evolution_builder", "qdrift")
+        builder = create("unitary_builder", "qdrift")
         assert isinstance(builder, QDrift)
 
     def test_can_create_with_settings(self):
         """Test that QDrift can be created with custom settings."""
-        builder = create("time_evolution_builder", "qdrift", num_samples=200, seed=42)
+        builder = create("unitary_builder", "qdrift", num_samples=200, seed=42)
         assert builder.settings().get("num_samples") == 200
         assert builder.settings().get("seed") == 42
 
@@ -70,12 +70,12 @@ class TestQDriftConstruction:
     """Tests for QDrift time evolution construction."""
 
     def test_returns_time_evolution_unitary(self):
-        """Test that run returns a TimeEvolutionUnitary."""
+        """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(num_samples=10, seed=42)
         unitary = builder.run(hamiltonian, time=0.1)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
         assert isinstance(container, PauliProductFormulaContainer)
 

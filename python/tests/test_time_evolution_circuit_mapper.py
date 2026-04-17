@@ -16,13 +16,13 @@ from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_seq
     PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
+from qdk_chemistry.data.time_evolution.base import UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.data.time_evolution.controlled_time_evolution import (
-    ControlledTimeEvolutionUnitary,
+    ControlledUnitary,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -49,10 +49,10 @@ def simple_ppf_container():
 
 @pytest.fixture
 def controlled_unitary(simple_ppf_container):
-    """Create a ControlledTimeEvolutionUnitary for testing."""
-    teu = TimeEvolutionUnitary(container=simple_ppf_container)
-    return ControlledTimeEvolutionUnitary(
-        time_evolution_unitary=teu,
+    """Create a ControlledUnitary for testing."""
+    teu = UnitaryRepresentation(container=simple_ppf_container)
+    return ControlledUnitary(
+        unitary=teu,
         control_indices=[2],
     )
 
@@ -66,7 +66,7 @@ class TestPauliSequenceMapper:
         assert mapper.name() == "pauli_sequence"
 
     def test_basic_mapping(self, controlled_unitary):
-        """Test basic mapping of ControlledTimeEvolutionUnitary to Circuit."""
+        """Test basic mapping of ControlledUnitary to Circuit."""
         mapper = PauliSequenceMapper(power=1)
 
         circuit = mapper.run(controlled_unitary)
@@ -122,7 +122,7 @@ class TestPauliSequenceMapper:
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
 
-        # Create a new TimeEvolutionUnitary with invalid container type
+        # Create a new UnitaryRepresentation with invalid container type
         class MockContainer:
             """Mock container class."""
 
@@ -131,9 +131,9 @@ class TestPauliSequenceMapper:
                 """Return mock container type."""
                 return "mock_container"
 
-        invalid_teu = TimeEvolutionUnitary(container=MockContainer())
-        invalid_controlled = ControlledTimeEvolutionUnitary(
-            time_evolution_unitary=invalid_teu,
+        invalid_teu = UnitaryRepresentation(container=MockContainer())
+        invalid_controlled = ControlledUnitary(
+            unitary=invalid_teu,
             control_indices=[2],
         )
 

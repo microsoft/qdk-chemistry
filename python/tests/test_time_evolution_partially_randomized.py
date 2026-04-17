@@ -10,7 +10,7 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import PartiallyRandomized
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -31,13 +31,13 @@ class TestPartiallyRandomizedBasics:
 
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
-        builder = create("time_evolution_builder", "partially_randomized")
+        builder = create("unitary_builder", "partially_randomized")
         assert isinstance(builder, PartiallyRandomized)
 
     def test_can_create_with_settings(self):
         """Test that PartiallyRandomized can be created with custom settings."""
         builder = create(
-            "time_evolution_builder",
+            "unitary_builder",
             "partially_randomized",
             weight_threshold=0.5,
             num_random_samples=200,
@@ -54,7 +54,7 @@ class TestPartiallyRandomizedConstruction:
     """Tests for PartiallyRandomized time evolution construction."""
 
     def test_returns_time_evolution_unitary(self):
-        """Test that run returns a TimeEvolutionUnitary."""
+        """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
@@ -62,7 +62,7 @@ class TestPartiallyRandomizedConstruction:
         builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42)
         unitary = builder.run(hamiltonian, time=0.1)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
         assert isinstance(container, PauliProductFormulaContainer)
 

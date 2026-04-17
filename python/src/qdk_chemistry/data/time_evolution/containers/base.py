@@ -1,4 +1,4 @@
-"""QDK/Chemistry unitary container base module."""
+"""QDK/Chemistry time evolution container base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,7 +12,7 @@ import h5py
 
 from qdk_chemistry.data.base import DataClass
 
-__all__: list[str] = ["UnitaryContainer", "TimeEvolutionUnitaryContainer"]
+__all__: list[str] = ["UnitaryContainer"]
 
 
 class UnitaryContainer(DataClass):
@@ -46,16 +46,16 @@ class UnitaryContainer(DataClass):
 
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
-        """Convert the TimeEvolutionUnitaryContainer to a dictionary for JSON serialization.
+        """Convert the UnitaryContainer to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the TimeEvolutionUnitaryContainer
+            dict: Dictionary representation of the UnitaryContainer
 
         """
 
     @abstractmethod
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the TimeEvolutionUnitaryContainer to an HDF5 group.
+        """Save the UnitaryContainer to an HDF5 group.
 
         Args:
             group: HDF5 group or file to write data to
@@ -96,7 +96,3 @@ class UnitaryContainer(DataClass):
             str: Summary string describing the UnitaryContainer's contents and properties
 
         """
-
-
-# Backward-compatible alias
-TimeEvolutionUnitaryContainer = UnitaryContainer

@@ -57,12 +57,6 @@ __cleanup_registered: bool = False
 
 __factories: list[AlgorithmFactory] = []
 
-# Backward-compatible aliases for renamed algorithm type strings
-_ALGORITHM_TYPE_ALIASES: dict[str, str] = {
-    "time_evolution_builder": "unitary_builder",
-    "controlled_evolution_circuit_mapper": "controlled_circuit_mapper",
-}
-
 
 def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> Algorithm:
     """Create an algorithm instance by type and name.
@@ -110,8 +104,6 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
         >>> default_calc = registry.create("dynamical_correlation_calculator")
 
     """
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     if algorithm_name is None:
         algorithm_name = ""
     for factory in __factories:
@@ -180,8 +172,6 @@ def print_settings(algorithm_type: str, algorithm_name: str, characters: int = 1
         >>> registry.print_settings("scf_solver", "pyscf", characters=100)
 
     """
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -241,8 +231,6 @@ def inspect_settings(algorithm_type: str, algorithm_name: str) -> list[tuple[str
         force_restricted: bool = False  # Force restricted calculation
 
     """
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             instance = factory.create(algorithm_name)
@@ -353,8 +341,6 @@ def available(algorithm_type: str | None = None) -> dict[str, list[str]] | list[
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.available()
         return result
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.available()
@@ -396,8 +382,6 @@ def show_default(algorithm_type: str | None = None) -> dict[str, str] | str:
         for factory in __factories:
             result[factory.algorithm_type_name()] = factory.default_algorithm_name()
         return result
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             return factory.default_algorithm_name()
@@ -425,8 +409,6 @@ def unregister(algorithm_type: str, algorithm_name: str) -> None:
         >>> registry.unregister("scf_solver", "my_custom_scf")
 
     """
-    # Resolve backward-compatible type aliases
-    algorithm_type = _ALGORITHM_TYPE_ALIASES.get(algorithm_type, algorithm_type)
     for factory in __factories:
         if factory.algorithm_type_name() == algorithm_type:
             factory.unregister_instance(algorithm_name)

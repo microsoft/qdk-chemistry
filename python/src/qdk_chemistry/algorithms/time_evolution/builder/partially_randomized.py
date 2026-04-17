@@ -139,7 +139,7 @@ class PartiallyRandomized(QDrift):
         >>> from qdk_chemistry.algorithms import create
         >>> # Create a partially randomized builder
         >>> builder = create(
-        ...     "time_evolution_builder",
+        ...     "unitary_builder",
         ...     "partially_randomized",
         ...     weight_threshold=0.1,  # Terms with |h_j| >= 0.1 treated deterministically
         ...     num_random_samples=200,

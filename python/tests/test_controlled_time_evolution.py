@@ -1,4 +1,4 @@
-"""Test for ControlledTimeEvolutionUnitary in QDK/Chemistry."""
+"""Test for ControlledUnitary in QDK/Chemistry."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,11 +9,11 @@ from typing import Any
 
 import h5py
 
-from qdk_chemistry.data import ControlledTimeEvolutionUnitary, TimeEvolutionUnitary, TimeEvolutionUnitaryContainer
+from qdk_chemistry.data import ControlledUnitary, UnitaryRepresentation, UnitaryContainer
 
 
-class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):
-    """Mock implementation of TimeEvolutionUnitaryContainer for testing purposes."""
+class MockUnitaryContainer(UnitaryContainer):
+    """Mock implementation of UnitaryContainer for testing purposes."""
 
     _data_type_name = "mock_time_evolution_unitary_container"
     _serialization_version = "0.1.0"
@@ -34,7 +34,7 @@ class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):
         return self._num_qubits
 
     def to_json(self) -> dict[str, Any]:
-        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization."""
+        """Convert the UnitaryRepresentation to a dictionary for JSON serialization."""
         data = {
             "container_type": self.type,
             "num_qubits": self._num_qubits,
@@ -42,7 +42,7 @@ class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the TimeEvolutionUnitary to an HDF5 group."""
+        """Save the UnitaryRepresentation to an HDF5 group."""
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["num_qubits"] = self._num_qubits
@@ -52,19 +52,19 @@ class MockTimeEvolutionUnitaryContainer(TimeEvolutionUnitaryContainer):
         return f"Mock Time Evolution Unitary with {self._num_qubits} qubits"
 
 
-def create_mock_time_evolution_unitary(num_qubits: int) -> TimeEvolutionUnitary:
-    """Create a mock TimeEvolutionUnitary for testing."""
-    container = MockTimeEvolutionUnitaryContainer(num_qubits=num_qubits)
-    return TimeEvolutionUnitary(container=container)
+def create_mock_time_evolution_unitary(num_qubits: int) -> UnitaryRepresentation:
+    """Create a mock UnitaryRepresentation for testing."""
+    container = MockUnitaryContainer(num_qubits=num_qubits)
+    return UnitaryRepresentation(container=container)
 
 
-class TestControlledTimeEvolutionUnitary:
-    """Tests for ControlledTimeEvolutionUnitary."""
+class TestControlledUnitary:
+    """Tests for ControlledUnitary."""
 
     def test_basic_properties(self):
-        """Test basic properties of ControlledTimeEvolutionUnitary."""
+        """Test basic properties of ControlledUnitary."""
         teu = create_mock_time_evolution_unitary(num_qubits=4)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[1])
+        cteu = ControlledUnitary(teu, control_indices=[1])
 
         assert cteu.control_indices == [1]
         assert cteu.get_num_total_qubits() == 5
@@ -73,7 +73,7 @@ class TestControlledTimeEvolutionUnitary:
     def test_to_json_serialization(self):
         """Test JSON serialization."""
         teu = create_mock_time_evolution_unitary(num_qubits=6)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[2])
+        cteu = ControlledUnitary(teu, control_indices=[2])
 
         json_data = cteu.to_json()
         assert "time_evolution_unitary" in json_data
@@ -82,7 +82,7 @@ class TestControlledTimeEvolutionUnitary:
     def test_to_hdf5_roundtrip(self, tmp_path):
         """Test HDF5 serialization and deserialization."""
         teu = create_mock_time_evolution_unitary(num_qubits=8)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[0])
+        cteu = ControlledUnitary(teu, control_indices=[0])
 
         file_path = tmp_path / "cte_unitary.h5"
 
@@ -101,9 +101,9 @@ class TestControlledTimeEvolutionUnitary:
             assert num_qubits == 8
 
     def test_summary_format(self):
-        """Test the summary format of ControlledTimeEvolutionUnitary."""
+        """Test the summary format of ControlledUnitary."""
         teu = create_mock_time_evolution_unitary(num_qubits=3)
-        cteu = ControlledTimeEvolutionUnitary(teu, control_indices=[5])
+        cteu = ControlledUnitary(teu, control_indices=[5])
 
         summary = cteu.get_summary()
         assert "Controlled Time Evolution Unitary" in summary

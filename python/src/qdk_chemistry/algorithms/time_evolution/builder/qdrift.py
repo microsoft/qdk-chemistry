@@ -18,7 +18,7 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -83,7 +83,7 @@ class QDriftSettings(Settings):
         )
 
 
-class QDrift(TimeEvolutionBuilder):
+class QDrift(UnitaryBuilder):
     r"""qDRIFT randomized product formula builder.
 
     Implements the qDRIFT algorithm from Campbell (2019), which approximates the
@@ -113,7 +113,7 @@ class QDrift(TimeEvolutionBuilder):
     Examples:
         >>> from qdk_chemistry.algorithms import create
         >>> # Create a qDRIFT builder with 500 samples
-        >>> qdrift = create("time_evolution_builder", "qdrift", num_samples=500, seed=42)
+        >>> qdrift = create("unitary_builder", "qdrift", num_samples=500, seed=42)
         >>> # Use it to build time evolution for a Hamiltonian
         >>> time_evolution = qdrift.run(qubit_hamiltonian, time=1.0)
 
@@ -263,7 +263,7 @@ class QDrift(TimeEvolutionBuilder):
         for idx in term_indices:
             label, coeff = terms[idx]
             sign = 1.0 if coeff >= 0 else -1.0
-            mapping = TimeEvolutionBuilder._pauli_label_to_map(label)  # noqa: SLF001
+            mapping = UnitaryBuilder._pauli_label_to_map(label)  # noqa: SLF001
             result.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=sign * angle_magnitude))
 
         return result

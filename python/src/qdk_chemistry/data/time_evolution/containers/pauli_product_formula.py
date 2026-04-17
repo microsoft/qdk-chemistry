@@ -10,7 +10,7 @@ from typing import Any
 
 import h5py
 
-from .base import TimeEvolutionUnitaryContainer
+from .base import UnitaryContainer
 
 __all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
 
@@ -31,7 +31,7 @@ class ExponentiatedPauliTerm:
     """The rotation angle for the exponentiation."""
 
 
-class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
+class PauliProductFormulaContainer(UnitaryContainer):
     r"""Dataclass for a Pauli product formula container.
 
     A Pauli Product Formula decomposes a time-evolution operator :math:`U(t) = e^{-i H t}`,

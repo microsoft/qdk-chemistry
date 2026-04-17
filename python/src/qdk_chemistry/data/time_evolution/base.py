@@ -1,4 +1,4 @@
-"""QDK/Chemistry unitary representation base module."""
+"""QDK/Chemistry time evolution base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -26,7 +26,7 @@ class UnitaryRepresentation(DataClass):
     """
 
     # Class attribute for filename validation
-    _data_type_name = "time_evolution_unitary"
+    _data_type_name = "unitary_representation"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -129,7 +129,3 @@ class UnitaryRepresentation(DataClass):
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)
-
-
-# Backward-compatible alias
-TimeEvolutionUnitary = UnitaryRepresentation
