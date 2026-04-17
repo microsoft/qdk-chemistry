@@ -405,26 +405,3 @@ TEST_F(MathUtilsTest, BinomialCoefficientValues) {
   EXPECT_EQ(binomial_coefficient(50, 25), 126410606437752ULL);
   EXPECT_EQ(binomial_coefficient(60, 30), 118264581564861424ULL);
 }
-
-// Tests for checked_n4 overflow utility
-TEST(CheckedN4, ZeroReturnsZero) {
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(0), 0u);
-}
-
-TEST(CheckedN4, SmallValues) {
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(1), 1u);
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(2), 16u);
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(3), 81u);
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(10), 10000u);
-}
-
-TEST(CheckedN4, LargeValidValue) {
-  // 215^4 = 2,136,750,625 — fits in size_t
-  EXPECT_EQ(qdk::chemistry::utils::checked_n4(215), 2136750625u);
-}
-
-TEST(CheckedN4, OverflowThrows) {
-  // 65537^4 > max(size_t) on both 32-bit and 64-bit platforms
-  size_t huge = size_t{1} << 16 | 1;
-  EXPECT_THROW(qdk::chemistry::utils::checked_n4(huge), std::overflow_error);
-}

@@ -2628,18 +2628,3 @@ TEST_F(HamiltonianTest, DataTypeName) {
 
   EXPECT_EQ(h.get_data_type_name(), "hamiltonian");
 }
-
-// Tests for _to_map input validation in SparseHamiltonianContainer
-TEST(SparseContainerValidation, DenseTwoBodySizeMismatchThrows) {
-  // 2x2 one-body expects 16-element two-body vector; pass 10
-  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
-  Eigen::VectorXd bad_two_body = Eigen::VectorXd::Zero(10);
-  EXPECT_THROW(SparseHamiltonianContainer(one_body, bad_two_body, 0.0),
-               std::invalid_argument);
-}
-
-TEST(SparseContainerValidation, DenseTwoBodyCorrectSizeSucceeds) {
-  Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
-  Eigen::VectorXd two_body = Eigen::VectorXd::Zero(16);
-  EXPECT_NO_THROW(SparseHamiltonianContainer(one_body, two_body, 0.0));
-}

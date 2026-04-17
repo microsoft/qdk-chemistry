@@ -16,7 +16,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
-#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
@@ -88,15 +87,6 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
       [norbs](
           const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
         using VecType = std::decay_t<decltype(vec)>;
-
-        // Validate norbs^4 matches vector size with overflow checking
-        size_t norbs4_check = utils::checked_n4(norbs);
-        if (static_cast<size_t>(vec.size()) != norbs4_check) {
-          throw std::invalid_argument("Vector size (" +
-                                      std::to_string(vec.size()) +
-                                      ") does not match norbs^4 (" +
-                                      std::to_string(norbs4_check) + ")");
-        }
 
         VecType output(vec.size());
         output.setZero();
@@ -469,14 +459,6 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   }
 
   size_t norbs = static_cast<size_t>(one_rdm_aa.rows());
-
-  // Validate 2-RDM size matches norbs^4
-  size_t norbs4 = utils::checked_n4(norbs);
-  if (static_cast<size_t>(two_rdm_ab.size()) != norbs4) {
-    throw std::invalid_argument(
-        "2-RDM size (" + std::to_string(two_rdm_ab.size()) +
-        ") does not match norbs^4 (" + std::to_string(norbs4) + ")");
-  }
 
   // Lambda function to get the two-body RDM element
   auto get_active_two_rdm_element = [&two_rdm_ab, norbs](size_t i, size_t j,

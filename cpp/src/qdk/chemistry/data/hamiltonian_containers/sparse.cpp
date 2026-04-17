@@ -9,7 +9,6 @@
 #include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
-#include <qdk/chemistry/utils/index_utils.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -583,8 +582,8 @@ void SparseHamiltonianContainer::_materialize_dense_two_body() const {
   size_t n = _orbitals->get_num_molecular_orbitals();
   size_t n2 = n * n;
   size_t n3 = n2 * n;
-  size_t n4 = utils::checked_n4(n);
-  _two_body_dense_cache = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n4));
+  _two_body_dense_cache =
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n * n * n * n));
   for (const auto& [idx, val] : _two_body_map) {
     const auto& [p, q, r, s] = idx;
     _two_body_dense_cache(
@@ -612,21 +611,6 @@ Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(
 SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
     const Eigen::VectorXd& v, size_t n) {
   TwoBodyMap m;
-  size_t n4 = utils::checked_n4(n);
-  if (n == 0) {
-    if (v.size() != 0) {
-      throw std::invalid_argument(
-          "Invalid two-body tensor size: expected 0 elements for n = 0, got " +
-          std::to_string(v.size()));
-    }
-    return m;
-  }
-  if (static_cast<size_t>(v.size()) != n4) {
-    throw std::invalid_argument("Invalid two-body tensor size: expected " +
-                                std::to_string(n4) +
-                                " elements for n = " + std::to_string(n) +
-                                ", got " + std::to_string(v.size()));
-  }
   size_t n2 = n * n;
   size_t n3 = n2 * n;
   for (size_t p = 0; p < n; ++p)
