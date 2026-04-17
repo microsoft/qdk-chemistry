@@ -79,9 +79,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
         """Return controlled_circuit_mapper as the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    def _run_impl(
-        self, controlled_unitary: ControlledUnitary, target_indices: Sequence[int] | None = None
-    ) -> Circuit:
+    def _run_impl(self, controlled_unitary: ControlledUnitary, target_indices: Sequence[int] | None = None) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled unitary.
 
         Args:

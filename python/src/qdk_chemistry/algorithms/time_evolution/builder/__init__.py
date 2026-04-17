@@ -15,7 +15,7 @@ __all__ = [
     "PartiallyRandomizedSettings",
     "QDrift",
     "QDriftSettings",
-    "UnitaryBuilderFactory",
     "Trotter",
     "TrotterSettings",
+    "UnitaryBuilderFactory",
 ]

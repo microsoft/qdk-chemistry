@@ -9,7 +9,7 @@ from typing import Any
 
 import h5py
 
-from qdk_chemistry.data import ControlledUnitary, UnitaryRepresentation, UnitaryContainer
+from qdk_chemistry.data import ControlledUnitary, UnitaryContainer, UnitaryRepresentation
 
 
 class MockUnitaryContainer(UnitaryContainer):

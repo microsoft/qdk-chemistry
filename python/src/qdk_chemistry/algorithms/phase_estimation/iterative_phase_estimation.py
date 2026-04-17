@@ -180,12 +180,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        unitary_rep = self._create_unitary(
-            qubit_hamiltonian, self.settings().get("evolution_time"), unitary_builder
-        )
-        controlled_unitary = ControlledUnitary(
-            unitary=unitary_rep, control_indices=[0]
-        )
+        unitary_rep = self._create_unitary(qubit_hamiltonian, self.settings().get("evolution_time"), unitary_builder)
+        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         power = 2 ** (total_iterations - iteration - 1)
         ctrl_unitary_circuit = self._create_controlled_circuit(controlled_unitary, power, circuit_mapper)
 
@@ -202,7 +198,11 @@ class IterativePhaseEstimation(PhaseEstimation):
         )
 
     def _create_circuit_from_qsharp_op(
-        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float, num_system_qubits: int
+        self,
+        state_preparation: Circuit,
+        controlled_unitary_circuit: Circuit,
+        phase_correction: float,
+        num_system_qubits: int,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
