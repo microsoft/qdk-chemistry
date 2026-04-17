@@ -262,10 +262,11 @@ class HamiltonianContainer {
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
+   * @throws std::runtime_error if I/O error occurs or Hamiltonian is
+   * unrestricted
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
-                               size_t nbeta) const = 0;
+                               size_t nbeta) const;
 
   /**
    * @brief Check if the Hamiltonian data is complete and consistent
@@ -643,16 +644,6 @@ class Hamiltonian : public DataClass,
    */
   static std::shared_ptr<Hamiltonian> _from_hdf5_file(
       const std::string& filename);
-
-  /**
-   * @brief Save FCIDUMP file without filename validation (internal use)
-   * @param filename Path to FCIDUMP file to create/overwrite
-   * @param nalpha Number of alpha electrons
-   * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
-   */
-  void _to_fcidump_file(const std::string& filename, size_t nalpha,
-                        size_t nbeta) const;
 };
 
 // Enforce inheritance from base class and presence of required methods.

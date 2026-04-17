@@ -308,8 +308,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     const bool is_unrestricted =
         (ms_scf_config->scf_orbital_type == SCFOrbitalType::Unrestricted);
-    if (is_unrestricted) {
-      if (initial_guess->is_restricted())
+    const bool is_restricted_open_shell = (ms_scf_config->scf_orbital_type ==
+                                           SCFOrbitalType::RestrictedOpenShell);
+    if (is_unrestricted || is_restricted_open_shell) {
+      if (is_unrestricted && initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
             "initial guess provided.");
