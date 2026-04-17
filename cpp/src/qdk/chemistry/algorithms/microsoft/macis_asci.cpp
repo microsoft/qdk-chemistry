@@ -66,7 +66,7 @@ struct asci_helper {
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
     macis::ASCISettings asci_settings = get_asci_settings_(settings_);
 
-    QDK_LOGGER().debug(
+    QDK_LOGGER().info(
         "MACIS ASCI helper prepared: norb={}, nalpha={}, nbeta={}, "
         "ntdets_max={}, "
         "ntdets_min={}, max_refine_iter={}, grow_factor={}, rv_prune_tol={}",
@@ -83,7 +83,7 @@ struct asci_helper {
         num_molecular_orbitals, num_molecular_orbitals);
 
     // Select Hamiltonian generator based on h_build_algo
-    QDK_LOGGER().debug("Constructing MACIS Hamiltonian generator.");
+    QDK_LOGGER().info("Constructing MACIS Hamiltonian generator.");
     std::unique_ptr<macis::HamiltonianGenerator<wfn_type>> ham_gen_ptr;
     const auto& algo = asci_settings.h_build_algo;
     if (algo == "residue_arrays") {
@@ -109,7 +109,7 @@ struct asci_helper {
       ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
     }
     auto& ham_gen = *ham_gen_ptr;
-    QDK_LOGGER().debug("MACIS Hamiltonian generator constructed.");
+    QDK_LOGGER().info("MACIS Hamiltonian generator constructed.");
 
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
@@ -121,7 +121,7 @@ struct asci_helper {
         qdk::chemistry::utils::microsoft::binomial_coefficient(
             num_molecular_orbitals, nbeta);
 
-    QDK_LOGGER().debug("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
+    QDK_LOGGER().info("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
 
     if (asci_settings.ntdets_max > fci_dimension) {
       QDK_LOGGER().info(
@@ -143,23 +143,23 @@ struct asci_helper {
       C_casci = {1.0};
 
       // Growth phase
-      QDK_LOGGER().debug("Starting MACIS ASCI growth phase.");
+      QDK_LOGGER().info("Starting MACIS ASCI growth phase.");
       std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
           std::move(C_casci), ham_gen,
           num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
-      QDK_LOGGER().debug(
+      QDK_LOGGER().info(
           "Completed MACIS ASCI growth phase with {} determinants.",
           dets.size());
 
       // Refinement phase
       if (asci_settings.max_refine_iter) {
-        QDK_LOGGER().debug("Starting MACIS ASCI refinement phase.");
+        QDK_LOGGER().info("Starting MACIS ASCI refinement phase.");
         std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
             asci_settings, mcscf_settings, E_casci, std::move(dets),
             std::move(C_casci), ham_gen,
             num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
-        QDK_LOGGER().debug(
+        QDK_LOGGER().info(
             "Completed MACIS ASCI refinement phase with {} determinants.",
             dets.size());
       }

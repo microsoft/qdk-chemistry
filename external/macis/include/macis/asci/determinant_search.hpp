@@ -566,6 +566,10 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         std::max(size_t(1024), max_size / num_threads);
     accumulated_pairs.reserve(per_thread_reserve);
 
+    // Running top-k cutoff for this thread-local accumulator.
+    bool threshold_ready = false;
+    double threshold_abs_rv = 0.0;
+
     // Working set for the current constraint — grows during excitation
     // generation, then gets S&A'd and merged into accumulated_pairs.
     // clear() preserves capacity, so after the first constraint this
@@ -674,27 +678,50 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           working_pairs.erase(uit, working_pairs.end());
         }
 
-        // Merge into accumulated results
-        accumulated_pairs.insert(
-            accumulated_pairs.end(),
-            std::make_move_iterator(working_pairs.begin()),
-            std::make_move_iterator(working_pairs.end()));
+        // If top-k cutoff is active, keep only candidates that can survive.
+        if (threshold_ready) {
+          auto keep_end = std::partition(
+              working_pairs.begin(), working_pairs.end(),
+              [threshold_abs_rv](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold_abs_rv;
+              });
+          working_pairs.erase(keep_end, working_pairs.end());
+        }
+
+        bool merged_new_candidates = !working_pairs.empty();
+        if (merged_new_candidates) {
+          // Merge filtered candidates into accumulated results.
+          accumulated_pairs.insert(
+              accumulated_pairs.end(),
+              std::make_move_iterator(working_pairs.begin()),
+              std::make_move_iterator(working_pairs.end()));
+        }
         working_pairs.clear();
         size_t accumulated_size = accumulated_pairs.size();
+        if (ic % 10 == 0) {
+          logger->info ("  * After Merge at CON = {}, accumulated_size = {} at CON = {}", ic,
+                       accumulated_size, ic);
+        }
 
-        if (accumulated_size > ntdets) {
+        const bool need_initial_threshold =
+            (!threshold_ready && ntdets > 0 && accumulated_size >= ntdets);
+        const bool need_threshold_refresh =
+            (threshold_ready && merged_new_candidates && ntdets > 0 &&
+             accumulated_size > ntdets);
+
+        if (need_initial_threshold || need_threshold_refresh) {
           const size_t cutoff_idx = ntdets - 1;
           std::nth_element(accumulated_pairs.begin(),
                            accumulated_pairs.begin() + cutoff_idx,
                            accumulated_pairs.end(), contrib_cmp);
-          const double threshold =
-              std::abs(accumulated_pairs[cutoff_idx].rv());
+          threshold_abs_rv = std::abs(accumulated_pairs[cutoff_idx].rv());
+          threshold_ready = true;
           // Repartition only the tail so entries tied at the cutoff are moved
           // directly behind the nth position before trimming.
           auto new_end = std::partition(
               accumulated_pairs.begin() + cutoff_idx + 1,
-              accumulated_pairs.end(), [threshold](const auto& contrib) {
-                return std::abs(contrib.rv()) >= threshold;
+              accumulated_pairs.end(), [threshold_abs_rv](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold_abs_rv;
               });
           accumulated_pairs.erase(new_end, accumulated_pairs.end());
         }

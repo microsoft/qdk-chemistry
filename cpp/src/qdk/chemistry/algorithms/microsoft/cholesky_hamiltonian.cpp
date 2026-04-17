@@ -224,11 +224,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 #endif
 
-  QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
+  QDK_LOGGER().info("Cholesky Rank | Max Diagonal Element");
   double D_max = 0.0;
   while (current_col < max_rank) {
     if (active_shell_pairs.empty()) {
-      QDK_LOGGER().debug("{:>13} | all shell pairs converged", current_col);
+      QDK_LOGGER().info("{:>13} | all shell pairs converged", current_col);
       break;
     }
 
@@ -248,7 +248,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         s2_max = s2;
       }
     }
-    QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
+    QDK_LOGGER().info("{:>13} | {}", current_col, D_max);
 
     // check convergence
     if (D_max < threshold) {
@@ -431,7 +431,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     }
   }
 
-  QDK_LOGGER().debug("Cholesky rank: {}", current_col);
+  QDK_LOGGER().info("Cholesky rank: {}", current_col);
 
   if (current_col == max_rank) {
     QDK_LOGGER().warn(

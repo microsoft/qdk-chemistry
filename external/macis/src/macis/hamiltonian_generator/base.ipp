@@ -39,7 +39,8 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
   size_t no = norb_;
   size_t no2 = no * no;
   size_t no3 = no2 * no;
-
+  std::cout << "Generating integral intermediates for Hamiltonian generator with "
+            << no << " orbitals..." << std::endl;
   // G_red(i,j,k) = G(i,j,k,k) = V(i,j,k,k) - V(i,k,k,j)
   // V_red(i,j,k) = V(i,j,k,k) = V(k,k,i,j)
   G_red_data_.resize(no3);
@@ -52,7 +53,7 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
         G_red_(k, i, j) = V(k, k, i, j) - V(k, j, i, k);
         V_red_(k, i, j) = V(k, k, i, j);
       }
-
+  std::cout << "Finished generating integral intermediates." << std::endl;
   // G2_red(i,j) = 0.5 * G(i,i,j,j)
   //             = 0.5 * (V(i,i,j,j) - V(i,j,j,i))
   // V2_red(i,j) = V(i,i,j,j)
@@ -65,6 +66,7 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
       G2_red_(i, j) = 0.5 * (V(i, i, j, j) - V(i, j, j, i));
       V2_red_(i, j) = V(i, i, j, j);
     }
+  std::cout << "Finished generating doubly reduced integral intermediates." << std::endl;
 }
 
 template <typename Scalar>
