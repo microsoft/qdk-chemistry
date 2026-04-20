@@ -195,6 +195,123 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
   EXPECT_EQ(num_active_orbitals, 5);
 }
 
+// ========== Transition metal double-d-shell tests ==========
+// Periods 4-5 include a correlating d' shell: 14 valence orbitals per atom
+// (ns + 5*(n-1)d + 5*nd' + 3*np) instead of the previous 9.
+//
+// Note: These tests require a C++ rebuild with the updated
+// valence orbital constants in valence_space.cpp.
+
+class TransitionMetalValenceTest : public ::testing::Test {
+ protected:
+  void SetUp() override { scf_solver = ScfSolverFactory::create(); }
+
+  std::unique_ptr<ScfSolver> scf_solver;
+};
+
+// Cu atom (Z=29, period 4): 11 valence electrons, 14 valence orbitals.
+// Cu doublet converges reliably with def2-SVP.
+TEST_F(TransitionMetalValenceTest, CopperAtomDef2SvpTest) {
+  std::vector<std::string> symbols = {"Cu"};
+  Eigen::MatrixXd coords(1, 3);
+  coords << 0.0, 0.0, 0.0;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 2, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  EXPECT_EQ(result.first, 11);   // 29 - 18 = 11 valence electrons
+  EXPECT_EQ(result.second, 14);  // 4s + 5*3d + 5*4d' + 3*4p
+}
+
+// Ni atom (Z=28, period 4): 10 valence electrons.
+// Ni triplet converges reliably with def2-SVP.
+TEST_F(TransitionMetalValenceTest, NickelAtomDef2SvpTest) {
+  std::vector<std::string> symbols = {"Ni"};
+  Eigen::MatrixXd coords(1, 3);
+  coords << 0.0, 0.0, 0.0;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 3, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  EXPECT_EQ(result.first, 10);   // 28 - 18
+  EXPECT_EQ(result.second, 14);  // full double-d-shell
+}
+
+// Zn atom (Z=30, period 4, d10 closed-shell singlet).
+TEST_F(TransitionMetalValenceTest, ZincAtomDef2SvpTest) {
+  std::vector<std::string> symbols = {"Zn"};
+  Eigen::MatrixXd coords(1, 3);
+  coords << 0.0, 0.0, 0.0;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  EXPECT_EQ(result.first, 12);   // 30 - 18
+  EXPECT_EQ(result.second, 14);  // full double-d-shell
+}
+
+// AgH molecule: period 5 transition metal.
+TEST_F(TransitionMetalValenceTest, SilverHydrideTest) {
+  auto structure = testing::create_agh_structure();
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  // Ag (Z=47): 11 valence electrons (47 - 36 core from Kr)
+  // Period 5: 14 valence orbitals (5s + 5*4d + 5*5d' + 3*5p)
+  // H: 1 valence electron, 1 valence orbital
+  EXPECT_EQ(result.first, 12);   // 11 + 1
+  EXPECT_EQ(result.second, 15);  // 14 + 1
+}
+
+// Period 3 elements are NOT affected by the double-d-shell.
+TEST_F(TransitionMetalValenceTest, Period3UnaffectedTest) {
+  std::vector<std::string> symbols = {"Na", "Cl"};
+  Eigen::MatrixXd coords(2, 3);
+  coords << 0.0, 0.0, 0.0, 0.0, 0.0, 2.361;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "STO-3G");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  // Na: 1 valence electron, 4 valence orbitals (3s + 3*3p)
+  // Cl: 7 valence electrons, 4 valence orbitals (3s + 3*3p)
+  EXPECT_EQ(result.first, 8);
+  EXPECT_EQ(result.second, 8);
+}
+
+// K atom (Z=19, period 4 main-group): 9 valence orbitals (no d' shell).
+TEST_F(TransitionMetalValenceTest, PotassiumAtomDef2SvpTest) {
+  std::vector<std::string> symbols = {"K"};
+  Eigen::MatrixXd coords(1, 3);
+  coords << 0.0, 0.0, 0.0;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 2, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  EXPECT_EQ(result.first, 1);   // 19 - 18
+  EXPECT_EQ(result.second, 9);  // period 4 main-group: no d' shell
+}
+
+// Pt atom (Z=78, period 6 d-block): 24 valence electrons, 21 valence orbitals.
+// Period 6 base (16) + 5 d' = 21.
+TEST_F(TransitionMetalValenceTest, PlatinumAtomDef2SvpTest) {
+  std::vector<std::string> symbols = {"Pt"};
+  Eigen::MatrixXd coords(1, 3);
+  coords << 0.0, 0.0, 0.0;
+  auto structure = std::make_shared<Structure>(coords, symbols);
+
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 1, "def2-svp");
+  auto result = compute_valence_space_parameters(wavefunction, 0);
+
+  EXPECT_EQ(result.first, 24);   // 78 - 54 (Xe core)
+  EXPECT_EQ(result.second, 21);  // 6s + 7*4f + 5*5d + 5*6d' + 3*6p
+}
+
 // Test fixture for orbital rotation
 class OrbitalRotationTest : public ::testing::Test {
  protected:

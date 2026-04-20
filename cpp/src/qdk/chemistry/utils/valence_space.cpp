@@ -28,6 +28,14 @@ static const std::vector<size_t> VALENCE_ORBITALS_BY_PERIOD = {
     16  // Period 6 (Cs-Rn): 6s, 7*4f, 5*5d, 3*6p
 };
 
+// d-block elements get 5 extra correlating d' orbitals (double-d-shell effect).
+// Ranges: Sc(21)-Zn(30), Y(39)-Cd(48), Hf(72)-Hg(80).
+static bool is_d_block(size_t atomic_number) {
+  return (atomic_number >= 21 && atomic_number <= 30) ||
+         (atomic_number >= 39 && atomic_number <= 48) ||
+         (atomic_number >= 72 && atomic_number <= 80);
+}
+
 // Helper function to calculate valence electrons for an element
 size_t calculate_valence_electrons(Element element) {
   QDK_LOG_TRACE_ENTERING();
@@ -55,12 +63,25 @@ size_t calculate_valence_orbitals(Element element) {
   size_t atomic_number = static_cast<size_t>(element);
 
   // Determine the period
-  if (atomic_number <= 2) return VALENCE_ORBITALS_BY_PERIOD[0];   // Period 1
-  if (atomic_number <= 10) return VALENCE_ORBITALS_BY_PERIOD[1];  // Period 2
-  if (atomic_number <= 18) return VALENCE_ORBITALS_BY_PERIOD[2];  // Period 3
-  if (atomic_number <= 36) return VALENCE_ORBITALS_BY_PERIOD[3];  // Period 4
-  if (atomic_number <= 54) return VALENCE_ORBITALS_BY_PERIOD[4];  // Period 5
-  return VALENCE_ORBITALS_BY_PERIOD[5];                           // Period 6
+  size_t base = 0;
+  if (atomic_number <= 2)
+    base = VALENCE_ORBITALS_BY_PERIOD[0];  // Period 1
+  else if (atomic_number <= 10)
+    base = VALENCE_ORBITALS_BY_PERIOD[1];  // Period 2
+  else if (atomic_number <= 18)
+    base = VALENCE_ORBITALS_BY_PERIOD[2];  // Period 3
+  else if (atomic_number <= 36)
+    base = VALENCE_ORBITALS_BY_PERIOD[3];  // Period 4
+  else if (atomic_number <= 54)
+    base = VALENCE_ORBITALS_BY_PERIOD[4];  // Period 5
+  else
+    base = VALENCE_ORBITALS_BY_PERIOD[5];  // Period 6
+
+  if (is_d_block(atomic_number)) {
+    base += 5;  // nd/(n+1)d' correlating shell
+  }
+
+  return base;
 }
 
 std::pair<size_t, size_t> compute_valence_space_parameters(
