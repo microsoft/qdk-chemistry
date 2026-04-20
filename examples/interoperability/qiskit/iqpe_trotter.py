@@ -119,7 +119,7 @@ iqpe = create(
     shots_per_bit=SHOTS_PER_BIT,
 )
 aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
-unitary_builder = create("unitary_builder", "trotter")
+unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
 
 

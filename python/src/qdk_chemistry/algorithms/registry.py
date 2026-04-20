@@ -510,8 +510,8 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.builder import UnitaryBuilderFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledCircuitMapperFactory,
     )
 
@@ -519,7 +519,7 @@ def _register_python_factories():
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
-    register_factory(UnitaryBuilderFactory())
+    register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(PhaseEstimationFactory())
@@ -585,16 +585,16 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.builder.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
-    from qdk_chemistry.algorithms.time_evolution.builder.qdrift import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.builder.qdrift import (  # noqa: PLC0415
         QDrift,
     )
-    from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.builder.trotter import (  # noqa: PLC0415
         Trotter,
     )
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper import (  # noqa: PLC0415
         PauliSequenceMapper,
     )
 

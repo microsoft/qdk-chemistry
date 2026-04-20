@@ -1,4 +1,4 @@
-"""QDK/Chemistry unitary builder abstractions."""
+"""QDK/Chemistry Hamiltonian unitary builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -10,23 +10,26 @@ from abc import abstractmethod
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 
-__all__: list[str] = ["UnitaryBuilder", "UnitaryBuilderFactory"]
+__all__: list[str] = [
+    "HamiltonianUnitaryBuilder",
+    "HamiltonianUnitaryBuilderFactory",
+    "TimeEvolutionBuilder",
+]
 
 
-class UnitaryBuilder(Algorithm):
-    """Base class for unitary Builders in QDK/Chemistry algorithms."""
+class HamiltonianUnitaryBuilder(Algorithm):
+    """Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms."""
 
     def __init__(self):
-        """Initialize the UnitaryBuilder."""
+        """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given QubitHamiltonian.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
-            time: The evolution time.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
@@ -56,12 +59,34 @@ class UnitaryBuilder(Algorithm):
         return mapping
 
 
-class UnitaryBuilderFactory(AlgorithmFactory):
-    """Factory class for creating UnitaryBuilder instances."""
+class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
+    """Base class for time-evolution-based Hamiltonian unitary builders.
+
+    Subclasses (e.g. Trotter, qDRIFT) implement ``_run_impl`` which receives
+    the ``time`` parameter representing the evolution time for constructing the
+    unitary :math:`U(t) = e^{-iHt}`.
+    """
+
+    @abstractmethod
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation for the given QubitHamiltonian.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian.
+            time: The evolution time for the unitary construction.
+
+        Returns:
+            UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
+
+        """
+
+
+class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):
+    """Factory class for creating HamiltonianUnitaryBuilder instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return unitary_builder as the algorithm type name."""
-        return "unitary_builder"
+        """Return hamiltonian_unitary_builder as the algorithm type name."""
+        return "hamiltonian_unitary_builder"
 
     def default_algorithm_name(self) -> str:
         """Return Trotter as the default algorithm name."""

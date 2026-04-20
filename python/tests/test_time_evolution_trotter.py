@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.trotter import Trotter
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )

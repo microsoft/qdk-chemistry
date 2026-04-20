@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift, QDriftSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.qdrift import QDrift, QDriftSettings
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -52,16 +52,16 @@ class TestQDriftBasics:
     def test_type_name(self):
         """Test the type_name method of QDrift."""
         builder = QDrift()
-        assert builder.type_name() == "unitary_builder"
+        assert builder.type_name() == "hamiltonian_unitary_builder"
 
     def test_can_create_via_registry(self):
         """Test that QDrift can be created via the algorithm registry."""
-        builder = create("unitary_builder", "qdrift")
+        builder = create("hamiltonian_unitary_builder", "qdrift")
         assert isinstance(builder, QDrift)
 
     def test_can_create_with_settings(self):
         """Test that QDrift can be created with custom settings."""
-        builder = create("unitary_builder", "qdrift", num_samples=200, seed=42)
+        builder = create("hamiltonian_unitary_builder", "qdrift", num_samples=200, seed=42)
         assert builder.settings().get("num_samples") == 200
         assert builder.settings().get("seed") == 42
 

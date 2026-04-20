@@ -50,7 +50,7 @@ class TestRegistryShowDefault:
             "circuit_executor",
             "controlled_circuit_mapper",
             "phase_estimation",
-            "unitary_builder",
+            "hamiltonian_unitary_builder",
             "circuit_executor",
         ]
 
@@ -103,7 +103,7 @@ class TestRegistryShowDefault:
         assert default_phase_estimation == "iterative"
 
         # Test for time evolution builder
-        default_unitary_builder = registry.show_default("unitary_builder")
+        default_unitary_builder = registry.show_default("hamiltonian_unitary_builder")
         assert isinstance(default_unitary_builder, str)
         assert default_unitary_builder == "trotter"
 

@@ -112,7 +112,7 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
 
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     return qpe.run(
         state_preparation=problem.state_prep,

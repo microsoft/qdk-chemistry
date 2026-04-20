@@ -12,16 +12,16 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper import (
+from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.time_evolution.base import UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.hamiltonian_unitary.base import UnitaryRepresentation
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import (
+from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import (
     ControlledUnitary,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT

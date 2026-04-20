@@ -25,9 +25,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.qdrift import QDrift
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -139,7 +139,7 @@ class PartiallyRandomized(QDrift):
         >>> from qdk_chemistry.algorithms import create
         >>> # Create a partially randomized builder
         >>> builder = create(
-        ...     "unitary_builder",
+        ...     "hamiltonian_unitary_builder",
         ...     "partially_randomized",
         ...     weight_threshold=0.1,  # Terms with |h_j| >= 0.1 treated deterministically
         ...     num_random_samples=200,
@@ -198,7 +198,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
         r"""Construct the unitary representation using partially randomized product formula.
 
         The algorithm:
@@ -208,7 +208,7 @@ class PartiallyRandomized(QDrift):
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The total evolution time (δ in the formula).
+            time: The evolution time for the unitary construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the
@@ -326,5 +326,5 @@ class PartiallyRandomized(QDrift):
         return "partially_randomized"
 
     def type_name(self) -> str:
-        """Return unitary_builder as the algorithm type name."""
-        return "unitary_builder"
+        """Return hamiltonian_unitary_builder as the algorithm type name."""
+        return "hamiltonian_unitary_builder"

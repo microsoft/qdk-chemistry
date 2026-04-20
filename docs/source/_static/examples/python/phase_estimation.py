@@ -72,7 +72,7 @@ state_prep = create("state_prep", "sparse_isometry_gf2x")
 circuit = state_prep.run(wfn_cas)
 
 # 7. Create QPE dependencies
-unitary_builder = create("unitary_builder", "trotter", order=2)
+unitary_builder = create("hamiltonian_unitary_builder", "trotter", order=2)
 circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
 circuit_executor = create("circuit_executor", "qiskit_aer_simulator", seed=42)
 

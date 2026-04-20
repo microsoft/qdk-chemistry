@@ -15,8 +15,8 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
     ControlledUnitary,
@@ -84,7 +84,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
@@ -156,7 +156,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
         iteration: int,
         total_iterations: int,
@@ -180,7 +180,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        unitary_rep = self._create_unitary(qubit_hamiltonian, self.settings().get("evolution_time"), unitary_builder)
+        unitary_rep = self._create_unitary(qubit_hamiltonian, unitary_builder)
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         power = 2 ** (total_iterations - iteration - 1)
         ctrl_unitary_circuit = self._create_controlled_circuit(controlled_unitary, power, circuit_mapper)

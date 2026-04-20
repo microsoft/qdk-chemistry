@@ -9,8 +9,11 @@ from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import (
+    HamiltonianUnitaryBuilder,
+    TimeEvolutionBuilder,
+)
+from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import (
     ControlledCircuitMapper,
 )
 from qdk_chemistry.data import (
@@ -76,7 +79,7 @@ class PhaseEstimation(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
@@ -105,20 +108,24 @@ class PhaseEstimation(Algorithm):
         """
 
     def _create_unitary(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, unitary_builder: UnitaryBuilder
+        self, qubit_hamiltonian: QubitHamiltonian, unitary_builder: HamiltonianUnitaryBuilder
     ) -> UnitaryRepresentation:
         """Create the unitary representation for the given Hamiltonian.
 
+        If the builder is a :class:`TimeEvolutionBuilder`, the ``evolution_time``
+        from the phase estimation settings is passed as the ``time`` argument.
+
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            time: The evolution time.
             unitary_builder: The unitary builder to use.
 
         Returns:
             The unitary representation.
 
         """
-        return unitary_builder.run(qubit_hamiltonian, time)
+        if isinstance(unitary_builder, TimeEvolutionBuilder):
+            return unitary_builder.run(qubit_hamiltonian, time=self.settings().get("evolution_time"))
+        return unitary_builder.run(qubit_hamiltonian)
 
     def _create_controlled_circuit(
         self,

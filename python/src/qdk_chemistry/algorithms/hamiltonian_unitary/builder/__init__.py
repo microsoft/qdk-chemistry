@@ -1,21 +1,21 @@
-"""QDK/Chemistry unitary builder module."""
+"""QDK/Chemistry Hamiltonian unitary builder module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import UnitaryBuilderFactory
+from .base import HamiltonianUnitaryBuilderFactory
 from .partially_randomized import PartiallyRandomized, PartiallyRandomizedSettings
 from .qdrift import QDrift, QDriftSettings
 from .trotter import Trotter, TrotterSettings
 
 __all__ = [
+    "HamiltonianUnitaryBuilderFactory",
     "PartiallyRandomized",
     "PartiallyRandomizedSettings",
     "QDrift",
     "QDriftSettings",
     "Trotter",
     "TrotterSettings",
-    "UnitaryBuilderFactory",
 ]

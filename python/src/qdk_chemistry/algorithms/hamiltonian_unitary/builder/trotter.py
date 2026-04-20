@@ -18,13 +18,13 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
-from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -73,7 +73,7 @@ class TrotterSettings(Settings):
         )
 
 
-class Trotter(UnitaryBuilder):
+class Trotter(TimeEvolutionBuilder):
     """Trotter decomposition builder."""
 
     def __init__(
@@ -141,12 +141,12 @@ class Trotter(UnitaryBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The total evolution time.
+            time: The evolution time for the unitary construction.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
@@ -350,4 +350,4 @@ class Trotter(UnitaryBuilder):
 
     def type_name(self) -> str:
         """Return unitary_builder as the algorithm type name."""
-        return "unitary_builder"
+        return "hamiltonian_unitary_builder"

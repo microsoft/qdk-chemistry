@@ -113,10 +113,10 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
-from qdk_chemistry.data.time_evolution.base import UnitaryRepresentation
-from qdk_chemistry.data.time_evolution.containers.base import UnitaryContainer
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledUnitary
+from qdk_chemistry.data.hamiltonian_unitary.base import UnitaryRepresentation
+from qdk_chemistry.data.hamiltonian_unitary.containers.base import UnitaryContainer
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import ControlledUnitary
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound

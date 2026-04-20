@@ -139,7 +139,7 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     return iqpe.run(
         qubit_hamiltonian=problem.hamiltonian,
@@ -165,7 +165,7 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     return qpe.run(
         qubit_hamiltonian=problem.hamiltonian,
@@ -221,7 +221,7 @@ def _run_iterative_with_parameters(
     iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     return iqpe.run(
         qubit_hamiltonian=hamiltonian,
@@ -472,7 +472,7 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
@@ -526,7 +526,7 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     with pytest.raises(ValueError, match="No iteration circuits have been generated"):
         iqpe.get_circuits()
@@ -615,7 +615,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
     state_prep.h(0)
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
     circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-    unitary_builder = create("unitary_builder", "trotter")
+    unitary_builder = create("hamiltonian_unitary_builder", "trotter")
 
     iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
     iter_0_circuit = iqpe.create_iteration_circuit(

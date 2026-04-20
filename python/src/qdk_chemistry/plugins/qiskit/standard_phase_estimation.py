@@ -19,8 +19,8 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
-from qdk_chemistry.algorithms.time_evolution.builder.base import UnitaryBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
     ControlledUnitary,
@@ -89,7 +89,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
         circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
@@ -135,7 +135,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
     ) -> Circuit:
         """Build the standard QPE circuit.
@@ -201,7 +201,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         *,
         time: float,
         power: int,
-        unitary_builder: UnitaryBuilder,
+        unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
     ) -> None:
         """Apply the controlled unitary to the circuit.
