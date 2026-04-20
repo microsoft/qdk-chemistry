@@ -1,40 +1,37 @@
-Unitary builder
-======================
+Hamiltonian Unitary Builder
+===========================
 
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and a time parameter as input and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
-Hamiltonian simulation — constructing the unitary :math:`U(t) = e^{-iHt}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+Building unitary from Hamiltonian, such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
 QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
 These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
 
 
-Using the UnitaryBuilder
-------------------------------
+Using the HamiltonianUnitaryBuilder
+------------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
 
-This section demonstrates how to create, configure, and run a time evolution builder.
+This section demonstrates how to create, configure, and run a Hamiltonian unitary builder.
 The ``run`` method returns a :class:`~qdk_chemistry.data.UnitaryRepresentation` object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., :doc:`PhaseEstimation <phase_estimation>`).
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` requires the following inputs:
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
 QubitHamiltonian
    A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
-
-Time
-   A float specifying the evolution time :math:`t` in :math:`U(t) = e^{-iHt}`.
 
 .. rubric:: Creating a builder
 
@@ -69,7 +66,7 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
