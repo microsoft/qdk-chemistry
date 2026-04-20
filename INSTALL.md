@@ -23,7 +23,7 @@ Most users should start with the PyPI install.
 - Supported platforms:
   - Linux: x86_64, arm64
   - macOS: arm64 (Apple Silicon)
-  - Windows: x86_64, arm64
+  - Windows: x86_64 and arm64 via [WSL](https://learn.microsoft.com/windows/wsl/install)
 
 ### Step 1: Create a virtual environment
 
@@ -147,7 +147,6 @@ QDK/Chemistry requires both a C and a C++ compiler supporting the ISO C++20 stan
 |-----------------|----------|
 | GNU  | 13+ |
 | AppleClang | 17+ |
-| Clang-cl (Windows) | 17+ |
 
 **NOTE**: Before installing dependencies on Ubuntu/Debian, update package indices with:
 
@@ -218,7 +217,7 @@ Build from source if you need to modify the C++ core, work with unreleased featu
 
 **Linux**: A Debian-based distribution is recommended for the broadest package availability. Other distributions may require building some dependencies (e.g. Eigen3, nlohmann-json) from source.
 
-**Windows**: Native Windows builds are supported using Clang-cl (LLVM Clang with MSVC ABI) and vcpkg for dependency management. Install [Visual Studio 2022](https://visualstudio.microsoft.com/) with the "C++ Clang tools for Windows" component, then use vcpkg to install dependencies. See the [vcpkg.json](vcpkg.json) manifest for the required packages.
+**Windows**: Native Windows builds are not supported. Use the [Windows Subsystem for Linux (WSL)](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
 
 **macOS**: The latest version of [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) must be installed.
 

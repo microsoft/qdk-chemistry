@@ -41,18 +41,6 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
-  - name: windows_x86_64
-    os: windows
-    arch: x86_64
-    march: x86-64-v3
-    imageName: windows-2022
-    vcpkgTriplet: x64-windows
-  - name: windows_aarch64
-    os: windows
-    arch: aarch64
-    march: armv8-a
-    imageName: windows-11-arm
-    vcpkgTriplet: arm64-windows
 - name: publishInternalFeed
   type: boolean
   default: false
@@ -104,12 +92,6 @@ extends:
           ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
-              demands:
-              - ImageOverride -equals ${{ target.imageName }}
-              os: ${{ target.os }}
-          ${{ elseif eq(target.os, 'windows') }}:
-            pool:
-              name: Azure-Pipelines-DevTools-EO
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
@@ -220,23 +202,6 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
 
-          # Build - Windows x86_64 and ARM64
-          - ${{ if eq(target.os, 'windows') }}:
-            - template: .pipelines/templates/build-pip-wheels-windows.yml@self
-              parameters:
-                march: $(buildMarch)
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-                vcpkgTriplet: ${{ target.vcpkgTriplet }}
-                devTag: ${{ parameters.devTag }}
-
-          # Test - Windows
-          - ${{ if eq(target.os, 'windows') }}:
-            - template: .pipelines/templates/test-pip-wheels-windows.yml@self
-              parameters:
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-
           # ARM builds require that we transfer ownership of the wheel directory
           # back to the original base image user
           - ${{ if eq(target.arch, 'aarch64') }}:
@@ -345,36 +310,6 @@ extends:
           - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.14
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels

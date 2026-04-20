@@ -276,17 +276,19 @@ if (-not $SkipCpp) {
         Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
         cmake -S cpp -B "$BuildDir" `
             -GNinja `
-            -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_INSTALL_PREFIX="$InstallDir" `
-            -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
-            -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
-            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
             -DQDK_UARCH="$QDK_UARCH" `
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
+            -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
             -DQDK_ENABLE_OPENMP=ON `
-            -DBUILD_TESTING=ON
+            -DBUILD_SHARED_LIBS=OFF `
+            -DBUILD_TESTING=ON `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_C_COMPILER=clang-cl `
+            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_INSTALL_PREFIX="$InstallDir" `
+            -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
+            -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
         if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
     } else {
         Write-Host "=== Step 1: Skipping configure (incremental build) ===" -ForegroundColor DarkGray
@@ -306,7 +308,7 @@ if (-not $SkipCpp) {
         Write-Host ""
         Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
         Push-Location "$BuildDir"
-        $env:OMP_NUM_THREADS = 4
+        $env:OMP_NUM_THREADS = 2
         ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST"
         $ctestExit = $LASTEXITCODE
         Pop-Location
@@ -365,7 +367,7 @@ if (-not $SkipPython) {
     if (-not $SkipTests) {
         Write-Host ""
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
-        $env:OMP_NUM_THREADS = 8
+        $env:OMP_NUM_THREADS = 2
         pytest -v --tb=short
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {

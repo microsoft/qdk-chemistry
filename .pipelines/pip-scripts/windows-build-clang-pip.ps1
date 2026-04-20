@@ -288,9 +288,9 @@ if (-not $SkipBuild) {
     uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
         -C cmake.args=-GNinja `
         -C cmake.define.QDK_UARCH="$QDK_UARCH" `
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF `
         -C cmake.define.QDK_ENABLE_OPENMP=ON `
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
         -C cmake.define.BUILD_SHARED_LIBS=OFF `
         -C cmake.define.BUILD_TESTING=OFF `
         -C cmake.define.CMAKE_BUILD_TYPE=Release `
@@ -323,7 +323,7 @@ if (-not $SkipTests) {
         .\venv\Scripts\activate
     }
 
-    $env:OMP_NUM_THREADS = 8
+    $env:OMP_NUM_THREADS = 2
     pytest -v --tb=short
     $pytestExit = $LASTEXITCODE
     Pop-Location
