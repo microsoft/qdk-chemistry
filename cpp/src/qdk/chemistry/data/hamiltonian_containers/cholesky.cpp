@@ -314,9 +314,10 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
 
     // Store alpha one-body integrals
     std::vector<std::vector<double>> one_body_alpha_vec;
-    for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
+    for (Eigen::Index i = 0; i < _one_body_integrals.first->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _one_body_integrals.first->cols(); ++j_idx) {
+      for (Eigen::Index j_idx = 0; j_idx < _one_body_integrals.first->cols();
+           ++j_idx) {
         row.push_back((*_one_body_integrals.first)(i, j_idx));
       }
       one_body_alpha_vec.push_back(row);
@@ -326,9 +327,9 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
     // Store beta one-body integrals (only if unrestricted)
     if (is_unrestricted()) {
       std::vector<std::vector<double>> one_body_beta_vec;
-      for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
+      for (Eigen::Index i = 0; i < _one_body_integrals.second->rows(); ++i) {
         std::vector<double> row;
-        for (int j_idx = 0; j_idx < _one_body_integrals.second->cols();
+        for (Eigen::Index j_idx = 0; j_idx < _one_body_integrals.second->cols();
              ++j_idx) {
           row.push_back((*_one_body_integrals.second)(i, j_idx));
         }
@@ -349,10 +350,10 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
 
     // Store aa
     std::vector<std::vector<double>> three_center_aa_vec;
-    for (int i = 0; i < _three_center_integrals.first->rows(); ++i) {
+    for (Eigen::Index i = 0; i < _three_center_integrals.first->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _three_center_integrals.first->cols();
-           ++j_idx) {
+      for (Eigen::Index j_idx = 0;
+           j_idx < _three_center_integrals.first->cols(); ++j_idx) {
         row.push_back((*_three_center_integrals.first)(i, j_idx));
       }
       three_center_aa_vec.push_back(row);
@@ -362,10 +363,11 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
     if (is_unrestricted()) {
       // Store bb
       std::vector<std::vector<double>> three_center_bb_vec;
-      for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
+      for (Eigen::Index i = 0; i < _three_center_integrals.second->rows();
+           ++i) {
         std::vector<double> row;
-        for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
-             ++j_idx) {
+        for (Eigen::Index j_idx = 0;
+             j_idx < _three_center_integrals.second->cols(); ++j_idx) {
           row.push_back((*_three_center_integrals.second)(i, j_idx));
         }
         three_center_bb_vec.push_back(row);
@@ -382,9 +384,9 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
     j["has_inactive_fock_matrix"] = true;
     // Store alpha inactive Fock matrix
     std::vector<std::vector<double>> inactive_fock_alpha_vec;
-    for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
+    for (Eigen::Index i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
+      for (Eigen::Index j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
            ++j_idx) {
         row.push_back((*_inactive_fock_matrix.first)(i, j_idx));
       }
@@ -395,10 +397,10 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
     // Store beta inactive Fock matrix (only if unrestricted)
     if (is_unrestricted()) {
       std::vector<std::vector<double>> inactive_fock_beta_vec;
-      for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
+      for (Eigen::Index i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
         std::vector<double> row;
-        for (int j_idx = 0; j_idx < _inactive_fock_matrix.second->cols();
-             ++j_idx) {
+        for (Eigen::Index j_idx = 0;
+             j_idx < _inactive_fock_matrix.second->cols(); ++j_idx) {
           row.push_back((*_inactive_fock_matrix.second)(i, j_idx));
         }
         inactive_fock_beta_vec.push_back(row);
@@ -419,9 +421,10 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
 
   if (_ao_cholesky_vectors) {
     std::vector<std::vector<double>> ao_cholesky_vectors_vec;
-    for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
+    for (Eigen::Index i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _ao_cholesky_vectors->cols(); ++j_idx) {
+      for (Eigen::Index j_idx = 0; j_idx < _ao_cholesky_vectors->cols();
+           ++j_idx) {
         row.push_back((*_ao_cholesky_vectors)(i, j_idx));
       }
       ao_cholesky_vectors_vec.push_back(row);
@@ -460,15 +463,16 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
     auto load_matrix =
         [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
       auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      int rows = matrix_vec.size();
-      int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      Eigen::Index rows = static_cast<Eigen::Index>(matrix_vec.size());
+      Eigen::Index cols =
+          rows > 0 ? static_cast<Eigen::Index>(matrix_vec[0].size()) : 0;
       Eigen::MatrixXd matrix(rows, cols);
-      for (int i = 0; i < rows; ++i) {
-        if (static_cast<int>(matrix_vec[i].size()) != cols) {
+      for (Eigen::Index i = 0; i < rows; ++i) {
+        if (static_cast<Eigen::Index>(matrix_vec[i].size()) != cols) {
           throw std::runtime_error(
               "Matrix rows have inconsistent column counts");
         }
-        for (int j_idx = 0; j_idx < cols; ++j_idx) {
+        for (Eigen::Index j_idx = 0; j_idx < cols; ++j_idx) {
           matrix(i, j_idx) = matrix_vec[i][j_idx];
         }
       }
