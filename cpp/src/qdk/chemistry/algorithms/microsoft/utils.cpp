@@ -292,11 +292,12 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
         qcs::BasisSet::from_serialized_json(mol, aux_basis_json);
   }
 
-  if (internal_aux_basis_set && internal_aux_basis_set->mode == qcs::BasisMode::RAW && normalize) {
+  if (internal_aux_basis_set &&
+      internal_aux_basis_set->mode == qcs::BasisMode::RAW && normalize) {
     _norm_psi4_mode(internal_aux_basis_set->shells);
     internal_aux_basis_set->mode = qcs::BasisMode::PSI4;
   }
-  
+
   return {internal_basis_set, internal_aux_basis_set};
 }
 
