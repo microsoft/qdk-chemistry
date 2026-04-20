@@ -57,5 +57,23 @@ int main() {
   }
   // end-cell-list-implementations
   // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-dfj
+  // Run SCF with density-fitted Coulomb integrals (DF-J)
+  // Create a basis set with an auxiliary basis for density fitting
+  auto dfj_basis = BasisSet::from_basis_name("def2-svp", "def2-universal-jfit",
+                                             structure);
+
+  // Configure the solver to use incore ERIs (required for DF-J)
+  auto dfj_solver = ScfSolverFactory::create();
+  dfj_solver->settings().set("eri_method", "incore");
+
+  // Run - DF-J is automatically enabled when auxiliary basis is detected
+  auto [E_dfj, wfn_dfj] = dfj_solver->run(structure, 0, 1, dfj_basis);
+  std::cout << "DF-J SCF Energy: " << E_dfj << " Hartree" << std::endl;
+  // end-cell-dfj
+  // --------------------------------------------------------------------------------------------
+
   return 0;
 }
