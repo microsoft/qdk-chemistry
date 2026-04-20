@@ -95,7 +95,9 @@ dfj_solver = create("scf_solver")
 dfj_solver.settings().set("eri_method", "incore")
 
 # Run - DF-J is automatically enabled when auxiliary basis is detected
-E_dfj, wfn_dfj = dfj_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis)
+E_dfj, wfn_dfj = dfj_solver.run(
+    structure, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis
+)
 print(f"DF-J SCF Energy: {E_dfj:.10f} Hartree")
 # end-cell-dfj
 ################################################################################

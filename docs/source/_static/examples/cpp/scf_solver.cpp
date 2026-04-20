@@ -62,8 +62,8 @@ int main() {
   // start-cell-dfj
   // Run SCF with density-fitted Coulomb integrals (DF-J)
   // Create a basis set with an auxiliary basis for density fitting
-  auto dfj_basis = BasisSet::from_basis_name("def2-svp", "def2-universal-jfit",
-                                             structure);
+  auto dfj_basis =
+      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", structure);
 
   // Configure the solver to use incore ERIs (required for DF-J)
   auto dfj_solver = ScfSolverFactory::create();
