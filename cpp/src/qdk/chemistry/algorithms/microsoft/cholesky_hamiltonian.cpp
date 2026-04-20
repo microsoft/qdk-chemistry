@@ -326,20 +326,26 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
     // correct for cholesky contributions by subtracting previous vectors
     if (current_col > 0) {
-      // Extract rows from L_data corresponding to shell pairs
-      std::vector<double> L_rows(n_cols * current_col);
+      // Use Eigen::Map with 64-bit (ptrdiff_t) indexing to avoid LP64 BLAS
+      // int32 overflow when num_aos2 * current_col > INT32_MAX.
+      // L_data is a column-major matrix of shape (num_aos2 x current_col).
+      // NOTE: L_map must be consumed before L_data grows (via insert() below),
+      // since reallocation would invalidate the mapped pointer.
+      Eigen::Map<const Eigen::MatrixXd> L_map(L_data.data(), num_aos2,
+                                              current_col);
+
+      // Extract rows from L_data corresponding to shell pairs.
+      // L_rows(col, k) = L_data(global_index[col], k) for each shell pair.
+      Eigen::MatrixXd L_rows(n_cols, current_col);
       for (size_t col = 0; col < n_cols; ++col) {
-        const size_t global_index = shell_pairs_to_lookup[col];
-        // Copy row from L_data: L_rows[col, :] = L_data[global_index, :]
-        blas::copy(current_col, L_data.data() + global_index, num_aos2,
-                   L_rows.data() + col, n_cols);
+        L_rows.row(col) = L_map.row(shell_pairs_to_lookup[col]);
       }
-      // Compute eri_col -= L_data * L_rows^T
-      // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col,
+
+      // Compute eri_col -= L_map * L_rows^T
+      // eri_col is num_aos2 x n_cols, L_map is num_aos2 x current_col,
       // L_rows^T is current_col x n_cols
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 num_aos2, n_cols, current_col, -1.0, L_data.data(), num_aos2,
-                 L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
+      Eigen::Map<Eigen::MatrixXd> eri_col_map(eri_col.data(), num_aos2, n_cols);
+      eri_col_map.noalias() -= L_map * L_rows.transpose();
     }
 
     // form new cholesky vector for each index in shell pair avoid redundant
