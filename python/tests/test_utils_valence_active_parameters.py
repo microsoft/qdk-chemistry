@@ -12,14 +12,7 @@ from qdk_chemistry.data import Configuration, Orbitals, SlaterDeterminantContain
 from qdk_chemistry.utils import compute_valence_space_parameters
 
 
-def solve_wavefunction(structure, charge, multiplicity):
-    """Run HF SCF with STO-3G and return the converged wavefunction."""
-    scf_solver = create("scf_solver")
-    _, wavefunction = scf_solver.run(structure, charge, multiplicity, "STO-3G")
-    return wavefunction
-
-
-def solve_wavefunction_basis(structure, charge, multiplicity, basis):
+def solve_wavefunction(structure, charge, multiplicity, basis="STO-3G"):
     """Run HF SCF and return the converged wavefunction for a given basis set."""
     scf_solver = create("scf_solver")
     _, wavefunction = scf_solver.run(structure, charge, multiplicity, basis)
@@ -136,7 +129,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 2, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 11  # 29 - 18 (Ar core)
@@ -148,7 +141,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 3, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 3, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 10  # 28 - 18
@@ -160,7 +153,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 1, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 12  # 30 - 18
@@ -172,7 +165,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 1, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 12  # 11 (Ag: 47-36) + 1 (H)
@@ -196,7 +189,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 2, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 1  # 19 - 18
@@ -208,7 +201,7 @@ class TestTransitionMetalValenceParameters:
         coords = np.array([[0.0, 0.0, 0.0]])
         structure = Structure(symbols, coords)
 
-        wavefunction = solve_wavefunction_basis(structure, 0, 1, "def2-svp")
+        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
         assert num_active_electrons == 24  # 78 - 54 (Xe core)
