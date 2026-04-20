@@ -462,8 +462,8 @@ class TestScfSolverDfj:
 
         assert abs(energy - (-75.955848898587732)) < scf_energy_tolerance
 
-    def test_water_rks_dfj_pbe(self):
-        """Test RKS-DFJ/PBE on water with def2-svp / def2-universal-jfit."""
+    def test_water_rks_dfj_pbe_m06_2x(self):
+        """Test RKS-DFJ/PBE then use it as guess for RKS-DFJ/M06-2X on water with def2-svp / def2-universal-jfit."""
         water = _create_h2o_dfj_structure()
         scf_solver = algorithms.create("scf_solver")
         scf_solver.settings().set("method", "pbe")
@@ -474,15 +474,11 @@ class TestScfSolverDfj:
 
         assert abs(energy - (-76.271464794036)) < scf_energy_tolerance
 
-    def test_water_rks_dfj_m06_2x(self):
-        """Test RKS-DFJ/M06-2X on water with def2-svp / def2-universal-jfit."""
-        water = _create_h2o_dfj_structure()
-        scf_solver = algorithms.create("scf_solver")
-        scf_solver.settings().set("method", "m06-2x")
-        scf_solver.settings().set("eri_method", "incore")
-
-        basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
-        energy, wfn = scf_solver.run(water, 0, 1, basis)
+        # use the PBE orbitals as the initial guess for M06-2X
+        m06_solver = algorithms.create("scf_solver")
+        m06_solver.settings().set("method", "m06-2x")
+        m06_solver.settings().set("eri_method", "incore")
+        energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals())
 
         assert abs(energy - (-76.320941901587)) < scf_energy_tolerance
 
