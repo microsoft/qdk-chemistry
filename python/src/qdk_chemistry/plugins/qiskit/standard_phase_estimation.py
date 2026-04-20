@@ -219,7 +219,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         """
         unitary_rep = self._create_unitary(
             qubit_hamiltonian=qubit_hamiltonian,
-            time=time,
             unitary_builder=unitary_builder,
         )
         ctrl_unitary = ControlledUnitary(
