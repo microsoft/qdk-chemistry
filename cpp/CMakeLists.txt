@@ -41,13 +41,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Add compiler flags
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    set(CMAKE_CXX_FLAGS_DEBUG_INIT "-g -O0 -Wall -Wextra")
-    set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG   "-g -O0 -Wall -Wextra" CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG"         CACHE STRING "" FORCE)
 elseif(MSVC)
-    set(CMAKE_CXX_FLAGS_DEBUG_INIT "/Zi /Od /W3")
-    set(CMAKE_CXX_FLAGS_RELEASE_INIT "/O2 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS_DEBUG   "/Zi /Od /W3"      CACHE STRING "" FORCE)
+    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /W1 /DNDEBUG" CACHE STRING "" FORCE)
 endif()
 
 # MSVC CRT doesn't define M_PI etc. without this.
@@ -58,43 +57,53 @@ if(MSVC)
     # Suppress noisy clang-cl warnings from FetchContent dependencies.
     add_compile_options(
         -Wno-c++98-compat
+        -Wno-c++98-compat-extra-semi
         -Wno-c++98-compat-pedantic
-        -Wno-documentation
-        -Wno-documentation-pedantic
-        -Wno-documentation-unknown-command
-        -Wno-unused-parameter
-        -Wno-sign-conversion
-        -Wno-unsafe-buffer-usage
-        -Wno-unsafe-buffer-usage-in-libc-call
-        -Wno-extra-semi
+        -Wno-cast-function-type-strict
+        -Wno-cast-qual
+        -Wno-covered-switch-default
+        -Wno-defaulted-function-deleted
+        -Wno-deprecated-copy-with-dtor
+        -Wno-deprecated-copy-with-user-provided-dtor
+        -Wno-deprecated-declarations
         -Wno-disabled-macro-expansion
-        -Wno-old-style-cast
-        -Wno-missing-prototypes
-        -Wno-missing-noreturn
+        -Wno-documentation
+        -Wno-documentation-unknown-command
+        -Wno-double-promotion
+        -Wno-exit-time-destructors
+        -Wno-extra-semi
+        -Wno-extra-semi-stmt
         -Wno-float-conversion
+        -Wno-float-equal
         -Wno-format-nonliteral
+        -Wno-global-constructors
+        -Wno-implicit-float-conversion
+        -Wno-implicit-int-float-conversion
+        -Wno-inconsistent-missing-destructor-override
+        -Wno-inconsistent-missing-override
+        -Wno-macro-redefined
+        -Wno-missing-noreturn
+        -Wno-missing-prototypes
+        -Wno-newline-eof
+        -Wno-old-style-cast
+        -Wno-pre-c++14-compat
+        -Wno-reserved-identifier
+        -Wno-reserved-macro-identifier
+        -Wno-shorten-64-to-32
+        -Wno-sign-conversion
+        -Wno-suggest-destructor-override
         -Wno-switch-default
         -Wno-switch-enum
-        -Wno-cast-qual
-        -Wno-cast-function-type-strict
-        -Wno-implicit-float-conversion
-        -Wno-double-promotion
         -Wno-undefined-func-template
-        -Wno-deprecated-declarations
-        -Wno-extra-semi-stmt
+        -Wno-unreachable-code
+        -Wno-unreachable-code-return
+        -Wno-unsafe-buffer-usage
+        -Wno-unsafe-buffer-usage-in-libc-call
+        -Wno-unused-command-line-argument
         -Wno-unused-macros
+        -Wno-unused-parameter
         -Wno-unused-variable
-        -Wno-shorten-64-to-32
-        -Wno-reserved-macro-identifier
-        -Wno-macro-redefined
-        -Wno-inconsistent-missing-destructor-override
-        -Wno-suggest-destructor-override
         -Wno-vla-cxx-extension
-        -Wno-exit-time-destructors
-        -Wno-global-constructors
-        -Wno-undef
-        -Wno-reserved-identifier
-        -Wno-float-equal
     )
     # lapackpp's lartg.cc uses std::complex without #include <complex>.
     # On libstdc++ it's transitively included; on MSVC STL it isn't.
@@ -197,30 +206,42 @@ add_library(chemistry)
 # Re-enable warnings for our own code that were globally suppressed for
 # FetchContent dependencies.  With clang the last flag wins, so these
 # target-level -W flags override the directory-level -Wno- counterparts.
-if(MSVC)
+if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_options(chemistry PRIVATE
-        -Wunused-parameter
-        -Wunused-variable
-        -Wsign-conversion
-        -Wfloat-conversion
-        -Wimplicit-float-conversion
+        -Wcast-qual
+        -Wdefaulted-function-deleted
+        -Wdeprecated-copy-with-dtor
+        -Wdeprecated-copy-with-user-provided-dtor
+        -Wdeprecated-declarations
         -Wdouble-promotion
-        -Wold-style-cast
+        -Wexit-time-destructors
         -Wextra-semi
         -Wextra-semi-stmt
-        -Wmissing-prototypes
+        -Wfloat-conversion
+        -Wfloat-equal
+        -Wformat-nonliteral
+        -Wglobal-constructors
+        -Wimplicit-float-conversion
+        -Wimplicit-int-float-conversion
+        -Winconsistent-missing-destructor-override
+        -Winconsistent-missing-override
         -Wmissing-noreturn
+        -Wmissing-prototypes
+        -Wold-style-cast
+        -Wreserved-identifier
+        -Wreserved-macro-identifier
         -Wshorten-64-to-32
-        -Wcast-qual
+        -Wsign-conversion
+        -Wsuggest-destructor-override
         -Wswitch-default
         -Wswitch-enum
-        -Wformat-nonliteral
-        -Wdeprecated-declarations
-        -Winconsistent-missing-destructor-override
-        -Wsuggest-destructor-override
-        -Wundef
-        -Wreserved-identifier
-        -Wfloat-equal
+        -Wundefined-func-template
+        -Wunreachable-code
+        -Wunreachable-code-return
+        -Wunsafe-buffer-usage
+        -Wunused-macros
+        -Wunused-parameter
+        -Wunused-variable
     )
 endif()
 add_subdirectory(src/qdk/chemistry/data)
