@@ -28,7 +28,7 @@ if _sys.platform == "win32":
     for _d in _dll_dirs.split(";"):
         _d = _d.strip()
         if _d and _os.path.isdir(_d):
-            _dll_dir_handles.append(_os.add_dll_directory(_d))
+            _dll_dir_handles.append(_os.add_dll_directory(_d))  # type: ignore[attr-defined]
     del _dll_dirs
 
 try:
