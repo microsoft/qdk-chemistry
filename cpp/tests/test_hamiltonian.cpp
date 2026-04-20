@@ -1358,7 +1358,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   if (factory_name == "qdk_density_fitted_hamiltonian") {
@@ -1389,7 +1389,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   if (factory_name == "qdk_density_fitted_hamiltonian") {

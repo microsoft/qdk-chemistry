@@ -244,25 +244,25 @@ Returns:
   py::class_<CholeskyHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
       cholesky_container(data, "CholeskyHamiltonianContainer", R"(
-Represents a molecular Hamiltonian using Cholesky-decomposed two-electron integrals.
+Represents a molecular Hamiltonian using Cholesky-decomposed three-center integrals.
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
 specifically designed for active space methods. It contains:
 
 * One-electron integrals (kinetic + nuclear attraction) in MO representation
-* Two-electron integrals (electron-electron repulsion) in MO representation
-* Cholesky vectors approximating the AO two-electron integrals
+* Three-center two-electron integrals (ij|Q) in MO representation
 * Molecular orbital information for the active space
 * Core energy contributions from inactive orbitals and nuclear repulsion
+
+Four-center integrals are lazily computed from three-center integrals on first access.
 
 Examples:
     >>> import numpy as np
     >>> # Create restricted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4⁴ elements
-    >>> ao_cholesky_vectors = np.random.rand(4*4, 10)   # 10 Cholesky vectors
+    >>> three_center = np.random.rand(16, 10)  # (norb^2) x naux
     >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
-    ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
+    ...     one_body, three_center, orbitals, 10.5, inactive_fock_matrix
     ... )
     >>> # Wrap in Hamiltonian interface
     >>> hamiltonian = Hamiltonian(container)
@@ -270,83 +270,133 @@ Examples:
 
   // Restricted constructor
   cholesky_container.def(
-      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+      py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, HamiltonianType>(),
+               std::optional<Eigen::MatrixXd>, HamiltonianType>(),
       R"(
 Constructor for restricted active space Hamiltonian with Cholesky-decomposed integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb⁴]
+    three_center_integrals (numpy.ndarray): Three-center two-electron integrals
+        in MO basis [(norb*norb) x naux]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb² x nvec]
+    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+        for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
     >>> import numpy as np
     >>> one_body = np.random.rand(4, 4)
-    >>> two_body = np.random.rand(256)  # 4⁴ elements
-    >>> ao_cholesky_vecs = np.random.rand(16, 10)  # 16 = 4², 10 vectors
+    >>> three_center = np.random.rand(16, 10)  # 16 = 4^2, 10 auxiliary basis functions
     >>> inactive_fock_matrix = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
-    ...     one_body, two_body, orbitals, 10.5, inactive_fock_matrix, ao_cholesky_vectors
+    ...     one_body, three_center, orbitals, 10.5, inactive_fock_matrix
     ... )
 )",
-      py::arg("one_body_integrals"), py::arg("two_body_integrals"),
+      py::arg("one_body_integrals"), py::arg("three_center_integrals"),
       py::arg("orbitals"), py::arg("core_energy"),
-      py::arg("inactive_fock_matrix"), py::arg("ao_cholesky_vectors"),
+      py::arg("inactive_fock_matrix"),
+      py::arg("ao_cholesky_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
   cholesky_container.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::VectorXd&, const Eigen::VectorXd&,
-               const Eigen::VectorXd&, std::shared_ptr<Orbitals>, double,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
-               const Eigen::MatrixXd&, HamiltonianType>(),
+               std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
+               const Eigen::MatrixXd&, std::optional<Eigen::MatrixXd>,
+               HamiltonianType>(),
       R"(
 Constructor for unrestricted active space Hamiltonian with Cholesky-decomposed integrals.
 
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb⁴]
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb⁴]
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb⁴]
+    three_center_integrals_aa (numpy.ndarray): Alpha-alpha three-center integrals
+        [(norb*norb) x naux], orbital pair index in row-major order
+    three_center_integrals_bb (numpy.ndarray): Beta-beta three-center integrals
+        [(norb*norb) x naux], orbital pair index in row-major order
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray): AO basis Cholesky vectors [norb² x nvec]
+    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+        for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
 Examples:
     >>> import numpy as np
     >>> one_body_a = np.random.rand(4, 4)
     >>> one_body_b = np.random.rand(4, 4)
-    >>> two_body_aaaa = np.random.rand(256)
-    >>> two_body_aabb = np.random.rand(256)
-    >>> two_body_bbbb = np.random.rand(256)
-    >>> cholesky_vecs = np.random.rand(16, 10)
+    >>> three_center_aa = np.random.rand(16, 10)  # 16 = 4^2, 10 aux
+    >>> three_center_bb = np.random.rand(16, 10)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
     >>> container = CholeskyHamiltonianContainer(
     ...     one_body_a, one_body_b,
-    ...     two_body_aaaa, two_body_aabb, two_body_bbbb,
-    ...     orbitals, 10.5, fock_a, fock_b, cholesky_vecs
+    ...     three_center_aa, three_center_bb,
+    ...     orbitals, 10.5, fock_a, fock_b
     ... )
 )",
       py::arg("one_body_integrals_alpha"), py::arg("one_body_integrals_beta"),
-      py::arg("two_body_integrals_aaaa"), py::arg("two_body_integrals_aabb"),
-      py::arg("two_body_integrals_bbbb"), py::arg("orbitals"),
+      py::arg("three_center_integrals_aa"),
+      py::arg("three_center_integrals_bb"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
-      py::arg("inactive_fock_matrix_beta"), py::arg("ao_cholesky_vectors"),
+      py::arg("inactive_fock_matrix_beta"),
+      py::arg("ao_cholesky_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
-  // Two-body integral access
+  // Three-center integral access
+  bind_getter_as_property(
+      cholesky_container, "get_three_center_integrals",
+      &CholeskyHamiltonianContainer::get_three_center_integrals,
+      R"(
+Get three-center integrals in MO basis for all spin channels.
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray]: Pair of (aa, bb) three-center
+    two-electron integral matrices, each of dimension [(norb*norb) x naux]
+    with the orbital pair index stored in row-major order.
+
+Raises:
+    RuntimeError: If three-center integrals are not set
+)",
+      py::return_value_policy::reference_internal);
+
+  // AO Cholesky vectors access
+  cholesky_container.def(
+      "get_ao_cholesky_vectors",
+      [](const CholeskyHamiltonianContainer& self) -> py::object {
+        const auto& opt = self.get_ao_cholesky_vectors();
+        if (!opt) return py::none();
+        const Eigen::MatrixXd& mat = *opt;
+        // Return a zero-copy view. We tie lifetime to self via
+        // py::return_value_policy semantics by passing a capsule that
+        // prevents GC.  The reference is valid as long as the container
+        // (and thus `self`) is alive; pybind11's prevent-gc mechanism
+        // handles that through the `self` capture in the keep-alive.
+        return py::array_t<double>(
+            {mat.rows(), mat.cols()},  // shape
+            {static_cast<py::ssize_t>(sizeof(double)),
+             static_cast<py::ssize_t>(mat.rows()) *
+                 static_cast<py::ssize_t>(sizeof(double))},  // strides
+                                                             // (col-major)
+            mat.data(),                                      // data pointer
+            py::cast(self));  // prevent GC of self while array is alive
+      },
+      R"(
+Get the optional AO Cholesky vectors (zero-copy view).
+
+Returns:
+    numpy.ndarray or None: AO Cholesky vectors matrix [nao^2 x nchol],
+    or None if not stored. The returned array shares memory with the
+    internal storage and should not be modified.
+)");
+
+  // Two-body integral access (lazily computed from three-center integrals)
   bind_getter_as_property(cholesky_container, "get_two_body_integrals",
                           &CholeskyHamiltonianContainer::get_two_body_integrals,
                           R"(
