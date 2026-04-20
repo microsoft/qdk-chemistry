@@ -29,6 +29,8 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
     QdkMacisAsci,
@@ -51,8 +53,6 @@ from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
@@ -64,6 +64,7 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HamiltonianConstructor",
+    "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "OrbitalLocalizer",
@@ -89,7 +90,6 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
-    "HamiltonianUnitaryBuilder",
     # Factory functions
     "available",
     "create",

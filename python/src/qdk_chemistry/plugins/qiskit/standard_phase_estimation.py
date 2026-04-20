@@ -18,9 +18,9 @@ from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
+from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
     ControlledUnitary,
