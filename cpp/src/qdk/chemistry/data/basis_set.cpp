@@ -1030,7 +1030,7 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   return std::make_shared<BasisSet>(
       std::string(BasisSet::custom_name), all_basis_shells,
       std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
-      std::string(BasisSet::custom_name), all_aux_shells, structure,
+      std::string(BasisSet::custom_aux_name), all_aux_shells, structure,
       atomic_orbital_type);
 }
 
@@ -1618,6 +1618,18 @@ std::string BasisSet::get_summary() const {
   }
 
   return oss.str();
+}
+
+size_t BasisSet::get_num_auxiliary_orbitals() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  size_t num_aux_orbitals = 0;
+  for (const auto& sh : _aux_shells_per_atom) {
+    for (const auto& shell : sh) {
+      num_aux_orbitals += shell.get_num_atomic_orbitals(_atomic_orbital_type);
+    }
+  }
+  return num_aux_orbitals;
 }
 
 void BasisSet::to_file(const std::string& filename,
