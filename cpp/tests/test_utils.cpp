@@ -199,8 +199,8 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 // Periods 4-5 include a correlating d' shell: 14 valence orbitals per atom
 // (ns + 5*(n-1)d + 5*nd' + 3*np) instead of the previous 9.
 //
-// Note: These tests require a C++ rebuild with the updated
-// valence orbital constants in valence_space.cpp.
+// Note: These tests assume the valence orbital constants in
+// valence_space.cpp have been updated accordingly.
 
 class TransitionMetalValenceTest : public ::testing::Test {
  protected:

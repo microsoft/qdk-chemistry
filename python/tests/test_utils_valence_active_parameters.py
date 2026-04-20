@@ -119,8 +119,8 @@ class TestTransitionMetalValenceParameters:
     Periods 4-5 include a correlating d' shell: 14 valence orbitals per TM atom
     (ns + 5*(n-1)d + 5*nd' + 3*np) instead of 9 (ns + 5*(n-1)d + 3*np).
 
-    Note: These tests require a C++ rebuild with the updated
-    valence orbital constants in valence_space.cpp.
+    Note: These tests assume the valence orbital constants in
+    valence_space.cpp have been updated accordingly.
     """
 
     def test_copper_atom_def2svp(self):
