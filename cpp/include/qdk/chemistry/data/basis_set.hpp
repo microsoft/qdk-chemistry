@@ -439,6 +439,9 @@ class BasisSet : public DataClass,
   /** @brief Name for custom ecps */
   static constexpr std::string_view custom_ecp_name = "custom_ecp";
 
+  /** @brief Name for custom auxiliary basis sets */
+  static constexpr std::string_view custom_aux_name = "custom_aux";
+
   /**
    * @brief Get the data type name for this class
    * @return "basis_set"
@@ -754,6 +757,12 @@ class BasisSet : public DataClass,
    * @return Total number of atomic orbitals
    */
   size_t get_num_atomic_orbitals() const;
+
+  /**
+   * @brief Get number of auxiliary orbitals (total from all shells)
+   * @return Total number of auxiliary orbitals
+   */
+  size_t get_num_auxiliary_orbitals() const;
 
   /**
    * @brief Get the atom index for a atomic orbital

@@ -649,7 +649,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
   // Create internal BasisSet
-  auto internal_basis_set =
+  auto [internal_basis_set, internal_aux_basis_set] =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();

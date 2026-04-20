@@ -12,6 +12,7 @@
 
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <string>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -51,32 +52,33 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   BasisSetType basis_set_type;
 
   std::string basis_set_name;
+  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
+
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(basis_or_guess)) {
     basis_set_name = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
                          ->get_basis_set()
                          ->get_name();
     basis_set_type = BasisSetType::FromOrbitals;
+    // Assume the guess is generated with the same basis set. Adjust here and
+    // later code if this assumption is no longer valid in the future.
+    qdk_raw_basis_set =
+        std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
+            ->get_basis_set();
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_or_guess)) {
     basis_set_name =
         std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)->get_name();
     basis_set_type = BasisSetType::Explicit;
+    qdk_raw_basis_set =
+        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
   } else if (std::holds_alternative<std::string>(basis_or_guess)) {
     basis_set_name = std::get<std::string>(basis_or_guess);
     basis_set_type = BasisSetType::FromString;
-  }
-  std::transform(basis_set_name.begin(), basis_set_name.end(),
-                 basis_set_name.begin(), ::tolower);
-
-  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
-  if (basis_set_name == data::BasisSet::custom_name ||
-      basis_set_type == BasisSetType::Explicit) {
-    qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
-  } else {
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
   }
+  std::transform(basis_set_name.begin(), basis_set_name.end(),
+                 basis_set_name.begin(), ::tolower);
 
   // Extract geometry from structure object
   std::vector<double> geometry(3 * structure->get_num_atoms());
@@ -207,6 +209,30 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
 
+  // Configure density-fitted Coulomb (DFJ)
+  std::string integral_type = _settings->get<std::string>("integral_type");
+  std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
+  // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ
+  bool use_dfj = (integral_type == "dfj");
+  if (integral_type == "auto" && qdk_raw_basis_set->has_aux_basis()) {
+    use_dfj = true;
+    if (aux_basis_name_setting.empty()) {
+      aux_basis_name_setting = qdk_raw_basis_set->get_aux_name();
+    }
+  }
+  if (use_dfj) {
+    if (!qdk_raw_basis_set->has_aux_basis()) {
+      throw std::invalid_argument(
+          "DFJ requested but no auxiliary basis set provided. "
+          "Set 'aux_basis' or use a BasisSet with an auxiliary basis.");
+    }
+    ms_scf_config->do_dfj = true;
+    ms_scf_config->aux_basis = aux_basis_name_setting;
+    std::transform(ms_scf_config->aux_basis.begin(),
+                   ms_scf_config->aux_basis.end(),
+                   ms_scf_config->aux_basis.begin(), ::tolower);
+  }
+
   ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
 
   // Convert enable_gdm boolean to algorithm method enum for backward
@@ -228,7 +254,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       _settings->get<int64_t>("gdm_max_diis_iteration");
   ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
       _settings->get<int64_t>("gdm_bfgs_history_size_limit");
-  if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
+  if (ms_scf_config->eri.method == qcs::ERIMethod::Incore &&
+      !ms_scf_config->do_dfj) {
 #ifdef QDK_CHEMISTRY_ENABLE_HGP
     ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;
 #else
@@ -247,20 +274,20 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   }
 #endif
 
+  // Convert QDK basis set to internal format
+  auto [ms_basis_set, ms_aux_basis_set] =
+      utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set);
+  auto [ms_raw_basis_set, ms_raw_aux_basis_set] =
+      utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
+
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
-    scf = qcs::SCF::make_hf_solver(
-        ms_mol, *ms_scf_config,
-        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                     false));
+    scf = qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, ms_basis_set,
+                                   ms_raw_basis_set, ms_aux_basis_set);
   } else {
-    scf = qcs::SCF::make_ks_solver(
-        ms_mol, *ms_scf_config,
-        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set),
-        utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set,
-                                                     false));
+    scf = qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, ms_basis_set,
+                                   ms_raw_basis_set, ms_aux_basis_set);
   }
 
   // Compute map from QDK shells to internal representation
@@ -370,18 +397,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     // Create new SCF solver with density matrix
     auto initial_guess_scf =
-        (method == "hf") ? qcs::SCF::make_hf_solver(
-                               ms_mol, *ms_scf_config, density_matrix,
-                               utils::microsoft::convert_basis_set_from_qdk(
-                                   *qdk_raw_basis_set),
-                               utils::microsoft::convert_basis_set_from_qdk(
-                                   *qdk_raw_basis_set, false))
-                         : qcs::SCF::make_ks_solver(
-                               ms_mol, *ms_scf_config, density_matrix,
-                               utils::microsoft::convert_basis_set_from_qdk(
-                                   *qdk_raw_basis_set),
-                               utils::microsoft::convert_basis_set_from_qdk(
-                                   *qdk_raw_basis_set, false));
+        (method == "hf")
+            ? qcs::SCF::make_hf_solver(ms_mol, *ms_scf_config, density_matrix,
+                                       ms_basis_set, ms_raw_basis_set,
+                                       ms_aux_basis_set)
+            : qcs::SCF::make_ks_solver(ms_mol, *ms_scf_config, density_matrix,
+                                       ms_basis_set, ms_raw_basis_set,
+                                       ms_aux_basis_set);
 
     // Replace the original scf with the initial guess version
     scf = std::move(initial_guess_scf);

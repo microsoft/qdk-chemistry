@@ -261,8 +261,9 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 }
 
-std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
+std::pair<std::shared_ptr<qcs::BasisSet>, std::shared_ptr<qcs::BasisSet>>
+convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
+                           bool normalize) {
   QDK_LOG_TRACE_ENTERING();
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
@@ -276,7 +277,7 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
   }
 
-  auto basis_json = convert_to_json(qdk_basis_set);
+  auto [basis_json, aux_basis_json] = convert_to_json(qdk_basis_set);
   auto internal_basis_set =
       qcs::BasisSet::from_serialized_json(mol, basis_json);
 
@@ -285,7 +286,13 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     internal_basis_set->mode = qcs::BasisMode::PSI4;
   }
 
-  return internal_basis_set;
+  std::shared_ptr<qcs::BasisSet> internal_aux_basis_set;
+  if (aux_basis_json.is_object()) {
+    internal_aux_basis_set =
+        qcs::BasisSet::from_serialized_json(mol, aux_basis_json);
+  }
+
+  return {internal_basis_set, internal_aux_basis_set};
 }
 
 nlohmann::ordered_json convert_to_json(
@@ -319,7 +326,7 @@ nlohmann::ordered_json convert_to_json(
   return record;
 }
 
-nlohmann::ordered_json convert_to_json(
+std::pair<nlohmann::ordered_json, nlohmann::ordered_json> convert_to_json(
     const qdk::chemistry::data::BasisSet& basis_set) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -373,7 +380,25 @@ nlohmann::ordered_json convert_to_json(
        {"ecp_shells", json_ecp_shells},
        {"element_ecp_electrons", json_element_ecp_electrons}});
 
-  return j;
+  // Build auxiliary basis JSON if present
+  nlohmann::ordered_json aux_j;
+  if (basis_set.has_aux_basis()) {
+    std::vector<nlohmann::ordered_json> json_aux_shells;
+    for (const auto& sh : basis_set.get_aux_shells()) {
+      json_aux_shells.push_back(convert_to_json(sh));
+    }
+    aux_j = nlohmann::ordered_json(
+        {{"name", basis_set.get_aux_name()},
+         {"pure", true},
+         {"mode", "RAW"},
+         {"atoms", nuclear_charges_unsigned},
+         {"num_atomic_orbitals", basis_set.get_num_auxiliary_orbitals()},
+         {"electron_shells", json_aux_shells},
+         {"ecp_shells", nlohmann::ordered_json::array()},
+         {"element_ecp_electrons", nlohmann::ordered_json::array()}});
+  }
+
+  return {j, aux_j};
 }
 
 std::vector<unsigned> compute_shell_map(

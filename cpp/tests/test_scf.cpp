@@ -805,7 +805,8 @@ TEST_F(ScfTest, AgHBasisSetEcpJsonMapping) {
   auto basis_set = orbitals->get_basis_set();
 
   // Serialize to JSON using convert_to_json
-  auto json = qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
+  auto [json, aux_json] =
+      qdk::chemistry::utils::microsoft::convert_to_json(*basis_set);
 
   // Verify ECP shells are present in JSON
   EXPECT_TRUE(json.contains("ecp_shells"));
