@@ -81,6 +81,29 @@ struct uint128_t {
   bool operator<(const uint128_t& o) const {
     return hi < o.hi || (hi == o.hi && lo < o.lo);
   }
+  bool operator==(const uint128_t& o) const { return lo == o.lo && hi == o.hi; }
+  uint128_t operator<<(int shift) const {
+    uint128_t r;
+    if (shift >= 128) {
+      r.lo = 0;
+      r.hi = 0;
+    } else if (shift >= 64) {
+      r.lo = 0;
+      r.hi = lo << (shift - 64);
+    } else if (shift > 0) {
+      r.lo = lo << shift;
+      r.hi = (hi << shift) | (lo >> (64 - shift));
+    } else {
+      r.lo = lo;
+      r.hi = hi;
+    }
+    return r;
+  }
+  uint128_t& operator|=(const uint128_t& o) {
+    lo |= o.lo;
+    hi |= o.hi;
+    return *this;
+  }
 };
 #pragma warning(pop)
 #else
