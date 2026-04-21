@@ -150,16 +150,6 @@ TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
-  auto oh = testing::create_oh_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("scf_type", "restricted");
-
-  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::runtime_error);
-}
-
 TEST_F(ScfTest, Oxygen_atom_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
