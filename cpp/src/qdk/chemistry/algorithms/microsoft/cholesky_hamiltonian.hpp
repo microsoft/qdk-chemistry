@@ -59,7 +59,7 @@ class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
                 "ERI screening threshold for skipping negligible shell "
                 "quartets during Cholesky decomposition",
                 qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
-    set_default("store_cholesky_vectors", false);
+    set_default("store_ao_cholesky_vectors", false);
   }
   ~CholeskyHamiltonianSettings() override = default;
 };
