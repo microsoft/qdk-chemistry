@@ -209,7 +209,7 @@ class PartiallyRandomized(QDrift):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
             time: The total evolution time (δ in the formula).
-            
+
         Returns:
             UnitaryRepresentation: The unitary representation built by the
                 partially randomized method.

@@ -171,7 +171,7 @@ class QDrift(TimeEvolutionBuilder):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
             time: The total evolution time.
-            
+
         Returns:
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 

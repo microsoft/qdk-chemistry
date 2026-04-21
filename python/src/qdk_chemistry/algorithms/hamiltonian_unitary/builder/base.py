@@ -67,7 +67,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:

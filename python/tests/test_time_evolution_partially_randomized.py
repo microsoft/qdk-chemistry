@@ -51,7 +51,7 @@ class TestPartiallyRandomizedBasics:
 
 
 class TestPartiallyRandomizedConstruction:
-    """Tests for PartiallyRandomized construction."""
+    """Tests for PartiallyRandomized time evolution construction."""
 
     def test_returns_unitary_representation(self):
         """Test that run returns a UnitaryRepresentation."""

@@ -67,7 +67,7 @@ class TestQDriftBasics:
 
 
 class TestQDriftConstruction:
-    """Tests for QDrift construction."""
+    """Tests for QDrift time evolution construction."""
 
     def test_returns_unitary_representation(self):
         """Test that run returns a UnitaryRepresentation."""
