@@ -538,21 +538,21 @@ class GDM {
  private:
   /**
    * @brief Transform history matrices (either history_dgrad or history_kappa)
-    * using current rotation matrices to transform into the
-    * pseudo-canonical orbital basis, K_new = U_left^T * K_old * U_right
+   * using current rotation matrices to transform into the
+   * pseudo-canonical orbital basis, K_new = U_left^T * K_old * U_right
    * @param[in,out] history History matrix block to be transformed (either
    * history_dgrad or history_kappa)
-  * @param[in] u_left Left rotation matrix (e.g., Uii or Uaa)
-  * @param[in] u_right Right rotation matrix (e.g., Uaa or Uww)
+   * @param[in] u_left Left rotation matrix (e.g., Uii or Uaa)
+   * @param[in] u_right Right rotation matrix (e.g., Uaa or Uww)
    * @param[in] history_size Number of history entries
-    * @param[in] num_rows Number of rows in each unpacked history block
-    * @param[in] num_cols Number of cols in each unpacked history block
+   * @param[in] num_rows Number of rows in each unpacked history block
+   * @param[in] num_cols Number of cols in each unpacked history block
    *
    */
   void transform_history_(Eigen::Block<RowMajorMatrix>& history,
                           const RowMajorMatrix& u_left,
                           const RowMajorMatrix& u_right, const int history_size,
-                    const int num_rows, const int num_cols);
+                          const int num_rows, const int num_cols);
 
   /**
    * @brief Generate pseudo-canonical orbitals and apply transformations
@@ -746,16 +746,15 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
 void GDM::transform_history_(Eigen::Block<RowMajorMatrix>& history,
                              const RowMajorMatrix& u_left,
                              const RowMajorMatrix& u_right,
-                             const int history_size,
-                             const int num_rows,
+                             const int history_size, const int num_rows,
                              const int num_cols) {
   QDK_LOG_TRACE_ENTERING();
   // Validate dimensions (negative values indicate invalid input)
   if (num_rows < 0 || num_cols < 0) {
     throw std::invalid_argument(
         std::string("transform_history_: invalid dimensions (num_rows=") +
-        std::to_string(num_rows) + ", num_cols=" +
-        std::to_string(num_cols) + ")");
+        std::to_string(num_rows) + ", num_cols=" + std::to_string(num_cols) +
+        ")");
   }
   // Skip transformation if either dimension is zero
   if (num_rows == 0 || num_cols == 0) {
@@ -913,7 +912,7 @@ static void diagonalize_block_rotate_orbitals(
     RowMajorMatrix& input_block_output_eigenvectors, const int block_size,
     Eigen::VectorXd& eigenvalues, const int eigenvalue_start_index,
     Eigen::Block<RowMajorMatrix> transformed_orbitals,
-  const int num_atomic_orbitals, const int num_molecular_orbitals) {
+    const int num_atomic_orbitals, const int num_molecular_orbitals) {
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, block_size,
                input_block_output_eigenvectors.data(), block_size,
                eigenvalues.data() + eigenvalue_start_index);
@@ -927,21 +926,23 @@ static void diagonalize_block_rotate_orbitals(
 }
 
 static void transform_gradient_vector(const Eigen::VectorXd& current_vector,
-                             const int start_index, const int num_rows,
-                             const int num_cols, const RowMajorMatrix& u_left,
-                             const RowMajorMatrix& u_right,
-                             Eigen::VectorXd& transformed_vector) {
+                                      const int start_index, const int num_rows,
+                                      const int num_cols,
+                                      const RowMajorMatrix& u_left,
+                                      const RowMajorMatrix& u_right,
+                                      Eigen::VectorXd& transformed_vector) {
   RowMajorMatrix current_matrix = Eigen::Map<const RowMajorMatrix>(
       current_vector.data() + start_index, num_rows, num_cols);
-  RowMajorMatrix transformed_matrix = u_left.transpose() * current_matrix * u_right;
+  RowMajorMatrix transformed_matrix =
+      u_left.transpose() * current_matrix * u_right;
   transformed_vector.segment(start_index, num_rows * num_cols) =
       Eigen::Map<const Eigen::VectorXd>(transformed_matrix.data(),
                                         num_rows * num_cols);
 }
 
 void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
-  const RowMajorMatrix& F, RowMajorMatrix& C, RowMajorMatrix& history_kappa,
-  RowMajorMatrix& history_dgrad, Eigen::VectorXd& current_gradient) {
+    const RowMajorMatrix& F, RowMajorMatrix& C, RowMajorMatrix& history_kappa,
+    RowMajorMatrix& history_dgrad, Eigen::VectorXd& current_gradient) {
   const int num_molecular_orbitals = C.cols();
   const int num_atomic_orbitals = C.rows();
   const int num_closed_orbitals = num_electrons_[1];
@@ -956,29 +957,37 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
   RowMajorMatrix F_dn_mo = F_up_mo;
 
-  F_up_mo.noalias() = C.transpose() * F.block(0, 0, num_atomic_orbitals, num_molecular_orbitals) * C;
-  F_dn_mo.noalias() = C.transpose() * F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                              num_molecular_orbitals) * C;
+  F_up_mo.noalias() =
+      C.transpose() *
+      F.block(0, 0, num_atomic_orbitals, num_molecular_orbitals) * C;
+  F_dn_mo.noalias() = C.transpose() *
+                      F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                              num_molecular_orbitals) *
+                      C;
   RowMajorMatrix Uii =
-      F_up_mo.block(0, 0, num_closed_orbitals, num_closed_orbitals) + F_dn_mo.block(0, 0, num_closed_orbitals, num_closed_orbitals);
-  RowMajorMatrix Uww = F_up_mo.block(num_closed_orbitals, num_closed_orbitals,
-                                      num_open_orbitals, num_open_orbitals) + F_dn_mo.block(num_closed_orbitals, num_closed_orbitals,
-                                                                                                  num_open_orbitals, num_open_orbitals);
-  RowMajorMatrix Uaa = F_up_mo.block(num_occupied_orbitals, num_occupied_orbitals,
-                                      num_virtual_orbitals, num_virtual_orbitals) + F_dn_mo.block(num_occupied_orbitals, num_occupied_orbitals,
-                                                                                                  num_virtual_orbitals, num_virtual_orbitals);
+      0.5 * (F_up_mo.block(0, 0, num_closed_orbitals, num_closed_orbitals) +
+             F_dn_mo.block(0, 0, num_closed_orbitals, num_closed_orbitals));
+  RowMajorMatrix Uww =
+      0.5 * (F_up_mo.block(num_closed_orbitals, num_closed_orbitals,
+                           num_open_orbitals, num_open_orbitals) +
+             F_dn_mo.block(num_closed_orbitals, num_closed_orbitals,
+                           num_open_orbitals, num_open_orbitals));
+  RowMajorMatrix Uaa =
+      0.5 * (F_up_mo.block(num_occupied_orbitals, num_occupied_orbitals,
+                           num_virtual_orbitals, num_virtual_orbitals) +
+             F_dn_mo.block(num_occupied_orbitals, num_occupied_orbitals,
+                           num_virtual_orbitals, num_virtual_orbitals));
 
   // Compute eigenvalues/eigenvectors of occupied-occupied and virtual-virtual
   // blocks for pseudo-canonical orbital transformation
   // Then transform the orbitals to pseudo-canonical basis
-  auto C_closed_view =
-      C.block(0, 0, num_atomic_orbitals, num_closed_orbitals);
+  auto C_closed_view = C.block(0, 0, num_atomic_orbitals, num_closed_orbitals);
   diagonalize_block_rotate_orbitals(
-      Uii, num_closed_orbitals, pseudo_canonical_eigenvalues_, 0,
-      C_closed_view, num_atomic_orbitals, num_molecular_orbitals);
+      Uii, num_closed_orbitals, pseudo_canonical_eigenvalues_, 0, C_closed_view,
+      num_atomic_orbitals, num_molecular_orbitals);
 
-  auto C_open_view = C.block(0, num_closed_orbitals, num_atomic_orbitals,
-                             num_open_orbitals);
+  auto C_open_view =
+      C.block(0, num_closed_orbitals, num_atomic_orbitals, num_open_orbitals);
   diagonalize_block_rotate_orbitals(
       Uww, num_open_orbitals, pseudo_canonical_eigenvalues_,
       num_closed_orbitals, C_open_view, num_atomic_orbitals,
@@ -995,51 +1004,52 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
   // accommodate current pseudo-canonical orbitals
   int offset = 0;
   auto history_kappa_iw =
-    history_kappa.block(0, 0, history_size_, size_closed_open);
+      history_kappa.block(0, 0, history_size_, size_closed_open);
   transform_history_(history_kappa_iw, Uii, Uww, history_size_,
-        num_closed_orbitals, num_open_orbitals);
+                     num_closed_orbitals, num_open_orbitals);
   auto history_dgrad_iw =
-    history_dgrad.block(0, 0, history_size_, size_closed_open);
+      history_dgrad.block(0, 0, history_size_, size_closed_open);
   transform_history_(history_dgrad_iw, Uii, Uww, history_size_,
-        num_closed_orbitals, num_open_orbitals);
+                     num_closed_orbitals, num_open_orbitals);
   offset += size_closed_open;
 
   auto history_kappa_wa =
-    history_kappa.block(0, offset, history_size_, size_open_virtual);
+      history_kappa.block(0, offset, history_size_, size_open_virtual);
   transform_history_(history_kappa_wa, Uww, Uaa, history_size_,
-        num_open_orbitals, num_virtual_orbitals);
+                     num_open_orbitals, num_virtual_orbitals);
   auto history_dgrad_wa =
-    history_dgrad.block(0, offset, history_size_, size_open_virtual);
+      history_dgrad.block(0, offset, history_size_, size_open_virtual);
   transform_history_(history_dgrad_wa, Uww, Uaa, history_size_,
-        num_open_orbitals, num_virtual_orbitals);
+                     num_open_orbitals, num_virtual_orbitals);
   offset += size_open_virtual;
 
   auto history_kappa_ia =
-    history_kappa.block(0, offset, history_size_, size_closed_virtual);
+      history_kappa.block(0, offset, history_size_, size_closed_virtual);
   transform_history_(history_kappa_ia, Uii, Uaa, history_size_,
-        num_closed_orbitals, num_virtual_orbitals);
+                     num_closed_orbitals, num_virtual_orbitals);
   auto history_dgrad_ia =
-    history_dgrad.block(0, offset, history_size_, size_closed_virtual);
+      history_dgrad.block(0, offset, history_size_, size_closed_virtual);
   transform_history_(history_dgrad_ia, Uii, Uaa, history_size_,
-        num_closed_orbitals, num_virtual_orbitals);
+                     num_closed_orbitals, num_virtual_orbitals);
 
   // Transform the gradient to accommodate current pseudo-canonical orbitals
-  Eigen::VectorXd current_gradient_transformed = Eigen::VectorXd(current_gradient.size());
+  Eigen::VectorXd current_gradient_transformed =
+      Eigen::VectorXd(current_gradient.size());
 
   offset = 0;
   transform_gradient_vector(current_gradient, offset, num_closed_orbitals,
-                   num_open_orbitals, Uii, Uww,
-                   current_gradient_transformed);
+                            num_open_orbitals, Uii, Uww,
+                            current_gradient_transformed);
   offset += size_closed_open;
 
   transform_gradient_vector(current_gradient, offset, num_open_orbitals,
-                   num_virtual_orbitals, Uww, Uaa,
-                   current_gradient_transformed);
+                            num_virtual_orbitals, Uww, Uaa,
+                            current_gradient_transformed);
   offset += size_open_virtual;
 
   transform_gradient_vector(current_gradient, offset, num_closed_orbitals,
-                   num_virtual_orbitals, Uii, Uaa,
-                   current_gradient_transformed);
+                            num_virtual_orbitals, Uii, Uaa,
+                            current_gradient_transformed);
 
   current_gradient = current_gradient_transformed;
 }
@@ -1047,9 +1057,61 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
 void GDM::build_restricted_open_shell_pseudo_canonical_orbitals_hessian_(
     const RowMajorMatrix& F, RowMajorMatrix& C, int num_molecular_orbitals,
     Eigen::VectorXd& initial_hessian) {
+  initial_hessian.setZero(total_rotation_size_);
+
+  generate_restricted_open_shell_pseudo_canonical_orbital_(
+      F, C, history_kappa_, history_dgrad_, current_gradient_);
+
   const int num_closed_orbitals = num_electrons_[1];
   const int num_open_orbitals = num_electrons_[0] - num_closed_orbitals;
   const int num_virtual_orbitals = num_molecular_orbitals - num_electrons_[0];
+
+  double initial_hessian_coeff =
+      2.0;  // between close and open shells, or between open and virtual
+            // orbitals, the coefficient should be 2.0
+  int offset = 0;
+  for (int j = 0; j < num_closed_orbitals; j++) {
+    for (int v = 0; v < num_open_orbitals; v++) {
+      int index = j * num_open_orbitals + v;
+      double pseudo_canonical_energy_diff =
+          std::abs(pseudo_canonical_eigenvalues_(num_closed_orbitals + v) -
+                   pseudo_canonical_eigenvalues_(j));
+      initial_hessian(index) =
+          std::max(initial_hessian_coeff *
+                       (std::abs(delta_energy_) + pseudo_canonical_energy_diff),
+                   nonpositive_threshold_);
+    }
+  }
+  offset += num_closed_orbitals * num_open_orbitals;
+
+  for (int v = 0; v < num_open_orbitals; v++) {
+    for (int a = 0; a < num_virtual_orbitals; a++) {
+      int index = offset + v * num_virtual_orbitals + a;
+      double pseudo_canonical_energy_diff =
+          std::abs(pseudo_canonical_eigenvalues_(num_electrons_[0] + a) -
+                   pseudo_canonical_eigenvalues_(num_closed_orbitals + v));
+      initial_hessian(index) =
+          std::max(initial_hessian_coeff *
+                       (std::abs(delta_energy_) + pseudo_canonical_energy_diff),
+                   nonpositive_threshold_);
+    }
+  }
+  offset += num_open_orbitals * num_virtual_orbitals;
+
+  initial_hessian_coeff = 4.0;  // between closed and virtual orbitals, the
+                                // coefficient should be 4.0
+  for (int j = 0; j < num_closed_orbitals; j++) {
+    for (int a = 0; a < num_virtual_orbitals; a++) {
+      int index = offset + j * num_virtual_orbitals + a;
+      double pseudo_canonical_energy_diff =
+          std::abs(pseudo_canonical_eigenvalues_(num_electrons_[0] + a) -
+                   pseudo_canonical_eigenvalues_(j));
+      initial_hessian(index) =
+          std::max(initial_hessian_coeff *
+                       (std::abs(delta_energy_) + pseudo_canonical_energy_diff),
+                   nonpositive_threshold_);
+    }
+  }
 }
 
 void GDM::iterate(SCFImpl& scf_impl) {

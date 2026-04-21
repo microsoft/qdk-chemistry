@@ -69,44 +69,6 @@ class DIIS : public SCFAlgorithm {
                              bool unrestricted, int nelec_alpha,
                              int nelec_beta) override;
 
-  /**
-   * @brief Build cached ROHF Fock/density matrices for convergence checks
-   *
-   * Converts spin-blocked Fock/density matrices into the total-density /
-   * effective-Fock representation, then saved internally for use in DIIS
-   * iterations and convergence checks
-   *
-   * @param[in] F Spin-blocked Fock matrix from `SCFImpl`
-   * @param[in] C Molecular orbital coefficients
-   * @param[in] P Spin-blocked density matrix
-   * @param[in] nelec_alpha Number of alpha electrons
-   * @param[in] nelec_beta Number of beta electrons
-   */
-  void build_rohf_f_p_matrix(const RowMajorMatrix& F, const RowMajorMatrix& C,
-                             const RowMajorMatrix& P, int nelec_alpha,
-                             int nelec_beta);
-
-  /**
-   * @brief Access the cached ROHF-effective Fock matrix
-   *
-   * @return Const reference to the total-density ROHF Fock matrix
-   */
-  const RowMajorMatrix& get_rohf_fock_matrix() const;
-
-  /**
-   * @brief Access the cached total (alpha+beta) density matrix
-   *
-   * @return Const reference to the cached ROHF density
-   */
-  const RowMajorMatrix& get_rohf_density_matrix() const;
-
-  /**
-   * @brief Mutable access to the total density matrix (used inside iterate)
-   *
-   * @return Reference to the cached ROHF density
-   */
-  RowMajorMatrix& rohf_density_matrix();
-
  private:
   /**
    * @brief Return most recent Pulay error metric for damping logic
@@ -120,11 +82,9 @@ class DIIS : public SCFAlgorithm {
   /**
    * @brief Select the Fock matrix view used for the current iteration
    */
-  const RowMajorMatrix& select_working_fock(const SCFImpl& scf_impl);
+  const RowMajorMatrix& select_working_fock(SCFImpl& scf_impl);
 
   std::unique_ptr<impl::DIIS> diis_impl_;  ///< Pulay DIIS core implementation
-  RowMajorMatrix rohf_effective_fock_;     ///< Cached ROHF effective Fock (AO)
-  RowMajorMatrix rohf_total_density_;  ///< Cached ROHF total density (P_a+P_b)
 };
 
 }  // namespace qdk::chemistry::scf

@@ -7,9 +7,11 @@
 #include <qdk/chemistry/scf/config.h>
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <vector>
 
 #include "../scf/scf_impl.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
@@ -47,6 +49,13 @@ SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
           : 1;
   P_last_ = RowMajorMatrix::Zero(num_density_matrices * num_atomic_orbitals,
                                  num_atomic_orbitals);
+
+  if (ctx.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+    rohf_effective_fock_ =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    rohf_total_density_ =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+  }
 }
 
 SCFAlgorithm::~SCFAlgorithm() noexcept = default;
@@ -69,15 +78,15 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
       return std::make_shared<DIIS>(ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
-      if (rohf_enabled) {
-        throw std::runtime_error("ROHF-enabled GDM is not supported!");
-      }
+      // if (rohf_enabled) {
+      //   throw std::runtime_error("ROHF-enabled GDM is not supported!");
+      // }
       return std::make_shared<GDM>(ctx, cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
-      if (rohf_enabled) {
-        throw std::runtime_error("ROHF-enabled DIIS_GDM is not supported!");
-      }
+      // if (rohf_enabled) {
+      //   throw std::runtime_error("ROHF-enabled DIIS_GDM is not supported!");
+      // }
       return std::make_shared<DIIS_GDM>(ctx,
                                         cfg.scf_algorithm.diis_subspace_size,
                                         cfg.scf_algorithm.gdm_config);
@@ -194,6 +203,170 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
   }
 }
 
+bool SCFAlgorithm::try_get_rohf_convergence_matrices(
+    const SCFImpl& scf_impl, const RowMajorMatrix*& fock_matrix,
+    const RowMajorMatrix*& density_matrix) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!ensure_rohf_convergence_matrices_(scf_impl)) {
+    return false;
+  }
+  fock_matrix = &get_rohf_convergence_fock_matrix();
+  density_matrix = &get_rohf_convergence_density_matrix();
+  return true;
+}
+
+void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
+                                         const RowMajorMatrix& C,
+                                         const RowMajorMatrix& P,
+                                         int nelec_alpha, int nelec_beta,
+                                         RowMajorMatrix& effective_fock,
+                                         RowMajorMatrix& total_density) {
+  QDK_LOG_TRACE_ENTERING();
+  const int num_atomic_orbitals = static_cast<int>(C.rows());
+  const int num_molecular_orbitals = static_cast<int>(C.cols());
+  if (num_atomic_orbitals != num_molecular_orbitals) {
+    throw std::runtime_error(
+        "ROHF build requires number of atomic orbitals to equal number of "
+        "molecular orbitals!");
+  }
+
+  total_density =
+      P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) +
+      P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
+
+  if (effective_fock.rows() != num_atomic_orbitals ||
+      effective_fock.cols() != num_atomic_orbitals) {
+    effective_fock =
+        RowMajorMatrix::Zero(num_atomic_orbitals, num_atomic_orbitals);
+  }
+
+  if (C.isZero()) {
+    effective_fock.noalias() =
+        F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    return;
+  }
+
+  RowMajorMatrix F_up_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  RowMajorMatrix F_dn_mo = F_up_mo;
+  RowMajorMatrix effective_F_mo = F_up_mo;
+
+  F_up_mo.noalias() = C.transpose() *
+                      F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) *
+                      C;
+  F_dn_mo.noalias() = C.transpose() *
+                      F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                              num_atomic_orbitals) *
+                      C;
+
+  auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
+                           int row, int col, int rows, int cols) {
+    if (rows <= 0 || cols <= 0) return;
+    effective_F_mo.block(row, col, rows, cols).noalias() =
+        0.5 * (F_up_mo.block(row, col, rows, cols) +
+               F_dn_mo.block(row, col, rows, cols));
+  };
+  auto copy_block = [&effective_F_mo](const RowMajorMatrix& src, int row,
+                                      int col, int rows, int cols) {
+    if (rows <= 0 || cols <= 0) return;
+    effective_F_mo.block(row, col, rows, cols) =
+        src.block(row, col, rows, cols);
+  };
+
+  const int nd = nelec_beta;
+  const int ns = nelec_alpha - nelec_beta;
+  const int nv = num_molecular_orbitals - nelec_alpha;
+
+  average_block(0, 0, nd, nd);
+  average_block(0, nd + ns, nd, nv);
+  average_block(nd + ns, 0, nv, nd);
+  average_block(nd + ns, nd + ns, nv, nv);
+  average_block(nd, nd, ns, ns);
+  copy_block(F_dn_mo, 0, nd, nd, ns);
+  copy_block(F_dn_mo, nd, 0, ns, nd);
+  copy_block(F_up_mo, nd, nd + ns, ns, nv);
+  copy_block(F_up_mo, nd + ns, nd, nv, ns);
+
+  // Transform the effective Fock matrix back to AO basis by solving
+  // C^{-T} * F_MO * C^{-1} = F_AO
+  // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
+  // C without explicitly inverting C
+  const int matrix_dim = num_molecular_orbitals;
+  using ColMajorMatrix =
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
+  // LAPACK expects column-major layout, so we copy the row-major data into a
+  // column-major matrix without transposing the logical layout
+  ColMajorMatrix Ct =
+      Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
+  // F_MO is symmetric, so we can use it directly as the right-hand side
+  // without transposing
+  ColMajorMatrix temp_rhs = effective_F_mo;
+  std::vector<int64_t> ipiv(matrix_dim);
+
+  auto info =
+      lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim, ipiv.data());
+  if (info != 0) {
+    throw std::runtime_error("getrf failed while factorizing C^T");
+  }
+
+  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+  if (info != 0) {
+    throw std::runtime_error("getrs failed while solving C^T X = F_mo");
+  }
+
+  temp_rhs.transposeInPlace();
+  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
+                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
+  if (info != 0) {
+    throw std::runtime_error("getrs failed while solving C^T X = M^T");
+  }
+
+  effective_fock = temp_rhs.transpose();
+  if (!effective_fock.isApprox(effective_fock.transpose())) {
+    effective_fock = 0.5 * (effective_fock + effective_fock.transpose().eval());
+  }
+}
+
+bool SCFAlgorithm::ensure_rohf_convergence_matrices_(const SCFImpl& scf_impl) {
+  QDK_LOG_TRACE_ENTERING();
+  if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
+    return false;
+  }
+
+  const auto nelec_vec = scf_impl.get_num_electrons();
+  build_rohf_f_p_matrix(
+      scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
+      scf_impl.get_density_matrix(), nelec_vec[0], nelec_vec[1],
+      rohf_effective_fock_, rohf_total_density_);
+  return true;
+}
+
+const RowMajorMatrix& SCFAlgorithm::get_rohf_convergence_fock_matrix() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (rohf_effective_fock_.size() == 0) {
+    throw std::logic_error("ROHF convergence cache not initialized");
+  }
+  return rohf_effective_fock_;
+}
+
+const RowMajorMatrix& SCFAlgorithm::get_rohf_convergence_density_matrix()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  if (rohf_total_density_.size() == 0) {
+    throw std::logic_error("ROHF convergence cache not initialized");
+  }
+  return rohf_total_density_;
+}
+
+RowMajorMatrix& SCFAlgorithm::rohf_convergence_density_matrix() {
+  QDK_LOG_TRACE_ENTERING();
+  if (rohf_total_density_.size() == 0) {
+    throw std::logic_error("ROHF convergence cache not initialized");
+  }
+  return rohf_total_density_;
+}
+
 double SCFAlgorithm::calculate_og_error_(const RowMajorMatrix& F,
                                          const RowMajorMatrix& P,
                                          const RowMajorMatrix& S,
@@ -252,22 +425,12 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
 
   const RowMajorMatrix* F_ptr;
   const RowMajorMatrix* P_ptr;
-  std::vector<int> nelec_vec = scf_impl.get_num_electrons();
-  const int nelec[2] = {nelec_vec[0], nelec_vec[1]};
 
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    // To be modified when ROHFGDM is implemented: in that case, the pointer
-    // will come from the DIIS instance saved in DIIS_GDM, like the current
-    // DIIS_GDM implementation
-    DIIS* rohf_diis = dynamic_cast<DIIS*>(this);
-    if (rohf_diis == nullptr) {
-      throw std::logic_error("ROHF convergence requires DIIS implementation");
+    if (!try_get_rohf_convergence_matrices(scf_impl, F_ptr, P_ptr)) {
+      throw std::logic_error(
+          "ROHF convergence matrices are not provided by this SCF algorithm");
     }
-    rohf_diis->build_rohf_f_p_matrix(
-        scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-        scf_impl.get_density_matrix(), nelec[0], nelec[1]);
-    F_ptr = &rohf_diis->get_rohf_fock_matrix();
-    P_ptr = &rohf_diis->get_rohf_density_matrix();
   } else {
     F_ptr = &scf_impl.get_fock_matrix();
     P_ptr = &scf_impl.get_density_matrix();
