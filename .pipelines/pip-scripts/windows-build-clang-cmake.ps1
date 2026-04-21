@@ -341,16 +341,11 @@ if (-not $SkipPython) {
     Write-Host "=== Step 5: Install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
-    # Set QDK_DLL_DIR so the qdk_chemistry package can find vcpkg DLL
-    # dependencies (openblas.dll, hdf5.dll, etc.) at import time.
-    $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
-    Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
-
     $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
-    .\venv\Scripts\activate
+    .\venv\Scripts\activate.ps1
     # Do not install:
     # - plugins: pyscf does not build on Windows
     # - jupyter: requires plugins

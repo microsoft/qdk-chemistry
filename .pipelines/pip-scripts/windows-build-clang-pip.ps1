@@ -274,16 +274,11 @@ if (-not $SkipBuild) {
     Write-Host "=== Step 1: Build and install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
-    # Set QDK_DLL_DIR so the qdk_chemistry package can find vcpkg DLL
-    # dependencies (openblas.dll, hdf5.dll, etc.) at import time.
-    $env:QDK_DLL_DIR = "$VcpkgInstalledDir\x64-windows\bin"
-    Write-Host "QDK_DLL_DIR: $env:QDK_DLL_DIR" -ForegroundColor Blue
-
     $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }
-    .\venv\Scripts\activate
+    .\venv\Scripts\activate.ps1
     # pip drives the full build: scikit-build-core invokes CMake to compile the
     # C++ library and pybind11 bindings, then packages everything into a wheel.
     # Do not install:

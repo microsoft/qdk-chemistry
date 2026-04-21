@@ -203,3 +203,17 @@ install(TARGETS _core
   LIBRARY DESTINATION .
   COMPONENT _core
 )
+
+# On Windows, bundle vcpkg runtime DLLs alongside _core.pyd so the package
+# is self-contained and does not require QDK_DLL_DIR at import time.
+if(WIN32 AND VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+    file(GLOB _vcpkg_runtime_dlls
+        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/*.dll"
+    )
+    if(_vcpkg_runtime_dlls)
+        install(FILES ${_vcpkg_runtime_dlls}
+            DESTINATION .
+            COMPONENT _core
+        )
+    endif()
+endif()

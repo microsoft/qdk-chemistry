@@ -21,15 +21,19 @@ if hasattr(_sys.stderr, "reconfigure"):
     _sys.stderr.reconfigure(encoding="utf-8")
 
 if _sys.platform == "win32":
-    # Allow users / CI to point to extra DLL directories via a semicolon-
+    _pkg_dir = _os.path.dirname(_os.path.abspath(__file__))
+    _dll_dir_handles = []
+    # Register the package directory itself (where bundled DLLs are installed).
+    if _os.path.isdir(_pkg_dir):
+        _dll_dir_handles.append(_os.add_dll_directory(_pkg_dir))  # type: ignore[attr-defined]
+    # Also allow users / CI to point to extra DLL directories via a semicolon-
     # separated environment variable (e.g. the vcpkg bin directory).
     _dll_dirs = _os.environ.get("QDK_DLL_DIR", "")
-    _dll_dir_handles = []
     for _d in _dll_dirs.split(";"):
         _d = _d.strip()
         if _d and _os.path.isdir(_d):
             _dll_dir_handles.append(_os.add_dll_directory(_d))  # type: ignore[attr-defined]
-    del _dll_dirs
+    del _dll_dirs, _pkg_dir
 
 try:
     __version__ = _get_version("qdk-chemistry")
