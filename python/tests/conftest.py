@@ -170,14 +170,28 @@ def simple_error_profile():
         description="A simple test error profile",
         errors={
             "h": {
-                "type": "depolarizing_error",
-                "rate": 0.01,
-                "num_qubits": 1,
+                "depolarizing_error": 0.01,
             },
             "cx": {
-                "type": "depolarizing_error",
-                "rate": 0.02,
-                "num_qubits": 2,
+                "depolarizing_error": 0.02,
+            },
+        },
+    )
+
+
+@pytest.fixture
+def simple_error_profile_with_qubit_loss():
+    """Fixture to create a simple QuantumErrorProfile with qubit loss."""
+    return QuantumErrorProfile(
+        name="simple_profile",
+        description="A simple test error profile",
+        errors={
+            "h": {
+                "depolarizing_error": 0.01,
+                "qubit_loss": 0.01,
+            },
+            "cx": {
+                "depolarizing_error": 0.02,
             },
         },
     )

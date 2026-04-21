@@ -464,10 +464,10 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         name="qpe_noise_test",
         description="Depolarizing noise for QPE integration test",
         errors={
-            "cx": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 2},
-            "rz": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
-            "h": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
-            "s": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
+            "cx": {"depolarizing_error": error_rate},
+            "rz": {"depolarizing_error": error_rate},
+            "h": {"depolarizing_error": error_rate},
+            "s": {"depolarizing_error": error_rate},
         },
     )
     simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
