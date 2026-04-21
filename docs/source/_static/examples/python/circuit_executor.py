@@ -86,8 +86,8 @@ noise_model = QuantumErrorProfile(
     name="depolarizing",
     description="Simple depolarizing noise model",
     errors={
-        "x": {"type": "depolarizing_error", "rate": 0.005, "num_qubits": 1},
-        "cx": {"type": "depolarizing_error", "rate": 0.007, "num_qubits": 2},
+        "x": {"depolarizing_error": 0.005},
+        "cx": {"depolarizing_error": 0.007},
     },
 )
 
