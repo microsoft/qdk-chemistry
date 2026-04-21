@@ -21,7 +21,7 @@ from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula imp
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import (
+from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import (
     ControlledUnitary,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT

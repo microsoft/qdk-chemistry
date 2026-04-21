@@ -112,7 +112,7 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.hamiltonian_unitary.base import UnitaryRepresentation
 from qdk_chemistry.data.hamiltonian_unitary.containers.base import UnitaryContainer
 from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import ControlledUnitary
+from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian

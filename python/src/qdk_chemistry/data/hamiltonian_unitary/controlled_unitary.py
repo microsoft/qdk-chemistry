@@ -80,8 +80,8 @@ class ControlledUnitary(DataClass):
         group.attrs["control_indices"] = self.control_indices
 
         # Create subgroup for the nested object
-        teu_group = group.create_group("unitary")
-        self.unitary.to_hdf5(teu_group)
+        unitary_group = group.create_group("unitary")
+        self.unitary.to_hdf5(unitary_group)
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "ControlledUnitary":
@@ -119,8 +119,8 @@ class ControlledUnitary(DataClass):
         control_indices = list(group.attrs["control_indices"])
 
         # Load nested UnitaryRepresentation
-        teu_group = group["unitary"]
-        unitary = UnitaryRepresentation.from_hdf5(teu_group)
+        unitary_group = group["unitary"]
+        unitary = UnitaryRepresentation.from_hdf5(unitary_group)
 
         return cls(
             unitary=unitary,
@@ -137,7 +137,7 @@ class ControlledUnitary(DataClass):
         line = "Controlled Unitary:\n"
         line += f"  Control Indices: {self.control_indices}\n"
         line += "  Unitary Summary:\n"
-        teu_summary = self.unitary.get_summary()
-        teu_summary_indented = "\n".join("    " + summary_line for summary_line in teu_summary.splitlines())
-        line += teu_summary_indented
+        unitary_summary = self.unitary.get_summary()
+        unitary_summary_indented = "\n".join("    " + summary_line for summary_line in unitary_summary.splitlines())
+        line += unitary_summary_indented
         return line

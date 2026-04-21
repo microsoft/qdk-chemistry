@@ -14,7 +14,7 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import ControlledUnitary
+from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import ControlledUnitary
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper

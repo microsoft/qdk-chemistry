@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
-from qdk_chemistry.data.hamiltonian_unitary.controlled_time_evolution import ControlledUnitary
+from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import ControlledUnitary
 
 __all__: list[str] = ["ControlledCircuitMapper", "ControlledCircuitMapperFactory"]
 
