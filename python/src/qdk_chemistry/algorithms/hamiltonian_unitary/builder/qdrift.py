@@ -159,7 +159,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         r"""Construct the unitary representation using qDRIFT randomized sampling.
 
         The qDRIFT method approximates :math:`e^{-iHt}` by:
@@ -170,8 +170,8 @@ class QDrift(TimeEvolutionBuilder):
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The evolution time for the unitary construction.
-
+            time: The total evolution time.
+            
         Returns:
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 

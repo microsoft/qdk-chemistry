@@ -7,7 +7,7 @@ Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, 
 Overview
 --------
 
-Building unitary from Hamiltonian, such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
+Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
 QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
@@ -37,7 +37,7 @@ QubitHamiltonian
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
@@ -49,7 +49,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-configure-trotter
       :end-before: # end-cell-configure-trotter
@@ -58,7 +58,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
@@ -71,7 +71,7 @@ You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
@@ -153,7 +153,7 @@ Related classes
 Further reading
 ---------------
 
-- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/unitary_builder.py>`_ script.
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hamiltonian_unitary_builder.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Quantum phase estimation algorithms
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - :doc:`Settings <settings>`: Configuration settings for algorithms

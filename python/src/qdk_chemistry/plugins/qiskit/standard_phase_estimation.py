@@ -175,7 +175,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             self._append_controlled_unitary(
                 circuit=qc,
                 qubit_hamiltonian=qubit_hamiltonian,
-                time=self._settings.get("evolution_time"),
                 control_qubit=ancilla[ancilla_idx],
                 target_qubits=system,
                 unitary_builder=unitary_builder,
@@ -199,7 +198,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         control_qubit: int,
         target_qubits: list,
         *,
-        time: float,
         power: int,
         unitary_builder: HamiltonianUnitaryBuilder,
         circuit_mapper: ControlledCircuitMapper,
@@ -211,7 +209,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
-            time: The evolution time.
             power: The power to which the controlled unitary is raised.
             unitary_builder: The unitary builder to use.
             circuit_mapper: The controlled circuit mapper to use.

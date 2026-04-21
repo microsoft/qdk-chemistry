@@ -1,4 +1,4 @@
-"""QDK/Chemistry pauli product formula container module."""
+"""QDK/Chemistry time evolution pauli product formula container module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

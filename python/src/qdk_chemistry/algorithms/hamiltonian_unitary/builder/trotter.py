@@ -141,13 +141,13 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The evolution time for the unitary construction.
-
+            time: The total evolution time.
+            
         Returns:
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 

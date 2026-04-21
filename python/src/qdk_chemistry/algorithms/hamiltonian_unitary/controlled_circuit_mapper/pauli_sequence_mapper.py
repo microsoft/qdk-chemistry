@@ -55,8 +55,8 @@ class PauliSequenceMapper(ControlledCircuitMapper):
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
-        * Requires a ``PauliProductFormulaContainer`` for the unitary.
-
+        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
+    
     """
 
     def __init__(self, power: int = 1):

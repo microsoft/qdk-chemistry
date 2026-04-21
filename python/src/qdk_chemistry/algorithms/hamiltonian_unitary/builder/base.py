@@ -60,23 +60,22 @@ class HamiltonianUnitaryBuilder(Algorithm):
 
 
 class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
-    """Base class for time-evolution-based Hamiltonian unitary builders.
+    """Base class for time evolution Builders in QDK/Chemistry algorithms."""
 
-    Subclasses (e.g. Trotter, qDRIFT) implement ``_run_impl`` which receives
-    the ``time`` parameter representing the evolution time for constructing the
-    unitary :math:`U(t) = e^{-iHt}`.
-    """
+    def __init__(self):
+        """Initialize the TimeEvolutionBuilder."""
+        super().__init__()
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation for the given QubitHamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
-            time: The evolution time for the unitary construction.
+            time: The evolution time.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitHamiltonian.
 
         """
 

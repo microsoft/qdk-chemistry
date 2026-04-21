@@ -28,7 +28,7 @@ The resulting :class:`~qdk_chemistry.data.Circuit` implements the controlled uni
 
 
 Using the ControlledCircuitMapper
-------------------------------------------
+---------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
