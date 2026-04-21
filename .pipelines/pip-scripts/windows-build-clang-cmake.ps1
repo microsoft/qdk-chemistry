@@ -19,7 +19,11 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$RepoRoot = $PSScriptRoot
+$RepoRoot = Get-Location
+if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
+    Write-Error "This script must be run from the repository root."
+    exit 1
+}
 $BuildDir = "$RepoRoot\cpp\build"
 $InstallDir = "$RepoRoot\install"
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"

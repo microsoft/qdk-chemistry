@@ -41,20 +41,20 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    set(CMAKE_CXX_FLAGS_DEBUG   "-g -O0 -Wall -Wextra" CACHE STRING "" FORCE)
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG"         CACHE STRING "" FORCE)
-elseif(MSVC)
-    set(CMAKE_CXX_FLAGS_DEBUG   "/Zi /Od /W3"      CACHE STRING "" FORCE)
-    set(CMAKE_CXX_FLAGS_RELEASE "/O2 /W1 /DNDEBUG" CACHE STRING "" FORCE)
-endif()
-
-# MSVC CRT doesn't define M_PI etc. without this.
-# Note: MSVC variable is TRUE for both cl.exe and clang-cl, while
-# CMAKE_CXX_COMPILER_ID is "Clang" for clang-cl (matching the first branch above).
-if(MSVC)
-    add_compile_definitions(_USE_MATH_DEFINES)
-    # Suppress noisy clang-cl warnings from FetchContent dependencies.
+# Set per-config compile flags.
+# We append to CMAKE_CXX_FLAGS_<CONFIG> (rather than replacing) to preserve toolchain defaults like /EHsc, /MD, etc.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG   " -g -O0 -Wall -Wextra")
+    string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -DNDEBUG")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG " -g -O0 -Wall -Wextra")
+    if(MSVC)
+        # clang-cl: CMake already sets /O2 /DNDEBUG; just suppress warnings
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -Wno-all -Wno-extra")
+    else()
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -DNDEBUG -Wno-all -Wno-extra")
+    endif()
+    # Suppress noisy clang warnings from FetchContent dependencies.
     add_compile_options(
         -Wno-c++98-compat
         -Wno-c++98-compat-extra-semi
@@ -64,10 +64,10 @@ if(MSVC)
         -Wno-covered-switch-default
         -Wno-defaulted-function-deleted
         -Wno-deprecated-copy-with-dtor
-        -Wno-deprecated-copy-with-user-provided-dtor
         -Wno-deprecated-declarations
         -Wno-disabled-macro-expansion
         -Wno-documentation
+        -Wno-documentation-pedantic
         -Wno-documentation-unknown-command
         -Wno-double-promotion
         -Wno-exit-time-destructors
@@ -86,34 +86,42 @@ if(MSVC)
         -Wno-missing-prototypes
         -Wno-newline-eof
         -Wno-old-style-cast
-        -Wno-pre-c++14-compat
         -Wno-reserved-identifier
         -Wno-reserved-macro-identifier
         -Wno-shorten-64-to-32
         -Wno-sign-conversion
+        -Wno-sign-compare
+        -Wno-suggest-override
         -Wno-suggest-destructor-override
         -Wno-switch-default
         -Wno-switch-enum
         -Wno-undefined-func-template
-        -Wno-unreachable-code
-        -Wno-unreachable-code-return
         -Wno-unsafe-buffer-usage
         -Wno-unsafe-buffer-usage-in-libc-call
-        -Wno-unused-command-line-argument
         -Wno-unused-macros
         -Wno-unused-parameter
         -Wno-unused-variable
-        -Wno-vla-cxx-extension
     )
+elseif(MSVC)
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG   " /Zi /Od /W3")
+    string(APPEND CMAKE_CXX_FLAGS_RELEASE " /O2 /W1 /DNDEBUG")
+endif()
+
+if(MSVC)
+    # MSVC CRT doesn't define M_PI etc. without this.
+    add_compile_definitions(_USE_MATH_DEFINES)
+
     # lapackpp's lartg.cc uses std::complex without #include <complex>.
     # On libstdc++ it's transitively included; on MSVC STL it isn't.
     # Use CMAKE_CXX_FLAGS (not add_compile_options) so it only applies to C++ files,
     # avoiding STL1003 errors when C files get the C++ <complex> header.
     # Force-include <complex> for C++ only — GauXC has C files that would break.
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FI complex")
+
     # gau2grid_helper.c calls exit() without #include <stdlib.h>.
     # Clang-cl treats implicit function declarations as errors in C99+.
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
+
     # blaspp's BLASFinder.cmake uses try_run() to detect Fortran name mangling,
     # but on Windows the test executable can't find openblas.dll at runtime,
     # leaving blas/defines.h empty and breaking lapackpp.
@@ -203,45 +211,53 @@ endif()
 # Create library
 add_library(chemistry)
 
-# Re-enable warnings for our own code that were globally suppressed for
-# FetchContent dependencies.  With clang the last flag wins, so these
-# target-level -W flags override the directory-level -Wno- counterparts.
-if(MSVC AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+# Re-enable warnings for our own code that were globally suppressed forFetchContent dependencies.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
     target_compile_options(chemistry PRIVATE
+        -Wcast-function-type-strict
         -Wcast-qual
-        -Wdefaulted-function-deleted
+        # -Wcovered-switch-default
+        -Wdisabled-macro-expansion
+        # -Wdefaulted-function-deleted
         -Wdeprecated-copy-with-dtor
-        -Wdeprecated-copy-with-user-provided-dtor
         -Wdeprecated-declarations
-        -Wdouble-promotion
-        -Wexit-time-destructors
-        -Wextra-semi
-        -Wextra-semi-stmt
-        -Wfloat-conversion
-        -Wfloat-equal
-        -Wformat-nonliteral
-        -Wglobal-constructors
-        -Wimplicit-float-conversion
-        -Wimplicit-int-float-conversion
-        -Winconsistent-missing-destructor-override
-        -Winconsistent-missing-override
-        -Wmissing-noreturn
-        -Wmissing-prototypes
-        -Wold-style-cast
+        # -Wdocumentation
+        # -Wdocumentation-pedantic
+        # -Wdocumentation-unknown-command
+        # -Wdouble-promotion
+        # -Wexit-time-destructors
+        # -Wextra-semi
+        # -Wextra-semi-stmt
+        # -Wfloat-conversion
+        # -Wfloat-equal
+        # -Wformat-nonliteral
+        # -Wglobal-constructors
+        # -Wimplicit-float-conversion
+        # -Wimplicit-int-float-conversion
+        # -Winconsistent-missing-destructor-override
+        # -Winconsistent-missing-override
+        # -Wmacro-redefined
+        # -Wmissing-noreturn
+        # -Wmissing-prototypes
+        # -Wnewline-eof
+        # -Wold-style-cast
         -Wreserved-identifier
         -Wreserved-macro-identifier
-        -Wshorten-64-to-32
-        -Wsign-conversion
-        -Wsuggest-destructor-override
-        -Wswitch-default
-        -Wswitch-enum
+        # -Wshorten-64-to-32
+        # -Wsign-compare
+        # -Wsign-conversion
+        # -Wsuggest-override
+        # -Wsuggest-destructor-override
+        # -Wswitch-default
+        # -Wswitch-enum
         -Wundefined-func-template
         -Wunreachable-code
         -Wunreachable-code-return
-        -Wunsafe-buffer-usage
-        -Wunused-macros
-        -Wunused-parameter
-        -Wunused-variable
+        # -Wunsafe-buffer-usage
+        # -Wunsafe-buffer-usage-in-libc-call
+        # -Wunused-macros
+        # -Wunused-parameter
+        # -Wunused-variable
     )
 endif()
 add_subdirectory(src/qdk/chemistry/data)
