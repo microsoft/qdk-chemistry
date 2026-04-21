@@ -29,7 +29,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
@@ -90,6 +90,7 @@ __all__ = [
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",
+    "TimeEvolutionBuilder",
     # Factory functions
     "available",
     "create",
