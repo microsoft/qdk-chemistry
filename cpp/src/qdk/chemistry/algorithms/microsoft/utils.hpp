@@ -78,9 +78,11 @@ std::shared_ptr<qcs::Molecule> convert_to_molecule(
  * format that can be easily serialized and used in other applications.
  *
  * @param basis_set The qdk::chemistry::data::BasisSet object to convert.
- * @return A nlohmann::ordered_json object representing the basis set.
+ * @return A pair of nlohmann::ordered_json objects: the first represents the
+ *         primary basis set, the second represents the auxiliary basis set
+ *         (null if no auxiliary basis exists).
  */
-nlohmann::ordered_json convert_to_json(
+std::pair<nlohmann::ordered_json, nlohmann::ordered_json> convert_to_json(
     const qdk::chemistry::data::BasisSet& basis_set);
 
 /**
@@ -121,12 +123,13 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
  * @param qdk_basis_set The qdk::chemistry::data::BasisSet object to convert.
  * @param  normalize Whether to normalize the basis set after conversion.
  * Default is true.
- * @return A std::unique_ptr<BasisSet> representing the same basis set
- * data.
+ * @return A pair of shared pointers: the first is the primary internal basis
+ *         set, the second is the auxiliary basis set (nullptr if none).
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
-std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
-    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
+std::pair<std::shared_ptr<qcs::BasisSet>, std::shared_ptr<qcs::BasisSet>>
+convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
+                           bool normalize = true);
 
 /**
  * @brief Compute a mapping between QDK and internal basis set shells

@@ -187,15 +187,16 @@ struct Shell {
 class BasisSet : public DataClass,
                  public std::enable_shared_from_this<BasisSet> {
  public:
-  /**
-   * @brief Constructor with basis set name and structure
-   * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
+  //   /**
+  //    * @brief Constructor with basis set name and structure
+  //    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+  //    * @param structure The molecular structure
+  //    * @param atomic_orbital_type Whether to use spherical or cartesian
+  //    atomic
+  //    * orbitals
+  //    */
+  //   BasisSet(const std::string& name, const Structure& structure,
+  //            AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells
@@ -219,15 +220,16 @@ class BasisSet : public DataClass,
            const Structure& structure,
            AOType atomic_orbital_type = AOType::Spherical);
 
-  /**
-   * @brief Constructor with basis set name and structure shared pointer
-   * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
+  //   /**
+  //    * @brief Constructor with basis set name and structure shared pointer
+  //    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+  //    * @param structure Shared pointer to the molecular structure
+  //    * @param atomic_orbital_type Whether to use spherical or cartesian
+  //    atomic
+  //    * orbitals
+  //    */
+  //   BasisSet(const std::string& name, std::shared_ptr<Structure> structure,
+  //            AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells and structure shared pointer
@@ -242,122 +244,34 @@ class BasisSet : public DataClass,
            AOType atomic_orbital_type = AOType::Spherical);
 
   /**
-   * @brief Constructor with shells, auxiliary basis set, and structure
-   * @param name Name of the basis set
-   * @param shells Vector of shells to initialize the basis set with
-   * @param auxiliary_basis Shared pointer to the auxiliary basis set
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           std::shared_ptr<BasisSet> auxiliary_basis,
-           const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with shells, auxiliary basis set, and structure shared
-   * pointer
-   * @param name Name of the basis set
-   * @param shells Vector of shells to initialize the basis set with
-   * @param auxiliary_basis Shared pointer to the auxiliary basis set
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           std::shared_ptr<BasisSet> auxiliary_basis,
-           std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with basis set name, auxiliary basis name, and structure
-   *
-   * Both primary and auxiliary basis sets are looked up by name. The primary
-   * basis set will have no shells until populated by a factory method or SCF.
-   *
-   * @param name Name of the primary basis set
-   * @param aux_name Name of the auxiliary basis set
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::string& aux_name,
-           const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with basis set name, auxiliary basis name, and structure
-   * shared pointer
-   * @param name Name of the primary basis set
-   * @param aux_name Name of the auxiliary basis set
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::string& aux_name,
-           std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with shells, ECP shells, auxiliary shells, and structure
-   *
-   * Creates a basis set with explicit primary shells, ECP shells, and auxiliary
-   * basis shells. The auxiliary basis set is constructed from aux_shells with
-   * the same structure.
-   *
-   * @param name Name of the basis set
-   * @param shells Vector of primary shells
-   * @param ecp_shells Vector of ECP shells
-   * @param aux_shells Vector of auxiliary basis shells
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           const std::vector<Shell>& ecp_shells,
-           const std::vector<Shell>& aux_shells, const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with shells, ECP shells, auxiliary shells, and structure
-   * shared pointer
-   * @param name Name of the basis set
-   * @param shells Vector of primary shells
-   * @param ecp_shells Vector of ECP shells
-   * @param aux_shells Vector of auxiliary basis shells
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   */
-  BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           const std::vector<Shell>& ecp_shells,
-           const std::vector<Shell>& aux_shells,
-           std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Constructor with shells, ECP shells, and structure
+   * @brief Constructor with shells, ECP shells, ECP electrons, and structure
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   * atom, atoms ordered same as in the structure
    * @param structure The molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           const std::vector<Shell>& ecp_shells, const Structure& structure,
+           const std::vector<Shell>& ecp_shells,
+           const std::vector<size_t>& ecp_electrons, const Structure& structure,
            AOType basis_type = AOType::Spherical);
 
   /**
-   * @brief Constructor with shells, ECP shells, and structure shared pointer
+   * @brief Constructor with shells, ECP shells, ECP electrons, and structure
+   *        shared pointer
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   * atom, atoms ordered same as in the structure
    * @param structure Shared pointer to the molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::vector<Shell>& ecp_shells,
+           const std::vector<size_t>& ecp_electrons,
            std::shared_ptr<Structure> structure,
            AOType basis_type = AOType::Spherical);
 
@@ -369,7 +283,7 @@ class BasisSet : public DataClass,
    * @param ecp_name Name of the ECP basis set
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure The molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -386,7 +300,7 @@ class BasisSet : public DataClass,
    * @param ecp_shells Vector of ECP shells to initialize the basis set with
    * @param ecp_name Name of the ECP basis set
    * @param ecp_electrons Vector containing numbers of ECP electrons for each
-   * atom
+   * atom, atoms ordered same as in the structure
    * @param structure Shared pointer to the molecular structure
    * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
@@ -397,50 +311,99 @@ class BasisSet : public DataClass,
            AOType basis_type = AOType::Spherical);
 
   /**
-   * @brief Full constructor with shells, ECP info, auxiliary info, and
-   * structure
-   *
-   * Creates a complete basis set with all ECP and auxiliary basis metadata.
-   *
-   * @param name Name of the primary basis set
-   * @param shells Vector of primary shells
-   * @param ecp_name Name of the ECP basis set
-   * @param ecp_shells Vector of ECP shells
-   * @param ecp_electrons Vector of ECP electrons per atom
-   * @param aux_name Name of the auxiliary basis set
-   * @param aux_shells Vector of auxiliary basis shells
+   * @brief Constructor with shells, auxiliary shells, and structure
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
    * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::vector<Shell>& aux_shells, const Structure& structure,
+           AOType basis_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with shells, auxiliary shells, and structure
+   *        shared pointer
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
+   * @param structure Shared pointer to the molecular structure
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::vector<Shell>& aux_shells,
+           std::shared_ptr<Structure> structure,
+           AOType basis_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with shells, named auxiliary shells, and structure
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param aux_name Name of the auxiliary basis set
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
+   * @param structure The molecular structure
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::string& aux_name, const std::vector<Shell>& aux_shells,
+           const Structure& structure, AOType basis_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with shells, named auxiliary shells, and structure
+   *        shared pointer
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param aux_name Name of the auxiliary basis set
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
+   * @param structure Shared pointer to the molecular structure
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const std::string& aux_name, const std::vector<Shell>& aux_shells,
+           std::shared_ptr<Structure> structure,
+           AOType basis_type = AOType::Spherical);
+
+  /**
+   * @brief Constructor with shells, ECP shells, ECP metadata, auxiliary shells,
+   *        auxiliary name, and structure
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param ecp_name Name of the ECP basis set
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   *        atom, atoms ordered same as in the structure
+   * @param aux_name Name of the auxiliary basis set
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
+   * @param structure The molecular structure
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
            const std::vector<size_t>& ecp_electrons,
            const std::string& aux_name, const std::vector<Shell>& aux_shells,
-           const Structure& structure,
-           AOType atomic_orbital_type = AOType::Spherical);
+           const Structure& structure, AOType basis_type = AOType::Spherical);
 
   /**
-   * @brief Full constructor with shells, ECP info, auxiliary info, and
-   * structure shared pointer
-   * @param name Name of the primary basis set
-   * @param shells Vector of primary shells
+   * @brief Constructor with shells, ECP shells, ECP metadata, auxiliary shells,
+   *        auxiliary name, and structure shared pointer
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
    * @param ecp_name Name of the ECP basis set
-   * @param ecp_shells Vector of ECP shells
-   * @param ecp_electrons Vector of ECP electrons per atom
+   * @param ecp_shells Vector of ECP shells to initialize the basis set with
+   * @param ecp_electrons Vector containing numbers of ECP electrons for each
+   *        atom, atoms ordered same as in the structure
    * @param aux_name Name of the auxiliary basis set
-   * @param aux_shells Vector of auxiliary basis shells
+   * @param aux_shells Vector of auxiliary shells (e.g., for density fitting)
    * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
+   * @param basis_type Whether to use spherical or cartesian atomic orbitals
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const std::string& ecp_name, const std::vector<Shell>& ecp_shells,
            const std::vector<size_t>& ecp_electrons,
            const std::string& aux_name, const std::vector<Shell>& aux_shells,
            std::shared_ptr<Structure> structure,
-           AOType atomic_orbital_type = AOType::Spherical);
-
+           AOType basis_type = AOType::Spherical);
   /**
    * @brief Default destructor
    */
@@ -475,6 +438,9 @@ class BasisSet : public DataClass,
 
   /** @brief Name for custom ecps */
   static constexpr std::string_view custom_ecp_name = "custom_ecp";
+
+  /** @brief Name for custom auxiliary basis sets */
+  static constexpr std::string_view custom_aux_name = "custom_aux";
 
   /**
    * @brief Get the data type name for this class
@@ -648,15 +614,78 @@ class BasisSet : public DataClass,
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
-   * @brief Create a basis set with auxiliary basis using per-atom-index maps
-   * @param index_to_basis_map Mapping from atom indices to primary basis set
-   * names
-   * @param index_to_aux_basis_map Mapping from atom indices to auxiliary basis
-   * set names
+   * @brief Create a basis set from a basis name and auxiliary basis name
+   * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+   * @param aux_basis_name Name of the auxiliary basis set (e.g.,
+   * "cc-pVDZ-RIFIT")
    * @param structure The molecular structure
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_basis_name(
+      const std::string& basis_name, const std::string& aux_basis_name,
+      const Structure& structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Create a basis set from a basis name and auxiliary basis name
+   * @param basis_name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
+   * @param aux_basis_name Name of the auxiliary basis set (e.g.,
+   * "cc-pVDZ-RIFIT")
+   * @param structure Shared pointer to the molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_basis_name(
+      std::string basis_name, const std::string& aux_basis_name,
+      std::shared_ptr<Structure> structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Create a basis set from element-to-basis and element-to-auxiliary
+   *        maps
+   * @param element_to_basis_map Mapping from element symbols to basis set names
+   * @param element_to_aux_basis_map Mapping from element symbols to auxiliary
+   *        basis set names
+   * @param structure The molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_element_map(
+      const std::map<std::string, std::string>& element_to_basis_map,
+      const std::map<std::string, std::string>& element_to_aux_basis_map,
+      const Structure& structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Create a basis set from element-to-basis and element-to-auxiliary
+   *        maps
+   * @param element_to_basis_map Mapping from element symbols to basis set names
+   * @param element_to_aux_basis_map Mapping from element symbols to auxiliary
+   *        basis set names
+   * @param structure Shared pointer to the molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
+   */
+  static std::shared_ptr<BasisSet> from_element_map(
+      const std::map<std::string, std::string>& element_to_basis_map,
+      const std::map<std::string, std::string>& element_to_aux_basis_map,
+      std::shared_ptr<Structure> structure,
+      AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
+   * @brief Create a basis set from index-to-basis and index-to-auxiliary maps
+   * @param index_to_basis_map Mapping from atom indices to basis set names
+   * @param index_to_aux_basis_map Mapping from atom indices to auxiliary basis
+   *        set names
+   * @param structure The molecular structure
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
    */
   static std::shared_ptr<BasisSet> from_index_map(
       const std::map<size_t, std::string>& index_to_basis_map,
@@ -665,15 +694,14 @@ class BasisSet : public DataClass,
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
-   * @brief Create a basis set with auxiliary basis using per-atom-index maps
-   * @param index_to_basis_map Mapping from atom indices to primary basis set
-   * names
+   * @brief Create a basis set from index-to-basis and index-to-auxiliary maps
+   * @param index_to_basis_map Mapping from atom indices to basis set names
    * @param index_to_aux_basis_map Mapping from atom indices to auxiliary basis
-   * set names
+   *        set names
    * @param structure Shared pointer to the molecular structure
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
+   *        orbitals
+   * @return Shared pointer to the created BasisSet
    */
   static std::shared_ptr<BasisSet> from_index_map(
       const std::map<size_t, std::string>& index_to_basis_map,
@@ -754,26 +782,37 @@ class BasisSet : public DataClass,
   bool has_ecp_shells() const;
 
   /**
-   * @brief Check if this basis set has an auxiliary basis set
-   * @return True if an auxiliary basis set is associated
+   * @brief Get all auxiliary shells (flattened from per-atom storage)
+   * @return Vector of all auxiliary shells
    */
-  bool has_auxiliary_basis_set() const;
+  std::vector<Shell> get_aux_shells() const;
 
   /**
-   * @brief Get the auxiliary basis set
-   * @return Shared pointer to the auxiliary basis set, or nullptr if none
+   * @brief Get auxiliary shells for a specific atom
+   * @param atom_index Index of the atom
+   * @return Vector of auxiliary shells for this atom
    */
-  std::shared_ptr<BasisSet> get_auxiliary_basis_set() const;
+  const std::vector<Shell>& get_aux_shells_for_atom(size_t atom_index) const;
 
   /**
-   * @brief Set the auxiliary basis set
-   *
-   * The auxiliary basis set is stored without its own auxiliary
-   * (no recursive nesting).
-   *
-   * @param aux_basis Shared pointer to the auxiliary basis set
+   * @brief Get a specific auxiliary shell by global index
+   * @param shell_index Global index of the auxiliary shell
+   * @return Reference to the auxiliary shell
+   * @throws std::out_of_range if index is invalid
    */
-  void set_auxiliary_basis_set(std::shared_ptr<BasisSet> aux_basis);
+  const Shell& get_aux_shell(size_t shell_index) const;
+
+  /**
+   * @brief Get total number of auxiliary shells across all atoms
+   * @return Total number of auxiliary shells
+   */
+  size_t get_num_aux_shells() const;
+
+  /**
+   * @brief Check if this basis set has an auxiliary basis
+   * @return True if there are any auxiliary shells
+   */
+  bool has_aux_basis() const;
 
   /**
    * @brief Get the shell index and magnetic quantum number for a atomic orbital
@@ -790,6 +829,12 @@ class BasisSet : public DataClass,
    * @return Total number of atomic orbitals
    */
   size_t get_num_atomic_orbitals() const;
+
+  /**
+   * @brief Get number of auxiliary orbitals (total from all shells)
+   * @return Total number of auxiliary orbitals
+   */
+  size_t get_num_auxiliary_orbitals() const;
 
   /**
    * @brief Get the atom index for a atomic orbital
@@ -890,6 +935,12 @@ class BasisSet : public DataClass,
    * @return True if structure is set
    */
   bool has_structure() const;
+
+  /**
+   * @brief Get the auxiliary basis set name
+   * @return Name of the auxiliary basis set
+   */
+  const std::string& get_aux_name() const;
 
   /**
    * @brief Get the ECP name
@@ -1079,6 +1130,13 @@ class BasisSet : public DataClass,
 
   /// ECP shells organized by atom index - each atom has a vector of ECP shells
   std::vector<std::vector<Shell>> _ecp_shells_per_atom;
+
+  /// Auxiliary shells organized by atom index - each atom has a vector of
+  /// auxiliary shells
+  std::vector<std::vector<Shell>> _aux_shells_per_atom;
+
+  /// Auxiliary basis set name
+  std::string _aux_name;
 
   /// Effective Core Potential (ECP) name (basis set name)
   std::string _ecp_name;

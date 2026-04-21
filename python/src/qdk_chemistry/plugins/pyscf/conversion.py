@@ -391,8 +391,10 @@ def pyscf_mol_to_qdk_basis(
         if any(n > 0 for n in ecp_electrons):
             return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, AOType.Spherical)
 
-    # Create BasisSet with name, shells, ecp_shells, structure, and basis type
-    return BasisSet(basis_name, shells, ecp_shells, structure, AOType.Spherical)
+    # Fallback: include ECP shells (with zero electrons) only if present
+    if ecp_shells:
+        return BasisSet(basis_name, shells, ecp_shells, ecp_electrons, structure, AOType.Spherical)
+    return BasisSet(basis_name, shells, structure, AOType.Spherical)
 
 
 def orbitals_to_scf(

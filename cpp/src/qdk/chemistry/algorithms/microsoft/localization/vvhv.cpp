@@ -66,7 +66,8 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
         basis_set_(basis_set),
         overlap_ori_(ao_overlap),
         minimal_basis_name_(minimal_basis_name),
-        basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
+        basis_ori_fp_(
+            utils::microsoft::convert_basis_set_from_qdk(*basis_set).first),
         inner_localizer_(inner_localizer) {
     QDK_LOG_TRACE_ENTERING();
 
@@ -348,7 +349,7 @@ void VVHVLocalization::initialize() {
   auto _min_basis = data::BasisSet::from_basis_name(
       minimal_basis_name_, basis_set_->get_structure());
   this->minimal_basis_fp_ =
-      utils::microsoft::convert_basis_set_from_qdk(*_min_basis);
+      utils::microsoft::convert_basis_set_from_qdk(*_min_basis).first;
   const auto* minimal_bs = this->minimal_basis_fp_.get();  // Minimal basis set
 
   const auto num_atoms = mol_structure->n_atoms;

@@ -65,6 +65,20 @@ class ScfSettings
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");
+    set_default(
+        "integral_type", std::string("auto"),
+        "How to calculate integrals, can take 'four_center' for standard "
+        "four-center integrals, 'dfj' for density fitting for Coulomb (J) "
+        "integrals, or "
+        "'auto' to select the appropriate method based on if auxiliary basis "
+        "is available. "
+        "when 'dfj' is used, an auxiliary basis set must be provided via the "
+        "'aux_basis' setting or through a BasisSet object that "
+        "includes an auxiliary basis.");
+    set_default("aux_basis", std::string(""),
+                "Auxiliary basis set name for density-fitted Coulomb (J) "
+                "integrals (e.g., 'def2-universal-jfit'). Only used when "
+                "'integral_type' is set to 'dfj'.");
   }
 };
 
