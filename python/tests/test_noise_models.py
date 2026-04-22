@@ -66,7 +66,7 @@ def test_yaml_unicode_round_trip_and_stdout(tmp_path):
                 "profile = QuantumErrorProfile(",
                 "    name='φ-profile Å',",
                 "    description='ΔE αβγ 你好',",
-                "    errors={'h': {'type': 'depolarizing_error', 'rate': 0.01, 'num_qubits': 1}},",
+                "    errors={'h': {'depolarizing_error': 0.01}},",
                 ")",
                 "profile.to_yaml_file(yaml_path)",
                 "loaded = QuantumErrorProfile.from_yaml_file(yaml_path)",
