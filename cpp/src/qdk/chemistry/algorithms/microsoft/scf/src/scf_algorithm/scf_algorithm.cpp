@@ -78,15 +78,9 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
       return std::make_shared<DIIS>(ctx, cfg.scf_algorithm.diis_subspace_size);
 
     case SCFAlgorithmName::GDM:
-      // if (rohf_enabled) {
-      //   throw std::runtime_error("ROHF-enabled GDM is not supported!");
-      // }
       return std::make_shared<GDM>(ctx, cfg.scf_algorithm.gdm_config);
 
     case SCFAlgorithmName::DIIS_GDM:
-      // if (rohf_enabled) {
-      //   throw std::runtime_error("ROHF-enabled DIIS_GDM is not supported!");
-      // }
       return std::make_shared<DIIS_GDM>(ctx,
                                         cfg.scf_algorithm.diis_subspace_size,
                                         cfg.scf_algorithm.gdm_config);
