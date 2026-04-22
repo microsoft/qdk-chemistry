@@ -310,8 +310,7 @@ void DIIS::iterate(SCFImpl& scf_impl) {
 
   // Decide which Fock/density view to feed into Pulay: RHF/UHF use the direct
   // SCFImpl matrices, while ROHF works on the cached total-density view.
-  RowMajorMatrix& working_density = select_working_density(scf_impl);
-  const RowMajorMatrix& working_fock = select_working_fock(scf_impl);
+  auto [working_density, working_fock] = select_working_matrices(scf_impl);
 
   auto& C = scf_impl.orbitals_matrix();
   const auto& S = scf_impl.overlap();
@@ -370,26 +369,19 @@ double DIIS::current_diis_error() const {
   return diis_impl_->get_diis_error();
 }
 
-RowMajorMatrix& DIIS::select_working_density(SCFImpl& scf_impl) {
+std::pair<RowMajorMatrix&, const RowMajorMatrix&> DIIS::select_working_matrices(
+  SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    if (!ensure_rohf_convergence_matrices_(scf_impl)) {
+    const RowMajorMatrix* rohf_fock = nullptr;
+    const RowMajorMatrix* rohf_density = nullptr;
+    if (!try_get_rohf_convergence_matrices(scf_impl, rohf_fock,
+                                           rohf_density)) {
       throw std::logic_error("ROHF convergence matrices are unavailable");
     }
-    return rohf_convergence_density_matrix();
+    return {rohf_convergence_density_matrix(), *rohf_fock};
   }
-  return scf_impl.density_matrix();
-}
-
-const RowMajorMatrix& DIIS::select_working_fock(SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    if (!ensure_rohf_convergence_matrices_(scf_impl)) {
-      throw std::logic_error("ROHF convergence matrices are unavailable");
-    }
-    return get_rohf_convergence_fock_matrix();
-  }
-  return scf_impl.get_fock_matrix();
+  return {scf_impl.density_matrix(), scf_impl.get_fock_matrix()};
 }
 
 }  // namespace qdk::chemistry::scf

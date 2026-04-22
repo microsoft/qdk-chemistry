@@ -201,9 +201,16 @@ bool SCFAlgorithm::try_get_rohf_convergence_matrices(
     const SCFImpl& scf_impl, const RowMajorMatrix*& fock_matrix,
     const RowMajorMatrix*& density_matrix) {
   QDK_LOG_TRACE_ENTERING();
-  if (!ensure_rohf_convergence_matrices_(scf_impl)) {
+  if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
     return false;
   }
+
+  const auto nelec_vec = scf_impl.get_num_electrons();
+  build_rohf_f_p_matrix(
+      scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
+      scf_impl.get_density_matrix(), nelec_vec[0], nelec_vec[1],
+      rohf_effective_fock_, rohf_total_density_);
+
   fock_matrix = &get_rohf_convergence_fock_matrix();
   density_matrix = &get_rohf_convergence_density_matrix();
   return true;
@@ -320,20 +327,6 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   if (!effective_fock.isApprox(effective_fock.transpose())) {
     effective_fock = 0.5 * (effective_fock + effective_fock.transpose().eval());
   }
-}
-
-bool SCFAlgorithm::ensure_rohf_convergence_matrices_(const SCFImpl& scf_impl) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
-    return false;
-  }
-
-  const auto nelec_vec = scf_impl.get_num_electrons();
-  build_rohf_f_p_matrix(
-      scf_impl.get_fock_matrix(), scf_impl.get_orbitals_matrix(),
-      scf_impl.get_density_matrix(), nelec_vec[0], nelec_vec[1],
-      rohf_effective_fock_, rohf_total_density_);
-  return true;
 }
 
 const RowMajorMatrix& SCFAlgorithm::get_rohf_convergence_fock_matrix() const {

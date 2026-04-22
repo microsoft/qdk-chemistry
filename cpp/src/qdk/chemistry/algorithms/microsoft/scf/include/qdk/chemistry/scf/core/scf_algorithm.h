@@ -159,6 +159,17 @@ class SCFAlgorithm {
    *
    * Converts spin-blocked Fock/density matrices into the effective ROHF Fock
    * and total-density representation used for OG evaluation.
+    *
+    * @param[in] F Spin-blocked Fock matrix in AO basis with alpha and beta
+    * blocks stacked by row
+    * @param[in] C Molecular-orbital coefficient matrix used for AO<->MO
+    * transformations
+    * @param[in] P Spin-blocked density matrix in AO basis with alpha and beta
+    * blocks stacked by row
+    * @param[in] nelec_alpha Number of alpha electrons
+    * @param[in] nelec_beta Number of beta electrons
+    * @param[out] effective_fock Effective ROHF Fock matrix in AO basis
+    * @param[out] total_density Total AO density matrix (P_alpha + P_beta)
    */
   static void build_rohf_f_p_matrix(const RowMajorMatrix& F,
                                     const RowMajorMatrix& C,
@@ -166,13 +177,6 @@ class SCFAlgorithm {
                                     int nelec_beta,
                                     RowMajorMatrix& effective_fock,
                                     RowMajorMatrix& total_density);
-
-  /**
-   * @brief Refresh cached ROHF convergence matrices from current SCF state
-   *
-   * @return true if ROHF matrices were refreshed, false for non-ROHF runs
-   */
-  bool ensure_rohf_convergence_matrices_(const SCFImpl& scf_impl);
 
   /**
    * @brief Access cached ROHF effective Fock matrix
