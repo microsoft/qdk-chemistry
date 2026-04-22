@@ -313,7 +313,7 @@ class TestScfSolver:
         scf_solver.settings().set("method", "pbe")
         scf_solver.settings().set("scf_type", "restricted")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Restricted open-shell calculations are only supported"):
             scf_solver.run(oh_structure, 0, 2, "sto-3g")
 
     def test_scf_solver_oxygen_atom_gdm(self):
