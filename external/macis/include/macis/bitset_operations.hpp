@@ -24,16 +24,22 @@ namespace macis {
  *  @brief CLZ (count leading zeros) for MSVC
  */
 inline auto clz(unsigned int i) {
+  if (i == 0) return static_cast<int>(sizeof(unsigned int) * CHAR_BIT);
+
   unsigned long idx;
-  _BitScanReverse(&idx, i);
+  const auto scanned = _BitScanReverse(&idx, i);
+  assert(scanned);
   return 31 - static_cast<int>(idx);
 }
 inline auto clz(unsigned long int i) {
   return clz(static_cast<unsigned int>(i));
 }
 inline auto clz(unsigned long long int i) {
+  if (i == 0) return static_cast<int>(sizeof(unsigned long long int) * CHAR_BIT);
+
   unsigned long idx;
-  _BitScanReverse64(&idx, i);
+  const auto scanned = _BitScanReverse64(&idx, i);
+  assert(scanned);
   return 63 - static_cast<int>(idx);
 }
 
