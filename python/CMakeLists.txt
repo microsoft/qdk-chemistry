@@ -204,16 +204,30 @@ install(TARGETS _core
   COMPONENT _core
 )
 
-# On Windows, bundle vcpkg runtime DLLs alongside _core.pyd so the package
-# is self-contained and does not require QDK_DLL_DIR at import time.
-if(WIN32 AND VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
-    file(GLOB _vcpkg_runtime_dlls
-        "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin/*.dll"
-    )
-    if(_vcpkg_runtime_dlls)
-        install(FILES ${_vcpkg_runtime_dlls}
-            DESTINATION .
-            COMPONENT _core
-        )
+# Windows: Bundle runtime DLLs alongside _core.pyd so the package is
+# self-contained and does not require QDK_DLL_DIR at import time.
+# This is intended for local/editable pip installs using the standard vcpkg-based build workflow.
+# It assumes dependencies were installed by vcpkg into VCPKG_INSTALLED_DIR.
+# For non-vcpkg builds (system-installed libraries), users should set QDK_DLL_DIR or ensure DLLs are on PATH.
+# In CI pipelines that produce distributable wheels, disable this and use `delvewheel repair` instead
+# (it resolves the full dependency tree automatically, regardless of where the DLLs come from).
+option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg and OpenMP DLLs into the install tree (Windows only)" ON)
+
+if(WIN32 AND QDK_BUNDLE_RUNTIME_DLLS)
+    # -- vcpkg dependencies (openblas, hdf5, fmt, spdlog and their transitive deps) --
+    if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+        set(_vcpkg_bin "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
+        set(_vcpkg_runtime_dlls)
+        foreach(_dll fmt hdf5 hdf5_cpp openblas spdlog szip zlib1)
+            if(EXISTS "${_vcpkg_bin}/${_dll}.dll")
+                list(APPEND _vcpkg_runtime_dlls "${_vcpkg_bin}/${_dll}.dll")
+            endif()
+        endforeach()
+        if(_vcpkg_runtime_dlls)
+            install(FILES ${_vcpkg_runtime_dlls}
+                DESTINATION .
+                COMPONENT _core
+            )
+        endif()
     endif()
 endif()
