@@ -155,10 +155,18 @@ class SCFImpl {
   const RowMajorMatrix& get_core_hamiltonian() const { return H_; }
 
   /**
-   * @brief Build Coulomb (J) and exchange (K) matrices for a density matrix
-   * @param density_matrix Density matrix (num_density_matrices x NAO x NAO)
-   * @param J Output Coulomb matrix (same size as density_matrix)
-   * @param K Output exchange matrix (same size as density_matrix)
+   * @brief Build Coulomb (J) and exchange (K) matrices for a given density
+   *
+   * Utility JK build for a caller-supplied density matrix.
+   * Currently used by the GDM trial-rotation gradient path
+   * (GDMLineFunctor / ROHF generalized-gradient evaluation).
+   * It is not part of the main SCFImpl::iterate_ update loop.
+   * Keeps this trial-path two-electron build logic in one place.
+   *
+   * @param[in] density_matrix Density matrix
+   * (num_density_matrices x NAO x NAO)
+   * @param[out] J Output Coulomb matrix (same size as density_matrix)
+   * @param[out] K Output exchange matrix (same size as density_matrix)
    */
   void build_jk_matrices(const RowMajorMatrix& density_matrix,
                          RowMajorMatrix& J, RowMajorMatrix& K) const;
