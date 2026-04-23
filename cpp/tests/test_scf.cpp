@@ -157,9 +157,8 @@ TEST_F(ScfTest, OH_ROKS_invalid) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("scf_type", "restricted");
 
-  // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"),
-               std::invalid_argument);  // open-shell dublet
+  // Restricted ROKS should reject this open-shell doublet case.
+  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_gdm) {
@@ -250,9 +249,8 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
-  // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
-               std::invalid_argument);  // open-shell dublet
+
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
@@ -262,7 +260,7 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
-  // Default should be a singlet
+
   EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 

@@ -1106,7 +1106,7 @@ void GDM::build_restricted_open_shell_pseudo_canonical_orbitals_hessian_(
   const int num_open_orbitals = num_electrons_[0] - num_closed_orbitals;
   const int num_virtual_orbitals = num_molecular_orbitals - num_electrons_[0];
 
-  // between close and open shells, or between open and virtual orbitals, the
+  // between closed and open shells, or between open and virtual orbitals, the
   // coefficient should be 2.0
   double initial_hessian_coeff = 2.0;
   int offset = 0;
