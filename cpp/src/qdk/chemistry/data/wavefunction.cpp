@@ -81,23 +81,27 @@ bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant) {
 
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
-                                   int norbs) {
+                                   size_t norbs) {
   QDK_LOG_TRACE_ENTERING();
   return std::visit(
       [norbs](
           const auto& vec) -> std::shared_ptr<ContainerTypes::VectorVariant> {
         using VecType = std::decay_t<decltype(vec)>;
+
         VecType output(vec.size());
         output.setZero();
 
-        for (int i = 0; i < norbs; ++i)
-          for (int j = 0; j < norbs; ++j)
-            for (int k = 0; k < norbs; ++k)
-              for (int l = 0; l < norbs; ++l) {
-                int new_index = k * norbs * norbs * norbs + l * norbs * norbs +
-                                i * norbs + j;
-                int index = i * norbs * norbs * norbs + j * norbs * norbs +
-                            k * norbs + l;
+        const size_t norbs2 = norbs * norbs;
+        const size_t norbs3 = norbs2 * norbs;
+
+        for (size_t i = 0; i < norbs; ++i)
+          for (size_t j = 0; j < norbs; ++j)
+            for (size_t k = 0; k < norbs; ++k)
+              for (size_t l = 0; l < norbs; ++l) {
+                Eigen::Index new_index = static_cast<Eigen::Index>(
+                    k * norbs3 + l * norbs2 + i * norbs + j);
+                Eigen::Index index = static_cast<Eigen::Index>(
+                    i * norbs3 + j * norbs2 + k * norbs + l);
                 output(new_index) = vec(index);
               }
         return make_shared<ContainerTypes::VectorVariant>(
@@ -454,16 +458,17 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
     two_rdm_ab = std::get<Eigen::VectorXd>(two_rdm_ab_var);
   }
 
-  int norbs = one_rdm_aa.rows();
+  size_t norbs = static_cast<size_t>(one_rdm_aa.rows());
 
   // Lambda function to get the two-body RDM element
-  auto get_active_two_rdm_element = [&two_rdm_ab, norbs](int i, int j, int k,
-                                                         int l) {
+  auto get_active_two_rdm_element = [&two_rdm_ab, norbs](size_t i, size_t j,
+                                                         size_t k, size_t l) {
     if (i >= norbs || j >= norbs || k >= norbs || l >= norbs) {
       throw std::out_of_range("Index out of bounds for two-body RDM");
     }
-    int norbs2 = norbs * norbs;
-    return two_rdm_ab(i * norbs * norbs2 + j * norbs2 + k * norbs + l);
+    size_t norbs2 = norbs * norbs;
+    return two_rdm_ab(static_cast<Eigen::Index>(i * norbs * norbs2 +
+                                                j * norbs2 + k * norbs + l));
   };
 
   // Source: Boguslawski & Tecmer (2015). doi:10.1002/qua.24832
