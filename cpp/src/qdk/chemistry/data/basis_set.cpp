@@ -352,50 +352,6 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   std::shared_ptr<BasisSet> auxiliary_basis,
-                   const Structure& structure, AOType atomic_orbital_type)
-    : BasisSet(name, shells, std::move(auxiliary_basis),
-               std::make_shared<Structure>(structure), atomic_orbital_type) {
-  QDK_LOG_TRACE_ENTERING();
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   std::shared_ptr<BasisSet> auxiliary_basis,
-                   std::shared_ptr<Structure> structure,
-                   AOType atomic_orbital_type)
-    : _name(name),
-      _atomic_orbital_type(atomic_orbital_type),
-      _structure(structure),
-      _ecp_name("none") {
-  QDK_LOG_TRACE_ENTERING();
-  if (!structure) {
-    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
-  }
-
-  // Organize shells by atom index
-  for (const auto& shell : shells) {
-    size_t atom_index = shell.atom_index;
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-
-    _shells_per_atom[atom_index].push_back(shell);
-  }
-
-  // Initialize ECP electrons vector with zeros for each atom
-  _ecp_electrons.resize(structure->get_num_atoms(), 0);
-
-  // Set auxiliary basis set
-  set_auxiliary_basis_set(std::move(auxiliary_basis));
-
-  if (!_is_valid()) {
-    throw std::invalid_argument("Tried to generate invalid BasisSet");
-  }
-}
-
-BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const std::vector<Shell>& ecp_shells,
                    const std::vector<size_t>& ecp_electrons,
                    const Structure& structure, AOType atomic_orbital_type)
@@ -804,31 +760,6 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
                                     structure, atomic_orbital_type);
 }
 
-std::shared_ptr<BasisSet> BasisSet::from_basis_name(
-    const std::string& basis_name, const std::string& aux_basis_name,
-    const Structure& structure, AOType atomic_orbital_type) {
-  return BasisSet::from_basis_name(
-      std::string(basis_name), std::string(aux_basis_name),
-      std::make_shared<Structure>(structure), atomic_orbital_type);
-}
-
-std::shared_ptr<BasisSet> BasisSet::from_basis_name(
-    std::string basis_name, std::string aux_basis_name,
-    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
-  // Build the primary basis set
-  auto basis_set = BasisSet::from_basis_name(std::move(basis_name), structure,
-                                             atomic_orbital_type);
-
-  // Build the auxiliary basis set using the same structure
-  auto aux_basis = BasisSet::from_basis_name(std::move(aux_basis_name),
-                                             structure, atomic_orbital_type);
-
-  // Attach auxiliary to primary
-  basis_set->set_auxiliary_basis_set(std::move(aux_basis));
-
-  return basis_set;
-}
-
 std::shared_ptr<BasisSet> BasisSet::from_element_map(
     const std::map<std::string, std::string>& element_to_basis_map,
     const Structure& structure, AOType atomic_orbital_type) {
@@ -860,31 +791,6 @@ std::shared_ptr<BasisSet> BasisSet::from_element_map(
 
   return BasisSet::from_index_map(tmp_basis_index_map, structure,
                                   atomic_orbital_type);
-}
-
-std::shared_ptr<BasisSet> BasisSet::from_element_map(
-    const std::map<std::string, std::string>& element_to_basis_map,
-    const std::map<std::string, std::string>& element_to_aux_basis_map,
-    const Structure& structure, AOType atomic_orbital_type) {
-  return BasisSet::from_element_map(
-      element_to_basis_map, element_to_aux_basis_map,
-      std::make_shared<Structure>(structure), atomic_orbital_type);
-}
-
-std::shared_ptr<BasisSet> BasisSet::from_element_map(
-    const std::map<std::string, std::string>& element_to_basis_map,
-    const std::map<std::string, std::string>& element_to_aux_basis_map,
-    std::shared_ptr<Structure> structure, AOType atomic_orbital_type) {
-  if (!structure) {
-    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
-  }
-  auto basis_set = BasisSet::from_element_map(std::move(element_to_basis_map),
-                                              structure, atomic_orbital_type);
-  auto aux_basis_set = BasisSet::from_element_map(
-      std::move(element_to_aux_basis_map), structure, atomic_orbital_type);
-  basis_set->set_auxiliary_basis_set(std::move(aux_basis_set));
-
-  return basis_set;
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_index_map(
@@ -1141,10 +1047,6 @@ BasisSet::BasisSet(const BasisSet& other)
   if (other._structure) {
     _structure = std::make_shared<Structure>(*other._structure);
   }
-  if (other._auxiliary_basis_set) {
-    _auxiliary_basis_set =
-        std::make_shared<BasisSet>(*other._auxiliary_basis_set);
-  }
   // Cache will be invalidated by default (_cache_valid = false)
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -1167,12 +1069,6 @@ BasisSet& BasisSet::operator=(const BasisSet& other) {
       _structure = std::make_shared<Structure>(*other._structure);
     } else {
       _structure.reset();
-    }
-    if (other._auxiliary_basis_set) {
-      _auxiliary_basis_set =
-          std::make_shared<BasisSet>(*other._auxiliary_basis_set);
-    } else {
-      _auxiliary_basis_set.reset();
     }
     // Invalidate cache when assigning new basis set
     _cache_valid = false;
@@ -1704,12 +1600,6 @@ std::string BasisSet::get_summary() const {
         << " atoms\n";
   }
 
-  if (has_auxiliary_basis_set()) {
-    oss << "Auxiliary basis set: " << _auxiliary_basis_set->get_name() << " ("
-        << _auxiliary_basis_set->get_num_atomic_orbitals()
-        << " atomic orbitals)\n";
-  }
-
   // Count shells by orbital type
   std::map<OrbitalType, unsigned> shell_counts;
   std::map<OrbitalType, unsigned> bf_counts;
@@ -2126,12 +2016,6 @@ void BasisSet::to_hdf5(H5::Group& group) const {
       _structure->to_hdf5(structure_group);
     }
 
-    // Save auxiliary basis set if present
-    if (has_auxiliary_basis_set()) {
-      H5::Group aux_group = group.createGroup("auxiliary_basis_set");
-      _auxiliary_basis_set->to_hdf5(aux_group);
-    }
-
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
@@ -2508,13 +2392,6 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
 
-    // Load auxiliary basis set if present
-    if (group.nameExists("auxiliary_basis_set")) {
-      H5::Group aux_group = group.openGroup("auxiliary_basis_set");
-      auto aux_basis = BasisSet::from_hdf5(aux_group);
-      basis_set->set_auxiliary_basis_set(aux_basis);
-    }
-
     return basis_set;
 
   } catch (const H5::Exception& e) {
@@ -2646,10 +2523,6 @@ nlohmann::json BasisSet::to_json() const {
 
   if (has_structure()) {
     j["structure"] = _structure->to_json();
-  }
-
-  if (has_auxiliary_basis_set()) {
-    j["auxiliary_basis_set"] = _auxiliary_basis_set->to_json();
   }
 
   return j;
@@ -2935,12 +2808,6 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
             "Cannot create BasisSet with ECP shells but without structure");
       }
       basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
-    }
-
-    // Deserialize auxiliary basis set if present
-    if (j.contains("auxiliary_basis_set")) {
-      auto aux_basis = BasisSet::from_json(j["auxiliary_basis_set"]);
-      basis_set->set_auxiliary_basis_set(aux_basis);
     }
 
     return basis_set;

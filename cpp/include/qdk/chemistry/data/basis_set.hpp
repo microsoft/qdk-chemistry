@@ -488,44 +488,6 @@ class BasisSet : public DataClass,
       AOType atomic_orbital_type = AOType::Spherical);
 
   /**
-   * @brief Create a basis set with an auxiliary basis set from database names
-   *
-   * Creates a primary basis set with an attached auxiliary basis set, both
-   * looked up by name from the basis set database.
-   *
-   * @param basis_name Name of the primary basis set (e.g., "cc-pVDZ")
-   * @param aux_basis_name Name of the auxiliary basis set (e.g.,
-   * "cc-pVDZ-rifit")
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
-   */
-  static std::shared_ptr<BasisSet> from_basis_name(
-      const std::string& basis_name, const std::string& aux_basis_name,
-      const Structure& structure,
-      AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Create a basis set with an auxiliary basis set from database names
-   *
-   * Creates a primary basis set with an attached auxiliary basis set, both
-   * looked up by name from the basis set database.
-   *
-   * @param basis_name Name of the primary basis set (e.g., "cc-pVDZ")
-   * @param aux_basis_name Name of the auxiliary basis set (e.g.,
-   * "cc-pVDZ-rifit")
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
-   */
-  static std::shared_ptr<BasisSet> from_basis_name(
-      std::string basis_name, std::string aux_basis_name,
-      std::shared_ptr<Structure> structure,
-      AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
    * @brief Constructor with basis set name and structure
    * @param element_to_basis_map Mapping from element symbols to basis set names
    * @param structure The molecular structure
@@ -548,40 +510,6 @@ class BasisSet : public DataClass,
    */
   static std::shared_ptr<BasisSet> from_element_map(
       const std::map<std::string, std::string>& element_to_basis_map,
-      std::shared_ptr<Structure> structure,
-      AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Create a basis set with auxiliary basis using per-element maps
-   * @param element_to_basis_map Mapping from element symbols to primary basis
-   * set names
-   * @param element_to_aux_basis_map Mapping from element symbols to auxiliary
-   * basis set names
-   * @param structure The molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
-   */
-  static std::shared_ptr<BasisSet> from_element_map(
-      const std::map<std::string, std::string>& element_to_basis_map,
-      const std::map<std::string, std::string>& element_to_aux_basis_map,
-      const Structure& structure,
-      AOType atomic_orbital_type = AOType::Spherical);
-
-  /**
-   * @brief Create a basis set with auxiliary basis using per-element maps
-   * @param element_to_basis_map Mapping from element symbols to primary basis
-   * set names
-   * @param element_to_aux_basis_map Mapping from element symbols to auxiliary
-   * basis set names
-   * @param structure Shared pointer to the molecular structure
-   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
-   * orbitals
-   * @return Shared pointer to the created BasisSet with auxiliary attached
-   */
-  static std::shared_ptr<BasisSet> from_element_map(
-      const std::map<std::string, std::string>& element_to_basis_map,
-      const std::map<std::string, std::string>& element_to_aux_basis_map,
       std::shared_ptr<Structure> structure,
       AOType atomic_orbital_type = AOType::Spherical);
 
@@ -1143,9 +1071,6 @@ class BasisSet : public DataClass,
 
   /// Number of ECP electrons replaced for each atom
   std::vector<size_t> _ecp_electrons;
-
-  /// Optional auxiliary basis set (e.g., for density fitting)
-  std::shared_ptr<BasisSet> _auxiliary_basis_set;
 
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;

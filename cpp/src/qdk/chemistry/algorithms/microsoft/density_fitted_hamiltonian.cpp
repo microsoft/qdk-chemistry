@@ -71,8 +71,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
-  auto aux_basis_set = basis_set->get_auxiliary_basis_set();
-  if (!aux_basis_set) {
+  if (!basis_set->has_aux_basis()) {
     throw std::runtime_error(
         "An auxiliary basis set must be provided for density-fitted "
         "Hamiltonian construction.");
@@ -80,8 +79,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
   const auto& [Ca, Cb] = orbitals->get_coefficients();
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
-  const size_t num_auxiliary_orbitals =
-      aux_basis_set->get_num_atomic_orbitals();
+  const size_t num_auxiliary_orbitals = basis_set->get_num_auxiliary_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Get alpha and beta active space indices
@@ -128,10 +126,8 @@ DensityFittedHamiltonianConstructor::_run_impl(
   auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
   // Create internal BasisSet
-  auto internal_basis_set =
+  auto [internal_basis_set, internal_aux_basis_set] =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
-  auto internal_aux_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*aux_basis_set);
 
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       internal_basis_set.get(), mol.get(), qcs::mpi_default_input());

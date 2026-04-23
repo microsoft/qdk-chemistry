@@ -584,11 +584,14 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Transform to MO
-    L_mo = detail_three_center::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo =
+        detail_three_center::transform_three_center_ao_to_mo(L_ao, Ca_active);
   } else {
     // Transform to MO (Alpha and Beta)
-    L_mo_alpha = detail_three_center::transform_cholesky_to_mo(L_ao, Ca_active);
-    L_mo_beta = detail_three_center::transform_cholesky_to_mo(L_ao, Cb_active);
+    L_mo_alpha =
+        detail_three_center::transform_three_center_ao_to_mo(L_ao, Ca_active);
+    L_mo_beta =
+        detail_three_center::transform_three_center_ao_to_mo(L_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta

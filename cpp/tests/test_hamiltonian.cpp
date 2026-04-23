@@ -132,8 +132,9 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
               one_body, three_center, orbitals, core_energy, inactive_fock));
     } else if (type == "cholesky") {
       return std::make_shared<Hamiltonian>(
-          std::make_unique<CholeskyHamiltonianContainer>(
-              one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+          std::make_unique<CholeskyHamiltonianContainer>(one_body, three_center,
+                                                         orbitals, core_energy,
+                                                         inactive_fock, L_ao));
     } else if (type == "sparse") {
       return std::make_shared<Hamiltonian>(
           std::make_unique<SparseHamiltonianContainer>(
@@ -165,9 +166,9 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
     } else if (type == "cholesky") {
       return std::make_shared<Hamiltonian>(
           std::make_unique<CholeskyHamiltonianContainer>(
-              sample_one_body_alpha, sample_one_body_beta, sample_two_body_aaaa,
-              sample_two_body_aabb, sample_two_body_bbbb, orbitals_unrestricted,
-              core_energy, sample_inactive_fock_alpha,
+              sample_one_body_alpha, sample_one_body_beta,
+              sample_three_center_aa, sample_three_center_bb,
+              orbitals_unrestricted, core_energy, sample_inactive_fock_alpha,
               sample_inactive_fock_beta, L_ao));
     } else if (type == "sparse") {
       // SparseHamiltonianContainer does not take separate alpha/beta integrals
@@ -279,9 +280,10 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
             one_body, three_center_2x2, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
   } else if (test_p == "cholesky") {
+    Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(4, 3);
     h_active_space = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
-            one_body, two_body, orbitals_with_inactive, core_energy,
+            one_body, three_center_2x2, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty, L_ao));
   } else if (test_p == "sparse") {
     GTEST_SKIP() << "Sparse container does not support active space";
@@ -321,8 +323,9 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
             one_body, three_center, orbitals, core_energy, inactive_fock));
   } else if (test_p == "cholesky") {
     h1 = std::make_shared<Hamiltonian>(
-        std::make_unique<CholeskyHamiltonianContainer>(
-            one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+        std::make_unique<CholeskyHamiltonianContainer>(one_body, three_center,
+                                                       orbitals, core_energy,
+                                                       inactive_fock, L_ao));
   } else if (test_p == "sparse") {
     // SparseHamiltonianContainer does not take orbitals/inactive_fock
     h1 = std::make_shared<Hamiltonian>(
@@ -1194,7 +1197,7 @@ TEST_P(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
   } else if (test_p == "cholesky") {
     h_active_space = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
-            one_body, two_body, orbitals_with_inactive, core_energy,
+            one_body, three_center, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty, L_ao));
   } else if (test_p == "sparse") {
     GTEST_SKIP() << "Sparse container does not support active space";
@@ -1302,18 +1305,13 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
                          ->has_container_type<CholeskyHamiltonianContainer>();
 
   // Exactly one should be true
-  // cholesky is currently a derived class of canonical, this will be changed
-  // in the future!
-  EXPECT_EQ(is_canonical,
-            test_p == "canonical_four_center" or test_p == "cholesky");
+  EXPECT_EQ(is_canonical, test_p == "canonical_four_center");
   EXPECT_EQ(is_density_fitted, test_p == "density_fitted");
   EXPECT_EQ(is_cholesky, test_p == "cholesky");
 
   // Test that accessing with incorrect container type throws std::bad_cast
   // We test against all OTHER container types
-  // cholesky is currently a derived class of canonical, this will be changed
-  // in the future!
-  if (test_p != "canonical_four_center" and test_p != "cholesky") {
+  if (test_p != "canonical_four_center") {
     EXPECT_THROW(hamiltonian_restricted
                      ->get_container<CanonicalFourCenterHamiltonianContainer>(),
                  std::bad_cast);
@@ -1349,22 +1347,25 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
+  scf_factory->settings().set("eri_method", "incore");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+
+  std::shared_ptr<BasisSet> basis = nullptr;
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
+  } else {
+    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  }
+
   auto [rhf_energy, rhf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+      scf_factory->run(o2_structure_ptr, 0, 1, basis);
 
   auto rhf_orbitals = rhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
-  }
-
-  if (factory_name == "qdk_density_fitted_hamiltonian") {
-    auto aux_basis = BasisSet::from_basis_name(
-        "cc-pvdz-rifit", rhf_orbitals->get_basis_set()->get_structure());
-    rhf_orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
   }
 
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
@@ -1381,21 +1382,24 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
+  scf_factory->settings().set("eri_method", "incore");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+
+  std::shared_ptr<BasisSet> basis = nullptr;
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
+  } else {
+    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  }
+
   auto [uhf_energy, uhf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 3, "cc-pvdz");
+      scf_factory->run(o2_structure_ptr, 0, 3, basis);
   auto uhf_orbitals = uhf_wavefunction->get_orbitals();
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
     ham_factory->settings().set("store_ao_cholesky_vectors", true);
-  }
-
-  if (factory_name == "qdk_density_fitted_hamiltonian") {
-    auto aux_basis = BasisSet::from_basis_name(
-        "cc-pvdz-rifit", uhf_orbitals->get_basis_set()->get_structure());
-    uhf_orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
   }
 
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
@@ -1413,10 +1417,19 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
 
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
+  scf_factory->settings().set("eri_method", "incore");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
+
+  std::shared_ptr<BasisSet> basis = nullptr;
+  if (factory_name == "qdk_density_fitted_hamiltonian") {
+    basis = BasisSet::from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2_structure);
+  } else {
+    basis = BasisSet::from_basis_name("cc-pvdz", o2_structure);
+  }
+
   auto [rhf_energy, rhf_wavefunction] =
-      scf_factory->run(o2_structure_ptr, 0, 1, "cc-pvdz");
+      scf_factory->run(o2_structure_ptr, 0, 1, basis);
 
   auto valence_active_space_selector =
       qdk::chemistry::algorithms::ActiveSpaceSelectorFactory::create(
@@ -1429,15 +1442,10 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
 
   auto orbitals = wfn_active->get_orbitals();
-  if (factory_name == "qdk_density_fitted_hamiltonian") {
-    auto aux_basis = BasisSet::from_basis_name(
-        "cc-pvdz-rifit", orbitals->get_basis_set()->get_structure());
-    orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
-  }
 
   auto rhf_hamiltonian = ham_factory->run(orbitals);
 
@@ -1855,9 +1863,9 @@ TEST_F(HamiltonianConstructorTest, CholeskyDeterministicBehavior) {
 }
 
 TEST_F(HamiltonianConstructorTest, DensityFittedFactoryRegistration) {
-  // Test that qdk_cholesky is available
+  // Test that qdk_density_fitted_hamiltonian is available
   auto available_solvers = HamiltonianConstructorFactory::available();
-  EXPECT_GE(available_solvers.size(), 2);
+  EXPECT_GE(available_solvers.size(), 3);
   bool found_density_fitted = false;
   for (const auto& solver : available_solvers) {
     if (solver == "qdk_density_fitted_hamiltonian") {
@@ -2348,8 +2356,8 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
   auto rmp2_corr_energy = mp2_calc_ptr->calculate_restricted_mp2_energy(
       df_hamiltonian, orbitals, n_alpha);
 
-  EXPECT_NEAR(rmp2_corr_energy, -0.3843068379,
-              testing::scf_energy_tolerance);  // reference value from Psi4
+  EXPECT_NEAR(rmp2_corr_energy, -0.384243676524845,
+              testing::mp2_tolerance);  // reference value from Pyscf
 }
 
 TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
@@ -2357,7 +2365,7 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
   auto [energy, df_hamiltonian, wfn] =
       run_restricted_active_o2("qdk_density_fitted_hamiltonian");
 
-  EXPECT_NEAR(energy, -149.5410413101995744, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy, -149.546010224686, testing::scf_energy_tolerance);
   // Verify hamiltonian properties
   EXPECT_TRUE(df_hamiltonian->has_one_body_integrals());
   EXPECT_TRUE(df_hamiltonian->has_two_body_integrals());
@@ -2383,16 +2391,16 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
   auto rmp2_corr_energy = mp2_calc_ptr->calculate_restricted_mp2_energy(
       df_hamiltonian, orbitals, n_alpha);
 
-  EXPECT_NEAR(rmp2_corr_energy, -0.0779523495,
-              testing::mp2_tolerance);  // reference value from Psi4
+  EXPECT_NEAR(rmp2_corr_energy, -0.0779355394591961,
+              testing::mp2_tolerance);  // reference value from Pyscf
 
   // Create ansatz from Hamiltonian and wavefunction
   auto ansatz = std::make_shared<Ansatz>(df_hamiltonian, wfn);
 
   // MP2 returns total energy
   auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
-  EXPECT_NEAR(mp2_total_energy, -149.6209819271,
-              testing::mp2_tolerance);  // reference value from Psi4
+  EXPECT_NEAR(mp2_total_energy, -149.623945764146,
+              testing::mp2_tolerance);  // reference value from Pyscf
 }
 
 // ============================================================================

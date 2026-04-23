@@ -430,18 +430,6 @@ TEST_F(BasisSetTest, Summary) {
   EXPECT_NE(std::string::npos, summary.find("6-31G"));
   EXPECT_NE(std::string::npos, summary.find("2"));  // 2 shells
   EXPECT_NE(std::string::npos, summary.find("4"));  // 4 atomic orbitals
-  EXPECT_EQ(std::string::npos, summary.find("Auxiliary"));
-
-  // Set auxiliary
-  std::vector<Shell> aux_shells;
-  aux_shells.emplace_back(
-      Shell(0, OrbitalType::S, std::vector{2.0}, std::vector{1.0}));
-  auto aux = std::make_shared<BasisSet>("my-aux-basis", aux_shells);
-  basis.set_auxiliary_basis_set(aux);
-
-  summary = basis.get_summary();
-  // Summary should mention the auxiliary basis set
-  EXPECT_NE(std::string::npos, summary.find("Auxiliary"));
 }
 
 TEST_F(BasisSetTest, JSONSerialization) {
