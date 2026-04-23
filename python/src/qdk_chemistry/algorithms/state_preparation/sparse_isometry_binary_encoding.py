@@ -143,12 +143,20 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         # PreparePureStateD treats qubits[0] as MSB, so pass dense_row_map
         # as-is (row 0 first) — do NOT reverse like the parent sparse isometry
         # (which uses the opposite convention: row rank-1 = MSB).
+        # Pool A only: qubits outside the active set entirely — never touched by binary encoding.
+        # Pool B (idle batch rows) is intentionally excluded: the reversed GF2X correction circuit
+        # applies CX gates AFTER SELECT, which entangles those rows with the helper qubit and
+        # corrupts fidelity.
+        active_qubits_set = {int(q) for q in gf2x_result.row_map}
+        ancilla_pool = sorted(set(range(n_qubits)) - active_qubits_set)
+
         state_prep_params = QSHARP_UTILS.BinaryEncoding.BinaryEncodingStatePreparationParams(
             rowMap=list(dense_row_map),
             stateVector=compressed_sv.tolist(),
             gaussianEliminationOps=[op.to_qsharp_parameter() for op in gaussian_elimination_ops],
             binaryEncodingOps=[op.to_qsharp_parameter() for op in encoded_ops],
             numQubits=n_qubits,
+            ancillaPool=ancilla_pool,
         )
 
         qsharp_factory = QsharpFactoryData(
@@ -158,7 +166,8 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*vars(state_prep_params).values())
         Logger.info(
             f"Binary encoding produced {len(encoded_ops)} operations "
-            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants"
+            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants "
+            f"using {len(ancilla_pool)} pre-existing qubits as ancilla pool"
         )
 
         return Circuit(

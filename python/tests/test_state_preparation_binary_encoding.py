@@ -21,13 +21,14 @@ from .test_helpers import create_random_wavefunction
 
 
 def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
-    """Derive qubit counts from the determinant matrix.
+    """Derive qubit counts from the determinant matrix, accounting for the ancilla pool.
 
     Returns:
         ``(n_system, n_ancilla)`` where
 
         - *n_system* is the number of system qubits
-        - *n_ancilla* is the number of ancilla qubits.
+        - *n_ancilla* is the number of extra ancilla qubits beyond the system register
+          after subtracting Pool A (idle GF2X qubits: system qubits absent from row_map).
 
     """
     num_orbitals = len(wf.get_orbitals().get_active_space_indices()[0])
@@ -47,13 +48,22 @@ def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
         active_qubit_indices=gf2x_result.row_map,
         ancilla_start=n_system,
     )
-    max_select_ancilla = 0
-    for op in ops:
-        if op.name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND):
-            n_addr = op.control_state
-            max_select_ancilla = max(max_select_ancilla, n_addr - 1)
+    naive_ancilla = max(
+        (
+            op.control_state - 1
+            for op in ops
+            if op.name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
+        ),
+        default=0,
+    )
 
-    return n_system, max_select_ancilla
+    # Pool A: system qubits not present in row_map (never touched by binary encoding ops)
+    active_set = {int(q) for q in gf2x_result.row_map}
+    pool_a = len(set(range(n_system)) - active_set)
+
+    # Actual ancilla = max(0, naive - pool_a)
+    actual_ancilla = max(0, naive_ancilla - pool_a)
+    return n_system, actual_ancilla
 
 
 @pytest.fixture
@@ -75,7 +85,7 @@ class TestSparseIsometryBinaryEncoding:
         result = circuit.estimate()
         assert isinstance(result, qsharp.estimator.EstimatorResult)
         lc = result["logicalCounts"]
-        assert lc["numQubits"] == 12  # 10 system qubits + 2 ancilla qubits
+        assert lc["numQubits"] == 10  # 10 system qubits; pool covers all ancilla
         assert lc["tCount"] == 7
         assert lc["rotationCount"] == 7
         assert lc["cczCount"] == 9
@@ -159,7 +169,7 @@ class TestSparseIsometryBinaryEncoding:
         circuit = prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         lc = circuit.estimate()["logicalCounts"]
-        assert lc["numQubits"] == 11
+        assert lc["numQubits"] == 10  # 10 system qubits; pool covers the 1 ancilla
         assert lc["tCount"] == 7
         assert lc["rotationCount"] == 7
         assert lc["cczCount"] == 5

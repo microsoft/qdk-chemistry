@@ -38,7 +38,7 @@ namespace QDKChemistry.Utils.StatePreparation {
     ) : Unit {
         PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
         for gate in params.expansionOps {
-            ApplyMatrixCompressionOp(gate, qs);
+            ApplyMatrixCompressionOp(gate, qs, []);
         }
     }
 
