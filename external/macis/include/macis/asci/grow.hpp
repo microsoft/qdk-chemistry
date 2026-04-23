@@ -100,9 +100,8 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     if (asci_settings.taper_grow_factor > 0 &&
         static_cast<size_t>(std::ceil(wfn.size() * current_grow_factor)) >
             asci_settings.ntdets_max) {
-      effective_grow_factor =
-          std::max(asci_settings.min_grow_factor,
-                   asci_settings.taper_grow_factor);
+      effective_grow_factor = std::max(asci_settings.min_grow_factor,
+                                       asci_settings.taper_grow_factor);
       logger->info("  * Tapering grow_factor from {:.2f} to {:.2f}",
                    current_grow_factor, effective_grow_factor);
     }
@@ -128,8 +127,8 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     double E;
     auto ai_st = hrt_t::now();
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
-        asci_settings, grow_mcscf, ndets_new, E0, std::move(wfn),
-        std::move(X), ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
+        asci_settings, grow_mcscf, ndets_new, E0, std::move(wfn), std::move(X),
+        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());

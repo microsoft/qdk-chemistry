@@ -9,14 +9,13 @@
 
 #pragma once
 #include <chrono>
-#include <optional>
-
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/solvers/davidson.hpp>
 #include <macis/solvers/incremental_h_build.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
+#include <optional>
 #include <sparsexx/io/write_dist_mm.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/util/submatrix.hpp>
@@ -170,23 +169,20 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
  *                           when cache is nullptr).
  */
 template <typename index_t, typename WfnType, typename WfnIterator>
-double selected_ci_diag(
-    WfnIterator dets_begin, WfnIterator dets_end,
-    HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
-    size_t davidson_max_m, double davidson_res_tol,
-    std::vector<double>& C_local,
-    CachedHamiltonianState<WfnType, index_t>* cache,
-    double min_patch_overlap
-    MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
+double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
+                        HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
+                        size_t davidson_max_m, double davidson_res_tol,
+                        std::vector<double>& C_local,
+                        CachedHamiltonianState<WfnType, index_t>* cache,
+                        double min_patch_overlap
+                            MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   auto logger = spdlog::get("ci_solver");
   if (!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
   }
   // Ensure sub-loggers exist for downstream code
-  if (!spdlog::get("h_build"))
-    spdlog::stdout_color_mt("h_build");
-  if (!spdlog::get("h_build_inc"))
-    spdlog::stdout_color_mt("h_build_inc");
+  if (!spdlog::get("h_build")) spdlog::stdout_color_mt("h_build");
+  if (!spdlog::get("h_build_inc")) spdlog::stdout_color_mt("h_build_inc");
 
   const size_t ndets = std::distance(dets_begin, dets_end);
   const bool incremental = cache != nullptr;
@@ -210,8 +206,7 @@ double selected_ci_diag(
     auto patched_op = build_patched_operator<index_t>(
         *cache, new_dets, ham_gen, h_el_tol, min_patch_overlap);
     auto H_en = clock_type::now();
-    logger->info("  PATCH_DUR = {:.5e} ms",
-                 duration_type(H_en - H_st).count());
+    logger->info("  PATCH_DUR = {:.5e} ms", duration_type(H_en - H_st).count());
 
     if (patched_op) {
       // Set up guess
@@ -231,16 +226,15 @@ double selected_ci_diag(
       }
 
       auto dav_st = clock_type::now();
-      auto [niter, eigval] = davidson(
-          ndets, davidson_max_m, *patched_op,
-          patched_op->diagonal().data(), davidson_res_tol, C_local.data());
+      auto [niter, eigval] = davidson(ndets, davidson_max_m, *patched_op,
+                                      patched_op->diagonal().data(),
+                                      davidson_res_tol, C_local.data());
       auto dav_en = clock_type::now();
 
       logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", "DAV_NITER",
                    niter, "E0", eigval, "DAVIDSON_DUR",
                    duration_type(dav_en - dav_st).count());
       E = eigval;
-
 
       return E;
     }
@@ -273,8 +267,8 @@ double selected_ci_diag(
     logger->info(
         "  H_DUR_MAX = {:.2e} ms, H_DUR_MIN = {:.2e} ms, H_DUR_AVG = {:.2e} ms",
         max_hdur, min_hdur, avg_hdur);
-    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}", max_nnz,
-                 min_nnz, total_nnz / double(world_size));
+    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}", max_nnz, min_nnz,
+                 total_nnz / double(world_size));
   }
 #else
   size_t total_nnz = H.nnz();
@@ -304,17 +298,15 @@ double selected_ci_diag(
 
 /// @brief Convenience overload without incremental cache.
 template <typename index_t, typename WfnType, typename WfnIterator>
-double selected_ci_diag(
-    WfnIterator dets_begin, WfnIterator dets_end,
-    HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
-    size_t davidson_max_m, double davidson_res_tol,
-    std::vector<double>& C_local
-    MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
+double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
+                        HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
+                        size_t davidson_max_m, double davidson_res_tol,
+                        std::vector<double>& C_local
+                            MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   return selected_ci_diag<index_t>(
-      dets_begin, dets_end, ham_gen, h_el_tol, davidson_max_m,
-      davidson_res_tol, C_local,
-      static_cast<CachedHamiltonianState<WfnType, index_t>*>(nullptr), 0.3
-      MACIS_MPI_CODE(, comm));
+      dets_begin, dets_end, ham_gen, h_el_tol, davidson_max_m, davidson_res_tol,
+      C_local, static_cast<CachedHamiltonianState<WfnType, index_t>*>(nullptr),
+      0.3 MACIS_MPI_CODE(, comm));
 }
 
 }  // namespace macis

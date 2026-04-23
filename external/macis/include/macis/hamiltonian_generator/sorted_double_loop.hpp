@@ -8,12 +8,13 @@
  */
 
 #pragma once
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/util/entropies.hpp>
 #include <macis/util/rdms.hpp>
-#include <spdlog/spdlog.h>
 
 #ifdef _OPENMP
 #include <omp.h>

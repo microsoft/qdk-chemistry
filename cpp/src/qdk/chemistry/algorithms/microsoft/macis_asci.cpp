@@ -7,9 +7,9 @@
 #include <macis/asci/determinant_search.hpp>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
-#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
-#include <macis/hamiltonian_generator/residue_arrays.hpp>
 #include <macis/hamiltonian_generator/dynamic_bit_masking.hpp>
+#include <macis/hamiltonian_generator/residue_arrays.hpp>
+#include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/mcscf/cas.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -74,13 +74,12 @@ struct asci_helper {
         asci_settings.ntdets_min, asci_settings.max_refine_iter,
         asci_settings.grow_factor, asci_settings.rv_prune_tol);
 
-    macis::matrix_span<double> T_span(
-        const_cast<double*>(T_a.data()),
-        num_molecular_orbitals, num_molecular_orbitals);
+    macis::matrix_span<double> T_span(const_cast<double*>(T_a.data()),
+                                      num_molecular_orbitals,
+                                      num_molecular_orbitals);
     macis::rank4_span<double> V_span(
-        const_cast<double*>(V_aaaa.data()),
-        num_molecular_orbitals, num_molecular_orbitals,
-        num_molecular_orbitals, num_molecular_orbitals);
+        const_cast<double*>(V_aaaa.data()), num_molecular_orbitals,
+        num_molecular_orbitals, num_molecular_orbitals, num_molecular_orbitals);
 
     // Select Hamiltonian generator based on h_build_algo
     QDK_LOGGER().info("Constructing MACIS Hamiltonian generator.");

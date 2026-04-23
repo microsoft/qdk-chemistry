@@ -8,12 +8,11 @@
  */
 
 #pragma once
+#include <algorithm>
+#include <cstring>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/types.hpp>
 #include <macis/wfn/raw_bitset.hpp>
-
-#include <algorithm>
-#include <cstring>
 #include <numeric>
 #include <vector>
 
@@ -74,8 +73,7 @@ struct SpinCache {
         std::copy_n(tmp.data(), n_alpha_elec,
                     &occ_alpha_flat[i * n_alpha_elec]);
         spin_wfn_traits::state_to_occ(beta[i], tmp);
-        std::copy_n(tmp.data(), n_beta_elec,
-                    &occ_beta_flat[i * n_beta_elec]);
+        std::copy_n(tmp.data(), n_beta_elec, &occ_beta_flat[i * n_beta_elec]);
       }
     }
   }
@@ -95,9 +93,7 @@ struct SpinCache {
 inline uint64_t pack_pair(uint32_t lo, uint32_t hi) {
   return (static_cast<uint64_t>(lo) << 32) | hi;
 }
-inline uint32_t pair_lo(uint64_t p) {
-  return static_cast<uint32_t>(p >> 32);
-}
+inline uint32_t pair_lo(uint64_t p) { return static_cast<uint32_t>(p >> 32); }
 inline uint32_t pair_hi(uint64_t p) {
   return static_cast<uint32_t>(p & 0xFFFFFFFF);
 }
@@ -125,8 +121,8 @@ inline void sort_unique_pairs(std::vector<uint64_t>& pairs) {
 template <typename index_t, typename WfnType>
 sparsexx::csr_matrix<double, index_t> build_csr_from_pairs(
     size_t ndets, const std::vector<uint64_t>& pairs,
-    const SpinCache<WfnType>& cache,
-    HamiltonianGenerator<WfnType>& ham_gen, double H_thresh) {
+    const SpinCache<WfnType>& cache, HamiltonianGenerator<WfnType>& ham_gen,
+    double H_thresh) {
   using csr_type = sparsexx::csr_matrix<double, index_t>;
   if (ndets == 0) return csr_type(0, 0, 0, 0);
 
@@ -156,8 +152,8 @@ sparsexx::csr_matrix<double, index_t> build_csr_from_pairs(
       auto ex_a = cache.alpha[i] ^ cache.alpha[j];
       auto ex_b = cache.beta[i] ^ cache.beta[j];
       pair_vals[k] = ham_gen.matrix_element(cache.alpha[i], cache.alpha[j],
-                                            ex_a, cache.beta[i],
-                                            cache.beta[j], ex_b, bra_oa, bra_ob);
+                                            ex_a, cache.beta[i], cache.beta[j],
+                                            ex_b, bra_oa, bra_ob);
     }
   }
 
@@ -230,10 +226,9 @@ sparsexx::csr_matrix<double, index_t> build_csr_from_pairs(
       if (rlen <= 1) continue;
       perm.resize(rlen);
       std::iota(perm.begin(), perm.end(), size_t(0));
-      std::sort(perm.begin(), perm.end(),
-                [&](size_t a, size_t b) {
-                  return colind[rs + a] < colind[rs + b];
-                });
+      std::sort(perm.begin(), perm.end(), [&](size_t a, size_t b) {
+        return colind[rs + a] < colind[rs + b];
+      });
       tmp_ci.resize(rlen);
       tmp_nz.resize(rlen);
       for (size_t k = 0; k < rlen; ++k) {
@@ -255,15 +250,11 @@ sparsexx::csr_matrix<double, index_t> build_csr_from_pairs(
 // is protected) and for any logging.
 // -----------------------------------------------------------------------
 template <typename index_t, typename WfnType>
-auto pair_based_build_impl_(
-    size_t ndets,
-    std::vector<uint64_t>& all_pairs,
-    SpinCache<WfnType>& cache,
-    HamiltonianGenerator<WfnType>& gen,
-    double H_thresh)
+auto pair_based_build_impl_(size_t ndets, std::vector<uint64_t>& all_pairs,
+                            SpinCache<WfnType>& cache,
+                            HamiltonianGenerator<WfnType>& gen, double H_thresh)
     -> sparsexx::csr_matrix<double, index_t> {
-  if (ndets == 0)
-    return sparsexx::csr_matrix<double, index_t>(0, 0, 0, 0);
+  if (ndets == 0) return sparsexx::csr_matrix<double, index_t>(0, 0, 0, 0);
   return build_csr_from_pairs<index_t>(ndets, all_pairs, cache, gen, H_thresh);
 }
 
