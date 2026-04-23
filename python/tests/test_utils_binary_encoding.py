@@ -662,8 +662,9 @@ class TestToGf2xOperations:
         assert dat == [12, 13]
 
     def test_translate_ops_mcx(self):
-        """MCX remaps control and target indices, preserving control states."""
-        ops = [(MatrixCompressionType.MCX, ([0, 1], [True, False], 2))]
+        """MCX remaps control and target indices; ctrl_state int bitmask passes through unchanged."""
+        # ctrl_state is always an int bitmask (0b01 = first control active, second inactive)
+        ops = [(MatrixCompressionType.MCX, ([0, 1], 0b01, 2))]
         translated = BinaryEncodingSynthesizer._translate_ops(
             ops,
             num_local_qubits=3,
@@ -672,7 +673,8 @@ class TestToGf2xOperations:
         )
         _, (ctrls, state, tgt) = translated[0]
         assert ctrls == [5, 6]
-        assert state == [True, False]
+        assert state == 0b01
+        assert isinstance(state, int)
         assert tgt == 7
 
     def test_measurement_based_uses_select_and(self):

@@ -977,7 +977,7 @@ class BinaryEncodingSynthesizer:
                         MatrixCompressionType.MCX,
                         (
                             [map_idx(int(q)) for q in controls],
-                            list(ctrl_state),
+                            ctrl_state,
                             map_idx(int(target)),
                         ),
                     )
@@ -1017,7 +1017,7 @@ class BinaryEncodingSynthesizer:
         if not rest_entries:
             return
 
-        mono_ops, mono_and = self._synthesize_single_pui_lookup_block(
+        mono_ops, mono_count = self._synthesize_single_pui_lookup_block(
             sbs,
             fixed_controls,
             rest_entries,
@@ -1028,17 +1028,17 @@ class BinaryEncodingSynthesizer:
             ops.extend(mono_ops)
             return
 
-        chunked_ops, chunked_and = [], 0
+        chunked_ops, chunked_count = [], 0
         for chunk in chunked:
-            sub_ops, sub_and = self._synthesize_single_pui_lookup_block(
+            sub_ops, sub_count = self._synthesize_single_pui_lookup_block(
                 sbs,
                 fixed_controls,
                 chunk,
             )
             chunked_ops.extend(sub_ops)
-            chunked_and += sub_and
+            chunked_count += sub_count
 
-        if chunked_and <= mono_and:
+        if chunked_count <= mono_count:
             ops.extend(chunked_ops)
             return
 
@@ -1058,8 +1058,8 @@ class BinaryEncodingSynthesizer:
             rest_entries: Per-target offsets and changing controls.
 
         Returns:
-            ``(ops, and_count)`` where ``and_count`` is the number of
-            emitted ``and`` operations, used as a Toffoli-cost proxy.
+            ``(ops, select_count)`` where ``select_count`` is the number of
+            emitted SELECT/SELECT_AND operations, used as a cost proxy.
 
         """
         if not rest_entries:
@@ -1081,9 +1081,11 @@ class BinaryEncodingSynthesizer:
         )
 
         gf2x_ops = list(reversed(lookup_ops))
-        and_count = sum(1 for name, _ in lookup_ops if name == "and")
+        select_count = sum(
+            1 for name, _ in lookup_ops if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
+        )
 
-        return gf2x_ops, and_count
+        return gf2x_ops, select_count
 
     def _canonicalize_pui_controls(
         self,
