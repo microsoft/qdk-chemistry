@@ -168,6 +168,7 @@ suppress_warnings = [
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
     "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
+    "*AlgorithmRef*",  # Suppress duplicate attribute warnings for AlgorithmRef (automodule + autosummary)
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [
