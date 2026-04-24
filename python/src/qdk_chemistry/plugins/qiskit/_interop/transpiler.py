@@ -22,6 +22,8 @@ from qiskit.circuit.library import (
     RZZGate,
     SdgGate,
     SGate,
+    TdgGate,
+    TGate,
     XGate,
     YGate,
     ZGate,
@@ -146,7 +148,7 @@ class SubstituteCliffordRzSettings(Settings):
     """Settings configuration for SubstituteCliffordRz.
 
     SubstituteCliffordRz-specific settings:
-        equivalent_gate_set (vector<string>, default=["id", "s", "sdg", "z"]): Equivalent gate set to use.
+        equivalent_gate_set (vector<string>, default=["id", "t", "s", "sdg", "tdg", "z"]): Equivalent gate set to use.
         tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
 
     """
@@ -155,7 +157,7 @@ class SubstituteCliffordRzSettings(Settings):
         """Initialize SubstituteCliffordRzSettings."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("equivalent_gate_set", "vector<string>", ["id", "s", "sdg", "z"])
+        self._set_default("equivalent_gate_set", "vector<string>", ["id", "t", "s", "z", "sdg", "tdg"])
         self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
 
     def set(self, key: str, value):
@@ -190,21 +192,25 @@ class SubstituteCliffordRzSettings(Settings):
 
 
 class SubstituteCliffordRz(TransformationPass):
-    """Transformation pass to substitute Rz(θ) gates with equivalent Clifford gates for special angles.
+    """Transformation pass to substitute Rz(θ) gates with equivalent Clifford+T gates for special angles.
 
-    This pass replaces Rz(θ) gates with one of the following Clifford gates:
+    This pass replaces Rz(θ) gates with one of the following gates:
 
     * Identity (Id)
+    * T gate (T)
     * Phase gate (S)
-    * Inverse Phase gate (Sdg)
     * Pauli-Z (Z)
+    * Inverse Phase gate (Sdg)
+    * T-dagger gate (Tdg)
 
     Substitution rules:
 
     +--------------------+--------------------------+
-    | Rz angle (θ)       | Equivalent Clifford gate |
+    | Rz angle (θ)       | Equivalent gate          |
     +====================+==========================+
     | 0                  | Id                       |
+    +--------------------+--------------------------+
+    | π/4                | T                        |
     +--------------------+--------------------------+
     | π/2                | S                        |
     +--------------------+--------------------------+
@@ -212,14 +218,26 @@ class SubstituteCliffordRz(TransformationPass):
     +--------------------+--------------------------+
     | -π/2 or 3π/2       | Sdg                      |
     +--------------------+--------------------------+
+    | -π/4 or 7π/4       | Tdg                      |
+    +--------------------+--------------------------+
 
     Note:
         * Only substitutes gates whose angle is non-parameterized and matches
-          one of the above special Clifford phases within the specified tolerance.
+          one of the above special phases within the specified tolerance.
         * Leaves parameterized Rz gates untouched to preserve symbolic expressions.
         * Ignores gates not in the user-specified ``equivalent_gate_set``
 
     """
+
+    # Map from mod-8 factor (angle = factor * π/4) to (gate_name, gate_class)
+    _FACTOR_TO_GATE: tuple[tuple[int, str, type], ...] = (
+        (0, "id", IGate),
+        (1, "t", TGate),
+        (2, "s", SGate),
+        (4, "z", ZGate),
+        (6, "sdg", SdgGate),
+        (7, "tdg", TdgGate),
+    )
 
     def __init__(
         self,
@@ -230,7 +248,7 @@ class SubstituteCliffordRz(TransformationPass):
 
         Args:
             equivalent_gate_set (list[str] | None): List of gates to substitute rz with special
-                angles. Default is None, which means ['id', 's', 'sdg', 'z'].
+                angles. Default is None, which means ['id', 't', 's', 'z', 'sdg', 'tdg'].
             tolerance (float): Angle comparison tolerance. Default is np.finfo(np.float64).eps.
 
         """
@@ -242,6 +260,19 @@ class SubstituteCliffordRz(TransformationPass):
                 raise TypeError("equivalent_gate_set must be a list of gate names or None")
             self._settings.set("equivalent_gate_set", equivalent_gate_set)
         self._settings.set("tolerance", tolerance)
+        self._build_lookup()
+
+    def _build_lookup(self):
+        """Precompute the mod-8 lookup table from current settings."""
+        gate_set = set(self._settings.get("equivalent_gate_set"))
+        tolerance = self._settings.get("tolerance")
+        # Precompute (mod8_target, gate_instance) pairs for enabled gates
+        self._lookup: list[tuple[float, object]] = []
+        for mod8_val, name, cls in self._FACTOR_TO_GATE:
+            if name in gate_set:
+                self._lookup.append((float(mod8_val), cls()))
+        self._tolerance = tolerance
+        self._inv_quarter_pi = 4.0 / np.pi  # precompute reciprocal
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Run the pass on the given ``DAGCircuit``.
@@ -254,48 +285,28 @@ class SubstituteCliffordRz(TransformationPass):
 
         """
         Logger.trace_entering()
-        equivalent_gate_set = self._settings.get("equivalent_gate_set")
-        tolerance = self._settings.get("tolerance")
-
-        if "id" not in equivalent_gate_set:
-            raise ValueError("Gate 'id' is missing in equivalent_gate_set.")
-        if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
-            raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
-
-        Logger.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
+        tolerance = self._tolerance
+        lookup = self._lookup
+        inv_quarter_pi = self._inv_quarter_pi
 
         for node in dag.op_nodes():
-            if node.op.name == "rz":
-                angle = node.op.params[0]
+            if node.op.name != "rz":
+                continue
 
-                # Skip parameterized rotations
-                if isinstance(angle, ParameterExpression):
-                    Logger.debug("Skipping parameterized Rz.")
-                    continue
+            angle = node.op.params[0]
 
-                factor = 2 * angle / np.pi
-                mod4_factor = np.mod(factor, 4)
-                Logger.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
+            # Skip parameterized rotations
+            if isinstance(angle, ParameterExpression):
+                continue
 
-                replacement_gate = None
-                if np.isclose(mod4_factor, 0, atol=tolerance) and "id" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Id.")
-                    replacement_gate = IGate()
-                elif np.isclose(mod4_factor, 1, atol=tolerance) and "s" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with S.")
-                    replacement_gate = SGate()
-                elif np.isclose(mod4_factor, 2, atol=tolerance) and "z" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Z.")
-                    replacement_gate = ZGate()
-                elif np.isclose(mod4_factor, 3, atol=tolerance) and "sdg" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
-                    replacement_gate = SdgGate()
+            # Compute mod-8 factor: angle = factor * (π/4)
+            factor = angle * inv_quarter_pi
+            mod8 = factor % 8.0
 
-                if replacement_gate:
-                    dag.substitute_node(node, replacement_gate, inplace=True)
-                else:
-                    Logger.debug(f"Keeping original Rz({angle:.4f}).")
-
+            for target, gate in lookup:
+                if abs(mod8 - target) <= tolerance or abs(mod8 - target - 8.0) <= tolerance:
+                    dag.substitute_node(node, gate, inplace=True)
+                    break
         return dag
 
     def settings(self) -> Settings:
