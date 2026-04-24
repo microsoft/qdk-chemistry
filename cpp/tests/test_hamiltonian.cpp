@@ -88,7 +88,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
 
@@ -112,7 +112,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_cholesky_vectors", true);
   }
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
 
@@ -960,12 +960,12 @@ TEST_F(HamiltonianTest, CholeskyContainerConstruction) {
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
 
-  // Create cholesky vectors (2x2 AO basis, 3 cholesky vectors)
-  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+  // Create cholesky vectors (2x2 MO basis, 3 cholesky vectors)
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
   // Test restricted constructor
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
@@ -992,13 +992,14 @@ TEST_F(HamiltonianTest, CholeskyContainerUnrestrictedConstruction) {
   double core_energy = 1.5;
 
   // Create cholesky vectors
-  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_mo_alpha = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_mo_beta = Eigen::MatrixXd::Random(4, 3);
 
   // Test unrestricted constructor
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-      two_body_bbbb, unrestricted_orbitals, core_energy, inactive_fock_alpha,
-      inactive_fock_beta, L_ao));
+      one_body_alpha, one_body_beta, L_mo_alpha, L_mo_beta,
+      unrestricted_orbitals, core_energy, inactive_fock_alpha,
+      inactive_fock_beta));
 
   EXPECT_TRUE(h.has_one_body_integrals());
   EXPECT_TRUE(h.has_two_body_integrals());
@@ -1014,10 +1015,11 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   auto orbitals = std::make_shared<ModelOrbitals>(2, true);
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
   Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
 
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+      one_body, L_mo, orbitals, core_energy, inactive_fock, L_ao));
 
   // Test JSON conversion
   nlohmann::json j = h.to_json();
@@ -1026,7 +1028,7 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
   EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
   EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_ao_cholesky_vectors"]);
+  EXPECT_TRUE(j["container"].contains("ao_cholesky_vectors"));
 
   // Test deserialization
   auto h_loaded = Hamiltonian::from_json(j);
@@ -1043,10 +1045,10 @@ TEST_F(HamiltonianTest, CholeskyContainerHDF5Serialization) {
   auto orbitals = std::make_shared<ModelOrbitals>(2, true);
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
-  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
   Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   // Save to HDF5
   std::string filename = "test.cholesky.hamiltonian.h5";
@@ -1071,10 +1073,10 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   auto orbitals = std::make_shared<ModelOrbitals>(2, true);
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
-  Eigen::MatrixXd L_ao = Eigen::MatrixXd::Random(4, 3);
+  Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
 
   Hamiltonian h1(std::make_unique<CholeskyHamiltonianContainer>(
-      one_body, two_body, orbitals, core_energy, inactive_fock, L_ao));
+      one_body, L_mo, orbitals, core_energy, inactive_fock));
 
   // Test copy constructor (uses clone internally)
   Hamiltonian h2(h1);
@@ -2227,7 +2229,6 @@ class DummyHamiltonianContainer : public HamiltonianContainer {
   bool is_restricted() const override { return true; }
   nlohmann::json to_json() const override { return {}; }
   void to_hdf5(H5::Group&) const override {}
-  void to_fcidump_file(const std::string&, size_t, size_t) const override {}
   bool is_valid() const override { return true; }
 };
 

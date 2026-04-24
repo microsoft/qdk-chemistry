@@ -239,7 +239,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   static Eigen::SparseMatrix<double> _to_sparse(const Eigen::MatrixXd& m);
 
   /// Convert a dense two-body vector to sparse map.
-  static TwoBodyMap _to_map(const Eigen::VectorXd& v, int n);
+  static TwoBodyMap _to_map(const Eigen::VectorXd& v, size_t n);
 };
 
 }  // namespace qdk::chemistry::data
