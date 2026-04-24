@@ -8,12 +8,7 @@
 ################################################################################
 # start-cell-create
 from qdk_chemistry.algorithms import create
-
-# Create a HamiltonianConstructor
-ham_constructor = create("hamiltonian_constructor")
-
-# Create a MC calculator
-mc_calculator = create("multi_configuration_calculator", "macis_cas")
+from qdk_chemistry.data import AlgorithmRef
 
 # Create the default MultiConfigurationScf instance
 mcscf = create("multi_configuration_scf", "pyscf")
@@ -22,13 +17,15 @@ mcscf = create("multi_configuration_scf", "pyscf")
 
 ################################################################################
 # start-cell-configure
-# Configure the MC calculator using the settings interface
-mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-mc_calculator.settings().set("calculate_one_rdm", True)
-mc_calculator.settings().set("calculate_two_rdm", True)
-
-# Configure the Hamiltonian constructor
-ham_constructor.settings().set("eri_method", "direct")
+# Configure nested algorithms via AlgorithmRef settings
+mcscf.settings().set(
+    "hamiltonian_constructor",
+    AlgorithmRef("hamiltonian_constructor", "qdk"),
+)
+mcscf.settings().set(
+    "multi_configuration_calculator",
+    AlgorithmRef("multi_configuration_calculator", "macis_cas"),
+)
 
 # Configure the MCSCF solver
 mcscf.settings().set("max_cycle_macro", 50)
@@ -62,9 +59,7 @@ active_wavefunction = valence_selector.run(scf_wavefunction)
 
 # Run MCSCF calculation
 nalpha, nbeta = active_wavefunction.get_active_num_electrons()
-E_mcscf, mcscf_wfn = mcscf.run(
-    active_wavefunction.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta
-)
+E_mcscf, mcscf_wfn = mcscf.run(active_wavefunction.get_orbitals(), nalpha, nbeta)
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 print(f"MCSCF Energy: {E_mcscf:.10f} Hartree")

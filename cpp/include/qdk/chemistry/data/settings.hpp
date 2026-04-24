@@ -26,6 +26,49 @@
 
 namespace qdk::chemistry::data {
 
+// Forward declaration for recursive AlgorithmRef
+class Settings;
+
+/**
+ * @brief Declarative reference to a nested algorithm to be created via the
+ * registry.
+ *
+ * An AlgorithmRef is stored inside a parent algorithm's Settings to
+ * describe a child algorithm that will be instantiated at run-time.
+ *
+ * Fields:
+ *   algorithm_type  – registry type key (e.g. "circuit_executor").
+ *                     May be fixed (immutable) when the parent only
+ *                     accepts one type.
+ *   algorithm_name  – registry name key (e.g. "qdk_sparse_state_simulator").
+ *                     Empty string means "use the factory default".
+ *   settings        – arbitrary key/value overrides forwarded to the
+ *                     child's Settings after creation.  May itself
+ *                     contain further AlgorithmRef values, enabling
+ *                     multi-level nesting.
+ *   type_fixed      – if true, algorithm_type cannot be changed by the user.
+ */
+struct AlgorithmRef {
+  std::string algorithm_type;
+  std::string algorithm_name;
+  std::shared_ptr<Settings> settings;
+  bool type_fixed = true;
+
+  AlgorithmRef() = default;
+  AlgorithmRef(std::string type, std::string name,
+               std::shared_ptr<Settings> settings_ptr = nullptr,
+               bool fixed = true)
+      : algorithm_type(std::move(type)),
+        algorithm_name(std::move(name)),
+        settings(std::move(settings_ptr)),
+        type_fixed(fixed) {}
+
+  bool operator==(const AlgorithmRef& other) const {
+    return algorithm_type == other.algorithm_type &&
+           algorithm_name == other.algorithm_name;
+  }
+};
+
 /**
  * @brief Type-safe variant for storing different setting value types
  *
@@ -36,7 +79,7 @@ namespace qdk::chemistry::data {
  */
 using SettingValue =
     std::variant<bool, int64_t, double, std::string, std::vector<int64_t>,
-                 std::vector<double>, std::vector<std::string>>;
+                 std::vector<double>, std::vector<std::string>, AlgorithmRef>;
 
 /**
  * @brief Constraint specifying minimum and maximum bounds for a setting value

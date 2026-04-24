@@ -88,6 +88,8 @@ py::object setting_value_to_python(const SettingValue &value) {
         } else if constexpr (std::is_same_v<ValueType,
                                             std::vector<std::string>>) {
           return py::cast(variant_value);
+        } else if constexpr (std::is_same_v<ValueType, AlgorithmRef>) {
+          return py::cast(variant_value);
         } else {
           static_assert(sizeof(ValueType) == 0,
                         "Unsupported type in SettingValue");
@@ -324,13 +326,20 @@ SettingValue python_to_setting_value_with_type(const py::object &obj,
                      std::string(py::str(py::type::of(obj))) +
                      ", expected list, tuple, or numpy array)");
       }
+    } else if (expected_type == "algorithm_ref") {
+      if (py::isinstance<AlgorithmRef>(obj)) {
+        return obj.cast<AlgorithmRef>();
+      }
+      throw SettingTypeMismatch(
+          key,
+          "AlgorithmRef (got " + std::string(py::str(py::type::of(obj))) + ")");
     } else {
       throw std::runtime_error("Unknown expected type '" + expected_type +
                                "' for setting '" + key +
                                "'. Supported types are: bool, int, float, "
                                "double, string, vector<int>, "
                                "vector<float>, vector<double>, "
-                               "vector<string>");
+                               "vector<string>, algorithm_ref");
     }
   } catch (const py::cast_error &e) {
     throw SettingTypeMismatch(
@@ -458,6 +467,72 @@ bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vec
   py::register_exception<SettingNotFound>(data, "SettingNotFound");
   py::register_exception<SettingTypeMismatch>(data, "SettingTypeMismatch");
   py::register_exception<SettingsAreLocked>(data, "SettingsAreLocked");
+
+  // Bind AlgorithmRef
+  py::class_<AlgorithmRef>(data, "AlgorithmRef", R"(
+Declarative reference to a nested algorithm instantiated via the registry.
+
+An AlgorithmRef is stored inside a parent algorithm's Settings to describe
+a child algorithm that will be created at run-time.
+
+Construct with keyword arguments to forward settings to the nested algorithm::
+
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42)
+
+Attributes:
+    algorithm_type (str): Registry type key (e.g. "circuit_executor").
+    algorithm_name (str): Registry name key (e.g. "qdk_sparse_state_simulator").
+        Empty string means "use the factory default".
+    settings (Settings | None): Nested key/value overrides forwarded to the
+        child's Settings after creation.
+    type_fixed (bool): If True, algorithm_type cannot be changed by the user.
+)")
+      .def(py::init<>())
+      .def(
+          py::init<std::string, std::string, std::shared_ptr<Settings>, bool>(),
+          py::arg("algorithm_type"), py::arg("algorithm_name"),
+          py::arg("settings") = nullptr, py::arg("type_fixed") = true)
+      .def(py::init([](const std::string &algorithm_type,
+                       const std::string &algorithm_name, bool type_fixed,
+                       py::kwargs kwargs) {
+             auto ref = AlgorithmRef(algorithm_type, algorithm_name, nullptr,
+                                     type_fixed);
+             if (kwargs && py::len(kwargs) > 0) {
+               // Convert kwargs to a Settings via JSON round-trip
+               py::module_ json_mod = py::module_::import("json");
+               py::dict d = kwargs;
+               py::str json_str = json_mod.attr("dumps")(d);
+               std::string json_cpp = json_str.cast<std::string>();
+               auto json_obj = nlohmann::json::parse(json_cpp);
+               ref.settings = Settings::from_json(json_obj);
+             }
+             return ref;
+           }),
+           py::arg("algorithm_type"), py::arg("algorithm_name"),
+           py::arg("type_fixed") = true,
+           R"(
+Create an AlgorithmRef with keyword arguments forwarded as nested settings.
+
+Args:
+    algorithm_type: Registry type key (e.g. "circuit_executor").
+    algorithm_name: Registry name key.
+    type_fixed: If True (default), algorithm_type cannot be changed.
+    **kwargs: Settings forwarded to the nested algorithm after creation.
+
+Examples:
+    >>> AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42)
+    >>> AlgorithmRef("multi_configuration_calculator", "macis_cas",
+    ...              ci_residual_tolerance=1e-10, calculate_one_rdm=True)
+)")
+      .def_readwrite("algorithm_type", &AlgorithmRef::algorithm_type)
+      .def_readwrite("algorithm_name", &AlgorithmRef::algorithm_name)
+      .def_readwrite("settings", &AlgorithmRef::settings)
+      .def_readwrite("type_fixed", &AlgorithmRef::type_fixed)
+      .def("__repr__", [](const AlgorithmRef &ref) {
+        return "AlgorithmRef(type='" + ref.algorithm_type + "', name='" +
+               ref.algorithm_name +
+               "', type_fixed=" + (ref.type_fixed ? "True" : "False") + ")";
+      });
 
   // Utility functions for conversion
   data.def("setting_value_to_python", &setting_value_to_python,
@@ -1228,6 +1303,8 @@ Examples:
           return "list[float]";
         } else if (type_name == "vector<string>") {
           return "list[str]";
+        } else if (type_name == "algorithm_ref") {
+          return "AlgorithmRef";
         } else {
           return "unknown";
         }

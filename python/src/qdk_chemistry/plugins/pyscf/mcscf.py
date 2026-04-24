@@ -52,6 +52,7 @@ from qdk_chemistry.algorithms import (
     MultiConfigurationScf,
 )
 from qdk_chemistry.data import (
+    AlgorithmRef,
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
     Hamiltonian,
@@ -274,6 +275,16 @@ class PyscfMcscfSettings(Settings):
         super().__init__()
         self._set_default("max_cycle_macro", "int", 50)
         self._set_default("verbose", "int", 0)
+        self._set_default(
+            "hamiltonian_constructor",
+            "algorithm_ref",
+            AlgorithmRef("hamiltonian_constructor", "qdk"),
+        )
+        self._set_default(
+            "multi_configuration_calculator",
+            "algorithm_ref",
+            AlgorithmRef("multi_configuration_calculator", "macis_cas"),
+        )
 
 
 class PyscfMcscfCalculator(MultiConfigurationScf):
@@ -298,8 +309,6 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
     def _run_impl(
         self,
         orbitals: Any,
-        ham_ctor: Any,  # noqa: ARG002
-        mc_calculator: Any,
         n_active_alpha_electrons: int,
         n_active_beta_electrons: int,
     ) -> tuple[float, Any]:
@@ -309,10 +318,11 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         performs a CASSCF calculation using the QDK MC calculator as the FCI solver,
         and returns the results as a pair of energy and QDK Wavefunction object.
 
+        The HamiltonianConstructor and MultiConfigurationCalculator are obtained
+        from the settings.
+
         Args:
             orbitals: The QDK Orbitals object containing molecular orbital information.
-            ham_ctor: Hamiltonian constructor (not used, kept for interface compatibility).
-            mc_calculator: The multi-configurational calculator for handling CI calculations.
             n_active_alpha_electrons: The number of alpha electrons in the active space.
             n_active_beta_electrons: The number of beta electrons in the active space.
 
@@ -326,6 +336,8 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
 
         """
         Logger.trace_entering()
+        # Create nested MC calculator from settings
+        mc_calculator = self._create_nested("multi_configuration_calculator")
         # check that alpha and beta active space indices are the same
         if orbitals.get_active_space_indices()[0] != orbitals.get_active_space_indices()[1]:
             raise ValueError("MCSCF implementation only supports identical active spaces for alpha and beta electrons.")

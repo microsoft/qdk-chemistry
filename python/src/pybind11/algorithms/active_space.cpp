@@ -175,6 +175,8 @@ Returns:
     return "<qdk_chemistry.algorithms.ActiveSpaceSelector>";
   });
 
+  qdk::chemistry::python::bind_create_nested(selector);
+
   // Bind concrete microsoft::OccupationActiveSpaceSelector implementation
   py::class_<microsoft::OccupationActiveSpaceSelector, ActiveSpaceSelector,
              py::smart_holder>(m, "QdkOccupationActiveSpaceSelector", R"(

@@ -30,10 +30,8 @@ class TestMultiConfigurationScfSolver : public MultiConfigurationScf {
 
  protected:
   std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<HamiltonianConstructor> hamiltonian,
-      std::shared_ptr<MultiConfigurationCalculator> /*mc_calculator*/,
-      unsigned int /*nalpha*/, unsigned int /*nbeta*/) const override {
+      std::shared_ptr<Orbitals> orbitals, unsigned int /*nalpha*/,
+      unsigned int /*nbeta*/) const override {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
@@ -72,10 +70,8 @@ class TestMultiConfigurationScfSolverAlternative
 
  protected:
   std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<HamiltonianConstructor> hamiltonian,
-      std::shared_ptr<MultiConfigurationCalculator> /*mc_calculator*/,
-      unsigned int /*nalpha*/, unsigned int /*nbeta*/) const override {
+      std::shared_ptr<Orbitals> orbitals, unsigned int /*nalpha*/,
+      unsigned int /*nbeta*/) const override {
     // Alternative dummy implementation for testing - create a simple
     // wavefunction
     Eigen::VectorXcd coeffs(1);
@@ -84,7 +80,10 @@ class TestMultiConfigurationScfSolverAlternative
     Wavefunction::DeterminantVector dets;
     dets.push_back(Configuration("2"));  // Simple single determinant
 
-    auto hamil = hamiltonian->run(orbitals);
+    auto ham_ctor =
+        this->template _create_nested<HamiltonianConstructorFactory>(
+            "hamiltonian_constructor");
+    auto hamil = ham_ctor->run(orbitals);
     auto container =
         std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
     auto wfn = std::make_shared<Wavefunction>(std::move(container));
@@ -227,8 +226,7 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
   auto mc_calculator = std::make_shared<MockMCCalculator>();
 
   // Test solve method
-  auto [energy, wavefunction] =
-      solver.run(test_orbitals, hamil_ctor, mc_calculator, 1, 1);
+  auto [energy, wavefunction] = solver.run(test_orbitals, 1, 1);
   EXPECT_EQ(energy, -100.0);
 
   // Test settings access
