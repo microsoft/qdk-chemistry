@@ -396,6 +396,24 @@ class WavefunctionContainer {
   get_active_orbital_occupations() const = 0;
 
   /**
+   * @brief Compute the expectation value of the total spin-squared operator
+   *
+   * Uses the spin-dependent 1-RDMs and all three spin-dependent 2-RDM blocks:
+   * \f[
+   *   \langle S^2 \rangle = \frac{3}{4} \sum_i
+   *     \left(\gamma^\alpha_{ii} + \gamma^\beta_{ii}\right)
+   *     - \sum_{ij} \left( \Gamma^{\alpha\beta}_{ijji}
+   *     + \tfrac{1}{4} \Gamma^{\alpha\alpha}_{ijji}
+   *     + \tfrac{1}{4} \Gamma^{\beta\beta}_{ijji} \right)
+   * \f]
+   *
+   * @return The expectation value \f$\langle S^2 \rangle\f$
+   * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
+   *         available
+   */
+  double compute_s_squared() const;
+
+  /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
    * available
    * @return True if available
@@ -882,6 +900,17 @@ class Wavefunction : public DataClass,
    * @throws std::runtime_error if mutual information is not available
    */
   virtual Eigen::MatrixXd get_mutual_information() const;
+
+  /**
+   * @brief Compute the expectation value of the total spin-squared operator
+   *
+   * Delegates to the underlying container's compute_s_squared().
+   *
+   * @return The expectation value \f$\langle S^2 \rangle\f$
+   * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
+   *         available
+   */
+  double compute_s_squared() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs are available
