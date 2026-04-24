@@ -204,16 +204,21 @@ install(TARGETS _core
   COMPONENT _core
 )
 
-# Windows: Bundle runtime DLLs alongside _core.pyd so the package is
-# self-contained and does not require QDK_DLL_DIR at import time.
-# This is intended for local/editable pip installs using the standard vcpkg-based build workflow.
-# It assumes dependencies were installed by vcpkg into VCPKG_INSTALLED_DIR.
-# For non-vcpkg builds (system-installed libraries), users should set QDK_DLL_DIR or ensure DLLs are on PATH.
-# In CI pipelines that produce distributable wheels, disable this and use `delvewheel repair` instead
-# (it resolves the full dependency tree automatically, regardless of where the DLLs come from).
-option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg and OpenMP DLLs into the install tree (Windows only)" ON)
+# Windows (Python 3.8+): DLL dependencies of .pyd files are only found if they
+# reside in the same directory as the .pyd or are registered via os.add_dll_directory().
+# PATH is NOT searched. When vcpkg provides dynamic libraries (x64-windows triplet),
+# copy the runtime DLLs next to _core.pyd so the package works out of the box.
+# With static triplets (x64-windows-static-md) all dependency code is linked directly
+# into _core.pyd, so no bundling is needed.
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+    set(_bundle_dlls_default OFF)
+else()
+    set(_bundle_dlls_default ON)
+endif()
+option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg and OpenMP DLLs into the install tree (Windows only)" ${_bundle_dlls_default})
 
 if(WIN32 AND QDK_BUNDLE_RUNTIME_DLLS)
+    message(STATUS "Bundling runtime DLLs into install tree")
     # -- vcpkg dependencies (openblas, hdf5, fmt, spdlog and their transitive deps) --
     if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
         set(_vcpkg_bin "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")

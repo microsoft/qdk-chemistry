@@ -1,15 +1,17 @@
-# test-windows-build-clang-pip.ps1
+# windows-build-clang-pip.ps1
 # Local script to build and test the QDK Chemistry Python package on Windows using Clang and pip.
 # pip (via scikit-build-core) handles the full C++ and Python build in one step.
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
-#   .\test-windows-build-clang-pip.ps1                  # Full build (install deps + build + test)
-#   .\test-windows-build-clang-pip.ps1 -SkipPrereqs     # Skip prerequisite installation
-#   .\test-windows-build-clang-pip.ps1 -SkipBuild       # Skip build, only run tests
-#   .\test-windows-build-clang-pip.ps1 -SkipTests       # Skip test runs
+#   .\windows-build-clang-pip.ps1                  # Full build (static vcpkg deps, default)
+#   .\windows-build-clang-pip.ps1 -DynamicDeps     # Full build (dynamic vcpkg deps, bundles DLLs)
+#   .\windows-build-clang-pip.ps1 -SkipPrereqs     # Skip prerequisite installation
+#   .\windows-build-clang-pip.ps1 -SkipBuild       # Skip build, only run tests
+#   .\windows-build-clang-pip.ps1 -SkipTests       # Skip test runs
 
 param(
+    [switch]$DynamicDeps,
     [switch]$SkipPrereqs,
     [switch]$SkipBuild,
     [switch]$SkipTests
@@ -22,12 +24,23 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     exit 1
 }
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
+# vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
+# Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
+# installation folder. Else, Windows won't find them at runtime and the Python package will fail to import.
+# This is because Windows does not have a system-wide DLL search path configuration like Linux's ldconfig.
+if ($DynamicDeps) {
+    $VcpkgTriplet = "x64-windows"
+} else {
+    $VcpkgTriplet = "x64-windows-static-md"
+}
 $QDK_UARCH = "x86-64-v3"
 
+$linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  QDK Chemistry - Windows Build (pip)       " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Repo root: $RepoRoot"
+Write-Host "Triplet:   $VcpkgTriplet ($linkMode)"
 Write-Host ""
 
 # --------------------------------------------------------------------------
@@ -172,9 +185,9 @@ if (-not $SkipPrereqs) {
 
     # --- 0d. Install vcpkg packages ---
     Write-Host ""
-    Write-Host "Installing vcpkg dependencies (this may take a while on first run)..."
+    Write-Host "Installing vcpkg dependencies with triplet '$VcpkgTriplet' (this may take a while on first run)..."
     & "$vcpkgRoot\vcpkg.exe" install `
-        --triplet x64-windows `
+        --triplet $VcpkgTriplet `
         --x-manifest-root="$RepoRoot" `
         --x-install-root="$VcpkgInstalledDir" `
         --overlay-ports="$RepoRoot\vcpkg-overlay\ports"
@@ -187,10 +200,13 @@ if (-not $SkipPrereqs) {
     # --- 0e. Set CMake/vcpkg environment variables ---
     $toolchainFile = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
     $env:CMAKE_TOOLCHAIN_FILE = $toolchainFile
-    $env:VCPKG_TARGET_TRIPLET = "x64-windows"
+    $env:VCPKG_TARGET_TRIPLET = $VcpkgTriplet
     $env:VCPKG_INSTALLED_DIR = $VcpkgInstalledDir
-    $env:CMAKE_PREFIX_PATH = "$VcpkgInstalledDir\x64-windows"
-    $env:PATH = "$VcpkgInstalledDir\x64-windows\bin;$VcpkgInstalledDir\x64-windows\debug\bin;$env:PATH"
+    $env:CMAKE_PREFIX_PATH = "$VcpkgInstalledDir\$VcpkgTriplet"
+    # Dynamic triplets produce runtime DLLs that must be on PATH for the build tools
+    if ($DynamicDeps) {
+        $env:PATH = "$VcpkgInstalledDir\$VcpkgTriplet\bin;$VcpkgInstalledDir\$VcpkgTriplet\debug\bin;$env:PATH"
+    }
 
     # --- 0f. uv (Python package manager) ---
     if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
@@ -248,10 +264,13 @@ if (-not $SkipPrereqs) {
         $vcpkgRoot = "$RepoRoot\vcpkg-tool"
     }
     $env:CMAKE_TOOLCHAIN_FILE = "$vcpkgRoot\scripts\buildsystems\vcpkg.cmake"
-    $env:VCPKG_TARGET_TRIPLET = "x64-windows"
+    $env:VCPKG_TARGET_TRIPLET = $VcpkgTriplet
     $env:VCPKG_INSTALLED_DIR = $VcpkgInstalledDir
-    $env:CMAKE_PREFIX_PATH = "$VcpkgInstalledDir\x64-windows"
-    $env:PATH = "$VcpkgInstalledDir\x64-windows\bin;$VcpkgInstalledDir\x64-windows\debug\bin;$env:PATH"
+    $env:CMAKE_PREFIX_PATH = "$VcpkgInstalledDir\$VcpkgTriplet"
+    # Dynamic triplets produce runtime DLLs that must be on PATH for the build tools
+    if ($DynamicDeps) {
+        $env:PATH = "$VcpkgInstalledDir\$VcpkgTriplet\bin;$VcpkgInstalledDir\$VcpkgTriplet\debug\bin;$env:PATH"
+    }
 }
 
 # Verify tools
