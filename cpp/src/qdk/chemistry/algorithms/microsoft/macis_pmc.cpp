@@ -37,15 +37,11 @@ struct pmc_helper {
       const std::vector<data::Configuration>& configurations,
       const data::Settings& settings_) {
     QDK_LOG_TRACE_ENTERING();
-    // Create MacisPmcSettings instance for accessing PMC-specific settings
-    MacisPmcSettings macis_pmc_settings;
-    double h_el_tol = macis_pmc_settings.get<double>("h_el_tol");
-    double H_thresh = macis_pmc_settings.get<double>("H_thresh");
-    double davidson_res_tol =
-        macis_pmc_settings.get<double>("davidson_res_tol");
+    // Read settings via the shared helpers — same names as CAS
+    macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
     int64_t iterative_solver_dimension_cutoff =
-        macis_pmc_settings.get<int64_t>("iterative_solver_dimension_cutoff");
-    int64_t davidson_max_m = macis_pmc_settings.get<int64_t>("davidson_max_m");
+        settings_.get_or_default<int64_t>("iterative_solver_dimension_cutoff",
+                                          100);
 
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
@@ -93,27 +89,28 @@ struct pmc_helper {
     // Perform projected CI diagonalization
     std::vector<double> C_pmc;
     double E_pmc = 0.0;
-    if (dets.size() == 1) {
+    const auto n = static_cast<int64_t>(dets.size());
+    if (n == 1) {
       E_pmc = ham_gen.matrix_element(dets[0], dets[0]);
       C_pmc = {1.0};
-    } else if (dets.size() < iterative_solver_dimension_cutoff) {
-      auto H = macis::make_csr_hamiltonian<int32_t>(dets.begin(), dets.end(),
-                                                    ham_gen, H_thresh);
-      std::vector<double> H_dense(dets.size() * dets.size(), 0.0);
-      std::vector<double> evals(dets.size(), 0.0);
+    } else if (n <= iterative_solver_dimension_cutoff) {
+      auto H = macis::make_csr_hamiltonian<int32_t>(
+          dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol);
+      std::vector<double> H_dense(n * n, 0.0);
+      std::vector<double> evals(n, 0.0);
 
-      sparsexx::convert_to_dense(H, H_dense.data(), dets.size());
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Upper, dets.size(),
-                   H_dense.data(), dets.size(), evals.data());
+      sparsexx::convert_to_dense(H, H_dense.data(), n);
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Upper, n, H_dense.data(), n,
+                   evals.data());
 
       E_pmc = evals[0];
 
-      C_pmc.resize(dets.size());
-      std::copy(H_dense.begin(), H_dense.begin() + dets.size(), C_pmc.begin());
+      C_pmc.resize(n);
+      std::copy_n(H_dense.begin(), n, C_pmc.begin());
     } else {
       E_pmc = macis::selected_ci_diag<int64_t, wfn_type>(
-          dets.begin(), dets.end(), ham_gen, h_el_tol, davidson_max_m,
-          davidson_res_tol, C_pmc);
+          dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol,
+          mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, C_pmc);
     }
 
     // Copy-back data to return struct

@@ -44,7 +44,9 @@ class MultiConfigurationSettings : public data::Settings {
     // evaluate mutual information
     set_default<bool>("calculate_mutual_information", false);
     // energy convergence threshold
-    set_default<double>("ci_residual_tolerance", 1.0e-6);
+    set_default<double>(
+        "ci_residual_tolerance", 1.0e-6, "CI residual convergence tolerance",
+        qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
     // maximum number of iterations any Davidson
     set_default<int64_t>("max_solver_iterations", 200,
                          "Maximum number of Davidson iterations",

@@ -80,23 +80,23 @@ struct cas_helper {
                             num_molecular_orbitals, num_molecular_orbitals));
 
     // CI diagonalization: dense for small spaces, iterative otherwise
-    if (dets.size() == 1) {
+    const auto n = static_cast<int64_t>(dets.size());
+    if (n == 1) {
       E_casci = ham_gen.matrix_element(dets[0], dets[0]);
       C_casci = {1.0};
-    } else if (static_cast<int64_t>(dets.size()) <=
-               iterative_solver_dimension_cutoff) {
+    } else if (n <= iterative_solver_dimension_cutoff) {
       auto H_csr = macis::make_csr_hamiltonian<int32_t>(
-          dets.begin(), dets.end(), ham_gen, 1e-16);
-      std::vector<double> H_dense(dets.size() * dets.size(), 0.0);
-      std::vector<double> evals(dets.size(), 0.0);
+          dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol);
+      std::vector<double> H_dense(n * n, 0.0);
+      std::vector<double> evals(n, 0.0);
 
-      sparsexx::convert_to_dense(H_csr, H_dense.data(), dets.size());
-      lapack::syev(lapack::Job::Vec, lapack::Uplo::Upper, dets.size(),
-                   H_dense.data(), dets.size(), evals.data());
+      sparsexx::convert_to_dense(H_csr, H_dense.data(), n);
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Upper, n, H_dense.data(), n,
+                   evals.data());
 
       E_casci = evals[0];
-      C_casci.resize(dets.size());
-      std::copy_n(H_dense.begin(), dets.size(), C_casci.begin());
+      C_casci.resize(n);
+      std::copy_n(H_dense.begin(), n, C_casci.begin());
     } else {
       E_casci = macis::CASRDMFunctor<generator_t>::rdms(
           mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,

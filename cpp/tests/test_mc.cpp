@@ -395,7 +395,8 @@ TEST_F(MCTest, Water_STO3G_CAS_SingleDet) {
  *
  * Water/STO-3G FCI has 441 determinants, which normally hits the dense path
  * (cutoff = 2000). Setting iterative_solver_dimension_cutoff = 10 forces
- * the Davidson/iterative solver. The energy must match the dense result.
+ * the Davidson/iterative solver. The energy is checked against a fixed
+ * regression reference.
  */
 TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
   auto water = testing::create_water_structure();
@@ -420,15 +421,23 @@ TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
 }
 
 /**
- * @brief Verify the iterative_solver_dimension_cutoff default and constraints.
+ * @brief Verify settings defaults, overrides, and constraints for CAS.
  */
-TEST_F(MCTest, MCSettings_IterativeSolverDimensionCutoff) {
-  MultiConfigurationSettings mc_settings;
-  EXPECT_EQ(mc_settings.get<int64_t>("iterative_solver_dimension_cutoff"),
-            2000);
+TEST_F(MCTest, MCSettings_DefaultsAndConstraints) {
+  auto mc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto& settings = mc->settings();
 
-  // Can override
-  mc_settings.set("iterative_solver_dimension_cutoff",
-                  static_cast<int64_t>(500));
-  EXPECT_EQ(mc_settings.get<int64_t>("iterative_solver_dimension_cutoff"), 500);
+  // iterative_solver_dimension_cutoff: default, override, constraint
+  EXPECT_EQ(settings.get<int64_t>("iterative_solver_dimension_cutoff"), 2000);
+  settings.set("iterative_solver_dimension_cutoff", static_cast<int64_t>(500));
+  EXPECT_EQ(settings.get<int64_t>("iterative_solver_dimension_cutoff"), 500);
+  EXPECT_THROW(settings.set("iterative_solver_dimension_cutoff",
+                            static_cast<int64_t>(0)),
+               std::invalid_argument);
+
+  // ci_matel_tol: default, override
+  EXPECT_DOUBLE_EQ(settings.get<double>("ci_matel_tol"),
+                   std::numeric_limits<double>::epsilon());
+  settings.set("ci_matel_tol", 1e-12);
+  EXPECT_DOUBLE_EQ(settings.get<double>("ci_matel_tol"), 1e-12);
 }
