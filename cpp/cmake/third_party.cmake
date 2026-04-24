@@ -57,12 +57,21 @@ handle_dependency(libint2
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
 set(LIBECPINT_USE_PUGIXML OFF CACHE BOOL "Use pugixml for ECPINT" FORCE)
+# MSVC native cl does not support C99 VLAs used throughout ecpint.
+# Apply a patch script that replaces them with std::vector.
+set(_ecpint_patch_args "")
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_ecpint_patch_args FETCHCONTENT_ARGS
+        PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/ecpint-msvc-vla.cmake"
+    )
+endif()
 handle_dependency(ecpint
   GIT_REPOSITORY https://github.com/robashaw/libecpint
   GIT_TAG v1.0.7
   BUILD_TARGET ECPINT::ecpint
   INSTALL_TARGET ECPINT::ecpint
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_ecpint_patch_args}
   REQUIRED
 )
 

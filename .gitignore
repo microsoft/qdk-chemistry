@@ -12,12 +12,14 @@ docs/*.txt
 # Distribution / packaging
 .Python
 build/
+build-msvc/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
 install/
+install-msvc/
 lib/
 lib64/
 parts/

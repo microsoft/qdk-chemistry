@@ -1,15 +1,15 @@
-# windows-build-clang-cmake.ps1
-# Local script to build and test the QDK Chemistry Python package on Windows using Clang and CMake.
+# windows-build-msvc-cmake.ps1
+# Local script to build and test the QDK Chemistry Python package on Windows using native MSVC cl.exe and CMake.
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
-#   .\windows-build-clang-cmake.ps1                  # Full build (static vcpkg deps, default)
-#   .\windows-build-clang-cmake.ps1 -DynamicDeps     # Full build (dynamic vcpkg deps, bundles DLLs)
-#   .\windows-build-clang-cmake.ps1 -SkipPrereqs     # Skip prerequisite installation
-#   .\windows-build-clang-cmake.ps1 -SkipCpp         # Skip C++ build, only do Python
-#   .\windows-build-clang-cmake.ps1 -SkipConfigure   # Skip CMake configure, incremental build only
-#   .\windows-build-clang-cmake.ps1 -SkipPython      # Skip Python build, only do C++
-#   .\windows-build-clang-cmake.ps1 -SkipTests       # Skip test runs
+#   .\windows-build-msvc-cmake.ps1                  # Full build (static vcpkg deps, default)
+#   .\windows-build-msvc-cmake.ps1 -DynamicDeps     # Full build (dynamic vcpkg deps, bundles DLLs)
+#   .\windows-build-msvc-cmake.ps1 -SkipPrereqs     # Skip prerequisite installation
+#   .\windows-build-msvc-cmake.ps1 -SkipCpp         # Skip C++ build, only do Python
+#   .\windows-build-msvc-cmake.ps1 -SkipConfigure   # Skip CMake configure, incremental build only
+#   .\windows-build-msvc-cmake.ps1 -SkipPython      # Skip Python build, only do C++
+#   .\windows-build-msvc-cmake.ps1 -SkipTests       # Skip test runs
 
 param(
     [switch]$DynamicDeps,
@@ -26,8 +26,8 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-$BuildDir = "$RepoRoot\cpp\build"
-$InstallDir = "$RepoRoot\install"
+$BuildDir = "$RepoRoot\cpp\build-msvc"
+$InstallDir = "$RepoRoot\install-msvc"
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
 # Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
@@ -42,7 +42,7 @@ $QDK_UARCH = "x86-64-v3"
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "  QDK Chemistry - Windows Build (clang-cl)  " -ForegroundColor Cyan
+Write-Host "  QDK Chemistry - Windows Build (MSVC cl)   " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "Repo root: $RepoRoot"
 Write-Host "Triplet:   $VcpkgTriplet ($linkMode)"
@@ -65,26 +65,11 @@ if (-not $SkipPrereqs) {
     Write-Host ""
     Write-Host "=== Step 0: Checking / installing prerequisites ===" -ForegroundColor Yellow
 
-    # --- 0a. VS Build Tools with clang-cl ---
+    # --- 0a. VS Build Tools with MSVC cl ---
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    $clangCl = $null
 
-    # Search existing VS installations for clang-cl (-products * includes BuildTools)
-    if (Test-Path $vswhere) {
-        $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
-        if ($vsPath) {
-            $candidates = @(
-                "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
-                "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
-            )
-            foreach ($c in $candidates) {
-                if (Test-Path $c) { $clangCl = $c; break }
-            }
-        }
-    }
-
-    if (-not $clangCl) {
-        Write-Host "clang-cl not found. Installing VS Build Tools with C++ and Clang components..." -ForegroundColor Magenta
+    if (-not (Test-Path $vswhere)) {
+        Write-Host "VS Build Tools not found. Installing..." -ForegroundColor Magenta
         Write-Host "This requires an elevated (admin) PowerShell and will take several minutes."
         Write-Host ""
 
@@ -100,8 +85,6 @@ if (-not $SkipPrereqs) {
         $installArgs = @(
             "--quiet", "--wait", "--norestart",
             "--add", "Microsoft.VisualStudio.Workload.VCTools",
-            "--add", "Microsoft.VisualStudio.Component.VC.Llvm.Clang",
-            "--add", "Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset",
             "--add", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
             "--add", "Microsoft.VisualStudio.Component.Windows11SDK.26100",
             "--includeRecommended"
@@ -112,36 +95,16 @@ if (-not $SkipPrereqs) {
             exit 1
         }
         Write-Host "VS Build Tools installed successfully." -ForegroundColor Green
-
-        # Re-search for clang-cl
-        $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
-        if ($vsPath) {
-            $candidates = @(
-                "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
-                "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
-            )
-            foreach ($c in $candidates) {
-                if (Test-Path $c) { $clangCl = $c; break }
-            }
-        }
-
-        if (-not $clangCl) {
-            Write-Error "clang-cl still not found after installing VS Build Tools."
-            exit 1
-        }
     }
-
-    $clangDir = Split-Path $clangCl
-    Write-Host "Using clang-cl: $clangCl" -ForegroundColor Green
-    & $clangCl --version
-
-    # Add clang-cl to PATH for this session
-    $env:PATH = "$clangDir;$env:PATH"
 
     # --- 0b. Set up MSVC environment (vcvarsall) ---
     Write-Host ""
     Write-Host "Setting up MSVC developer environment..."
     $vsPath = & $vswhere -latest -products * -property installationPath
+    if (-not $vsPath) {
+        Write-Error "No Visual Studio installation found."
+        exit 1
+    }
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
     if (-not (Test-Path $vcvarsall)) {
         Write-Error "vcvarsall.bat not found at $vcvarsall"
@@ -166,8 +129,9 @@ if (-not $SkipPrereqs) {
     Remove-Item $tempFile
     Write-Host "MSVC developer environment configured." -ForegroundColor Green
 
-    # Re-add clang-cl to PATH (vcvarsall may have reset it)
-    $env:PATH = "$clangDir;$env:PATH"
+    # Verify cl.exe is available
+    Assert-Command "cl"
+    Write-Host "Using cl: $(Get-Command cl | Select-Object -ExpandProperty Source)" -ForegroundColor Green
 
     # --- 0c. vcpkg ---
     # Check VS-bundled vcpkg first, then VCPKG_INSTALLATION_ROOT, then bootstrap
@@ -190,7 +154,7 @@ if (-not $SkipPrereqs) {
 
     # --- 0d. Install vcpkg packages ---
     Write-Host ""
-    Write-Host "Installing vcpkg dependencies (this may take a while on first run)..."
+    Write-Host "Installing vcpkg dependencies with triplet '$VcpkgTriplet' (this may take a while on first run)..."
     & "$vcpkgRoot\vcpkg.exe" install `
         --triplet $VcpkgTriplet `
         --x-manifest-root="$RepoRoot" `
@@ -230,18 +194,6 @@ if (-not $SkipPrereqs) {
     # Even when skipping, we need the environment set up
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
-    $candidates = @(
-        "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
-        "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
-    )
-    foreach ($c in $candidates) {
-        if (Test-Path $c) {
-            $clangDir = Split-Path $c
-            $env:PATH = "$clangDir;$env:PATH"
-            break
-        }
-    }
-    Assert-Command "clang-cl"
 
     # Set up MSVC env
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
@@ -254,9 +206,8 @@ if (-not $SkipPrereqs) {
             }
         }
         Remove-Item $tempFile
-        # Re-add clang-cl to PATH
-        $env:PATH = "$clangDir;$env:PATH"
     }
+    Assert-Command "cl"
 
     # vcpkg env - check VS-bundled vcpkg first
     $vcpkgRoot = $null
@@ -281,7 +232,7 @@ if (-not $SkipPrereqs) {
 # Verify tools
 Write-Host ""
 Write-Host "=== Environment summary ===" -ForegroundColor Yellow
-Write-Host "  clang-cl:        $(Get-Command clang-cl | Select-Object -ExpandProperty Source)"
+Write-Host "  cl:              $(Get-Command cl | Select-Object -ExpandProperty Source)"
 Write-Host "  cmake:           $(Get-Command cmake | Select-Object -ExpandProperty Source)"
 Write-Host "  ninja:           $(Get-Command ninja | Select-Object -ExpandProperty Source)"
 Write-Host "  python:          $(Get-Command python | Select-Object -ExpandProperty Source)  ($(python --version 2>&1))"
@@ -297,6 +248,7 @@ Write-Host ""
 if (-not $SkipCpp) {
     if (-not $SkipConfigure) {
         Write-Host "=== Step 1: Configure C++ build ===" -ForegroundColor Yellow
+        # CMake auto-detects cl.exe from the vcvarsall environment.
         cmake -S cpp -B "$BuildDir" `
             -GNinja `
             -DQDK_UARCH="$QDK_UARCH" `
@@ -306,8 +258,8 @@ if (-not $SkipCpp) {
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
             -DCMAKE_BUILD_TYPE=Release `
-            -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_CXX_COMPILER=clang-cl `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
             -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
@@ -323,7 +275,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 6 2>&1 *> cpp/build/build.log
+    cmake --build "$BuildDir" --parallel 6 2>&1 *> cpp/build-msvc/build.log
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
     Write-Host "C++ build succeeded." -ForegroundColor Green
 
@@ -371,8 +323,8 @@ if (-not $SkipPython) {
     uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
         -C cmake.args=-GNinja `
         -C cmake.define.CMAKE_PREFIX_PATH="$env:CMAKE_PREFIX_PATH;$InstallDir" `
-        -C cmake.define.CMAKE_C_COMPILER=clang-cl `
-        -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
+        -C cmake.define.CMAKE_C_COMPILER=cl `
+        -C cmake.define.CMAKE_CXX_COMPILER=cl `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
         -C cmake.define.VCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
         -C cmake.define.VCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"

@@ -157,6 +157,9 @@ cmake_dependent_option(QDK_ENABLE_OPENMP
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/modules)
 
+# Make the patches directory available to subdirectories (e.g. external/macis)
+set(QDK_CMAKE_PATCHES_DIR "${PROJECT_SOURCE_DIR}/cmake/patches" CACHE INTERNAL "")
+
 # Custom CMake Find* modules for linear algebra dependencies
 include( FetchContent )
 FetchContent_Declare( linalg-cmake-modules

@@ -23,9 +23,18 @@ endif()
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
 include( FetchContent )
+  # MSVC native cl does not support __PRETTY_FUNCTION__ used in blaspp.
+  # Apply a patch to replace it with __FUNCSIG__.
+  if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+      set(_blaspp_patch PATCH_COMMAND "${CMAKE_COMMAND}" -P
+          "${QDK_CMAKE_PATCHES_DIR}/blaspp-msvc-pretty-function.cmake")
+  else()
+      set(_blaspp_patch "")
+  endif()
   FetchContent_Declare( blaspp
     GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
     GIT_TAG v2025.05.28
+    ${_blaspp_patch}
   )
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
