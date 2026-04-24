@@ -70,7 +70,7 @@ class PyscfAVASSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("ao_labels", "vector<string>", [])
-        self._set_default("threshold", "double", 0.2)
+        self._set_default("threshold", "double", 0.2, limit=(0.0, 1.0))
         self._set_default("canonicalize", "bool", False)
         self._set_default("openshell_option", "int", 2)
 
