@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import (
+    AlgorithmRef,
     SettingNotFoundError,
     Settings,
     SettingTypeMismatch,
@@ -1329,3 +1330,220 @@ def test_settings_data_type_name():
     """Test that Settings has the correct _data_type_name class attribute."""
     assert hasattr(Settings, "_data_type_name")
     assert Settings._data_type_name == "settings"
+
+
+# ---------------------------------------------------------------------------
+# AlgorithmRef nesting tests
+# ---------------------------------------------------------------------------
+
+
+class _SettingsWithAlgorithmRef(Settings):
+    """Settings container that holds a single AlgorithmRef."""
+
+    def __init__(self):
+        super().__init__()
+        self._set_default(
+            "inner_algo",
+            "algorithm_ref",
+            AlgorithmRef("scf_solver", "qdk"),
+        )
+
+
+class _SettingsWithNestedRefs(Settings):
+    """Settings container with two levels of AlgorithmRef nesting.
+
+    ``outer_algo`` is an AlgorithmRef whose own settings contain
+    another AlgorithmRef (``inner_algo``), proving multi-level
+    nesting works end-to-end.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._set_default(
+            "outer_algo",
+            "algorithm_ref",
+            AlgorithmRef("multi_configuration_scf", "pyscf"),
+        )
+
+
+class TestAlgorithmRefSettings:
+    """Tests for storing and retrieving AlgorithmRef values in Settings."""
+
+    def test_store_and_retrieve_algorithm_ref(self):
+        """AlgorithmRef can be stored and retrieved from Settings."""
+        s = _SettingsWithAlgorithmRef()
+        ref = s.get("inner_algo")
+        assert isinstance(ref, AlgorithmRef)
+        assert ref.algorithm_type == "scf_solver"
+        assert ref.algorithm_name == "qdk"
+        assert ref.type_fixed is True
+
+    def test_overwrite_algorithm_ref(self):
+        """An AlgorithmRef value can be overwritten with a different name."""
+        s = _SettingsWithAlgorithmRef()
+        s.set("inner_algo", AlgorithmRef("scf_solver", "pyscf"))
+        ref = s.get("inner_algo")
+        assert ref.algorithm_name == "pyscf"
+        assert ref.algorithm_type == "scf_solver"
+
+    def test_algorithm_ref_type_fixed_enforcement(self):
+        """Setting a different algorithm_type when type_fixed=True raises."""
+        s = _SettingsWithAlgorithmRef()
+        with pytest.raises(Exception, match="type.*fixed|cannot be changed"):
+            s.set("inner_algo", AlgorithmRef("wrong_type", "whatever"))
+
+    def test_algorithm_ref_with_kwargs(self):
+        """AlgorithmRef constructed with kwargs stores them in .settings."""
+        ref = AlgorithmRef("scf_solver", "pyscf", max_iterations=200, method="dft")
+        assert ref.settings is not None
+        assert ref.settings.get("max_iterations") == 200
+        assert ref.settings.get("method") == "dft"
+
+    def test_algorithm_ref_without_kwargs(self):
+        """AlgorithmRef constructed without kwargs has settings=None."""
+        ref = AlgorithmRef("scf_solver", "pyscf")
+        assert ref.settings is None
+
+    def test_single_level_nesting_in_settings(self):
+        """An AlgorithmRef with kwargs can be stored in Settings."""
+        s = _SettingsWithAlgorithmRef()
+        s.set(
+            "inner_algo",
+            AlgorithmRef("scf_solver", "pyscf", max_iterations=100),
+        )
+        ref = s.get("inner_algo")
+        assert ref.algorithm_name == "pyscf"
+        assert ref.settings is not None
+        assert ref.settings.get("max_iterations") == 100
+
+    def test_multi_level_nesting(self):
+        """AlgorithmRef settings can themselves contain AlgorithmRef values.
+
+        This verifies the recursive nesting capability: an outer algorithm
+        holds an AlgorithmRef whose settings contain another AlgorithmRef.
+        """
+        # Build a level-2 ref: an MC calculator with specific settings
+        AlgorithmRef(
+            "multi_configuration_calculator",
+            "macis_cas",
+            ci_residual_tolerance=1e-10,
+        )
+
+        # Build a level-1 ref: MCSCF whose settings embed the MC calculator ref
+        # We use Settings.from_json to create a settings object with an AlgorithmRef value
+        outer_settings = Settings.from_json(
+            json.dumps(
+                {
+                    "multi_configuration_calculator": {
+                        "__type__": "algorithm_ref",
+                        "algorithm_type": "multi_configuration_calculator",
+                        "algorithm_name": "macis_cas",
+                        "type_fixed": True,
+                        "settings": {
+                            "ci_residual_tolerance": 1e-10,
+                        },
+                    },
+                }
+            )
+        )
+
+        outer_ref = AlgorithmRef(
+            "multi_configuration_scf",
+            "pyscf",
+            settings=outer_settings,
+        )
+
+        # Store in top-level settings
+        s = _SettingsWithNestedRefs()
+        s.set("outer_algo", outer_ref)
+
+        # Retrieve and verify level 1
+        retrieved_outer = s.get("outer_algo")
+        assert retrieved_outer.algorithm_type == "multi_configuration_scf"
+        assert retrieved_outer.algorithm_name == "pyscf"
+        assert retrieved_outer.settings is not None
+
+        # Retrieve and verify level 2
+        inner_retrieved = retrieved_outer.settings.get("multi_configuration_calculator")
+        assert isinstance(inner_retrieved, AlgorithmRef)
+        assert inner_retrieved.algorithm_type == "multi_configuration_calculator"
+        assert inner_retrieved.algorithm_name == "macis_cas"
+        assert inner_retrieved.settings is not None
+        assert np.isclose(inner_retrieved.settings.get("ci_residual_tolerance"), 1e-10)
+
+    def test_json_round_trip_preserves_nested_refs(self):
+        """JSON serialization round-trip preserves multi-level AlgorithmRef nesting."""
+        inner_ref_json = {
+            "__type__": "algorithm_ref",
+            "algorithm_type": "circuit_executor",
+            "algorithm_name": "qdk_sparse_state_simulator",
+            "type_fixed": True,
+            "settings": {"seed": 42},
+        }
+        outer_ref_json = {
+            "__type__": "algorithm_ref",
+            "algorithm_type": "phase_estimation",
+            "algorithm_name": "iterative",
+            "type_fixed": True,
+            "settings": {
+                "num_bits": 10,
+                "circuit_executor": inner_ref_json,
+            },
+        }
+        top_settings = Settings.from_json(json.dumps({"my_algo": outer_ref_json}))
+
+        # Serialize to JSON and back
+        json_data = top_settings.to_json()
+        restored = Settings.from_json(json_data)
+
+        # Verify level 1
+        outer = restored.get("my_algo")
+        assert isinstance(outer, AlgorithmRef)
+        assert outer.algorithm_type == "phase_estimation"
+        assert outer.algorithm_name == "iterative"
+        assert outer.settings is not None
+        assert outer.settings.get("num_bits") == 10
+
+        # Verify level 2
+        inner = outer.settings.get("circuit_executor")
+        assert isinstance(inner, AlgorithmRef)
+        assert inner.algorithm_type == "circuit_executor"
+        assert inner.algorithm_name == "qdk_sparse_state_simulator"
+        assert inner.settings is not None
+        assert inner.settings.get("seed") == 42
+
+    def test_hdf5_round_trip_preserves_nested_refs(self):
+        """HDF5 serialization round-trip preserves multi-level AlgorithmRef nesting."""
+        inner_ref_json = {
+            "__type__": "algorithm_ref",
+            "algorithm_type": "circuit_executor",
+            "algorithm_name": "qdk_full_state_simulator",
+            "type_fixed": False,
+            "settings": {"seed": 7},
+        }
+        top_settings = Settings.from_json(
+            json.dumps(
+                {
+                    "my_ref": inner_ref_json,
+                    "plain_val": 99,
+                }
+            )
+        )
+
+        with tempfile.NamedTemporaryFile(suffix=".settings.h5", delete=False) as f:
+            path = f.name
+
+        try:
+            top_settings.to_hdf5_file(path)
+            restored = Settings.from_hdf5_file(path)
+
+            ref = restored.get("my_ref")
+            assert isinstance(ref, AlgorithmRef)
+            assert ref.algorithm_type == "circuit_executor"
+            assert ref.algorithm_name == "qdk_full_state_simulator"
+            assert ref.type_fixed is False
+            assert ref.settings is not None
+            assert ref.settings.get("seed") == 7
+            assert restored.get("plain_val") == 99
+        finally:
+            os.unlink(path)
