@@ -7,17 +7,13 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <memory>
-#include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/mc.hpp>
-#include <qdk/chemistry/algorithms/scf.hpp>
+#include <optional>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
-using namespace qdk::chemistry::algorithms;
 
 // Test compute_s_squared for a 2-electron, 2-orbital RHF singlet wavefunction.
 //
@@ -68,7 +64,7 @@ TEST(SSquared, RHFSinglet) {
 
   Eigen::VectorXd coeffs(1);
   coeffs(0) = 1.0;
-  Wavefunction::DeterminantVector dets = {Configuration("ud")};
+  Wavefunction::DeterminantVector dets = {Configuration("20")};
 
   auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, orbitals,
@@ -81,7 +77,7 @@ TEST(SSquared, RHFSinglet) {
       std::make_optional(two_rdm_bbbb)));  // beta-beta 2-RDM
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.0, 1e-12);
+  EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for a single alpha electron (doublet, S=1/2).
@@ -116,7 +112,7 @@ TEST(SSquared, SingleElectronDoublet) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.75, 1e-12);
+  EXPECT_NEAR(s_squared, 0.75, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for a triplet state (S=1, M_S=0).
@@ -171,8 +167,8 @@ TEST(SSquared, TripletMSZero) {
   Eigen::VectorXd coeffs(2);
   coeffs(0) = 1.0 / std::sqrt(2.0);
   coeffs(1) = -1.0 / std::sqrt(2.0);
-  Wavefunction::DeterminantVector dets = {Configuration("ud"),
-                                          Configuration("du")};
+  Wavefunction::DeterminantVector dets = {Configuration("20"),
+                                          Configuration("02")};
 
   // Note: We override the RDMs manually here to match the triplet state.
   // The CAS container doesn't recompute them from coefficients.
@@ -183,7 +179,7 @@ TEST(SSquared, TripletMSZero) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 2.0, 1e-12);
+  EXPECT_NEAR(s_squared, 2.0, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for triplet M_S=+1: two alpha electrons in 2 orbitals.
@@ -232,7 +228,7 @@ TEST(SSquared, TripletMSPlusOne) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 2.0, 1e-12);
+  EXPECT_NEAR(s_squared, 2.0, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for a 3-electron quartet (S=3/2, M_S=+3/2).
@@ -277,7 +273,7 @@ TEST(SSquared, QuartetMSPlusThreeHalf) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 3.75, 1e-12);
+  EXPECT_NEAR(s_squared, 3.75, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for a 4-electron singlet: two doubly-occupied orbitals
@@ -329,7 +325,7 @@ TEST(SSquared, FourElectronSinglet) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.0, 1e-12);
+  EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for a single beta electron (doublet, S=1/2).
@@ -360,7 +356,7 @@ TEST(SSquared, SingleBetaElectronDoublet) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.75, 1e-12);
+  EXPECT_NEAR(s_squared, 0.75, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for an open-shell singlet (S=0, M_S=0).
@@ -404,8 +400,8 @@ TEST(SSquared, OpenShellSinglet) {
   Eigen::VectorXd coeffs(2);
   coeffs(0) = 1.0 / std::sqrt(2.0);
   coeffs(1) = 1.0 / std::sqrt(2.0);
-  Wavefunction::DeterminantVector dets = {Configuration("ud"),
-                                          Configuration("du")};
+  Wavefunction::DeterminantVector dets = {Configuration("20"),
+                                          Configuration("02")};
 
   auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
@@ -414,7 +410,7 @@ TEST(SSquared, OpenShellSinglet) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.0, 1e-12);
+  EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
 }
 
 // Test compute_s_squared for the vacuum (0 electrons).
@@ -443,7 +439,53 @@ TEST(SSquared, Vacuum) {
       std::make_optional(two_rdm_bbbb)));
 
   double s_squared = wf.compute_s_squared();
-  EXPECT_NEAR(s_squared, 0.0, 1e-12);
+  EXPECT_NEAR(s_squared, 0.0, testing::numerical_zero_tolerance);
+}
+
+// Stretched H2 broken-symmetry UHF: hardcoded textbook example.
+// Single determinant with α in orbital 0, β in orbital 1 (orthogonal spatial
+// orbitals). This models the dissociation limit where α localizes on atom A
+// and β on atom B. The state is a 50/50 singlet-triplet mixture.
+// Expected <S²> = 1.0
+TEST(SSquared, SpinContaminatedUHF_StretchedH2) {
+  const int norbs = 2;
+  const int norbs4 = norbs * norbs * norbs * norbs;
+
+  // α electron in orbital 0, β electron in orbital 1
+  Eigen::MatrixXd one_rdm_aa = Eigen::MatrixXd::Zero(norbs, norbs);
+  Eigen::MatrixXd one_rdm_bb = Eigen::MatrixXd::Zero(norbs, norbs);
+  one_rdm_aa(0, 0) = 1.0;
+  one_rdm_bb(1, 1) = 1.0;
+
+  // 2-RDMs: only aabb is non-zero (1α, 1β → no same-spin pairs)
+  Eigen::VectorXd two_rdm_aabb = Eigen::VectorXd::Zero(norbs4);
+  Eigen::VectorXd two_rdm_aaaa = Eigen::VectorXd::Zero(norbs4);
+  Eigen::VectorXd two_rdm_bbbb = Eigen::VectorXd::Zero(norbs4);
+
+  // Γ^{aabb}(p,q,r,s) = γ^a(p,q) · γ^b(r,s)
+  for (int p = 0; p < norbs; ++p)
+    for (int q = 0; q < norbs; ++q)
+      for (int r = 0; r < norbs; ++r)
+        for (int s = 0; s < norbs; ++s) {
+          int idx =
+              p * norbs * norbs * norbs + q * norbs * norbs + r * norbs + s;
+          two_rdm_aabb[idx] = one_rdm_aa(p, q) * one_rdm_bb(r, s);
+        }
+
+  auto orbitals = testing::create_test_orbitals(4, norbs, true);
+
+  Eigen::VectorXd coeffs(1);
+  coeffs(0) = 1.0;
+  Wavefunction::DeterminantVector dets = {Configuration("ud")};
+
+  auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
+      std::make_optional(one_rdm_bb), std::nullopt,
+      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_bbbb)));
+
+  double s_squared = wf.compute_s_squared();
+  EXPECT_NEAR(s_squared, 1.0, testing::numerical_zero_tolerance);
 }
 
 // Test that compute_s_squared throws when RDMs are missing
@@ -451,210 +493,10 @@ TEST(SSquared, ThrowsWithoutRDMs) {
   auto orbitals = testing::create_test_orbitals(4, 2, true);
   Eigen::VectorXd coeffs(1);
   coeffs(0) = 1.0;
-  Wavefunction::DeterminantVector dets = {Configuration("ud")};
+  Wavefunction::DeterminantVector dets = {Configuration("20")};
 
   auto wf = Wavefunction(
       std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals));
 
   EXPECT_THROW(wf.compute_s_squared(), std::runtime_error);
-}
-
-// ---------------------------------------------------------------------------
-// Helper: run SCF → Hamiltonian → CAS/SCI with RDMs
-// ---------------------------------------------------------------------------
-
-// Force unrestricted orbitals to restricted (MACIS requires restricted)
-static std::shared_ptr<Orbitals> make_restricted(
-    std::shared_ptr<Orbitals> orbitals) {
-  if (orbitals->is_restricted()) return orbitals;
-  return std::make_shared<Orbitals>(
-      orbitals->get_coefficients().first, orbitals->get_energies().first,
-      orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      std::make_tuple(orbitals->get_active_space_indices().first,
-                      orbitals->get_inactive_space_indices().first));
-}
-
-// Run SCF + CAS-FCI with RDMs and return the wavefunction
-static std::shared_ptr<Wavefunction> run_cas_with_rdms(
-    std::shared_ptr<Structure> structure, int charge, int multiplicity,
-    const std::string& basis, int nalpha, int nbeta,
-    std::shared_ptr<Orbitals> custom_orbitals = nullptr) {
-  std::shared_ptr<Orbitals> orbitals;
-  if (custom_orbitals) {
-    orbitals = custom_orbitals;
-  } else {
-    auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("scf_type", std::string("auto"));
-    scf_solver->settings().set("enable_gdm", true);
-    auto [E_scf, wfn_scf] =
-        scf_solver->run(structure, charge, multiplicity, basis);
-    orbitals = make_restricted(wfn_scf->get_orbitals());
-  }
-
-  auto ham_gen = HamiltonianConstructorFactory::create();
-  auto H = ham_gen->run(orbitals);
-
-  auto mc = MultiConfigurationCalculatorFactory::create();  // macis_cas
-  mc->settings().set("calculate_one_rdm", true);
-  mc->settings().set("calculate_two_rdm", true);
-  auto [E, wfn] = mc->run(H, nalpha, nbeta);
-  return wfn;
-}
-
-// Run SCF + SCI (ASCI) with RDMs and return the wavefunction
-static std::shared_ptr<Wavefunction> run_sci_with_rdms(
-    std::shared_ptr<Structure> structure, int charge, int multiplicity,
-    const std::string& basis, int nalpha, int nbeta, int ntdets_max = 128,
-    std::shared_ptr<Orbitals> custom_orbitals = nullptr) {
-  std::shared_ptr<Orbitals> orbitals;
-  if (custom_orbitals) {
-    orbitals = custom_orbitals;
-  } else {
-    auto scf_solver = ScfSolverFactory::create();
-    scf_solver->settings().set("scf_type", std::string("auto"));
-    scf_solver->settings().set("enable_gdm", true);
-    auto [E_scf, wfn_scf] =
-        scf_solver->run(structure, charge, multiplicity, basis);
-    orbitals = make_restricted(wfn_scf->get_orbitals());
-  }
-
-  auto ham_gen = HamiltonianConstructorFactory::create();
-  auto H = ham_gen->run(orbitals);
-
-  auto mc = MultiConfigurationCalculatorFactory::create("macis_asci");
-  mc->settings().set("calculate_one_rdm", true);
-  mc->settings().set("calculate_two_rdm", true);
-  mc->settings().set("ntdets_max", ntdets_max);
-  mc->settings().set("max_refine_iter", 0);
-  mc->settings().set("grow_factor", 2);
-  mc->settings().set("core_selection_strategy", std::string("fixed"));
-  auto [E, wfn] = mc->run(H, nalpha, nbeta);
-  return wfn;
-}
-
-// ---------------------------------------------------------------------------
-// Tests using SCF + CAS (full CI) with RDMs from MACIS
-// ---------------------------------------------------------------------------
-
-// H atom: single electron, doublet, <S^2> = 0.75
-TEST(SSquaredCAS, H_Doublet) {
-  auto wfn = run_cas_with_rdms(testing::create_hydrogen_structure(), 0, 2,
-                               "sto-3g", 1, 0);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, 1e-6);
-}
-
-// H2+ (charge=+1): single electron, doublet, <S^2> = 0.75
-TEST(SSquaredCAS, H2Plus_Doublet) {
-  // H2 at 1.4 Bohr
-  std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {0., 0., 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-  auto h2 = std::make_shared<Structure>(coords, symbols);
-  auto wfn = run_cas_with_rdms(h2, 1, 2, "sto-3g", 1, 0);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, 1e-6);
-}
-
-// H2 (neutral): singlet, <S^2> = 0
-TEST(SSquaredCAS, H2_Singlet) {
-  std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {0., 0., 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-  auto h2 = std::make_shared<Structure>(coords, symbols);
-  auto wfn = run_cas_with_rdms(h2, 0, 1, "sto-3g", 1, 1);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.0, 1e-6);
-}
-
-// H2O: closed-shell singlet, <S^2> = 0
-// Full CI in sto-3g (7 MOs, 5α+5β) — no active space truncation
-TEST(SSquaredCAS, Water_Singlet) {
-  auto water = testing::create_water_structure();
-  auto wfn = run_cas_with_rdms(water, 0, 1, "sto-3g", 5, 5);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.0, 1e-6);
-}
-
-// Li atom: doublet, <S^2> = 0.75
-TEST(SSquaredCAS, Li_Doublet) {
-  auto li = testing::create_li_structure();
-  auto wfn = run_cas_with_rdms(li, 0, 2, "sto-3g", 2, 1);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, 1e-6);
-}
-
-// O2: triplet ground state, <S^2> = 2.0
-// CAS(2,2) with 6 frozen (core + doubly-occupied valence)
-TEST(SSquaredCAS, O2_Triplet) {
-  auto o2 = testing::create_o2_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("scf_type", std::string("auto"));
-  scf_solver->settings().set("enable_gdm", true);
-  auto [E_scf, wfn_scf] = scf_solver->run(o2, 0, 3, "sto-3g");
-  auto orbitals = testing::with_active_space(
-      wfn_scf->get_orbitals(), std::vector<size_t>{6, 7, 8, 9},
-      std::vector<size_t>{0, 1, 2, 3, 4, 5});
-  auto restricted = make_restricted(orbitals);
-  auto wfn = run_cas_with_rdms(o2, 0, 3, "sto-3g", 3, 1, restricted);
-  EXPECT_NEAR(wfn->compute_s_squared(), 2.0, 1e-6);
-}
-
-// N atom: quartet S=3/2, <S^2> = 3.75
-// CAS in 2s2p shell (4 orbitals, freeze 1s)
-TEST(SSquaredCAS, N_Quartet) {
-  auto n_atom = testing::create_nitrogen_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("scf_type", std::string("auto"));
-  scf_solver->settings().set("enable_gdm", true);
-  auto [E_scf, wfn_scf] = scf_solver->run(n_atom, 0, 4, "sto-3g");
-  auto orbitals = testing::with_active_space(wfn_scf->get_orbitals(),
-                                             std::vector<size_t>{1, 2, 3, 4},
-                                             std::vector<size_t>{0});
-  auto restricted = make_restricted(orbitals);
-  auto wfn = run_cas_with_rdms(n_atom, 0, 4, "sto-3g", 4, 1, restricted);
-  EXPECT_NEAR(wfn->compute_s_squared(), 3.75, 1e-6);
-}
-
-// ---------------------------------------------------------------------------
-// Tests using SCF + SCI (ASCI) with RDMs from MACIS
-// ---------------------------------------------------------------------------
-
-// H atom via SCI: doublet, <S^2> = 0.75
-TEST(SSquaredSCI, H_Doublet) {
-  auto wfn = run_sci_with_rdms(testing::create_hydrogen_structure(), 0, 2,
-                               "sto-3g", 1, 0, 1);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, 1e-6);
-}
-
-// H2 via SCI: singlet, <S^2> = 0
-TEST(SSquaredSCI, H2_Singlet) {
-  std::vector<Eigen::Vector3d> coords = {{0., 0., 0.}, {0., 0., 1.4}};
-  std::vector<std::string> symbols = {"H", "H"};
-  auto h2 = std::make_shared<Structure>(coords, symbols);
-  auto wfn = run_sci_with_rdms(h2, 0, 1, "sto-3g", 1, 1, 4);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.0, 1e-6);
-}
-
-// Li atom via SCI: doublet, <S^2> = 0.75
-TEST(SSquaredSCI, Li_Doublet) {
-  auto li = testing::create_li_structure();
-  auto wfn = run_sci_with_rdms(li, 0, 2, "sto-3g", 2, 1, 50);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.75, 1e-6);
-}
-
-// Water via SCI: singlet, <S^2> = 0
-// Full orbital space in sto-3g
-TEST(SSquaredSCI, Water_Singlet) {
-  auto water = testing::create_water_structure();
-  auto wfn = run_sci_with_rdms(water, 0, 1, "sto-3g", 5, 5, 128);
-  EXPECT_NEAR(wfn->compute_s_squared(), 0.0, 1e-6);
-}
-
-// N atom via SCI: quartet, <S^2> = 3.75
-TEST(SSquaredSCI, N_Quartet) {
-  auto n_atom = testing::create_nitrogen_structure();
-  auto scf_solver = ScfSolverFactory::create();
-  scf_solver->settings().set("scf_type", std::string("auto"));
-  scf_solver->settings().set("enable_gdm", true);
-  auto [E_scf, wfn_scf] = scf_solver->run(n_atom, 0, 4, "sto-3g");
-  auto orbitals = testing::with_active_space(wfn_scf->get_orbitals(),
-                                             std::vector<size_t>{1, 2, 3, 4},
-                                             std::vector<size_t>{0});
-  auto restricted = make_restricted(orbitals);
-  auto wfn = run_sci_with_rdms(n_atom, 0, 4, "sto-3g", 4, 1, 20, restricted);
-  EXPECT_NEAR(wfn->compute_s_squared(), 3.75, 1e-6);
 }

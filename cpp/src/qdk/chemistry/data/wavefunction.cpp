@@ -589,30 +589,24 @@ double WavefunctionContainer::compute_s_squared() const {
   // Uses QDK convention: Gamma(p,q,r,s) = <a†_p a†_r a_s a_q>
   // Flat index: p*n^3 + q*n^2 + r*n + s
 
-  if (!has_one_rdm_spin_dependent()) {
-    throw std::runtime_error(
-        "Spin-dependent 1-RDMs are required to compute <S^2>");
+  if (!has_one_rdm_spin_traced()) {
+    throw std::runtime_error("Spin-traced 1-RDM is required to compute <S^2>");
   }
   if (!has_two_rdm_spin_dependent()) {
     throw std::runtime_error(
         "Spin-dependent 2-RDMs are required to compute <S^2>");
   }
 
-  const auto& one_rdm_aa_var = std::get<0>(get_active_one_rdm_spin_dependent());
-  const auto& one_rdm_bb_var = std::get<1>(get_active_one_rdm_spin_dependent());
+  const auto& one_rdm_traced_var = get_active_one_rdm_spin_traced();
 
-  if (detail::is_matrix_variant_complex(one_rdm_aa_var) ||
-      detail::is_matrix_variant_complex(one_rdm_bb_var)) {
+  if (detail::is_matrix_variant_complex(one_rdm_traced_var)) {
     throw std::runtime_error(
         "Complex 1-RDM <S^2> calculation not yet implemented");
   }
 
-  const auto& one_rdm_aa = std::get<Eigen::MatrixXd>(one_rdm_aa_var);
-  const auto& one_rdm_bb = std::get<Eigen::MatrixXd>(one_rdm_bb_var);
-  int norbs = one_rdm_aa.rows();
-
-  double one_rdm_trace =
-      std::get<Eigen::MatrixXd>(get_active_one_rdm_spin_traced()).trace();
+  const auto& one_rdm_traced = std::get<Eigen::MatrixXd>(one_rdm_traced_var);
+  int norbs = one_rdm_traced.rows();
+  double one_rdm_trace = one_rdm_traced.trace();
 
   const auto& two_rdm_aabb_var =
       std::get<0>(get_active_two_rdm_spin_dependent());
@@ -629,11 +623,7 @@ double WavefunctionContainer::compute_s_squared() const {
         int idx = i * norbs * norbs * norbs + j * norbs * norbs + j * norbs + i;
         using ValueType =
             std::decay_t<decltype(vec[static_cast<Eigen::Index>(0)])>;
-        if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
-          sum += vec[idx].real();
-        } else {
-          sum += vec[idx];
-        }
+        sum += std::real(vec[idx]);
       }
     }
     return sum;

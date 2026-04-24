@@ -398,14 +398,17 @@ class WavefunctionContainer {
   /**
    * @brief Compute the expectation value of the total spin-squared operator
    *
-   * Uses the spin-dependent 1-RDMs and all three spin-dependent 2-RDM blocks:
+   * Uses the spin-dependent 1-RDMs and all three spin-dependent 2-RDM blocks.
+   * The mixed-spin contribution includes both exchange-like
+   * \f$\Gamma^{\alpha\beta}_{ijji}\f$ and Coulomb-like
+   * \f$\Gamma^{\alpha\beta}_{iijj}\f$ terms:
    * \f[
    *   \langle S^2 \rangle = \frac{3}{4} \sum_i
    *     \left(\gamma^\alpha_{ii} + \gamma^\beta_{ii}\right)
    *     - \sum_{ij} \left( \Gamma^{\alpha\beta}_{ijji}
    *     + \tfrac{1}{4} \Gamma^{\alpha\alpha}_{ijji}
    *     + \tfrac{1}{4} \Gamma^{\beta\beta}_{ijji} \right)
-   * \f]
+   *     - \tfrac{1}{2} \sum_{ij} \Gamma^{\alpha\beta}_{iijj}
    *
    * @return The expectation value \f$\langle S^2 \rangle\f$
    * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
