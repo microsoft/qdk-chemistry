@@ -120,7 +120,9 @@ if(MSVC)
 
     # gau2grid_helper.c calls exit() without #include <stdlib.h>.
     # Clang-cl treats implicit function declarations as errors in C99+.
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
+    endif()
 
     # blaspp's BLASFinder.cmake uses try_run() to detect Fortran name mangling,
     # but on Windows the test executable can't find openblas.dll at runtime,
