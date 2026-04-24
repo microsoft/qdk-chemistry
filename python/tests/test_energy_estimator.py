@@ -264,12 +264,13 @@ def test_estimator_fewer_shots():
     "executor_name",
     [
         "qdk_full_state_simulator",
+        "qdk_sparse_state_simulator",
         pytest.param(
             "qiskit_aer_simulator",
             marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available"),
         ),
     ],
-    ids=["qdk-full-state", "qiskit-aer"],
+    ids=["qdk-full-state", "qdk-sparse-state", "qiskit-aer"],
 )
 def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     """Functional test for energy estimation on the 4e4o ethylene problem using different circuit executors.
