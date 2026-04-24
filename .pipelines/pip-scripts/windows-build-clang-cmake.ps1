@@ -370,7 +370,7 @@ if (-not $SkipPython) {
     # - jupyter: requires plugins
     uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
         -C cmake.args=-GNinja `
-        -C cmake.define.CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH;$InstallDir" `
+        -C cmake.define.CMAKE_PREFIX_PATH="$env:CMAKE_PREFIX_PATH;$InstallDir" `
         -C cmake.define.CMAKE_C_COMPILER=clang-cl `
         -C cmake.define.CMAKE_CXX_COMPILER=clang-cl `
         -C cmake.define.CMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `

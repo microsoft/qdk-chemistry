@@ -120,6 +120,7 @@ if(MSVC)
 
     # gau2grid_helper.c calls exit() without #include <stdlib.h>.
     # Clang-cl treats implicit function declarations as errors in C99+.
+    # Native MSVC cl.exe allows them by default, so no flag needed there.
     if(CMAKE_C_COMPILER_ID MATCHES "Clang")
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
     endif()
@@ -213,7 +214,7 @@ endif()
 # Create library
 add_library(chemistry)
 
-# Re-enable warnings for our own code that were globally suppressed forFetchContent dependencies.
+# Re-enable warnings for our own code that were globally suppressed for FetchContent dependencies.
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
     target_compile_options(chemistry PRIVATE
         -Wcast-function-type-strict
