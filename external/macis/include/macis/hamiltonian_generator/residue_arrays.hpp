@@ -77,20 +77,18 @@ class ResidueArrayHamiltonianGenerator
         if (std::abs(val) < 1e-16) continue;
 
         if (i != last_bra) {
-          bra_oa.assign(cache.occ_a(i),
-                        cache.occ_a(i) + cache.n_alpha_elec);
-          bra_ob.assign(cache.occ_b(i),
-                        cache.occ_b(i) + cache.n_beta_elec);
+          bra_oa.assign(cache.occ_a(i), cache.occ_a(i) + cache.n_alpha_elec);
+          bra_ob.assign(cache.occ_b(i), cache.occ_b(i) + cache.n_beta_elec);
           last_bra = i;
         }
 
         auto ex_a = cache.alpha[i] ^ cache.alpha[j];
         auto ex_b = cache.beta[i] ^ cache.beta[j];
 
-        rdm_contributions_spin_dep<true>(
-            cache.alpha[i], cache.alpha[j], ex_a, cache.beta[i],
-            cache.beta[j], ex_b, bra_oa, bra_ob, val, ordm_aa, ordm_bb,
-            trdm_aaaa, trdm_bbbb, trdm_aabb);
+        rdm_contributions_spin_dep<true>(cache.alpha[i], cache.alpha[j], ex_a,
+                                         cache.beta[i], cache.beta[j], ex_b,
+                                         bra_oa, bra_ob, val, ordm_aa, ordm_bb,
+                                         trdm_aaaa, trdm_bbbb, trdm_aabb);
       }
 
 #pragma omp for schedule(static)
@@ -98,13 +96,10 @@ class ResidueArrayHamiltonianGenerator
         double val = C[i] * C[i];
         if (std::abs(val) < 1e-16) continue;
 
-        bra_oa.assign(cache.occ_a(i),
-                      cache.occ_a(i) + cache.n_alpha_elec);
-        bra_ob.assign(cache.occ_b(i),
-                      cache.occ_b(i) + cache.n_beta_elec);
-        rdm_contributions_diag_spin_dep(bra_oa, bra_ob, val, ordm_aa,
-                                        ordm_bb, trdm_aaaa, trdm_bbbb,
-                                        trdm_aabb);
+        bra_oa.assign(cache.occ_a(i), cache.occ_a(i) + cache.n_alpha_elec);
+        bra_ob.assign(cache.occ_b(i), cache.occ_b(i) + cache.n_beta_elec);
+        rdm_contributions_diag_spin_dep(bra_oa, bra_ob, val, ordm_aa, ordm_bb,
+                                        trdm_aaaa, trdm_bbbb, trdm_aabb);
       }
     }
 
@@ -240,7 +235,9 @@ class ResidueArrayHamiltonianGenerator
       }
     }
 
-    { std::vector<ResiduePair>().swap(residue_arr); }
+    {
+      std::vector<ResiduePair>().swap(residue_arr);
+    }
 
     size_t total_raw = 0;
     for (auto& tp : thread_pairs) total_raw += tp.size();
@@ -248,7 +245,9 @@ class ResidueArrayHamiltonianGenerator
     all_pairs.reserve(total_raw);
     for (auto& tp : thread_pairs) {
       all_pairs.insert(all_pairs.end(), tp.begin(), tp.end());
-      { std::vector<uint64_t>().swap(tp); }
+      {
+        std::vector<uint64_t>().swap(tp);
+      }
     }
     detail::sort_unique_pairs(all_pairs);
 
@@ -257,13 +256,13 @@ class ResidueArrayHamiltonianGenerator
 
  private:
   template <typename index_t>
-  sparse_matrix_type<index_t> residue_array_build_(
-      full_det_iterator dets_begin, full_det_iterator dets_end,
-      double H_thresh) {
+  sparse_matrix_type<index_t> residue_array_build_(full_det_iterator dets_begin,
+                                                   full_det_iterator dets_end,
+                                                   double H_thresh) {
     const size_t ndets = std::distance(dets_begin, dets_end);
     auto [all_pairs, cache] = enumerate_connected_pairs_(dets_begin, dets_end);
-    return detail::pair_based_build_impl_<index_t>(
-        ndets, all_pairs, cache, *this, H_thresh);
+    return detail::pair_based_build_impl_<index_t>(ndets, all_pairs, cache,
+                                                   *this, H_thresh);
   }
 };
 

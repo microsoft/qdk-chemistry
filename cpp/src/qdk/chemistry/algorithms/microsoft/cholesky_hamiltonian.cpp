@@ -155,14 +155,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
 #endif
 
-  // Reusable ERI column buffers to avoid per-iteration reallocations.
+  // Reusable ERI column buffer — single shared buffer, no per-thread copies.
   std::vector<double> eri_col_max(num_aos2 * max_n_cols, 0.0);
-#ifdef _OPENMP
-  std::vector<std::vector<double>> eri_col_threads_max(nthreads);
-  for (int t = 0; t < nthreads; ++t) {
-    eri_col_threads_max[t].resize(num_aos2 * max_n_cols, 0.0);
-  }
-#endif
 
   // Compute diagonal elements for all shell pairs
   QDK_LOGGER().debug("Computing diagonal elements");
@@ -261,17 +255,17 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     const size_t n_cols = n1_max * n2_max;
     const size_t eri_col_used = num_aos2 * n_cols;
     std::fill_n(eri_col_max.begin(), eri_col_used, 0.0);
+
+    // Accumulate ERI integrals directly into the shared buffer.
+    // Thread assignment by (s34++) % nthreads maps each (s3, s4) shell pair
+    // to exactly one thread, so each (bf3, bf4) index block is written by a
+    // single thread. No synchronization or per-thread buffers are needed.
 #ifdef _OPENMP
-    for (int t = 0; t < nthreads; ++t) {
-      std::fill_n(eri_col_threads_max[t].begin(), eri_col_used, 0.0);
-    }
 #pragma omp parallel
 #endif
     {
 #ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
-      // get thread-local eri_col
-      auto& eri_col_local = eri_col_threads_max[thread_id];
 #else
       const auto thread_id = 0;
 #endif
@@ -299,7 +293,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           const auto& res = buf[0];
           if (res == nullptr) continue;
 
-          // fill in eri_col
+          // fill in eri_col — direct write, no thread-local copy
           for (size_t i = 0, ijkl = 0; i < n1_max; ++i) {
             const size_t ind_i = i * n2_max;
             for (size_t j = 0; j < n2_max; ++j) {
@@ -308,11 +302,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                 const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
                 for (size_t l = 0; l < n4; ++l, ++ijkl) {
                   const size_t ind_ijkl = ind_ijk + (bf4_st + l);
-#ifdef _OPENMP
-                  eri_col_local[ind_ijkl] += res[ijkl];
-#else
                   eri_col_max[ind_ijkl] += res[ijkl];
-#endif
                 }  // l
               }  // k
             }  // j
@@ -320,14 +310,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         }  // s4
       }  // s3
     }  // omp parallel
-
-    // merge thread-local eri_col
-#ifdef _OPENMP
-    for (int t = 0; t < nthreads; ++t) {
-      blas::axpy(eri_col_used, 1.0, eri_col_threads_max[t].data(), 1,
-                 eri_col_max.data(), 1);
-    }
-#endif
+    // No merge step — threads wrote directly to shared buffer.
 
     // precompute lookup
     const size_t bf1_max_st = shell2bf[s1_max];

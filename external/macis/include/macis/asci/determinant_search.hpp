@@ -227,8 +227,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-  const double* G_red, const double* V_red, const double* V_pqrs,
-  HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+    const double* G_red, const double* V_red, const double* V_pqrs,
+    HamiltonianGenerator<wfn_t<N>>& ham_gen) {
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
   using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
@@ -556,7 +556,11 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   std::vector<double> thread_wall(debug_timing ? num_threads : 0, 0.0);
 #pragma omp parallel
   {
+#ifdef _OPENMP
     const int tid = omp_get_thread_num();
+#else
+    const int tid = 0;
+#endif
     const asci_contrib_topk_comparator<wfn_t<N>> contrib_cmp{};
     auto t_wall_st = clock_type::now();
 
@@ -629,7 +633,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-              c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
                 norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
                 V_buf, virt_ind_buf, occ_ind_buf);
 
@@ -699,8 +703,9 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         working_pairs.clear();
         size_t accumulated_size = accumulated_pairs.size();
         if (ic % 10 == 0) {
-          logger->info ("  * After Merge at CON = {}, accumulated_size = {} at CON = {}", ic,
-                       accumulated_size, ic);
+          logger->info(
+              "  * After Merge at CON = {}, accumulated_size = {} at CON = {}",
+              ic, accumulated_size, ic);
         }
 
         const bool need_initial_threshold =

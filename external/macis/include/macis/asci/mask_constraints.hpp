@@ -8,11 +8,12 @@
  */
 
 #pragma once
+#include <spdlog/spdlog.h>
+
 #include <macis/asci/alpha_constraint.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
-#include <spdlog/spdlog.h>
 #include <variant>
 
 namespace macis {
@@ -838,7 +839,8 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
   auto cgen_logger = spdlog::get("asci_search");
   if (cgen_logger) {
-    size_t max_w = constraint_sizes.empty() ? 0 : constraint_sizes.front().second;
+    size_t max_w =
+        constraint_sizes.empty() ? 0 : constraint_sizes.front().second;
     cgen_logger->debug(
         "  * CGEN: ncon={}, total_work={}, avg/worker={}, max_single={}, "
         "nlevels={}",
@@ -952,9 +954,9 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       // Constraints with C_min == 0 cannot be further decomposed.
       // Keep them in-place even when they exceed local_average.
       auto it = std::partition(
-          constraint_sizes.begin(), constraint_sizes.end(),
-          [=](const auto& a) {
-            return a.second <= local_average or a.first.C_min() == 0 or a.first.C_min() == 1;
+          constraint_sizes.begin(), constraint_sizes.end(), [=](const auto& a) {
+            return a.second <= local_average or a.first.C_min() == 0 or
+                   a.first.C_min() == 1;
           });
 
       // Remove constraints from full list
@@ -993,9 +995,9 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
     }
 
     // Recompute average with updated total_work and constraint count
-    total_work = std::accumulate(
-        constraint_sizes.begin(), constraint_sizes.end(), 0ul,
-        [](auto s, const auto& p) { return s + p.second; });
+    total_work =
+        std::accumulate(constraint_sizes.begin(), constraint_sizes.end(), 0ul,
+                        [](auto s, const auto& p) { return s + p.second; });
     local_average = std::max(1ul, total_work / world_size);
 
     if (cgen_logger) {
@@ -1005,8 +1007,8 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       cgen_logger->debug(
           "  * CGEN level {}: split {} -> ncon={}, total_work={}, "
           "avg/worker={}, max_single={}",
-          ilevel, tps_to_next.size(), constraint_sizes.size(),
-          total_work, local_average, max_w);
+          ilevel, tps_to_next.size(), constraint_sizes.size(), total_work,
+          local_average, max_w);
     }
   }  // Recurse into constraints
 
