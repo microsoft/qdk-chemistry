@@ -119,10 +119,6 @@ All implementations share a common base set of settings from ``ProjectedMultiCon
      - int
      - ``2000``
      - Matrix size cutoff for using dense vs iterative (Davidson) eigensolver
-   * - ``ci_matel_tol``
-     - float
-     - ``~2.2e-16`` (machine epsilon)
-     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
@@ -154,7 +150,20 @@ MACIS PMC
 The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`PMC` implementation provides a high-performance solver for projecting the Hamiltonian onto a specified set of configurations.
 This implementation leverages the same efficient parallel algorithms used in :doc:`MACIS ASCI <mc_calculator>` but applies them to a fixed, user-provided determinant space.
 
-This implementation uses only the common settings described above.
+This implementation uses the common settings described above, plus the following MACIS-specific setting:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``ci_matel_tol``
+     - float
+     - ``~2.2e-16`` (machine epsilon)
+     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
 
 Related classes

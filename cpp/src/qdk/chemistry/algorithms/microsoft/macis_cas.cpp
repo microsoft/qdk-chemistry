@@ -56,15 +56,13 @@ struct cas_helper {
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
-    macis::ASCISettings asci_settings = get_asci_settings_(settings_);
 
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
 
     int64_t iterative_solver_dimension_cutoff =
-        settings_.get_or_default<int64_t>("iterative_solver_dimension_cutoff",
-                                          2000);
+        settings_.get<int64_t>("iterative_solver_dimension_cutoff");
 
     // Generate determinant basis
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(

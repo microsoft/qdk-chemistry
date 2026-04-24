@@ -40,8 +40,7 @@ struct pmc_helper {
     // Read settings via the shared helpers — same names as CAS
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
     int64_t iterative_solver_dimension_cutoff =
-        settings_.get_or_default<int64_t>("iterative_solver_dimension_cutoff",
-                                          100);
+        settings_.get<int64_t>("iterative_solver_dimension_cutoff");
 
     using wfn_type = macis::wfn_t<N>;
     using wfn_traits = macis::wavefunction_traits<wfn_type>;
