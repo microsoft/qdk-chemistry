@@ -46,7 +46,7 @@ class PyscfAVASSettings(Settings):
     interface for setting and getting options.
 
     Attributes:
-        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = None).
+        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = []).
             Supports indexed atom labels (e.g., ``["C1 2pz", "C2 2pz"]``) for selecting specific atoms.
         threshold (float): Eigenvalue threshold for including orbitals in the active space (default = 0.2).
             Orbitals with AVAS projection eigenvalues above this threshold are included.
