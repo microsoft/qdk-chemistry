@@ -36,13 +36,11 @@ class MacisSettings : public MultiConfigurationSettings {
 
 /** @brief Build a MACIS MCSCFSettings struct from generic settings.
  *
- * Recognizes native MACIS keys (`ci_res_tol`, `ci_max_subspace`) when present,
- * otherwise falls back to QDK synonyms (`ci_residual_tolerance`,
- * `max_solver_iterations`). Additional tolerances are copied verbatim.
+ * Maps QDK setting names (`ci_residual_tolerance`, `max_solver_iterations`,
+ * `ci_matel_tol`) to the corresponding MACIS struct fields.
  *
  * @param settings_ Source settings.
- * @return Populated `macis::MCSCFSettings` respecting defaults for missing
- * keys.
+ * @return Populated `macis::MCSCFSettings`.
  */
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
 

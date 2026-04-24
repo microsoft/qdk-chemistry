@@ -103,7 +103,7 @@ All implementations share a common base set of settings from ``ProjectedMultiCon
      - float
      - ``1e-6``
      - Convergence threshold for :term:`CI` Davidson solver
-   * - ``davidson_iterations``
+   * - ``max_solver_iterations``
      - int
      - ``200``
      - Maximum number of Davidson iterations
@@ -115,6 +115,14 @@ All implementations share a common base set of settings from ``ProjectedMultiCon
      - bool
      - ``False``
      - Calculate two-electron reduced density matrix
+   * - ``iterative_solver_dimension_cutoff``
+     - int
+     - ``2000``
+     - Matrix size cutoff for using dense vs iterative (Davidson) eigensolver
+   * - ``ci_matel_tol``
+     - float
+     - ``~2.2e-16`` (machine epsilon)
+     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
 See :doc:`Settings <settings>` for a more general treatment of settings in QDK/Chemistry.
 
@@ -146,43 +154,7 @@ MACIS PMC
 The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`PMC` implementation provides a high-performance solver for projecting the Hamiltonian onto a specified set of configurations.
 This implementation leverages the same efficient parallel algorithms used in :doc:`MACIS ASCI <mc_calculator>` but applies them to a fixed, user-provided determinant space.
 
-.. rubric:: Settings
-
-In addition to the common settings, :term:`MACIS` :term:`PMC` supports the following implementation-specific settings:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 15 45
-
-   * - Setting
-     - Type
-     - Default
-     - Description
-
-   * - ``iterative_solver_dimension_cutoff``
-     - int
-     - ``100``
-     - Matrix size cutoff for using iterative eigensolver. If the number of determinants is below this value, dense diagonalization is used instead
-
-   * - ``H_thresh``
-     - float
-     - ``1e-16``
-     - Hamiltonian matrix entries threshold for dense diagonalization
-
-   * - ``h_el_tol``
-     - float
-     - ``1e-8``
-     - Electron interaction tolerance for Hamiltonian-wavefunction products in iterative solver
-
-   * - ``davidson_res_tol``
-     - float
-     - ``1e-8``
-     - Residual tolerance for Davidson solver convergence
-
-   * - ``davidson_max_m``
-     - int
-     - ``200``
-     - Maximum allowed subspace size for Davidson solver
+This implementation uses only the common settings described above.
 
 
 Related classes

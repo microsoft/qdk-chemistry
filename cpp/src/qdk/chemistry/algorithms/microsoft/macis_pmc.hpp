@@ -12,14 +12,11 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 /**
  * @class MacisPmcSettings
- * @brief Settings class specific to MACIS PMC calculations
+ * @brief Settings class for MACIS PMC calculations.
  *
- * This class extends the base ProjectedMultiConfigurationSettings class with
- * parameters specific to Projected Multi-Configuration (PMC) calculations using
- * the MACIS library. It provides default values for PMC-specific settings such
- * as determinant limits, tolerances, and algorithm control parameters.
+ * Inherits all solver settings from MacisSettings.
  *
- * @see ProjectedMultiConfigurationSettings
+ * @see MacisSettings
  */
 class MacisPmcSettings : public MacisSettings {
  public:
