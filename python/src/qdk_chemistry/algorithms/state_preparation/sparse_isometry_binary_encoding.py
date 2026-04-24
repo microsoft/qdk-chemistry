@@ -89,6 +89,40 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
 
         """
         Logger.trace_entering()
+
+        params = self._build_binary_encoding_params(wavefunction)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
+            parameter=params,
+        )
+        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
+        Logger.info(
+            f"Binary encoding produced {len(params['binaryEncodingOps'])} operations "
+            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants "
+            f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
+        )
+
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
+            encoding="jordan-wigner",
+        )
+
+    def _build_binary_encoding_params(self, wavefunction: Wavefunction) -> dict:
+        """Build binary-encoding state preparation parameters from a wavefunction.
+
+        Extracts coefficients and determinants, performs GF2+X elimination and
+        binary-encoding synthesis, and returns the parameter dict for Q# circuit
+        construction.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+
+        Returns:
+            A dict of parameters for Q# circuit construction.
+
+        """
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
@@ -156,23 +190,49 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             numQubits=n_qubits,
             ancillaPool=ancilla_pool,
         )
+        return vars(state_prep_params)
 
+    def _create_dense(self, params: dict) -> Circuit:
+        """Create a standalone dense state preparation circuit.
+
+        Args:
+            params: The parameter dict for Q# circuit construction.
+
+        Returns:
+            A dense state preparation circuit on the reduced qubit subset.
+
+        """
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
-            parameter=vars(state_prep_params),
+            program=QSHARP_UTILS.StatePreparation.MakeDenseStatePreparation,
+            parameter={
+                "rowMap": params["rowMap"],
+                "stateVector": params["stateVector"],
+                "numQubits": params["numQubits"],
+            },
         )
-        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*vars(state_prep_params).values())
-        Logger.info(
-            f"Binary encoding produced {len(encoded_ops)} operations "
-            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants "
-            f"using {len(ancilla_pool)} pre-existing qubits as ancilla pool"
-        )
+        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
-        return Circuit(
-            qsharp_factory=qsharp_factory,
-            qsharp_op=qsharp_op,
-            encoding="jordan-wigner",
+    def _create_isometry(self, params: dict) -> Circuit:
+        """Create a standalone isometry circuit (binary encoding + GF2+X expansion).
+
+        Args:
+            params: The parameter dict for Q# circuit construction.
+
+        Returns:
+            A Circuit containing the binary-encoding operations followed by
+            the GF2+X expansion operations.
+
+        """
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingExpansion,
+            parameter={
+                "binaryEncodingOps": params["binaryEncodingOps"],
+                "gaussianEliminationOps": params["gaussianEliminationOps"],
+                "numQubits": params["numQubits"],
+                "ancillaPool": params["ancillaPool"],
+            },
         )
+        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
     def _perform_binary_encoding(
         self, gf2x_result: GF2XEliminationResult, n_qubits: int

@@ -124,6 +124,30 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 "alpha and beta orbitals are not supported for state preparation."
             )
 
+        params = self._build_state_prep_params(wavefunction)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=params,
+        )
+
+        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**params)
+        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
+
+    def _build_state_prep_params(self, wavefunction: Wavefunction) -> dict:
+        """Build state preparation parameters from a wavefunction.
+
+        Extracts coefficients and determinants, performs GF2+X elimination,
+        and returns the parameter dict for Q# circuit construction.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+
+        Returns:
+            A parameter dict for Q# circuit construction.
+
+        """
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
@@ -166,14 +190,46 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
             expansionOps=[op.to_dict() for op in expansion_ops],
             numQubits=n_qubits,
         )
+        return vars(state_prep_params)
 
+    def _create_dense(self, params: dict) -> Circuit:
+        """Create a standalone dense state preparation circuit.
+
+        Args:
+            params: The parameter dict for Q# circuit construction.
+
+        Returns:
+            A dense state preparation circuit on the reduced qubit subset.
+
+        """
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            parameter=vars(state_prep_params),
+            program=QSHARP_UTILS.StatePreparation.MakeDenseStatePreparation,
+            parameter={
+                "rowMap": params["rowMap"],
+                "stateVector": params["stateVector"],
+                "numQubits": params["numQubits"],
+            },
         )
+        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
-        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
+    def _create_isometry(self, params: dict) -> Circuit:
+        """Create a standalone isometry circuit.
+
+        Args:
+            params: The parameter dict for Q# circuit construction.
+
+        Returns:
+            A Circuit containing the GF2+X expansion operations.
+
+        """
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeExpansion,
+            parameter={
+                "expansionOps": params["expansionOps"],
+                "numQubits": params["numQubits"],
+            },
+        )
+        return Circuit(qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
     def _qiskit_dense_preparation(
         self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, num_qubits: int

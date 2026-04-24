@@ -13,6 +13,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     import Std.Math.Lg;
     import Std.Measurement.MResetX;
     import Std.StatePreparation.PreparePureStateD;
+    import QDKChemistry.Utils.StatePreparation.ApplyDensePreparation;
 
     /// A single gate produced by the matrix compression pipeline.
     ///
@@ -325,20 +326,9 @@ namespace QDKChemistry.Utils.BinaryEncoding {
         qs : Qubit[],
     ) : Unit {
         // Step 1: Dense state prep on reduced subspace
-        PreparePureStateD(params.stateVector, Subarray(params.rowMap, qs));
-
-        // Build ancilla pool from indices
-        let poolQubits = Subarray(params.ancillaPool, qs);
-
-        // Step 2: Apply binary-encoding ops (pre-reversed by Python)
-        for gate in params.binaryEncodingOps {
-            ApplyMatrixCompressionOp(gate, qs, poolQubits);
-        }
-
-        // Step 3: Expand back via GF2+X operations (CX/X only — no pool needed)
-        for gate in params.gaussianEliminationOps {
-            ApplyMatrixCompressionOp(gate, qs, []);
-        }
+        ApplyDensePreparation(params.rowMap, params.stateVector, qs);
+        // Step 2 & 3: Apply binary-encoding operations and GF2+X operations
+        ApplyExpansion(params.binaryEncodingOps, params.gaussianEliminationOps, qs, params.ancillaPool);
     }
 
     /// Create a callable for the binary-encoding state preparation.
@@ -378,5 +368,34 @@ namespace QDKChemistry.Utils.BinaryEncoding {
             numQubits = numQubits,
             ancillaPool = ancillaPool,
         }, qs);
+    }
+
+    /// Applies the binary-encoding operations followed by GF2+X expansion operations.
+    operation ApplyExpansion(
+        binaryEncodingOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
+        qs : Qubit[],
+        ancillaPool : Int[],
+    ) : Unit {
+        let poolQubits = Subarray(ancillaPool, qs);
+        for gate in binaryEncodingOps {
+            ApplyMatrixCompressionOp(gate, qs, poolQubits);
+        }
+        for gate in gaussianEliminationOps {
+            ApplyMatrixCompressionOp(gate, qs, []);
+        }
+    }
+
+    /// Circuit entry point for the isometry stage of binary-encoding
+    /// state preparation.
+    /// Allocates qubits and delegates to ApplyExpansion.
+    operation MakeBinaryEncodingExpansion(
+        binaryEncodingOps : MatrixCompressionOp[],
+        gaussianEliminationOps : MatrixCompressionOp[],
+        numQubits : Int,
+        ancillaPool : Int[],
+    ) : Unit {
+        use qs = Qubit[numQubits];
+        ApplyExpansion(binaryEncodingOps, gaussianEliminationOps, qs, ancillaPool);
     }
 }
