@@ -224,10 +224,6 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     Prevent Sphinx from documenting standard library and third-party modules.
     This stops pathlib, pydantic_settings, etc. from being included in docs.
     """
-    # Skip pybind11 internal implementation details
-    if "pybind11_detail" in name:
-        return True
-
     # Get the module where the object is defined
     if hasattr(obj, "__module__"):
         module = obj.__module__
@@ -308,13 +304,13 @@ def normalize_autodoc_signature(
 
 def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
-    # Strip docstrings from pybind11 internal implementation details to avoid
-    # docutils parse errors from malformed rST in their auto-generated docs.
-    if "pybind11_detail" in name:
-        lines.clear()
-        return
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
+        # Escape '*args' and '**kwargs' in pybind11 auto-generated signature
+        # lines so Sphinx/reST does not treat them as emphasis/bold markup.
+        # Negative lookbehind avoids double-escaping already-escaped instances.
+        rewritten = re.sub(r"(?<!\\)\*\*kwargs", r"\\**kwargs", rewritten)
+        rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
     if options is not None and "._core." in name:

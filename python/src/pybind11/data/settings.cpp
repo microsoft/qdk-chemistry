@@ -520,25 +520,32 @@ Attributes:
              // Apply kwargs as overrides
              if (kwargs && py::len(kwargs) > 0) {
                if (ref.settings) {
-                 // Apply overrides to the resolved settings
-                 py::module_ json_mod = py::module_::import("json");
-                 py::dict d = kwargs;
-                 py::str json_str = json_mod.attr("dumps")(d);
-                 std::string json_cpp = json_str.cast<std::string>();
-                 auto overrides = nlohmann::json::parse(json_cpp);
-                 auto override_settings = Settings::from_json(overrides);
-                 // Update only keys that exist in the resolved settings
-                 for (const auto &key : override_settings->keys()) {
-                   ref.settings->set(key, override_settings->get(key));
+                 // Apply overrides directly to the resolved settings without
+                 // JSON round-tripping so non-JSON-serializable SettingValue
+                 // inputs remain supported.
+                 for (auto item : kwargs) {
+                   const auto key = py::cast<std::string>(
+                       py::reinterpret_borrow<py::object>(item.first));
+                   for (const auto &existing_key : ref.settings->keys()) {
+                     if (existing_key == key) {
+                       ref.settings->set(
+                           key, py::reinterpret_borrow<py::object>(item.second)
+                                    .cast<SettingValue>());
+                       break;
+                     }
+                   }
                  }
                } else {
-                 // Fallback: create Settings from kwargs alone
-                 py::module_ json_mod = py::module_::import("json");
-                 py::dict d = kwargs;
-                 py::str json_str = json_mod.attr("dumps")(d);
-                 std::string json_cpp = json_str.cast<std::string>();
-                 auto json_obj = nlohmann::json::parse(json_cpp);
-                 ref.settings = Settings::from_json(json_obj);
+                 // Fallback: create Settings from kwargs alone using direct
+                 // SettingValue conversion instead of JSON serialization.
+                 ref.settings = std::make_shared<Settings>();
+                 for (auto item : kwargs) {
+                   const auto key = py::cast<std::string>(
+                       py::reinterpret_borrow<py::object>(item.first));
+                   ref.settings->set(
+                       key, py::reinterpret_borrow<py::object>(item.second)
+                                .cast<SettingValue>());
+                 }
                }
              }
              return ref;
@@ -550,7 +557,7 @@ Create an AlgorithmRef with keyword arguments forwarded as setting overrides.
 Args:
     algorithm_type: Registry type key (e.g. "circuit_executor").
     algorithm_name: Registry name key.
-    **kwargs: Setting overrides applied on top of the algorithm's defaults.
+    \**kwargs: Setting overrides applied on top of the algorithm's defaults.
 
 Examples:
     >>> AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42)
@@ -618,12 +625,11 @@ Args:
 Bulk-update nested settings without resetting defaults.
 
 Args:
-    **kwargs: Setting key/value pairs to update.
+    \**kwargs: Setting key/value pairs to update.
 
 Examples:
     >>> ref.update(ci_residual_tolerance=1e-10, calculate_one_rdm=True)
 )")
-      // --- __getattr__ / __setattr__ ----------------------------------------
       .def(
           "__getattr__",
           [](const AlgorithmRef &ref, const std::string &key) -> py::object {
