@@ -1058,8 +1058,8 @@ class BinaryEncodingSynthesizer:
             rest_entries: Per-target offsets and changing controls.
 
         Returns:
-            ``(ops, select_count)`` where ``select_count`` is the number of
-            emitted SELECT/SELECT_AND operations, used as a cost proxy.
+            ``(ops, toffoli_cost)`` where ``toffoli_cost`` is the estimated
+            number of Toffoli gates used by the emitted SELECT operations.
 
         """
         if not rest_entries:
@@ -1081,11 +1081,13 @@ class BinaryEncodingSynthesizer:
         )
 
         gf2x_ops = list(reversed(lookup_ops))
-        select_count = sum(
-            1 for name, _ in lookup_ops if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
+        toffoli_cost = sum(
+            _select_toffoli_cost(data_table)
+            for name, (data_table, _, _) in lookup_ops
+            if name in (MatrixCompressionType.SELECT, MatrixCompressionType.SELECT_AND)
         )
 
-        return gf2x_ops, select_count
+        return gf2x_ops, toffoli_cost
 
     def _canonicalize_pui_controls(
         self,
@@ -1212,6 +1214,57 @@ class BinaryEncodingSynthesizer:
         return table
 
 
+def _is_data_all_zeros(data: list[list[bool]]) -> bool:
+    """Return True when every row of data is all-false."""
+    return all(not any(row) for row in data)
+
+
+def _scs_toffoli_cost(data: list[list[bool]]) -> int:
+    """Toffoli cost of the ``SparseOneHotSCS`` recursion (singly-controlled).
+
+    Each non-trivial split (N > 1) uses one AND gate (= 1 Toffoli with
+    measurement-based uncompute).
+    """
+    n = len(data)
+    if n == 0 or _is_data_all_zeros(data) or n == 1:
+        return 0
+    k = math.ceil(math.log2(n))
+    half = 2 ** (k - 1)
+    left, right = data[:half], data[half:]
+    left_empty = _is_data_all_zeros(left)
+    right_empty = _is_data_all_zeros(right)
+    if not left_empty and not right_empty:
+        return 1 + _scs_toffoli_cost(left) + _scs_toffoli_cost(right)
+    if not right_empty:
+        return 1 + _scs_toffoli_cost(right)
+    if not left_empty:
+        return 1 + _scs_toffoli_cost(left)
+    return 0
+
+
+def _select_toffoli_cost(data: list[list[bool]]) -> int:
+    """Estimate the Toffoli count for a ``SparseOneHotSelect`` call.
+
+    The first address-bit split is free (no AND gate); each branch
+    delegates to ``SparseOneHotSCS``.
+    """
+    n = len(data)
+    if n == 0 or _is_data_all_zeros(data) or n == 1:
+        return 0
+    k = math.ceil(math.log2(n))
+    half = 2 ** (k - 1)
+    left, right = data[:half], data[half:]
+    left_empty = _is_data_all_zeros(left)
+    right_empty = _is_data_all_zeros(right)
+    if not left_empty and not right_empty:
+        return _scs_toffoli_cost(left) + _scs_toffoli_cost(right)
+    if not right_empty:
+        return _scs_toffoli_cost(right)
+    if not left_empty:
+        return _scs_toffoli_cost(left)
+    return 0
+
+
 def _lookup_select(
     table_dict: dict[tuple[int, ...], tuple[int, ...]],
     address_qubits: list[int],
@@ -1243,16 +1296,18 @@ def _lookup_select(
     n_data = len(data_qubits)
     n_entries = 1 << n_address
 
-    # Build dense Bool[][] table from sparse dict.
-    # addr_tuple uses little-endian bit ordering: addr_tuple[0] = LSB.
+    # Reverse the address qubit order so that entries that share low-order
+    # address bits are grouped earlier in the tree.
+    reversed_address = list(reversed(address_qubits))
+
+    # Build dense Bool[][] table with reversed bit ordering.
     data_table: list[list[bool]] = [[False] * n_data for _ in range(n_entries)]
     for addr_tuple, data_tuple in table_dict.items():
-        addr_int = sum(int(bit) << i for i, bit in enumerate(addr_tuple))
+        reversed_tuple = tuple(reversed(addr_tuple))
+        addr_int = sum(int(bit) << i for i, bit in enumerate(reversed_tuple))
         data_table[addr_int] = [bool(b) for b in data_tuple]
 
-    # Our table index also uses little-endian (addr_tuple[0] = LSB), so
-    # pass address_qubits directly without reversing.
     op_type = MatrixCompressionType.SELECT_AND if use_measurement_and else MatrixCompressionType.SELECT
-    operations.append((op_type, (data_table, list(address_qubits), list(data_qubits))))
+    operations.append((op_type, (data_table, reversed_address, list(data_qubits))))
 
     return operations
