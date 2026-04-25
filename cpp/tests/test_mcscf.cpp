@@ -7,10 +7,8 @@
 #include <filesystem>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
-#include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 
 #include "ut_common.hpp"
@@ -40,26 +38,6 @@ class TestMultiConfigurationScfSolver : public MultiConfigurationScf {
         std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
     Wavefunction wfn(std::move(container));
     return {-100.0, std::make_shared<Wavefunction>(std::move(wfn))};
-  }
-};
-
-class MockMCCalculator : public MultiConfigurationCalculator {
- public:
-  std::string name() const override { return "mc_2"; }
-
- protected:
-  std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
-      std::shared_ptr<Hamiltonian> hamiltonian, unsigned int /*nalpha*/,
-      unsigned int /*nbeta*/) const override {
-    // Dummy implementation for testing - create a simple wavefunction
-    Eigen::VectorXcd coeffs(1);
-    coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration("2")};
-    auto orbitals = hamiltonian->get_orbitals();
-    auto container =
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
-    auto wfn = std::make_shared<Wavefunction>(std::move(container));
-    return {-100.0, wfn};
   }
 };
 
@@ -200,30 +178,8 @@ TEST_F(MultiConfigurationScfTest, SolverInterface) {
   // Test the MultiConfigurationScf interface through a concrete implementation
   TestMultiConfigurationScfSolver solver;
 
-  // Create a dummy Hamiltonian for testing using ut_common helpers
+  // Create test orbitals
   auto test_orbitals = testing::create_test_orbitals(3, 2, true);
-
-  // Create minimal one-body and two-body integrals for 2 orbitals
-  Eigen::MatrixXd one_body(2, 2);
-  one_body << -1.0, 0.1, 0.1, -0.5;
-
-  // Create minimal two-body integrals for 2 orbitals (16 elements total)
-  Eigen::VectorXd two_body(16);
-  two_body.setZero();
-  two_body(0) = 0.5;  // <00|00> element
-
-  double core_energy = 1.0;
-  auto inactive_fock = Eigen::MatrixXd::Zero(0, 0);
-
-  auto hamil_ctor = std::shared_ptr<HamiltonianConstructor>(
-      std::move(HamiltonianConstructorFactory::create()));
-
-  auto dummy_ham = std::make_shared<Hamiltonian>(
-      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body, two_body, test_orbitals, core_energy, inactive_fock));
-
-  // Create a mock MC calculator
-  auto mc_calculator = std::make_shared<MockMCCalculator>();
 
   // Test solve method
   auto [energy, wavefunction] = solver.run(test_orbitals, 1, 1);

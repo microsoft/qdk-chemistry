@@ -54,8 +54,7 @@ class MultiConfigurationScf
    * @brief Default constructor
    *
    * Creates an MultiConfigurationScf solver with default settings that
-   * include AlgorithmRef entries for hamiltonian_constructor and
-   * multi_configuration_calculator.
+   * include an AlgorithmRef entry for multi_configuration_calculator.
    */
   MultiConfigurationScf() {
     _settings = std::make_unique<MultiConfigurationScfSettings>();

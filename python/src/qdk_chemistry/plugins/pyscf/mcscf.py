@@ -313,8 +313,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         performs a CASSCF calculation using the QDK MC calculator as the FCI solver,
         and returns the results as a pair of energy and QDK Wavefunction object.
 
-        The HamiltonianConstructor and MultiConfigurationCalculator are obtained
-        from the settings.
+        The MultiConfigurationCalculator is obtained from the settings.
 
         Args:
             orbitals: The QDK Orbitals object containing molecular orbital information.
