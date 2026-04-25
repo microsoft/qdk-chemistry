@@ -63,10 +63,6 @@ class TestMCSCF:
         # Calculate with QDK/MACIS
         mcscf = alg.create("multi_configuration_scf", "pyscf")
         mcscf.settings().set(
-            "hamiltonian_constructor",
-            AlgorithmRef("hamiltonian_constructor", "qdk"),
-        )
-        mcscf.settings().set(
             "multi_configuration_calculator",
             AlgorithmRef("multi_configuration_calculator", "macis_cas"),
         )
@@ -94,10 +90,6 @@ class TestMCSCF:
 
         # Calculate with QDK/MACIS
         mcscf = alg.create("multi_configuration_scf", "pyscf")
-        mcscf.settings().set(
-            "hamiltonian_constructor",
-            AlgorithmRef("hamiltonian_constructor", "qdk"),
-        )
         mcscf.settings().set(
             "multi_configuration_calculator",
             AlgorithmRef("multi_configuration_calculator", "macis_cas", ci_residual_tolerance=1e-10),

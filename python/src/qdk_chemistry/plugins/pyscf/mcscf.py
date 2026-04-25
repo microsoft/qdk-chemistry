@@ -276,11 +276,6 @@ class PyscfMcscfSettings(Settings):
         self._set_default("max_cycle_macro", "int", 50)
         self._set_default("verbose", "int", 0)
         self._set_default(
-            "hamiltonian_constructor",
-            "algorithm_ref",
-            AlgorithmRef("hamiltonian_constructor", "qdk"),
-        )
-        self._set_default(
             "multi_configuration_calculator",
             "algorithm_ref",
             AlgorithmRef("multi_configuration_calculator", "macis_cas"),

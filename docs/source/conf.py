@@ -168,7 +168,6 @@ suppress_warnings = [
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
     "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
-    "*AlgorithmRef*",  # Suppress duplicate attribute warnings for AlgorithmRef (automodule + autosummary)
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [
@@ -225,6 +224,10 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
     Prevent Sphinx from documenting standard library and third-party modules.
     This stops pathlib, pydantic_settings, etc. from being included in docs.
     """
+    # Skip pybind11 internal implementation details
+    if "pybind11_detail" in name:
+        return True
+
     # Get the module where the object is defined
     if hasattr(obj, "__module__"):
         module = obj.__module__
@@ -305,6 +308,11 @@ def normalize_autodoc_signature(
 
 def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
+    # Strip docstrings from pybind11 internal implementation details to avoid
+    # docutils parse errors from malformed rST in their auto-generated docs.
+    if "pybind11_detail" in name:
+        lines.clear()
+        return
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
         if rewritten != line:

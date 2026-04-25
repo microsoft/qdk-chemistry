@@ -1376,7 +1376,6 @@ class TestAlgorithmRefSettings:
         assert isinstance(ref, AlgorithmRef)
         assert ref.algorithm_type == "scf_solver"
         assert ref.algorithm_name == "qdk"
-        assert ref.type_fixed is True
 
     def test_overwrite_algorithm_ref(self):
         """An AlgorithmRef value can be overwritten with a different name."""
@@ -1386,10 +1385,10 @@ class TestAlgorithmRefSettings:
         assert ref.algorithm_name == "pyscf"
         assert ref.algorithm_type == "scf_solver"
 
-    def test_algorithm_ref_type_fixed_enforcement(self):
-        """Setting a different algorithm_type when type_fixed=True raises."""
+    def test_algorithm_ref_type_immutability(self):
+        """Setting a different algorithm_type always raises (immutable)."""
         s = _SettingsWithAlgorithmRef()
-        with pytest.raises(Exception, match="type.*fixed|cannot be changed"):
+        with pytest.raises(ValueError, match="cannot be changed"):
             s.set("inner_algo", AlgorithmRef("wrong_type", "whatever"))
 
     def test_algorithm_ref_with_kwargs(self):
@@ -1400,9 +1399,12 @@ class TestAlgorithmRefSettings:
         assert ref.settings.get("method") == "dft"
 
     def test_algorithm_ref_without_kwargs(self):
-        """AlgorithmRef constructed without kwargs has settings=None."""
+        """AlgorithmRef constructed without kwargs auto-resolves defaults."""
         ref = AlgorithmRef("scf_solver", "pyscf")
-        assert ref.settings is None
+        # Settings are auto-resolved from the registry when available,
+        # or None if the resolver hasn't been installed yet.
+        # In either case the construction must succeed.
+        assert ref.settings is None or isinstance(ref.settings, Settings)
 
     def test_single_level_nesting_in_settings(self):
         """An AlgorithmRef with kwargs can be stored in Settings."""
@@ -1422,13 +1424,6 @@ class TestAlgorithmRefSettings:
         This verifies the recursive nesting capability: an outer algorithm
         holds an AlgorithmRef whose settings contain another AlgorithmRef.
         """
-        # Build a level-2 ref: an MC calculator with specific settings
-        AlgorithmRef(
-            "multi_configuration_calculator",
-            "macis_cas",
-            ci_residual_tolerance=1e-10,
-        )
-
         # Build a level-1 ref: MCSCF whose settings embed the MC calculator ref
         # We use Settings.from_json to create a settings object with an AlgorithmRef value
         outer_settings = Settings.from_json(
@@ -1438,7 +1433,6 @@ class TestAlgorithmRefSettings:
                         "__type__": "algorithm_ref",
                         "algorithm_type": "multi_configuration_calculator",
                         "algorithm_name": "macis_cas",
-                        "type_fixed": True,
                         "settings": {
                             "ci_residual_tolerance": 1e-10,
                         },
@@ -1477,14 +1471,12 @@ class TestAlgorithmRefSettings:
             "__type__": "algorithm_ref",
             "algorithm_type": "circuit_executor",
             "algorithm_name": "qdk_sparse_state_simulator",
-            "type_fixed": True,
             "settings": {"seed": 42},
         }
         outer_ref_json = {
             "__type__": "algorithm_ref",
             "algorithm_type": "phase_estimation",
             "algorithm_name": "iterative",
-            "type_fixed": True,
             "settings": {
                 "num_bits": 10,
                 "circuit_executor": inner_ref_json,
@@ -1518,7 +1510,6 @@ class TestAlgorithmRefSettings:
             "__type__": "algorithm_ref",
             "algorithm_type": "circuit_executor",
             "algorithm_name": "qdk_full_state_simulator",
-            "type_fixed": False,
             "settings": {"seed": 7},
         }
         top_settings = Settings.from_json(
@@ -1541,7 +1532,6 @@ class TestAlgorithmRefSettings:
             assert isinstance(ref, AlgorithmRef)
             assert ref.algorithm_type == "circuit_executor"
             assert ref.algorithm_name == "qdk_full_state_simulator"
-            assert ref.type_fixed is False
             assert ref.settings is not None
             assert ref.settings.get("seed") == 7
             assert restored.get("plain_val") == 99

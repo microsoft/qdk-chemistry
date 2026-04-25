@@ -21,8 +21,6 @@ namespace qdk::chemistry::algorithms {
 class MultiConfigurationScfSettings : public data::Settings {
  public:
   MultiConfigurationScfSettings() {
-    set_default("hamiltonian_constructor",
-                data::AlgorithmRef("hamiltonian_constructor", "qdk"));
     set_default(
         "multi_configuration_calculator",
         data::AlgorithmRef("multi_configuration_calculator", "macis_cas"));

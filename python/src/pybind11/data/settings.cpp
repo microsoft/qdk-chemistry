@@ -473,65 +473,217 @@ bool, int, long, size_t, float, double, string, vector<int>, vector<double>, vec
 Declarative reference to a nested algorithm instantiated via the registry.
 
 An AlgorithmRef is stored inside a parent algorithm's Settings to describe
-a child algorithm that will be created at run-time.
+a child algorithm that will be created at run-time.  The algorithm_type is
+immutable after construction.  When a name is provided, the ref's settings
+are automatically populated with the algorithm's defaults so that invalid
+keys raise immediately.
 
-Construct with keyword arguments to forward settings to the nested algorithm::
+Construct with keyword arguments to override default settings::
 
     AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42)
 
 Attributes:
     algorithm_type (str): Registry type key (e.g. "circuit_executor").
+        Immutable after construction.
     algorithm_name (str): Registry name key (e.g. "qdk_sparse_state_simulator").
         Empty string means "use the factory default".
-    settings (Settings | None): Nested key/value overrides forwarded to the
-        child's Settings after creation.
-    type_fixed (bool): If True, algorithm_type cannot be changed by the user.
+        Use ``set_algorithm_name()`` to change (re-resolves default settings).
+    settings (Settings | None): Settings for the referenced algorithm.
+        Automatically populated with the algorithm's defaults when the ref
+        is constructed (if a factory is registered for the type).
 )")
       .def(py::init<>())
-      .def(
-          py::init<std::string, std::string, std::shared_ptr<Settings>, bool>(),
-          py::arg("algorithm_type"), py::arg("algorithm_name"),
-          py::arg("settings") = nullptr, py::arg("type_fixed") = true)
+      .def(py::init<std::string, std::string, std::shared_ptr<Settings>>(),
+           py::arg("algorithm_type"), py::arg("algorithm_name"),
+           py::arg("settings") = nullptr)
       .def(py::init([](const std::string &algorithm_type,
-                       const std::string &algorithm_name, bool type_fixed,
-                       py::kwargs kwargs) {
-             auto ref = AlgorithmRef(algorithm_type, algorithm_name, nullptr,
-                                     type_fixed);
+                       const std::string &algorithm_name, py::kwargs kwargs) {
+             // Construct — auto-resolves default settings from C++ factories
+             auto ref = AlgorithmRef(algorithm_type, algorithm_name);
+
+             // If C++ didn't resolve, try the Python registry
+             if (!ref.settings) {
+               try {
+                 py::module_ reg =
+                     py::module_::import("qdk_chemistry.algorithms.registry");
+                 py::object instance =
+                     reg.attr("create")(algorithm_type, algorithm_name);
+                 py::object py_settings = instance.attr("settings")();
+                 // Deep-copy via JSON round-trip
+                 auto json_obj = py_settings.cast<Settings &>().to_json();
+                 ref.settings = Settings::from_json(json_obj);
+               } catch (...) {
+                 // Registry not available yet; leave settings unresolved
+               }
+             }
+
+             // Apply kwargs as overrides
              if (kwargs && py::len(kwargs) > 0) {
-               // Convert kwargs to a Settings via JSON round-trip
-               py::module_ json_mod = py::module_::import("json");
-               py::dict d = kwargs;
-               py::str json_str = json_mod.attr("dumps")(d);
-               std::string json_cpp = json_str.cast<std::string>();
-               auto json_obj = nlohmann::json::parse(json_cpp);
-               ref.settings = Settings::from_json(json_obj);
+               if (ref.settings) {
+                 // Apply overrides to the resolved settings
+                 py::module_ json_mod = py::module_::import("json");
+                 py::dict d = kwargs;
+                 py::str json_str = json_mod.attr("dumps")(d);
+                 std::string json_cpp = json_str.cast<std::string>();
+                 auto overrides = nlohmann::json::parse(json_cpp);
+                 auto override_settings = Settings::from_json(overrides);
+                 // Update only keys that exist in the resolved settings
+                 for (const auto &key : override_settings->keys()) {
+                   ref.settings->set(key, override_settings->get(key));
+                 }
+               } else {
+                 // Fallback: create Settings from kwargs alone
+                 py::module_ json_mod = py::module_::import("json");
+                 py::dict d = kwargs;
+                 py::str json_str = json_mod.attr("dumps")(d);
+                 std::string json_cpp = json_str.cast<std::string>();
+                 auto json_obj = nlohmann::json::parse(json_cpp);
+                 ref.settings = Settings::from_json(json_obj);
+               }
              }
              return ref;
            }),
            py::arg("algorithm_type"), py::arg("algorithm_name"),
-           py::arg("type_fixed") = true,
            R"(
-Create an AlgorithmRef with keyword arguments forwarded as nested settings.
+Create an AlgorithmRef with keyword arguments forwarded as setting overrides.
 
 Args:
     algorithm_type: Registry type key (e.g. "circuit_executor").
     algorithm_name: Registry name key.
-    type_fixed: If True (default), algorithm_type cannot be changed.
-    **kwargs: Settings forwarded to the nested algorithm after creation.
+    **kwargs: Setting overrides applied on top of the algorithm's defaults.
 
 Examples:
     >>> AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42)
     >>> AlgorithmRef("multi_configuration_calculator", "macis_cas",
     ...              ci_residual_tolerance=1e-10, calculate_one_rdm=True)
 )")
-      .def_readwrite("algorithm_type", &AlgorithmRef::algorithm_type)
-      .def_readwrite("algorithm_name", &AlgorithmRef::algorithm_name)
-      .def_readwrite("settings", &AlgorithmRef::settings)
-      .def_readwrite("type_fixed", &AlgorithmRef::type_fixed)
+      // --- get() / set() ---------------------------------------------------
+      .def(
+          "get",
+          [](const AlgorithmRef &ref, const std::string &key) -> py::object {
+            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
+            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
+            if (key == "settings") return py::cast(ref.settings);
+            if (!ref.settings) throw SettingNotFound(key);
+            return setting_value_to_python(ref.settings->get(key));
+          },
+          py::arg("key"),
+          R"(
+Get a field or nested setting.
+
+``"algorithm_type"``, ``"algorithm_name"``, ``"settings"`` return the
+corresponding struct field.  Anything else is forwarded to
+``settings.get(key)``.
+
+Args:
+    key: The field or setting key.
+)")
+      .def(
+          "set",
+          [](AlgorithmRef &ref, const std::string &key,
+             const SettingValue &value) { ref.set(key, value); },
+          py::arg("key"), py::arg("value"),
+          R"(
+Set a field or nested setting.
+
+``"algorithm_type"`` always raises (immutable).  ``"algorithm_name"``
+re-resolves default settings.  Everything else is forwarded to
+``settings.set(key, value)``.
+
+Args:
+    key: The field or setting key.
+    value: The new value.
+)")
+      .def("set_algorithm_name", &AlgorithmRef::set_algorithm_name,
+           py::arg("name"),
+           R"(
+Change the algorithm name and re-resolve default settings.
+
+Any previous setting overrides are lost.
+
+Args:
+    name: The new algorithm name.
+)")
+      // --- update(**kwargs) -------------------------------------------------
+      .def(
+          "update",
+          [](AlgorithmRef &ref, py::kwargs kwargs) {
+            for (auto &[k, v] : kwargs) {
+              std::string key = k.cast<std::string>();
+              SettingValue sv = v.cast<SettingValue>();
+              ref.set(key, sv);
+            }
+          },
+          R"(
+Bulk-update nested settings without resetting defaults.
+
+Args:
+    **kwargs: Setting key/value pairs to update.
+
+Examples:
+    >>> ref.update(ci_residual_tolerance=1e-10, calculate_one_rdm=True)
+)")
+      // --- __getattr__ / __setattr__ ----------------------------------------
+      .def(
+          "__getattr__",
+          [](const AlgorithmRef &ref, const std::string &key) -> py::object {
+            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
+            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
+            if (key == "settings") return py::cast(ref.settings);
+            if (ref.settings && ref.settings->has(key))
+              return setting_value_to_python(ref.settings->get(key));
+            throw py::attribute_error("AlgorithmRef has no attribute '" + key +
+                                      "'");
+          },
+          py::arg("key"))
+      .def(
+          "__setattr__",
+          [](AlgorithmRef &ref, const std::string &key,
+             const py::object &value) {
+            if (key == "algorithm_type")
+              throw std::invalid_argument(
+                  "algorithm_type is immutable after construction");
+            if (key == "algorithm_name") {
+              ref.set_algorithm_name(value.cast<std::string>());
+              return;
+            }
+            if (key == "settings") {
+              ref.settings = value.cast<std::shared_ptr<Settings>>();
+              return;
+            }
+            if (!ref.settings) throw SettingNotFound(key);
+            SettingValue sv = value.cast<SettingValue>();
+            ref.settings->set(key, sv);
+          },
+          py::arg("key"), py::arg("value"))
+      // --- [] / in ----------------------------------------------------------
+      .def(
+          "__getitem__",
+          [](const AlgorithmRef &ref, const std::string &key) -> py::object {
+            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
+            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
+            if (key == "settings") return py::cast(ref.settings);
+            if (!ref.settings) throw SettingNotFound(key);
+            return setting_value_to_python(ref.settings->get(key));
+          },
+          py::arg("key"))
+      .def(
+          "__setitem__",
+          [](AlgorithmRef &ref, const std::string &key,
+             const SettingValue &value) { ref.set(key, value); },
+          py::arg("key"), py::arg("value"))
+      .def(
+          "__contains__",
+          [](const AlgorithmRef &ref, const std::string &key) -> bool {
+            if (key == "algorithm_type" || key == "algorithm_name" ||
+                key == "settings")
+              return true;
+            return ref.settings && ref.settings->has(key);
+          },
+          py::arg("key"))
       .def("__repr__", [](const AlgorithmRef &ref) {
         return "AlgorithmRef(type='" + ref.algorithm_type + "', name='" +
-               ref.algorithm_name +
-               "', type_fixed=" + (ref.type_fixed ? "True" : "False") + ")";
+               ref.algorithm_name + "')";
       });
 
   // Utility functions for conversion

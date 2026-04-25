@@ -17,6 +17,51 @@
 
 namespace qdk::chemistry::data {
 
+// ---------------------------------------------------------------------------
+// AlgorithmRef implementation
+// ---------------------------------------------------------------------------
+
+// Definition of the static member.
+std::function<std::shared_ptr<Settings>(const std::string&, const std::string&)>
+    AlgorithmRef::create_default_settings;
+
+AlgorithmRef::AlgorithmRef(std::string type, std::string name,
+                           std::shared_ptr<Settings> settings_ptr)
+    : algorithm_type(std::move(type)),
+      algorithm_name(std::move(name)),
+      settings(std::move(settings_ptr)) {
+  if (!settings) {
+    _resolve_settings();
+  }
+}
+
+void AlgorithmRef::set_algorithm_name(const std::string& name) {
+  algorithm_name = name;
+  _resolve_settings();
+}
+
+void AlgorithmRef::_resolve_settings() {
+  if (!create_default_settings || algorithm_type.empty()) {
+    return;
+  }
+  // Guard against re-entrant calls during factory initialisation.
+  static thread_local bool resolving = false;
+  if (resolving) {
+    return;
+  }
+  resolving = true;
+  try {
+    settings = create_default_settings(algorithm_type, algorithm_name);
+  } catch (...) {
+    settings = nullptr;
+  }
+  resolving = false;
+}
+
+// ---------------------------------------------------------------------------
+// Settings implementation
+// ---------------------------------------------------------------------------
+
 void Settings::set(const std::string& key, const SettingValue& value) {
   QDK_LOG_TRACE_ENTERING();
   if (_locked) {
@@ -32,12 +77,11 @@ void Settings::set(const std::string& key, const SettingValue& value) {
     throw SettingTypeMismatch(key, "does not match type of given argument");
   }
 
-  // For AlgorithmRef, enforce type_fixed constraint
+  // For AlgorithmRef, enforce type immutability
   if (std::holds_alternative<AlgorithmRef>(value)) {
     const auto& existing = std::get<AlgorithmRef>(settings_[key]);
     const auto& incoming = std::get<AlgorithmRef>(value);
-    if (existing.type_fixed &&
-        incoming.algorithm_type != existing.algorithm_type) {
+    if (incoming.algorithm_type != existing.algorithm_type) {
       throw std::invalid_argument("Algorithm type for setting '" + key +
                                   "' is fixed to '" + existing.algorithm_type +
                                   "' and cannot be changed to '" +
@@ -943,7 +987,6 @@ nlohmann::json Settings::convert_setting_value_to_json(
           ref_json["__type__"] = "algorithm_ref";
           ref_json["algorithm_type"] = variant_value.algorithm_type;
           ref_json["algorithm_name"] = variant_value.algorithm_name;
-          ref_json["type_fixed"] = variant_value.type_fixed;
           if (variant_value.settings) {
             ref_json["settings"] = variant_value.settings->to_json();
           } else {
@@ -995,7 +1038,7 @@ SettingValue Settings::convert_json_to_setting_value(
     AlgorithmRef ref;
     ref.algorithm_type = json_obj.value("algorithm_type", "");
     ref.algorithm_name = json_obj.value("algorithm_name", "");
-    ref.type_fixed = json_obj.value("type_fixed", true);
+    // Note: type_fixed is ignored for backward compatibility with old files
     if (json_obj.contains("settings") && json_obj["settings"].is_object() &&
         !json_obj["settings"].empty()) {
       ref.settings = Settings::from_json(json_obj["settings"]);
@@ -1195,15 +1238,6 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
           };
           write_str("algorithm_type", variant_value.algorithm_type);
           write_str("algorithm_name", variant_value.algorithm_name);
-
-          int fixed_val = variant_value.type_fixed ? 1 : 0;
-          {
-            hsize_t dims[1] = {1};
-            H5::DataSpace ds(1, dims);
-            H5::DataSet dataset = ref_group.createDataSet(
-                "type_fixed", H5::PredType::NATIVE_INT, ds);
-            dataset.write(&fixed_val, H5::PredType::NATIVE_INT);
-          }
 
           if (variant_value.settings) {
             H5::Group settings_group = ref_group.createGroup("settings");
@@ -1795,13 +1829,7 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
           if (null_pos != std::string::npos) str_data.resize(null_pos);
           ref.algorithm_name = str_data;
         }
-        // Read type_fixed
-        {
-          int fixed_val = 1;
-          H5::DataSet ds = sub_group.openDataSet("type_fixed");
-          ds.read(&fixed_val, H5::PredType::NATIVE_INT);
-          ref.type_fixed = (fixed_val != 0);
-        }
+        // type_fixed is ignored for backward compatibility with old files
         // Read nested settings if present
         hsize_t n_sub = sub_group.getNumObjs();
         for (hsize_t k = 0; k < n_sub; ++k) {

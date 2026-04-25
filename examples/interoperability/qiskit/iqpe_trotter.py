@@ -120,7 +120,7 @@ iqpe = create(
 )
 iqpe.settings().set(
     "circuit_executor",
-    AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
 )
 iqpe.settings().set(
     "evolution_builder",

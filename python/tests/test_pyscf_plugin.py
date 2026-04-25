@@ -1810,10 +1810,6 @@ class TestPyscfPlugin:
         # Calculate with qdk-chemistry/MACIS
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
         pyscf_mcscf.settings().set(
-            "hamiltonian_constructor",
-            AlgorithmRef("hamiltonian_constructor", "qdk"),
-        )
-        pyscf_mcscf.settings().set(
             "multi_configuration_calculator",
             AlgorithmRef("multi_configuration_calculator", "macis_cas"),
         )
@@ -1844,10 +1840,6 @@ class TestPyscfPlugin:
 
         # Calculate with qdk-chemistry/MACIS
         pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
-        pyscf_mcscf.settings().set(
-            "hamiltonian_constructor",
-            AlgorithmRef("hamiltonian_constructor", "qdk"),
-        )
         pyscf_mcscf.settings().set(
             "multi_configuration_calculator",
             AlgorithmRef("multi_configuration_calculator", "macis_cas", ci_residual_tolerance=1e-10),

@@ -22,7 +22,7 @@ __all__: list[str] = ["EnergyEstimator", "EnergyEstimatorFactory"]
 
 
 class EnergyEstimatorSettings(Settings):
-    """Settings for EnergyEstimator algorithms with a nested circuit executor."""
+    """Settings for EnergyEstimator algorithms."""
 
     def __init__(self):
         """Initialize the EnergyEstimatorSettings."""
@@ -31,6 +31,7 @@ class EnergyEstimatorSettings(Settings):
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+            "Circuit executor used to run quantum circuits for energy estimation.",
         )
 
 
@@ -56,8 +57,8 @@ class EnergyEstimator(Algorithm):
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of the Hamiltonian.
 
-        The ``CircuitExecutor`` is obtained internally via
-        ``self._create_nested("circuit_executor")``.
+        The circuit executor used to run quantum circuits is configured via
+        the ``circuit_executor`` setting (an ``AlgorithmRef``).
 
         Args:
             circuit: Circuit.

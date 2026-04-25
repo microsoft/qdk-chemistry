@@ -9,6 +9,7 @@
 #include <any>
 #include <concepts>
 #include <fstream>
+#include <functional>
 #include <limits>
 #include <map>
 #include <memory>
@@ -37,36 +38,121 @@ class Settings;
  * describe a child algorithm that will be instantiated at run-time.
  *
  * Fields:
- *   algorithm_type  – registry type key (e.g. "circuit_executor").
- *                     May be fixed (immutable) when the parent only
- *                     accepts one type.
- *   algorithm_name  – registry name key (e.g. "qdk_sparse_state_simulator").
- *                     Empty string means "use the factory default".
- *   settings        – arbitrary key/value overrides forwarded to the
- *                     child's Settings after creation.  May itself
- *                     contain further AlgorithmRef values, enabling
- *                     multi-level nesting.
- *   type_fixed      – if true, algorithm_type cannot be changed by the user.
+ *   - @c algorithm_type – registry type key (e.g. "circuit_executor").
+ *     Immutable after construction.
+ *   - @c algorithm_name – registry name key
+ *     (e.g. "qdk_sparse_state_simulator").  Empty string means "use the
+ *     factory default".  Use set_algorithm_name() to change; this also
+ *     re-resolves the default settings.
+ *   - @c settings – key/value settings for the referenced algorithm.
+ *     Automatically populated with the algorithm's default settings when
+ *     the ref is constructed (if @c create_default_settings has been
+ *     installed).  May itself contain further AlgorithmRef values,
+ *     enabling multi-level nesting.
  */
 struct AlgorithmRef {
-  std::string algorithm_type;
-  std::string algorithm_name;
-  std::shared_ptr<Settings> settings;
-  bool type_fixed = true;
+  /**
+   * @brief Global create function used to auto-resolve default settings.
+   *
+   * Signature: (algorithm_type, algorithm_name) → default Settings copy,
+   * or nullptr if the algorithm is not found.
+   *
+   * Set once by the algorithm / Python layer so that AlgorithmRef
+   * constructors and set_algorithm_name() can populate the @c settings
+   * member automatically.
+   */
+  static std::function<std::shared_ptr<Settings>(const std::string& type,
+                                                 const std::string& name)>
+      create_default_settings;
 
+  std::string algorithm_type;  ///< Registry type key (immutable after ctor).
+  std::string algorithm_name;  ///< Registry name key.
+  std::shared_ptr<Settings> settings;  ///< Nested settings for the algorithm.
+
+  /**
+   * @brief Default constructor.
+   */
   AlgorithmRef() = default;
-  AlgorithmRef(std::string type, std::string name,
-               std::shared_ptr<Settings> settings_ptr = nullptr,
-               bool fixed = true)
-      : algorithm_type(std::move(type)),
-        algorithm_name(std::move(name)),
-        settings(std::move(settings_ptr)),
-        type_fixed(fixed) {}
 
+  /**
+   * @brief Construct an AlgorithmRef with a given type, name, and optional
+   *        settings.
+   *
+   * If @p settings_ptr is nullptr the constructor attempts to auto-resolve
+   * the algorithm's default settings via @c create_default_settings.
+   *
+   * @param type          Registry type key (e.g. "circuit_executor").
+   * @param name          Registry name key (e.g. "qdk_sparse_state_simulator").
+   * @param settings_ptr  Optional pre-built settings; nullptr triggers
+   *                      auto-resolution.
+   */
+  AlgorithmRef(std::string type, std::string name,
+               std::shared_ptr<Settings> settings_ptr = nullptr);
+
+  /**
+   * @brief Change the algorithm name and re-resolve default settings.
+   *
+   * Replaces the current settings with a fresh copy of the new algorithm's
+   * defaults obtained via @c create_default_settings.  Any previous
+   * overrides are lost.
+   *
+   * @param name The new algorithm name.
+   */
+  void set_algorithm_name(const std::string& name);
+
+  /**
+   * @brief Set a field or nested setting on this AlgorithmRef.
+   *
+   * Special keys:
+   * - @c "algorithm_name" – changes the name and re-resolves default settings
+   *   (any previous overrides are lost).
+   * - @c "algorithm_type" – always throws (immutable after construction).
+   * - Anything else – forwarded to <tt>settings->set(key, value)</tt>.
+   *
+   * @param key   The setting key.
+   * @param value The new value (must be SettingValue).
+   * @throws std::invalid_argument if @p key is @c "algorithm_type".
+   * @throws SettingTypeMismatch   if @p key is @c "algorithm_name" and
+   *                               @p value is not a string.
+   * @throws SettingNotFound       if @c settings is nullptr or does
+   *                               not contain @p key.
+   * @note Declared as a template to break the circular dependency with
+   *       SettingValue.  Defined after the SettingValue alias below.
+   */
+  template <typename V>
+  void set(const std::string& key, const V& value);
+
+  /**
+   * @brief Bulk-update nested settings without resetting defaults.
+   *
+   * Applies each entry in @p overrides to the current settings via set().
+   *
+   * @param overrides Map of setting keys to new values.
+   * @throws SettingNotFound if settings is nullptr or a key does not exist.
+   * @note Declared as a template to break the circular dependency with
+   *       SettingValue.  Defined after the SettingValue alias below.
+   */
+  template <typename V>
+  void update(const std::map<std::string, V>& overrides);
+
+  /**
+   * @brief Equality comparison (compares type and name only).
+   * @param other The AlgorithmRef to compare against.
+   * @return @c true if both @c algorithm_type and @c algorithm_name match.
+   */
   bool operator==(const AlgorithmRef& other) const {
     return algorithm_type == other.algorithm_type &&
            algorithm_name == other.algorithm_name;
   }
+
+ private:
+  /**
+   * @brief Populate @c settings from @c create_default_settings.
+   *
+   * Guards against re-entrant calls that may occur when the factory
+   * itself constructs AlgorithmRef instances during registration.
+   */
+  void _resolve_settings();
 };
 
 /**
@@ -1156,5 +1242,35 @@ class Settings : public DataClass,
 static_assert(DataClassCompliant<Settings>,
               "Settings must derive from DataClass and implement all required "
               "deserialization methods");
+
+// AlgorithmRef::set / update — deferred definitions.
+// These are templates so they can be declared inside AlgorithmRef (before
+// SettingValue exists) but defined here where Settings, SettingValue,
+// SettingNotFound, and SettingTypeMismatch are all complete.
+template <typename V>
+void AlgorithmRef::set(const std::string& key, const V& value) {
+  if (key == "algorithm_type") {
+    throw std::invalid_argument(
+        "algorithm_type is immutable after construction");
+  }
+  if (key == "algorithm_name") {
+    if (!std::holds_alternative<std::string>(value)) {
+      throw SettingTypeMismatch("algorithm_name", "string");
+    }
+    set_algorithm_name(std::get<std::string>(value));
+    return;
+  }
+  if (!settings) {
+    throw SettingNotFound(key);
+  }
+  settings->set(key, value);
+}
+
+template <typename V>
+void AlgorithmRef::update(const std::map<std::string, V>& overrides) {
+  for (const auto& [k, v] : overrides) {
+    set(k, v);
+  }
+}
 
 }  // namespace qdk::chemistry::data

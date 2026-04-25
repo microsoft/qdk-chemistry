@@ -203,6 +203,11 @@ class QdkEnergyEstimator(EnergyEstimator):
                 * ``energy_result``: Energy expectation value and variance for the provided Hamiltonian.
                 * ``measurement_data``: Raw measurement counts and metadata used to compute the expectation value.
 
+        Note:
+            * Measurement circuits are generated for each QubitHamiltonian term.
+            * Parameterized circuits are not supported.
+            * Only one circuit is supported per run.
+
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")

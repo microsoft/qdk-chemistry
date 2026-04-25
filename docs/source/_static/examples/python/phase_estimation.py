@@ -72,10 +72,22 @@ state_prep = create("state_prep", "sparse_isometry_gf2x")
 circuit = state_prep.run(wfn_cas)
 
 # 7. Create and run IQPE with nested algorithm settings
+from qdk_chemistry.data import AlgorithmRef
 
 iqpe = create(
     "phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10
 )
+
+# Configure nested algorithms — kwargs override the algorithm's defaults
+iqpe.settings().set(
+    "evolution_builder",
+    AlgorithmRef("time_evolution_builder", "trotter", order=2),
+)
+iqpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=42),
+)
+
 result = iqpe.run(
     state_preparation=circuit,
     qubit_hamiltonian=qubit_ham,
