@@ -2,9 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/algorithms/algorithm_ref_init.hpp>
-
 #include <qdk/chemistry/algorithms/active_space.hpp>
+#include <qdk/chemistry/algorithms/algorithm_ref_init.hpp>
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
