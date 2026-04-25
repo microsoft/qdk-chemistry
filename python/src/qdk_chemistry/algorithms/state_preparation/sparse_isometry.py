@@ -124,39 +124,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 "alpha and beta orbitals are not supported for state preparation."
             )
 
-        params = self._build_state_prep_params(wavefunction)
-
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            parameter=params,
-        )
-
-        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**params)
-        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
-
-    def _build_state_prep_params(self, wavefunction: Wavefunction) -> dict:
-        """Build state preparation parameters from a wavefunction.
-
-        Extracts coefficients and determinants, performs GF2+X elimination,
-        and returns the parameter dict for Q# circuit construction.
-
-        Args:
-            wavefunction: The target wavefunction to prepare.
-
-        Returns:
-            A parameter dict for Q# circuit construction.
-
-        """
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
-            bitstrings.append(bitstring)
-
+        bitstrings, coeffs = self._wavefunction_to_bitstrings_and_coeffs(wavefunction)
         # Check for single determinant case after filtering
         if len(bitstrings) == 1:
             Logger.info("After filtering, only 1 determinant remains, using single reference state preparation")
@@ -173,6 +141,53 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
         if self._settings.get("dense_preparation_method") == "qiskit":
             return self._qiskit_dense_preparation(gf2x_operation_results, statevector_data, n_qubits)
 
+        params = self._build_qsharp_state_prep_params(wavefunction)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=params,
+        )
+
+        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(**params)
+        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
+
+    def _wavefunction_to_bitstrings_and_coeffs(self, wavefunction: Wavefunction) -> tuple[list[str], np.ndarray]:
+        """Extract bitstrings and coefficients from a wavefunction.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+
+        Returns:
+            A tuple containing a list of bitstrings and a corresponding array of coefficients.
+
+        """
+        coeffs = wavefunction.get_coefficients()
+        dets = wavefunction.get_active_determinants()
+        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
+        bitstrings = []
+        for det in dets:
+            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
+            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
+            bitstrings.append(bitstring)
+        return bitstrings, coeffs
+
+    def _build_qsharp_state_prep_params(self, wavefunction: Wavefunction) -> dict:
+        """Build state preparation parameters from a wavefunction.
+
+        Extracts coefficients and determinants, performs GF2+X elimination,
+        and returns the parameter dict for Q# circuit construction.
+
+        Args:
+            wavefunction: The target wavefunction to prepare.
+
+        Returns:
+            A parameter dict for Q# circuit construction.
+
+        """
+        bitstrings, coeffs = self._wavefunction_to_bitstrings_and_coeffs(wavefunction)
+        n_qubits = len(bitstrings[0])
+        gf2x_operation_results, statevector_data = self._perform_gf2x(bitstrings, coeffs)
         # Use QDK dense state preparation
         expansion_ops: list[MatrixCompressionOp] = []
         for operation in reversed(gf2x_operation_results.operations):
