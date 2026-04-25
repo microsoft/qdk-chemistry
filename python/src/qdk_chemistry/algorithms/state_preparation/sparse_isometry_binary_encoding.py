@@ -97,11 +97,6 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             parameter=params,
         )
         qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
-        Logger.info(
-            f"Binary encoding produced {len(params['binaryEncodingOps'])} operations "
-            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants "
-            f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
-        )
 
         return Circuit(
             qsharp_factory=qsharp_factory,
@@ -190,7 +185,14 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             numQubits=n_qubits,
             ancillaPool=ancilla_pool,
         )
-        return vars(state_prep_params)
+        params = vars(state_prep_params)
+
+        Logger.info(
+            f"Binary encoding produced {len(params['binaryEncodingOps'])} operations "
+            f"for {n_qubits}-qubit system with {len(bitstrings)} determinants "
+            f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
+        )
+        return params
 
     def _create_dense(self, params: dict) -> Circuit:
         """Create a standalone dense state preparation circuit.
