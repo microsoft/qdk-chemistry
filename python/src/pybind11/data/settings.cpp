@@ -526,26 +526,20 @@ Attributes:
                  for (auto item : kwargs) {
                    const auto key = py::cast<std::string>(
                        py::reinterpret_borrow<py::object>(item.first));
-                   for (const auto &existing_key : ref.settings->keys()) {
-                     if (existing_key == key) {
-                       ref.settings->set(
-                           key, py::reinterpret_borrow<py::object>(item.second)
-                                    .cast<SettingValue>());
-                       break;
-                     }
+                   auto value = py::reinterpret_borrow<py::object>(item.second);
+                   if (!ref.settings->has(key)) {
+                     throw SettingNotFound(key);
                    }
+                   ref.settings->set(
+                       key, python_to_setting_value_with_type(
+                                value, ref.settings->get_type_name(key), key));
                  }
                } else {
-                 // Fallback: create Settings from kwargs alone using direct
-                 // SettingValue conversion instead of JSON serialization.
-                 ref.settings = std::make_shared<Settings>();
-                 for (auto item : kwargs) {
-                   const auto key = py::cast<std::string>(
-                       py::reinterpret_borrow<py::object>(item.first));
-                   ref.settings->set(
-                       key, py::reinterpret_borrow<py::object>(item.second)
-                                .cast<SettingValue>());
-                 }
+                 throw py::value_error(
+                     "Unable to resolve default settings for algorithm '" +
+                     algorithm_type + "/" + algorithm_name +
+                     "'; keyword overrides require resolvable default "
+                     "settings.");
                }
              }
              return ref;

@@ -113,8 +113,7 @@ class MultiConfigurationScf
    *
    * This pure virtual method must be implemented by derived classes to perform
    * the MCSCF calculation, which optimizes both orbital and CI coefficients.
-   * The method takes initial orbitals, a Hamiltonian constructor and a
-   * multi-configurational calculator, then returns both the calculated energy
+   * The method takes initial orbitals, then returns both the calculated energy
    * and the optimized multi-configurational wavefunction, including both
    * optimized orbital coefficients and CI coefficients.
    *
