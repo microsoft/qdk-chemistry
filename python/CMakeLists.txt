@@ -16,6 +16,26 @@ else()
     message(STATUS "Project version: ${QDK_VERSION}")
 endif()
 
+# Compute full version: append .dev0 for from-source builds not on a release tag.
+set(QDK_FULL_VERSION "${QDK_VERSION_RAW}")
+if(QDK_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    find_package(Git QUIET)
+    if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../.git")
+        execute_process(
+            COMMAND ${GIT_EXECUTABLE} describe --tags --exact-match HEAD
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+            OUTPUT_VARIABLE _GIT_TAG
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+            ERROR_QUIET
+            RESULT_VARIABLE _GIT_TAG_RESULT)
+        if(NOT _GIT_TAG_RESULT EQUAL 0
+           OR NOT (_GIT_TAG STREQUAL "${QDK_VERSION_RAW}" OR _GIT_TAG STREQUAL "v${QDK_VERSION_RAW}"))
+            string(APPEND QDK_FULL_VERSION ".dev0")
+        endif()
+    endif()
+endif()
+message(STATUS "Full version: ${QDK_FULL_VERSION}")
+
 # Re-run CMake configure when the VERSION file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_VERSION_FILE}")
 
@@ -168,7 +188,7 @@ function(find_python_module module)
 endfunction()
 
 # Set module properties
-target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
+target_compile_definitions(_core PRIVATE VERSION_INFO=${QDK_FULL_VERSION})
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES
