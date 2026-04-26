@@ -18,9 +18,12 @@ from qdk_chemistry.data import Structure
 
 from .reference_tolerances import scf_energy_tolerance
 
-# Mo ROHF/def2-svp reference: sum of absolute values of h1e (alpha = beta for ROHF).
-# Without ECP (bare Z=42) this blows up to ~10,000+.
-_MO_ROHF_H1E_ABS_SUM = 233.2282872909
+# Mo ROHF/def2-svp reference: trace of h1e (alpha = beta for ROHF).
+# Trace is unitarily invariant, so it does not depend on the MO rotation
+# within degenerate subspaces (d-shell degeneracy causes different rotations
+# across thread counts / platforms).
+# Without ECP (bare Z=42), the trace is ~ -1800.  With ECP (Z_eff=14), ~ -134.
+_MO_ROHF_H1E_TRACE = -133.9900221637
 
 
 @pytest.fixture(scope="module")
@@ -41,5 +44,5 @@ def test_ecp_included_in_hamiltonian_h1e(mo_rohf_orbitals, constructor_name):
     ham = create("hamiltonian_constructor", constructor_name).run(mo_rohf_orbitals)
     h1e_a, h1e_b = ham.get_one_body_integrals()
 
-    np.testing.assert_allclose(np.sum(np.abs(h1e_a)), _MO_ROHF_H1E_ABS_SUM, atol=scf_energy_tolerance)
-    np.testing.assert_allclose(np.sum(np.abs(h1e_b)), _MO_ROHF_H1E_ABS_SUM, atol=scf_energy_tolerance)
+    np.testing.assert_allclose(np.trace(h1e_a), _MO_ROHF_H1E_TRACE, atol=scf_energy_tolerance)
+    np.testing.assert_allclose(np.trace(h1e_b), _MO_ROHF_H1E_TRACE, atol=scf_energy_tolerance)
