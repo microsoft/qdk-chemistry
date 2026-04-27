@@ -714,20 +714,22 @@ class TestLookupSelect:
         assert len(ops) == 1
         name, (data_table, addr, dat) = ops[0]
         assert name == MatrixCompressionType.SELECT
-        assert addr == [0, 1]
+        assert addr == [1, 0]
         assert dat == [2]
         assert len(data_table) == 4
 
     def test_data_table_correctness(self):
         """Verify the dense Bool[][] table encodes the sparse dict correctly."""
         # Address (1,0) → data (1,0), address (0,1) → data (0,1)
+        # After reversal: (1,0) → reversed (0,1) → addr_int=2
+        #                 (0,1) → reversed (1,0) → addr_int=1
         table = {(1, 0): (1, 0), (0, 1): (0, 1)}
         ops = _lookup_select(table, [0, 1], [2, 3])
         _, (data_table, _, _) = ops[0]
-        # addr_int for (1,0): bit0=1, bit1=0 → addr_int=1
-        assert data_table[1] == [True, False]
-        # addr_int for (0,1): bit0=0, bit1=1 → addr_int=2
-        assert data_table[2] == [False, True]
+        # addr_int for (1,0): reversed to (0,1), bit0=0, bit1=1 → addr_int=2
+        assert data_table[2] == [True, False]
+        # addr_int for (0,1): reversed to (1,0), bit0=1, bit1=0 → addr_int=1
+        assert data_table[1] == [False, True]
         # Other entries should be all-false
         assert data_table[0] == [False, False]
         assert data_table[3] == [False, False]
