@@ -8,6 +8,7 @@
 #include <macis/asci/grow.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/mcscf/cas.hpp>
+#include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
@@ -55,22 +56,19 @@ struct cas_helper {
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
-    macis::ASCISettings asci_settings = get_asci_settings_(settings_);
 
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
     double E_casci = 0.0;
 
-    E_casci = macis::CASRDMFunctor<generator_t>::rdms(
-        mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-        nbeta, const_cast<double*>(T_a.data()),
-        const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
-    // Generate determinant basis for RDM calculation
+    int64_t iterative_solver_dimension_cutoff =
+        settings_.get<int64_t>("iterative_solver_dimension_cutoff");
+
+    // Generate determinant basis
     dets = macis::generate_hilbert_space<typename generator_t::full_det_t>(
         num_molecular_orbitals, nalpha, nbeta);
 
-    // Build Hamiltonian generator and delegate wavefunction construction via
-    // unified builder
+    // Build Hamiltonian generator
     generator_t ham_gen(macis::matrix_span<double>(
                             const_cast<double*>(T_a.data()),
                             num_molecular_orbitals, num_molecular_orbitals),
@@ -78,6 +76,31 @@ struct cas_helper {
                             const_cast<double*>(V_aaaa.data()),
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
+
+    // CI diagonalization: dense for small spaces, iterative otherwise
+    const auto n = static_cast<int64_t>(dets.size());
+    if (n == 1) {
+      E_casci = ham_gen.matrix_element(dets[0], dets[0]);
+      C_casci = {1.0};
+    } else if (n <= iterative_solver_dimension_cutoff) {
+      auto H_csr = macis::make_csr_hamiltonian<int32_t>(
+          dets.begin(), dets.end(), ham_gen, mcscf_settings.ci_matel_tol);
+      std::vector<double> H_dense(n * n, 0.0);
+      std::vector<double> evals(n, 0.0);
+
+      sparsexx::convert_to_dense(H_csr, H_dense.data(), n);
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Upper, n, H_dense.data(), n,
+                   evals.data());
+
+      E_casci = evals[0];
+      C_casci.resize(n);
+      std::copy_n(H_dense.begin(), n, C_casci.begin());
+    } else {
+      E_casci = macis::CASRDMFunctor<generator_t>::rdms(
+          mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+          nbeta, const_cast<double*>(T_a.data()),
+          const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+    }
 
     data::Wavefunction wfn = build_wavefunction<data::CasWavefunctionContainer>(
         settings_, hamiltonian, ham_gen, num_molecular_orbitals, C_casci, dets);

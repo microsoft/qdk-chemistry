@@ -203,8 +203,8 @@ Typical usage:
     pmc = alg.QdkMacisPmc()
 
     # Configure PMC-specific settings
-    pmc.settings().set("davidson_res_tol", 1e-8)
-    pmc.settings().set("davidson_max_m", 200)
+    pmc.settings().set("ci_residual_tolerance", 1e-8)
+    pmc.settings().set("max_solver_iterations", 200)
 
     # Prepare configurations
     configurations = [...]  # Your list of Configuration objects

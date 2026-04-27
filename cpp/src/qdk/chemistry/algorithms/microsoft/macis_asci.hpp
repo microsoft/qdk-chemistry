@@ -23,7 +23,7 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * @see MultiConfigurationSettings
  */
-class MacisAsciSettings : public MultiConfigurationSettings {
+class MacisAsciSettings : public MacisSettings {
  public:
   /**
    * @brief Default constructor
@@ -50,10 +50,18 @@ class MacisAsciSettings : public MultiConfigurationSettings {
         data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
 
     // Tolerance parameters
-    set_default<double>("h_el_tol", macis_defaults.h_el_tol);
-    set_default<double>("rv_prune_tol", macis_defaults.rv_prune_tol);
-    set_default<double>("pt2_tol", macis_defaults.pt2_tol);
-    set_default<double>("refine_energy_tol", macis_defaults.refine_energy_tol);
+    set_default<double>("search_matel_tol", macis_defaults.h_el_tol,
+                        "Hamiltonian matrix element magnitude threshold",
+                        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>("rv_prune_tol", macis_defaults.rv_prune_tol,
+                        "Ratio value pruning threshold",
+                        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>("pt2_tol", macis_defaults.pt2_tol,
+                        "PT2 correction tolerance",
+                        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>("refine_energy_tol", macis_defaults.refine_energy_tol,
+                        "Energy convergence tolerance for refinement",
+                        data::BoundConstraint<double>{0.0, 1.0});
 
     // PT2 correction parameters
     set_default<int64_t>(
@@ -87,11 +95,18 @@ class MacisAsciSettings : public MultiConfigurationSettings {
                         "Factor by which to grow the variational space",
                         data::BoundConstraint<double>{
                             1.0e0, std::numeric_limits<double>::max()});
-    set_default<double>("min_grow_factor", macis_defaults.min_grow_factor);
+    set_default<double>(
+        "min_grow_factor", macis_defaults.min_grow_factor,
+        "Minimum allowed growth factor",
+        data::BoundConstraint<double>{1.0, std::numeric_limits<double>::max()});
     set_default<double>("growth_backoff_rate",
-                        macis_defaults.growth_backoff_rate);
-    set_default<double>("growth_recovery_rate",
-                        macis_defaults.growth_recovery_rate);
+                        macis_defaults.growth_backoff_rate,
+                        "Rate to reduce grow_factor on failure",
+                        data::BoundConstraint<double>{0.0, 1.0});
+    set_default<double>(
+        "growth_recovery_rate", macis_defaults.growth_recovery_rate,
+        "Rate to restore grow_factor on success",
+        data::BoundConstraint<double>{1.0, std::numeric_limits<double>::max()});
     set_default<int64_t>(
         "max_refine_iter", macis_defaults.max_refine_iter,
         "Maximum number of refinement iterations",
@@ -103,13 +118,23 @@ class MacisAsciSettings : public MultiConfigurationSettings {
         data::BoundConstraint<int64_t>{1, std::numeric_limits<int64_t>::max()});
 
     // Constraint parameters
-    set_default<int64_t>("constraint_level", macis_defaults.constraint_level);
-    set_default<int64_t>("pt2_max_constraint_level",
-                         macis_defaults.pt2_max_constraint_level);
-    set_default<int64_t>("pt2_min_constraint_level",
-                         macis_defaults.pt2_min_constraint_level);
-    set_default<int64_t>("pt2_constraint_refine_force",
-                         macis_defaults.pt2_constraint_refine_force);
+    set_default<int64_t>(
+        "constraint_level", macis_defaults.constraint_level,
+        "Constraint level for excitation generation",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "pt2_max_constraint_level", macis_defaults.pt2_max_constraint_level,
+        "Maximum constraint level for PT2 calculations",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "pt2_min_constraint_level", macis_defaults.pt2_min_constraint_level,
+        "Minimum constraint level for PT2 calculations",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+    set_default<int64_t>(
+        "pt2_constraint_refine_force",
+        macis_defaults.pt2_constraint_refine_force,
+        "Force constraint refinement for PT2 calculations",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
 
     // Core selection strategy parameter
     set_default<std::string>("core_selection_strategy", "percentage");

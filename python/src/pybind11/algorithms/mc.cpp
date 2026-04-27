@@ -227,7 +227,7 @@ Typical usage:
 
     # Configure ASCI-specific settings
     asci.settings().set("ntdets_max", 1000)
-    asci.settings().set("h_el_tol", 1e-6)
+    asci.settings().set("search_matel_tol", 1e-6)
 
     # Run calculation
     energy, wavefunction = asci.run(hamiltonian, n_alpha, n_beta)

@@ -116,7 +116,7 @@ class MockProjectedMultiConfigurationCalculator(ProjectedMultiConfigurationCalcu
         self._settings = Settings()
         # Define default settings
         self._settings._set_default("test_param", "int", 42)
-        self._settings._set_default("h_el_tol", "double", 1e-12)
+        self._settings._set_default("search_matel_tol", "double", 1e-12)
         self._settings._set_default("calculate_one_rdm", "bool", False)
         self._settings._set_default("calculate_two_rdm", "bool", False)
 
