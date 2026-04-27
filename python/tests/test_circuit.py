@@ -461,35 +461,5 @@ class TestCircuitEstimate:
             c[1] = measure q[1];
         """)
         circuit = Circuit(qir=qir)
-        with pytest.raises(RuntimeError, match="Cannot estimate resources"):
-            circuit.estimate()
-
-
-class TestCircuitCirq:
-    """Test cases for Cirq circuit support in Circuit."""
-
-    def test_circuit_construction_with_cirq(self):
-        """Test that Circuit can be constructed with a Cirq circuit."""
-        import cirq  # noqa: PLC0415
-
-        q = cirq.LineQubit(0)
-        cirq_circuit = cirq.Circuit(cirq.H(q))
-        circuit = Circuit(cirq=cirq_circuit)
-        assert circuit.get_cirq_circuit() is cirq_circuit
-
-    def test_get_cirq_circuit_raises_when_not_set(self, simple_qasm):
-        """Test that get_cirq_circuit raises when no Cirq circuit is available."""
-        circuit = Circuit(qasm=simple_qasm)
-        with pytest.raises(RuntimeError, match="No Cirq circuit representation"):
-            circuit.get_cirq_circuit()
-
-    def test_cirq_only_circuit_no_other_repr(self):
-        """Test that Circuit with only Cirq is valid and other methods raise."""
-        import cirq  # noqa: PLC0415
-
-        q = cirq.LineQubit(0)
-        cirq_circuit = cirq.Circuit(cirq.H(q))
-        circuit = Circuit(cirq=cirq_circuit)
-        assert circuit.get_cirq_circuit() is cirq_circuit
-        with pytest.raises(RuntimeError):
-            circuit.get_qasm()
+        result = circuit.estimate()
+        assert result is not None

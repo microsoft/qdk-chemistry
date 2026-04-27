@@ -58,7 +58,6 @@ class Circuit(DataClass):
         qsharp_op: Callable[..., Any] | None = None,
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
-        cirq: Any | None = None,
     ) -> None:
         """Initialize a Circuit.
 
@@ -68,17 +67,17 @@ class Circuit(DataClass):
             qsharp: The Q# circuit object. Defaults to None.
             qsharp_factory: The factory data for creating a Q# program. Defaults to None.
             qsharp_op: The Q# operation associated with the circuit. Defaults to None.
-            encoding: Fermion-to-qubit encoding (e.g. ``"jordan-wigner"``). Defaults to None.
-            cirq: A Cirq circuit (``cirq.AbstractCircuit``). Requires ``cirq-core``. Defaults to None.
+            encoding: The fermion-to-qubit encoding assumed by this circuit.
+                Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
+                Defaults to None.
 
         Notes:
-            At least one representation (qasm, qir, qsharp, qsharp_factory, or cirq) must be provided.
+            At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
             If multiple representations are available, conversion methods attempt to follow this priority order:
             - get_qasm(): Returns qasm string if available, otherwise converts from qir via Qiskit if possible.
             - get_qir(): Returns qir if available, otherwise converts from qasm
             - get_qsharp_circuit(): Returns Q# circuit if available, otherwise converts from qasm
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
-            - get_cirq_circuit(): Returns cirq circuit if stored directly.
 
         """
         Logger.trace_entering()
@@ -88,17 +87,9 @@ class Circuit(DataClass):
         self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
         self.encoding = encoding
-        self._cirq = cirq
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
-        has_repr = (
-            self.qasm is not None
-            or self.qsharp is not None
-            or self.qir is not None
-            or self._qsharp_factory is not None
-            or self._cirq is not None
-        )
-        if not has_repr:
+        if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):
             raise RuntimeError("No representation of the quantum circuit is set.")
 
         # Make instance immutable after construction (handled by base class)
@@ -224,10 +215,12 @@ class Circuit(DataClass):
                 params,
                 *self._qsharp_factory.parameter.values(),
             )
+        if self._has_qir():
+            return qsharp.openqasm.estimate(self.get_qasm(), params)
         if self.qasm is not None:
             return qsharp.openqasm.estimate(self.qasm, params)
 
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+        raise RuntimeError("Cannot estimate resources: no Q# factory data, QIR, or QASM representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
@@ -268,20 +261,6 @@ class Circuit(DataClass):
         # Cache via object.__setattr__ to bypass the immutability guard
         object.__setattr__(self, "_qiskit_circuit", result)
         return result
-
-    def get_cirq_circuit(self) -> Any:
-        """Get the quantum circuit as a Cirq circuit object.
-
-        Returns:
-            A ``cirq.AbstractCircuit`` (typically ``cirq.FrozenCircuit`` or ``cirq.Circuit``).
-
-        Raises:
-            RuntimeError: If no Cirq circuit representation is available.
-
-        """
-        if self._cirq is not None:
-            return self._cirq
-        raise RuntimeError("No Cirq circuit representation is available. Construct the Circuit with a cirq argument.")
 
     # DataClass interface implementation
     def get_summary(self) -> str:

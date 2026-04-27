@@ -202,104 +202,41 @@ class TestPauliProductFormulaContainer:
         assert "Step repetitions: 4" in summary
 
 
-class TestCirqPauliStringMapper:
-    """Test CirqPauliStringMapper circuit conversion."""
+class TestPauliSequenceMapperCircuit:
+    """Test PauliSequenceMapper produces a Circuit with QIR that supports estimation."""
 
     def _map(self, step_terms, step_reps, num_qubits):
-        """Helper: build a TimeEvolutionUnitary and map it to a Circuit via CirqPauliStringMapper."""
-        from qdk_chemistry.algorithms.time_evolution.circuit_mapper.cirq_pauli_string_mapper import (  # noqa: PLC0415
-            CirqPauliStringMapper,
-        )
+        """Helper: build a TimeEvolutionUnitary and map it to a Circuit via PauliSequenceMapper."""
+        from qdk_chemistry.algorithms.time_evolution.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
         from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary  # noqa: PLC0415
 
         container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=step_reps, num_qubits=num_qubits)
         evolution = TimeEvolutionUnitary(container=container)
-        mapper = CirqPauliStringMapper()
+        mapper = PauliSequenceMapper()
         return mapper.run(evolution)
 
-    def test_returns_circuit_with_cirq(self, step_terms):
-        """Test that the mapper returns a Circuit with a Cirq representation."""
-        import cirq  # noqa: PLC0415
-
+    def test_returns_circuit_with_qir(self, step_terms):
+        """Test that the mapper returns a Circuit with QIR and Q# representations."""
         circuit = self._map(step_terms, step_reps=1, num_qubits=2)
         assert circuit is not None
-        cirq_circuit = circuit.get_cirq_circuit()
-        assert isinstance(cirq_circuit, cirq.AbstractCircuit)
+        assert circuit.qir is not None
+        assert circuit.qsharp is not None
 
-    def test_single_qubit_terms(self):
-        """Test conversion with single-qubit Pauli terms."""
-        import cirq  # noqa: PLC0415
-
-        terms = [ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5)]
-        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
-        ops = list(cirq_circuit.all_operations())
-        assert len(ops) == 1
-        assert isinstance(ops[0], cirq.PauliStringPhasor)
-
-    def test_two_qubit_terms(self):
-        """Test conversion with two-qubit Pauli terms."""
-        terms = [ExponentiatedPauliTerm(pauli_term={0: "Z", 1: "Z"}, angle=0.25)]
-        cirq_circuit = self._map(terms, 1, 2).get_cirq_circuit()
-        ops = list(cirq_circuit.all_operations())
-        assert len(ops) == 1
-
-    def test_step_reps(self, step_terms):
-        """Test that step_reps > 1 produces a CircuitOperation with repetitions."""
-        import cirq  # noqa: PLC0415
-
-        cirq_circuit = self._map(step_terms, step_reps=5, num_qubits=2).get_cirq_circuit()
-        ops = list(cirq_circuit.all_operations())
-        assert len(ops) == 1
-        assert isinstance(ops[0], cirq.CircuitOperation)
-        assert ops[0].repetitions == 5
-
-    def test_empty_terms(self):
-        """Test conversion with empty step terms."""
-        cirq_circuit = self._map([], 1, 2).get_cirq_circuit()
-        assert len(list(cirq_circuit.all_operations())) == 0
-
-    def test_angle_mapping(self):
-        """Test that the angle is correctly mapped to exponent_neg = 2*angle/pi."""
-        import math  # noqa: PLC0415
-
-        import cirq  # noqa: PLC0415
-
-        angle = 0.7
-        terms = [ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=angle)]
-        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
-        op = next(iter(cirq_circuit.all_operations()))
-        assert isinstance(op, cirq.PauliStringPhasor)
-        assert abs(op.exponent_neg - 2 * angle / math.pi) < 1e-12
-        assert op.exponent_pos == 0
-
-    def test_preserves_term_order(self):
-        """Test that the order of terms in the circuit matches the container."""
-        import cirq  # noqa: PLC0415
-
-        terms = [
-            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1),
-            ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=0.2),
-            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3),
-        ]
-        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
-        ops = list(cirq_circuit.all_operations())
-        assert len(ops) == 3
-        q = cirq.LineQubit(0)
-        for op, expected_pauli in zip(ops, [cirq.X, cirq.Y, cirq.Z], strict=True):
-            ps = op.pauli_string
-            assert ps[q] == expected_pauli
+    def test_circuit_supports_resource_estimation(self, step_terms):
+        """Test that the mapped circuit can be resource-estimated via Circuit.estimate()."""
+        circuit = self._map(step_terms, step_reps=1, num_qubits=2)
+        result = circuit.estimate()
+        assert result is not None
+        assert result["physicalCounts"]["physicalQubits"] > 0
 
     def test_end_to_end_with_trotter(self, step_terms):
-        """Test mapper works end-to-end from TimeEvolutionUnitary."""
-        from qdk_chemistry.algorithms.time_evolution.circuit_mapper.cirq_pauli_string_mapper import (  # noqa: PLC0415
-            CirqPauliStringMapper,
-        )
+        """Test mapper works end-to-end from TimeEvolutionUnitary to resource estimation."""
+        from qdk_chemistry.algorithms.time_evolution.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
         from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary  # noqa: PLC0415
 
         container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=2, num_qubits=2)
         evolution = TimeEvolutionUnitary(container=container)
-        mapper = CirqPauliStringMapper()
+        mapper = PauliSequenceMapper()
         circuit = mapper.run(evolution)
         assert circuit is not None
-        cirq_circuit = circuit.get_cirq_circuit()
-        assert cirq_circuit is not None
+        assert circuit.qir is not None

@@ -6,12 +6,9 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import EvolutionCircuitMapperFactory
-from .cirq_pauli_string_mapper import CirqPauliStringMapper, CirqPauliStringMapperSettings
 from .pauli_sequence_mapper import PauliSequenceMapper, PauliSequenceMapperSettings
 
 __all__ = [
-    "CirqPauliStringMapper",
-    "CirqPauliStringMapperSettings",
     "EvolutionCircuitMapperFactory",
     "PauliSequenceMapper",
     "PauliSequenceMapperSettings",
