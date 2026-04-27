@@ -1418,6 +1418,7 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
   scf_factory->settings().set("eri_method", "incore");
+  scf_factory->settings().set("integral_type", "four_center");
 
   auto o2_structure_ptr = std::make_shared<Structure>(o2_structure);
 
@@ -2361,11 +2362,12 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
 }
 
 TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
-  // Run restricted O2 with density-fitted
+  // Run restricted O2 SCF with four center integrals, but generate a
+  // density-fitted Hamiltonian
   auto [energy, df_hamiltonian, wfn] =
       run_restricted_active_o2("qdk_density_fitted_hamiltonian");
 
-  EXPECT_NEAR(energy, -149.546010224686, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy, -149.5410413101995744, testing::scf_energy_tolerance);
   // Verify hamiltonian properties
   EXPECT_TRUE(df_hamiltonian->has_one_body_integrals());
   EXPECT_TRUE(df_hamiltonian->has_two_body_integrals());
@@ -2391,16 +2393,17 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
   auto rmp2_corr_energy = mp2_calc_ptr->calculate_restricted_mp2_energy(
       df_hamiltonian, orbitals, n_alpha);
 
-  EXPECT_NEAR(rmp2_corr_energy, -0.0779355394591961,
-              testing::mp2_tolerance);  // reference value from Pyscf
+  EXPECT_NEAR(rmp2_corr_energy, -0.0779523495,
+              testing::mp2_tolerance);  // reference value from Psi4
 
   // Create ansatz from Hamiltonian and wavefunction
   auto ansatz = std::make_shared<Ansatz>(df_hamiltonian, wfn);
 
   // MP2 returns total energy
   auto [mp2_total_energy, final_wavefunction, _] = mp2_calculator->run(ansatz);
-  EXPECT_NEAR(mp2_total_energy, -149.623945764146,
-              testing::mp2_tolerance);  // reference value from Pyscf
+
+  EXPECT_NEAR(mp2_total_energy, -149.6209819271,
+              testing::mp2_tolerance);  // reference value from Psi4
 }
 
 // ============================================================================

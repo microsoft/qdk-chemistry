@@ -211,6 +211,13 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Configure density-fitted Coulomb (DFJ)
   std::string integral_type = _settings->get<std::string>("integral_type");
+  if (integral_type != "auto" && integral_type != "dfj" &&
+      integral_type != "four_center") {
+    throw std::invalid_argument(
+        "Invalid value for 'integral_type'. Must be one of 'auto', 'dfj', or "
+        "'four_center'.");
+  }
+
   std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
   // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ
   bool use_dfj = (integral_type == "dfj");
