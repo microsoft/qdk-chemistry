@@ -167,8 +167,8 @@ TEST(SSquared, TripletMSZero) {
   Eigen::VectorXd coeffs(2);
   coeffs(0) = 1.0 / std::sqrt(2.0);
   coeffs(1) = -1.0 / std::sqrt(2.0);
-  Wavefunction::DeterminantVector dets = {Configuration("20"),
-                                          Configuration("02")};
+  Wavefunction::DeterminantVector dets = {Configuration("ud"),
+                                          Configuration("du")};
 
   // Note: We override the RDMs manually here to match the triplet state.
   // The CAS container doesn't recompute them from coefficients.
@@ -400,8 +400,8 @@ TEST(SSquared, OpenShellSinglet) {
   Eigen::VectorXd coeffs(2);
   coeffs(0) = 1.0 / std::sqrt(2.0);
   coeffs(1) = 1.0 / std::sqrt(2.0);
-  Wavefunction::DeterminantVector dets = {Configuration("20"),
-                                          Configuration("02")};
+  Wavefunction::DeterminantVector dets = {Configuration("ud"),
+                                          Configuration("du")};
 
   auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, orbitals, std::nullopt, std::make_optional(one_rdm_aa),
