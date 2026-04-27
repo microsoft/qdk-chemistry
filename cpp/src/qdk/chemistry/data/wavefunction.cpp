@@ -620,19 +620,18 @@ double WavefunctionContainer::compute_s_squared() const {
   const std::size_t expected_two_rdm_size =
       static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs) *
       static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs);
-  auto validate_two_rdm_size = [expected_two_rdm_size,
-                                norbs](const auto& two_rdm_var,
-                                       const char* block_name) {
+  auto validate_two_rdm_size = [expected_two_rdm_size, norbs](
+                                   const auto& two_rdm_var,
+                                   const char* block_name) {
     std::visit(
-        [expected_two_rdm_size, norbs,
-         block_name](const auto& vec) {
+        [expected_two_rdm_size, norbs, block_name](const auto& vec) {
           if (vec.size() != expected_two_rdm_size) {
             std::ostringstream error;
             error << "Invalid size for spin-dependent 2-RDM block '"
                   << block_name << "' in compute_s_squared(): got "
                   << vec.size() << " elements, expected "
-                  << expected_two_rdm_size << " (= norbs^4 for norbs="
-                  << norbs << ")";
+                  << expected_two_rdm_size << " (= norbs^4 for norbs=" << norbs
+                  << ")";
             throw std::runtime_error(error.str());
           }
         },
