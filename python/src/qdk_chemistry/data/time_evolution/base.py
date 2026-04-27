@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import h5py  # noqa: TC002
 
@@ -15,9 +15,6 @@ from qdk_chemistry.data.base import DataClass
 
 from .containers.base import TimeEvolutionUnitaryContainer  # noqa: TC001
 from .containers.pauli_product_formula import PauliProductFormulaContainer
-
-if TYPE_CHECKING:
-    from qdk_chemistry.data.circuit import Circuit
 
 __all__: list[str] = []
 
@@ -67,23 +64,6 @@ class TimeEvolutionUnitary(DataClass):
 
         """
         return self._container.num_qubits
-
-    def to_circuit(self) -> Circuit:
-        """Convert the time evolution unitary to a :class:`~qdk_chemistry.data.circuit.Circuit`.
-
-        Delegates to the underlying container's ``to_circuit()`` method. Currently only
-        ``PauliProductFormulaContainer`` is supported.
-
-        Returns:
-            A :class:`~qdk_chemistry.data.circuit.Circuit` representing the time evolution unitary.
-
-        Raises:
-            ValueError: If the container type does not support circuit conversion.
-
-        """
-        if not hasattr(self._container, "to_circuit"):
-            raise ValueError(f"Container type '{self._container.type}' does not support to_circuit() conversion.")
-        return self._container.to_circuit()
 
     def to_json(self) -> dict[str, Any]:
         """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.

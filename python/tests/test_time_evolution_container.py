@@ -202,71 +202,77 @@ class TestPauliProductFormulaContainer:
         assert "Step repetitions: 4" in summary
 
 
-class TestPauliProductFormulaCirqConversion:
-    """Test Cirq circuit conversion from PauliProductFormulaContainer."""
+class TestCirqPauliStringMapper:
+    """Test CirqPauliStringMapper circuit conversion."""
 
-    def test_to_circuit_returns_circuit(self, step_terms):
-        """Test that to_circuit returns a Circuit object with a Cirq representation."""
+    def _map(self, step_terms, step_reps, num_qubits):
+        """Helper: build a TimeEvolutionUnitary and map it to a Circuit via CirqPauliStringMapper."""
+        from qdk_chemistry.algorithms.time_evolution.circuit_mapper.cirq_pauli_string_mapper import (  # noqa: PLC0415
+            CirqPauliStringMapper,
+        )
+        from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary  # noqa: PLC0415
+
+        container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=step_reps, num_qubits=num_qubits)
+        evolution = TimeEvolutionUnitary(container=container)
+        mapper = CirqPauliStringMapper()
+        return mapper.run(evolution)
+
+    def test_returns_circuit_with_cirq(self, step_terms):
+        """Test that the mapper returns a Circuit with a Cirq representation."""
         import cirq  # noqa: PLC0415
 
-        container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=1, num_qubits=2)
-        circuit = container.to_circuit()
+        circuit = self._map(step_terms, step_reps=1, num_qubits=2)
         assert circuit is not None
         cirq_circuit = circuit.get_cirq_circuit()
         assert isinstance(cirq_circuit, cirq.AbstractCircuit)
 
-    def test_to_circuit_single_qubit_terms(self):
+    def test_single_qubit_terms(self):
         """Test conversion with single-qubit Pauli terms."""
         import cirq  # noqa: PLC0415
 
         terms = [ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5)]
-        container = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=1)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
         ops = list(cirq_circuit.all_operations())
         assert len(ops) == 1
         assert isinstance(ops[0], cirq.PauliStringPhasor)
 
-    def test_to_circuit_two_qubit_terms(self):
+    def test_two_qubit_terms(self):
         """Test conversion with two-qubit Pauli terms."""
         terms = [ExponentiatedPauliTerm(pauli_term={0: "Z", 1: "Z"}, angle=0.25)]
-        container = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=2)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map(terms, 1, 2).get_cirq_circuit()
         ops = list(cirq_circuit.all_operations())
         assert len(ops) == 1
 
-    def test_to_circuit_step_reps(self, step_terms):
+    def test_step_reps(self, step_terms):
         """Test that step_reps > 1 produces a CircuitOperation with repetitions."""
         import cirq  # noqa: PLC0415
 
-        container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=5, num_qubits=2)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map(step_terms, step_reps=5, num_qubits=2).get_cirq_circuit()
         ops = list(cirq_circuit.all_operations())
         assert len(ops) == 1
         assert isinstance(ops[0], cirq.CircuitOperation)
         assert ops[0].repetitions == 5
 
-    def test_to_circuit_empty_terms(self):
+    def test_empty_terms(self):
         """Test conversion with empty step terms."""
-        container = PauliProductFormulaContainer(step_terms=[], step_reps=1, num_qubits=2)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map([], 1, 2).get_cirq_circuit()
         assert len(list(cirq_circuit.all_operations())) == 0
 
-    def test_to_circuit_angle_mapping(self):
-        """Test that the angle is correctly mapped to exponent_neg."""
+    def test_angle_mapping(self):
+        """Test that the angle is correctly mapped to exponent_neg = 2*angle/pi."""
         import math  # noqa: PLC0415
 
         import cirq  # noqa: PLC0415
 
         angle = 0.7
         terms = [ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=angle)]
-        container = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=1)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
         op = next(iter(cirq_circuit.all_operations()))
         assert isinstance(op, cirq.PauliStringPhasor)
         assert abs(op.exponent_neg - 2 * angle / math.pi) < 1e-12
         assert op.exponent_pos == 0
 
-    def test_to_circuit_preserves_term_order(self):
+    def test_preserves_term_order(self):
         """Test that the order of terms in the circuit matches the container."""
         import cirq  # noqa: PLC0415
 
@@ -275,8 +281,7 @@ class TestPauliProductFormulaCirqConversion:
             ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=0.2),
             ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.3),
         ]
-        container = PauliProductFormulaContainer(step_terms=terms, step_reps=1, num_qubits=1)
-        cirq_circuit = container.to_circuit().get_cirq_circuit()
+        cirq_circuit = self._map(terms, 1, 1).get_cirq_circuit()
         ops = list(cirq_circuit.all_operations())
         assert len(ops) == 3
         q = cirq.LineQubit(0)
@@ -284,17 +289,17 @@ class TestPauliProductFormulaCirqConversion:
             ps = op.pauli_string
             assert ps[q] == expected_pauli
 
-
-class TestTimeEvolutionUnitaryToCircuit:
-    """Test TimeEvolutionUnitary.to_circuit() delegation."""
-
-    def test_to_circuit_delegates_to_container(self, step_terms):
-        """Test that TimeEvolutionUnitary.to_circuit() works end-to-end."""
+    def test_end_to_end_with_trotter(self, step_terms):
+        """Test mapper works end-to-end from TimeEvolutionUnitary."""
+        from qdk_chemistry.algorithms.time_evolution.circuit_mapper.cirq_pauli_string_mapper import (  # noqa: PLC0415
+            CirqPauliStringMapper,
+        )
         from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary  # noqa: PLC0415
 
         container = PauliProductFormulaContainer(step_terms=step_terms, step_reps=2, num_qubits=2)
         evolution = TimeEvolutionUnitary(container=container)
-        circuit = evolution.to_circuit()
+        mapper = CirqPauliStringMapper()
+        circuit = mapper.run(evolution)
         assert circuit is not None
         cirq_circuit = circuit.get_cirq_circuit()
         assert cirq_circuit is not None

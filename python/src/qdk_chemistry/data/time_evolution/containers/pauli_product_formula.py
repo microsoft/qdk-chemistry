@@ -7,16 +7,12 @@
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import h5py  # noqa: TC002
 
 from .base import TimeEvolutionUnitaryContainer
-
-if TYPE_CHECKING:
-    from qdk_chemistry.data.circuit import Circuit
 
 __all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
 
@@ -130,52 +126,6 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             step_reps=self.step_reps,
             num_qubits=self._num_qubits,
         )
-
-    def to_circuit(self) -> Circuit:
-        r"""Convert the Pauli product formula to a :class:`~qdk_chemistry.data.circuit.Circuit`.
-
-        Each :class:`ExponentiatedPauliTerm` :math:`e^{-i\theta P}` is mapped to a ``cirq.PauliStringPhasor`` with
-        ``exponent_neg = 2\theta / \pi``, which implements :math:`e^{-i\theta P}` up to global phase.
-        When ``step_reps > 1`` the single-step circuit is wrapped in a ``cirq.CircuitOperation``.
-
-        Requires the ``cirq-core`` package.
-
-        Returns:
-            A :class:`~qdk_chemistry.data.circuit.Circuit` with a Cirq representation of the time-evolution unitary.
-
-        Raises:
-            ImportError: If ``cirq-core`` is not installed.
-
-        """
-        try:
-            import cirq  # noqa: PLC0415
-        except ImportError as exc:
-            raise ImportError("The 'cirq-core' package is required for Cirq circuit conversion.") from exc
-
-        from qdk_chemistry.data.circuit import Circuit as QdkCircuit  # noqa: PLC0415
-
-        pauli_gate = {"X": cirq.X, "Y": cirq.Y, "Z": cirq.Z}
-        qubits = cirq.LineQubit.range(self._num_qubits)
-
-        moments: list[cirq.Moment] = []
-        for term in self.step_terms:
-            if not term.pauli_term:
-                continue
-            pauli_string = cirq.PauliString({qubits[idx]: pauli_gate[op] for idx, op in term.pauli_term.items()})
-            phasor = cirq.PauliStringPhasor(
-                pauli_string,
-                exponent_neg=2 * term.angle / math.pi,
-                exponent_pos=0,
-            )
-            moments.append(cirq.Moment(phasor))
-
-        step_circuit = cirq.FrozenCircuit(moments)
-        if self.step_reps <= 1:
-            cirq_circuit = step_circuit
-        else:
-            cirq_circuit = cirq.Circuit(cirq.CircuitOperation(step_circuit, repetitions=self.step_reps)).freeze()
-
-        return QdkCircuit(cirq=cirq_circuit)
 
     def combine(self, other_container: PauliProductFormulaContainer, atol=1e-12) -> PauliProductFormulaContainer:
         """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
