@@ -128,7 +128,7 @@ TEST(SSquaredCAS, Li_Doublet) {
 }
 
 // O2: triplet ground state, <S^2> = 2.0
-// CAS(2,2) with 6 frozen (core + doubly-occupied valence)
+// CAS(4,4) with 6 frozen (core + doubly-occupied valence)
 TEST(SSquaredCAS, O2_Triplet) {
   auto o2 = testing::create_o2_structure();
   auto scf_solver = ScfSolverFactory::create();
