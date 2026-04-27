@@ -85,7 +85,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Create internal Molecule
   auto structure = basis_set->get_structure();
-  auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
   // Create internal BasisSet
   auto [internal_basis_set, internal_aux_basis_set] =
@@ -116,7 +115,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   // Create Integral Instance
   auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), mol.get(), scf_config->mpi);
+      internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
 
   // Compute Core Hamiltonian in AO basis
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
@@ -124,6 +123,14 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
+
+  // Add ECP integrals if present
+  if (internal_basis_set->ecp_shells.size() > 0) {
+    Eigen::MatrixXd ECP_full =
+        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    int1e->ecp_integral(ECP_full.data());
+    H_full += ECP_full;
+  }
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)

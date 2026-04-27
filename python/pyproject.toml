@@ -238,6 +238,7 @@ select = [
 
 # Scikit-build-core configuration
 [tool.scikit-build]
+experimental = true
 cmake.version = ">=3.15"
 cmake.build-type = "Release"
 # Build in current directory (python/)
@@ -245,9 +246,9 @@ cmake.source-dir = "."
 # Enable verbose output for debugging
 cmake.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
-metadata.version.provider = "scikit_build_core.metadata.regex"
+metadata.version.provider = "_dev_version"
+metadata.version.provider-path = "."
 metadata.version.input = "../VERSION"
-metadata.version.regex = "^(?P<value>\\S+)$"
 
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
