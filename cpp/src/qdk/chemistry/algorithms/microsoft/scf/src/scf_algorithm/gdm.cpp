@@ -29,6 +29,53 @@ namespace qdk::chemistry::scf {
 namespace impl {
 
 /**
+ * @brief Compute C = A^T * B * A using BLAS GEMM only
+ *
+ * Matrix shapes:
+ * A: m x n
+ * B: m x m
+ * C: n x n
+ *
+ * @param[in] m Row count of A and dimension of square B block.
+ * @param[in] n Column count of A and dimension of square C block.
+ *
+ * Assumed leading dimensions for contiguous storage:
+ * RowMajor: lda = n, ldb = m, ldc = n
+ * ColMajor: lda = m, ldb = m, ldc = n
+ *
+ * Pointers may reference sub-block starts (not necessarily matrix origin).
+ * The intermediate workspace is allocated internally and does not reuse B.
+ */
+static void compute_atba_gemm(const double* A, const double* B, double* C,
+                              int m, int n,
+                              blas::Layout layout = blas::Layout::RowMajor) {
+  if (A == nullptr || B == nullptr || C == nullptr) {
+    throw std::invalid_argument("compute_atba_gemm: null matrix pointer.");
+  }
+  if (m < 0 || n < 0) {
+    throw std::invalid_argument("compute_atba_gemm: negative dimensions.");
+  }
+  if (m == 0 || n == 0) {
+    return;
+  }
+
+  const int lda = (layout == blas::Layout::RowMajor) ? n : m;
+  const int ldb = m;
+  const int ldc = n;
+
+  std::vector<double> workspace(static_cast<size_t>(m) * n);
+  const int ld_workspace = (layout == blas::Layout::RowMajor) ? n : m;
+
+  // workspace = B * A
+  blas::gemm(layout, blas::Op::NoTrans, blas::Op::NoTrans, m, n, m, 1.0, B, ldb,
+             A, lda, 0.0, workspace.data(), ld_workspace);
+
+  // C = A^T * workspace
+  blas::gemm(layout, blas::Op::Trans, blas::Op::NoTrans, n, n, m, 1.0, A, lda,
+             workspace.data(), ld_workspace, 0.0, C, ldc);
+}
+
+/**
  * @brief Construct the antisymmetric kappa matrix and apply C * exp(kappa)
  * @param[in,out] C Molecular orbital coefficient matrix
  * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
@@ -178,13 +225,13 @@ static void compute_restricted_unrestricted_gradient(
     }
 
     RowMajorMatrix F_MO =
-        C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-                num_molecular_orbitals)
-            .transpose() *
-        F.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-                num_molecular_orbitals) *
-        C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-                num_molecular_orbitals);
+        RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+    const int spin_block_offset =
+        num_molecular_orbitals * num_molecular_orbitals * spin_index;
+    const double* C_block_ptr = C.data() + spin_block_offset;
+    const double* F_block_ptr = F.data() + spin_block_offset;
+    compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
+                      num_molecular_orbitals, num_molecular_orbitals);
 
     // Extract occupied-virtual block and compute gradient
     // The -4.0 before F_{ia} comes from derivative of energy w.r.t. kappa
@@ -262,13 +309,33 @@ static void compute_restricted_open_shell_gradient(
 
   const auto C_ao_mo =
       C.block(0, 0, num_atomic_orbitals, num_molecular_orbitals);
+  const double* C_ao_mo_ptr = C_ao_mo.data();
 
   // Calculate Generalized Fock matrix in MO basis
-  RowMajorMatrix H_mo = C_ao_mo.transpose() * H_ao * C_ao_mo;
-  RowMajorMatrix J_alpha_mo = C_ao_mo.transpose() * J_alpha_ao * C_ao_mo;
-  RowMajorMatrix J_beta_mo = C_ao_mo.transpose() * J_beta_ao * C_ao_mo;
-  RowMajorMatrix K_alpha_mo = C_ao_mo.transpose() * K_alpha_ao * C_ao_mo;
-  RowMajorMatrix K_beta_mo = C_ao_mo.transpose() * K_beta_ao * C_ao_mo;
+  RowMajorMatrix H_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_ao_mo_ptr, H_ao.data(), H_mo.data(), num_atomic_orbitals,
+                    num_molecular_orbitals);
+
+  RowMajorMatrix J_alpha_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_ao_mo_ptr, J_alpha_ao.data(), J_alpha_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
+
+  RowMajorMatrix J_beta_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_ao_mo_ptr, J_beta_ao.data(), J_beta_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
+
+  RowMajorMatrix K_alpha_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_ao_mo_ptr, K_alpha_ao.data(), K_alpha_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
+
+  RowMajorMatrix K_beta_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_ao_mo_ptr, K_beta_ao.data(), K_beta_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
 
   RowMajorMatrix F_I = H_mo + 2.0 * J_beta_mo - K_beta_mo;
   RowMajorMatrix F_A = J_alpha_mo - J_beta_mo - 0.5 * (K_alpha_mo - K_beta_mo);
@@ -897,13 +964,13 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
   }
 
   RowMajorMatrix F_MO =
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_molecular_orbitals)
-          .transpose() *
-      F.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_molecular_orbitals) *
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
-              num_molecular_orbitals);
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
+  const int spin_block_offset =
+      num_molecular_orbitals * num_molecular_orbitals * spin_index;
+  const double* C_block_ptr = C.data() + spin_block_offset;
+  const double* F_block_ptr = F.data() + spin_block_offset;
+  compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
+                    num_molecular_orbitals, num_molecular_orbitals);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
@@ -998,13 +1065,15 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
   RowMajorMatrix F_dn_mo = F_up_mo;
 
-  F_up_mo.noalias() =
-      C.transpose() *
-      F.block(0, 0, num_atomic_orbitals, num_molecular_orbitals) * C;
-  F_dn_mo.noalias() = C.transpose() *
-                      F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                              num_molecular_orbitals) *
-                      C;
+  const double* C_block_ptr = C.data();
+  const double* F_up_block_ptr = F.data();
+  const double* F_dn_block_ptr =
+      F.data() + num_atomic_orbitals * num_molecular_orbitals;
+
+  compute_atba_gemm(C_block_ptr, F_up_block_ptr, F_up_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
+  compute_atba_gemm(C_block_ptr, F_dn_block_ptr, F_dn_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
