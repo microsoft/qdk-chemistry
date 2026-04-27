@@ -410,7 +410,6 @@ class WavefunctionContainer {
    *     + \tfrac{1}{4} \Gamma^{\beta\beta}_{ijji} \right)
    *     - \tfrac{1}{2} \sum_{ij} \Gamma^{\alpha\beta}_{iijj}
    * \f]
-   * \f]
    * @return The expectation value \f$\langle S^2 \rangle\f$
    * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
    *         available

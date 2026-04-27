@@ -617,6 +617,31 @@ double WavefunctionContainer::compute_s_squared() const {
   const auto& two_rdm_bbbb_var =
       std::get<2>(get_active_two_rdm_spin_dependent());
 
+  const std::size_t expected_two_rdm_size =
+      static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs) *
+      static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs);
+  auto validate_two_rdm_size = [expected_two_rdm_size,
+                                norbs](const auto& two_rdm_var,
+                                       const char* block_name) {
+    std::visit(
+        [expected_two_rdm_size, norbs,
+         block_name](const auto& vec) {
+          if (vec.size() != expected_two_rdm_size) {
+            std::ostringstream error;
+            error << "Invalid size for spin-dependent 2-RDM block '"
+                  << block_name << "' in compute_s_squared(): got "
+                  << vec.size() << " elements, expected "
+                  << expected_two_rdm_size << " (= norbs^4 for norbs="
+                  << norbs << ")";
+            throw std::runtime_error(error.str());
+          }
+        },
+        two_rdm_var);
+  };
+
+  validate_two_rdm_size(two_rdm_aabb_var, "aabb");
+  validate_two_rdm_size(two_rdm_aaaa_var, "aaaa");
+  validate_two_rdm_size(two_rdm_bbbb_var, "bbbb");
   // sum_{ij} Gamma(i,j,j,i): O(n^2)
   auto sum_ijji = [norbs](const auto& vec) -> double {
     double sum = 0.0;
