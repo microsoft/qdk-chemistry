@@ -12,7 +12,20 @@ state. It also includes functions to create custom pass managers based on preset
 
 import numpy as np
 from qiskit.circuit import ParameterExpression
-from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+from qiskit.circuit.library import (
+    IGate,
+    RXGate,
+    RXXGate,
+    RYGate,
+    RYYGate,
+    RZGate,
+    RZZGate,
+    SdgGate,
+    SGate,
+    XGate,
+    YGate,
+    ZGate,
+)
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler.basepasses import TransformationPass
 from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
@@ -25,6 +38,7 @@ __all__ = [
     "MergeZBasisRotations",
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
+    "SubstitutePauliRotation",
 ]
 
 
@@ -289,6 +303,184 @@ class SubstituteCliffordRz(TransformationPass):
 
         Returns:
             The settings object associated with SubstituteCliffordRz.
+
+        """
+        Logger.trace_entering()
+        return self._settings
+
+
+class SubstitutePauliRotationSettings(Settings):
+    """Settings configuration for SubstitutePauliRotation.
+
+    SubstitutePauliRotation-specific settings:
+        equivalent_gate_set (vector<string>, default=["id", "x", "y", "z"]): Equivalent gate set to use.
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+
+    """
+
+    def __init__(self):
+        """Initialize SubstitutePauliRotationSettings."""
+        Logger.trace_entering()
+        super().__init__()
+        self._set_default("equivalent_gate_set", "vector<string>", ["id", "x", "y", "z"])
+        self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
+
+    def set(self, key: str, value):
+        """Override set to ensure 'id' is always in equivalent_gate_set and duplicates are removed.
+
+        Args:
+            key (str): Setting key to set.
+            value: Value to set.
+
+        """
+        if key == "equivalent_gate_set" and isinstance(value, list):
+            value = list({*value, "id"})
+        Logger.trace_entering()
+        super().set(key, value)
+
+    def update(self, settings_dict: dict):
+        """Override update to ensure 'id' is always in equivalent_gate_set and duplicates are removed.
+
+        Args:
+            settings_dict (dict): Dictionary of settings to update.
+
+        """
+        if "equivalent_gate_set" in settings_dict and isinstance(settings_dict["equivalent_gate_set"], list):
+            settings_dict = {
+                **settings_dict,
+                "equivalent_gate_set": list({*settings_dict["equivalent_gate_set"], "id"}),
+            }
+        Logger.trace_entering()
+        super().update(settings_dict)
+
+
+class SubstitutePauliRotation(TransformationPass):
+    r"""Substitute Pauli rotation gates at integer multiples of π.
+
+    Handles both 1-qubit (Rx, Ry, Rz) and 2-qubit (Rxx, Ryy, Rzz) rotations:
+
+    * :math:`R_P(k\pi)` where *k* is even → removed (identity up to global phase).
+    * :math:`R_P(k\pi)` where *k* is odd  → the corresponding Pauli gate(s).
+
+    For 2-qubit rotations the Pauli is applied independently to each qubit.
+    """
+
+    def __init__(
+        self,
+        equivalent_gate_set: list[str] | None = None,
+        tolerance: float = float(np.finfo(np.float64).eps),
+    ):
+        """Initialize SubstitutePauliRotation.
+
+        Args:
+            equivalent_gate_set: List of gates to allow substitution with, or None for
+                defaults (``["id", "x", "y", "z"]``).
+            tolerance: Angle comparison tolerance.
+
+        """
+        Logger.trace_entering()
+        super().__init__()
+        self._rotation_gates = {
+            "rx": (XGate, RXGate),
+            "ry": (YGate, RYGate),
+            "rz": (ZGate, RZGate),
+            "rxx": (XGate, RXXGate),
+            "ryy": (YGate, RYYGate),
+            "rzz": (ZGate, RZZGate),
+        }
+        self._settings = SubstitutePauliRotationSettings()
+        if equivalent_gate_set is not None:
+            if not isinstance(equivalent_gate_set, list):
+                raise TypeError("equivalent_gate_set must be a list of gate names or None")
+            self._settings.set("equivalent_gate_set", equivalent_gate_set)
+        self._settings.set("tolerance", tolerance)
+
+    def substitute_pauli_rotations(
+        self,
+        dag: DAGCircuit,
+        rotation_gates: dict[str, tuple],
+        equivalent_gate_set: list[str],
+        tolerance: float,
+    ) -> DAGCircuit:
+        r"""Replace rotation gates at integer multiples of π with Pauli gates or identity.
+
+        For a rotation gate :math:`R_P(\theta)`:
+
+        * Even multiples of π (0, 2π, …) → identity (gate removed).
+        * Odd multiples of π (π, 3π, …) → the corresponding Pauli gate(s).
+
+        For 2-qubit rotations the Pauli is applied independently to each qubit.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+            rotation_gates: Gate-name → (Pauli class, Rotation class) mapping.
+            equivalent_gate_set: List of gate names allowed for substitution.
+            tolerance: Angle comparison tolerance.
+
+        Returns:
+            The transformed ``DAGCircuit`` with Pauli substitutions.
+
+        """
+        if "id" not in equivalent_gate_set:
+            raise ValueError("Gate 'id' is missing in equivalent_gate_set.")
+        if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
+            raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
+
+        for node in dag.op_nodes():
+            if node.op.name not in rotation_gates:
+                continue
+
+            angle = node.op.params[0]
+            if isinstance(angle, ParameterExpression):
+                continue
+
+            pauli_cls, _ = rotation_gates[node.op.name]
+            pauli_name = pauli_cls().name  # e.g. "x", "y", "z"
+
+            k = round(float(angle) / np.pi)
+            if abs(float(angle) - k * np.pi) > tolerance:
+                continue
+
+            if k % 2 == 0 and "id" in equivalent_gate_set:
+                # Even multiple of π → identity; remove the gate
+                dag.remove_op_node(node)
+            elif k % 2 != 0 and pauli_name in equivalent_gate_set:
+                # Odd multiple of π → Pauli gate(s)
+                if len(node.qargs) == 1:
+                    dag.substitute_node(node, pauli_cls(), inplace=True)
+                else:
+                    replacement = DAGCircuit()
+                    replacement.add_qubits(node.qargs)
+                    for qubit in node.qargs:
+                        replacement.apply_operation_back(pauli_cls(), qargs=[qubit])
+                    dag.substitute_node_with_dag(node, replacement)
+
+        return dag
+
+    def run(self, dag: DAGCircuit) -> DAGCircuit:
+        """Run the pass on the given ``DAGCircuit``.
+
+        Args:
+            dag: The input ``DAGCircuit`` to transform.
+
+        Returns:
+            The transformed ``DAGCircuit`` with Pauli substitutions.
+
+        """
+        Logger.trace_entering()
+        Logger.debug("Running SubstitutePauliRotation pass.")
+        return self.substitute_pauli_rotations(
+            dag,
+            self._rotation_gates,
+            self._settings.get("equivalent_gate_set"),
+            self._settings.get("tolerance"),
+        )
+
+    def settings(self) -> Settings:
+        """Get the settings for this pass.
+
+        Returns:
+            The settings object associated with this pass.
 
         """
         Logger.trace_entering()

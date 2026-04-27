@@ -128,6 +128,70 @@ class TestPauliProductFormulaContainer:
         assert restored.step_reps == container.step_reps
         assert len(restored.step_terms) == len(container.step_terms)
 
+    def test_combine_no_adjacent_identical(self):
+        """Test combine when no adjacent terms share the same Pauli string."""
+        a = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.1),
+                ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.2),
+            ],
+            step_reps=2,
+            num_qubits=2,
+        )
+        b = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=0.3),
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.4),
+            ],
+            step_reps=2,
+            num_qubits=2,
+        )
+        result = a.combine(b)
+
+        # a expanded: [X, Z, X, Z], b expanded: [Y, X, Y, X]
+        # No adjacent duplicates anywhere, so all 8 terms survive.
+        assert result.step_reps == 1
+        assert len(result.step_terms) == 8
+        expected_angles = [0.1, 0.2, 0.1, 0.2, 0.3, 0.4, 0.3, 0.4]
+        for term, expected in zip(result.step_terms, expected_angles, strict=True):
+            assert np.isclose(term.angle, expected, atol=1e-14)
+
+    def test_combine_with_adjacent_identical(self):
+        """Test combine where adjacent identical Pauli terms get merged."""
+        a = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "Y"}, angle=1.5),
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
+            ],
+            step_reps=2,
+            num_qubits=1,
+        )
+        b = PauliProductFormulaContainer(
+            step_terms=[
+                ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.7),
+                ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=1.5),
+            ],
+            step_reps=1,
+            num_qubits=1,
+        )
+        result = a.combine(b)
+
+        # a expanded: [Y(1.5), X(0.5), Y(1.5), X(0.5)], b expanded: [X(0.7), Z(1.5)]
+        # Only the two adjacent X terms at the boundary are merged into X(1.2)
+        assert result.step_reps == 1
+        assert len(result.step_terms) == 5
+
+        assert result.step_terms[0].pauli_term == {0: "Y"}
+        assert np.isclose(result.step_terms[0].angle, 1.5, atol=1e-14)
+        assert result.step_terms[1].pauli_term == {0: "X"}
+        assert np.isclose(result.step_terms[1].angle, 0.5, atol=1e-14)
+        assert result.step_terms[2].pauli_term == {0: "Y"}
+        assert np.isclose(result.step_terms[2].angle, 1.5, atol=1e-14)
+        assert result.step_terms[3].pauli_term == {0: "X"}
+        assert np.isclose(result.step_terms[3].angle, 1.2, atol=1e-14)
+        assert result.step_terms[4].pauli_term == {0: "Z"}
+        assert np.isclose(result.step_terms[4].angle, 1.5, atol=1e-14)
+
     def test_summary(self, container):
         """Test the summary generation of the container."""
         summary = container.get_summary()
@@ -199,7 +263,7 @@ class TestPauliProductFormulaCirqConversion:
         cirq_circuit = container.to_circuit().get_cirq_circuit()
         op = next(iter(cirq_circuit.all_operations()))
         assert isinstance(op, cirq.PauliStringPhasor)
-        assert abs(op.exponent_neg - angle / math.pi) < 1e-12
+        assert abs(op.exponent_neg - 2 * angle / math.pi) < 1e-12
         assert op.exponent_pos == 0
 
     def test_to_circuit_preserves_term_order(self):

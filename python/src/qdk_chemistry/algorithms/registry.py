@@ -511,11 +511,17 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.circuit_mapper import (  # noqa: PLC0415
+        EvolutionCircuitMapperFactory,
+    )
     from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledEvolutionCircuitMapperFactory,
     )
+    from qdk_chemistry.algorithms.time_evolution.measure_simulation import MeasureSimulationFactory  # noqa: PLC0415
 
     register_factory(EnergyEstimatorFactory())
+    register_factory(EvolutionCircuitMapperFactory())
+    register_factory(MeasureSimulationFactory())
     register_factory(StatePreparationFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
@@ -594,9 +600,13 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
         Trotter,
     )
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
-        PauliSequenceMapper,
+    from qdk_chemistry.algorithms.time_evolution.circuit_mapper import (  # noqa: PLC0415
+        PauliSequenceMapper as EvolutionPauliSequenceMapper,
     )
+    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
+        PauliSequenceMapper as ControlledPauliSequenceMapper,
+    )
+    from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAndMeasure  # noqa: PLC0415
 
     register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
@@ -606,7 +616,9 @@ def _register_python_algorithms():
     register(lambda: Trotter())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
-    register(lambda: PauliSequenceMapper())
+    register(lambda: EvolutionPauliSequenceMapper())
+    register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: EvolveAndMeasure())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())

@@ -134,9 +134,9 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
     def to_circuit(self) -> Circuit:
         r"""Convert the Pauli product formula to a :class:`~qdk_chemistry.data.circuit.Circuit`.
 
-        Each :class:`ExponentiatedPauliTerm` :math:`e^{-i\theta P}` is mapped to a ``cirq.PauliStringPhasor``
-        that phases the :math:`-1` eigenstate of *P* by :math:`e^{i\theta}` and leaves the :math:`+1` eigenstate
-        unchanged. When ``step_reps > 1`` the single-step circuit is wrapped in a ``cirq.CircuitOperation``.
+        Each :class:`ExponentiatedPauliTerm` :math:`e^{-i\theta P}` is mapped to a ``cirq.PauliStringPhasor`` with
+        ``exponent_neg = 2\theta / \pi``, which implements :math:`e^{-i\theta P}` up to global phase.
+        When ``step_reps > 1`` the single-step circuit is wrapped in a ``cirq.CircuitOperation``.
 
         Requires the ``cirq-core`` package.
 
@@ -164,7 +164,7 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             pauli_string = cirq.PauliString({qubits[idx]: pauli_gate[op] for idx, op in term.pauli_term.items()})
             phasor = cirq.PauliStringPhasor(
                 pauli_string,
-                exponent_neg=term.angle / math.pi,
+                exponent_neg=2 * term.angle / math.pi,
                 exponent_pos=0,
             )
             moments.append(cirq.Moment(phasor))
@@ -176,6 +176,51 @@ class PauliProductFormulaContainer(TimeEvolutionUnitaryContainer):
             cirq_circuit = cirq.Circuit(cirq.CircuitOperation(step_circuit, repetitions=self.step_reps)).freeze()
 
         return QdkCircuit(cirq=cirq_circuit)
+
+    def combine(self, other_container: PauliProductFormulaContainer, atol=1e-12) -> PauliProductFormulaContainer:
+        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+
+        The terms from ``self`` (repeated ``step_reps`` times) are followed by the
+        terms from ``other_container`` (also repeated according to its
+        ``step_reps``). When two consecutive terms act with the same Pauli operator
+        string (i.e., have identical ``pauli_term`` dictionaries), their rotation
+        angles are summed into a single ``ExponentiatedPauliTerm``. If the summed
+        angle has magnitude less than ``atol``, the resulting term is removed.
+
+        Args:
+            other_container: The second ``PauliProductFormulaContainer`` appended
+                after this container.
+            atol: Absolute tolerance used when deciding whether a merged term with
+                a small rotation angle should be dropped.
+
+        Returns:
+            A single ``PauliProductFormulaContainer`` representing the combined
+            evolution with adjacent identical terms fused.
+
+        """
+        if self.num_qubits != other_container.num_qubits:
+            raise ValueError(
+                f"Cannot combine PauliProductFormulaContainer instances with different "
+                f"num_qubits (self.num_qubits={self.num_qubits}, "
+                f"other_container.num_qubits={other_container.num_qubits})."
+            )
+
+        merged: list[ExponentiatedPauliTerm] = []
+        for step_terms, step_reps in (
+            (self.step_terms, self.step_reps),
+            (other_container.step_terms, other_container.step_reps),
+        ):
+            for _ in range(step_reps):
+                for term in step_terms:
+                    if merged and merged[-1].pauli_term == term.pauli_term:
+                        new_angle = merged[-1].angle + term.angle
+                        if abs(new_angle) > atol:
+                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                        else:
+                            merged.pop()
+                    else:
+                        merged.append(term)
+        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=self.num_qubits)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
