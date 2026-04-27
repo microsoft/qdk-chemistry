@@ -24,8 +24,9 @@ using namespace qdk::chemistry::data;
 //   For a single determinant:
 //   aabb block: Gamma^{aabb}(p,q,r,s) = gamma^a(p,q) * gamma^b(r,s)
 //   aaaa block: Gamma^{aaaa}(p,q,r,s) = gamma^a(p,q) * gamma^a(r,s) -
-//   gamma^a(p,s) * gamma^a(r,q) bbbb block: Gamma^{bbbb}(p,q,r,s) =
-//   gamma^b(p,q) * gamma^b(r,s) - gamma^b(p,s) * gamma^b(r,q)
+//   gamma^a(p,s) * gamma^a(r,q)
+//   bbbb block: Gamma^{bbbb}(p,q,r,s) = gamma^b(p,q) * gamma^b(r,s) -
+//   gamma^b(p,s) * gamma^b(r,q)
 //
 // Expected <S^2> = 0 for a singlet.
 TEST(SSquared, RHFSinglet) {
