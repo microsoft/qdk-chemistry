@@ -36,19 +36,6 @@ class Settings;
  *
  * An AlgorithmRef is stored inside a parent algorithm's Settings to
  * describe a child algorithm that will be instantiated at run-time.
- *
- * Fields:
- *   - @c algorithm_type – registry type key (e.g. "circuit_executor").
- *     Immutable after construction.
- *   - @c algorithm_name – registry name key
- *     (e.g. "qdk_sparse_state_simulator").  Empty string means "use the
- *     factory default".  Use set_algorithm_name() to change; this also
- *     re-resolves the default settings.
- *   - @c settings – key/value settings for the referenced algorithm.
- *     Automatically populated with the algorithm's default settings when
- *     the ref is constructed (if @c create_default_settings has been
- *     installed).  May itself contain further AlgorithmRef values,
- *     enabling multi-level nesting.
  */
 class AlgorithmRef {
  public:
