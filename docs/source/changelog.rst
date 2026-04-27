@@ -4,6 +4,11 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.0.0
+=============
+
+Work in progress
+
 Version 1.1.0
 =============
 
