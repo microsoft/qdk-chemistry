@@ -934,8 +934,19 @@ static void rotate_gradient_to_pseudo_canonical_basis(
     Eigen::Ref<Eigen::VectorXd> transformed_vector) {
   RowMajorMatrix current_matrix = Eigen::Map<const RowMajorMatrix>(
       current_vector.data() + start_index, num_rows, num_cols);
-  RowMajorMatrix transformed_matrix =
-      u_left.transpose() * current_matrix * u_right;
+  RowMajorMatrix temp_matrix = RowMajorMatrix::Zero(num_rows, num_cols);
+  RowMajorMatrix transformed_matrix = RowMajorMatrix::Zero(num_rows, num_cols);
+
+  // temp_matrix = current_matrix * u_right
+  blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
+             num_rows, num_cols, num_cols, 1.0, current_matrix.data(), num_cols,
+             u_right.data(), num_cols, 0.0, temp_matrix.data(), num_cols);
+
+  // transformed_matrix = u_left^T * temp_matrix
+  blas::gemm(blas::Layout::RowMajor, blas::Op::Trans, blas::Op::NoTrans,
+             num_rows, num_cols, num_rows, 1.0, u_left.data(), num_rows,
+             temp_matrix.data(), num_cols, 0.0, transformed_matrix.data(),
+             num_cols);
   transformed_vector.segment(start_index, num_rows * num_cols) =
       Eigen::Map<const Eigen::VectorXd>(transformed_matrix.data(),
                                         num_rows * num_cols);
