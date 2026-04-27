@@ -910,8 +910,8 @@ class Wavefunction : public DataClass,
    * Delegates to the underlying container's compute_s_squared().
    *
    * @return The expectation value \f$\langle S^2 \rangle\f$
-   * @throws std::runtime_error if spin-dependent 1-RDMs or 2-RDMs are not
-   *         available
+   * @throws std::runtime_error if a spin-traced 1-RDM or spin-dependent
+   *         2-RDMs are not available
    */
   double compute_s_squared() const;
 
