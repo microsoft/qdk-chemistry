@@ -378,36 +378,6 @@ def test_json_serialization():
     finally:
         Path(filename).unlink()
 
-    # Test JSON serialization with auxiliary basis set
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.D, [0.3], [0.5])]
-    aux_basis = BasisSet("aux-fit", aux_shells)
-    basis_out.set_auxiliary_basis_set(aux_basis)
-    assert basis_out.has_auxiliary_basis_set()
-
-    json_data_aux = basis_out.to_json()
-    basis_in_aux = BasisSet.from_json(json_data_aux)
-
-    assert basis_in_aux.has_auxiliary_basis_set()
-    aux_loaded = basis_in_aux.get_auxiliary_basis_set()
-    assert aux_loaded.get_name() == "aux-fit"
-    assert aux_loaded.get_num_shells() == 2
-    assert aux_loaded.get_num_atomic_orbitals() == 6  # 1 s + 5 d (spherical)
-
-    # Test file-based JSON with aux
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
-        filename_aux = tmp.name
-
-    try:
-        basis_out.to_json_file(filename_aux)
-        basis_file_aux = BasisSet.from_json_file(filename_aux)
-
-        assert basis_file_aux.has_auxiliary_basis_set()
-        aux_file = basis_file_aux.get_auxiliary_basis_set()
-        assert aux_file.get_name() == "aux-fit"
-        assert aux_file.get_num_shells() == 2
-    finally:
-        Path(filename_aux).unlink()
-
 
 def test_hdf5_serialization():
     """Test HDF5 serialization and deserialization."""
@@ -444,31 +414,6 @@ def test_hdf5_serialization():
         if "filename" in locals():
             with contextlib.suppress(FileNotFoundError):
                 Path(filename).unlink()
-
-    # Test HDF5 serialization with auxiliary basis set
-    aux_shells = [Shell(0, OrbitalType.S, [2.0], [1.0]), Shell(0, OrbitalType.P, [0.8], [0.7])]
-    aux_basis = BasisSet("aux-jkfit", aux_shells)
-    basis_out.set_auxiliary_basis_set(aux_basis)
-
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp:
-            filename_aux = tmp.name
-
-        basis_out.to_hdf5_file(filename_aux)
-        basis_in_aux = BasisSet.from_hdf5_file(filename_aux)
-
-        assert basis_in_aux.has_auxiliary_basis_set()
-        aux_loaded = basis_in_aux.get_auxiliary_basis_set()
-        assert aux_loaded.get_name() == "aux-jkfit"
-        assert aux_loaded.get_num_shells() == 2
-        assert aux_loaded.get_num_atomic_orbitals() == 4  # 1 s + 3 p
-
-    except RuntimeError as e:
-        pytest.skip(f"HDF5 test skipped - {e!s}")
-    finally:
-        if "filename_aux" in locals():
-            with contextlib.suppress(FileNotFoundError):
-                Path(filename_aux).unlink()
 
 
 def test_error_handling():

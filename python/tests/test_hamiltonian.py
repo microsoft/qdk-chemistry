@@ -1557,7 +1557,9 @@ class TestDensityFittedHamiltonianConstructor:
         scf_solver = create("scf_solver")
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("convergence_threshold", 1e-8)
-        rhf_energy, hf_wavefunction = scf_solver.run(o2, 0, 1, "cc-pvdz")
+        scf_solver.settings().set("integral_type", "four_center")
+        basis = BasisSet.from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2)  # to be used for DFMP2
+        rhf_energy, hf_wavefunction = scf_solver.run(o2, 0, 1, basis)
 
         assert abs(rhf_energy - (-149.5410413101995744)) < scf_energy_tolerance
 
@@ -1570,8 +1572,6 @@ class TestDensityFittedHamiltonianConstructor:
         # Density-fitted Hamiltonian construction with auxiliary basis
         ham_constructor = create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
         orbitals = wfn_active.get_orbitals()
-        aux_basis = BasisSet.from_basis_name("cc-pvdz-rifit", o2)
-        orbitals.basis_set.set_auxiliary_basis_set(aux_basis)
         df_hamiltonian = ham_constructor.run(orbitals)
 
         assert df_hamiltonian.has_one_body_integrals()
