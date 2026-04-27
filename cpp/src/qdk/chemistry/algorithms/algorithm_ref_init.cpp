@@ -28,32 +28,27 @@ std::shared_ptr<data::Settings> try_factory(const std::string& name) {
 
 }  // namespace
 
-void init_algorithm_ref_resolver() {
-  data::AlgorithmRef::create_default_settings =
-      [](const std::string& type,
-         const std::string& name) -> std::shared_ptr<data::Settings> {
-    // Dispatch to the matching factory by type name.
-    if (type == ScfSolverFactory::algorithm_type_name())
-      return try_factory<ScfSolverFactory>(name);
-    if (type == ActiveSpaceSelectorFactory::algorithm_type_name())
-      return try_factory<ActiveSpaceSelectorFactory>(name);
-    if (type == HamiltonianConstructorFactory::algorithm_type_name())
-      return try_factory<HamiltonianConstructorFactory>(name);
-    if (type == MultiConfigurationCalculatorFactory::algorithm_type_name())
-      return try_factory<MultiConfigurationCalculatorFactory>(name);
-    if (type ==
-        ProjectedMultiConfigurationCalculatorFactory::algorithm_type_name())
-      return try_factory<ProjectedMultiConfigurationCalculatorFactory>(name);
-    if (type == DynamicalCorrelationCalculatorFactory::algorithm_type_name())
-      return try_factory<DynamicalCorrelationCalculatorFactory>(name);
-    if (type == MultiConfigurationScfFactory::algorithm_type_name())
-      return try_factory<MultiConfigurationScfFactory>(name);
-    if (type == LocalizerFactory::algorithm_type_name())
-      return try_factory<LocalizerFactory>(name);
-    if (type == StabilityCheckerFactory::algorithm_type_name())
-      return try_factory<StabilityCheckerFactory>(name);
-    return nullptr;
-  };
+namespace detail {
+
+std::shared_ptr<data::Settings> resolve_algorithm_defaults(
+    const std::string& type, const std::string& name) {
+#define REGISTER_FACTORY_SETTINGS_INIT(NAME) \
+  if (type == NAME::algorithm_type_name()) return try_factory<NAME>(name);
+  REGISTER_FACTORY_SETTINGS_INIT(ScfSolverFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(ActiveSpaceSelectorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(HamiltonianConstructorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationCalculatorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(ProjectedMultiConfigurationCalculatorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(DynamicalCorrelationCalculatorFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(MultiConfigurationScfFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(LocalizerFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
+
+#undef REGISTER_FACTORY_SETTINGS_INIT
+
+  return nullptr;
 }
+
+}  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms

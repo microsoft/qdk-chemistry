@@ -6,6 +6,8 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
+#include <qdk/chemistry/algorithms/algorithm_ref_init.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -27,21 +29,32 @@ std::function<std::shared_ptr<Settings>(const std::string&, const std::string&)>
 
 AlgorithmRef::AlgorithmRef(std::string type, std::string name,
                            std::shared_ptr<Settings> settings_ptr)
-    : algorithm_type(std::move(type)),
-      algorithm_name(std::move(name)),
-      settings(std::move(settings_ptr)) {
-  if (!settings) {
+    : algorithm_type_(std::move(type)),
+      algorithm_name_(std::move(name)),
+      settings_(std::move(settings_ptr)) {
+  if (!settings_) {
     _resolve_settings();
   }
 }
 
-void AlgorithmRef::set_algorithm_name(const std::string& name) {
-  algorithm_name = name;
+void AlgorithmRef::_set_algorithm_name(const std::string& name) {
+  algorithm_name_ = name;
   _resolve_settings();
 }
 
 void AlgorithmRef::_resolve_settings() {
-  if (!create_default_settings || algorithm_type.empty()) {
+  // Lazily install the C++ factory-based resolver on first request,
+  // unless an explicit resolver (e.g. from the Python layer) was already set.
+  if (!create_default_settings) {
+    static std::once_flag init_flag;
+    std::call_once(init_flag, [] {
+      if (!create_default_settings) {
+        create_default_settings =
+            algorithms::detail::resolve_algorithm_defaults;
+      }
+    });
+  }
+  if (!create_default_settings || algorithm_type_.empty()) {
     return;
   }
   // Guard against re-entrant calls during factory initialisation.
@@ -51,9 +64,9 @@ void AlgorithmRef::_resolve_settings() {
   }
   resolving = true;
   try {
-    settings = create_default_settings(algorithm_type, algorithm_name);
+    settings_ = create_default_settings(algorithm_type_, algorithm_name_);
   } catch (...) {
-    settings = nullptr;
+    settings_ = nullptr;
   }
   resolving = false;
 }
@@ -81,11 +94,11 @@ void Settings::set(const std::string& key, const SettingValue& value) {
   if (std::holds_alternative<AlgorithmRef>(value)) {
     const auto& existing = std::get<AlgorithmRef>(settings_[key]);
     const auto& incoming = std::get<AlgorithmRef>(value);
-    if (incoming.algorithm_type != existing.algorithm_type) {
-      throw std::invalid_argument("Algorithm type for setting '" + key +
-                                  "' is fixed to '" + existing.algorithm_type +
-                                  "' and cannot be changed to '" +
-                                  incoming.algorithm_type + "'");
+    if (incoming.get_algorithm_type() != existing.get_algorithm_type()) {
+      throw std::invalid_argument(
+          "Algorithm type for setting '" + key + "' is fixed to '" +
+          existing.get_algorithm_type() + "' and cannot be changed to '" +
+          incoming.get_algorithm_type() + "'");
     }
   }
 
@@ -966,8 +979,8 @@ std::string Settings::visit_to_string(const SettingValue& value) const {
           oss << "]";
           return oss.str();
         } else if constexpr (std::is_same_v<ValueType, AlgorithmRef>) {
-          return "AlgorithmRef(" + variant_value.algorithm_type + "/" +
-                 variant_value.algorithm_name + ")";
+          return "AlgorithmRef(" + variant_value.get_algorithm_type() + "/" +
+                 variant_value.get_algorithm_name() + ")";
         } else {
           return "unknown_type";
         }
@@ -985,10 +998,10 @@ nlohmann::json Settings::convert_setting_value_to_json(
         if constexpr (std::is_same_v<ValueType, AlgorithmRef>) {
           nlohmann::json ref_json;
           ref_json["__type__"] = "algorithm_ref";
-          ref_json["algorithm_type"] = variant_value.algorithm_type;
-          ref_json["algorithm_name"] = variant_value.algorithm_name;
-          if (variant_value.settings) {
-            ref_json["settings"] = variant_value.settings->to_json();
+          ref_json["algorithm_type"] = variant_value.get_algorithm_type();
+          ref_json["algorithm_name"] = variant_value.get_algorithm_name();
+          if (variant_value.get_settings()) {
+            ref_json["settings"] = variant_value.get_settings()->to_json();
           } else {
             ref_json["settings"] = nlohmann::json::object();
           }
@@ -1035,15 +1048,15 @@ SettingValue Settings::convert_json_to_setting_value(
     return json_obj.get<std::string>();
   } else if (json_obj.is_object() && json_obj.contains("__type__") &&
              json_obj["__type__"] == "algorithm_ref") {
-    AlgorithmRef ref;
-    ref.algorithm_type = json_obj.value("algorithm_type", "");
-    ref.algorithm_name = json_obj.value("algorithm_name", "");
     // Note: type_fixed is ignored for backward compatibility with old files
+    std::shared_ptr<Settings> ref_settings;
     if (json_obj.contains("settings") && json_obj["settings"].is_object() &&
         !json_obj["settings"].empty()) {
-      ref.settings = Settings::from_json(json_obj["settings"]);
+      ref_settings = Settings::from_json(json_obj["settings"]);
     }
-    return ref;
+    return AlgorithmRef(json_obj.value("algorithm_type", ""),
+                        json_obj.value("algorithm_name", ""),
+                        std::move(ref_settings));
   } else if (json_obj.is_object() && json_obj.contains("__type__") &&
              json_obj["__type__"] == "array") {
     // Handle typed empty arrays
@@ -1236,12 +1249,12 @@ void Settings::save_setting_value_to_hdf5(H5::Group& group,
                 ref_group.createDataSet(ds_name, str_type, ds);
             dataset.write(val.c_str(), str_type);
           };
-          write_str("algorithm_type", variant_value.algorithm_type);
-          write_str("algorithm_name", variant_value.algorithm_name);
+          write_str("algorithm_type", variant_value.get_algorithm_type());
+          write_str("algorithm_name", variant_value.get_algorithm_name());
 
-          if (variant_value.settings) {
+          if (variant_value.get_settings()) {
             H5::Group settings_group = ref_group.createGroup("settings");
-            variant_value.settings->to_hdf5(settings_group);
+            variant_value.get_settings()->to_hdf5(settings_group);
           }
         }
       },
@@ -1806,7 +1819,9 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
       }
 
       if (is_algorithm_ref) {
-        AlgorithmRef ref;
+        std::string ref_type;
+        std::string ref_name;
+        std::shared_ptr<Settings> ref_settings;
         // Read algorithm_type
         {
           H5::DataSet ds = sub_group.openDataSet("algorithm_type");
@@ -1816,7 +1831,7 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
           ds.read(&str_data[0], dt);
           size_t null_pos = str_data.find('\0');
           if (null_pos != std::string::npos) str_data.resize(null_pos);
-          ref.algorithm_type = str_data;
+          ref_type = str_data;
         }
         // Read algorithm_name
         {
@@ -1827,7 +1842,7 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
           ds.read(&str_data[0], dt);
           size_t null_pos = str_data.find('\0');
           if (null_pos != std::string::npos) str_data.resize(null_pos);
-          ref.algorithm_name = str_data;
+          ref_name = str_data;
         }
         // type_fixed is ignored for backward compatibility with old files
         // Read nested settings if present
@@ -1836,11 +1851,12 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
           if (sub_group.getObjnameByIdx(k) == "settings" &&
               sub_group.getObjTypeByIdx(k) == H5G_GROUP) {
             H5::Group nested = sub_group.openGroup("settings");
-            ref.settings = Settings::from_hdf5(nested);
+            ref_settings = Settings::from_hdf5(nested);
             break;
           }
         }
-        settings->settings_[obj_name] = ref;
+        settings->settings_[obj_name] = AlgorithmRef(
+            std::move(ref_type), std::move(ref_name), std::move(ref_settings));
       }
       // Load metadata groups
       else if (obj_name == "_descriptions") {

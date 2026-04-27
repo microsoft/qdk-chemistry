@@ -50,7 +50,8 @@ class Settings;
  *     installed).  May itself contain further AlgorithmRef values,
  *     enabling multi-level nesting.
  */
-struct AlgorithmRef {
+class AlgorithmRef {
+ public:
   /**
    * @brief Global create function used to auto-resolve default settings.
    *
@@ -58,16 +59,11 @@ struct AlgorithmRef {
    * or nullptr if the algorithm is not found.
    *
    * Set once by the algorithm / Python layer so that AlgorithmRef
-   * constructors and set_algorithm_name() can populate the @c settings
-   * member automatically.
+   * constructors can populate the @c settings member automatically.
    */
   static std::function<std::shared_ptr<Settings>(const std::string& type,
                                                  const std::string& name)>
       create_default_settings;
-
-  std::string algorithm_type;  ///< Registry type key (immutable after ctor).
-  std::string algorithm_name;  ///< Registry name key.
-  std::shared_ptr<Settings> settings;  ///< Nested settings for the algorithm.
 
   /**
    * @brief Default constructor.
@@ -89,16 +85,14 @@ struct AlgorithmRef {
   AlgorithmRef(std::string type, std::string name,
                std::shared_ptr<Settings> settings_ptr = nullptr);
 
-  /**
-   * @brief Change the algorithm name and re-resolve default settings.
-   *
-   * Replaces the current settings with a fresh copy of the new algorithm's
-   * defaults obtained via @c create_default_settings.  Any previous
-   * overrides are lost.
-   *
-   * @param name The new algorithm name.
-   */
-  void set_algorithm_name(const std::string& name);
+  /// @brief Get the registry type key (immutable after construction).
+  const std::string& get_algorithm_type() const { return algorithm_type_; }
+
+  /// @brief Get the registry name key.
+  const std::string& get_algorithm_name() const { return algorithm_name_; }
+
+  /// @brief Get the nested settings for the algorithm.
+  const std::shared_ptr<Settings>& get_settings() const { return settings_; }
 
   /**
    * @brief Set a field or nested setting on this AlgorithmRef.
@@ -107,6 +101,7 @@ struct AlgorithmRef {
    * - @c "algorithm_name" – changes the name and re-resolves default settings
    *   (any previous overrides are lost).
    * - @c "algorithm_type" – always throws (immutable after construction).
+   * - @c "settings" – replaces the settings pointer directly.
    * - Anything else – forwarded to <tt>settings->set(key, value)</tt>.
    *
    * @param key   The setting key.
@@ -141,11 +136,26 @@ struct AlgorithmRef {
    * @return @c true if both @c algorithm_type and @c algorithm_name match.
    */
   bool operator==(const AlgorithmRef& other) const {
-    return algorithm_type == other.algorithm_type &&
-           algorithm_name == other.algorithm_name;
+    return algorithm_type_ == other.algorithm_type_ &&
+           algorithm_name_ == other.algorithm_name_;
   }
 
  private:
+  std::string algorithm_type_;  ///< Registry type key (immutable after ctor).
+  std::string algorithm_name_;  ///< Registry name key.
+  std::shared_ptr<Settings> settings_;  ///< Nested settings for the algorithm.
+
+  /**
+   * @brief Change the algorithm name and re-resolve default settings.
+   *
+   * Replaces the current settings with a fresh copy of the new algorithm's
+   * defaults obtained via @c create_default_settings.  Any previous
+   * overrides are lost.
+   *
+   * @param name The new algorithm name.
+   */
+  void _set_algorithm_name(const std::string& name);
+
   /**
    * @brief Populate @c settings from @c create_default_settings.
    *
@@ -420,9 +430,14 @@ class Settings : public DataClass,
    * @brief Set a setting value
    * @param key The setting key
    * @param value The setting value
+   * @throws SettingsAreLocked if the settings have been locked
+   * @throws SettingNotFound if @p key does not exist
+   * @throws SettingTypeMismatch if @p value type does not match the existing
+   *         type for @p key
+   * @throws std::invalid_argument if an AlgorithmRef's algorithm_type is
+   *         changed, or if a constrained value is out of range / not in the
+   *         allowed set
    */
-  // TODO (NAB):  Doesn't this function also throw exceptions if the key doesn't
-  // exist? Workitem: 38750
   void set(const std::string& key, const SettingValue& value);
 
   /**
@@ -1236,17 +1251,21 @@ class Settings : public DataClass,
   static std::shared_ptr<Settings> _from_hdf5_file(const std::string& filename);
 };
 
-// Enforce inheritance from base class and presence of required methods.
-// This checks the presence of key methods (serialization, deserialization) and
-// get_summary.
+/**
+ * Enforce inheritance from base class and presence of required methods.
+ * This checks the presence of key methods (serialization, deserialization) and
+ * get_summary.
+ */
 static_assert(DataClassCompliant<Settings>,
               "Settings must derive from DataClass and implement all required "
               "deserialization methods");
 
-// AlgorithmRef::set / update — deferred definitions.
-// These are templates so they can be declared inside AlgorithmRef (before
-// SettingValue exists) but defined here where Settings, SettingValue,
-// SettingNotFound, and SettingTypeMismatch are all complete.
+/**
+ * AlgorithmRef::set / update — deferred definitions.
+ * These are templates so they can be declared inside AlgorithmRef (before
+ * SettingValue exists) but defined here where Settings, SettingValue,
+ * SettingNotFound, and SettingTypeMismatch are all complete.
+ */
 template <typename V>
 void AlgorithmRef::set(const std::string& key, const V& value) {
   if (key == "algorithm_type") {
@@ -1257,13 +1276,13 @@ void AlgorithmRef::set(const std::string& key, const V& value) {
     if (!std::holds_alternative<std::string>(value)) {
       throw SettingTypeMismatch("algorithm_name", "string");
     }
-    set_algorithm_name(std::get<std::string>(value));
+    _set_algorithm_name(std::get<std::string>(value));
     return;
   }
-  if (!settings) {
+  if (!settings_) {
     throw SettingNotFound(key);
   }
-  settings->set(key, value);
+  settings_->set(key, value);
 }
 
 template <typename V>

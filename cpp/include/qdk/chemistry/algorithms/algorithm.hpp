@@ -117,9 +117,9 @@ class Algorithm {
   typename FactoryType::return_type _create_nested(
       const std::string& key) const {
     auto ref = this->_settings->template get<data::AlgorithmRef>(key);
-    auto instance = FactoryType::create(ref.algorithm_name);
-    if (ref.settings) {
-      instance->settings().update(*ref.settings);
+    auto instance = FactoryType::create(ref.get_algorithm_name());
+    if (ref.get_settings()) {
+      instance->settings().update(*ref.get_settings());
     }
     return instance;
   }

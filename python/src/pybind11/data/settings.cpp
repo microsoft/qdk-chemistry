@@ -502,7 +502,8 @@ Attributes:
              auto ref = AlgorithmRef(algorithm_type, algorithm_name);
 
              // If C++ didn't resolve, try the Python registry
-             if (!ref.settings) {
+             if (!ref.get_settings()) {
+               std::shared_ptr<Settings> resolved;
                try {
                  py::module_ reg =
                      py::module_::import("qdk_chemistry.algorithms.registry");
@@ -511,15 +512,19 @@ Attributes:
                  py::object py_settings = instance.attr("settings")();
                  // Deep-copy via JSON round-trip
                  auto json_obj = py_settings.cast<Settings &>().to_json();
-                 ref.settings = Settings::from_json(json_obj);
+                 resolved = Settings::from_json(json_obj);
                } catch (...) {
                  // Registry not available yet; leave settings unresolved
+               }
+               if (resolved) {
+                 ref = AlgorithmRef(algorithm_type, algorithm_name,
+                                    std::move(resolved));
                }
              }
 
              // Apply kwargs as overrides
              if (kwargs && py::len(kwargs) > 0) {
-               if (ref.settings) {
+               if (ref.get_settings()) {
                  // Apply overrides directly to the resolved settings without
                  // JSON round-tripping so non-JSON-serializable SettingValue
                  // inputs remain supported.
@@ -527,12 +532,13 @@ Attributes:
                    const auto key = py::cast<std::string>(
                        py::reinterpret_borrow<py::object>(item.first));
                    auto value = py::reinterpret_borrow<py::object>(item.second);
-                   if (!ref.settings->has(key)) {
+                   if (!ref.get_settings()->has(key)) {
                      throw SettingNotFound(key);
                    }
-                   ref.settings->set(
-                       key, python_to_setting_value_with_type(
-                                value, ref.settings->get_type_name(key), key));
+                   ref.get_settings()->set(
+                       key,
+                       python_to_setting_value_with_type(
+                           value, ref.get_settings()->get_type_name(key), key));
                  }
                } else {
                  throw py::value_error(
@@ -562,11 +568,13 @@ Examples:
       .def(
           "get",
           [](const AlgorithmRef &ref, const std::string &key) -> py::object {
-            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
-            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
-            if (key == "settings") return py::cast(ref.settings);
-            if (!ref.settings) throw SettingNotFound(key);
-            return setting_value_to_python(ref.settings->get(key));
+            if (key == "algorithm_type")
+              return py::cast(ref.get_algorithm_type());
+            if (key == "algorithm_name")
+              return py::cast(ref.get_algorithm_name());
+            if (key == "settings") return py::cast(ref.get_settings());
+            if (!ref.get_settings()) throw SettingNotFound(key);
+            return setting_value_to_python(ref.get_settings()->get(key));
           },
           py::arg("key"),
           R"(
@@ -595,16 +603,6 @@ Args:
     key: The field or setting key.
     value: The new value.
 )")
-      .def("set_algorithm_name", &AlgorithmRef::set_algorithm_name,
-           py::arg("name"),
-           R"(
-Change the algorithm name and re-resolve default settings.
-
-Any previous setting overrides are lost.
-
-Args:
-    name: The new algorithm name.
-)")
       // --- update(**kwargs) -------------------------------------------------
       .def(
           "update",
@@ -627,11 +625,13 @@ Examples:
       .def(
           "__getattr__",
           [](const AlgorithmRef &ref, const std::string &key) -> py::object {
-            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
-            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
-            if (key == "settings") return py::cast(ref.settings);
-            if (ref.settings && ref.settings->has(key))
-              return setting_value_to_python(ref.settings->get(key));
+            if (key == "algorithm_type")
+              return py::cast(ref.get_algorithm_type());
+            if (key == "algorithm_name")
+              return py::cast(ref.get_algorithm_name());
+            if (key == "settings") return py::cast(ref.get_settings());
+            if (ref.get_settings() && ref.get_settings()->has(key))
+              return setting_value_to_python(ref.get_settings()->get(key));
             throw py::attribute_error("AlgorithmRef has no attribute '" + key +
                                       "'");
           },
@@ -644,27 +644,33 @@ Examples:
               throw std::invalid_argument(
                   "algorithm_type is immutable after construction");
             if (key == "algorithm_name") {
-              ref.set_algorithm_name(value.cast<std::string>());
+              ref.set("algorithm_name",
+                      SettingValue(value.cast<std::string>()));
               return;
             }
             if (key == "settings") {
-              ref.settings = value.cast<std::shared_ptr<Settings>>();
-              return;
+              // "settings" isn't a SettingValue key, so we go through
+              // the dedicated set() path with the special key.
+              throw std::invalid_argument(
+                  "Direct assignment to 'settings' is not supported. "
+                  "Use set() or update() to modify individual settings.");
             }
-            if (!ref.settings) throw SettingNotFound(key);
+            if (!ref.get_settings()) throw SettingNotFound(key);
             SettingValue sv = value.cast<SettingValue>();
-            ref.settings->set(key, sv);
+            ref.get_settings()->set(key, sv);
           },
           py::arg("key"), py::arg("value"))
       // --- [] / in ----------------------------------------------------------
       .def(
           "__getitem__",
           [](const AlgorithmRef &ref, const std::string &key) -> py::object {
-            if (key == "algorithm_type") return py::cast(ref.algorithm_type);
-            if (key == "algorithm_name") return py::cast(ref.algorithm_name);
-            if (key == "settings") return py::cast(ref.settings);
-            if (!ref.settings) throw SettingNotFound(key);
-            return setting_value_to_python(ref.settings->get(key));
+            if (key == "algorithm_type")
+              return py::cast(ref.get_algorithm_type());
+            if (key == "algorithm_name")
+              return py::cast(ref.get_algorithm_name());
+            if (key == "settings") return py::cast(ref.get_settings());
+            if (!ref.get_settings()) throw SettingNotFound(key);
+            return setting_value_to_python(ref.get_settings()->get(key));
           },
           py::arg("key"))
       .def(
@@ -678,12 +684,12 @@ Examples:
             if (key == "algorithm_type" || key == "algorithm_name" ||
                 key == "settings")
               return true;
-            return ref.settings && ref.settings->has(key);
+            return ref.get_settings() && ref.get_settings()->has(key);
           },
           py::arg("key"))
       .def("__repr__", [](const AlgorithmRef &ref) {
-        return "AlgorithmRef(type='" + ref.algorithm_type + "', name='" +
-               ref.algorithm_name + "')";
+        return "AlgorithmRef(type='" + ref.get_algorithm_type() + "', name='" +
+               ref.get_algorithm_name() + "')";
       });
 
   // Utility functions for conversion

@@ -4,19 +4,28 @@
 
 #pragma once
 
-namespace qdk::chemistry::algorithms {
+#include <memory>
+#include <string>
+
+namespace qdk::chemistry::data {
+class Settings;
+}
+
+namespace qdk::chemistry::algorithms::detail {
 
 /**
- * @brief Install the global AlgorithmRef::create_default_settings resolver.
+ * @brief Resolve default settings for a given algorithm type and name
+ *        using the C++ factory dispatch.
  *
- * This wires up AlgorithmRef so that constructing one with a known
- * algorithm type automatically populates its @c settings member with a
- * copy of the algorithm's defaults.
+ * @internal This is called lazily by AlgorithmRef::_resolve_settings()
+ * the first time an AlgorithmRef is constructed without an explicit
+ * resolver installed.  Users should never need to call this directly.
  *
- * Call this once before creating any AlgorithmRef instances (e.g. at
- * program start-up or in a test fixture).  It is safe to call more than
- * once; subsequent calls overwrite the previous resolver.
+ * @param type  Registry type key (e.g. "scf_solver").
+ * @param name  Registry name key (e.g. "rhf").  Empty means factory default.
+ * @return Default Settings copy, or nullptr if the algorithm is not found.
  */
-void init_algorithm_ref_resolver();
+std::shared_ptr<data::Settings> resolve_algorithm_defaults(
+    const std::string& type, const std::string& name);
 
-}  // namespace qdk::chemistry::algorithms
+}  // namespace qdk::chemistry::algorithms::detail
