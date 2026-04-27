@@ -46,7 +46,10 @@ class PyscfAVASSettings(Settings):
     interface for setting and getting options.
 
     Attributes:
-        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = None).
+        ao_labels (list[str]): The atomic orbital labels to be included in the active space (default = []).
+            Supports indexed atom labels (e.g., ``["C1 2pz", "C2 2pz"]``) for selecting specific atoms.
+        threshold (float): Eigenvalue threshold for including orbitals in the active space (default = 0.2).
+            Orbitals with AVAS projection eigenvalues above this threshold are included.
         canonicalize (bool): Whether to canonicalize the active space orbitals after selection (default = False).
         openshell_option (int): How to handle singly-occupied orbitals in the active space (default = 2).
             The singly-occupied orbitals are projected as part of alpha orbitals if ``openshell_option=2``, or
@@ -67,6 +70,7 @@ class PyscfAVASSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("ao_labels", "vector<string>", [])
+        self._set_default("threshold", "double", 0.2, limit=(0.0, 1.0))
         self._set_default("canonicalize", "bool", False)
         self._set_default("openshell_option", "int", 2)
 
@@ -121,6 +125,7 @@ class PyscfAVAS(ActiveSpaceSelector):
             raise ValueError("PySCF-QDK/Chemistry AVAS Plugin only supports restricted orbitals.")
 
         ao_labels = self._settings.get("ao_labels")
+        threshold = self._settings.get("threshold")
         canonicalize = self._settings.get("canonicalize")
         openshell_option = self._settings.get("openshell_option")
 
@@ -155,7 +160,13 @@ class PyscfAVAS(ActiveSpaceSelector):
                     f"Or with indices: {atom_symbols}"
                 )
 
-        avas_obj = avas.AVAS(mf, ao_labels_clean, canonicalize=canonicalize, openshell_option=openshell_option)
+        avas_obj = avas.AVAS(
+            mf,
+            ao_labels_clean,
+            threshold=threshold,
+            canonicalize=canonicalize,
+            openshell_option=openshell_option,
+        )
         norb_act, nelec_act, mo_coeff = avas_obj.kernel()
 
         # Extract active indices
