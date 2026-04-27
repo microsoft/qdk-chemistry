@@ -22,7 +22,7 @@ def dynamic_metadata(field, settings):
 
     repo_root = version_file.resolve().parent
 
-    # Only consider appending .dev0 inside a git checkout.
+    # Only consider appending +local inside a git checkout.
     if not (repo_root / ".git").exists():
         return version
 
@@ -40,7 +40,7 @@ def dynamic_metadata(field, settings):
             if tag in (version, f"v{version}"):
                 return version
     except FileNotFoundError:
-        # git not installed — not a dev build
-        return version
+        # git not installed — cannot verify release tag, treat as local build
+        pass
 
     return f"{version}+local"

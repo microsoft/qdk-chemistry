@@ -68,7 +68,9 @@ TELEMETRY_ENABLED = (
     else (
         False
         if QSHARP_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
-        else ("dev" not in QDK_CHEMISTRY_VERSION)  # Auto-disable for dev builds
+        else (
+            "dev" not in QDK_CHEMISTRY_VERSION and "+local" not in QDK_CHEMISTRY_VERSION
+        )  # Auto-disable for dev/local builds
     )
 )
 
