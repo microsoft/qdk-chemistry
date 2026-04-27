@@ -590,7 +590,8 @@ double WavefunctionContainer::compute_s_squared() const {
   // Flat index: p*n^3 + q*n^2 + r*n + s
 
   if (!has_one_rdm_spin_traced()) {
-    throw std::runtime_error("Spin-traced 1-RDM is required to compute <S^2>");
+    throw std::runtime_error(
+        "Spin-traced or spin-dependent 1-RDM data is required to compute <S^2>");
   }
   if (!has_two_rdm_spin_dependent()) {
     throw std::runtime_error(
@@ -621,8 +622,6 @@ double WavefunctionContainer::compute_s_squared() const {
     for (int i = 0; i < norbs; ++i) {
       for (int j = 0; j < norbs; ++j) {
         int idx = i * norbs * norbs * norbs + j * norbs * norbs + j * norbs + i;
-        using ValueType =
-            std::decay_t<decltype(vec[static_cast<Eigen::Index>(0)])>;
         sum += std::real(vec[idx]);
       }
     }
