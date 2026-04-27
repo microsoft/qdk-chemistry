@@ -591,7 +591,8 @@ double WavefunctionContainer::compute_s_squared() const {
 
   if (!has_one_rdm_spin_traced()) {
     throw std::runtime_error(
-        "Spin-traced or spin-dependent 1-RDM data is required to compute <S^2>");
+        "Spin-traced or spin-dependent 1-RDM data is required to compute "
+        "<S^2>");
   }
   if (!has_two_rdm_spin_dependent()) {
     throw std::runtime_error(
