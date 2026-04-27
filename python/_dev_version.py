@@ -1,4 +1,4 @@
-"""Scikit-build-core metadata provider: appends .dev0 for from-source dev builds."""
+"""Scikit-build-core metadata provider: appends +local for from-source dev builds."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 def dynamic_metadata(field, settings):
-    """Return version from VERSION file, appending .dev0 if HEAD is not release-tagged."""
+    """Return version from VERSION file, appending +local if HEAD is not release-tagged."""
     assert field == "version"
     version_file = Path(settings.get("input", "../VERSION"))
     version = version_file.read_text().strip()
@@ -43,4 +43,4 @@ def dynamic_metadata(field, settings):
         # git not installed — not a dev build
         return version
 
-    return f"{version}.dev0"
+    return f"{version}+local"

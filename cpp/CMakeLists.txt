@@ -16,7 +16,7 @@ else()
     message(STATUS "Project version: ${QDK_VERSION}")
 endif()
 
-# Compute full version: append .dev0 for from-source builds not on a release tag.
+# Compute full version: append +local for from-source builds not on a release tag.
 set(QDK_FULL_VERSION "${QDK_VERSION_RAW}")
 if(QDK_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     find_package(Git QUIET)
@@ -30,7 +30,7 @@ if(QDK_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
             RESULT_VARIABLE _GIT_TAG_RESULT)
         if(NOT _GIT_TAG_RESULT EQUAL 0
            OR NOT (_GIT_TAG STREQUAL "${QDK_VERSION_RAW}" OR _GIT_TAG STREQUAL "v${QDK_VERSION_RAW}"))
-            string(APPEND QDK_FULL_VERSION ".dev0")
+            string(APPEND QDK_FULL_VERSION "+local")
         endif()
     endif()
 endif()
