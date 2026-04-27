@@ -5,14 +5,19 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from typing import Any
+from __future__ import annotations
 
-import h5py
+from typing import TYPE_CHECKING, Any
+
+import h5py  # noqa: TC002
 
 from qdk_chemistry.data.base import DataClass
 
-from .containers.base import TimeEvolutionUnitaryContainer
+from .containers.base import TimeEvolutionUnitaryContainer  # noqa: TC001
 from .containers.pauli_product_formula import PauliProductFormulaContainer
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data.circuit import Circuit
 
 __all__: list[str] = []
 
@@ -63,6 +68,23 @@ class TimeEvolutionUnitary(DataClass):
         """
         return self._container.num_qubits
 
+    def to_circuit(self) -> Circuit:
+        """Convert the time evolution unitary to a :class:`~qdk_chemistry.data.circuit.Circuit`.
+
+        Delegates to the underlying container's ``to_circuit()`` method. Currently only
+        ``PauliProductFormulaContainer`` is supported.
+
+        Returns:
+            A :class:`~qdk_chemistry.data.circuit.Circuit` representing the time evolution unitary.
+
+        Raises:
+            ValueError: If the container type does not support circuit conversion.
+
+        """
+        if not hasattr(self._container, "to_circuit"):
+            raise ValueError(f"Container type '{self._container.type}' does not support to_circuit() conversion.")
+        return self._container.to_circuit()
+
     def to_json(self) -> dict[str, Any]:
         """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
 
@@ -91,7 +113,7 @@ class TimeEvolutionUnitary(DataClass):
         return self._container.get_summary()
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitary":
+    def from_json(cls, json_data: dict[str, Any]) -> TimeEvolutionUnitary:
         """Create TimeEvolutionUnitary from a JSON dictionary.
 
         Args:
@@ -113,7 +135,7 @@ class TimeEvolutionUnitary(DataClass):
         return cls(container=container)
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitary":
+    def from_hdf5(cls, group: h5py.Group) -> TimeEvolutionUnitary:
         """Load an instance from an HDF5 group.
 
         Args:
