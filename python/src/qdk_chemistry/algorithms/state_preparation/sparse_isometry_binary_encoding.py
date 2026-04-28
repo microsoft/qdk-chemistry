@@ -18,7 +18,12 @@ import numpy as np
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionOp, MatrixCompressionType
+from qdk_chemistry.utils.binary_encoding import (
+    BinaryEncodingSynthesizer,
+    MatrixCompressionOp,
+    MatrixCompressionType,
+    _dense_qubits_size,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .sparse_isometry import (
@@ -90,34 +95,6 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         """
         Logger.trace_entering()
 
-        params = self._build_binary_encoding_params(wavefunction)
-
-        qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
-            parameter=params,
-        )
-        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
-
-        return Circuit(
-            qsharp_factory=qsharp_factory,
-            qsharp_op=qsharp_op,
-            encoding="jordan-wigner",
-        )
-
-    def _build_binary_encoding_params(self, wavefunction: Wavefunction) -> dict:
-        """Build binary-encoding state preparation parameters from a wavefunction.
-
-        Extracts coefficients and determinants, performs GF2+X elimination and
-        binary-encoding synthesis, and returns the parameter dict for Q# circuit
-        construction.
-
-        Args:
-            wavefunction: The target wavefunction to prepare.
-
-        Returns:
-            A dict of parameters for Q# circuit construction.
-
-        """
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
         num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
@@ -133,13 +110,55 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
         n_qubits = len(bitstrings[0])
         Logger.debug(f"Using {len(bitstrings)} determinants for state preparation")
 
-        # Step 1: GF2+X elimination — skip the diagonal reduction because
-        # binary encoding's stage-1 handles the identity pivot block natively;
-        # the extra CX + X ops from diagonal reduction would be redundant.
+        # GF2+X elimination — skip the diagonal reduction because binary encoding's
+        # stage-1 handles the identity pivot block natively; the extra CX + X ops
+        # from diagonal reduction would be redundant.
         bitstring_matrix = self._bitstrings_to_binary_matrix(bitstrings)
         gf2x_result = gf2x_with_tracking(bitstring_matrix, skip_diagonal_reduction=True, forward_only=True)
 
-        # Step 2: Binary encoding on the REF matrix
+        # Check applicability: binary encoding needs at least one spare row beyond
+        # the dense register for the one-hot batch indicators.
+        num_rows, num_cols = gf2x_result.reduced_matrix.shape
+        if _dense_qubits_size(num_cols) >= num_rows:
+            Logger.info(
+                "Binary encoding is not applicable for this wavefunction; falling back to dense+GF2X state preparation."
+            )
+            return self._build_gf2x_circuit(gf2x_result, coeffs, n_qubits)
+
+        params = self._build_binary_encoding_params(gf2x_result, coeffs, n_qubits, bitstrings)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationCircuit,
+            parameter=params,
+        )
+        qsharp_op = QSHARP_UTILS.BinaryEncoding.MakeBinaryEncodingStatePreparationOp(*params.values())
+
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=qsharp_op,
+            encoding="jordan-wigner",
+        )
+
+    def _build_binary_encoding_params(
+        self,
+        gf2x_result: GF2XEliminationResult,
+        coeffs: np.ndarray,
+        n_qubits: int,
+        bitstrings: list[str],
+    ) -> dict:
+        """Build binary-encoding state preparation parameters from an already-computed REF result.
+
+        Args:
+            gf2x_result: Forward-only REF result from GF2+X elimination.
+            coeffs: Wavefunction coefficients aligned with matrix columns.
+            n_qubits: Total number of qubits in the original space.
+            bitstrings: Determinant bitstrings (used for logging only).
+
+        Returns:
+            A dict of parameters for Q# binary-encoding circuit construction.
+
+        """
+        # Step 1: Binary encoding on the REF matrix
         encoded_ops, bijection, dense_size = self._perform_binary_encoding(gf2x_result, n_qubits)
 
         # Step 2b: Build compressed statevector reindexed by the bijection.
@@ -193,6 +212,54 @@ class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePrepar
             f"using {len(params['ancillaPool'])} pre-existing qubits as ancilla pool"
         )
         return params
+
+    def _build_gf2x_circuit(self, gf2x_result: GF2XEliminationResult, coeffs: np.ndarray, n_qubits: int) -> Circuit:
+        """Build a dense+GF2X state preparation circuit from a REF result.
+
+        Args:
+            gf2x_result: Forward-only REF result from GF2+X elimination.
+            coeffs: Wavefunction coefficients aligned with matrix columns.
+            n_qubits: Total number of qubits in the original space.
+
+        Returns:
+            A Circuit using dense state preparation followed by GF2+X expansion.
+
+        """
+        # Build statevector: each column of the reduced matrix maps to a unique
+        # computational-basis state via little-endian binary encoding.
+        statevector = np.zeros(2**gf2x_result.rank, dtype=float)
+        for det_idx in range(gf2x_result.reduced_matrix.shape[1]):
+            reduced_col = gf2x_result.reduced_matrix[:, det_idx]
+            sv_index = int("".join(str(b) for b in reversed(reduced_col)), 2)
+            statevector[sv_index] = coeffs[det_idx]
+        norm = np.linalg.norm(statevector)
+        if norm > 0:
+            statevector /= norm
+
+        # Build expansion ops (reversed GF2+X ops).
+        expansion_ops: list[MatrixCompressionOp] = []
+        for op in reversed(gf2x_result.operations):
+            if op[0] in ("cx", "cnot") and isinstance(op[1], tuple):
+                target, control = op[1]
+                expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.CX, [control, target]))
+            elif op[0] == "x" and isinstance(op[1], int):
+                expansion_ops.append(MatrixCompressionOp(MatrixCompressionType.X, [op[1]]))
+
+        # row_map[::-1] matches the parent's Q# PreparePureStateD convention (row rank-1 = MSB).
+        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
+            rowMap=gf2x_result.row_map[::-1],
+            stateVector=statevector.tolist(),
+            expansionOps=[op.to_dict() for op in expansion_ops],
+            numQubits=n_qubits,
+        )
+        params = vars(state_prep_params)
+
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=params,
+        )
+        state_prep_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=state_prep_op, encoding="jordan-wigner")
 
     def _create_dense(self, params: dict) -> Circuit:
         """Create a standalone dense state preparation circuit.

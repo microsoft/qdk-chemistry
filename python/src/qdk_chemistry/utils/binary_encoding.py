@@ -173,8 +173,7 @@ class RefTableau:
 
         Raises:
             NotRefError: If ``data`` is not in REF.
-            AssertionError: If the matrix rank/size assumptions required by
-                the algorithm are violated.
+            ValueError: If ``data`` is not a 2-dimensional array.
 
         """
         self.data = np.asarray(data, dtype=np.int8)
@@ -185,10 +184,6 @@ class RefTableau:
 
         self.num_rows, self.num_cols = self.data.shape
         self.dense_size = _dense_qubits_size(self.num_cols)
-        if self.dense_size >= self.num_rows:
-            raise ValueError(
-                f"Dense size ({self.dense_size}) must be strictly less than number of rows ({self.num_rows})"
-            )
 
         self._tmp_row = np.zeros(self.num_cols, dtype=np.int8)
         self.pivots = self.identify_pivots()
@@ -374,6 +369,12 @@ class BinaryEncodingSynthesizer:
 
         """
         self.tableau = tableau
+        if tableau.dense_size >= tableau.num_rows:
+            raise ValueError(
+                f"Binary encoding is not applicable: state is already dense "
+                f"({tableau.num_cols} determinant(s) require a {tableau.dense_size}-qubit dense register, "
+                f"leaving no spare rows in a {tableau.num_rows}-row matrix)."
+            )
         self.include_negative_controls = include_negative_controls
         self.measurement_based_uncompute = measurement_based_uncompute
 

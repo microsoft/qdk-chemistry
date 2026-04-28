@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncod
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 from qdk_chemistry.data import Circuit, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionType
+from qdk_chemistry.utils.binary_encoding import BinaryEncodingSynthesizer, MatrixCompressionType, _dense_qubits_size
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_random_wavefunction
@@ -202,6 +202,88 @@ class TestSparseIsometryBinaryEncoding:
         qc = circuit.get_qiskit_circuit()
         sim_data = np.array(Statevector.from_instruction(qc))
 
+        system_sv = sim_data[: 2**n_system]
+        overlap = np.abs(np.vdot(expected_sv, system_sv))
+        assert np.isclose(
+            overlap, 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+
+    @pytest.mark.parametrize(
+        ("n_electrons", "n_orbitals", "n_dets", "seed", "expected_n_qubits"),
+        [
+            # 4 electrons, 3 orbitals, 9 determinants: the full space has only
+            # ceil(6 choose 4) = 15 states.  After GF2+X (forward-only, no
+            # diagonal reduction) the REF matrix has rank 4 (4 rows) but still
+            # 9 columns, so dense_size = _dense_qubits_size(9) = 4 = num_rows.
+            # The condition dense_size >= num_rows triggers the fallback.
+            (4, 3, 9, 0, 6),
+            (4, 3, 9, 1, 6),
+        ],
+        ids=["4e3o_9det_seed0", "4e3o_9det_seed1"],
+    )
+    def test_fallback_to_dense_gf2x(self, n_electrons, n_orbitals, n_dets, seed, expected_n_qubits):
+        """Wavefunction where after GF2+X the REF matrix is already dense falls back to dense+GF2X."""
+        wf = create_random_wavefunction(
+            n_electrons=n_electrons,
+            n_orbitals=n_orbitals,
+            n_dets=n_dets,
+            seed=seed,
+        )
+
+        # Confirm this case is genuinely a fallback case before testing.
+        num_orbitals = len(wf.get_orbitals().get_active_space_indices()[0])
+        bitstrings = []
+        for det in wf.get_active_determinants():
+            a, b = det.to_binary_strings(num_orbitals)
+            bitstrings.append(b[::-1] + a[::-1])
+        mat = np.array([[int(c) for c in bs] for bs in bitstrings], dtype=np.int8).T
+        gf2x_result = gf2x_with_tracking(mat, skip_diagonal_reduction=True, forward_only=True)
+        num_rows, num_cols = gf2x_result.reduced_matrix.shape
+        assert _dense_qubits_size(num_cols) >= num_rows, (
+            f"Expected fallback: dense_size={_dense_qubits_size(num_cols)} must be >= num_rows={num_rows}"
+        )
+
+        circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        assert isinstance(circuit, Circuit)
+        assert circuit.encoding == "jordan-wigner"
+
+        lc = circuit.estimate()["logicalCounts"]
+        # No binary-encoding SELECT/SELECT_AND ops in the fallback path.
+        assert lc["cczCount"] == 0
+        # System qubits only — PreparePureStateD does not need external ancilla.
+        assert lc["numQubits"] == expected_n_qubits
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    @pytest.mark.parametrize(
+        ("n_electrons", "n_orbitals", "n_dets", "seed"),
+        [
+            (4, 3, 9, 0),
+            (4, 3, 9, 1),
+        ],
+        ids=["4e3o_9det_seed0", "4e3o_9det_seed1"],
+    )
+    def test_fallback_statevector(self, n_electrons, n_orbitals, n_dets, seed):
+        """Fallback circuit produces the correct statevector (Qiskit simulation).
+
+        Validates that the fallback dense+GF2X path correctly encodes the target
+        wavefunction amplitudes, not merely that it runs without error.
+        """
+        from qiskit.quantum_info import Statevector  # noqa: PLC0415
+
+        from qdk_chemistry.plugins.qiskit.conversion import create_statevector_from_wavefunction  # noqa: PLC0415
+
+        wf = create_random_wavefunction(
+            n_electrons=n_electrons,
+            n_orbitals=n_orbitals,
+            n_dets=n_dets,
+            seed=seed,
+        )
+        circuit = create("state_prep", "sparse_isometry_binary_encoding").run(wf)
+        expected_sv = create_statevector_from_wavefunction(wf, normalize=True)
+        n_system = 2 * n_orbitals
+
+        qc = circuit.get_qiskit_circuit()
+        sim_data = np.array(Statevector.from_instruction(qc))
         system_sv = sim_data[: 2**n_system]
         overlap = np.abs(np.vdot(expected_sv, system_sv))
         assert np.isclose(

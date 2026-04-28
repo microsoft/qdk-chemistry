@@ -249,6 +249,45 @@ class TestBinaryEncodingSynthesizerBasic:
         with pytest.raises(NotRefError):
             BinaryEncodingSynthesizer.from_matrix(mat)
 
+    @pytest.mark.parametrize(
+        ("matrix", "expected_num_cols", "expected_dense_size", "expected_num_rows"),
+        [
+            # 4 columns need a 2-qubit dense register, but there are only 2 rows — no spare row.
+            (
+                np.array([[1, 0, 0, 0], [0, 1, 0, 0]], dtype=np.int8),
+                4,
+                2,
+                2,
+            ),
+            # 2 columns need a 1-qubit dense register, but there is only 1 row — no spare row.
+            (
+                np.array([[1, 0]], dtype=np.int8),
+                2,
+                1,
+                1,
+            ),
+            # 8 columns need a 3-qubit dense register, but there are only 3 rows — no spare row.
+            (
+                np.array(
+                    [[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0], [0, 0, 1, 0, 0, 0, 0, 0]],
+                    dtype=np.int8,
+                ),
+                8,
+                3,
+                3,
+            ),
+        ],
+    )
+    def test_rejects_already_dense_tableau(self, matrix, expected_num_cols, expected_dense_size, expected_num_rows):
+        """Already-dense tableau must raise ValueError with an informative message."""
+        with pytest.raises(ValueError, match="Binary encoding is not applicable") as exc_info:
+            BinaryEncodingSynthesizer(RefTableau(matrix))
+
+        msg = str(exc_info.value)
+        assert f"{expected_num_cols} determinant(s)" in msg
+        assert f"{expected_dense_size}-qubit dense register" in msg
+        assert f"{expected_num_rows}-row matrix" in msg
+
     def test_max_batch_size_power_of_two(self):
         """max_batch_size must return a positive power of two."""
         mat = np.array(
