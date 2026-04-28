@@ -18,7 +18,6 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
@@ -126,10 +125,6 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
       return std::make_shared<Hamiltonian>(
           std::make_unique<CanonicalFourCenterHamiltonianContainer>(
               one_body, two_body, orbitals, core_energy, inactive_fock));
-    } else if (type == "density_fitted") {
-      return std::make_shared<Hamiltonian>(
-          std::make_unique<DensityFittedHamiltonianContainer>(
-              one_body, three_center, orbitals, core_energy, inactive_fock));
     } else if (type == "cholesky") {
       return std::make_shared<Hamiltonian>(
           std::make_unique<CholeskyHamiltonianContainer>(one_body, three_center,
@@ -155,13 +150,6 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
               sample_one_body_alpha, sample_one_body_beta, sample_two_body_aaaa,
               sample_two_body_aabb, sample_two_body_bbbb, orbitals_unrestricted,
               core_energy, sample_inactive_fock_alpha,
-              sample_inactive_fock_beta));
-    } else if (type == "density_fitted") {
-      return std::make_shared<Hamiltonian>(
-          std::make_unique<DensityFittedHamiltonianContainer>(
-              sample_one_body_alpha, sample_one_body_beta,
-              sample_three_center_aa, sample_three_center_bb,
-              orbitals_unrestricted, core_energy, sample_inactive_fock_alpha,
               sample_inactive_fock_beta));
     } else if (type == "cholesky") {
       return std::make_shared<Hamiltonian>(
@@ -272,11 +260,11 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "cholesky") {
     // For density fitted, need 3-center integrals
     Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(4, 3);
     h_active_space = std::make_shared<Hamiltonian>(
-        std::make_unique<DensityFittedHamiltonianContainer>(
+        std::make_unique<CholeskyHamiltonianContainer>(
             one_body, three_center_2x2, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
   } else if (test_p == "cholesky") {
@@ -317,9 +305,9 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
     h1 = std::make_shared<Hamiltonian>(
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals, core_energy, inactive_fock));
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "cholesky") {
     h1 = std::make_shared<Hamiltonian>(
-        std::make_unique<DensityFittedHamiltonianContainer>(
+        std::make_unique<CholeskyHamiltonianContainer>(
             one_body, three_center, orbitals, core_energy, inactive_fock));
   } else if (test_p == "cholesky") {
     h1 = std::make_shared<Hamiltonian>(
@@ -491,7 +479,7 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
 
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(2, 1, 0, 2), 7.0);
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 2, 1), 8.0);
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "cholesky") {
     Eigen::MatrixXd test_one_body = Eigen::MatrixXd::Identity(2, 2);
     Eigen::MatrixXd test_three_center = Eigen::MatrixXd::Zero(4, 3);
 
@@ -503,7 +491,7 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     test_three_center(1, 1) = 5.0;  //
     test_three_center(3, 2) = 6.0;  //
 
-    Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
+    Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
         test_one_body, test_three_center, orbitals, core_energy,
         inactive_fock));
 
@@ -514,7 +502,7 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
 
     // Test three center integral
     auto [three_c_aa, three_c_bb] =
-        h.get_container<DensityFittedHamiltonianContainer>()
+        h.get_container<CholeskyHamiltonianContainer>()
             .get_three_center_integrals();
 
     EXPECT_TRUE(three_c_aa.isApprox(test_three_center));
@@ -559,39 +547,30 @@ TEST_P(HamiltonianTest, TwoBodyElementAccess) {
     auto large_orbitals =
         std::make_shared<ModelOrbitals>(3, true);  // 3 orbitals, restricted
 
-    Hamiltonian h_large(std::make_unique<DensityFittedHamiltonianContainer>(
+    Hamiltonian h_large(std::make_unique<CholeskyHamiltonianContainer>(
         large_one_body, large_three_center, large_orbitals, 0.0,
         large_inact_f));
 
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 2, 1, 2), 49.0);
     EXPECT_DOUBLE_EQ(h_large.get_two_body_element(1, 0, 1, 0), 64.0);
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "sparse") {
+    Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+
+    sparse_one_body.insert(0, 0) = 1.0;
+    sparse_one_body.insert(0, 1) = 0.5;
+    sparse_one_body.insert(1, 0) = 0.5;
+    sparse_one_body.insert(1, 1) = 1.0;
+    sparse_one_body.makeCompressed();
+
     SparseHamiltonianContainer::TwoBodyMap two_body_map;
-    two_body_map[{0, 0, 0, 0}] = 1.0;
-    two_body_map[{0, 0, 0, 1}] = 2.0;
-    two_body_map[{1, 1, 1, 1}] = 4.0;
-    two_body_map[{0, 1, 1, 0}] = 5.0;
-
-    Eigen::SparseMatrix<double> sp_one_body(2, 2);
-    sp_one_body.insert(0, 0) = 1.0;
-    sp_one_body.insert(1, 1) = 1.0;
-    sp_one_body.makeCompressed();
-
-    Hamiltonian h(std::make_unique<SparseHamiltonianContainer>(
-        sp_one_body, two_body_map, 0.0));
-
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0), 1.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
-    // Non-stored entries return 0
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
-    EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+    two_body_map[{0, 0, 0, 0}] = 2.0;
+    two_body_map[{1, 1, 1, 1}] = 3.0;
 
     auto container = std::make_unique<SparseHamiltonianContainer>(
         sparse_one_body, two_body_map, core_energy);
     const auto& ref = *container;
 
+    // sparse-specific accessors
     EXPECT_DOUBLE_EQ(ref.one_body_element(0, 0), 1.0);
     EXPECT_DOUBLE_EQ(ref.one_body_element(0, 1), 0.5);
     EXPECT_DOUBLE_EQ(ref.one_body_element(1, 0), 0.5);
@@ -788,14 +767,14 @@ TEST_P(HamiltonianTest, ValidationTests) {
         Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             correct_one_body, correct_two_body, orbitals, core_energy,
             inactive_fock)));
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "cholesky") {
     // Mismatched dimensions should throw during construction
     Eigen::MatrixXd bad_one_body = Eigen::MatrixXd::Identity(3, 3);
     Eigen::MatrixXd bad_two_body = Eigen::MatrixXd::Random(
         5, 6);  // The number of columns hould be 9 for 3x3
 
     EXPECT_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
+        Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
             bad_one_body, bad_two_body, orbitals, core_energy, inactive_fock)),
         std::invalid_argument);
 
@@ -804,20 +783,18 @@ TEST_P(HamiltonianTest, ValidationTests) {
     non_square_one_body.setRandom();
     Eigen::MatrixXd any_two_body = Eigen::MatrixXd::Random(9, 9);
 
-    EXPECT_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
-            non_square_one_body, any_two_body, orbitals, core_energy,
-            inactive_fock)),
-        std::invalid_argument);
+    EXPECT_THROW(Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+                     non_square_one_body, any_two_body, orbitals, core_energy,
+                     inactive_fock)),
+                 std::invalid_argument);
 
     // Test validation passes with correct dimensions
     Eigen::MatrixXd correct_one_body = Eigen::MatrixXd::Identity(2, 2);
     Eigen::MatrixXd correct_two_body =
         Eigen::MatrixXd::Random(4, 9);  // 2*2 = 4
-    EXPECT_NO_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
-            correct_one_body, correct_two_body, orbitals, core_energy,
-            inactive_fock)));
+    EXPECT_NO_THROW(Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        correct_one_body, correct_two_body, orbitals, core_energy,
+        inactive_fock)));
   }
 }
 
@@ -838,11 +815,10 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
         Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             tiny_one_body, tiny_two_body, tiny_orbitals, core_energy,
             tiny_inactive_fock)));
-  } else if (test_p == "density_fitted") {
-    EXPECT_NO_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
-            tiny_one_body, tiny_three_center, tiny_orbitals, core_energy,
-            tiny_inactive_fock)));
+  } else if (test_p == "cholesky") {
+    EXPECT_NO_THROW(Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        tiny_one_body, tiny_three_center, tiny_orbitals, core_energy,
+        tiny_inactive_fock)));
   }
 
   // Test with large matrices (stress test)
@@ -865,11 +841,10 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
         Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             large_one_body, large_two_body, large_orbitals, core_energy,
             large_inactive_fock)));
-  } else if (test_p == "density_fitted") {
-    EXPECT_NO_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
-            large_one_body, large_three_center, large_orbitals, core_energy,
-            large_inactive_fock)));
+  } else if (test_p == "cholesky") {
+    EXPECT_NO_THROW(Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        large_one_body, large_three_center, large_orbitals, core_energy,
+        large_inactive_fock)));
   }
 
   // Test wrong size by one element
@@ -884,12 +859,11 @@ TEST_P(HamiltonianTest, ValidationEdgeCases) {
             three_by_three, off_by_one_4c, orbitals, core_energy,
             inactive_fock)),
         std::invalid_argument);
-  } else if (test_p == "density_fitted") {
-    EXPECT_THROW(
-        Hamiltonian(std::make_unique<DensityFittedHamiltonianContainer>(
-            three_by_three, off_by_one_3c, orbitals, core_energy,
-            inactive_fock)),
-        std::invalid_argument);
+  } else if (test_p == "cholesky") {
+    EXPECT_THROW(Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+                     three_by_three, off_by_one_3c, orbitals, core_energy,
+                     inactive_fock)),
+                 std::invalid_argument);
   }
 }
 
@@ -1008,8 +982,8 @@ TEST_P(HamiltonianTest, UnrestrictedSpinChannelAccess) {
                      0.0);
     EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 0, SpinChannel::bbbb),
                      0.0);
-  } else if (test_p == "density_fitted") {
-    Hamiltonian h(std::make_unique<DensityFittedHamiltonianContainer>(
+  } else if (test_p == "cholesky") {
+    Hamiltonian h(std::make_unique<CholeskyHamiltonianContainer>(
         one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
         unrestricted_orbitals, core_energy, empty_fock, empty_fock));
 
@@ -1187,13 +1161,6 @@ TEST_P(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
         std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
-  } else if (test_p == "density_fitted") {
-    // For density fitted, need 3-center integrals
-    Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(3, 4);
-    h_active_space = std::make_shared<Hamiltonian>(
-        std::make_unique<DensityFittedHamiltonianContainer>(
-            one_body, three_center, orbitals_with_inactive, core_energy,
-            inactive_fock_non_empty));
   } else if (test_p == "cholesky") {
     h_active_space = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
@@ -1263,12 +1230,12 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
                   empty_fock));
         },
         std::invalid_argument);
-  } else if (test_p == "density_fitted") {
+  } else if (test_p == "cholesky") {
     EXPECT_THROW(
         {
           // geminal dimension mismatch
           Hamiltonian h_mismatched(
-              std::make_unique<DensityFittedHamiltonianContainer>(
+              std::make_unique<CholeskyHamiltonianContainer>(
                   one_body_alpha, one_body_beta, three_center_aa,
                   three_center_bb1, unrestricted_orbitals, core_energy,
                   empty_fock, empty_fock));
@@ -1278,7 +1245,7 @@ TEST_P(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
         {
           // aux basis number mismatch
           Hamiltonian h_mismatched(
-              std::make_unique<DensityFittedHamiltonianContainer>(
+              std::make_unique<CholeskyHamiltonianContainer>(
                   one_body_alpha, one_body_beta, three_center_aa,
                   three_center_bb2, unrestricted_orbitals, core_energy,
                   empty_fock, empty_fock));
@@ -1298,15 +1265,11 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
   bool is_canonical =
       hamiltonian_restricted
           ->has_container_type<CanonicalFourCenterHamiltonianContainer>();
-  bool is_density_fitted =
-      hamiltonian_restricted
-          ->has_container_type<DensityFittedHamiltonianContainer>();
   bool is_cholesky = hamiltonian_restricted
                          ->has_container_type<CholeskyHamiltonianContainer>();
 
   // Exactly one should be true
   EXPECT_EQ(is_canonical, test_p == "canonical_four_center");
-  EXPECT_EQ(is_density_fitted, test_p == "density_fitted");
   EXPECT_EQ(is_cholesky, test_p == "cholesky");
 
   // Test that accessing with incorrect container type throws std::bad_cast
@@ -1314,11 +1277,6 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
   if (test_p != "canonical_four_center") {
     EXPECT_THROW(hamiltonian_restricted
                      ->get_container<CanonicalFourCenterHamiltonianContainer>(),
-                 std::bad_cast);
-  }
-  if (test_p != "density_fitted") {
-    EXPECT_THROW(hamiltonian_restricted
-                     ->get_container<DensityFittedHamiltonianContainer>(),
                  std::bad_cast);
   }
   if (test_p != "cholesky") {
@@ -1895,15 +1853,14 @@ TEST_F(HamiltonianConstructorTest, DensityFittedRestrictedO2) {
   EXPECT_TRUE(hamiltonian->has_two_body_integrals());
   EXPECT_TRUE(hamiltonian->has_orbitals());
   EXPECT_TRUE(hamiltonian->is_restricted());
-  EXPECT_EQ(hamiltonian->get_container_type(), "density_fitted");
+  EXPECT_EQ(hamiltonian->get_container_type(), "cholesky");
 
   // Verify we can access the typed container
-  EXPECT_TRUE(
-      hamiltonian->has_container_type<DensityFittedHamiltonianContainer>());
+  EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
   EXPECT_NO_THROW({
     const auto& container =
-        hamiltonian->get_container<DensityFittedHamiltonianContainer>();
-    EXPECT_EQ(container.get_container_type(), "density_fitted");
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "cholesky");
   });
 }
 
@@ -1917,15 +1874,14 @@ TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
   EXPECT_TRUE(hamiltonian->has_two_body_integrals());
   EXPECT_TRUE(hamiltonian->has_orbitals());
   EXPECT_TRUE(hamiltonian->is_unrestricted());
-  EXPECT_EQ(hamiltonian->get_container_type(), "density_fitted");
+  EXPECT_EQ(hamiltonian->get_container_type(), "cholesky");
 
   // Verify we can access the typed container
-  EXPECT_TRUE(
-      hamiltonian->has_container_type<DensityFittedHamiltonianContainer>());
+  EXPECT_TRUE(hamiltonian->has_container_type<CholeskyHamiltonianContainer>());
   EXPECT_NO_THROW({
     const auto& container =
-        hamiltonian->get_container<DensityFittedHamiltonianContainer>();
-    EXPECT_EQ(container.get_container_type(), "density_fitted");
+        hamiltonian->get_container<CholeskyHamiltonianContainer>();
+    EXPECT_EQ(container.get_container_type(), "cholesky");
   });
 }
 
@@ -2332,7 +2288,7 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedRestrictedO2MP2) {
   EXPECT_TRUE(df_hamiltonian->has_two_body_integrals());
   EXPECT_TRUE(df_hamiltonian->has_orbitals());
   EXPECT_TRUE(df_hamiltonian->is_restricted());
-  EXPECT_EQ(df_hamiltonian->get_container_type(), "density_fitted");
+  EXPECT_EQ(df_hamiltonian->get_container_type(), "cholesky");
 
   // Verify we can access the typed container
   auto [h_aa, h_bb] = df_hamiltonian->get_one_body_integrals();
@@ -2373,7 +2329,7 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
   EXPECT_TRUE(df_hamiltonian->has_two_body_integrals());
   EXPECT_TRUE(df_hamiltonian->has_orbitals());
   EXPECT_TRUE(df_hamiltonian->is_restricted());
-  EXPECT_EQ(df_hamiltonian->get_container_type(), "density_fitted");
+  EXPECT_EQ(df_hamiltonian->get_container_type(), "cholesky");
 
   auto orbitals = df_hamiltonian->get_orbitals();
   double core_energy = df_hamiltonian->get_core_energy();
@@ -2434,25 +2390,25 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
 
   // Create density-fitted Hamiltonian
   auto h_df = std::make_shared<Hamiltonian>(
-      std::make_unique<DensityFittedHamiltonianContainer>(
+      std::make_unique<CholeskyHamiltonianContainer>(
           one_body, three_center, orbitals, 1.5, inactive_fock));
 
   // Verify original types
   EXPECT_EQ(h_canonical->get_container_type(), "canonical_four_center");
-  EXPECT_EQ(h_df->get_container_type(), "density_fitted");
+  EXPECT_EQ(h_df->get_container_type(), "cholesky");
 
   // Serialize and deserialize canonical
   nlohmann::json canonical_json = h_canonical->to_json();
   auto h_canonical_restored = Hamiltonian::from_json(canonical_json);
   EXPECT_EQ(h_canonical_restored->get_container_type(), "canonical_four_center")
       << "Canonical container type must be preserved through JSON";
-  EXPECT_NE(h_canonical_restored->get_container_type(), "density_fitted")
+  EXPECT_NE(h_canonical_restored->get_container_type(), "cholesky")
       << "Canonical JSON cannot produce density_fitted container";
 
   // Serialize and deserialize density-fitted
   nlohmann::json df_json = h_df->to_json();
   auto h_df_restored = Hamiltonian::from_json(df_json);
-  EXPECT_EQ(h_df_restored->get_container_type(), "density_fitted")
+  EXPECT_EQ(h_df_restored->get_container_type(), "cholesky")
       << "Density-fitted container type must be preserved through JSON";
   EXPECT_NE(h_df_restored->get_container_type(), "canonical_four_center")
       << "Density-fitted JSON cannot produce canonical container";
@@ -2466,7 +2422,7 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
 
   h_df->to_hdf5_file("test_df.hamiltonian.h5");
   auto h_df_hdf5 = Hamiltonian::from_hdf5_file("test_df.hamiltonian.h5");
-  EXPECT_EQ(h_df_hdf5->get_container_type(), "density_fitted");
+  EXPECT_EQ(h_df_hdf5->get_container_type(), "cholesky");
   std::filesystem::remove("test_df.hamiltonian.h5");
 }
 
@@ -2927,8 +2883,7 @@ TEST_F(SparseTest, SparseContainerIsValid) {
 // ============================================================================
 INSTANTIATE_TEST_SUITE_P(
     AllContainerTypes, HamiltonianTest,
-    ::testing::Values("canonical_four_center", "density_fitted", "cholesky",
-                      "sparse"),
+    ::testing::Values("canonical_four_center", "cholesky", "sparse"),
     [](const ::testing::TestParamInfo<std::string>& info) {
       std::string name = info.param;
       std::replace(name.begin(), name.end(), '_', ' ');

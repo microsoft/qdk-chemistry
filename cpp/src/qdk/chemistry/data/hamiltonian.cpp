@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/density_fitted.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -504,9 +503,6 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
   }
-  if (container_type == "density_fitted") {
-    return DensityFittedHamiltonianContainer::from_json(j);
-  }
   if (container_type == "cholesky") {
     return CholeskyHamiltonianContainer::from_json(j);
   }
@@ -534,8 +530,6 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     // Forward to appropriate container implementation
     if (container_type == "canonical_four_center") {
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
-    } else if (container_type == "density_fitted") {
-      return DensityFittedHamiltonianContainer::from_hdf5(group);
     } else if (container_type == "cholesky") {
       return CholeskyHamiltonianContainer::from_hdf5(group);
     }

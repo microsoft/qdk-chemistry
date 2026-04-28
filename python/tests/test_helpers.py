@@ -12,8 +12,8 @@ from qdk_chemistry.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
+    CholeskyHamiltonianContainer,
     Configuration,
-    DensityFittedHamiltonianContainer,
     Hamiltonian,
     Orbitals,
     OrbitalType,
@@ -80,7 +80,7 @@ def create_test_hamiltonian(num_orbitals: int, container_type: str = "canonical_
         num_orbitals: Number of molecular orbitals
         container_type: Type of container to use. Options are:
             - "canonical_four_center" (default): Uses CanonicalFourCenterHamiltonianContainer
-            - "density_fitted": Uses DensityFittedHamiltonianContainer
+            - "cholesky": Uses CholeskyHamiltonianContainer
 
     Returns:
         Hamiltonian: A test Hamiltonian with the specified container type
@@ -93,14 +93,14 @@ def create_test_hamiltonian(num_orbitals: int, container_type: str = "canonical_
     if container_type == "canonical_four_center":
         two_body = np.zeros(num_orbitals**4)
         return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
-    if container_type == "density_fitted":
+    if container_type == "cholesky":
         # Create three-center integrals [n_orb_pairs x n_aux]
         # Using n_aux = num_orbitals auxiliary basis functions
         n_orb_pairs = num_orbitals**2
         n_aux = num_orbitals
         three_center = np.zeros((n_orb_pairs, n_aux))
-        return Hamiltonian(DensityFittedHamiltonianContainer(one_body, three_center, orbitals, 0.0, fock))
-    raise ValueError(f"Unknown container_type: {container_type}. Use 'canonical_four_center' or 'density_fitted'.")
+        return Hamiltonian(CholeskyHamiltonianContainer(one_body, three_center, orbitals, 0.0, fock))
+    raise ValueError(f"Unknown container_type: {container_type}. Use 'canonical_four_center' or 'cholesky'.")
 
 
 def create_nontrivial_test_hamiltonian(num_orbitals: int = 2):

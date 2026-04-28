@@ -18,7 +18,6 @@ Exposed classes are:
 - :class:`ControlledTimeEvolutionUnitary`: Controlled time evolution unitary.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
-- :class:`DensityFittedHamiltonianContainer`: Hamiltonian container with density-fitted 3-center integrals.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
@@ -75,7 +74,6 @@ from qdk_chemistry._core.data import (
     Configuration,
     ConfigurationSet,
     CoupledClusterContainer,
-    DensityFittedHamiltonianContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -140,7 +138,6 @@ __all__ = [
     "ControlledTimeEvolutionUnitary",
     "CoupledClusterContainer",
     "DataClass",
-    "DensityFittedHamiltonianContainer",
     "ElectronicStructureSettings",
     "Element",
     "EncodingMismatchError",

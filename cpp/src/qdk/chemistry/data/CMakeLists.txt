@@ -9,7 +9,6 @@ target_sources(chemistry PRIVATE
     json_serialization.cpp
     hamiltonian.cpp
     hamiltonian_containers/canonical_four_center.cpp
-    hamiltonian_containers/density_fitted.cpp
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
     orbitals.cpp
