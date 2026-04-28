@@ -115,7 +115,7 @@ for quantum chemistry calculations. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 Derived classes implement specific storage formats for two-electron integrals
-(e.g., canonical 4-center, density-fitted, etc.).
+(e.g., canonical 4-center, Cholesky, etc.).
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
@@ -890,7 +890,7 @@ wrapping a HamiltonianContainer implementation. It supports:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 The actual integral storage is handled by the underlying container, which
-can use different representations (canonical 4-center, density-fitted, etc.).
+can use different representations (canonical 4-center, Cholesky, etc.).
 
 Examples:
     >>> # Create a Hamiltonian from a CanonicalFourCenterHamiltonianContainer container

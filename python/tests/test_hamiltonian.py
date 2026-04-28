@@ -129,7 +129,7 @@ class TestHamiltonian:
             assert np.array_equal(aabb, _two_body)
             assert np.array_equal(bbbb, _two_body)
         elif container_type == "cholesky":
-            # Density-fitted container should yield four-center integrals equal
+            # Cholesky container should yield four-center integrals equal
             # to the contraction of the three-center integrals over the
             # auxiliary index (assuming identity metric):
             # (ij|kl) = sum_P (ij|P) (kl|P).
@@ -562,7 +562,7 @@ class TestRestrictedUnrestricted:
                 inactive_fock_beta,
             )
         else:
-            # For density-fitted, use three-center integrals scaled appropriately
+            # For Cholesky, use three-center integrals scaled appropriately
             base_three_center = np.array(
                 [
                     [1.0, 0.6, 0.8],
@@ -774,11 +774,11 @@ class TestRestrictedUnrestricted:
 
 
 # =============================================================================
-# Density-Fitted Specific Tests
+# Cholesky-Specific Tests
 # =============================================================================
 
 
-class TestDensityFittedSpecific:
+class TestCholeskySpecific:
     """Tests specific to CholeskyHamiltonianContainer."""
 
     def test_three_center_integrals_storage(self):

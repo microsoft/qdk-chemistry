@@ -59,7 +59,7 @@ class HamiltonianTest : public ::testing::TestWithParam<std::string> {
 
     inactive_fock_non_empty = Eigen::MatrixXd::Random(4, 4);
 
-    // For density-fitted: 3-center integrals [n_orb^2 x n_aux]
+    // For Cholesky: 3-center integrals [n_orb^2 x n_aux]
     // Using 3 auxiliary basis functions for 2 orbitals (4 geminals)
     // These numbers are selected because they correspond to two_body that is
     // used for canonical four-center tests
@@ -261,7 +261,7 @@ TEST_P(HamiltonianTest, ConstructorWithInactiveFock) {
             one_body, two_body, orbitals_with_inactive, core_energy,
             inactive_fock_non_empty));
   } else if (test_p == "cholesky") {
-    // For density fitted, need 3-center integrals
+    // For Cholesky, need 3-center integrals
     Eigen::MatrixXd three_center_2x2 = Eigen::MatrixXd::Random(4, 3);
     h_active_space = std::make_shared<Hamiltonian>(
         std::make_unique<CholeskyHamiltonianContainer>(
@@ -2370,7 +2370,7 @@ TEST_F(HamiltonianIntegrationTest, DensityFittedActiveRestrictedO2MP2) {
  * @brief Test that container type is preserved through JSON serialization.
  *
  * Verifies that serializing a canonical_four_center Hamiltonian to JSON and
- * deserializing cannot produce a density_fitted container, and vice versa.
+ * deserializing cannot produce a three_center container, and vice versa.
  */
 TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
   // Create test data
@@ -2388,7 +2388,7 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
       std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body, two_body, orbitals, 1.5, inactive_fock));
 
-  // Create density-fitted Hamiltonian
+  // Create Cholesky Hamiltonian
   auto h_df = std::make_shared<Hamiltonian>(
       std::make_unique<CholeskyHamiltonianContainer>(
           one_body, three_center, orbitals, 1.5, inactive_fock));
@@ -2403,15 +2403,15 @@ TEST(HamiltonianContainerTypeTest, ContainerTypePreservedThroughSerialization) {
   EXPECT_EQ(h_canonical_restored->get_container_type(), "canonical_four_center")
       << "Canonical container type must be preserved through JSON";
   EXPECT_NE(h_canonical_restored->get_container_type(), "cholesky")
-      << "Canonical JSON cannot produce density_fitted container";
+      << "Canonical JSON cannot produce cholesky container";
 
-  // Serialize and deserialize density-fitted
+  // Serialize and deserialize Cholesky
   nlohmann::json df_json = h_df->to_json();
   auto h_df_restored = Hamiltonian::from_json(df_json);
   EXPECT_EQ(h_df_restored->get_container_type(), "cholesky")
-      << "Density-fitted container type must be preserved through JSON";
+      << "Cholesky container type must be preserved through JSON";
   EXPECT_NE(h_df_restored->get_container_type(), "canonical_four_center")
-      << "Density-fitted JSON cannot produce canonical container";
+      << "Cholesky JSON cannot produce canonical container";
 
   // Verify HDF5 serialization as well
   h_canonical->to_hdf5_file("test_canonical.hamiltonian.h5");
