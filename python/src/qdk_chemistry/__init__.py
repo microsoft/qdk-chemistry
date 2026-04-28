@@ -17,7 +17,7 @@ except _PackageNotFoundError:
         __version__ = (Path(__file__).parent.parent.parent.parent / "VERSION").read_text().strip()
     except (OSError, UnicodeDecodeError):
         # VERSION file not reachable or unreadable (e.g. vendored copy without repo root)
-        __version__ = "0.0.0.dev0"
+        __version__ = "0.0.0+local"
 
 import contextlib
 import os

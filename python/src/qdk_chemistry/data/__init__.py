@@ -65,6 +65,7 @@ Exposed exceptions are:
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
+    AlgorithmRef,
     Ansatz,
     AOType,
     BasisSet,
@@ -126,6 +127,7 @@ SettingsAreLockedError = SettingsAreLocked
 
 __all__ = [
     "AOType",
+    "AlgorithmRef",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",

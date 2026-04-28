@@ -71,21 +71,26 @@ qubit_ham = qubit_mapper.run(hamiltonian)
 state_prep = create("state_prep", "sparse_isometry_gf2x")
 circuit = state_prep.run(wfn_cas)
 
-# 7. Create QPE dependencies
-unitary_builder = create("hamiltonian_unitary_builder", "trotter", order=2)
-circuit_mapper = create("controlled_circuit_mapper", "pauli_sequence")
-circuit_executor = create("circuit_executor", "qiskit_aer_simulator", seed=42)
+# 7. Create and run IQPE with nested algorithm settings
+from qdk_chemistry.data import AlgorithmRef
 
-# 8. Create and run IQPE
 iqpe = create(
     "phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10
 )
+
+# Configure nested algorithms — kwargs override the algorithm's defaults
+iqpe.settings().set(
+    "evolution_builder",
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+)
+iqpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=42),
+)
+
 result = iqpe.run(
     state_preparation=circuit,
     qubit_hamiltonian=qubit_ham,
-    unitary_builder=unitary_builder,
-    circuit_mapper=circuit_mapper,
-    circuit_executor=circuit_executor,
 )
 
 # 9. Inspect results

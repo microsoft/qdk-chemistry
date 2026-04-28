@@ -8,15 +8,8 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import (
-    HamiltonianUnitaryBuilder,
-    TimeEvolutionBuilder,
-)
-from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import (
-    ControlledCircuitMapper,
-)
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     ControlledUnitary,
     QpeResult,
@@ -35,11 +28,8 @@ class PhaseEstimationSettings(Settings):
     def __init__(self):
         """Initialize the settings for Phase Estimation.
 
-        Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value. This setting is only applicable to
-                time evolution-based unitary builders such as Trotter.
+        Includes nested algorithm references for the evolution builder,
+        circuit mapper, and circuit executor.
 
         """
         super().__init__()
@@ -49,6 +39,21 @@ class PhaseEstimationSettings(Settings):
             "float",
             0.0,
             "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
+        self._set_default(
+            "unitary_builder",
+            "algorithm_ref",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+        )
+        self._set_default(
+            "circuit_mapper",
+            "algorithm_ref",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        self._set_default(
+            "circuit_executor",
+            "algorithm_ref",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
         )
 
 
@@ -79,9 +84,6 @@ class PhaseEstimation(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: HamiltonianUnitaryBuilder,
-        circuit_mapper: ControlledCircuitMapper,
-        circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
@@ -97,9 +99,6 @@ class PhaseEstimation(Algorithm):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            unitary_builder: Builder that constructs unitaries from the Hamiltonian.
-            circuit_mapper: Maps controlled unitaries to circuit operations.
-            circuit_executor: The executor to run quantum circuits on a backend or simulator.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -107,46 +106,39 @@ class PhaseEstimation(Algorithm):
 
         """
 
-    def _create_unitary(
-        self, qubit_hamiltonian: QubitHamiltonian, unitary_builder: HamiltonianUnitaryBuilder
-    ) -> UnitaryRepresentation:
+    def _create_unitary(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Create the unitary representation for the given Hamiltonian.
 
-        If the builder is a :class:`TimeEvolutionBuilder`, the ``evolution_time``
-        from the phase estimation settings is passed as the ``time`` argument.
+        Creates the unitary builder from the nested ``unitary_builder`` setting
+        and passes the ``evolution_time`` from the phase estimation settings.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            unitary_builder: The unitary builder to use.
 
         Returns:
             The unitary representation.
 
         """
-        if isinstance(unitary_builder, TimeEvolutionBuilder):
-            return unitary_builder.run(qubit_hamiltonian, time=self.settings().get("evolution_time"))
-        return unitary_builder.run(qubit_hamiltonian)
+        unitary_builder = self._create_nested("unitary_builder")
+        return unitary_builder.run(qubit_hamiltonian, time=self.settings().get("evolution_time"))
 
     def _create_controlled_circuit(
         self,
         controlled_unitary: ControlledUnitary,
         power: int,
-        circuit_mapper: ControlledCircuitMapper,
     ) -> Circuit:
         """Create the controlled circuit for the given Hamiltonian and power.
 
         Args:
             controlled_unitary: The controlled unitary.
             power: The power to which the controlled unitary should be raised.
-            circuit_mapper: The controlled circuit mapper to use.
 
         Returns:
             The controlled circuit.
 
         """
-        # Create a new instance of the mapper to avoid setting lock
-        circuit_mapper.settings().update("power", power)  # Update the power setting
-        # Avoid lock settings
+        circuit_mapper = self._create_nested("circuit_mapper")
+        circuit_mapper.settings().update("power", power)
         return circuit_mapper._run_impl(controlled_unitary=controlled_unitary)  # noqa: SLF001
 
 

@@ -17,9 +17,6 @@ References:
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
@@ -89,9 +86,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        unitary_builder: HamiltonianUnitaryBuilder,
-        circuit_mapper: ControlledCircuitMapper,
-        circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
@@ -99,9 +93,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            unitary_builder: The unitary builder to use.
-            circuit_mapper: The controlled circuit mapper to use.
-            circuit_executor: The executor to run quantum circuits.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -109,11 +100,10 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
+        circuit_executor = self._create_nested("circuit_executor")
         circuit = self.create_circuit(
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
-            unitary_builder=unitary_builder,
-            circuit_mapper=circuit_mapper,
         )
         self._qpe_circuit = circuit
         shots = self._settings.get("shots")
@@ -134,17 +124,12 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        *,
-        unitary_builder: HamiltonianUnitaryBuilder,
-        circuit_mapper: ControlledCircuitMapper,
     ) -> Circuit:
         """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            unitary_builder: The unitary builder to use.
-            circuit_mapper: The controlled circuit mapper to use.
 
         Returns:
             The constructed QPE quantum circuit.
@@ -177,8 +162,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
                 qubit_hamiltonian=qubit_hamiltonian,
                 control_qubit=ancilla[ancilla_idx],
                 target_qubits=system,
-                unitary_builder=unitary_builder,
-                circuit_mapper=circuit_mapper,
                 power=power,
             )
 
@@ -199,8 +182,6 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         target_qubits: list,
         *,
         power: int,
-        unitary_builder: HamiltonianUnitaryBuilder,
-        circuit_mapper: ControlledCircuitMapper,
     ) -> None:
         """Apply the controlled unitary to the circuit.
 
@@ -210,22 +191,17 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
-            unitary_builder: The unitary builder to use.
-            circuit_mapper: The controlled circuit mapper to use.
 
         """
         unitary_rep = self._create_unitary(
             qubit_hamiltonian=qubit_hamiltonian,
-            unitary_builder=unitary_builder,
         )
         ctrl_unitary = ControlledUnitary(
             unitary=unitary_rep,
             control_indices=[0],
         )
 
-        ctrl_unitary_circuit = self._create_controlled_circuit(
-            controlled_unitary=ctrl_unitary, power=power, circuit_mapper=circuit_mapper
-        )
+        ctrl_unitary_circuit = self._create_controlled_circuit(controlled_unitary=ctrl_unitary, power=power)
         cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]

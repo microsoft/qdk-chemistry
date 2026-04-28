@@ -116,7 +116,7 @@ class MockProjectedMultiConfigurationCalculator(ProjectedMultiConfigurationCalcu
         self._settings = Settings()
         # Define default settings
         self._settings._set_default("test_param", "int", 42)
-        self._settings._set_default("h_el_tol", "double", 1e-12)
+        self._settings._set_default("search_matel_tol", "double", 1e-12)
         self._settings._set_default("calculate_one_rdm", "bool", False)
         self._settings._set_default("calculate_two_rdm", "bool", False)
 
@@ -289,7 +289,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, _orbs, _hamil_constr, _mc_solver, __: int, ___: int):
+    def _run_impl(self, _orbs, __: int, ___: int):
         """A simple test implementation of the solve method."""
         # Simple test implementation - return basic energy and wavefunction
         energy = -1.5  # Mock energy value
@@ -561,9 +561,7 @@ class TestAlgorithmClasses:
 
         # Test solve method with basic hamiltonian and mc calculator
         orbitals = create_test_orbitals(2)
-        hamiltonian_creator = MockHamiltonianConstructor()
-        cas_solver = MockMultiConfigurationCalculator()
-        energy, wavefunction = mcscf_solver.run(orbitals, hamiltonian_creator, cas_solver, 1, 1)
+        energy, wavefunction = mcscf_solver.run(orbitals, 1, 1)
         assert isinstance(energy, float)
         assert isinstance(wavefunction, Wavefunction)
 

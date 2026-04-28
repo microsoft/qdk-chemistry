@@ -4,6 +4,8 @@
 
 #include <pybind11/pybind11.h>
 
+#include <qdk/chemistry/data/settings.hpp>
+
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
@@ -90,4 +92,23 @@ PYBIND11_MODULE(_core, m) {
   // Bind constants and config at the top level
   bind_constants(m);
   bind_qdk_chemistry_config(m);
+
+  // Install the global create function so AlgorithmRef can auto-resolve
+  // default settings via the Python algorithm registry.
+  qdk::chemistry::data::AlgorithmRef::create_default_settings =
+      [](const std::string& type, const std::string& name)
+      -> std::shared_ptr<qdk::chemistry::data::Settings> {
+    py::gil_scoped_acquire gil;
+    try {
+      py::module_ reg =
+          py::module_::import("qdk_chemistry.algorithms.registry");
+      py::object instance = reg.attr("create")(type, name);
+      py::object py_settings = instance.attr("settings")();
+      auto json_obj =
+          py_settings.cast<qdk::chemistry::data::Settings&>().to_json();
+      return qdk::chemistry::data::Settings::from_json(json_obj);
+    } catch (...) {
+      return nullptr;
+    }
+  };
 }

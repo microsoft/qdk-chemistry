@@ -8,12 +8,7 @@
 ################################################################################
 # start-cell-create
 from qdk_chemistry.algorithms import create
-
-# Create a HamiltonianConstructor
-ham_constructor = create("hamiltonian_constructor")
-
-# Create a MC calculator
-mc_calculator = create("multi_configuration_calculator", "macis_cas")
+from qdk_chemistry.data import AlgorithmRef
 
 # Create the default MultiConfigurationScf instance
 mcscf = create("multi_configuration_scf", "pyscf")
@@ -22,15 +17,36 @@ mcscf = create("multi_configuration_scf", "pyscf")
 
 ################################################################################
 # start-cell-configure
-# Configure the MC calculator using the settings interface
-mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-mc_calculator.settings().set("calculate_one_rdm", True)
-mc_calculator.settings().set("calculate_two_rdm", True)
+# --- Pattern 1: kwargs at construction ---
+# Keyword arguments are applied as setting overrides on top of the defaults:
+mcscf.settings().set(
+    "multi_configuration_calculator",
+    AlgorithmRef(
+        "multi_configuration_calculator",
+        "macis_cas",
+        ci_residual_tolerance=1e-6,
+        calculate_one_rdm=True,
+        calculate_two_rdm=True,
+    ),
+)
 
-# Configure the Hamiltonian constructor
-ham_constructor.settings().set("eri_method", "direct")
+# --- Pattern 2: ref.set() / subscript notation ---
+# Get the existing ref, modify individual settings, and put it back:
+mc_ref = mcscf.settings().get("multi_configuration_calculator")
+mc_ref.set("ci_residual_tolerance", 1e-8)  # ref.set(key, value)
+mc_ref["calculate_one_rdm"] = True  # ref[key] = value
+mcscf.settings().set("multi_configuration_calculator", mc_ref)
 
-# Configure the MCSCF solver
+# --- Pattern 3: ref.update() for bulk changes ---
+mc_ref = mcscf.settings().get("multi_configuration_calculator")
+mc_ref.update(ci_residual_tolerance=1e-10, calculate_two_rdm=True)
+mcscf.settings().set("multi_configuration_calculator", mc_ref)
+
+# --- Pattern 4: reading back settings ---
+print(mc_ref["ci_residual_tolerance"])  # ref[key]
+print("max_iterations" in mc_ref)  # key in ref
+
+# Configure the MCSCF solver itself
 mcscf.settings().set("max_cycle_macro", 50)
 # end-cell-configure
 ################################################################################
@@ -62,9 +78,7 @@ active_wavefunction = valence_selector.run(scf_wavefunction)
 
 # Run MCSCF calculation
 nalpha, nbeta = active_wavefunction.get_active_num_electrons()
-E_mcscf, mcscf_wfn = mcscf.run(
-    active_wavefunction.get_orbitals(), ham_constructor, mc_calculator, nalpha, nbeta
-)
+E_mcscf, mcscf_wfn = mcscf.run(active_wavefunction.get_orbitals(), nalpha, nbeta)
 
 print(f"SCF Energy: {E_scf:.10f} Hartree")
 print(f"MCSCF Energy: {E_mcscf:.10f} Hartree")
