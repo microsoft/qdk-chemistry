@@ -66,8 +66,8 @@ Examples:
     ...                   n_active_alpha_electrons : int,
     ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
     ...         # Custom MCSCF implementation
-    ...         # Use self._create_nested("hamiltonian_constructor") and
-    ...         # self._create_nested("multi_configuration_calculator") to get nested algorithms
+    ...         # Use self._create_nested("multi_configuration_calculator")
+    ...         # to get the configurable nested algorithm exposed by these settings.
     ...         return -1.0, data.Wavefunction()
 )");
 

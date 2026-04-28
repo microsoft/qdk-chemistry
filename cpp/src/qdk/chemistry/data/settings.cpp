@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <iostream>
 #include <mutex>
-#include <qdk/chemistry/algorithms/algorithm_ref_init.hpp>
+#include <qdk/chemistry/algorithms/algorithm_defaults.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>

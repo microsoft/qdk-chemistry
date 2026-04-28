@@ -117,6 +117,12 @@ class Algorithm {
   typename FactoryType::return_type _create_nested(
       const std::string& key) const {
     auto ref = this->_settings->template get<data::AlgorithmRef>(key);
+    if (ref.get_algorithm_type() != FactoryType::algorithm_type_name()) {
+      throw std::runtime_error("AlgorithmRef type mismatch for settings key '" +
+                               key + "': expected '" +
+                               FactoryType::algorithm_type_name() +
+                               "' but got '" + ref.get_algorithm_type() + "'");
+    }
     auto instance = FactoryType::create(ref.get_algorithm_name());
     if (ref.get_settings()) {
       instance->settings().update(*ref.get_settings());

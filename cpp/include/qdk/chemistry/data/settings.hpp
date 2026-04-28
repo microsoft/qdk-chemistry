@@ -88,7 +88,6 @@ class AlgorithmRef {
    * - @c "algorithm_name" – changes the name and re-resolves default settings
    *   (any previous overrides are lost).
    * - @c "algorithm_type" – always throws (immutable after construction).
-   * - @c "settings" – replaces the settings pointer directly.
    * - Anything else – forwarded to <tt>settings->set(key, value)</tt>.
    *
    * @param key   The setting key.
