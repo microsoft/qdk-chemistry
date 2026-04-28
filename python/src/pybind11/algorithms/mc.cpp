@@ -169,6 +169,8 @@ Returns:
     return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
 
+  qdk::chemistry::python::bind_create_nested(mc_calculator);
+
   // Bind concrete microsoft::MacisCas implementation
   py::class_<microsoft::MacisCas, MultiConfigurationCalculator,
              py::smart_holder>(m, "QdkMacisCas", R"(
@@ -227,7 +229,7 @@ Typical usage:
 
     # Configure ASCI-specific settings
     asci.settings().set("ntdets_max", 1000)
-    asci.settings().set("h_el_tol", 1e-6)
+    asci.settings().set("search_matel_tol", 1e-6)
 
     # Run calculation
     energy, wavefunction = asci.run(hamiltonian, n_alpha, n_beta)
