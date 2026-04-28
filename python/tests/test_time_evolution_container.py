@@ -240,3 +240,21 @@ class TestPauliSequenceMapperCircuit:
         circuit = mapper.run(evolution)
         assert circuit is not None
         assert circuit.qir is not None
+
+    def test_circuit_has_qsharp_factory(self, step_terms):
+        """Test that the mapped circuit has a QSharpFactoryData for QRE integration."""
+        circuit = self._map(step_terms, step_reps=1, num_qubits=2)
+        assert circuit._qsharp_factory is not None
+        assert callable(circuit._qsharp_factory.program)
+        assert "evo_params" in circuit._qsharp_factory.parameter
+        assert "target_indices" in circuit._qsharp_factory.parameter
+
+    def test_circuit_qre_logical_counts(self, step_terms):
+        """Test that QRE logical_counts works with the circuit's factory data."""
+        from qdk import qsharp  # noqa: PLC0415
+
+        circuit = self._map(step_terms, step_reps=1, num_qubits=2)
+        factory = circuit._qsharp_factory
+        counts = qsharp.logical_counts(factory.program, *factory.parameter.values())
+        assert counts["numQubits"] == 2
+        assert counts["rotationCount"] > 0
