@@ -8,11 +8,8 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     EnergyExpectationResult,
     MeasurementData,
@@ -33,6 +30,26 @@ class MeasureSimulationSettings(Settings):
     def __init__(self):
         """Initialize defaults for evolve-and-measure simulation."""
         super().__init__()
+        self._set_default(
+            "evolution_builder",
+            "algorithm_ref",
+            AlgorithmRef("time_evolution_builder", "trotter"),
+        )
+        self._set_default(
+            "circuit_mapper",
+            "algorithm_ref",
+            AlgorithmRef("evolution_circuit_mapper", "pauli_sequence"),
+        )
+        self._set_default(
+            "circuit_executor",
+            "algorithm_ref",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+        self._set_default(
+            "energy_estimator",
+            "algorithm_ref",
+            AlgorithmRef("energy_estimator", "qdk"),
+        )
 
 
 class MeasureSimulation(Algorithm):
@@ -55,11 +72,7 @@ class MeasureSimulation(Algorithm):
         observables: list[QubitHamiltonian],
         *,
         state_prep: Circuit | None = None,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: EvolutionCircuitMapper,
         shots: int = 1000,
-        circuit_executor: CircuitExecutor,
-        energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
         pre_transpilation_passes: list[str] | None = None,
@@ -67,16 +80,16 @@ class MeasureSimulation(Algorithm):
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
+        The evolution builder, circuit mapper, circuit executor, and energy
+        estimator are resolved from the algorithm's settings via
+        ``AlgorithmRef``.
+
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
             times: List of times to evolve under the Hamiltonians.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Optional circuit that prepares the initial state before time evolution.
-            evolution_builder: Time-evolution builder.
-            circuit_mapper: Mapper for time-evolution unitary to circuit.
             shots: Number of shots to use for measurement.
-            circuit_executor: Circuit executor backend.
-            energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
             device_backend_name: Optional device backend name.
             pre_transpilation_passes: Optional list of passes to apply before transpilation.
@@ -91,17 +104,17 @@ class MeasureSimulation(Algorithm):
         self,
         qubit_hamiltonian: QubitHamiltonian,
         time: float,
-        evolution_builder: TimeEvolutionBuilder,
     ) -> TimeEvolutionUnitary:
         """Create the time-evolution unitary for current settings."""
+        evolution_builder = self._create_nested("evolution_builder")
         return evolution_builder.run(qubit_hamiltonian, time)
 
     def _map_time_evolution_to_circuit(
         self,
         evolution: TimeEvolutionUnitary,
-        circuit_mapper: EvolutionCircuitMapper,
     ) -> Circuit:
         """Map a time-evolution unitary into an executable circuit."""
+        circuit_mapper = self._create_nested("circuit_mapper")
         return circuit_mapper.run(evolution)
 
     def _prepend_state_prep_circuit(self, state_prep: Circuit, circuit: Circuit, num_qubits: int) -> Circuit:
@@ -137,8 +150,6 @@ class MeasureSimulation(Algorithm):
         self,
         circuit: Circuit,
         observable: QubitHamiltonian,
-        circuit_executor: CircuitExecutor,
-        energy_estimator: EnergyEstimator,
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
@@ -146,10 +157,12 @@ class MeasureSimulation(Algorithm):
         post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
+        energy_estimator = self._create_nested("energy_estimator")
+        # Propagate this algorithm's circuit_executor setting to the energy estimator
+        energy_estimator.settings().set("circuit_executor", self._settings.get("circuit_executor"))
         energy_result, measurement_data = energy_estimator.run(
             circuit,
             observable,
-            circuit_executor,
             total_shots=shots,
             noise_model=noise,
             device_backend_name=device_backend_name,

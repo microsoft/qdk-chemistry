@@ -7,17 +7,32 @@
 
 from abc import abstractmethod
 
-from qdk_chemistry.algorithms import CircuitExecutor
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
     QubitHamiltonian,
+    Settings,
 )
 
 __all__: list[str] = ["EnergyEstimator", "EnergyEstimatorFactory"]
+
+
+class EnergyEstimatorSettings(Settings):
+    """Settings for EnergyEstimator algorithms."""
+
+    def __init__(self):
+        """Initialize the EnergyEstimatorSettings."""
+        super().__init__()
+        self._set_default(
+            "circuit_executor",
+            "algorithm_ref",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+            "Circuit executor used to run quantum circuits for energy estimation.",
+        )
 
 
 class EnergyEstimator(Algorithm):
@@ -26,6 +41,7 @@ class EnergyEstimator(Algorithm):
     def __init__(self):
         """Initialize the EnergyEstimator."""
         super().__init__()
+        self._settings = EnergyEstimatorSettings()
 
     def type_name(self) -> str:
         """Return ``energy_estimator`` as the algorithm type name."""
@@ -36,7 +52,6 @@ class EnergyEstimator(Algorithm):
         self,
         circuit: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
@@ -45,10 +60,12 @@ class EnergyEstimator(Algorithm):
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of the Hamiltonian.
 
+        The circuit executor used to run quantum circuits is configured via
+        the ``circuit_executor`` setting (an ``AlgorithmRef``).
+
         Args:
             circuit: Circuit.
             qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
-            circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
             device_backend_name: Optional device backend name string to pass to the circuit executor.

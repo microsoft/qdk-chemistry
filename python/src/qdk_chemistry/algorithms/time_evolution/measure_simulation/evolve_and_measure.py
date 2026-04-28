@@ -5,10 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -50,11 +46,7 @@ class EvolveAndMeasure(MeasureSimulation):
         observables: list[QubitHamiltonian],
         *,
         state_prep: Circuit | None = None,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: EvolutionCircuitMapper,
         shots: int = 1000,
-        circuit_executor: CircuitExecutor,
-        energy_estimator: EnergyEstimator,
         noise: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
         pre_transpilation_passes: list[str] | None = None,
@@ -62,16 +54,16 @@ class EvolveAndMeasure(MeasureSimulation):
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
+        The evolution builder, circuit mapper, circuit executor, and energy
+        estimator are resolved from the algorithm's settings via
+        ``AlgorithmRef``.
+
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
             times: Monotonically-increasing list of times to evolve under the Hamiltonians.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Optional circuit that prepares the initial state before time evolution.
-            evolution_builder: Time-evolution builder.
-            circuit_mapper: Mapper for time-evolution unitary to circuit.
             shots: Number of shots to use for measurement.
-            circuit_executor: Circuit executor backend.
-            energy_estimator: Energy estimator algorithm.
             noise: Optional noise profile.
             device_backend_name: Optional device backend name string to pass to the circuit executor.
             pre_transpilation_passes: Optional list of passes to apply before transpilation.
@@ -104,8 +96,6 @@ class EvolveAndMeasure(MeasureSimulation):
         self._evolution_circuit = self._build_evolution_circuit(
             qubit_hamiltonians=qubit_hamiltonians,
             times=times,
-            evolution_builder=evolution_builder,
-            circuit_mapper=circuit_mapper,
             state_prep=state_prep,
         )
 
@@ -116,8 +106,6 @@ class EvolveAndMeasure(MeasureSimulation):
                     circuit=self._evolution_circuit,
                     shots=shots,
                     observable=observable,
-                    circuit_executor=circuit_executor,
-                    energy_estimator=energy_estimator,
                     noise=noise,
                     device_backend_name=device_backend_name,
                     pre_transpilation_passes=pre_transpilation_passes,
@@ -130,35 +118,34 @@ class EvolveAndMeasure(MeasureSimulation):
         self,
         qubit_hamiltonians: list[QubitHamiltonian],
         times: list[float],
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: EvolutionCircuitMapper,
         *,
         state_prep: Circuit | None = None,
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
+        The evolution builder and circuit mapper are resolved from
+        the algorithm's settings via ``AlgorithmRef``.
+
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
             times: Monotonically-increasing list of times to evolve under the Hamiltonians.
-            evolution_builder: Time-evolution builder.
-            circuit_mapper: Mapper for time-evolution unitary to circuit.
             state_prep: Optional circuit that prepares the initial state before time evolution.
 
         Returns:
             The combined evolution circuit.
 
         """
-        evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0], evolution_builder)
+        evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0])
 
         for i in range(1, len(qubit_hamiltonians)):
             delta_t = times[i] - times[i - 1]
             evolution = TimeEvolutionUnitary(
                 evolution.get_container().combine(
-                    self._create_time_evolution(qubit_hamiltonians[i], delta_t, evolution_builder).get_container(),
+                    self._create_time_evolution(qubit_hamiltonians[i], delta_t).get_container(),
                 )
             )
 
-        circuit = self._map_time_evolution_to_circuit(evolution, circuit_mapper)
+        circuit = self._map_time_evolution_to_circuit(evolution)
 
         if state_prep is not None:
             circuit = self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)

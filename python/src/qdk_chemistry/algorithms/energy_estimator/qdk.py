@@ -8,7 +8,7 @@
 import numpy as np
 import qsharp
 
-from qdk_chemistry.algorithms import CircuitExecutor
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -186,7 +186,6 @@ class QdkEnergyEstimator(EnergyEstimator):
         self,
         circuit: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        circuit_executor: CircuitExecutor,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
         device_backend_name: str | None = None,
@@ -198,7 +197,6 @@ class QdkEnergyEstimator(EnergyEstimator):
         Args:
             circuit: Circuit.
             qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
-            circuit_executor: An instance of ``CircuitExecutor`` to run quantum circuits.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
             device_backend_name: Optional device backend name string to pass to the circuit executor.
@@ -217,9 +215,8 @@ class QdkEnergyEstimator(EnergyEstimator):
             * Only one circuit is supported per run.
 
         """
-        # This function definition is not required it is present to add type hints and docstrings
-        #  for the derived classes specialized run() method.
         Logger.trace_entering()
+        circuit_executor = self._create_nested("circuit_executor")
         if device_backend_name is not None and circuit_executor.name() != "qiskit_aer_simulator":
             raise ValueError(
                 f"device_backend_name is only supported with 'qiskit_aer_simulator', "
