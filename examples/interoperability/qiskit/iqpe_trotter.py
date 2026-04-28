@@ -123,7 +123,7 @@ iqpe.settings().set(
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
 )
 iqpe.settings().set(
-    "evolution_builder",
+    "unitary_builder",
     AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
 )
 iqpe.settings().set(

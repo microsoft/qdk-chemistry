@@ -118,7 +118,7 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
         AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     qpe.settings().set(
-        "evolution_builder",
+        "unitary_builder",
         AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 

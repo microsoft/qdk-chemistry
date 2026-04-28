@@ -80,7 +80,7 @@ iqpe = create(
 
 # Configure nested algorithms — kwargs override the algorithm's defaults
 iqpe.settings().set(
-    "evolution_builder",
+    "unitary_builder",
     AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
 )
 iqpe.settings().set(
