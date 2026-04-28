@@ -306,7 +306,7 @@ jobs:
 
     - name: Install C++ library
       run: |
-        cmake --install "$BUILD_DIR"
+        cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
 
     - name: Test C++ installation
       run: |
