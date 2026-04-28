@@ -153,11 +153,11 @@ The storage size scales as :math:`O(N^4)` where :math:`N` is the number of molec
 - Methods that require explicit four-center integrals
 - Small to medium active spaces
 
-Density-fitted container
+Three-center Hamiltonian container
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation.
-Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set.
+A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation or Cholesky decomposition.
+Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set in case of density fitting or the Cholesky vectors in case of Cholesky decomposition.
 The four-center integrals are computed on-the-fly when needed via:
 
 .. math::
@@ -175,13 +175,36 @@ The storage size scales as :math:`O(N_{aux} \times N^2)` where :math:`N_{aux}` i
 .. rubric:: Creating with the HamiltonianConstructor
 
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm can produce either container type depending on the implementation used.
-Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``DensityFittedHamiltonianContainer``:
+
+**Cholesky decomposition** — Use the ``qdk_cholesky`` implementation to create a ``CholeskyHamiltonianContainer`` from Cholesky-decomposed ERIs.
+This method does not require an auxiliary basis set; it decomposes the full ERI tensor directly.
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
+      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_cholesky");
+      // Optionally configure Cholesky tolerance
+      constructor->settings().set("cholesky_tolerance", 1e-8);
+      auto hamiltonian = constructor->run(orbitals);
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_cholesky")
+      # Optionally configure Cholesky tolerance
+      constructor.settings().set("cholesky_tolerance", 1e-8)
+      hamiltonian = constructor.run(orbitals)
+
+**Density fitting** — Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``CholeskyHamiltonianContainer`` from density-fitted integrals.
+This method requires an auxiliary basis set.
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
       auto hamiltonian = constructor->run(orbitals);
 
 .. tab:: Python API
