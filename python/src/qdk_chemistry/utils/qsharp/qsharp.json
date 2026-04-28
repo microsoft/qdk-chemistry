@@ -1,0 +1,11 @@
+{
+    "author": "Microsoft",
+    "license": "MIT",
+    "files": [
+        "src/BinaryEncoding.qs",
+        "src/StatePreparation.qs",
+        "src/IterativePhaseEstimation.qs",
+        "src/ControlledPauliExp.qs",
+        "src/MeasurementBasis.qs"
+    ]
+}

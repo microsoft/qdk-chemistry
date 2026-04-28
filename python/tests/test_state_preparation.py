@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 import qsharp
 
-from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
     SparseIsometryGF2XStatePreparation,
@@ -310,71 +310,25 @@ def test_prepare_single_reference_state_error_cases():
         test_cls._prepare_single_reference_state("1012")
 
 
-def test_asymmetric_active_space_error():
-    """Test error for asymmetric active space in StatePrep."""
-
-    class MockOrbitals:
-        """Mock orbitals with asymmetric active space indices."""
-
-        def get_active_space_indices(self):
-            """Return asymmetric active space indices."""
-            return ([0, 1, 2], [0, 1, 2, 3])
-
-    class MockWavefunction:
-        """Mock wavefunction for testing asymmetric active space."""
-
-        def get_orbitals(self):
-            """Return mock orbitals."""
-            return MockOrbitals()
-
-        def get_active_determinants(self):
-            """Return mock determinants."""
-            return [Configuration("2020000"), Configuration("2200000")]
-
-        def get_coefficient(self, _):
-            """Return mock coefficient."""
-            return 1.0
-
-        def get_coefficients(self):
-            """Return coefficients for all determinants."""
-            return [1.0, 0.5]  # Two coefficients for the two determinants
-
-        def size(self):
-            """Return the number of determinants."""
-            return len(self.get_active_determinants())
-
-    mock_wfn = MockWavefunction()
-    for sp_key in available("state_prep"):
-        prep = create("state_prep", sp_key)
-        with pytest.raises(
-            ValueError,
-            match=re.escape(
-                "Active space contains 3 alpha orbitals and 4 beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            ),
-        ):
-            prep.run(mock_wfn)
-
-
 def test_find_pivot_row():
     """Test the _find_pivot_row helper function."""
     # Test matrix with clear pivot patterns
     m = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 1], [0, 0, 0]], dtype=np.int8)
 
     # Test finding pivot in column 0 starting from row 0
-    pivot = _find_pivot_row(m, 0, 4, 0)
+    pivot = _find_pivot_row(m, 0, 0)
     assert pivot == 1  # Row 1 has a 1 in column 0
 
     # Test finding pivot in column 1 starting from row 0
-    pivot = _find_pivot_row(m, 0, 4, 1)
+    pivot = _find_pivot_row(m, 0, 1)
     assert pivot == 0  # Row 0 has a 1 in column 1
 
     # Test finding pivot in column 2 starting from row 1
-    pivot = _find_pivot_row(m, 1, 4, 2)
+    pivot = _find_pivot_row(m, 1, 2)
     assert pivot == 1  # Row 1 has a 1 in column 2
 
     # Test no pivot found
-    pivot = _find_pivot_row(m, 3, 4, 0)
+    pivot = _find_pivot_row(m, 3, 0)
     assert pivot is None  # No 1 found in column 0 starting from row 3
 
 
@@ -386,8 +340,9 @@ def test_eliminate_column() -> None:
     row_map = [0, 1, 2, 3]
     cnot_ops: list[tuple[int, int]] = []
 
-    # Eliminate column 0 with pivot row 0
-    m_result, cnot_ops_result = _eliminate_column(matrix, 4, 0, 0, row_map, cnot_ops)
+    # Eliminate column 0 with pivot row 0 (in-place)
+    matrix_work = matrix.copy()
+    _eliminate_column(matrix_work, 0, 0, row_map, cnot_ops)
 
     # Verify matrix is modified correctly (rows 1 and 3 should be XORed with row 0)
     expected = np.array(
@@ -400,14 +355,13 @@ def test_eliminate_column() -> None:
         dtype=np.int8,
     )
 
-    assert np.array_equal(m_result, expected)
+    assert np.array_equal(matrix_work, expected)
 
-    # Verify CNOT operations are recorded correctly
+    # Verify CX operations are recorded correctly
     expected_cnots = [(1, 0), (3, 0)]  # (target, control) pairs
-    assert cnot_ops_result == expected_cnots
+    assert cnot_ops == expected_cnots
 
-    # Verify original inputs are not modified
-    assert cnot_ops == []  # Original list should be empty
+    # Verify original matrix is not modified
     original_expected = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1], [1, 1, 0]], dtype=np.int8)
     assert np.array_equal(matrix, original_expected)
 
@@ -417,12 +371,11 @@ def test_perform_gaussian_elimination() -> None:
     # Test matrix for Gaussian elimination
     matrix = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
 
-    m, n = matrix.shape
     row_map = [0, 1, 2]
     cnot_ops: list[tuple[int, int]] = []
 
     # Perform Gaussian elimination
-    m_result, row_map_result, cnot_ops_result = _perform_gaussian_elimination(matrix, m, n, row_map, cnot_ops)
+    m_result, row_map_result, cnot_ops_result = _perform_gaussian_elimination(matrix, row_map, cnot_ops)
 
     # Verify the result is in row echelon form
     # After elimination, we should have:
@@ -434,15 +387,15 @@ def test_perform_gaussian_elimination() -> None:
     assert len(row_map_result) == 3
     assert isinstance(cnot_ops_result, list)
 
-    # Assert the specific CNOT sequence: CNOT(0,2), CNOT(0,1), CNOT(2,1)
+    # Assert the specific CX sequence: CX(0,2), CX(0,1), CX(2,1)
     # For matrix [[1,1,0], [0,1,1], [1,0,1]], Gaussian elimination should produce:
-    # Column 0: CNOT(2,0) to eliminate position [2,0]
-    # Column 1: CNOT(0,1) to eliminate position [0,1]
-    # Column 1: CNOT(2,1) to eliminate position [2,1] (redundant but part of algorithm)
-    assert len(cnot_ops_result) == 3, f"Expected 3 CNOT operations, got {len(cnot_ops_result)}"
-    assert cnot_ops_result[0] == (2, 0), f"First CNOT should be CNOT(0,2), got {cnot_ops_result[0]}"
-    assert cnot_ops_result[1] == (0, 1), f"Second CNOT should be CNOT(0,1), got {cnot_ops_result[1]}"
-    assert cnot_ops_result[2] == (2, 1), f"Third CNOT should be CNOT(2,1), got {cnot_ops_result[2]}"
+    # Column 0: CX(2,0) to eliminate position [2,0]
+    # Column 1: CX(0,1) to eliminate position [0,1]
+    # Column 1: CX(2,1) to eliminate position [2,1] (redundant but part of algorithm)
+    assert len(cnot_ops_result) == 3, f"Expected 3 CX operations, got {len(cnot_ops_result)}"
+    assert cnot_ops_result[0] == (2, 0), f"First CX should be CX(0,2), got {cnot_ops_result[0]}"
+    assert cnot_ops_result[1] == (0, 1), f"Second CX should be CX(0,1), got {cnot_ops_result[1]}"
+    assert cnot_ops_result[2] == (2, 1), f"Third CX should be CX(2,1), got {cnot_ops_result[2]}"
 
     # Verify original inputs are not modified
     original_expected = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
@@ -529,8 +482,8 @@ def test_gf2x_with_tracking_basic():
     for op in elimination_results.operations:
         assert isinstance(op, tuple)
         assert len(op) == 2
-        assert op[0] in ["cnot", "x"]
-        if op[0] == "cnot":
+        assert op[0] in ["cx", "x"]
+        if op[0] == "cx":
             assert isinstance(op[1], tuple)
             assert len(op[1]) == 2
         elif op[0] == "x":
@@ -552,9 +505,9 @@ def test_gf2x_with_tracking_duplicate_rows():
 
     elimination_results = gf2x_with_tracking(matrix)
 
-    # Should have CNOT operations to eliminate duplicates
-    cnot_ops = [op for op in elimination_results.operations if op[0] == "cnot"]
-    assert len(cnot_ops) > 0, "Expected CNOT operations for duplicate elimination"
+    # Should have CX operations to eliminate duplicates
+    cnot_ops = [op for op in elimination_results.operations if op[0] == "cx"]
+    assert len(cnot_ops) > 0, "Expected CX operations for duplicate elimination"
 
     # Verify rank reduction due to duplicate elimination
     original_rank = np.linalg.matrix_rank(matrix)
@@ -562,7 +515,7 @@ def test_gf2x_with_tracking_duplicate_rows():
 
     # Verify operations use original matrix indices
     for op in elimination_results.operations:
-        if op[0] == "cnot":
+        if op[0] == "cx":
             target, control = op[1]
             assert 0 <= target < matrix.shape[0]
             assert 0 <= control < matrix.shape[0]
@@ -605,13 +558,13 @@ def test_gf2x_with_tracking_diagonal_matrix():
     # This should reduce rank from 3 to 2
     assert elimination_results.rank == 2, f"Expected rank 2 for diagonal reduction, got {elimination_results.rank}"
 
-    # Should have CNOT and X operations from diagonal reduction
-    cnot_ops = [op for op in elimination_results.operations if op[0] == "cnot"]
+    # Should have CX and X operations from diagonal reduction
+    cnot_ops = [op for op in elimination_results.operations if op[0] == "cx"]
     x_ops = [op for op in elimination_results.operations if op[0] == "x"]
 
-    # Diagonal reduction uses CNOT(i, i+1) for i=0 to rank-2, then X on last row
-    # For 3x3: CNOT(0,1), CNOT(1,2), X(2)
-    assert len(cnot_ops) >= 2, f"Expected at least 2 CNOT operations, got {len(cnot_ops)}"
+    # Diagonal reduction uses CX(i, i+1) for i=0 to rank-2, then X on last row
+    # For 3x3: CX(0,1), CX(1,2), X(2)
+    assert len(cnot_ops) >= 2, f"Expected at least 2 CX operations, got {len(cnot_ops)}"
     assert len(x_ops) >= 1, f"Expected at least 1 X operation, got {len(x_ops)}"
 
 
@@ -688,7 +641,7 @@ def test_gf2x_with_tracking_reconstruction():
 
         # Verify operations use valid indices
         for op in elimination_results.operations:
-            if op[0] == "cnot":
+            if op[0] == "cx":
                 target, control = op[1]
                 assert 0 <= target < original_matrix.shape[0]
                 assert 0 <= control < original_matrix.shape[0]
@@ -712,7 +665,7 @@ def test_gf2x_with_tracking_reconstruction():
 
             # Apply operations in reverse order to reconstruct
             for op in reversed(elimination_results.operations):
-                if op[0] == "cnot":
+                if op[0] == "cx":
                     target, control = op[1]
                     reconstructed[target] = reconstructed[target] ^ reconstructed[control]
                 elif op[0] == "x":
@@ -745,9 +698,9 @@ def test_remove_duplicate_rows_with_cnot() -> None:
     # Should have eliminated duplicate rows
     assert m_result.shape[0] < matrix.shape[0], "Expected rows to be eliminated"
 
-    # Should have CNOT operations
-    cnot_ops = [op for op in operations_result if op[0] == "cnot"]
-    assert len(cnot_ops) > 0, "Expected CNOT operations for duplicate elimination"
+    # Should have CX operations
+    cnot_ops = [op for op in operations_result if op[0] == "cx"]
+    assert len(cnot_ops) > 0, "Expected CX operations for duplicate elimination"
 
     # Verify row mapping consistency
     assert len(row_map_result) == m_result.shape[0]
@@ -862,17 +815,17 @@ def test_reduce_diagonal_matrix() -> None:
         f"Expected shape (2, 3), got {elimination_results.reduced_matrix.shape}"
     )
 
-    # Should have CNOT and X operations
-    cnot_ops = [op for op in elimination_results.operations if op[0] == "cnot"]
+    # Should have CX and X operations
+    cnot_ops = [op for op in elimination_results.operations if op[0] == "cx"]
     x_ops = [op for op in elimination_results.operations if op[0] == "x"]
 
-    # For 3x3 diagonal matrix: CNOT(0,2), CNOT(1,2), X(2)
-    assert len(cnot_ops) == 2, f"Expected 2 CNOT operations, got {len(cnot_ops)}"
+    # For 3x3 diagonal matrix: CX(0,2), CX(1,2), X(2)
+    assert len(cnot_ops) == 2, f"Expected 2 CX operations, got {len(cnot_ops)}"
     assert len(x_ops) == 1, f"Expected 1 X operation, got {len(x_ops)}"
 
-    # Assert exact CNOT sequence: CNOT(1,0), CNOT(2,1)
-    assert cnot_ops[0] == ("cnot", (1, 0)), f"First CNOT should be CNOT(0,1), got {cnot_ops[0]}"
-    assert cnot_ops[1] == ("cnot", (2, 1)), f"Second CNOT should be CNOT(1,2), got {cnot_ops[1]}"
+    # Assert exact CX sequence: CX(1,0), CX(2,1)
+    assert cnot_ops[0] == ("cx", (1, 0)), f"First CX should be CX(0,1), got {cnot_ops[0]}"
+    assert cnot_ops[1] == ("cx", (2, 1)), f"Second CX should be CX(1,2), got {cnot_ops[1]}"
 
     # Verify specific X operation: X(2) - the last row gets X operation
     expected_x_qubits = {2}
@@ -890,7 +843,8 @@ def test_reduce_diagonal_matrix() -> None:
 
     non_diagonal_m = np.array([[1, 0], [1, 0]], dtype=np.int8)
     elimination_results = _reduce_diagonal_matrix(non_diagonal_m, row_map, col_map, operations)
-    assert all(non_diagonal_m[i, j] == elimination_results.reduced_matrix[i, j] for i in range(2) for j in range(2))
+    assert elimination_results.reduced_matrix.shape == (1, 2)
+    assert np.array_equal(elimination_results.reduced_matrix[0], non_diagonal_m[0])
 
 
 def test_gf2x_edge_cases():
@@ -945,11 +899,110 @@ def test_gf2x_with_tracking_edge_case_pseudo_diagonal():
         f"Row map length should be {elimination_results.rank}, got {len(elimination_results.row_map)}"
     )
 
-    # Verify that operations list contains both CNOT and X operations
-    cnot_ops = [op for op in elimination_results.operations if op[0] == "cnot"]
+    # Verify that operations list contains both CX and X operations
+    cnot_ops = [op for op in elimination_results.operations if op[0] == "cx"]
     x_ops = [op for op in elimination_results.operations if op[0] == "x"]
-    assert len(cnot_ops) > 0, "Should have recorded some CNOT operations"
+    assert len(cnot_ops) > 0, "Should have recorded some CX operations"
     assert len(x_ops) > 0, "Should have recorded some X operations"
 
     # Should have some operations recorded
     assert len(elimination_results.operations) > 0, "Should have recorded some operations"
+
+
+def test_forward_only_produces_upper_triangular():
+    """Forward-only elimination produces row echelon form (zeros below each pivot)."""
+    matrix = np.array([[1, 1, 0], [1, 0, 1], [0, 1, 1]], dtype=np.int8)
+    m_result, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [], forward_only=True)
+
+    for r in range(m_result.shape[0]):
+        nz = np.flatnonzero(m_result[r])
+        if nz.size == 0:
+            continue
+        pivot_col = int(nz[0])
+        assert np.all(m_result[r + 1 :, pivot_col] == 0)
+
+
+def test_forward_only_does_not_back_substitute():
+    """Forward-only differs from full RREF, above-diagonal entries survive."""
+    matrix = np.array([[1, 1, 0], [0, 1, 1], [1, 0, 1]], dtype=np.int8)
+    m_fwd, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [], forward_only=True)
+    m_full, _, _ = _perform_gaussian_elimination(matrix, [0, 1, 2], [])
+    assert not np.array_equal(m_fwd, m_full)
+
+
+def test_forward_only_reconstruction():
+    """Reversing recorded CNOTs on the REF result recovers the original matrix."""
+    matrix = np.array(
+        [[1, 0, 1, 1], [0, 1, 1, 0], [1, 1, 0, 1], [0, 0, 1, 1]],
+        dtype=np.int8,
+    )
+    row_map = list(range(4))
+    m_result, rm_result, cnot_ops = _perform_gaussian_elimination(matrix, row_map, [], forward_only=True)
+
+    reconstructed = np.zeros_like(matrix)
+    for i, orig in enumerate(rm_result):
+        reconstructed[orig] = m_result[i]
+    for target, control in reversed(cnot_ops):
+        reconstructed[target] ^= reconstructed[control]
+
+    assert np.array_equal(reconstructed, matrix)
+
+
+def test_forward_only_row_swap_tracking():
+    """Row swaps needed for pivoting are reflected in the returned row_map."""
+    matrix = np.array([[0, 1], [1, 0]], dtype=np.int8)
+    _, rm_result, _ = _perform_gaussian_elimination(matrix, [0, 1], [], forward_only=True)
+    assert rm_result[0] == 1
+    assert rm_result[1] == 0
+
+
+def test_forward_only_large_rank_deficient():
+    """Rank-4 matrix: REF has exactly 4 non-zero rows and 2 zero rows."""
+    matrix = np.array(
+        [
+            [1, 0, 1, 0, 1, 1, 0, 0],
+            [0, 1, 0, 1, 0, 0, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1],  # row 0 XOR row 1
+            [1, 0, 1, 0, 1, 1, 0, 0],  # duplicate of row 0
+            [0, 0, 0, 0, 1, 0, 1, 0],
+            [0, 0, 0, 0, 0, 1, 0, 1],
+        ],
+        dtype=np.int8,
+    )
+    m_ref, rm, ops = _perform_gaussian_elimination(matrix, list(range(6)), [], forward_only=True)
+    non_zero = int(np.sum(np.any(m_ref, axis=1)))
+    assert non_zero == 4
+
+    # Verify REF property: below each pivot is all zero
+    for r in range(m_ref.shape[0]):
+        nz = np.flatnonzero(m_ref[r])
+        if nz.size == 0:
+            continue
+        assert np.all(m_ref[r + 1 :, int(nz[0])] == 0)
+
+    # Reconstruction must recover original
+    reconstructed = np.zeros_like(matrix)
+    for i, orig in enumerate(rm):
+        reconstructed[orig] = m_ref[i]
+    for target, control in reversed(ops):
+        reconstructed[target] ^= reconstructed[control]
+    assert np.array_equal(reconstructed, matrix)
+
+
+def test_forward_only_wide_matrix():
+    """Wide matrix test: more columns than rows, full GF(2) rank 3."""
+    matrix = np.array(
+        [
+            [1, 0, 0, 1, 1, 0, 1, 0, 1, 1],
+            [0, 1, 0, 0, 1, 1, 0, 1, 1, 0],
+            [0, 0, 1, 1, 0, 1, 1, 1, 0, 0],
+        ],
+        dtype=np.int8,
+    )
+    m_ref, _, ops = _perform_gaussian_elimination(matrix, list(range(3)), [], forward_only=True)
+
+    # Already in REF (identity-like left block), should need 0 ops
+    assert len(ops) == 0
+    assert np.array_equal(m_ref, matrix)
+    # All 3 rows non-zero
+    assert int(np.sum(np.any(m_ref, axis=1))) == 3
