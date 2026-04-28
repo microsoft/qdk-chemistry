@@ -118,6 +118,25 @@ class Algorithm(ABC):
         """
         return self._settings
 
+    def _create_nested(self, setting_key: str):
+        """Instantiate a nested algorithm from an AlgorithmRef in settings.
+
+        Reads the ``AlgorithmRef`` stored at *setting_key*, creates the
+        corresponding algorithm via the registry, and applies any nested
+        settings overrides.
+
+        Args:
+            setting_key: Settings key that holds an ``AlgorithmRef`` value.
+
+        Returns:
+            Algorithm: A fully configured algorithm instance.
+
+        Raises:
+            KeyError: If the algorithm type or name cannot be found.
+
+        """
+        return create_from_ref(self._settings, setting_key)
+
     @abstractmethod
     def type_name(self) -> str:
         """Return the name of the algorithm type.
@@ -169,6 +188,33 @@ class Algorithm(ABC):
 
         """
         return [self.name()]
+
+
+def create_from_ref(settings, setting_key: str):
+    """Instantiate a nested algorithm from an AlgorithmRef stored in a Settings object.
+
+    This is a standalone helper usable by both pure-Python algorithms
+    (via ``Algorithm._create_nested``) and C++-backed algorithms that
+    don't inherit the Python ``Algorithm`` base class.
+
+    Args:
+        settings: A ``Settings`` object containing the ``AlgorithmRef``.
+        setting_key: Settings key that holds an ``AlgorithmRef`` value.
+
+    Returns:
+        Algorithm: A fully configured algorithm instance.
+
+    Raises:
+        KeyError: If the algorithm type or name cannot be found.
+
+    """
+    from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+    ref = settings.get(setting_key)
+    if ref.settings is not None:
+        kwargs = {k: ref.settings.get(k) for k in ref.settings}
+        return registry.create(ref.algorithm_type, ref.algorithm_name, **kwargs)
+    return registry.create(ref.algorithm_type, ref.algorithm_name)
 
 
 class AlgorithmFactory(ABC):
