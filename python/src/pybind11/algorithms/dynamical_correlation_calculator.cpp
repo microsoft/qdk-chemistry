@@ -96,6 +96,8 @@ Examples:
     return "<qdk_chemistry.algorithms.DynamicalCorrelationCalculator>";
   });
 
+  qdk::chemistry::python::bind_create_nested(ref_calc);
+
   ref_calc.def("run", &DynamicalCorrelationCalculator::run, py::arg("ansatz"),
                R"(
   Perform reference-derived calculation.

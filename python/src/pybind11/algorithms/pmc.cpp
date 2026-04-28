@@ -178,6 +178,8 @@ Returns:
     return "<qdk_chemistry.algorithms.ProjectedMultiConfigurationCalculator>";
   });
 
+  qdk::chemistry::python::bind_create_nested(pmc_calculator);
+
   // Bind concrete microsoft::MacisPmc implementation
   py::class_<microsoft::MacisPmc, ProjectedMultiConfigurationCalculator,
              py::smart_holder>(m, "QdkMacisPmc", R"(

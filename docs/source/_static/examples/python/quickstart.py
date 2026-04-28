@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import AlgorithmRef, Structure
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
@@ -117,11 +117,13 @@ print(
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and the qubit Hamiltonian
 estimator = create("energy_estimator", algorithm_name="qdk")
-circuit_executor = create("circuit_executor", algorithm_name="qdk_full_state_simulator")
+estimator.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+)
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
     qubit_hamiltonian=qubit_hamiltonian,
-    circuit_executor=circuit_executor,
     total_shots=500000,
 )
 

@@ -14,9 +14,6 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
     ControlledTimeEvolutionUnitary,
@@ -84,9 +81,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
-        circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         """Run the iterative phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
@@ -94,15 +88,14 @@ class IterativePhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: The state preparation circuit.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
-            circuit_executor: The executor to run quantum circuits.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
             QpeResult: The result of the phase estimation.
 
         """
+        # Create nested algorithms from settings
+        circuit_executor = self._create_nested("circuit_executor")
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
@@ -114,8 +107,6 @@ class IterativePhaseEstimation(PhaseEstimation):
             iteration_circuit = self.create_iteration_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
-                evolution_builder=evolution_builder,
-                circuit_mapper=circuit_mapper,
                 iteration=iteration,
                 total_iterations=self.settings().get("num_bits"),
                 phase_correction=phase_feedback,
@@ -156,8 +147,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
         iteration: int,
         total_iterations: int,
         phase_correction: float = 0.0,
@@ -167,8 +156,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            evolution_builder: The time evolution builder to use.
-            circuit_mapper: The controlled evolution circuit mapper to use.
             iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
             phase_correction: Feedback phase angle to apply before controlled evolution, defaults to 0.0.
@@ -180,14 +167,12 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        time_evolution_unitary = self._create_time_evolution(
-            qubit_hamiltonian, self.settings().get("evolution_time"), evolution_builder
-        )
+        time_evolution_unitary = self._create_time_evolution(qubit_hamiltonian, self.settings().get("evolution_time"))
         controlled_evolution = ControlledTimeEvolutionUnitary(
             time_evolution_unitary=time_evolution_unitary, control_indices=[0]
         )
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(controlled_evolution, power, circuit_mapper)
+        ctrl_evol_circuit = self._create_ctrl_time_evol_circuit(controlled_evolution, power)
 
         if state_preparation._qsharp_op and ctrl_evol_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(

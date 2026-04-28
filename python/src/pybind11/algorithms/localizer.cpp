@@ -165,6 +165,8 @@ Returns:
     return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
   });
 
+  qdk::chemistry::python::bind_create_nested(localizer);
+
   // Bind concrete microsoft::PipekMezeyLocalizer implementation
   py::class_<microsoft::PipekMezeyLocalizer, Localizer, py::smart_holder>(
       m, "QdkPipekMezeyLocalizer", R"(

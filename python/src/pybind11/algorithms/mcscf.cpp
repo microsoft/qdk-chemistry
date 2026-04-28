@@ -37,15 +37,11 @@ class MultiConfigurationScfBase
 
  protected:
   MultiConfigurationScfReturnType _run_impl(
-      std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<HamiltonianConstructor> ham_ctor,
-      std::shared_ptr<MultiConfigurationCalculator> mc_calculator,
-      unsigned int n_active_alpha_electrons,
+      std::shared_ptr<Orbitals> orbitals, unsigned int n_active_alpha_electrons,
       unsigned int n_active_beta_electrons) const override {
     PYBIND11_OVERRIDE_PURE(MultiConfigurationScfReturnType,
-                           MultiConfigurationScf, _run_impl, orbitals, ham_ctor,
-                           mc_calculator, n_active_alpha_electrons,
-                           n_active_beta_electrons);
+                           MultiConfigurationScf, _run_impl, orbitals,
+                           n_active_alpha_electrons, n_active_beta_electrons);
   }
 };
 
@@ -67,11 +63,11 @@ Examples:
     ...         super().__init__()  # Call the base class constructor
     ...     def _run_impl(self,
     ...                   orbitals : data.Orbitals,
-    ...                   ham_ctor : alg.HamiltonianConstructor,
-    ...                   mc_calculator : alg.MultiConfigurationCalculator,
     ...                   n_active_alpha_electrons : int,
     ...                   n_active_beta_electrons : int) ->tuple[float, data.Wavefunction] :
     ...         # Custom MCSCF implementation
+    ...         # Use self._create_nested("multi_configuration_calculator")
+    ...         # to get the configurable nested algorithm exposed by these settings.
     ...         return -1.0, data.Wavefunction()
 )");
 
@@ -89,17 +85,16 @@ Examples:
     ...         super().__init__()  # Calls this constructor
 )");
 
-  multi_configuration_scf.def(
-      "run", &MultiConfigurationScf::run,
-      R"(
+  multi_configuration_scf.def("run", &MultiConfigurationScf::run,
+                              R"(
 Perform a MultiConfigurationScf calculation.
 
 This method automatically locks settings before execution.
+The nested HamiltonianConstructor and MultiConfigurationCalculator are
+created from AlgorithmRef entries in settings.
 
 Args:
     orbitals (qdk_chemistry.data.Orbitals): The initial molecular orbitals for the calculation
-    ham_ctor (qdk_chemistry.algorithms.HamiltonianConstructor): The Hamiltonian constructor for building and updating the Hamiltonian
-    mc_calculator (qdk_chemistry.algorithms.MultiConfigurationCalculator): The MC calculator to evaluate the active space
     n_active_alpha_electrons (int): The number of alpha electrons in the active space
     n_active_beta_electrons (int): The number of beta electrons in the active space
 
@@ -107,8 +102,9 @@ Returns:
     tuple[float, qdk_chemistry.data.Wavefunction]: A tuple containing the calculated energy and the resulting wavefunction
 
 )",
-      py::arg("orbitals"), py::arg("ham_ctor"), py::arg("mc_calculator"),
-      py::arg("n_active_alpha_electrons"), py::arg("n_active_beta_electrons"));
+                              py::arg("orbitals"),
+                              py::arg("n_active_alpha_electrons"),
+                              py::arg("n_active_beta_electrons"));
 
   multi_configuration_scf.def("settings", &MultiConfigurationScf::settings,
                               R"(
@@ -166,6 +162,9 @@ Returns:
   multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {
     return "<qdk_chemistry.algorithms.MultiConfigurationScf>";
   });
+
+  // Add _create_nested so C++-backed classes can instantiate nested algorithms
+  qdk::chemistry::python::bind_create_nested(multi_configuration_scf);
 
   // Factory class binding - creates MultiConfigurationScfFactory class with
   // static methods

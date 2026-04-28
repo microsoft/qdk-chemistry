@@ -171,6 +171,8 @@ Returns:
     return "<qdk_chemistry.algorithms.ScfSolver>";
   });
 
+  qdk::chemistry::python::bind_create_nested(scf_solver);
+
   // Bind concrete microsoft::ScfSolver implementation
   py::class_<microsoft::ScfSolver, ScfSolver, py::smart_holder>(
       m, "QdkScfSolver", R"(

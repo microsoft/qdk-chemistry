@@ -25,7 +25,7 @@ except ImportError as ex:
 from qdk_chemistry.algorithms import (
     create,
 )
-from qdk_chemistry.data import Circuit, Structure
+from qdk_chemistry.data import AlgorithmRef, Circuit, Structure
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -118,9 +118,18 @@ iqpe = create(
     evolution_time=T_TIME,
     shots_per_bit=SHOTS_PER_BIT,
 )
-aer_simulator = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED)
-evolution_builder = create("time_evolution_builder", "trotter")
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+iqpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
+)
+iqpe.settings().set(
+    "evolution_builder",
+    AlgorithmRef("time_evolution_builder", "trotter"),
+)
+iqpe.settings().set(
+    "circuit_mapper",
+    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+)
 
 
 Logger.info("\n=== Running iterative phase estimation (Trotterized) ===")
@@ -131,9 +140,6 @@ Logger.info(f"  Electron sector (alpha, beta): ({n_alpha}, {n_beta})")
 result = iqpe.run(
     state_preparation=Circuit(qasm3.dumps(state_prep)),
     qubit_hamiltonian=qubit_hamiltonian,
-    circuit_executor=aer_simulator,
-    evolution_builder=evolution_builder,
-    circuit_mapper=circuit_mapper,
 )
 
 ########################################################################################

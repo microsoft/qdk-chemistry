@@ -8,12 +8,8 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import (
-    ControlledEvolutionCircuitMapper,
-)
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     ControlledTimeEvolutionUnitary,
     QpeResult,
@@ -32,11 +28,8 @@ class PhaseEstimationSettings(Settings):
     def __init__(self):
         """Initialize the settings for Phase Estimation.
 
-        Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value. This setting is only applicable to
-                time evolution-based unitary builders such as Trotter.
+        Includes nested algorithm references for the evolution builder,
+        circuit mapper, and circuit executor.
 
         """
         super().__init__()
@@ -46,6 +39,21 @@ class PhaseEstimationSettings(Settings):
             "float",
             0.0,
             "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
+        )
+        self._set_default(
+            "evolution_builder",
+            "algorithm_ref",
+            AlgorithmRef("time_evolution_builder", "trotter"),
+        )
+        self._set_default(
+            "circuit_mapper",
+            "algorithm_ref",
+            AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        )
+        self._set_default(
+            "circuit_executor",
+            "algorithm_ref",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
         )
 
 
@@ -76,9 +84,6 @@ class PhaseEstimation(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
         *,
-        evolution_builder: TimeEvolutionBuilder,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
-        circuit_executor: CircuitExecutor,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
         r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
@@ -94,9 +99,6 @@ class PhaseEstimation(Algorithm):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            evolution_builder: Builder that constructs time evolution unitaries from the Hamiltonian.
-            circuit_mapper: Maps controlled time evolution unitaries to circuit operations.
-            circuit_executor: The executor to run quantum circuits on a backend or simulator.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -104,42 +106,37 @@ class PhaseEstimation(Algorithm):
 
         """
 
-    def _create_time_evolution(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, evolution_builder: TimeEvolutionBuilder
-    ) -> TimeEvolutionUnitary:
+    def _create_time_evolution(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Create the time evolution circuit for the given Hamiltonian and power.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
             time: The evolution time.
-            evolution_builder: The time evolution builder to use.
 
         Returns:
             The time evolution unitary circuit.
 
         """
+        evolution_builder = self._create_nested("evolution_builder")
         return evolution_builder.run(qubit_hamiltonian, time)
 
     def _create_ctrl_time_evol_circuit(
         self,
         controlled_evolution: ControlledTimeEvolutionUnitary,
         power: int,
-        circuit_mapper: ControlledEvolutionCircuitMapper,
     ) -> Circuit:
         """Create the controlled time evolution circuit for the given Hamiltonian and power.
 
         Args:
             controlled_evolution: The controlled time evolution unitary.
             power: The power to which the controlled unitary should be raised.
-            circuit_mapper: The controlled evolution circuit mapper to use.
 
         Returns:
             The controlled time evolution circuit.
 
         """
-        # Create a new instance of the mapper to avoid setting lock
-        circuit_mapper.settings().update("power", power)  # Update the power setting
-        # Avoid lock settings
+        circuit_mapper = self._create_nested("circuit_mapper")
+        circuit_mapper.settings().update("power", power)
         return circuit_mapper._run_impl(controlled_evolution=controlled_evolution)  # noqa: SLF001
 
 

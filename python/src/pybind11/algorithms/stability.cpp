@@ -156,6 +156,8 @@ Returns:
     return "<qdk_chemistry.algorithms.StabilityChecker>";
   });
 
+  qdk::chemistry::python::bind_create_nested(stability_checker);
+
   // Bind concrete microsoft::StabilityChecker implementation
   py::class_<microsoft::StabilityChecker, StabilityChecker, py::smart_holder>(
       m, "QdkStabilityChecker", R"(

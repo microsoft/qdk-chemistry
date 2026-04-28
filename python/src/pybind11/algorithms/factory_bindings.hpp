@@ -16,6 +16,37 @@ namespace py = pybind11;
 namespace qdk::chemistry::python {
 
 /**
+ * @brief Add _create_nested() to any pybind11 algorithm class binding.
+ *
+ * This delegates to the Python-side ``create_from_ref`` helper so that
+ * both pure-Python and C++-backed algorithm classes share the same
+ * implementation.
+ *
+ * Call this after creating the py::class_ for every algorithm type.
+ */
+template <typename PyClassType>
+void bind_create_nested(PyClassType& cls) {
+  cls.def(
+      "_create_nested",
+      [](py::object self, const std::string& key) -> py::object {
+        py::module_ base = py::module_::import("qdk_chemistry.algorithms.base");
+        py::object create_from_ref = base.attr("create_from_ref");
+        py::object settings = self.attr("settings")();
+        return create_from_ref(settings, key);
+      },
+      py::arg("setting_key"),
+      R"(
+Instantiate a nested algorithm from an AlgorithmRef stored in settings.
+
+Args:
+    setting_key (str): Settings key that holds an AlgorithmRef value.
+
+Returns:
+    Algorithm: A fully configured algorithm instance.
+)");
+}
+
+/**
  * @brief Generic template to bind AlgorithmFactory instances to Python
  *
  * This template function automatically creates Python bindings for any

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import Circuit, QpeResult, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QpeResult, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .reference_tolerances import (
@@ -23,7 +23,6 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-    from qdk_chemistry.algorithms import create
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
     from qdk_chemistry.utils.phase import energy_from_phase
 
@@ -109,17 +108,22 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
 
     """
     qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
-
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    qpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
 
     return qpe.run(
         state_preparation=problem.state_prep,
         qubit_hamiltonian=problem.hamiltonian,
-        evolution_builder=evolution_builder,
-        circuit_mapper=circuit_mapper,
-        circuit_executor=simulator,
     )
 
 

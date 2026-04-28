@@ -169,6 +169,8 @@ Returns:
     return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
 
+  qdk::chemistry::python::bind_create_nested(mc_calculator);
+
   // Bind concrete microsoft::MacisCas implementation
   py::class_<microsoft::MacisCas, MultiConfigurationCalculator,
              py::smart_holder>(m, "QdkMacisCas", R"(
