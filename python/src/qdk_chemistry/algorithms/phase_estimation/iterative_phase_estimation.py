@@ -179,7 +179,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 state_preparation, ctrl_evol_circuit, phase_correction, num_system_qubits
             )
 
-        if state_preparation.get_qiskit_circuit() and ctrl_evol_circuit.get_qiskit_circuit():
+        if state_preparation.get_qiskit_circuit() is not None and ctrl_evol_circuit.get_qiskit_circuit() is not None:
             return self._create_circuit_from_qiskit(state_preparation, ctrl_evol_circuit, phase_correction)
 
         raise RuntimeError(
