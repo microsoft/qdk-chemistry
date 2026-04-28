@@ -16,7 +16,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source $HOME/.cargo/env
 which rustc
 
-# Install ipykernel
+# Install ipykernel, change to run pr easy
 pip install ipykernel pandas pre-commit rdkit
 
 # Install QDK Chemistry package
