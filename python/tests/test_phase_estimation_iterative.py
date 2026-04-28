@@ -12,12 +12,12 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
     _validate_iteration_inputs,
 )
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     QpeResult,
     QuantumErrorProfile,
@@ -137,16 +137,22 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     iqpe = IterativePhaseEstimation(
         num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots_per_bit=problem.shots_iterative
     )
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
 
     return iqpe.run(
         qubit_hamiltonian=problem.hamiltonian,
         state_preparation=state_prep_circuit,
-        circuit_executor=simulator,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
     )
 
 
@@ -163,16 +169,22 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
     qpe = QiskitStandardPhaseEstimation(
         num_bits=problem.num_bits, evolution_time=problem.evolution_time, shots=problem.shots_traditional
     )
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    qpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
 
     return qpe.run(
         qubit_hamiltonian=problem.hamiltonian,
         state_preparation=problem.state_prep,
-        circuit_executor=simulator,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
     )
 
 
@@ -219,16 +231,22 @@ def _run_iterative_with_parameters(
     )
 
     iqpe = IterativePhaseEstimation(num_bits=num_bits, evolution_time=evolution_time, shots_per_bit=shots_per_bit)
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=seed)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=seed),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
 
     return iqpe.run(
         qubit_hamiltonian=hamiltonian,
         state_preparation=Circuit(qsharp_factory=qsharp_factories, qsharp_op=qsharp_op),
-        circuit_executor=simulator,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
     )
 
 
@@ -464,26 +482,32 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
         name="qpe_noise_test",
         description="Depolarizing noise for QPE integration test",
         errors={
-            "cx": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 2},
-            "rz": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
-            "h": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
-            "s": {"type": "depolarizing_error", "rate": error_rate, "num_qubits": 1},
+            "cx": {"depolarizing_error": error_rate},
+            "rz": {"depolarizing_error": error_rate},
+            "h": {"depolarizing_error": error_rate},
+            "s": {"depolarizing_error": error_rate},
         },
     )
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
     iqpe = IterativePhaseEstimation(
         num_bits=two_qubit_phase_problem.num_bits,
         evolution_time=two_qubit_phase_problem.evolution_time,
         shots_per_bit=two_qubit_phase_problem.shots_iterative,
     )
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
     noisy_result = iqpe.run(
         state_preparation=two_qubit_phase_problem.state_prep,
         qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        circuit_executor=simulator,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
         noise=error_profile,
     )
 
@@ -524,9 +548,18 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
         evolution_time=two_qubit_phase_problem.evolution_time,
         shots_per_bit=two_qubit_phase_problem.shots_iterative,
     )
-    simulator = create("circuit_executor", "qdk_full_state_simulator", seed=_SEED)
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
 
     with pytest.raises(ValueError, match="No iteration circuits have been generated"):
         iqpe.get_circuits()
@@ -534,9 +567,6 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
     iqpe.run(
         qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         state_preparation=two_qubit_phase_problem.state_prep,
-        circuit_executor=simulator,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
     )
 
     assert len(iqpe.get_circuits()) == two_qubit_phase_problem.num_bits
@@ -614,15 +644,18 @@ def test_create_iteration_circuit_power_calculation() -> None:
     state_prep = QuantumCircuit(1)
     state_prep.h(0)
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
-    circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
-    evolution_builder = create("time_evolution_builder", "trotter")
-
     iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "evolution_builder",
+        AlgorithmRef("time_evolution_builder", "trotter"),
+    )
     iter_0_circuit = iqpe.create_iteration_circuit(
         state_preparation=state_prep_circuit,
         qubit_hamiltonian=hamiltonian,
-        circuit_mapper=circuit_mapper,
-        evolution_builder=evolution_builder,
         iteration=0,
         total_iterations=5,
     )
