@@ -80,17 +80,12 @@ TEST_F(BasisSetTest, Constructors) {
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
 
-  // // Constructor with empty name and structure
-  // EXPECT_THROW(BasisSet basis1("", structure), std::invalid_argument);
-
-  // // Constructor with name and structure should throw (empty basis invalid)
-  // EXPECT_THROW(BasisSet basis2("6-31G", structure), std::invalid_argument);
-
-  // // Constructor with name, structure and basis type should throw (empty
-  // basis
-  // // invalid)
-  // EXPECT_THROW(BasisSet basis3("6-31G", structure, AOType::Cartesian),
-  //              std::invalid_argument);
+  // Constructor with empty name should throw
+  std::vector<Shell> empty_name_shells;
+  empty_name_shells.emplace_back(
+      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+  EXPECT_THROW(BasisSet basis1("", empty_name_shells, structure),
+               std::invalid_argument);
 
   // Constructor with shells should work
   std::vector<Shell> shells;
@@ -232,10 +227,6 @@ TEST_F(BasisSetTest, AOTypeManagement) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
-
-  // // Test default basis type (spherical) - empty basis sets are invalid
-  // EXPECT_THROW(BasisSet basis_spherical("test", structure),
-  //              std::invalid_argument);
 
   // Create cartesian basis set
   std::vector<Shell> shells;
@@ -395,10 +386,6 @@ TEST_F(BasisSetTest, Validation) {
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
   std::vector<std::string> symbols = {"H"};
   Structure structure(coords, symbols);
-
-  // // Empty basis is invalid
-  // EXPECT_THROW(BasisSet empty_basis("test", structure),
-  // std::invalid_argument);
 
   // Add a shell
   std::vector<Shell> shells;
@@ -1871,6 +1858,7 @@ TEST_F(BasisSetTest, AuxiliaryBasisFromSharedPtrConstructor) {
   EXPECT_EQ(3u, basis.get_num_shells());
   EXPECT_TRUE(basis.has_aux_basis());
   EXPECT_EQ(4u, basis.get_num_aux_shells());
+  EXPECT_EQ(6u, basis.get_num_auxiliary_orbitals());
 }
 
 TEST_F(BasisSetTest, AuxiliaryBasisFromShellsConstructor) {
@@ -2491,6 +2479,30 @@ TEST_F(BasisSetTest, AuxiliaryShellErrorPaths) {
   BasisSet no_aux("no-aux", shells, structure);
   EXPECT_EQ(0u, no_aux.get_num_aux_shells());
   EXPECT_TRUE(no_aux.get_aux_shells().empty());
+}
+
+TEST_F(BasisSetTest, AuxiliaryBasisMismatchedAtomIndices) {
+  // Structure with only 1 atom (index 0 is valid, index 1+ is invalid)
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<std::string> symbols = {"H"};
+  Structure structure(coords, symbols);
+
+  // Primary shell on atom 0 (valid)
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+
+  // Aux shell referencing atom index 5, which does not exist in the structure
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(5, OrbitalType::S, std::vector{2.0},
+                          std::vector{1.0});
+
+  // Construction should throw because aux shell references non-existent atom
+  EXPECT_THROW(BasisSet("test", shells, "aux-bad", aux_shells, structure),
+               std::invalid_argument);
+
+  // Also test with unnamed aux constructor
+  EXPECT_THROW(BasisSet("test", shells, aux_shells, structure),
+               std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, AuxiliaryBasisCartesianAOType) {
