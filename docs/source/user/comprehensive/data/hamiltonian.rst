@@ -176,7 +176,7 @@ The storage size scales as :math:`O(N_{aux} \times N^2)` where :math:`N_{aux}` i
 
 The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm can produce either container type depending on the implementation used.
 
-**Cholesky decomposition** — Use the ``qdk_cholesky`` implementation to create a ``CholeskyHamiltonianContainer`` from Cholesky-decomposed ERIs.
+**Cholesky decomposition** — Use the ``qdk_cholesky`` implementation to create a ``ThreeCenterHamiltonianContainer`` from Cholesky-decomposed ERIs.
 This method does not require an auxiliary basis set; it decomposes the full ERI tensor directly.
 
 .. tab:: C++ API
@@ -197,7 +197,7 @@ This method does not require an auxiliary basis set; it decomposes the full ERI 
       constructor.settings().set("cholesky_tolerance", 1e-8)
       hamiltonian = constructor.run(orbitals)
 
-**Density fitting** — Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``CholeskyHamiltonianContainer`` from density-fitted integrals.
+**Density fitting** — Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``ThreeCenterHamiltonianContainer`` from density-fitted integrals.
 This method requires an auxiliary basis set.
 
 .. tab:: C++ API

@@ -44,7 +44,7 @@ class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  *
  * @note An auxiliary basis set must be provided when calling run().
  *
- * @see CholeskyHamiltonianContainer
+ * @see ThreeCenterHamiltonianContainer
  * @see HamiltonianConstructor
  */
 class DensityFittedHamiltonianConstructor

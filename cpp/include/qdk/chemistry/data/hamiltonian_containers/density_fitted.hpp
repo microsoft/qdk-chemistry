@@ -102,7 +102,7 @@ class DensityFittedHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g.,
-   * "canonical_four_center", "cholesky")
+   * "canonical_four_center", "three_center")
    */
   std::string get_container_type() const override final;
 

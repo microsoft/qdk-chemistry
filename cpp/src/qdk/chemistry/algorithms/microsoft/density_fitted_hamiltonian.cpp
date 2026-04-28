@@ -29,7 +29,7 @@
 // QDK/Chemistry data::Hamiltonian headers
 #include <blas.hh>
 #include <lapack.hh>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"
@@ -237,7 +237,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active, dfmoeri_aa, orbitals,
               structure->calculate_nuclear_repulsion_energy(),
               dummy_inactive_fock));
@@ -250,7 +250,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, dfmoeri_aa, dfmoeri_bb, orbitals,
               structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
               dummy_fock_beta));
@@ -314,7 +314,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CholeskyHamiltonianContainer>(
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
             H_active, dfmoeri_aa, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
             F_inactive));
@@ -423,7 +423,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CholeskyHamiltonianContainer>(
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
             H_active_alpha, H_active_beta, dfmoeri_aa, dfmoeri_bb, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
             F_inactive_alpha, F_inactive_beta));

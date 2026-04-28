@@ -1,7 +1,7 @@
 """Parameterized tests for Hamiltonian with different container types.
 
 This module tests the Hamiltonian class with both CanonicalFourCenterHamiltonianContainer
-and CholeskyHamiltonianContainer using pytest parametrization.
+and ThreeCenterHamiltonianContainer using pytest parametrization.
 
 Both containers implement the same interface and should behave identically
 for all Hamiltonian operations.
@@ -26,11 +26,11 @@ from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
     Structure,
+    ThreeCenterHamiltonianContainer,
 )
 
 from .reference_tolerances import (
@@ -42,7 +42,7 @@ from .reference_tolerances import (
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
 
 # Container types for parametrization
-CONTAINER_TYPES = ["canonical_four_center", "cholesky"]
+CONTAINER_TYPES = ["canonical_four_center", "three_center"]
 
 
 # =============================================================================
@@ -75,8 +75,8 @@ def create_non_zero_hamiltonian(container_type):
     """Create a Hamiltonian with non-zero integrals for testing."""
     if container_type == "canonical_four_center":
         container = CanonicalFourCenterHamiltonianContainer(_one_body, _two_body, _orbitals, 1.5, np.array([]))
-    elif container_type == "cholesky":
-        container = CholeskyHamiltonianContainer(_one_body, _three_center, _orbitals, 1.5, np.array([]))
+    elif container_type == "three_center":
+        container = ThreeCenterHamiltonianContainer(_one_body, _three_center, _orbitals, 1.5, np.array([]))
     else:
         raise ValueError(f"Unknown container_type: {container_type}")
 
@@ -128,8 +128,8 @@ class TestHamiltonian:
             assert np.array_equal(aaaa, _two_body)
             assert np.array_equal(aabb, _two_body)
             assert np.array_equal(bbbb, _two_body)
-        elif container_type == "cholesky":
-            # Cholesky container should yield four-center integrals equal
+        elif container_type == "three_center":
+            # Three-center container should yield four-center integrals equal
             # to the contraction of the three-center integrals over the
             # auxiliary index (assuming identity metric):
             # (ij|kl) = sum_P (ij|P) (kl|P).
@@ -504,7 +504,7 @@ class TestRestrictedUnrestricted:
             container = CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock)
         else:
             three_center = rng.random((9, 3))
-            container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.0, inactive_fock)
+            container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, inactive_fock)
 
         h = Hamiltonian(container)
 
@@ -562,7 +562,7 @@ class TestRestrictedUnrestricted:
                 inactive_fock_beta,
             )
         else:
-            # For Cholesky, use three-center integrals scaled appropriately
+            # For three-center container, use three-center integrals scaled appropriately
             base_three_center = np.array(
                 [
                     [1.0, 0.6, 0.8],
@@ -573,7 +573,7 @@ class TestRestrictedUnrestricted:
             )
             three_center_aa = math.sqrt(0.5) * base_three_center
             three_center_bb = math.sqrt(1.5) * base_three_center
-            container = CholeskyHamiltonianContainer(
+            container = ThreeCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 three_center_aa,
@@ -623,7 +623,7 @@ class TestRestrictedUnrestricted:
                     [0.5, 0.3, 0.4],
                 ]
             )
-            container_restricted = CholeskyHamiltonianContainer(
+            container_restricted = ThreeCenterHamiltonianContainer(
                 one_body, three_center, orbitals_restricted, 1.0, np.eye(2)
             )
 
@@ -663,7 +663,7 @@ class TestRestrictedUnrestricted:
             )
             three_center_aa = math.sqrt(0.5) * base_three_center
             three_center_bb = math.sqrt(1.5) * base_three_center
-            container_unrestricted = CholeskyHamiltonianContainer(
+            container_unrestricted = ThreeCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 three_center_aa,
@@ -713,7 +713,7 @@ class TestRestrictedUnrestricted:
             )
         else:
             three_center = np.zeros((16, 4))
-            container_restricted = CholeskyHamiltonianContainer(
+            container_restricted = ThreeCenterHamiltonianContainer(
                 one_body, three_center, model_orbitals_restricted, 0.0, np.eye(4)
             )
 
@@ -748,7 +748,7 @@ class TestRestrictedUnrestricted:
         else:
             three_center_aa = np.zeros((16, 4))
             three_center_bb = np.zeros((16, 4))
-            container_unrestricted = CholeskyHamiltonianContainer(
+            container_unrestricted = ThreeCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 three_center_aa,
@@ -774,12 +774,12 @@ class TestRestrictedUnrestricted:
 
 
 # =============================================================================
-# Cholesky-Specific Tests
+# Three-Center-Specific Tests
 # =============================================================================
 
 
-class TestCholeskySpecific:
-    """Tests specific to CholeskyHamiltonianContainer."""
+class TestThreeCenterSpecific:
+    """Tests specific to ThreeCenterHamiltonianContainer."""
 
     def test_three_center_integrals_storage(self):
         """Test three-center integral storage and retrieval."""
@@ -795,7 +795,7 @@ class TestCholeskySpecific:
         )
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
 
         # Verify three-center storage (returns pair for aa, bb; restricted shares same data)
         tc_aa, tc_bb = container.get_three_center_integrals()
@@ -821,7 +821,7 @@ class TestCholeskySpecific:
         )
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
         h = Hamiltonian(container)
 
         aaaa, _, _ = h.get_two_body_integrals()
@@ -854,7 +854,7 @@ class TestCholeskySpecific:
         three_center_aa = math.sqrt(0.5) * base_three_center
         three_center_bb = math.sqrt(1.5) * base_three_center
 
-        container = CholeskyHamiltonianContainer(
+        container = ThreeCenterHamiltonianContainer(
             one_body_alpha,
             one_body_beta,
             three_center_aa,
@@ -877,7 +877,7 @@ class TestCholeskySpecific:
         three_center = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
         assert container.get_ao_cholesky_vectors() is None
 
     def test_ao_cholesky_vectors_present(self):
@@ -888,7 +888,7 @@ class TestCholeskySpecific:
         ao_vecs = rng.random((9, 5))  # e.g. 3^2 AOs, 5 Cholesky vectors
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(
+        container = ThreeCenterHamiltonianContainer(
             one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         result = container.get_ao_cholesky_vectors()
@@ -903,13 +903,13 @@ class TestCholeskySpecific:
         ao_vecs = rng.random((9, 5))
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(
+        container = ThreeCenterHamiltonianContainer(
             one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         h = Hamiltonian(container)
 
         h_roundtrip = Hamiltonian.from_json(h.to_json())
-        assert h_roundtrip.get_container_type() == "cholesky"
+        assert h_roundtrip.get_container_type() == "three_center"
 
         roundtrip_data = json.loads(h_roundtrip.to_json())
         assert "ao_cholesky_vectors" in roundtrip_data["container"]
@@ -932,7 +932,7 @@ class TestContainerEquivalence:
     def test_both_containers_have_same_interface(self):
         """Test that both containers expose the same Hamiltonian interface."""
         h_canonical = create_test_hamiltonian(2, "canonical_four_center")
-        h_df = create_test_hamiltonian(2, "cholesky")
+        h_df = create_test_hamiltonian(2, "three_center")
 
         # Both should have the same interface methods
         assert h_canonical.has_one_body_integrals() == h_df.has_one_body_integrals()
@@ -962,7 +962,7 @@ class TestContainerEquivalence:
         )
 
         canonical = CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]))
-        density_fitted = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+        density_fitted = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
 
         h_canonical = Hamiltonian(canonical)
         h_df = Hamiltonian(density_fitted)
@@ -992,7 +992,7 @@ class TestContainerEquivalence:
     def test_one_body_equivalence(self):
         """Test that both containers have the same one-body integrals."""
         h_canonical = create_test_hamiltonian(3, "canonical_four_center")
-        h_df = create_test_hamiltonian(3, "cholesky")
+        h_df = create_test_hamiltonian(3, "three_center")
 
         can_alpha, can_beta = h_canonical.get_one_body_integrals()
         df_alpha, df_beta = h_df.get_one_body_integrals()
@@ -1038,7 +1038,7 @@ class TestContainerEquivalence:
             np.eye(2),
             np.eye(2),
         )
-        density_fitted = CholeskyHamiltonianContainer(
+        density_fitted = ThreeCenterHamiltonianContainer(
             one_body_alpha,
             one_body_beta,
             three_center_aa,
@@ -1115,7 +1115,7 @@ class TestDensityFittedHamiltonianConstructor:
         assert df_hamiltonian.has_two_body_integrals()
         assert df_hamiltonian.has_orbitals()
         assert df_hamiltonian.is_restricted()
-        assert df_hamiltonian.get_container_type() == "cholesky"
+        assert df_hamiltonian.get_container_type() == "three_center"
 
         n_alpha, n_beta = wfn_active.get_active_num_electrons()
         assert n_alpha == n_beta == 6
