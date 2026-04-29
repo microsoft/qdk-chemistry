@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.energy_estimator.qdk import (
     _parity,
     _paulis_to_nonid_masks,
 )
-from qdk_chemistry.data import Circuit, MeasurementData, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 
 from .reference_tolerances import (
@@ -254,10 +254,13 @@ def test_estimator_fewer_shots():
     """
     circuit = Circuit(qasm=qasm)
     observable = QubitHamiltonian(["ZZ", "XX", "YY"], np.array([2, 3, 4]))
-    executor = create("circuit_executor", "qdk_full_state_simulator")
     estimator = QdkEnergyEstimator()
+    estimator.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+    )
     with pytest.raises(ValueError, match=r"Total shots .* is less than the number of observables .*"):
-        estimator.run(circuit, observable, executor, total_shots=1)
+        estimator.run(circuit, observable, total_shots=1)
 
 
 @pytest.mark.parametrize(
@@ -284,12 +287,14 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     test_hamiltonian = QubitHamiltonian(
         ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([0.76388709, 0.1022262, 1.03502496])
     )
-    executor = create("circuit_executor", executor_name)
     estimator = QdkEnergyEstimator()
+    estimator.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", executor_name),
+    )
     energy_result, _ = estimator.run(
         state_prep_circuit,
         test_hamiltonian,
-        executor,
         total_shots=50000,
     )
     assert np.isclose(
