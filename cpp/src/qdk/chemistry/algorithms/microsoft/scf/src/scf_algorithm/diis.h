@@ -54,22 +54,6 @@ class DIIS : public SCFAlgorithm {
    */
   void iterate(SCFImpl& scf_impl) override;
 
-  /**
-   * @brief Update the density matrix
-   *
-   * Default implementation handles restricted and unrestricted cases, while
-   * subclasses such as ASAHF may override it
-   *
-   * @param[in,out] P Density matrix to overwrite
-   * @param[in] C Molecular orbital coefficient matrix
-   * @param[in] unrestricted True if two spin blocks are present
-   * @param[in] nelec_alpha Number of alpha electrons
-   * @param[in] nelec_beta Number of beta electrons
-   */
-  void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                             bool unrestricted, int nelec_alpha,
-                             int nelec_beta) override;
-
  private:
   /**
    * @brief Return most recent Pulay error metric for damping logic

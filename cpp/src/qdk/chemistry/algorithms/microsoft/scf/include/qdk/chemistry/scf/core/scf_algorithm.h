@@ -129,10 +129,12 @@ class SCFAlgorithm {
       int num_molecular_orbitals, int idx_spin);
 
   /**
-   * @brief Update the density matrix for restricted or unrestricted
-   * calculations. For ASAHF and ROHF calculations, this method will be
-   * overridden to implement the specific density matrix construction for those
-   * methods.
+   * @brief Update the density matrix for RHF, UHF, or ROHF calculations.
+   *
+   * The base implementation handles standard RHF/UHF construction and also
+   * reconstructs spin-blocked alpha/beta densities for ROHF from a shared
+   * molecular-orbital coefficient matrix. Algorithms with custom density
+   * construction (for example ASAHF) can still override this method.
    *
    * @param[in,out] P Reference to the density matrix to be updated
    * @param[in] C Reference to the molecular orbital coefficients

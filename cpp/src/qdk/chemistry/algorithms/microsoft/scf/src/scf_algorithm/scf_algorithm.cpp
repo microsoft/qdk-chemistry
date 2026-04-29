@@ -206,6 +206,36 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
                                          bool unrestricted, int nelec_alpha,
                                          int nelec_beta) {
   QDK_LOG_TRACE_ENTERING();
+  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+    const int num_atomic_orbitals =
+        static_cast<int>(ctx_.basis_set->num_atomic_orbitals);
+    if (C.rows() != num_atomic_orbitals) {
+      throw std::invalid_argument(
+          "ROHF coefficient matrix row count does not match AO dimension");
+    }
+    if (P.rows() != 2 * num_atomic_orbitals ||
+        P.cols() != num_atomic_orbitals) {
+      throw std::invalid_argument(
+          "ROHF density matrix must contain alpha and beta AO blocks");
+    }
+
+    auto build_density_block = [&](auto&& target, int n_occ) {
+      if (n_occ <= 0) {
+        target.setZero();
+        return;
+      }
+      target.noalias() = C.block(0, 0, num_atomic_orbitals, n_occ) *
+                         C.block(0, 0, num_atomic_orbitals, n_occ).transpose();
+    };
+
+    auto P_alpha = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
+    auto P_beta = P.block(num_atomic_orbitals, 0, num_atomic_orbitals,
+                          num_atomic_orbitals);
+    build_density_block(P_alpha, nelec_alpha);
+    build_density_block(P_beta, nelec_beta);
+    return;
+  }
+
   const int num_orbital_sets = unrestricted ? 2 : 1;
   const int num_atomic_orbitals =
       static_cast<int>(ctx_.basis_set->num_atomic_orbitals);

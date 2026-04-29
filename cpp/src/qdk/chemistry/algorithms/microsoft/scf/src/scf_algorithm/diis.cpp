@@ -118,38 +118,6 @@ class DIIS {
       std::numeric_limits<double>::infinity();  ///< Current DIIS error
 };
 
-/**
- * @brief Reconstruct spin-blocked densities from the ROHF MO matrix
- *
- * Generates $P_\alpha$ and $P_\beta$ blocks so we can hand the updated
- * density back to SCFImpl after diagonalization.
- *
- * @param P Spin-blocked density matrix to overwrite
- * @param C Molecular-orbital coefficients from latest diagonalization
- * @param nelec_alpha Number of alpha electrons
- * @param nelec_beta Number of beta electrons
- */
-void update_rohf_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                                int nelec_alpha, int nelec_beta) {
-  QDK_LOG_TRACE_ENTERING();
-  const int num_atomic_orbitals = static_cast<int>(C.rows());
-
-  auto build_density = [&](auto&& target, int n_occ) {
-    if (n_occ <= 0) {
-      target.setZero();
-      return;
-    }
-    target.noalias() = C.block(0, 0, num_atomic_orbitals, n_occ) *
-                       C.block(0, 0, num_atomic_orbitals, n_occ).transpose();
-  };
-
-  auto P_alpha = P.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
-  auto P_beta =
-      P.block(num_atomic_orbitals, 0, num_atomic_orbitals, num_atomic_orbitals);
-  build_density(P_alpha, nelec_alpha);
-  build_density(P_beta, nelec_beta);
-}
-
 DIIS::DIIS(const SCFContext& ctx, const size_t subspace_size)
     : ctx_(ctx), subspace_size_(subspace_size) {
   QDK_LOG_TRACE_ENTERING();
@@ -350,18 +318,6 @@ void DIIS::iterate(SCFImpl& scf_impl) {
     double factor = cfg->scf_algorithm.damping_factor;
     density_matrix = P_last_ * factor + density_matrix * (1.0 - factor);
   }
-}
-
-void DIIS::update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
-                                 bool unrestricted, int nelec_alpha,
-                                 int nelec_beta) {
-  QDK_LOG_TRACE_ENTERING();
-  if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    impl::update_rohf_density_matrix(P, C, nelec_alpha, nelec_beta);
-    return;
-  }
-  SCFAlgorithm::update_density_matrix(P, C, unrestricted, nelec_alpha,
-                                      nelec_beta);
 }
 
 double DIIS::current_diis_error() const {
