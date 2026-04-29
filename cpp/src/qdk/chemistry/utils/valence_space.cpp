@@ -58,7 +58,7 @@ size_t calculate_valence_electrons(Element element) {
 }
 
 // Helper function to calculate valence orbitals for an element
-size_t calculate_valence_orbitals(Element element) {
+size_t calculate_valence_orbitals(Element element, bool include_double_d_shell) {
   QDK_LOG_TRACE_ENTERING();
   size_t atomic_number = static_cast<size_t>(element);
 
@@ -77,7 +77,7 @@ size_t calculate_valence_orbitals(Element element) {
   else
     base = VALENCE_ORBITALS_BY_PERIOD[5];  // Period 6
 
-  if (is_d_block(atomic_number)) {
+  if (include_double_d_shell && is_d_block(atomic_number)) {
     base += 5;  // nd/(n+1)d' correlating shell
   }
 
@@ -85,7 +85,8 @@ size_t calculate_valence_orbitals(Element element) {
 }
 
 std::pair<size_t, size_t> compute_valence_space_parameters(
-    std::shared_ptr<Wavefunction> wavefunction, int charge) {
+    std::shared_ptr<Wavefunction> wavefunction, int charge,
+    bool include_double_d_shell) {
   QDK_LOG_TRACE_ENTERING();
   // Extract structure from wavefunction
   std::shared_ptr<Structure> structure =
@@ -104,7 +105,8 @@ std::pair<size_t, size_t> compute_valence_space_parameters(
           static_cast<unsigned>(element));
     }
     auto valence_electron = calculate_valence_electrons(element);
-    auto valence_orbital = calculate_valence_orbitals(element);
+    auto valence_orbital =
+        calculate_valence_orbitals(element, include_double_d_shell);
     total_valence_electrons += valence_electron;
     total_valence_orbitals += valence_orbital;
   }

@@ -114,9 +114,10 @@ class TestValenceParameters:
 
 
 class TestTransitionMetalValenceParameters:
-    """Tests for the double-d-shell valence space in transition metals.
+    """Tests for the optional double-d-shell valence space in transition metals.
 
-    Periods 4-5 include a correlating d' shell: 14 valence orbitals per TM atom
+    When ``include_double_d_shell=True``, periods 4-5 transition metals get a
+    correlating d' shell: 14 valence orbitals per TM atom
     (ns + 5*(n-1)d + 5*nd' + 3*np) instead of 9 (ns + 5*(n-1)d + 3*np).
 
     Note: These tests assume the valence orbital constants in
@@ -130,7 +131,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 11  # 29 - 18 (Ar core)
         assert num_active_orbitals == 14  # 4s + 5*3d + 5*4d' + 3*4p
@@ -142,7 +145,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 3, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 10  # 28 - 18
         assert num_active_orbitals == 14
@@ -154,7 +159,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 12  # 30 - 18
         assert num_active_orbitals == 14
@@ -166,7 +173,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 12  # 11 (Ag: 47-36) + 1 (H)
         assert num_active_orbitals == 15  # 14 (Ag) + 1 (H)
@@ -178,7 +187,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 1)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 8  # 1 (Na) + 7 (Cl)
         assert num_active_orbitals == 8  # 4 (Na) + 4 (Cl)
@@ -190,7 +201,9 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 1  # 19 - 18
         assert num_active_orbitals == 9  # period 4 main-group: no d' shell
@@ -202,7 +215,35 @@ class TestTransitionMetalValenceParameters:
         structure = Structure(symbols, coords)
 
         wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
+            wavefunction, 0, include_double_d_shell=True
+        )
 
         assert num_active_electrons == 24  # 78 - 54 (Xe core)
         assert num_active_orbitals == 21  # 6s + 7*4f + 5*5d + 5*6d' + 3*6p
+
+    def test_copper_default_no_double_d_shell(self):
+        """With the default (include_double_d_shell=False) Cu has no d' shell."""
+        symbols = ["Cu"]
+        coords = np.array([[0.0, 0.0, 0.0]])
+        structure = Structure(symbols, coords)
+
+        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
+        # Default: include_double_d_shell=False.
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+
+        assert num_active_electrons == 11  # 29 - 18
+        assert num_active_orbitals == 9  # 4s + 5*3d + 3*4p (no d' shell)
+
+    def test_platinum_default_no_double_d_shell(self):
+        """With the default (include_double_d_shell=False) Pt has no d' shell."""
+        symbols = ["Pt"]
+        coords = np.array([[0.0, 0.0, 0.0]])
+        structure = Structure(symbols, coords)
+
+        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
+        # Default: include_double_d_shell=False.
+        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
+
+        assert num_active_electrons == 24  # 78 - 54
+        assert num_active_orbitals == 16  # 6s + 7*4f + 5*5d + 3*6p (no d' shell)

@@ -23,6 +23,17 @@ namespace qdk::chemistry::utils {
  *                     wavefunction->orbitals->basis_set)
  * @param charge The total charge of the molecular system, which should be equal
  *               to the charge set in scf calculation
+ * @param include_double_d_shell If true, add 5 correlating d' orbitals to the
+ *                               valence space for d-block elements (Sc-Zn,
+ *                               Y-Cd, Hf-Hg) to capture the strong nd /
+ *                               (n+1)d' radial correlation in transition
+ *                               metals (the "double d-shell" effect). Defaults
+ *                               to false. This option mirrors the
+ *                               ``include_double_d_shell`` setting on
+ *                               :class:`ValenceActiveSpaceSettings` and should
+ *                               be kept consistent with it when the
+ *                               computed values are passed to a
+ *                               ``ValenceActiveSpaceSelector``.
  *
  * @return A pair where:
  *         - first: Number of valence electrons
@@ -30,6 +41,6 @@ namespace qdk::chemistry::utils {
  */
 std::pair<size_t, size_t> compute_valence_space_parameters(
     std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
-    int charge);
+    int charge, bool include_double_d_shell = false);
 
 }  // namespace qdk::chemistry::utils
