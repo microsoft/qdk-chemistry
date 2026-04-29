@@ -540,8 +540,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
       _aux_name(aux_name),
-      _ecp_name("none"),
-      _ecp_electrons(std::vector<size_t>(structure->get_num_atoms(), 0)) {
+      _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");

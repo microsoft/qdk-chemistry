@@ -1736,8 +1736,11 @@ def test_auxiliary_basis_set_from_basis_name_database():
 
 
 class TestBasisSetConstructorDispatch:
-    """Tests for the BasisSet __init__ dispatcher covering all constructor
-    signatures with positional, keyword, and mixed calling conventions."""
+    """Tests for the BasisSet __init__ dispatcher.
+
+    Covers all constructor signatures with positional, keyword, and mixed
+    calling conventions.
+    """
 
     @pytest.fixture
     def shell(self):
@@ -1858,7 +1861,7 @@ class TestBasisSetConstructorDispatch:
         assert b.get_num_ecp_shells() == 1
         assert list(b.get_ecp_electrons()) == [2]
 
-    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6
+    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6 list path
 
     def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
         b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
@@ -1866,7 +1869,7 @@ class TestBasisSetConstructorDispatch:
         assert b.get_ecp_name() == "my-ecp"
         assert list(b.get_ecp_electrons()) == [2]
 
-    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name, aux_shells, structure) --- n==8
+    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name, aux_shells, structure) --- n==8 path
 
     def test_full_8arg_constructor(self, shells, ecp_shells, aux_shells, structure):
         b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], "my-aux", aux_shells, structure)

@@ -279,9 +279,10 @@ Examples:
                   }
                 }
                 if (!recognised) {
-                  throw py::type_error("BasisSet() got an unexpected keyword "
-                                       "argument '" +
-                                       key + "'");
+                  throw py::type_error(
+                      "BasisSet() got an unexpected keyword "
+                      "argument '" +
+                      key + "'");
                 }
               }
             };
