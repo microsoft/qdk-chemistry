@@ -85,12 +85,9 @@ def check_versions() -> int:
     pyproject = repo_root / "python/pyproject.toml"
     if pyproject.exists():
         content = pyproject.read_text()
-        if (
-            'metadata.version.provider = "scikit_build_core.metadata.regex"'
-            not in content
-        ):
+        if 'metadata.version.provider = "_dev_version"' not in content:
             errors.append(
-                "pyproject.toml: missing scikit-build-core metadata.version.provider"
+                "pyproject.toml: missing _dev_version metadata.version.provider"
             )
         if 'metadata.version.input = "../VERSION"' not in content:
             errors.append(
