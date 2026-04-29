@@ -29,9 +29,6 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
                                         const std::string& spin_label,
                                         size_t num_molecular_orbitals);
 
-}  // namespace detail
-
-namespace detail_three_center {
 /**
  * @brief Transforms AO 3-center vectors to MO basis.
  *
@@ -71,6 +68,6 @@ Eigen::MatrixXd build_K_from_three_center(
     const Eigen::MatrixXd& ao_three_center_vectors,
     const Eigen::MatrixXd& coeffs, const std::vector<size_t>& occ_orb_ind);
 
-}  // namespace detail_three_center
+}  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms::microsoft

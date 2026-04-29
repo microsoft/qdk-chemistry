@@ -82,10 +82,6 @@ bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
   return true;
 }
 
-}  // namespace detail
-
-namespace detail_three_center {
-
 Eigen::MatrixXd transform_three_center_ao_to_mo(
     const Eigen::MatrixXd& ao_three_center_vectors,
     const Eigen::MatrixXd& mo_coeffs) {
@@ -193,6 +189,6 @@ Eigen::MatrixXd build_K_from_three_center(
   return K;
 }
 
-}  // namespace detail_three_center
+}  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms::microsoft

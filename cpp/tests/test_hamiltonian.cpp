@@ -302,10 +302,6 @@ TEST_P(HamiltonianTest, CopyConstructorAndAssignment) {
   } else if (test_p == "three_center") {
     h1 = std::make_shared<Hamiltonian>(
         std::make_unique<ThreeCenterHamiltonianContainer>(
-            one_body, three_center, orbitals, core_energy, inactive_fock));
-  } else if (test_p == "three_center") {
-    h1 = std::make_shared<Hamiltonian>(
-        std::make_unique<ThreeCenterHamiltonianContainer>(
             one_body, three_center, orbitals, core_energy, inactive_fock,
             L_ao));
   } else if (test_p == "sparse") {
@@ -1265,10 +1261,13 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
   bool is_three_center =
       hamiltonian_restricted
           ->has_container_type<ThreeCenterHamiltonianContainer>();
+  bool is_sparse =
+      hamiltonian_restricted->has_container_type<SparseHamiltonianContainer>();
 
   // Exactly one should be true
   EXPECT_EQ(is_canonical, test_p == "canonical_four_center");
   EXPECT_EQ(is_three_center, test_p == "three_center");
+  EXPECT_EQ(is_sparse, test_p == "sparse");
 
   // Test that accessing with incorrect container type throws std::bad_cast
   // We test against all OTHER container types
@@ -1281,6 +1280,11 @@ TEST_P(HamiltonianTest, GetContainerTypedAccess) {
     EXPECT_THROW(hamiltonian_restricted
                      ->get_container<ThreeCenterHamiltonianContainer>(),
                  std::bad_cast);
+  }
+  if (test_p != "sparse") {
+    EXPECT_THROW(
+        hamiltonian_restricted->get_container<SparseHamiltonianContainer>(),
+        std::bad_cast);
   }
 }
 

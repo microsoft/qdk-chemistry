@@ -591,14 +591,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Transform to MO
-    L_mo =
-        detail_three_center::transform_three_center_ao_to_mo(L_ao, Ca_active);
+    L_mo = detail::transform_three_center_ao_to_mo(L_ao, Ca_active);
   } else {
     // Transform to MO (Alpha and Beta)
-    L_mo_alpha =
-        detail_three_center::transform_three_center_ao_to_mo(L_ao, Ca_active);
-    L_mo_beta =
-        detail_three_center::transform_three_center_ao_to_mo(L_ao, Cb_active);
+    L_mo_alpha = detail::transform_three_center_ao_to_mo(L_ao, Ca_active);
+    L_mo_beta = detail::transform_three_center_ao_to_mo(L_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -684,10 +681,9 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     // Compute the two electron part of the inactive fock matrix
     Eigen::MatrixXd J_inactive_ao, K_inactive_ao;
     // Use Cholesky vectors to build J and K
-    J_inactive_ao =
-        detail_three_center::build_J_from_three_center(L_ao, D_inactive);
-    K_inactive_ao = detail_three_center::build_K_from_three_center(
-        L_ao, Ca, inactive_indices);
+    J_inactive_ao = detail::build_J_from_three_center(L_ao, D_inactive);
+    K_inactive_ao =
+        detail::build_K_from_three_center(L_ao, Ca, inactive_indices);
     Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
 
     // Compute the inactive Fock matrix
@@ -777,14 +773,12 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     // Compute J and K matrices for alpha and beta densities
     Eigen::MatrixXd J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao;
     // Use Cholesky vectors to build J and K
-    J_alpha_ao =
-        detail_three_center::build_J_from_three_center(L_ao, D_inactive_alpha);
-    K_alpha_ao = detail_three_center::build_K_from_three_center(
-        L_ao, Ca, inactive_indices_alpha);
-    J_beta_ao =
-        detail_three_center::build_J_from_three_center(L_ao, D_inactive_beta);
-    K_beta_ao = detail_three_center::build_K_from_three_center(
-        L_ao, Cb, inactive_indices_beta);
+    J_alpha_ao = detail::build_J_from_three_center(L_ao, D_inactive_alpha);
+    K_alpha_ao =
+        detail::build_K_from_three_center(L_ao, Ca, inactive_indices_alpha);
+    J_beta_ao = detail::build_J_from_three_center(L_ao, D_inactive_beta);
+    K_beta_ao =
+        detail::build_K_from_three_center(L_ao, Cb, inactive_indices_beta);
 
     Eigen::MatrixXd F_inactive_alpha_ao =
         H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;

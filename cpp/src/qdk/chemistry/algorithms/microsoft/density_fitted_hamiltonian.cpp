@@ -8,23 +8,16 @@
 
 // STL Headers
 #include <cstddef>
-#include <cstring>
-#include <filesystem>
-#include <iostream>
 #include <memory>
-#include <set>
-#include <variant>
-
-// MACIS Headers
-#include <macis/mcscf/fock_matrices.hpp>
 
 // QDK/Chemistry SCF headers
-#include <Eigen/src/Core/Matrix.h>
 #include <qdk/chemistry/scf/core/moeri.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
+
+#include <Eigen/Core>
 
 // QDK/Chemistry data::Hamiltonian headers
 #include <blas.hh>
@@ -52,7 +45,7 @@ void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
 
   size_t nao2 = nao * nao;
 
-  // 1. Cholesky factorization of metric:  df_metric = L L^{T}
+  // 1. Use cholesky factorization on metric:  df_metric = L L^{T}
   lapack::potrf(lapack::Uplo::Lower, naux, df_metric.get(), naux);
 
   // 2. Solve L B = eri_df  => B = L^{-1} eri_df = (metric)^(-1/2) eri_df
@@ -126,8 +119,10 @@ DensityFittedHamiltonianConstructor::_run_impl(
   auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
   // Create internal BasisSet
-  auto [internal_basis_set, internal_aux_basis_set] =
+  auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  auto internal_aux_basis_set =
+      utils::microsoft::convert_aux_basis_set_from_qdk(*basis_set);
 
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       internal_basis_set.get(), mol.get(), qcs::mpi_default_input());
@@ -166,12 +161,6 @@ DensityFittedHamiltonianConstructor::_run_impl(
     }
   }
 
-  // Convert to row-major for MOERI
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      Ca_active_rm = Ca_active;
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      Cb_active_rm = Cb_active;
-
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
 
@@ -208,12 +197,10 @@ DensityFittedHamiltonianConstructor::_run_impl(
   Eigen::Map<Eigen::MatrixXd> B_ao(h_eri.get(),
                                    num_atomic_orbitals * num_atomic_orbitals,
                                    num_auxiliary_orbitals);
-  dfmoeri_aa =
-      detail_three_center::transform_three_center_ao_to_mo(B_ao, Ca_active);
+  dfmoeri_aa = detail::transform_three_center_ao_to_mo(B_ao, Ca_active);
 
   if (!is_restricted_calc) {
-    dfmoeri_bb =
-        detail_three_center::transform_three_center_ao_to_mo(B_ao, Cb_active);
+    dfmoeri_bb = detail::transform_three_center_ao_to_mo(B_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -285,11 +272,10 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
     // Compute the two electron part of the inactive fock matrix
     Eigen::MatrixXd J_inactive_ao, K_inactive_ao;
-    // Use Cholesky vectors to build J and K
-    J_inactive_ao =
-        detail_three_center::build_J_from_three_center(B_ao, D_inactive);
-    K_inactive_ao = detail_three_center::build_K_from_three_center(
-        B_ao, Ca, inactive_indices);
+    // Use AO three center vectors to build J and K
+    J_inactive_ao = detail::build_J_from_three_center(B_ao, D_inactive);
+    K_inactive_ao =
+        detail::build_K_from_three_center(B_ao, Ca, inactive_indices);
     Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
 
     // Compute the inactive Fock matrix
@@ -372,15 +358,13 @@ DensityFittedHamiltonianConstructor::_run_impl(
 
     // Compute J and K matrices for alpha and beta densities
     Eigen::MatrixXd J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao;
-    // Use Cholesky vectors to build J and K
-    J_alpha_ao =
-        detail_three_center::build_J_from_three_center(B_ao, D_inactive_alpha);
-    K_alpha_ao = detail_three_center::build_K_from_three_center(
-        B_ao, Ca, inactive_indices_alpha);
-    J_beta_ao =
-        detail_three_center::build_J_from_three_center(B_ao, D_inactive_beta);
-    K_beta_ao = detail_three_center::build_K_from_three_center(
-        B_ao, Cb, inactive_indices_beta);
+    // Use AO three center vectors to build J and K
+    J_alpha_ao = detail::build_J_from_three_center(B_ao, D_inactive_alpha);
+    K_alpha_ao =
+        detail::build_K_from_three_center(B_ao, Ca, inactive_indices_alpha);
+    J_beta_ao = detail::build_J_from_three_center(B_ao, D_inactive_beta);
+    K_beta_ao =
+        detail::build_K_from_three_center(B_ao, Cb, inactive_indices_beta);
 
     Eigen::MatrixXd F_inactive_alpha_ao =
         H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;
