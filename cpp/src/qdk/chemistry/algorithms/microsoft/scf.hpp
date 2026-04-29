@@ -67,12 +67,14 @@ class ScfSettings
                 "Set to -1 to use all available threads.");
     set_default(
         "integral_type", std::string("auto"),
-        "Method for evaluating two-electron integrals: 'four_center' for "
-        "standard four-center integrals, 'dfj' for density-fitted Coulomb "
-        "(J) integrals, or 'auto' to select automatically based on whether "
-        "an auxiliary basis is available. When 'dfj' is used, an auxiliary "
-        "basis set must be provided via the 'aux_basis' setting or through "
-        "a BasisSet object that includes an auxiliary basis.");
+        "How to calculate integrals, can take 'four_center' for standard "
+        "four-center integrals, 'dfj' for density fitting for Coulomb (J) "
+        "integrals, or "
+        "'auto' to select the appropriate method based on if auxiliary basis "
+        "is available. "
+        "when 'dfj' is used, an auxiliary basis set must be provided via the "
+        "'aux_basis' setting or through a BasisSet object that "
+        "includes an auxiliary basis.");
     set_default("aux_basis", std::string(""),
                 "Auxiliary basis set name for density-fitted Coulomb (J) "
                 "integrals (e.g., 'def2-universal-jfit'). Only used when "
