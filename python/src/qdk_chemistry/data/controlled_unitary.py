@@ -11,7 +11,7 @@ import h5py
 
 from qdk_chemistry.data.base import DataClass
 
-from .base import UnitaryRepresentation
+from .unitary_representation.base import UnitaryRepresentation
 
 __all__: list[str] = ["ControlledUnitary"]
 

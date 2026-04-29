@@ -24,7 +24,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_naive,
 )
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
-from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )

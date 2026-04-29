@@ -11,10 +11,8 @@ from qdk import qsharp
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
-from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
-    PauliProductFormulaContainer,
-)
-from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import ControlledUnitary
+from qdk_chemistry.data.controlled_unitary import ControlledUnitary
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper

@@ -16,13 +16,13 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.pauli_sequence_mapper im
     PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.hamiltonian_unitary.base import UnitaryRepresentation
-from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
+from qdk_chemistry.data.controlled_unitary import (
+    ControlledUnitary,
+)
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
-)
-from qdk_chemistry.data.hamiltonian_unitary.controlled_unitary import (
-    ControlledUnitary,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 

@@ -11,7 +11,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import PartiallyRandomized
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
-from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
