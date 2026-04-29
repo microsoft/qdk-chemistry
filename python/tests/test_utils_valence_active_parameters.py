@@ -8,7 +8,17 @@
 import numpy as np
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Configuration, Orbitals, SlaterDeterminantContainer, Structure, Wavefunction
+from qdk_chemistry.data import (
+    AOType,
+    BasisSet,
+    Configuration,
+    Orbitals,
+    OrbitalType,
+    Shell,
+    SlaterDeterminantContainer,
+    Structure,
+    Wavefunction,
+)
 from qdk_chemistry.utils import compute_valence_space_parameters
 
 
@@ -17,6 +27,42 @@ def solve_wavefunction(structure, charge, multiplicity, basis="STO-3G"):
     scf_solver = create("scf_solver")
     _, wavefunction = scf_solver.run(structure, charge, multiplicity, basis)
     return wavefunction
+
+
+def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_orbitals):
+    """Build a minimal Wavefunction directly, without running SCF.
+
+    ``compute_valence_space_parameters`` only consults the structure (atom
+    elements), the total electron count, and ``num_molecular_orbitals``. We
+    therefore wrap a dummy single-s-shell BasisSet (so it validates), an
+    identity orbital coefficient matrix sized to ``num_molecular_orbitals``,
+    and a Configuration string that yields exactly ``(n_alpha, n_beta)``
+    electrons. This avoids basis set dependencies and SCF convergence
+    flakiness in tests that only validate counting logic.
+    """
+    structure = Structure(symbols, np.asarray(coords, dtype=float))
+
+    exps = np.array([1.0])
+    coefs = np.array([1.0])
+    shells = [Shell(i, OrbitalType.S, exps, coefs) for i in range(len(symbols))]
+    basis_set = BasisSet("dummy", shells, structure, AOType.Spherical)
+
+    coeffs = np.eye(num_molecular_orbitals, num_molecular_orbitals)
+    orbitals = Orbitals(coeffs, None, None, basis_set)
+
+    pair_count = min(n_alpha, n_beta)
+    chars = ["0"] * num_molecular_orbitals
+    for i in range(pair_count):
+        chars[i] = "2"
+    if n_alpha > n_beta:
+        for i in range(n_alpha - n_beta):
+            chars[pair_count + i] = "u"
+    elif n_beta > n_alpha:
+        for i in range(n_beta - n_alpha):
+            chars[pair_count + i] = "d"
+    config = Configuration("".join(chars))
+    container = SlaterDeterminantContainer(config, orbitals)
+    return Wavefunction(container)
 
 
 class TestValenceParameters:
@@ -120,17 +166,19 @@ class TestTransitionMetalValenceParameters:
     correlating d' shell: 14 valence orbitals per TM atom
     (ns + 5*(n-1)d + 5*nd' + 3*np) instead of 9 (ns + 5*(n-1)d + 3*np).
 
-    Note: These tests assume the valence orbital constants in
-    valence_space.cpp have been updated accordingly.
+    These tests only validate the valence-space sizing logic in
+    ``compute_valence_space_parameters``; that function only consults the
+    structure, the total electron count, and ``num_molecular_orbitals``. We
+    therefore build a minimal Wavefunction directly via
+    :func:`make_minimal_wavefunction` and skip SCF entirely. This keeps the
+    suite fast and removes any dependence on a particular basis set being
+    available.
     """
 
-    def test_copper_atom_def2svp(self):
+    def test_copper_atom(self):
         """Cu atom (Z=29, period 4): 11 valence electrons, 14 valence orbitals."""
-        symbols = ["Cu"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
+        # 29 electrons doublet: 15 alpha + 14 beta. 50 MOs >> num_core + 14.
+        wavefunction = make_minimal_wavefunction(["Cu"], [[0.0, 0.0, 0.0]], 15, 14, 50)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -138,13 +186,10 @@ class TestTransitionMetalValenceParameters:
         assert num_active_electrons == 11  # 29 - 18 (Ar core)
         assert num_active_orbitals == 14  # 4s + 5*3d + 5*4d' + 3*4p
 
-    def test_nickel_atom_def2svp(self):
+    def test_nickel_atom(self):
         """Ni atom (Z=28, period 4): 10 valence electrons, 14 valence orbitals."""
-        symbols = ["Ni"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 3, "def2-svp")
+        # 28 electrons triplet: 15 alpha + 13 beta.
+        wavefunction = make_minimal_wavefunction(["Ni"], [[0.0, 0.0, 0.0]], 15, 13, 50)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -154,11 +199,7 @@ class TestTransitionMetalValenceParameters:
 
     def test_zinc_full_d_shell(self):
         """Zn (Z=30, period 4, d10): 12 valence electrons, 14 orbitals."""
-        symbols = ["Zn"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
+        wavefunction = make_minimal_wavefunction(["Zn"], [[0.0, 0.0, 0.0]], 15, 15, 50)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -168,11 +209,8 @@ class TestTransitionMetalValenceParameters:
 
     def test_silver_hydride(self):
         """AgH: Ag (Z=47, period 5) also gets 14 valence orbitals with double-d-shell."""
-        symbols = ["Ag", "H"]
-        coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
+        # Ag (47) + H (1) = 48 electrons, singlet.
+        wavefunction = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24, 60)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -182,11 +220,8 @@ class TestTransitionMetalValenceParameters:
 
     def test_period3_unaffected(self):
         """Period 3 elements (Na, Cl) should still get 4 valence orbitals each."""
-        symbols = ["Na", "Cl"]
-        coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 2.361]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 1)
+        # Na (11) + Cl (17) = 28 electrons, singlet.
+        wavefunction = make_minimal_wavefunction(["Na", "Cl"], [[0.0, 0.0, 0.0], [0.0, 0.0, 2.361]], 14, 14, 30)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -196,11 +231,8 @@ class TestTransitionMetalValenceParameters:
 
     def test_potassium_period4_main_group(self):
         """K (Z=19, period 4 main group): only 9 valence orbitals (no d' shell)."""
-        symbols = ["K"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
+        # 19 electrons doublet: 10 alpha + 9 beta.
+        wavefunction = make_minimal_wavefunction(["K"], [[0.0, 0.0, 0.0]], 10, 9, 30)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -210,11 +242,8 @@ class TestTransitionMetalValenceParameters:
 
     def test_platinum_period6_d_block(self):
         """Pt (Z=78, period 6 d-block): 24 valence electrons, 21 valence orbitals."""
-        symbols = ["Pt"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
+        # 78 electrons singlet.
+        wavefunction = make_minimal_wavefunction(["Pt"], [[0.0, 0.0, 0.0]], 39, 39, 100)
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
             wavefunction, 0, include_double_d_shell=True
         )
@@ -224,11 +253,7 @@ class TestTransitionMetalValenceParameters:
 
     def test_copper_default_no_double_d_shell(self):
         """With the default (include_double_d_shell=False) Cu has no d' shell."""
-        symbols = ["Cu"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 2, "def2-svp")
+        wavefunction = make_minimal_wavefunction(["Cu"], [[0.0, 0.0, 0.0]], 15, 14, 50)
         # Default: include_double_d_shell=False.
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
@@ -237,11 +262,7 @@ class TestTransitionMetalValenceParameters:
 
     def test_platinum_default_no_double_d_shell(self):
         """With the default (include_double_d_shell=False) Pt has no d' shell."""
-        symbols = ["Pt"]
-        coords = np.array([[0.0, 0.0, 0.0]])
-        structure = Structure(symbols, coords)
-
-        wavefunction = solve_wavefunction(structure, 0, 1, "def2-svp")
+        wavefunction = make_minimal_wavefunction(["Pt"], [[0.0, 0.0, 0.0]], 39, 39, 100)
         # Default: include_double_d_shell=False.
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
 
