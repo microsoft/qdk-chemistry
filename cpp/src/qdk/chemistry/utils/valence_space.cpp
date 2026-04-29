@@ -58,7 +58,8 @@ size_t calculate_valence_electrons(Element element) {
 }
 
 // Helper function to calculate valence orbitals for an element
-size_t calculate_valence_orbitals(Element element, bool include_double_d_shell) {
+size_t calculate_valence_orbitals(Element element,
+                                  bool include_double_d_shell) {
   QDK_LOG_TRACE_ENTERING();
   size_t atomic_number = static_cast<size_t>(element);
 
