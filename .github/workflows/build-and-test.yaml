@@ -250,6 +250,7 @@ jobs:
         cmake -S cpp -B "$BUILD_DIR" \
           -GNinja \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
           -DBUILD_TESTING=ON
