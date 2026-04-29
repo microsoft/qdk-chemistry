@@ -187,17 +187,6 @@ struct Shell {
 class BasisSet : public DataClass,
                  public std::enable_shared_from_this<BasisSet> {
  public:
-  //   /**
-  //    * @brief Constructor with basis set name and structure
-  //    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
-  //    * @param structure The molecular structure
-  //    * @param atomic_orbital_type Whether to use spherical or cartesian
-  //    atomic
-  //    * orbitals
-  //    */
-  //   BasisSet(const std::string& name, const Structure& structure,
-  //            AOType atomic_orbital_type = AOType::Spherical);
-
   /**
    * @brief Constructor with shells
    * @param name Name of the basis set
@@ -219,17 +208,6 @@ class BasisSet : public DataClass,
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const Structure& structure,
            AOType atomic_orbital_type = AOType::Spherical);
-
-  //   /**
-  //    * @brief Constructor with basis set name and structure shared pointer
-  //    * @param name Name of the basis set (e.g., "6-31G", "cc-pVDZ")
-  //    * @param structure Shared pointer to the molecular structure
-  //    * @param atomic_orbital_type Whether to use spherical or cartesian
-  //    atomic
-  //    * orbitals
-  //    */
-  //   BasisSet(const std::string& name, std::shared_ptr<Structure> structure,
-  //            AOType atomic_orbital_type = AOType::Spherical);
 
   /**
    * @brief Constructor with shells and structure shared pointer
