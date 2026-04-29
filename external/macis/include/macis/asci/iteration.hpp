@@ -8,12 +8,11 @@
  */
 
 #pragma once
-#include <numeric>
-
 #include <blas.hh>
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
+#include <numeric>
 
 namespace macis {
 
@@ -51,8 +50,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb,
-               CachedHamiltonianState<wfn_t<N>, index_t>* h_cache = nullptr
-               MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
+               CachedHamiltonianState<wfn_t<N>, index_t>* h_cache =
+                   nullptr MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
@@ -120,7 +119,7 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
-                    ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
+                    ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
   std::sort(wfn.begin(), wfn.end(), wfn_comp{});
 
@@ -138,8 +137,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     size_t n_matched = 0;
     const size_t old_size = old_wfn.size();
     for (size_t i = 0; i < old_size; ++i) {
-      auto it = std::lower_bound(wfn.begin(), wfn.end(),
-                                 old_wfn[i], wfn_comp{});
+      auto it =
+          std::lower_bound(wfn.begin(), wfn.end(), old_wfn[i], wfn_comp{});
       if (it != wfn.end() && *it == old_wfn[i]) {
         size_t new_idx = static_cast<size_t>(std::distance(wfn.begin(), it));
         X_local[new_idx] = old_X[i];
@@ -161,8 +160,10 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     if (norm < asci_settings.min_warm_start_overlap) {
       X_local.clear();  // triggers identity guess in selected_ci_diag
       if (logger)
-        logger->info("  WARM_START: norm {:.4f} < {:.4f} threshold, using diagonal guess",
-                     norm, asci_settings.min_warm_start_overlap);
+        logger->info(
+            "  WARM_START: norm {:.4f} < {:.4f} threshold, using diagonal "
+            "guess",
+            norm, asci_settings.min_warm_start_overlap);
     } else {
       blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
     }
@@ -170,9 +171,8 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
   double E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
-      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
-      X_local, h_cache, asci_settings.min_patch_overlap
-      MACIS_MPI_CODE(, comm));
+      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, X_local,
+      h_cache, asci_settings.min_patch_overlap MACIS_MPI_CODE(, comm));
 
 #ifdef MACIS_ENABLE_MPI
   auto world_size = comm_size(comm);

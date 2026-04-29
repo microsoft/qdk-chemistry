@@ -8,13 +8,12 @@
  */
 
 #pragma once
-#include <macis/csr_hamiltonian.hpp>
-#include <macis/types.hpp>
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cstring>
+#include <macis/csr_hamiltonian.hpp>
+#include <macis/types.hpp>
 #include <numeric>
 #include <optional>
 #include <vector>
@@ -39,13 +38,11 @@ class PatchedSparseOperator {
  public:
   using csr_type = sparsexx::csr_matrix<double, index_t>;
 
-  PatchedSparseOperator(
-      const csr_type& old_H, size_t n_new,
-      std::vector<size_t> old_to_new,
-      csr_type H_nn, csr_type H_on,
-      std::vector<size_t> kept_new_indices,
-      std::vector<size_t> added_new_indices,
-      std::vector<double> diagonal)
+  PatchedSparseOperator(const csr_type& old_H, size_t n_new,
+                        std::vector<size_t> old_to_new, csr_type H_nn,
+                        csr_type H_on, std::vector<size_t> kept_new_indices,
+                        std::vector<size_t> added_new_indices,
+                        std::vector<double> diagonal)
       : old_H_(old_H),
         n_new_(n_new),
         n_old_(old_H.m()),
@@ -135,8 +132,8 @@ class PatchedSparseOperator {
         // Lazily allocate / resize cached scratch vectors
         if (transpose_scratch_.size() != static_cast<size_t>(nthreads) ||
             transpose_scratch_n_added_ != n_added) {
-          transpose_scratch_.assign(
-              nthreads, std::vector<double>(n_added, 0.0));
+          transpose_scratch_.assign(nthreads,
+                                    std::vector<double>(n_added, 0.0));
           transpose_scratch_n_added_ = n_added;
         } else {
           for (auto& v : transpose_scratch_)
@@ -144,7 +141,11 @@ class PatchedSparseOperator {
         }
 #pragma omp parallel
         {
+#ifdef _OPENMP
           auto& local = transpose_scratch_[omp_get_thread_num()];
+#else
+          auto& local = transpose_scratch_[0];
+#endif
 #pragma omp for schedule(static)
           for (size_t i_local = 0; i_local < n_kept; ++i_local) {
             double v_kept = alpha * V[kept_new_[i_local]];
@@ -221,7 +222,8 @@ std::optional<PatchedSparseOperator<index_t>> build_patched_operator(
     double min_overlap = 0.3) {
   using csr_type = sparsexx::csr_matrix<double, index_t>;
   using wfn_traits = wavefunction_traits<WfnType>;
-  using spin_wfn_traits = wavefunction_traits<typename wfn_traits::spin_wfn_type>;
+  using spin_wfn_traits =
+      wavefunction_traits<typename wfn_traits::spin_wfn_type>;
   using wfn_comp = typename wfn_traits::spin_comparator;
   using clock_type = std::chrono::high_resolution_clock;
   using dur_s = std::chrono::duration<double>;
@@ -264,14 +266,17 @@ std::optional<PatchedSparseOperator<index_t>> build_patched_operator(
                 : 0.0;
 
   if (logger) {
-    logger->info("  PATCH: n_old={}, n_new={}, n_kept={}, n_added={}, overlap={:.1f}%",
-                 n_old, n_new, n_kept, n_added, 100.0 * overlap_frac);
+    logger->info(
+        "  PATCH: n_old={}, n_new={}, n_kept={}, n_added={}, overlap={:.1f}%",
+        n_old, n_new, n_kept, n_added, 100.0 * overlap_frac);
   }
 
   if (overlap_frac < min_overlap) {
     if (logger)
-      logger->info("  PATCH: overlap {:.1f}% < {:.0f}% threshold, falling back to full build",
-                   100.0 * overlap_frac, 100.0 * min_overlap);
+      logger->info(
+          "  PATCH: overlap {:.1f}% < {:.0f}% threshold, falling back to full "
+          "build",
+          100.0 * overlap_frac, 100.0 * min_overlap);
     return std::nullopt;
   }
 
@@ -283,8 +288,8 @@ std::optional<PatchedSparseOperator<index_t>> build_patched_operator(
   csr_type H_nn(0, 0, 0, 0);
   if (n_added > 0) {
     H_nn = make_csr_hamiltonian_block<index_t>(
-        added_dets.begin(), added_dets.end(),
-        added_dets.begin(), added_dets.end(), ham_gen, h_el_tol);
+        added_dets.begin(), added_dets.end(), added_dets.begin(),
+        added_dets.end(), ham_gen, h_el_tol);
   }
   auto nn_en = clock_type::now();
 
@@ -296,8 +301,8 @@ std::optional<PatchedSparseOperator<index_t>> build_patched_operator(
   csr_type H_on(0, 0, 0, 0);
   if (n_kept > 0 && n_added > 0) {
     H_on = make_csr_hamiltonian_block<index_t>(
-        kept_dets.begin(), kept_dets.end(),
-        added_dets.begin(), added_dets.end(), ham_gen, h_el_tol);
+        kept_dets.begin(), kept_dets.end(), added_dets.begin(),
+        added_dets.end(), ham_gen, h_el_tol);
   }
   auto on_en = clock_type::now();
 
@@ -336,18 +341,16 @@ std::optional<PatchedSparseOperator<index_t>> build_patched_operator(
   auto diag_en = clock_type::now();
 
   if (logger) {
-    logger->info("  PATCH: nn_nnz={}, nn_dur={:.3e}s, on_nnz={}, on_dur={:.3e}s, diag_dur={:.3e}s",
-                 H_nn.nnz(), dur_s(nn_en - nn_st).count(),
-                 H_on.nnz(), dur_s(on_en - on_st).count(),
-                 dur_s(diag_en - diag_st).count());
+    logger->info(
+        "  PATCH: nn_nnz={}, nn_dur={:.3e}s, on_nnz={}, on_dur={:.3e}s, "
+        "diag_dur={:.3e}s",
+        H_nn.nnz(), dur_s(nn_en - nn_st).count(), H_on.nnz(),
+        dur_s(on_en - on_st).count(), dur_s(diag_en - diag_st).count());
   }
 
   return PatchedSparseOperator<index_t>(
-      cache.H, n_new,
-      std::move(old_to_new),
-      std::move(H_nn), std::move(H_on),
-      std::move(kept_new), std::move(added_new),
-      std::move(diagonal));
+      cache.H, n_new, std::move(old_to_new), std::move(H_nn), std::move(H_on),
+      std::move(kept_new), std::move(added_new), std::move(diagonal));
 }
 
 }  // namespace macis

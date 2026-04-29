@@ -5,6 +5,7 @@
 #include "cholesky_hamiltonian.hpp"
 
 // STL Headers
+#include <algorithm>
 #include <cstring>
 #include <filesystem>
 #include <set>
@@ -91,6 +92,14 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   const size_t max_rank = num_aos * (num_aos + 1) / 2;
   QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
 
+  // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
+  // This enables reusing ERI column buffers across iterations.
+  size_t max_shell_size = 0;
+  for (size_t s = 0; s < num_shells; ++s) {
+    max_shell_size = std::max(max_shell_size, obs[s].size());
+  }
+  const size_t max_n_cols = max_shell_size * max_shell_size;
+
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
   const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
                                std::numeric_limits<double>::epsilon();
@@ -146,6 +155,9 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   //  Thread-local active shell pair lists
   std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
 #endif
+
+  // Reusable ERI column buffer — single shared buffer, no per-thread copies.
+  std::vector<double> eri_col_max(num_aos2 * max_n_cols, 0.0);
 
   // Compute diagonal elements for all shell pairs
   QDK_LOGGER().debug("Computing diagonal elements");
@@ -207,6 +219,13 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 #endif
 
+  // Target number of GEMM columns per batched orthogonalization call.
+  // Amortizes memory-bandwidth cost of reading L_data by combining multiple
+  // shell pairs into one GEMM. Auto-adapts to basis set: small shells (s,p)
+  // batch many; large shells (d,f) batch few. Value of 20 saturates bandwidth
+  // on typical hardware.
+  constexpr size_t TARGET_GEMM_COLS = 20;
+
   QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
   double D_max = 0.0;
   while (current_col < max_rank) {
@@ -215,206 +234,229 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       break;
     }
 
-    // get max diagonal element
-    size_t q_shell_pair_max;
-    D_max = 0.0;
-    size_t s1_max, s2_max;
+    // === Step 1: Select top-B shell pairs by max diagonal ===
+    struct SPInfo {
+      size_t sp_index, s1, s2;
+      double max_diag;
+    };
+    std::vector<SPInfo> sp_list;
+    sp_list.reserve(active_shell_pairs.size());
     for (const auto sp_index : active_shell_pairs) {
       const auto [s1, s2] = sp_index_to_shells[sp_index];
-      // get block max
       const auto& diag = D_shell_pair[sp_index];
       const double block_max = *std::max_element(diag.begin(), diag.end());
-      if (block_max > D_max) {
-        D_max = block_max;
-        q_shell_pair_max = sp_index;
-        s1_max = s1;
-        s2_max = s2;
-      }
+      sp_list.push_back({sp_index, s1, s2, block_max});
     }
-    QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
+    // Sort all active shell pairs by max diagonal (descending)
+    std::sort(sp_list.begin(), sp_list.end(),
+              [](const SPInfo& a, const SPInfo& b) {
+                return a.max_diag > b.max_diag;
+              });
 
-    // check convergence
+    D_max = sp_list[0].max_diag;
     if (D_max < threshold) {
+      QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
       break;
     }
 
-    // get column for max shell pair (s1_max, s2_max)
-    const size_t n1_max = obs[s1_max].size();
-    const size_t n2_max = obs[s2_max].size();
-    const size_t n_cols = n1_max * n2_max;
-    std::vector<double> eri_col(num_aos2 * n_cols, 0.0);
-#ifdef _OPENMP
-    std::vector<std::vector<double>> eri_col_threads(nthreads);
-    for (int t = 0; t < nthreads; ++t) {
-      eri_col_threads[t].resize(num_aos2 * n_cols, 0.0);
+    // Accumulate shell pairs until we reach the target column count
+    size_t n_batch = 0;
+    size_t total_n_cols = 0;
+    for (size_t b = 0; b < sp_list.size(); ++b) {
+      if (sp_list[b].max_diag < threshold) break;
+      const size_t n1 = obs[sp_list[b].s1].size();
+      const size_t n2 = obs[sp_list[b].s2].size();
+      total_n_cols += n1 * n2;
+      n_batch++;
+      if (total_n_cols >= TARGET_GEMM_COLS) break;
     }
+    if (n_batch == 0) break;
+
+    // Build batch entries
+    struct BatchEntry {
+      size_t sp_index, s1, s2, n1, n2, n_cols, col_offset;
+      size_t bf1_st, bf2_st;
+    };
+    std::vector<BatchEntry> batch(n_batch);
+    total_n_cols = 0;  // recompute for accurate offsets
+    for (size_t b = 0; b < n_batch; ++b) {
+      const auto& sp = sp_list[b];
+      const size_t n1 = obs[sp.s1].size();
+      const size_t n2 = obs[sp.s2].size();
+      batch[b] = {
+          sp.sp_index,  sp.s1,           sp.s2,          n1, n2, n1 * n2,
+          total_n_cols, shell2bf[sp.s1], shell2bf[sp.s2]};
+      total_n_cols += n1 * n2;
+    }
+
+    QDK_LOGGER().debug("{:>13} | {} | batch={}", current_col, D_max, n_batch);
+
+    // === Step 2: Compute ERI columns for ALL batch entries ===
+    // Each shell pair writes to its own section of eri_col_batch.
+    // No dependency between shell pairs — fully parallel.
+    const size_t eri_batch_size = num_aos2 * total_n_cols;
+    std::vector<double> eri_col_batch(eri_batch_size, 0.0);
+
+#ifdef _OPENMP
 #pragma omp parallel
 #endif
     {
 #ifdef _OPENMP
       const auto thread_id = omp_get_thread_num();
-      // get thread-local eri_col
-      auto& eri_col_local = eri_col_threads[thread_id];
 #else
       const auto thread_id = 0;
 #endif
       auto& engine = engines_coulomb[thread_id];
       const auto& buf = engine.results();
-      for (size_t s3 = 0, s34 = 0; s3 < num_shells; ++s3) {
-        const size_t n3 = obs[s3].size();
-        const size_t bf3_st = shell2bf[s3];
-        for (size_t s4 = 0; s4 < num_shells; ++s4) {
-          // Assign to threads
-          if ((s34++) % nthreads != thread_id) continue;
 
-          // screening via schwarz bounds
-          if (K_schwarz(s1_max, s2_max) * K_schwarz(s3, s4) < eri_threshold) {
-            continue;
+      for (size_t b = 0; b < n_batch; ++b) {
+        const auto& be = batch[b];
+        double* eri_out = eri_col_batch.data() + be.col_offset * num_aos2;
+
+        for (size_t s3 = 0, s34 = 0; s3 < num_shells; ++s3) {
+          const size_t n3 = obs[s3].size();
+          const size_t bf3_st = shell2bf[s3];
+          for (size_t s4 = 0; s4 < num_shells; ++s4) {
+            if ((s34++) % nthreads != thread_id) continue;
+
+            if (K_schwarz(be.s1, be.s2) * K_schwarz(s3, s4) < eri_threshold) {
+              continue;
+            }
+
+            const size_t n4 = obs[s4].size();
+            const size_t bf4_st = shell2bf[s4];
+
+            engine.compute2<::libint2::Operator::coulomb,
+                            ::libint2::BraKet::xx_xx, 0>(obs[be.s1], obs[be.s2],
+                                                         obs[s3], obs[s4]);
+            const auto& res = buf[0];
+            if (res == nullptr) continue;
+
+            for (size_t i = 0, ijkl = 0; i < be.n1; ++i) {
+              const size_t ind_i = i * be.n2;
+              for (size_t j = 0; j < be.n2; ++j) {
+                const size_t ind_ij = (ind_i + j) * num_aos2;
+                for (size_t k = 0; k < n3; ++k) {
+                  const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
+                  for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                    eri_out[ind_ijk + (bf4_st + l)] += res[ijkl];
+                  }
+                }
+              }
+            }
+          }  // s4
+        }  // s3
+      }  // for each batch entry
+    }  // omp parallel
+    // === Step 3: ONE big GEMM for all columns at once ===
+    // Precompute lookup for all columns
+    std::vector<size_t> all_lookup(total_n_cols);
+    for (size_t b = 0; b < n_batch; ++b) {
+      const auto& be = batch[b];
+      for (size_t i = 0; i < be.n1; ++i) {
+        for (size_t j = 0; j < be.n2; ++j) {
+          const size_t local_idx = i * be.n2 + j;
+          all_lookup[be.col_offset + local_idx] =
+              (be.bf1_st + i) * num_aos + (be.bf2_st + j);
+        }
+      }
+    }
+
+    if (current_col > 0) {
+      // Gather rows: L_rows[col, :] = L_data[all_lookup[col], :]
+      std::vector<double> L_rows(total_n_cols * current_col);
+      for (size_t col = 0; col < total_n_cols; ++col) {
+        blas::copy(current_col, L_data.data() + all_lookup[col], num_aos2,
+                   L_rows.data() + col, total_n_cols);
+      }
+      // One big GEMM: eri_col_batch -= L_data * L_rows^T
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 num_aos2, total_n_cols, current_col, -1.0, L_data.data(),
+                 num_aos2, L_rows.data(), total_n_cols, 1.0,
+                 eri_col_batch.data(), num_aos2);
+    }
+    // === Step 4: Form vectors (sequentially within batch) ===
+    // Process each batch entry, forming vectors and doing in-batch
+    // Gram-Schmidt against vectors formed earlier in this batch.
+    for (size_t b = 0; b < n_batch; ++b) {
+      const auto& be = batch[b];
+      double* eri_col = eri_col_batch.data() + be.col_offset * num_aos2;
+
+      for (size_t local_i = 0; local_i < be.n1; ++local_i) {
+        const size_t j_max = (be.s1 == be.s2) ? (local_i + 1) : be.n2;
+        for (size_t local_j = 0; local_j < j_max; ++local_j) {
+          const size_t local_index = local_i * be.n2 + local_j;
+          const double D_val = D_shell_pair[be.sp_index][local_index];
+
+          if (D_val < threshold) continue;
+
+          double Q_max = std::sqrt(1.0 / D_val);
+          std::vector<double> L_col_vec(num_aos2);
+          blas::copy(num_aos2, eri_col + local_index * num_aos2, 1,
+                     L_col_vec.data(), 1);
+          blas::scal(num_aos2, Q_max, L_col_vec.data(), 1);
+
+          L_data.insert(L_data.end(), L_col_vec.data(),
+                        L_col_vec.data() + num_aos2);
+
+          const double* L_col = L_data.data() + current_col * num_aos2;
+
+          // In-batch Gram-Schmidt: update remaining ERI columns in this
+          // shell pair (same as before)
+          for (size_t col = local_index + 1; col < be.n1 * be.n2; ++col) {
+            const size_t global_col_idx =
+                (be.bf1_st + col / be.n2) * num_aos + (be.bf2_st + col % be.n2);
+            const double scale_factor = -L_col[global_col_idx];
+            blas::axpy(num_aos2, scale_factor, L_col, 1,
+                       eri_col + col * num_aos2, 1);
           }
 
-          const size_t n4 = obs[s4].size();
-          const size_t bf4_st = shell2bf[s4];
-
-          // compute integral shell quartet
-          engine.compute2<::libint2::Operator::coulomb,
-                          ::libint2::BraKet::xx_xx, 0>(obs[s1_max], obs[s2_max],
-                                                       obs[s3], obs[s4]);
-          const auto& res = buf[0];
-          if (res == nullptr) continue;
-
-          // fill in eri_col
-          for (size_t i = 0, ijkl = 0; i < n1_max; ++i) {
-            const size_t ind_i = i * n2_max;
-            for (size_t j = 0; j < n2_max; ++j) {
-              const size_t ind_ij = (ind_i + j) * num_aos2;
-              for (size_t k = 0; k < n3; ++k) {
-                const size_t ind_ijk = ind_ij + (bf3_st + k) * num_aos;
-                for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                  const size_t ind_ijkl = ind_ijk + (bf4_st + l);
-#ifdef _OPENMP
-                  eri_col_local[ind_ijkl] += res[ijkl];
-#else
-                  eri_col[ind_ijkl] += res[ijkl];
-#endif
-                }  // l
-              }  // k
-            }  // j
-          }  // i
-        }  // s4
-      }  // s3
-    }  // omp parallel
-
-    // merge thread-local eri_col
-#ifdef _OPENMP
-    for (int t = 0; t < nthreads; ++t) {
-      blas::axpy(eri_col.size(), 1.0, eri_col_threads[t].data(), 1,
-                 eri_col.data(), 1);
-    }
-#endif
-
-    // precompute lookup
-    const size_t bf1_max_st = shell2bf[s1_max];
-    const size_t bf2_max_st = shell2bf[s2_max];
-    std::vector<size_t> shell_pairs_to_lookup(n1_max * n2_max);
-    for (size_t i = 0; i < n1_max; ++i) {
-      for (size_t j = 0; j < n2_max; ++j) {
-        const size_t local_index = i * n2_max + j;
-        shell_pairs_to_lookup[local_index] =
-            (bf1_max_st + i) * num_aos + (bf2_max_st + j);
-      }
-    }
-
-    // correct for cholesky contributions by subtracting previous vectors
-    if (current_col > 0) {
-      // Extract rows from L_data corresponding to shell pairs
-      std::vector<double> L_rows(n_cols * current_col);
-      for (size_t col = 0; col < n_cols; ++col) {
-        const size_t global_index = shell_pairs_to_lookup[col];
-        // Copy row from L_data: L_rows[col, :] = L_data[global_index, :]
-        blas::copy(current_col, L_data.data() + global_index, num_aos2,
-                   L_rows.data() + col, n_cols);
-      }
-      // Compute eri_col -= L_data * L_rows^T
-      // eri_col is num_aos2 x n_cols, L_data is num_aos2 x current_col,
-      // L_rows^T is current_col x n_cols
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 num_aos2, n_cols, current_col, -1.0, L_data.data(), num_aos2,
-                 L_rows.data(), n_cols, 1.0, eri_col.data(), num_aos2);
-    }
-
-    // form new cholesky vector for each index in shell pair avoid redundant
-    // vectors for symmetric shell pairs
-    for (size_t local_i = 0; local_i < n1_max; ++local_i) {
-      const size_t j_max = (s1_max == s2_max) ? (local_i + 1) : n2_max;
-      for (size_t local_j = 0; local_j < j_max; ++local_j) {
-        const size_t local_index = local_i * n2_max + local_j;
-        const double D_val = D_shell_pair[q_shell_pair_max][local_index];
-
-        // skip if below threshold
-        if (D_val < threshold) {
-          continue;
-        }
-
-        // Form Cholesky vector
-        double Q_max = std::sqrt(1.0 / D_val);
-        std::vector<double> L_col_vec(num_aos2);
-        // Copy column from eri_col
-        blas::copy(num_aos2, eri_col.data() + local_index * num_aos2, 1,
-                   L_col_vec.data(), 1);
-        // Scale by Q_max
-        blas::scal(num_aos2, Q_max, L_col_vec.data(), 1);
-
-        // append to L_data
-        L_data.insert(L_data.end(), L_col_vec.data(),
-                      L_col_vec.data() + num_aos2);
-
-        // reference to current column
-        const double* L_col = L_data.data() + current_col * num_aos2;
-
-        // Update remaining columns in eri_col for vectors formed within this
-        // shell pair
-        for (size_t col = local_index + 1; col < n1_max * n2_max; ++col) {
-          const size_t global_col_idx = shell_pairs_to_lookup[col];
-          const double scale_factor = -L_col[global_col_idx];
-          double* eri_col_ptr = eri_col.data() + col * num_aos2;
-          blas::axpy(num_aos2, scale_factor, L_col, 1, eri_col_ptr, 1);
-        }
-
-        // Update diagonal elements
-        std::vector<size_t> shell_pairs_to_remove;
-        for (const auto sp_index : active_shell_pairs) {
-          const auto [s1, s2] = sp_index_to_shells[sp_index];
-          const auto n1 = obs[s1].size();
-          const auto n2 = obs[s2].size();
-          const auto bf1_st = shell2bf[s1];
-          const auto bf2_st = shell2bf[s2];
-          // update diagonal block
-          for (size_t i = 0; i < n1; ++i) {
-            const size_t bf1_st_i = (bf1_st + i) * num_aos;
-            for (size_t j = 0; j < n2; ++j) {
-              const size_t idx = i * n2 + j;
-              const size_t global_idx = bf1_st_i + (bf2_st + j);
-              D_shell_pair[sp_index][idx] -=
-                  L_col[global_idx] * L_col[global_idx];
+          // ALSO update ERI columns of LATER batch entries
+          // (cross-batch Gram-Schmidt)
+          for (size_t b2 = b + 1; b2 < n_batch; ++b2) {
+            const auto& be2 = batch[b2];
+            double* eri_col2 = eri_col_batch.data() + be2.col_offset * num_aos2;
+            for (size_t col2 = 0; col2 < be2.n1 * be2.n2; ++col2) {
+              const size_t g_idx = (be2.bf1_st + col2 / be2.n2) * num_aos +
+                                   (be2.bf2_st + col2 % be2.n2);
+              const double sf = -L_col[g_idx];
+              blas::axpy(num_aos2, sf, L_col, 1, eri_col2 + col2 * num_aos2, 1);
             }
           }
-          // remove if below threshold
-          const auto& diag = D_shell_pair[sp_index];
-          const double max_diag = *std::max_element(diag.begin(), diag.end());
-          if (max_diag < threshold) {
-            shell_pairs_to_remove.push_back(sp_index);
+
+          // Update diagonal elements
+          std::vector<size_t> shell_pairs_to_remove;
+          for (const auto sp_index : active_shell_pairs) {
+            const auto [s1, s2] = sp_index_to_shells[sp_index];
+            const auto n1 = obs[s1].size();
+            const auto n2 = obs[s2].size();
+            const auto bf1_st = shell2bf[s1];
+            const auto bf2_st = shell2bf[s2];
+            for (size_t i = 0; i < n1; ++i) {
+              const size_t bf1_st_i = (bf1_st + i) * num_aos;
+              for (size_t j = 0; j < n2; ++j) {
+                const size_t idx = i * n2 + j;
+                const size_t global_idx = bf1_st_i + (bf2_st + j);
+                D_shell_pair[sp_index][idx] -=
+                    L_col[global_idx] * L_col[global_idx];
+              }
+            }
+            const auto& diag = D_shell_pair[sp_index];
+            const double max_diag = *std::max_element(diag.begin(), diag.end());
+            if (max_diag < threshold) {
+              shell_pairs_to_remove.push_back(sp_index);
+            }
           }
+          for (const auto sp_index : shell_pairs_to_remove) {
+            active_shell_pairs.erase(sp_index);
+          }
+          current_col += 1;
         }
-        // remove inactive shell pairs
-        for (const auto sp_index : shell_pairs_to_remove) {
-          active_shell_pairs.erase(sp_index);
-        }
-        current_col += 1;
       }
-    }
+    }  // for each batch entry
   }
 
-  QDK_LOGGER().debug("Cholesky rank: {}", current_col);
+  QDK_LOGGER().info("Cholesky rank: {}", current_col);
 
   if (current_col == max_rank) {
     QDK_LOGGER().warn(
@@ -730,16 +772,6 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
 
-  // Declare MOERI vectors
-  Eigen::VectorXd moeri_aaaa;
-  Eigen::VectorXd moeri_aabb;
-  Eigen::VectorXd moeri_bbbb;
-
-  const size_t moeri_size = nactive * nactive * nactive * nactive;
-
-  // Store Cholesky vectors for later use in inactive space computation
-  // Eigen::MatrixXd L_ao;
-
   // Use Cholesky Decomposition
   double cholesky_tol = _settings->get<double>("cholesky_tolerance");
   double eri_tol = _settings->get<double>("eri_threshold");
@@ -752,36 +784,18 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   Eigen::Map<const Eigen::MatrixXd> L_ao(
       output.data(), num_atomic_orbitals * num_atomic_orbitals,
       num_cholesky_vectors);
-  // L_ao = L_ao_map;
-  /**
-   * @brief Reconstruct MO ERIs from Cholesky vectors
-   * @param L_left Left Cholesky vectors in MO basis
-   * @param L_right Right Cholesky vectors in MO basis
-   * @param output Output vector to store reconstructed ERIs
-   */
-  auto reconstruct_eris = [moeri_size](const Eigen::MatrixXd& L_left,
-                                       const Eigen::MatrixXd& L_right,
-                                       Eigen::VectorXd& output) {
-    output.resize(moeri_size);
-    size_t n = L_left.rows();  // n_mo * n_mo
-    Eigen::Map<Eigen::MatrixXd> output_matrix(output.data(), n, n);
-    output_matrix.noalias() = L_left * L_right.transpose();
-  };
+
+  Eigen::MatrixXd L_mo;
+  Eigen::MatrixXd L_mo_alpha;
+  Eigen::MatrixXd L_mo_beta;
 
   if (is_restricted_calc) {
     // Transform to MO
-    Eigen::MatrixXd L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
-    reconstruct_eris(L_mo, L_mo, moeri_aaaa);
+    L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
   } else {
     // Transform to MO (Alpha and Beta)
-    Eigen::MatrixXd L_mo_alpha =
-        detail::transform_cholesky_to_mo(L_ao, Ca_active);
-    Eigen::MatrixXd L_mo_beta =
-        detail::transform_cholesky_to_mo(L_ao, Cb_active);
-
-    reconstruct_eris(L_mo_alpha, L_mo_alpha, moeri_aaaa);  // (aaaa)
-    reconstruct_eris(L_mo_beta, L_mo_beta, moeri_bbbb);    // (bbbb)
-    reconstruct_eris(L_mo_beta, L_mo_alpha, moeri_aabb);   // (aabb)
+    L_mo_alpha = detail::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo_beta = detail::transform_cholesky_to_mo(L_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -804,17 +818,17 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd H_active(nactive, nactive);
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
-      if (!_settings->get<bool>("store_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-                H_active, moeri_aaaa, orbitals,
-                structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+            std::make_unique<data::CholeskyHamiltonianContainer>(
+                H_active, L_mo, orbitals,
+                structure->calculate_nuclear_repulsion_energy(), dummy_fock,
+                L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock,
-              L_ao));
+              H_active, L_mo, orbitals,
+              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -823,19 +837,18 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       H_active_beta = Cb_active.transpose() * H_full * Cb_active;
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
-      if (!_settings->get<bool>("store_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-                H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb,
-                moeri_bbbb, orbitals,
+            std::make_unique<data::CholeskyHamiltonianContainer>(
+                H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
                 structure->calculate_nuclear_repulsion_energy(),
-                dummy_fock_alpha, dummy_fock_beta));
+                dummy_fock_alpha, dummy_fock_beta, L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals, structure->calculate_nuclear_repulsion_energy(),
-              dummy_fock_alpha, dummy_fock_beta, L_ao));
+              H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
+              structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
+              dummy_fock_beta));
     }
   }
 
@@ -893,18 +906,18 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (!_settings->get<bool>("store_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
+          std::make_unique<data::CholeskyHamiltonianContainer>(
+              H_active, L_mo, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive));
+              F_inactive, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active, moeri_aaaa, orbitals,
+            H_active, L_mo, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive, L_ao));
+            F_inactive));
   } else {
     // Unrestricted case
 
@@ -1005,20 +1018,18 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (!_settings->get<bool>("store_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals,
+          std::make_unique<data::CholeskyHamiltonianContainer>(
+              H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
               E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive_alpha, F_inactive_beta));
+              F_inactive_alpha, F_inactive_beta, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-            orbitals,
+            H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
             E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive_alpha, F_inactive_beta, L_ao));
+            F_inactive_alpha, F_inactive_beta));
   }
 }
 }  // namespace qdk::chemistry::algorithms::microsoft

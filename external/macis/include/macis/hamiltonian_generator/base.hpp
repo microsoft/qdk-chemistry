@@ -49,12 +49,6 @@ class HamiltonianGeneratorBase {
   /// @brief Two-electron integrals V_pqrs = (pq|rs)
   rank4_span_t V_pqrs_;
 
-  /// @brief Storage for antisymmetrized two-electron integrals G(i,j,k,l) =
-  /// (ij|kl) - (il|kj)
-  std::vector<Scalar> G_pqrs_data_;
-  /// @brief Span view of antisymmetrized two-electron integrals
-  rank4_span_t G_pqrs_;
-
   /// @brief Storage for reduced antisymmetrized integrals G_red(i,j,k) =
   /// G(i,j,k,k)
   std::vector<Scalar> G_red_data_;
@@ -115,12 +109,6 @@ class HamiltonianGeneratorBase {
    * @return Pointer to the underlying data of V_red_data_
    */
   inline auto* V_red() const { return V_red_data_.data(); }
-
-  /**
-   * @brief Get pointer to antisymmetrized integral data
-   * @return Pointer to the underlying data of G_pqrs_data_
-   */
-  inline auto* G() const { return G_pqrs_data_.data(); }
 
   /**
    * @brief Get pointer to two-electron integral data
