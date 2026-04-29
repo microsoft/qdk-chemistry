@@ -29,11 +29,10 @@ namespace qdk::chemistry::utils {
  *                               (n+1)d' radial correlation in transition
  *                               metals (the "double d-shell" effect). Defaults
  *                               to false. This option mirrors the
- *                               ``include_double_d_shell`` setting on
- *                               :class:`ValenceActiveSpaceSettings` and should
- *                               be kept consistent with it when the
- *                               computed values are passed to a
- *                               ``ValenceActiveSpaceSelector``.
+ *                               include_double_d_shell setting on
+ *                               ValenceActiveSpaceSettings and should be kept
+ *                               consistent with it when the computed values
+ *                               are passed to a ValenceActiveSpaceSelector.
  *
  * @return A pair where:
  *         - first: Number of valence electrons

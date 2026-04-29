@@ -35,10 +35,11 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     ``compute_valence_space_parameters`` only consults the structure (atom
     elements), the total electron count, and ``num_molecular_orbitals``. We
     therefore wrap a dummy single-s-shell BasisSet (so it validates), an
-    identity orbital coefficient matrix sized to ``num_molecular_orbitals``,
-    and a Configuration string that yields exactly ``(n_alpha, n_beta)``
-    electrons. This avoids basis set dependencies and SCF convergence
-    flakiness in tests that only validate counting logic.
+    orbital coefficient matrix with the documented
+    ``(num_atomic_orbitals, num_molecular_orbitals)`` shape, and a
+    Configuration string that yields exactly ``(n_alpha, n_beta)`` electrons.
+    This avoids basis set dependencies and SCF convergence flakiness in tests
+    that only validate counting logic.
     """
     structure = Structure(symbols, np.asarray(coords, dtype=float))
 
@@ -47,7 +48,11 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     shells = [Shell(i, OrbitalType.S, exps, coefs) for i in range(len(symbols))]
     basis_set = BasisSet("dummy", shells, structure, AOType.Spherical)
 
-    coeffs = np.eye(num_molecular_orbitals, num_molecular_orbitals)
+    # Coefficients are (num_atomic_orbitals, num_molecular_orbitals); their
+    # values are unused by compute_valence_space_parameters, only the shape
+    # matters here.
+    num_atomic_orbitals = basis_set.get_num_atomic_orbitals()
+    coeffs = np.zeros((num_atomic_orbitals, num_molecular_orbitals))
     orbitals = Orbitals(coeffs, None, None, basis_set)
 
     pair_count = min(n_alpha, n_beta)

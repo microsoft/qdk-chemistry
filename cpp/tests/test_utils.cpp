@@ -212,8 +212,9 @@ namespace {
 
 // Build a minimal valid Wavefunction without running SCF. Each atom gets a
 // single dummy s-shell so the BasisSet validates; the orbital coefficient
-// matrix is sized to ``num_molecular_orbitals`` and a Configuration string is
-// constructed to yield the requested ``(n_alpha, n_beta)`` electron counts.
+// matrix has the documented (num_atomic_orbitals x num_molecular_orbitals)
+// shape and a Configuration string is constructed to yield the requested
+// ``(n_alpha, n_beta)`` electron counts.
 std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     const std::vector<std::string>& symbols, const Eigen::MatrixXd& coords,
     size_t n_alpha, size_t n_beta, size_t num_molecular_orbitals) {
@@ -229,8 +230,12 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
   }
   auto basis_set = std::make_shared<BasisSet>("dummy", shells, structure);
 
+  // Coefficients are (num_atomic_orbitals x num_molecular_orbitals); the
+  // values are unused by compute_valence_space_parameters, only the shape
+  // matters here.
+  const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   Eigen::MatrixXd coeffs =
-      Eigen::MatrixXd::Identity(num_molecular_orbitals, num_molecular_orbitals);
+      Eigen::MatrixXd::Zero(num_atomic_orbitals, num_molecular_orbitals);
   auto orbitals =
       std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt, basis_set);
 
