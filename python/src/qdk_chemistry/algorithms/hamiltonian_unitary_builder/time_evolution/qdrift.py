@@ -18,7 +18,7 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,

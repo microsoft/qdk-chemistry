@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.qdrift import QDrift
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
 from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,

@@ -30,7 +30,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
     QdkMacisAsci,

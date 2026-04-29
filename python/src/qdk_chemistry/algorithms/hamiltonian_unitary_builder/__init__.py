@@ -1,4 +1,4 @@
-"""QDK/Chemistry Hamiltonian unitary algorithms module."""
+"""QDK/Chemistry Hamiltonian unitary builder module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

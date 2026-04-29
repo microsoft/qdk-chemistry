@@ -18,8 +18,8 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary.builder.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
