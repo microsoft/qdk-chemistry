@@ -21,14 +21,6 @@ namespace qdk::chemistry::algorithms::microsoft {
  * Default settings:
  * - num_active_electrons: -1 (invalid default, must be set by user)
  * - num_active_orbitals: -1 (invalid default, must be set by user)
- * - include_double_d_shell: false (when true, the user-facing valence space
- *   sizing utility :func:`compute_valence_space_parameters` will add 5
- *   correlating d' orbitals per d-block atom (Sc-Zn, Y-Cd, Hf-Hg) to capture
- *   the strong nd / (n+1)d' radial correlation in transition metals - the
- *   "double d-shell" effect. This setting documents the user's intent on the
- *   selector and should be passed through to
- *   ``compute_valence_space_parameters`` when computing
- *   ``num_active_electrons`` / ``num_active_orbitals``.)
  */
 class ValenceActiveSpaceSettings : public qdk::chemistry::data::Settings {
  public:
@@ -38,13 +30,10 @@ class ValenceActiveSpaceSettings : public qdk::chemistry::data::Settings {
    * Sets initial values for:
    * - num_active_electrons: -1 (invalid, must be set by user)
    * - num_active_orbitals: -1 (invalid, must be set by user)
-   * - include_double_d_shell: false (opt-in double-d-shell expansion for
-   *   transition-metal valence space sizing)
    */
   ValenceActiveSpaceSettings() {
     set_default("num_active_electrons", -1);
     set_default("num_active_orbitals", -1);
-    set_default("include_double_d_shell", false);
   }
 };
 

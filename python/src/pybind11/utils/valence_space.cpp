@@ -25,9 +25,6 @@ Args:
         d-block atom (Sc-Zn, Y-Cd, Hf-Hg) to capture the strong nd / (n+1)d'
         radial correlation in transition metals (the "double d-shell"
         effect). Defaults to ``False`` to preserve the historical sizing.
-        Mirrors the ``include_double_d_shell`` setting on
-        :class:`QdkValenceActiveSpaceSelector` and should be kept consistent
-        with it when the returned values are used to populate that selector.
 
 Returns:
     tuple: Pair of ( n_active_electrons, n_active_orbitals )
