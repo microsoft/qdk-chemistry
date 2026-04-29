@@ -216,7 +216,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // unless the user has explicitly provided an auxiliary basis via the
   // 'aux_basis' setting
   bool use_dfj = (integral_type == "dfj");
-  if ((integral_type == "auto" || integral_type == "dfj") && qdk_raw_basis_set->has_aux_basis()) {
+  if ((integral_type == "auto" || integral_type == "dfj") &&
+      qdk_raw_basis_set->has_aux_basis()) {
     use_dfj = true;
     if (aux_basis_name_setting.empty()) {
       aux_basis_name_setting = qdk_raw_basis_set->get_aux_name();
