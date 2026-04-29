@@ -90,7 +90,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
   // Cholesky decomposition (rank is bounded by num_aos*(num_aos+1)/2)
   const size_t max_rank = num_aos * (num_aos + 1) / 2;
-  QDK_LOGGER().info("Maximum possible Cholesky rank: {}", max_rank);
+  QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
 
   // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
   // This enables reusing ERI column buffers across iterations.
@@ -226,11 +226,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // on typical hardware.
   constexpr size_t TARGET_GEMM_COLS = 20;
 
-  QDK_LOGGER().info("Cholesky Rank | Max Diagonal Element");
+  QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
   double D_max = 0.0;
   while (current_col < max_rank) {
     if (active_shell_pairs.empty()) {
-      QDK_LOGGER().info("{:>13} | all shell pairs converged", current_col);
+      QDK_LOGGER().debug("{:>13} | all shell pairs converged", current_col);
       break;
     }
 
@@ -255,7 +255,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
     D_max = sp_list[0].max_diag;
     if (D_max < threshold) {
-      QDK_LOGGER().info("{:>13} | {}", current_col, D_max);
+      QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
       break;
     }
 
@@ -289,7 +289,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       total_n_cols += n1 * n2;
     }
 
-    QDK_LOGGER().info("{:>13} | {} | batch={}", current_col, D_max, n_batch);
+    QDK_LOGGER().debug("{:>13} | {} | batch={}", current_col, D_max, n_batch);
 
     // === Step 2: Compute ERI columns for ALL batch entries ===
     // Each shell pair writes to its own section of eri_col_batch.

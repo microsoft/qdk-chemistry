@@ -702,11 +702,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
         }
         working_pairs.clear();
         size_t accumulated_size = accumulated_pairs.size();
-        if (ic % 10 == 0) {
-          logger->info(
-              "  * After Merge at CON = {}, accumulated_size = {} at CON = {}",
-              ic, accumulated_size, ic);
-        }
 
         const bool need_initial_threshold =
             (!threshold_ready && ntdets > 0 && accumulated_size >= ntdets);
@@ -731,10 +726,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
           accumulated_pairs.erase(new_end, accumulated_pairs.end());
         }
 
-        logger->debug(
-            "after merge, thread {} accumulated_pairs.size() = {}, ntdets = {} "
-            "at CON = {}",
-            tid, accumulated_pairs.size(), ntdets, ic);
+        logger->debug("thread {}, threshold_abs_rv = {} at CON = {}", tid,
+                      threshold_abs_rv, ic);
       }  // Loc constraint loop
     }  // Constraint Loop
 
