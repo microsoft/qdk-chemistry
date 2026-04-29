@@ -1579,6 +1579,7 @@ def test_auxiliary_basis_set_accessors():
     assert len(aux_for_atom0) == 1
     assert aux_for_atom0[0].orbital_type == OrbitalType.S
 
+
 def test_auxiliary_basis_set_from_basis_name_database():
     """Test from_basis_name with auxiliary using actual basis set database."""
     positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
