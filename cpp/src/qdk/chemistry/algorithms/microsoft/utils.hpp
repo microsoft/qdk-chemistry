@@ -137,9 +137,8 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
  * @return A shared pointer to the primary internal basis set.
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
-std::shared_ptr<qcs::BasisSet>
-convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
-                           bool normalize = true);
+std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
 
 /**
  * @brief Convert a qdk::chemistry::data::BasisSet to the internal library
@@ -155,9 +154,8 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
  * @return A shared pointer to the auxiliary internal basis set.
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
-std::shared_ptr<qcs::BasisSet>
-convert_aux_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
-                           bool normalize = true);
+std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
 /**
  * @brief Compute a mapping between QDK and internal basis set shells
  *

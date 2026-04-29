@@ -261,9 +261,8 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 }
 
-std::shared_ptr<qcs::BasisSet>
-convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
-                           bool normalize) {
+std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
   QDK_LOG_TRACE_ENTERING();
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
@@ -289,8 +288,8 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
   return internal_basis_set;
 }
 
-std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
-                           bool normalize) {
+std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
   QDK_LOG_TRACE_ENTERING();
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
@@ -302,8 +301,8 @@ std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(const qdk::chemist
   for (size_t i = 0; i < mol->n_atoms; ++i) {
     int n_core_electrons = static_cast<int>(ecp_electrons[i]);
     mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
-  }                          
-  auto aux_basis_json = convert_to_json_auxiliary(qdk_basis_set);                          
+  }
+  auto aux_basis_json = convert_to_json_auxiliary(qdk_basis_set);
   std::shared_ptr<qcs::BasisSet> internal_aux_basis_set;
   if (aux_basis_json.is_object()) {
     internal_aux_basis_set =
@@ -406,7 +405,6 @@ nlohmann::ordered_json convert_to_json_primary(
 
   return j;
 }
-
 
 nlohmann::ordered_json convert_to_json_auxiliary(
     const qdk::chemistry::data::BasisSet& basis_set) {
