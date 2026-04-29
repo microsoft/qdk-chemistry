@@ -85,6 +85,10 @@ struct pmc_helper {
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 
+    // Optionally export the CI Hamiltonian to a Matrix Market file
+    maybe_export_ci_matrix(settings_, dets.begin(), dets.end(), ham_gen,
+                           mcscf_settings.ci_matel_tol);
+
     // Perform projected CI diagonalization
     std::vector<double> C_pmc;
     double E_pmc = 0.0;

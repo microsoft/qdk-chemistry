@@ -133,6 +133,10 @@ struct asci_helper {
       }
     }
 
+    // Optionally export the CI Hamiltonian to a Matrix Market file
+    maybe_export_ci_matrix(settings_, dets.begin(), dets.end(), ham_gen,
+                           mcscf_settings.ci_matel_tol);
+
     // Build wavefunction with unified builder (supports spin-dependent RDMs
     // when requested)
     data::Wavefunction wfn = build_wavefunction<data::SciWavefunctionContainer>(

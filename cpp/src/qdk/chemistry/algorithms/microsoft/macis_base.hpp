@@ -6,11 +6,14 @@
 
 #include <Eigen/Core>
 #include <macis/asci/determinant_search.hpp>
+#include <macis/csr_hamiltonian.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
+#include <sparsexx/io/write_mm.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -30,6 +33,10 @@ class MacisSettings : public MultiConfigurationSettings {
     set_default<double>("ci_matel_tol", defaults.ci_matel_tol,
                         "Hamiltonian matrix element sparsification threshold",
                         data::BoundConstraint<double>{0.0, 1.0});
+    set_default<std::string>(
+        "ci_matrix_file", "",
+        "If non-empty, write the CI Hamiltonian matrix to this path in Matrix "
+        "Market format");
   }
   ~MacisSettings() override = default;
 };
@@ -53,6 +60,35 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
  * @return Filled `macis::ASCISettings` instance.
  */
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
+
+/** @brief Optionally export the CI Hamiltonian matrix in Matrix Market format.
+ *
+ * If the setting `ci_matrix_file` is non-empty, constructs the CSR
+ * Hamiltonian from the given determinant set and generator, then writes
+ * it to the specified file path using 1-based indexing.
+ *
+ * @tparam Generator Hamiltonian generator type.
+ * @tparam WfnIterator Iterator over determinant container.
+ * @param settings Source settings (checked for `ci_matrix_file`).
+ * @param dets_begin Start of determinant range.
+ * @param dets_end End of determinant range.
+ * @param ham_gen Prepared Hamiltonian generator.
+ * @param ci_matel_tol Sparsification threshold for matrix elements.
+ */
+template <typename Generator, typename WfnIterator>
+void maybe_export_ci_matrix(const data::Settings& settings,
+                            WfnIterator dets_begin, WfnIterator dets_end,
+                            Generator& ham_gen, double ci_matel_tol) {
+  auto filename = settings.get<std::string>("ci_matrix_file");
+  if (filename.empty()) return;
+
+  QDK_LOGGER().info("Exporting CI Hamiltonian matrix to '{}'", filename);
+  auto H_csr = macis::make_csr_hamiltonian<int64_t>(dets_begin, dets_end,
+                                                    ham_gen, ci_matel_tol);
+  sparsexx::write_mm(filename, H_csr, false, 1);
+  QDK_LOGGER().info("Wrote {}x{} CI matrix ({} non-zeros) to '{}'", H_csr.m(),
+                    H_csr.n(), H_csr.nnz(), filename);
+}
 
 /** @brief Dispatch calculation to an implementation specialized by wavefunction
  * bitset size.

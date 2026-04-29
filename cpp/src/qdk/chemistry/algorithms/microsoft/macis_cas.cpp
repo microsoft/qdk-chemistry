@@ -77,6 +77,10 @@ struct cas_helper {
                             num_molecular_orbitals, num_molecular_orbitals,
                             num_molecular_orbitals, num_molecular_orbitals));
 
+    // Optionally export the CI Hamiltonian to a Matrix Market file
+    maybe_export_ci_matrix(settings_, dets.begin(), dets.end(), ham_gen,
+                           mcscf_settings.ci_matel_tol);
+
     // CI diagonalization: dense for small spaces, iterative otherwise
     const auto n = static_cast<int64_t>(dets.size());
     if (n == 1) {

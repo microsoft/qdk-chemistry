@@ -4,6 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdio>
+#include <filesystem>
+#include <fstream>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/pmc.hpp>
@@ -1513,4 +1516,118 @@ TEST_F(MacisAsciBackoffTest, MinimalRecoveryKeepsBackoff) {
   auto [energy, wavefunction] = calculator->run(hamiltonian, 5, 5);
   ASSERT_LT(energy, hf_energy_);
   EXPECT_GT(wavefunction->size(), static_cast<size_t>(1));
+}
+
+// ========== Tests for CI matrix Matrix Market export ==========
+
+// Test that ci_matrix_file setting triggers Matrix Market file output via CAS
+TEST_F(MacisAsciTest, MacisCasExportsCIMatrixToMatrixMarket) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  if (!calculator) {
+    GTEST_SKIP() << "MACIS CAS not available";
+  }
+
+  // Use a temp file for the output
+  auto tmp_path = std::filesystem::temp_directory_path() / "ci_matrix_test.mtx";
+  std::string filename = tmp_path.string();
+
+  auto& settings = calculator->settings();
+  settings.set("ci_matrix_file", filename);
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  auto [energy, wfn] = calculator->run(hamiltonian, 3, 3);
+
+  // Verify the file was created
+  ASSERT_TRUE(std::filesystem::exists(tmp_path));
+  EXPECT_GT(std::filesystem::file_size(tmp_path), 0u);
+
+  // Verify Matrix Market header
+  std::ifstream file(filename);
+  ASSERT_TRUE(file.is_open());
+  std::string banner;
+  std::getline(file, banner);
+  EXPECT_EQ(banner.substr(0, 15), "%%MatrixMarket ");
+
+  // Read dimensions line
+  size_t m = 0, n = 0, nnz = 0;
+  file >> m >> n >> nnz;
+  EXPECT_EQ(m, n);     // CI matrix is square
+  EXPECT_GT(m, 0u);    // Non-trivial matrix
+  EXPECT_GT(nnz, 0u);  // Has non-zero entries
+  EXPECT_GE(nnz, m);   // At least diagonal entries
+
+  // Read first data line and verify it's a valid triplet
+  double val = 0.0;
+  size_t row = 0, col = 0;
+  file >> row >> col >> val;
+  EXPECT_GE(row, 1u);  // 1-based indexing
+  EXPECT_LE(row, m);
+  EXPECT_GE(col, 1u);
+  EXPECT_LE(col, n);
+  EXPECT_TRUE(std::isfinite(val));
+
+  file.close();
+
+  // Clean up
+  std::filesystem::remove(tmp_path);
+}
+
+// Test that the default (empty) ci_matrix_file produces no file
+TEST_F(MacisAsciTest, MacisCasNoExportByDefault) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  if (!calculator) {
+    GTEST_SKIP() << "MACIS CAS not available";
+  }
+
+  auto tmp_path =
+      std::filesystem::temp_directory_path() / "ci_matrix_should_not_exist.mtx";
+  // Make sure file doesn't already exist
+  std::filesystem::remove(tmp_path);
+
+  // Do NOT set ci_matrix_file (leave default empty string)
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  auto [energy, wfn] = calculator->run(hamiltonian, 3, 3);
+
+  // File should NOT be created
+  EXPECT_FALSE(std::filesystem::exists(tmp_path));
+}
+
+// Test CI matrix export via ASCI
+TEST_F(MacisAsciTest, MacisAsciExportsCIMatrixToMatrixMarket) {
+  auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
+  ASSERT_NE(calculator, nullptr);
+
+  auto tmp_path =
+      std::filesystem::temp_directory_path() / "ci_matrix_asci_test.mtx";
+  std::string filename = tmp_path.string();
+
+  auto& settings = calculator->settings();
+  settings.set("ci_matrix_file", filename);
+  settings.set("ntdets_max", macis_params::ntdets_max_large);
+  settings.set("ntdets_min", macis_params::ntdets_min);
+  settings.set("max_refine_iter", macis_params::refine_off);
+  settings.set("grow_factor", macis_params::grow_factor);
+  settings.set("core_selection_strategy", "fixed");
+
+  auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
+  auto [energy, wfn] = calculator->run(hamiltonian, 3, 3);
+
+  // Verify the file was created and has valid content
+  ASSERT_TRUE(std::filesystem::exists(tmp_path));
+
+  std::ifstream file(filename);
+  ASSERT_TRUE(file.is_open());
+  std::string banner;
+  std::getline(file, banner);
+  EXPECT_EQ(banner.substr(0, 15), "%%MatrixMarket ");
+
+  size_t m = 0, n = 0, nnz = 0;
+  file >> m >> n >> nnz;
+  EXPECT_EQ(m, n);
+  EXPECT_GT(m, 0u);
+  // ASCI uses a selected subset, so matrix may be smaller than full CAS
+  EXPECT_LE(m, macis_params::ntdets_max_large);
+
+  file.close();
+  std::filesystem::remove(tmp_path);
 }
