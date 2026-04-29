@@ -2596,7 +2596,7 @@ class TestQDKChemistryPySCFBasisConversion:
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1
-        assert qdk_basis_no_meta.has_ecp_electrons()  # No metadata set
+        assert qdk_basis_no_meta.has_ecp_electrons()
         assert qdk_basis_no_meta.get_ecp_name() == "none"
 
         # Edge case 2: Full ECP structure format roundtrip

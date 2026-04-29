@@ -1728,3 +1728,192 @@ def test_auxiliary_basis_set_from_basis_name_database():
         assert loaded.get_aux_name() == "def2-universal-jfit"
         assert loaded.get_num_shells() == basis.get_num_shells()
         assert loaded.get_num_aux_shells() == basis.get_num_aux_shells()
+
+
+# ---------------------------------------------------------------------------
+# Tests for __init__ dispatcher: positional, keyword, mixed, and error paths
+# ---------------------------------------------------------------------------
+
+
+class TestBasisSetConstructorDispatch:
+    """Tests for the BasisSet __init__ dispatcher covering all constructor
+    signatures with positional, keyword, and mixed calling conventions."""
+
+    @pytest.fixture
+    def shell(self):
+        return Shell(0, OrbitalType.S, [1.0], [1.0])
+
+    @pytest.fixture
+    def shells(self, shell):
+        return [shell]
+
+    @pytest.fixture
+    def structure(self):
+        positions = np.array([[0.0, 0.0, 0.0]])
+        return Structure(["H"], positions)
+
+    @pytest.fixture
+    def aux_shells(self):
+        return [Shell(0, OrbitalType.S, [2.0], [1.0])]
+
+    @pytest.fixture
+    def ecp_shells(self):
+        return [Shell(0, OrbitalType.S, [5.0], [10.0], [0])]
+
+    # --- Copy constructor: BasisSet(other) ---
+
+    def test_copy_positional(self, shells):
+        original = BasisSet("orig", shells)
+        copy = BasisSet(original)
+        assert copy.get_name() == "orig"
+        assert copy.get_num_shells() == 1
+
+    def test_copy_rejects_kwargs(self, shells):
+        original = BasisSet("orig", shells)
+        with pytest.raises(TypeError, match="copy constructor does not accept keyword"):
+            BasisSet(original, atomic_orbital_type=AOType.Cartesian)
+
+    # --- (name, shells) ---
+
+    def test_name_shells_positional(self, shells):
+        b = BasisSet("test", shells)
+        assert b.get_name() == "test"
+        assert b.get_num_shells() == 1
+        assert b.get_atomic_orbital_type() == AOType.Spherical
+
+    def test_name_shells_all_kwargs(self, shells):
+        b = BasisSet(name="test", shells=shells)
+        assert b.get_name() == "test"
+        assert b.get_num_shells() == 1
+
+    def test_name_shells_mixed(self, shells):
+        b = BasisSet("test", shells=shells)
+        assert b.get_name() == "test"
+        assert b.get_num_shells() == 1
+
+    def test_name_shells_with_ao_kwarg(self, shells):
+        b = BasisSet("test", shells, atomic_orbital_type=AOType.Cartesian)
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    def test_name_shells_with_ao_positional(self, shells):
+        b = BasisSet("test", shells, AOType.Cartesian)
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    def test_name_shells_fully_kwarg_with_ao(self, shells):
+        b = BasisSet(name="test", shells=shells, atomic_orbital_type=AOType.Cartesian)
+        assert b.get_name() == "test"
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    # --- (name, shells, structure) ---
+
+    def test_name_shells_structure_positional(self, shells, structure):
+        b = BasisSet("test", shells, structure)
+        assert b.has_structure()
+        assert b.get_structure().get_num_atoms() == 1
+
+    def test_name_shells_structure_kwarg(self, shells, structure):
+        b = BasisSet("test", shells, structure=structure)
+        assert b.has_structure()
+
+    def test_name_shells_structure_all_kwargs(self, shells, structure):
+        b = BasisSet(name="test", shells=shells, structure=structure)
+        assert b.has_structure()
+
+    def test_name_shells_structure_with_ao(self, shells, structure):
+        b = BasisSet("test", shells, structure, AOType.Cartesian)
+        assert b.has_structure()
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    def test_name_shells_structure_ao_kwarg(self, shells, structure):
+        b = BasisSet("test", shells, structure=structure, atomic_orbital_type=AOType.Cartesian)
+        assert b.has_structure()
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    # --- (name, shells, aux_shells, structure) --- n==4 path
+
+    def test_name_shells_aux_structure_positional(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, aux_shells, structure)
+        assert b.has_aux_basis()
+        assert b.get_num_aux_shells() == 1
+        assert b.has_structure()
+
+    def test_name_shells_aux_structure_with_ao(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, aux_shells, structure, AOType.Cartesian)
+        assert b.has_aux_basis()
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
+    # --- (name, shells, aux_name, aux_shells, structure) --- n==5 str path
+
+    def test_name_shells_auxname_aux_structure_positional(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, "my-aux", aux_shells, structure)
+        assert b.has_aux_basis()
+        assert b.get_aux_name() == "my-aux"
+        assert b.has_structure()
+
+    # --- (name, shells, ecp_shells, ecp_electrons, structure) --- n==5 list path
+
+    def test_name_shells_ecp_ecpelec_structure_positional(self, shells, ecp_shells, structure):
+        b = BasisSet("test", shells, ecp_shells, [2], structure)
+        assert b.has_ecp_shells()
+        assert b.get_num_ecp_shells() == 1
+        assert list(b.get_ecp_electrons()) == [2]
+
+    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6
+
+    def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
+        b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
+        assert b.has_ecp_shells()
+        assert b.get_ecp_name() == "my-ecp"
+        assert list(b.get_ecp_electrons()) == [2]
+
+    # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name, aux_shells, structure) --- n==8
+
+    def test_full_8arg_constructor(self, shells, ecp_shells, aux_shells, structure):
+        b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], "my-aux", aux_shells, structure)
+        assert b.has_ecp_shells()
+        assert b.get_ecp_name() == "my-ecp"
+        assert b.has_aux_basis()
+        assert b.get_aux_name() == "my-aux"
+        assert b.has_structure()
+
+    # --- Error cases: unexpected kwargs ---
+
+    def test_rejects_unexpected_kwarg(self, shells):
+        with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
+            BasisSet("test", shells, bogus=42)
+
+    def test_rejects_unexpected_kwarg_typo(self, shells):
+        with pytest.raises(TypeError, match="unexpected keyword argument 'struture'"):
+            BasisSet("test", shells, struture="oops")
+
+    # --- Error cases: multiple values ---
+
+    def test_rejects_name_multiple_values(self, shells):
+        with pytest.raises(TypeError, match="multiple values for argument 'name'"):
+            BasisSet("test", name="other", shells=shells)
+
+    def test_rejects_shells_multiple_values(self, shells):
+        with pytest.raises(TypeError, match="multiple values for argument 'shells'"):
+            BasisSet("test", shells, shells=shells)
+
+    # --- Error cases: structure without shells ---
+
+    def test_rejects_structure_without_shells(self, structure):
+        with pytest.raises(TypeError, match="'structure' keyword requires 'name' and 'shells'"):
+            BasisSet(name="test", structure=structure)
+
+    # --- Error cases: no matching constructor ---
+
+    def test_rejects_wrong_types(self):
+        with pytest.raises(TypeError):
+            BasisSet(123, 456)
+
+    def test_rejects_no_args(self):
+        with pytest.raises(TypeError):
+            BasisSet()
+
+    # --- Error cases: ECP shells at n==4 should raise ---
+
+    def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
+        with pytest.raises(TypeError, match="ECP shells requires explicit ecp_electrons"):
+            BasisSet("test", shells, ecp_shells, structure)

@@ -220,15 +220,17 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
   // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ
+  // unless the user has explicitly provided an auxiliary basis via the
+  // 'aux_basis' setting
   bool use_dfj = (integral_type == "dfj");
-  if (integral_type == "auto" && qdk_raw_basis_set->has_aux_basis()) {
+  if ((integral_type == "auto" || integral_type == "dfj") && qdk_raw_basis_set->has_aux_basis()) {
     use_dfj = true;
     if (aux_basis_name_setting.empty()) {
       aux_basis_name_setting = qdk_raw_basis_set->get_aux_name();
     }
   }
   if (use_dfj) {
-    if (!qdk_raw_basis_set->has_aux_basis()) {
+    if (aux_basis_name_setting.empty()) {
       throw std::invalid_argument(
           "DFJ requested but no auxiliary basis set provided. "
           "Set 'aux_basis' or use a BasisSet with an auxiliary basis.");
@@ -284,10 +286,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Convert QDK basis set to internal format
   auto ms_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set);
-  auto ms_raw_basis_set =
-      utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
   auto ms_aux_basis_set =
       utils::microsoft::convert_aux_basis_set_from_qdk(*qdk_raw_basis_set);
+  auto ms_raw_basis_set =
+      utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
 
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
