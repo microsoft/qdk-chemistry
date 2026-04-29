@@ -7,10 +7,41 @@
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/core/types.h>
 
+#include <blas.hh>
 #include <limits>
 #include <memory>
+#include <vector>
 
 namespace qdk::chemistry::scf {
+
+/**
+ * @brief Compute C = A^T * B * A using BLAS GEMM only
+ *
+ * Matrix shapes:
+ * A: m x n
+ * B: m x m
+ * C: n x n
+ *
+ * @param[in] m Row count of A and dimension of square B block.
+ * @param[in] n Column count of A and dimension of square C block.
+ *
+ * Assumed leading dimensions for contiguous storage:
+ * RowMajor: lda = n, ldb = m, ldc = n
+ * ColMajor: lda = m, ldb = m, ldc = n
+ *
+ * Pointers may reference sub-block starts (not necessarily matrix origin).
+ * The intermediate workspace is provided by caller to avoid repeated
+ * allocations across consecutive calls.
+ *
+ * @param[in] A Pointer to the A matrix block.
+ * @param[in] B Pointer to the B matrix block.
+ * @param[out] C Pointer to output C matrix block.
+ * @param[in,out] workspace Temporary buffer of at least m*n doubles.
+ * @param[in] layout BLAS matrix layout (RowMajor by default).
+ */
+void compute_atba_gemm(const double* A, const double* B, double* C, int m,
+                       int n, std::vector<double>& workspace,
+                       blas::Layout layout = blas::Layout::RowMajor);
 
 // Forward declaration
 class SCFImpl;
@@ -98,10 +129,12 @@ class SCFAlgorithm {
       int num_molecular_orbitals, int idx_spin);
 
   /**
-   * @brief Update the density matrix for restricted or unrestricted
-   * calculations. For ASAHF and ROHF calculations, this method will be
-   * overridden to implement the specific density matrix construction for those
-   * methods.
+   * @brief Update the density matrix for RHF, UHF, or ROHF calculations.
+   *
+   * The base implementation handles standard RHF/UHF construction and also
+   * reconstructs spin-blocked alpha/beta densities for ROHF from a shared
+   * molecular-orbital coefficient matrix. Algorithms with custom density
+   * construction (for example ASAHF) can still override this method.
    *
    * @param[in,out] P Reference to the density matrix to be updated
    * @param[in] C Reference to the molecular orbital coefficients
@@ -112,6 +145,23 @@ class SCFAlgorithm {
   virtual void update_density_matrix(RowMajorMatrix& P, const RowMajorMatrix& C,
                                      bool unrestricted, int nelec_alpha,
                                      int nelec_beta);
+
+  /**
+   * @brief Try to provide ROHF convergence matrices for OG evaluation
+   *
+   * For ROHF, some algorithms evaluate convergence using an effective Fock
+   * matrix and total density matrix rather than the spin-blocked SCFImpl
+   * matrices. Derived algorithms can override this hook and provide pointers
+   * to those matrices.
+   *
+   * @param[in] scf_impl SCF implementation object
+   * @param[out] fock_matrix Pointer to convergence Fock matrix
+   * @param[out] density_matrix Pointer to convergence density matrix
+   * @return true if matrices were provided by the algorithm, false otherwise
+   */
+  virtual bool try_get_rohf_convergence_matrices(
+      const SCFImpl& scf_impl, const RowMajorMatrix*& fock_matrix,
+      const RowMajorMatrix*& density_matrix);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking
@@ -137,6 +187,45 @@ class SCFAlgorithm {
                                     RowMajorMatrix& error_matrix,
                                     int num_orbital_sets);
 
+  /**
+   * @brief Build ROHF convergence matrices from spin-blocked SCF matrices
+   *
+   * Converts spin-blocked Fock/density matrices into the effective ROHF Fock
+   * and total-density representation used for OG evaluation.
+   *
+   * @param[in] F Spin-blocked Fock matrix in AO basis with alpha and beta
+   * blocks stacked by row
+   * @param[in] C Molecular-orbital coefficient matrix used for AO<->MO
+   * transformations
+   * @param[in] P Spin-blocked density matrix in AO basis with alpha and beta
+   * blocks stacked by row
+   * @param[in] nelec_alpha Number of alpha electrons
+   * @param[in] nelec_beta Number of beta electrons
+   * @param[out] effective_fock Effective ROHF Fock matrix in AO basis
+   * @param[out] total_density Total AO density matrix (P_alpha + P_beta)
+   */
+  static void build_rohf_f_p_matrix(const RowMajorMatrix& F,
+                                    const RowMajorMatrix& C,
+                                    const RowMajorMatrix& P, int nelec_alpha,
+                                    int nelec_beta,
+                                    RowMajorMatrix& effective_fock,
+                                    RowMajorMatrix& total_density);
+
+  /**
+   * @brief Access cached ROHF effective Fock matrix
+   */
+  const RowMajorMatrix& get_rohf_convergence_fock_matrix() const;
+
+  /**
+   * @brief Access cached ROHF total density matrix
+   */
+  const RowMajorMatrix& get_rohf_convergence_density_matrix() const;
+
+  /**
+   * @brief Mutable access to cached ROHF total density matrix
+   */
+  RowMajorMatrix& rohf_convergence_density_matrix();
+
  protected:
   const SCFContext& ctx_;  ///< Reference to SCF context
   double og_error_ = 0.0;  ///< Current orbital gradient error
@@ -149,5 +238,7 @@ class SCFAlgorithm {
   double delta_energy_ =
       std::numeric_limits<double>::infinity();  ///< Energy change
   double density_rms_ = 0.0;                    ///< Last calculated density RMS
+  RowMajorMatrix rohf_effective_fock_;  ///< Cached ROHF effective Fock (AO)
+  RowMajorMatrix rohf_total_density_;   ///< Cached ROHF total density (P_a+P_b)
 };
 }  // namespace qdk::chemistry::scf

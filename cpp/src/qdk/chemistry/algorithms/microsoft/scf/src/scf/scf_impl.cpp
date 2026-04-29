@@ -1061,7 +1061,8 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
+        ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       F_matrix +=
           (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
            J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
@@ -1095,6 +1096,13 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
       ctx_.cfg->mpi.world_rank, ctx_.result.nuclear_repulsion_energy,
       scf_one_electron_energy, scf_two_electron_energy);
   return {total_energy, F_matrix};
+}
+
+void SCFImpl::build_jk_matrices(const RowMajorMatrix& density_matrix,
+                                RowMajorMatrix& J, RowMajorMatrix& K) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(density_matrix.data(), J.data(), K.data(), alpha, beta, omega);
 }
 
 }  // namespace qdk::chemistry::scf

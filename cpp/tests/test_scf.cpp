@@ -150,14 +150,15 @@ TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, OH_ROHF_Invalid_GDM) {
+TEST_F(ScfTest, OH_ROKS_invalid) {
   auto oh = testing::create_oh_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("enable_gdm", true);
-  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("scf_type", "restricted");
 
-  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::runtime_error);
+  // Restricted ROKS should reject this open-shell doublet case.
+  EXPECT_THROW(scf_solver->run(oh, 0, 2, "sto-3g"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_gdm) {
@@ -227,6 +228,20 @@ TEST_F(ScfTest, Oxygen_atom_charged_doublet_gdm) {
   EXPECT_FALSE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, OH_ROHF_GDM) {
+  auto oh = testing::create_oh_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
+
+  EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
+
+  // Check doublet orbitals
+  EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
+}
+
 TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
@@ -234,9 +249,8 @@ TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("energy_thresh_diis_switch", -2e-4);
-  // Default should be a singlet
-  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"),
-               std::invalid_argument);  // open-shell dublet
+
+  EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 
 TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
@@ -246,7 +260,7 @@ TEST_F(ScfTest, Oxygen_atom_invalid_bfgs_history_size_limit_gdm) {
   scf_solver->settings().set("method", "pbe");
   scf_solver->settings().set("enable_gdm", true);
   scf_solver->settings().set("gdm_bfgs_history_size_limit", 0);
-  // Default should be a singlet
+
   EXPECT_THROW(scf_solver->run(oxygen, 0, 1, "cc-pvdz"), std::invalid_argument);
 }
 

@@ -149,6 +149,29 @@ class SCFImpl {
   const RowMajorMatrix& get_fock_matrix() const { return F_; }
 
   /**
+   * @brief Get the core Hamiltonian matrix
+   * @return Reference to core Hamiltonian H
+   */
+  const RowMajorMatrix& get_core_hamiltonian() const { return H_; }
+
+  /**
+   * @brief Build Coulomb (J) and exchange (K) matrices for a given density
+   *
+   * Utility JK build for a caller-supplied density matrix.
+   * Currently used by the GDM trial-rotation gradient path
+   * (GDMLineFunctor / ROHF generalized-gradient evaluation).
+   * It is not part of the main SCFImpl::iterate_ update loop.
+   * Keeps this trial-path two-electron build logic in one place.
+   *
+   * @param[in] density_matrix Density matrix
+   * (num_density_matrices x NAO x NAO)
+   * @param[out] J Output Coulomb matrix (same size as density_matrix)
+   * @param[out] K Output exchange matrix (same size as density_matrix)
+   */
+  void build_jk_matrices(const RowMajorMatrix& density_matrix,
+                         RowMajorMatrix& J, RowMajorMatrix& K) const;
+
+  /**
    * @brief Get the molecular orbital coefficient matrix
    * @see SCF::get_orbitals_matrix() for API details
    */
