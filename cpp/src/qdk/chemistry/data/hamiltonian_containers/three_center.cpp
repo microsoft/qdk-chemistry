@@ -11,7 +11,7 @@
 #include <limits>
 #include <macis/util/fcidump.hpp>
 #include <memory>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -23,7 +23,7 @@
 
 namespace qdk::chemistry::data {
 
-CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -46,7 +46,7 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
   }
 }
 
-CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals_alpha,
     const Eigen::MatrixXd& one_body_integrals_beta,
     const Eigen::MatrixXd& three_center_integrals_aa,
@@ -74,30 +74,30 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
   }
 }
 
-std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
+std::unique_ptr<HamiltonianContainer> ThreeCenterHamiltonianContainer::clone()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (is_restricted()) {
-    return std::make_unique<CholeskyHamiltonianContainer>(
+    return std::make_unique<ThreeCenterHamiltonianContainer>(
         *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
         _core_energy, *_inactive_fock_matrix.first, _ao_cholesky_vectors,
         _type);
   }
-  return std::make_unique<CholeskyHamiltonianContainer>(
+  return std::make_unique<ThreeCenterHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *_three_center_integrals.first, *_three_center_integrals.second,
       _orbitals, _core_energy, *_inactive_fock_matrix.first,
       *_inactive_fock_matrix.second, _ao_cholesky_vectors, _type);
 }
 
-std::string CholeskyHamiltonianContainer::get_container_type() const {
+std::string ThreeCenterHamiltonianContainer::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
-  return "cholesky";
+  return "three_center";
 }
 
 std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
            const Eigen::VectorXd&>
-CholeskyHamiltonianContainer::get_two_body_integrals() const {
+ThreeCenterHamiltonianContainer::get_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Three-center integrals are not set");
@@ -114,7 +114,7 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
       std::cref(*std::get<2>(_cached_four_center_integrals)));
 }
 
-void CholeskyHamiltonianContainer::_build_four_center_cache() const {
+void ThreeCenterHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
   size_t norb = _orbitals->get_active_space_indices().first.size();
@@ -159,7 +159,7 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
 }
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
-CholeskyHamiltonianContainer::get_three_center_integrals() const {
+ThreeCenterHamiltonianContainer::get_three_center_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Three-center two-body integrals are not set");
@@ -169,12 +169,12 @@ CholeskyHamiltonianContainer::get_three_center_integrals() const {
 }
 
 const std::optional<Eigen::MatrixXd>&
-CholeskyHamiltonianContainer::get_ao_cholesky_vectors() const {
+ThreeCenterHamiltonianContainer::get_ao_cholesky_vectors() const {
   QDK_LOG_TRACE_ENTERING();
   return _ao_cholesky_vectors;
 }
 
-double CholeskyHamiltonianContainer::get_two_body_element(
+double ThreeCenterHamiltonianContainer::get_two_body_element(
     unsigned i, unsigned j, unsigned k, unsigned l, SpinChannel channel) const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -211,13 +211,13 @@ double CholeskyHamiltonianContainer::get_two_body_element(
   }
 }
 
-bool CholeskyHamiltonianContainer::has_two_body_integrals() const {
+bool ThreeCenterHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   return _three_center_integrals.first != nullptr &&
          _three_center_integrals.first->size() > 0;
 }
 
-bool CholeskyHamiltonianContainer::is_restricted() const {
+bool ThreeCenterHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
   // Hamiltonian is restricted if alpha and beta components point to the same
   // data
@@ -227,7 +227,7 @@ bool CholeskyHamiltonianContainer::is_restricted() const {
           (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
 }
 
-bool CholeskyHamiltonianContainer::is_valid() const {
+bool ThreeCenterHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
   // Check if essential data is present
   if (!has_one_body_integrals() || !has_two_body_integrals()) {
@@ -244,7 +244,7 @@ bool CholeskyHamiltonianContainer::is_valid() const {
   return true;
 }
 
-void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
+void ThreeCenterHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
   // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
@@ -283,14 +283,14 @@ void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
 }
 
 std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-CholeskyHamiltonianContainer::make_restricted_three_center_integrals(
+ThreeCenterHamiltonianContainer::make_restricted_three_center_integrals(
     const Eigen::MatrixXd& integrals) {
   QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
   return std::make_pair(shared_integrals, shared_integrals);
 }
 
-nlohmann::json CholeskyHamiltonianContainer::to_json() const {
+nlohmann::json ThreeCenterHamiltonianContainer::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
@@ -431,8 +431,8 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
   return j;
 }
 
-std::unique_ptr<CholeskyHamiltonianContainer>
-CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
+std::unique_ptr<ThreeCenterHamiltonianContainer>
+ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -577,12 +577,12 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
       // so alpha and beta point to the same data
-      return std::make_unique<CholeskyHamiltonianContainer>(
+      return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
           inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CholeskyHamiltonianContainer>(
+      return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
           orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
           std::move(ao_cholesky_vectors), type);
@@ -594,7 +594,7 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
   }
 }
 
-void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
+void ThreeCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Save version first
@@ -678,8 +678,8 @@ void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
   }
 }
 
-std::unique_ptr<CholeskyHamiltonianContainer>
-CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
+std::unique_ptr<ThreeCenterHamiltonianContainer>
+ThreeCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     // Validate version first
@@ -790,12 +790,12 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
     // Create and return appropriate Hamiltonian using the correct constructor
     if (is_restricted_data) {
       // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<CholeskyHamiltonianContainer>(
+      return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
           inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CholeskyHamiltonianContainer>(
+      return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
           orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
           std::move(ao_cholesky_vectors), type);

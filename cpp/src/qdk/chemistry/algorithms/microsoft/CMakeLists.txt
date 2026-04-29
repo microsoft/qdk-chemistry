@@ -9,7 +9,9 @@ target_sources(chemistry PRIVATE
     localization/pipek_mezey.cpp
     localization/vvhv.cpp
     hamiltonian.cpp
+    density_fitted_hamiltonian.cpp
     cholesky_hamiltonian.cpp
+    hamiltonian_util.cpp
     macis_asci.cpp
     macis_base.cpp
     macis_cas.cpp

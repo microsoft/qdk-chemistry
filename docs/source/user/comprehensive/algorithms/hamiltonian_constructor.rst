@@ -109,6 +109,7 @@ QDK (Native)
 .. rubric:: Factory name: ``"qdk"`` (default)
 
 The native QDK/Chemistry implementation for Hamiltonian construction. Transforms molecular orbitals from :term:`AO` to :term:`MO` basis and computes one- and two-electron integrals.
+This implementation produces a ``CanonicalFourCenterHamiltonianContainer`` with explicit four-center integrals.
 
 .. rubric:: Settings
 
@@ -134,7 +135,7 @@ QDK Cholesky
 A Cholesky decomposition-based implementation for Hamiltonian construction.
 This method uses Cholesky decomposition of the electron repulsion integral (ERI) tensor to reduce memory requirements and computational cost while maintaining high accuracy.
 The decomposition represents the four-center ERIs as products of three-center integrals (Cholesky vectors), which are transformed to the MO basis.
-The output Hamiltonian stores the MO three-center integrals directly in a ``CholeskyHamiltonianContainer``, avoiding expansion to the full four-center representation.
+The output Hamiltonian stores the MO three-center integrals directly in a ``ThreeCenterHamiltonianContainer``, avoiding expansion to the full four-center representation.
 Additionally, the original AO Cholesky vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
 Four-center integrals are lazily computed from the three-center integrals on demand.
 
@@ -158,7 +159,72 @@ Four-center integrals are lazily computed from the three-center integrals on dem
      - ERI screening threshold for skipping negligible shell quartets during Cholesky decomposition. Default: 1e-12
    * - ``store_ao_cholesky_vectors``
      - bool
-     - Whether to store the AO three-center integrals in a ``CholeskyHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
+     - Whether to store the AO three-center integrals in a ``ThreeCenterHamiltonianContainer`` in addition to the MO three-center integrals, which are always saved. Default: false
+
+QDK Density-Fitted
+~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_density_fitted_hamiltonian"``
+
+A memory-efficient implementation that uses density fitting (resolution-of-the-identity, RI) to approximate two-electron integrals.
+This implementation produces a ``ThreeCenterHamiltonianContainer`` that stores three-center integrals instead of four-center integrals, significantly reducing memory requirements for large active spaces.
+
+The density fitting approximation expresses four-center integrals as:
+
+.. math::
+
+    (ij|kl) \approx \sum_P (ij|P)(P|kl)
+
+where :math:`P` indexes an auxiliary basis set. The four-center integrals are computed on-the-fly when needed.
+
+.. rubric:: When to use
+
+- Large active space calculations where memory is a concern
+- Systems where the density fitting approximation provides acceptable accuracy
+- Workflows already using density-fitted :term:`SCF` calculations
+
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      // Set the auxiliary basis set for density fitting, unless it is already set
+      if (!orbitals->get_basis_set()->has_auxiliary_basis_set()) {
+        orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
+      }
+
+      // Create density-fitted Hamiltonian constructor
+      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
+
+      // Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
+      auto hamiltonian_with_aux = constructor->run(orbitals);
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      # Set the auxiliary basis set for density fitting, unless it is already set
+      if not orbitals.get_basis_set().has_auxiliary_basis_set():
+          orbitals.get_basis_set().set_auxiliary_basis_set(aux_basis)
+
+      # Create density-fitted Hamiltonian constructor
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+
+      # Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
+      hamiltonian_with_aux = constructor.run(orbitals)
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``scf_type``
+     - string
+     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 Related classes
 ---------------

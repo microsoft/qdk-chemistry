@@ -141,6 +141,9 @@ Hartree-Fock (:term:`HF`)
 Density Functional Theory (:term:`DFT`)
    Kohn-Sham methods: :term:`RKS`, :term:`UKS`, :term:`ROKS`
 
+Density-Fitted Coulomb Integrals (DF-J)
+   Accelerated evaluation of Coulomb (J) integrals via resolution-of-the-identity with auxiliary basis sets (e.g., ``def2-universal-jfit``), compatible with all :term:`HF` and :term:`DFT` methods above.
+
 See :doc:`comprehensive/algorithms/scf_solver` for further details about available :term:`SCF` methods and implementations.
 
 Implementation Highlights

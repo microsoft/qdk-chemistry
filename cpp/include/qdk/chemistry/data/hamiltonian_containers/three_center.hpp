@@ -18,7 +18,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @class CholeskyHamiltonianContainer
+ * @class ThreeCenterHamiltonianContainer
  * @brief Contains a molecular Hamiltonian expressed using three-center
  * integrals.
  *
@@ -30,7 +30,7 @@ namespace qdk::chemistry::data {
  * transformations.
  *
  */
-class CholeskyHamiltonianContainer : public HamiltonianContainer {
+class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with three center integrals
@@ -50,7 +50,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CholeskyHamiltonianContainer(
+  ThreeCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -85,7 +85,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  CholeskyHamiltonianContainer(
+  ThreeCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
       const Eigen::MatrixXd& three_center_integrals_aa,
@@ -99,7 +99,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Destructor
    */
-  ~CholeskyHamiltonianContainer() override = default;
+  ~ThreeCenterHamiltonianContainer() override = default;
 
   /**
    * @brief Create a deep copy of this container
@@ -110,7 +110,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get the type of the underlying container
    * @return String identifying the container type (e.g.,
-   * "cholesky")
+   * "three_center")
    */
   std::string get_container_type() const override final;
 
@@ -186,21 +186,21 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
-   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * @return Unique pointer to const ThreeCenterHamiltonianContainer loaded from
    * group
    * @throws std::runtime_error if I/O error occurs
    */
-  static std::unique_ptr<CholeskyHamiltonianContainer> from_hdf5(
+  static std::unique_ptr<ThreeCenterHamiltonianContainer> from_hdf5(
       H5::Group& group);
 
   /**
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
-   * @return Unique pointer to const CholeskyHamiltonianContainer loaded from
+   * @return Unique pointer to const ThreeCenterHamiltonianContainer loaded from
    * JSON
    * @throws std::runtime_error if JSON is malformed
    */
-  static std::unique_ptr<CholeskyHamiltonianContainer> from_json(
+  static std::unique_ptr<ThreeCenterHamiltonianContainer> from_json(
       const nlohmann::json& j);
 
   /**

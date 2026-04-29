@@ -27,6 +27,7 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEst
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
+    QdkDensityFittedHamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
@@ -71,6 +72,7 @@ __all__ = [
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkDensityFittedHamiltonianConstructor",
     "QdkEnergyEstimator",
     "QdkHamiltonianConstructor",
     "QdkMP2NaturalOrbitalLocalizer",

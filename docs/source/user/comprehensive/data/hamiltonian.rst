@@ -134,10 +134,91 @@ When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the 
       :start-after: # start-cell-properties
       :end-before: # end-cell-properties
 
+Container types
+---------------
+
+The :class:`~qdk_chemistry.data.Hamiltonian` class uses a container-based design where different integral storage formats are implemented as specialized container classes, while the main ``Hamiltonian`` class provides a unified interface.
+This design enables efficient memory usage and optimized integral access patterns depending on the underlying storage method.
+
+Canonical four-center container
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The default container that stores two-electron integrals in the conventional four-index form in chemist's notation in the molecular orbital basis :math:`( ij|kl )`.
+This is the most straightforward representation and is compatible with all quantum chemistry methods.
+The storage size scales as :math:`O(N^4)` where :math:`N` is the number of molecular orbitals.
+
+.. rubric:: When to use
+
+- General-purpose calculations where memory is not a constraint
+- Methods that require explicit four-center integrals
+- Small to medium active spaces
+
+Three-center Hamiltonian container
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation or Cholesky decomposition.
+Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set in case of density fitting or the Cholesky vectors in case of Cholesky decomposition.
+The four-center integrals are computed on-the-fly when needed via:
+
+.. math::
+
+   (ij|kl) \approx \sum_P (ij|P)(P|kl)
+
+The storage size scales as :math:`O(N_{aux} \times N^2)` where :math:`N_{aux}` is the size of the auxiliary basis, typically yielding significant memory savings for larger systems.
+
+.. rubric:: When to use
+
+- Large active space calculations where memory is constrained
+- When using density-fitted orbitals from :term:`SCF` calculations
+- Systems where the density fitting approximation is acceptable
+
+.. rubric:: Creating with the HamiltonianConstructor
+
+The :doc:`HamiltonianConstructor <../algorithms/hamiltonian_constructor>` algorithm can produce either container type depending on the implementation used.
+
+**Cholesky decomposition** — Use the ``qdk_cholesky`` implementation to create a ``ThreeCenterHamiltonianContainer`` from Cholesky-decomposed ERIs.
+This method does not require an auxiliary basis set; it decomposes the full ERI tensor directly.
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_cholesky");
+      // Optionally configure Cholesky tolerance
+      constructor->settings().set("cholesky_tolerance", 1e-8);
+      auto hamiltonian = constructor->run(orbitals);
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_cholesky")
+      # Optionally configure Cholesky tolerance
+      constructor.settings().set("cholesky_tolerance", 1e-8)
+      hamiltonian = constructor.run(orbitals)
+
+**Density fitting** — Use the ``qdk_density_fitted_hamiltonian`` implementation to create a ``ThreeCenterHamiltonianContainer`` from density-fitted integrals.
+This method requires an auxiliary basis set.
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      auto constructor = algorithms::HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
+      auto hamiltonian = constructor->run(orbitals);
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+      hamiltonian = constructor.run(orbitals)
+
 Serialization
 -------------
 
 The :class:`~qdk_chemistry.data.Hamiltonian` class supports serialization to and from JSON and HDF5 formats.
+Both container types are fully serializable, and the container type is preserved through serialization/deserialization cycles.
 For detailed information about serialization in QDK/Chemistry, see the :doc:`Serialization <../data/serialization>` documentation.
 
 Active space Hamiltonian

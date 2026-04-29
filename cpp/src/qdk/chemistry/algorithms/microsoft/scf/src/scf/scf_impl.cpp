@@ -51,7 +51,8 @@ namespace qdk::chemistry::scf {
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  std::shared_ptr<BasisSet> basis_set,
-                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri,
+                 std::shared_ptr<BasisSet> raw_basis_set,
+                 std::shared_ptr<BasisSet> aux_basis_set, bool delay_eri,
                  bool skip_verify) {
   QDK_LOG_TRACE_ENTERING();
   auto& mol = *mol_ptr;
@@ -65,12 +66,12 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
     ctx_.basis_set = basis_set;
   }
   if (cfg.do_dfj) {
-    if (basis_set == nullptr) {
+    if (aux_basis_set == nullptr) {
       ctx_.aux_basis_set =
           BasisSet::from_database_json(mol_ptr, cfg.aux_basis, cfg.basis_mode,
                                        !cfg.cartesian /*pure*/, true /*sort*/);
     } else {
-      ctx_.aux_basis_set = basis_set;
+      ctx_.aux_basis_set = aux_basis_set;
     }
   }
   if (cfg.output_basis_mode == BasisMode::RAW) {
@@ -252,12 +253,13 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
                  bool delay_eri)
-    : SCFImpl(mol_ptr, cfg, nullptr, nullptr, delay_eri) {}
+    : SCFImpl(mol_ptr, cfg, nullptr, nullptr, nullptr, delay_eri) {}
 
 SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                  const RowMajorMatrix& dm, std::shared_ptr<BasisSet> basis_set,
-                 std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri)
-    : SCFImpl(mol, cfg, basis_set, raw_basis_set, delay_eri) {
+                 std::shared_ptr<BasisSet> raw_basis_set,
+                 std::shared_ptr<BasisSet> aux_basis_set, bool delay_eri)
+    : SCFImpl(mol, cfg, basis_set, raw_basis_set, aux_basis_set, delay_eri) {
   QDK_LOG_TRACE_ENTERING();
   VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
          dm.cols() == num_atomic_orbitals_);

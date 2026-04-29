@@ -1,4 +1,11 @@
-"""Tests for the Hamiltonian class aligned with the immutable API."""
+"""Parameterized tests for Hamiltonian with different container types.
+
+This module tests the Hamiltonian class with both CanonicalFourCenterHamiltonianContainer
+and ThreeCenterHamiltonianContainer using pytest parametrization.
+
+Both containers implement the same interface and should behave identically
+for all Hamiltonian operations.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -6,6 +13,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import math
 import pickle
 import tempfile
 from pathlib import Path
@@ -13,39 +21,96 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
+    Ansatz,
+    BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CholeskyHamiltonianContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
+    Structure,
+    ThreeCenterHamiltonianContainer,
 )
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+    mp2_energy_tolerance,
+    scf_energy_tolerance,
+)
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+
+# Container types for parametrization
+CONTAINER_TYPES = ["canonical_four_center", "three_center"]
+
+
+# =============================================================================
+# Shared module-level variables for tests
+# =============================================================================
+
+_one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
+_coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
+_orbitals = Orbitals(_coeffs, None, None, create_test_basis_set(2))
+_rng = np.random.default_rng(42)
+_two_body = _rng.random(2**4)
+# Three-center integrals chosen so that contraction (ij|kl) = sum_P (ij|P)(P|kl)
+# produces two-body = 2.0 for all elements: 1.0^2 + 0.6^2 + 0.8^2 = 2.0
+_three_center = np.array(
+    [
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
+        [1.0, 0.6, 0.8],
+    ]
+)
+
+
+# =============================================================================
+# Helper functions for creating containers directly
+# =============================================================================
+
+
+def create_non_zero_hamiltonian(container_type):
+    """Create a Hamiltonian with non-zero integrals for testing."""
+    if container_type == "canonical_four_center":
+        container = CanonicalFourCenterHamiltonianContainer(_one_body, _two_body, _orbitals, 1.5, np.array([]))
+    elif container_type == "three_center":
+        container = ThreeCenterHamiltonianContainer(_one_body, _three_center, _orbitals, 1.5, np.array([]))
+    else:
+        raise ValueError(f"Unknown container_type: {container_type}")
+
+    return Hamiltonian(container)
+
+
+# =============================================================================
+# Parameterized Tests - Run for Both Container Types
+# =============================================================================
 
 
 class TestHamiltonian:
-    def test_default_constructor(self):
-        h = create_test_hamiltonian(2)
+    """Parameterized tests that run for both container types."""
+
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_default_constructor(self, container_type):
+        """Test default Hamiltonian construction."""
+        h = create_test_hamiltonian(2, container_type)
         assert isinstance(h, Hamiltonian)
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
         assert h.has_orbitals()
 
-    def test_size_and_electron_counts(self):
-        h = create_test_hamiltonian(3)
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_size_and_electron_counts(self, container_type):
+        """Test orbital count retrieval."""
+        h = create_test_hamiltonian(3, container_type)
         assert isinstance(h, Hamiltonian)
         assert h.get_orbitals().get_num_molecular_orbitals() == 3
 
-    def test_full_constructor(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(0)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_full_constructor(self, container_type):
+        """Test full constructor with custom values."""
+        h = create_non_zero_hamiltonian(container_type)
         assert h.has_one_body_integrals()
         assert h.has_two_body_integrals()
         assert h.has_orbitals()
@@ -53,55 +118,79 @@ class TestHamiltonian:
         assert h.get_core_energy() == 1.5
 
         aa, bb = h.get_one_body_integrals()
-        assert np.array_equal(aa, one_body)
-        assert np.array_equal(bb, one_body)
+        assert np.array_equal(aa, _one_body)
+        assert np.array_equal(bb, _one_body)
 
+        # Verify two-body integrals for each container type.
         aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
+        if container_type == "canonical_four_center":
+            # Canonical container should store the provided four-center integrals.
+            assert np.array_equal(aaaa, _two_body)
+            assert np.array_equal(aabb, _two_body)
+            assert np.array_equal(bbbb, _two_body)
+        elif container_type == "three_center":
+            # Three-center container should yield four-center integrals equal
+            # to the contraction of the three-center integrals over the
+            # auxiliary index (assuming identity metric):
+            # (ij|kl) = sum_P (ij|P) (kl|P).
+            expected_aaaa = np.einsum("ip,kp->ik", _three_center, _three_center).flatten()
+            assert np.allclose(
+                aaaa,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            # In the restricted case, mixed- and beta-beta blocks should match.
+            assert np.allclose(
+                aabb,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.allclose(
+                bbbb,
+                expected_aaaa,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+        else:
+            pytest.fail(f"Unexpected container_type: {container_type}")
 
-    def test_one_body_integrals(self):
-        one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
-        two_body = np.zeros(2**4)
-        orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_one_body_integrals(self, container_type):
+        """Test one-body integrals retrieval."""
+        h = create_non_zero_hamiltonian(container_type)
+
         assert h.has_one_body_integrals()
-        assert np.array_equal(h.get_one_body_integrals()[0], one_body)
+        assert np.array_equal(h.get_one_body_integrals()[0], _one_body)
 
-    def test_two_body_integrals(self):
-        one_body = np.eye(2)
-        rng = np.random.default_rng(1)
-        two_body = rng.random(2**4)
-        orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, np.array([])))
-        assert h.has_two_body_integrals()
-        # get_two_body_integrals returns (aaaa, aabb, bbbb) tuple
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_two_body_integrals(self, container_type):
+        """Test two-body integrals retrieval."""
+        h = create_test_hamiltonian(2, container_type)
+
         aaaa, aabb, bbbb = h.get_two_body_integrals()
-        # For restricted case, all should be the same and equal to two_body
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
+        # For restricted case, all should be the same
+        assert np.array_equal(aabb, aaaa)
+        assert np.array_equal(bbbb, aaaa)
 
-    def test_two_body_element_access(self):
-        h = create_test_hamiltonian(2)
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_two_body_element_access(self, container_type):
+        """Test two-body element access."""
+        h = create_test_hamiltonian(2, container_type)
         val = h.get_two_body_element(0, 1, 1, 0)
         assert isinstance(val, float)
 
-    def test_active_space_management(self):
-        one_body = np.eye(3)
-        two_body = np.zeros(3**4)
-        orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 2.5, np.array([])))
-        assert h.get_core_energy() == 2.5
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_active_space_management(self, container_type):
+        """Test core energy retrieval."""
+        h = create_non_zero_hamiltonian(container_type)
+        assert h.get_core_energy() == 1.5
 
-    def test_json_serialization(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_json_serialization(self, container_type):
+        """Test JSON serialization roundtrip."""
+        h = create_non_zero_hamiltonian(container_type)
 
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
@@ -116,6 +205,8 @@ class TestHamiltonian:
         assert h2.has_one_body_integrals()
         assert h2.has_two_body_integrals()
         assert h2.has_orbitals()
+
+        # Verify integrals match
         assert np.allclose(
             h.get_one_body_integrals()[0],
             h2.get_one_body_integrals()[0],
@@ -128,35 +219,24 @@ class TestHamiltonian:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
-        # Compare each component of the two-body integrals tuple
+
+        # Compare two-body integrals
         h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
         h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
         assert np.allclose(
-            h_aaaa,
-            h2_aaaa,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
+            h_aaaa, h2_aaaa, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
         assert np.allclose(
-            h_aabb,
-            h2_aabb,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
+            h_aabb, h2_aabb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
         assert np.allclose(
-            h_bbbb,
-            h2_bbbb,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
+            h_bbbb, h2_bbbb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
 
-    def test_json_file_io(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_json_file_io(self, container_type):
+        """Test JSON file I/O."""
+        h = create_non_zero_hamiltonian(container_type)
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             filename = f.name
@@ -169,49 +249,33 @@ class TestHamiltonian:
             assert h2.has_one_body_integrals()
             assert h2.has_two_body_integrals()
             assert h2.has_orbitals()
+
+            # Compare integrals
             assert np.allclose(
                 h.get_one_body_integrals()[0],
                 h2.get_one_body_integrals()[0],
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
-            assert np.allclose(
-                h.get_one_body_integrals()[1],
-                h2.get_one_body_integrals()[1],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            # Compare each component of the two-body integrals tuple
+
             h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
             h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
             assert np.allclose(
-                h_aaaa,
-                h2_aaaa,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_aaaa, h2_aaaa, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
             assert np.allclose(
-                h_aabb,
-                h2_aabb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_aabb, h2_aabb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
             assert np.allclose(
-                h_bbbb,
-                h2_bbbb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_bbbb, h2_bbbb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
         finally:
             Path(filename).unlink(missing_ok=True)
 
-    def test_hdf5_file_io(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_hdf5_file_io(self, container_type):
+        """Test HDF5 file I/O."""
+        h = create_non_zero_hamiltonian(container_type)
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -224,50 +288,35 @@ class TestHamiltonian:
             assert h2.has_one_body_integrals()
             assert h2.has_two_body_integrals()
             assert h2.has_orbitals()
+
+            # Compare integrals
             assert np.allclose(
                 h.get_one_body_integrals()[0],
                 h2.get_one_body_integrals()[0],
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
-            assert np.allclose(
-                h.get_one_body_integrals()[1],
-                h2.get_one_body_integrals()[1],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            # Compare each component of the two-body integrals tuple
+
             h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
             h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
             assert np.allclose(
-                h_aaaa,
-                h2_aaaa,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_aaaa, h2_aaaa, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
             assert np.allclose(
-                h_aabb,
-                h2_aabb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_aabb, h2_aabb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
             assert np.allclose(
-                h_bbbb,
-                h2_bbbb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
+                h_bbbb, h2_bbbb, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
             )
         finally:
             Path(filename).unlink(missing_ok=True)
 
-    def test_generic_file_io(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([])))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_generic_file_io(self, container_type):
+        """Test generic file I/O with both JSON and HDF5 formats."""
+        h = create_non_zero_hamiltonian(container_type)
 
+        # Test JSON
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
             json_filename = f.name
         try:
@@ -290,6 +339,7 @@ class TestHamiltonian:
         finally:
             Path(json_filename).unlink(missing_ok=True)
 
+        # Test HDF5
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             hdf5_filename = f.name
         try:
@@ -312,19 +362,10 @@ class TestHamiltonian:
         finally:
             Path(hdf5_filename).unlink(missing_ok=True)
 
-    def test_file_io_validation(self):
-        h = create_test_hamiltonian(2)
-        with pytest.raises(RuntimeError, match="Unsupported file type"):
-            h.to_file("test.txt", "txt")
-        with pytest.raises(RuntimeError, match="Unsupported file type"):
-            Hamiltonian.from_file("test.txt", "txt")
-        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian JSON file"):
-            Hamiltonian.from_json_file("nonexistent.hamiltonian.json")
-        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian HDF5 file"):
-            Hamiltonian.from_hdf5_file("nonexistent.hamiltonian.h5")
-
-    def test_minimal_hamiltonian_json_roundtrip(self):
-        h = create_test_hamiltonian(1)
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_minimal_hamiltonian_json_roundtrip(self, container_type):
+        """Test JSON roundtrip for minimal 1-orbital Hamiltonian."""
+        h = create_test_hamiltonian(1, container_type)
         data = json.loads(h.to_json())
         assert data["container"]["core_energy"] == 0.0
         assert data["container"]["has_one_body_integrals"] is True
@@ -337,14 +378,10 @@ class TestHamiltonian:
         assert h2.has_two_body_integrals()
         assert h2.has_orbitals()
 
-    def test_static_methods_exist(self):
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        two_body = rng.random(2**4)
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        fock = np.array([])
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, fock))
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_static_methods_exist(self, container_type):
+        """Test that static methods exist and work."""
+        h = create_non_zero_hamiltonian(container_type)
 
         with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
             filename = f.name
@@ -354,25 +391,28 @@ class TestHamiltonian:
         finally:
             Path(filename).unlink(missing_ok=True)
 
-    def test_repr_method(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_repr_method(self, container_type):
         """Test that __repr__ returns the summary."""
-        h = create_test_hamiltonian(2)
+        h = create_test_hamiltonian(2, container_type)
         repr_str = repr(h)
         summary_str = h.get_summary()
         assert repr_str == summary_str
         assert "Hamiltonian" in repr_str
 
-    def test_str_method(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_str_method(self, container_type):
         """Test that __str__ returns the summary."""
-        h = create_test_hamiltonian(2)
+        h = create_test_hamiltonian(2, container_type)
         str_str = str(h)
         summary_str = h.get_summary()
         assert str_str == summary_str
         assert "Hamiltonian" in str_str
 
-    def test_pickling_hamiltonian(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_pickling_hamiltonian(self, container_type):
         """Test that Hamiltonian can be pickled and unpickled correctly."""
-        h = create_test_hamiltonian(3)
+        h = create_test_hamiltonian(3, container_type)
 
         # Test pickling round-trip
         pickled_data = pickle.dumps(h)
@@ -392,9 +432,9 @@ class TestHamiltonian:
         if h.has_two_body_integrals():
             h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
             h_restored_aaaa, h_restored_aabb, h_restored_bbbb = h_restored.get_two_body_integrals()
-            assert np.array_equal(h_restored_aaaa, h_aaaa)
-            assert np.array_equal(h_restored_aabb, h_aabb)
-            assert np.array_equal(h_restored_bbbb, h_bbbb)
+            assert np.allclose(h_restored_aaaa, h_aaaa)
+            assert np.allclose(h_restored_aabb, h_aabb)
+            assert np.allclose(h_restored_bbbb, h_bbbb)
 
         # Verify orbital consistency
         if h.has_orbitals():
@@ -403,9 +443,49 @@ class TestHamiltonian:
             assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
             assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
 
-    def test_restricted_hamiltonian_construction(self):
+
+# =============================================================================
+# File I/O Validation Tests (container-independent)
+# =============================================================================
+
+
+class TestFileIOValidation:
+    """Tests for file I/O validation (container-independent)."""
+
+    def test_file_io_validation(self):
+        """Test file I/O validation errors."""
+        h = create_test_hamiltonian(2)
+        with pytest.raises(RuntimeError, match="Unsupported file type"):
+            h.to_file("test.txt", "txt")
+        with pytest.raises(RuntimeError, match="Unsupported file type"):
+            Hamiltonian.from_file("test.txt", "txt")
+        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian JSON file"):
+            Hamiltonian.from_json_file("nonexistent.hamiltonian.json")
+        with pytest.raises(RuntimeError, match="Unable to open Hamiltonian HDF5 file"):
+            Hamiltonian.from_hdf5_file("nonexistent.hamiltonian.h5")
+
+
+class TestInvalidContainerType:
+    """Tests for invalid container type handling."""
+
+    def test_invalid_container_type_raises(self):
+        """Test that invalid container type raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown container_type"):
+            create_test_hamiltonian(2, "invalid_type")
+
+
+# =============================================================================
+# Restricted/Unrestricted Tests
+# =============================================================================
+
+
+class TestRestrictedUnrestricted:
+    """Tests for restricted and unrestricted Hamiltonian behavior."""
+
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_restricted_hamiltonian_construction(self, container_type):
         """Test restricted Hamiltonian construction and properties."""
-        # Create restricted orbitals (default behavior)
+        # Create restricted orbitals
         coeffs = np.eye(3)
         basis_set = create_test_basis_set(3, "test-restricted")
         orbitals = Orbitals(coeffs, None, None, basis_set)
@@ -417,10 +497,16 @@ class TestHamiltonian:
         rng = np.random.default_rng(42)
         one_body = rng.random((3, 3))
         one_body = 0.5 * (one_body + one_body.T)  # Make symmetric
-        two_body = rng.random(3**4)
         inactive_fock = rng.random((3, 3))
 
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock))
+        if container_type == "canonical_four_center":
+            two_body = rng.random(3**4)
+            container = CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.0, inactive_fock)
+        else:
+            three_center = rng.random((9, 3))
+            container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, inactive_fock)
+
+        h = Hamiltonian(container)
 
         # Verify Hamiltonian properties
         assert h.is_restricted()
@@ -434,12 +520,14 @@ class TestHamiltonian:
         assert np.array_equal(h.get_one_body_integrals()[0], one_body)
         assert np.array_equal(h.get_one_body_integrals()[1], one_body)
 
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body)
-        assert np.array_equal(aabb, two_body)
-        assert np.array_equal(bbbb, two_body)
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_get_container_type(self, container_type):
+        """Test get_container_type returns correct string."""
+        h = create_test_hamiltonian(2, container_type)
+        assert h.get_container_type() == container_type
 
-    def test_unrestricted_hamiltonian_construction(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_unrestricted_hamiltonian_construction(self, container_type):
         """Test unrestricted Hamiltonian construction and properties."""
         # Create unrestricted orbitals with different alpha/beta coefficients
         coeffs_alpha = np.eye(2)
@@ -455,14 +543,14 @@ class TestHamiltonian:
         rng = np.random.default_rng(123)
         one_body_alpha = np.array([[1.0, 0.2], [0.2, 1.5]])
         one_body_beta = np.array([[1.1, 0.3], [0.3, 1.6]])
-        two_body_aaaa = rng.random(2**4)
-        two_body_aabb = rng.random(2**4)
-        two_body_bbbb = rng.random(2**4)
         inactive_fock_alpha = np.array([[0.5, 0.1], [0.1, 0.7]])
         inactive_fock_beta = np.array([[0.6, 0.2], [0.2, 0.8]])
 
-        h = Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(
+        if container_type == "canonical_four_center":
+            two_body_aaaa = rng.random(2**4)
+            two_body_aabb = rng.random(2**4)
+            two_body_bbbb = rng.random(2**4)
+            container = CanonicalFourCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 two_body_aaaa,
@@ -473,7 +561,30 @@ class TestHamiltonian:
                 inactive_fock_alpha,
                 inactive_fock_beta,
             )
-        )
+        else:
+            # For three-center container, use three-center integrals scaled appropriately
+            base_three_center = np.array(
+                [
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                ]
+            )
+            three_center_aa = math.sqrt(0.5) * base_three_center
+            three_center_bb = math.sqrt(1.5) * base_three_center
+            container = ThreeCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                three_center_aa,
+                three_center_bb,
+                orbitals,
+                2.0,
+                inactive_fock_alpha,
+                inactive_fock_beta,
+            )
+
+        h = Hamiltonian(container)
 
         # Verify Hamiltonian properties
         assert not h.is_restricted()
@@ -486,23 +597,37 @@ class TestHamiltonian:
         # Verify separate alpha/beta integral access
         assert np.array_equal(h.get_one_body_integrals()[0], one_body_alpha)
         assert np.array_equal(h.get_one_body_integrals()[1], one_body_beta)
-        aaaa, aabb, bbbb = h.get_two_body_integrals()
-        assert np.array_equal(aaaa, two_body_aaaa)
-        assert np.array_equal(aabb, two_body_aabb)
-        assert np.array_equal(bbbb, two_body_bbbb)
 
-    def test_unrestricted_vs_restricted_serialization(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_unrestricted_vs_restricted_serialization(self, container_type):
         """Test that restricted/unrestricted nature is preserved in serialization."""
+        basis_set = create_test_basis_set(2, "test-serialization")
+
         # Test restricted Hamiltonian
         coeffs = np.eye(2)
-        basis_set = create_test_basis_set(2, "test-serialization-restricted")
         orbitals_restricted = Orbitals(coeffs, None, None, basis_set)
 
         one_body = np.array([[1.0, 0.1], [0.1, 1.0]])
-        two_body = np.ones(16) * 0.5
-        h_restricted = Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals_restricted, 1.0, np.eye(2))
-        )
+
+        if container_type == "canonical_four_center":
+            two_body = np.ones(16) * 0.5
+            container_restricted = CanonicalFourCenterHamiltonianContainer(
+                one_body, two_body, orbitals_restricted, 1.0, np.eye(2)
+            )
+        else:
+            three_center = np.array(
+                [
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
+                    [0.5, 0.3, 0.4],
+                ]
+            )
+            container_restricted = ThreeCenterHamiltonianContainer(
+                one_body, three_center, orbitals_restricted, 1.0, np.eye(2)
+            )
+
+        h_restricted = Hamiltonian(container_restricted)
 
         # Test unrestricted Hamiltonian
         coeffs_alpha = np.eye(2)
@@ -511,11 +636,12 @@ class TestHamiltonian:
 
         one_body_alpha = np.array([[1.0, 0.1], [0.1, 1.0]])
         one_body_beta = np.array([[1.1, 0.2], [0.2, 1.1]])
-        two_body_aaaa = np.ones(16) * 1.0
-        two_body_aabb = np.ones(16) * 2.0
-        two_body_bbbb = np.ones(16) * 3.0
-        h_unrestricted = Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(
+
+        if container_type == "canonical_four_center":
+            two_body_aaaa = np.ones(16) * 1.0
+            two_body_aabb = np.ones(16) * 2.0
+            two_body_bbbb = np.ones(16) * 3.0
+            container_unrestricted = CanonicalFourCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 two_body_aaaa,
@@ -526,7 +652,29 @@ class TestHamiltonian:
                 np.eye(2),
                 np.eye(2),
             )
-        )
+        else:
+            base_three_center = np.array(
+                [
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                    [1.0, 0.6, 0.8],
+                ]
+            )
+            three_center_aa = math.sqrt(0.5) * base_three_center
+            three_center_bb = math.sqrt(1.5) * base_three_center
+            container_unrestricted = ThreeCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                three_center_aa,
+                three_center_bb,
+                orbitals_unrestricted,
+                2.0,
+                np.eye(2),
+                np.eye(2),
+            )
+
+        h_unrestricted = Hamiltonian(container_unrestricted)
 
         # Test JSON serialization preserves restricted/unrestricted nature
         h_restricted_json = Hamiltonian.from_json(h_restricted.to_json())
@@ -547,7 +695,8 @@ class TestHamiltonian:
             h_unrestricted.get_one_body_integrals()[1], h_unrestricted_json.get_one_body_integrals()[1]
         )
 
-    def test_active_space_consistency(self):
+    @pytest.mark.parametrize("container_type", CONTAINER_TYPES)
+    def test_active_space_consistency(self, container_type):
         """Test that active space handling works correctly for both restricted and unrestricted."""
         # Test restricted case with active space
         model_orbitals_restricted = ModelOrbitals(4, True)
@@ -556,10 +705,19 @@ class TestHamiltonian:
 
         # Create restricted Hamiltonian
         one_body = np.eye(4)
-        two_body = np.zeros(4**4)
-        h_restricted = Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4))
-        )
+
+        if container_type == "canonical_four_center":
+            two_body = np.zeros(4**4)
+            container_restricted = CanonicalFourCenterHamiltonianContainer(
+                one_body, two_body, model_orbitals_restricted, 0.0, np.eye(4)
+            )
+        else:
+            three_center = np.zeros((16, 4))
+            container_restricted = ThreeCenterHamiltonianContainer(
+                one_body, three_center, model_orbitals_restricted, 0.0, np.eye(4)
+            )
+
+        h_restricted = Hamiltonian(container_restricted)
         assert h_restricted.is_restricted()
 
         # Test unrestricted case with active space
@@ -571,11 +729,12 @@ class TestHamiltonian:
         # Create unrestricted Hamiltonian
         one_body_alpha = np.eye(4)
         one_body_beta = np.eye(4) * 1.1
-        two_body_aaaa = np.zeros(4**4)
-        two_body_aabb = np.zeros(4**4)
-        two_body_bbbb = np.zeros(4**4)
-        h_unrestricted = Hamiltonian(
-            CanonicalFourCenterHamiltonianContainer(
+
+        if container_type == "canonical_four_center":
+            two_body_aaaa = np.zeros(4**4)
+            two_body_aabb = np.zeros(4**4)
+            two_body_bbbb = np.zeros(4**4)
+            container_unrestricted = CanonicalFourCenterHamiltonianContainer(
                 one_body_alpha,
                 one_body_beta,
                 two_body_aaaa,
@@ -586,7 +745,21 @@ class TestHamiltonian:
                 np.eye(4),
                 np.eye(4),
             )
-        )
+        else:
+            three_center_aa = np.zeros((16, 4))
+            three_center_bb = np.zeros((16, 4))
+            container_unrestricted = ThreeCenterHamiltonianContainer(
+                one_body_alpha,
+                one_body_beta,
+                three_center_aa,
+                three_center_bb,
+                model_orbitals_unrestricted,
+                0.0,
+                np.eye(4),
+                np.eye(4),
+            )
+
+        h_unrestricted = Hamiltonian(container_unrestricted)
         assert h_unrestricted.is_unrestricted()
 
         # Verify active space information is accessible
@@ -596,470 +769,106 @@ class TestHamiltonian:
         assert alpha_indices == beta_indices
 
         alpha_indices_unres, beta_indices_unres = model_orbitals_unrestricted.get_active_space_indices()
-        assert len(alpha_indices_unres) == 4  # All orbitals active by default
+        assert len(alpha_indices_unres) == 4
         assert len(beta_indices_unres) == 4
 
 
-class TestCholeskyHamiltonian:
-    """Test suite for CholeskyHamiltonianContainer."""
+# =============================================================================
+# Three-Center-Specific Tests
+# =============================================================================
 
-    def test_default_constructor(self):
-        """Test construction of Cholesky Hamiltonian."""
+
+class TestThreeCenterSpecific:
+    """Tests specific to ThreeCenterHamiltonianContainer."""
+
+    def test_three_center_integrals_storage(self):
+        """Test three-center integral storage and retrieval."""
         one_body = np.eye(2)
-        rng = np.random.default_rng(0)
-        cholesky_vecs = rng.random((4, 10))  # 4 = 2^2 AOs, 10 vectors
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-        assert isinstance(h, Hamiltonian)
-        assert h.has_one_body_integrals()
-        assert h.has_two_body_integrals()
-        assert h.has_orbitals()
-
-    def test_size_and_electron_counts(self):
-        """Test Hamiltonian size properties."""
-        one_body = np.eye(3)
-        rng = np.random.default_rng(1)
-        cholesky_vecs = rng.random((9, 15))  # 9 = 3^2 AOs, 15 vectors
-        orbitals = create_test_orbitals(3)
-
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
-        assert h.get_orbitals().get_num_molecular_orbitals() == 3
-
-    def test_full_constructor(self):
-        """Test full constructor with all parameters."""
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(0)
-        cholesky_vecs = rng.random((4, 10))
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-        assert h.has_one_body_integrals()
-        assert h.has_two_body_integrals()
-        assert h.has_orbitals()
-        assert h.get_orbitals().get_num_molecular_orbitals() == 2
-        assert h.get_core_energy() == 1.5
-
-        aa, bb = h.get_one_body_integrals()
-        assert np.array_equal(aa, one_body)
-        assert np.array_equal(bb, one_body)
-
-    def test_one_body_integrals(self):
-        """Test one-body integral access."""
-        one_body = np.array([[1.0, 0.2], [0.2, 1.5]])
-        cholesky_vecs = np.random.default_rng(2).random((4, 8))
+        # Three-center: [n_orb_pairs x n_aux] = [4 x 3]
+        three_center = np.array(
+            [
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+            ]
+        )
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
-        assert h.has_one_body_integrals()
-        assert np.array_equal(h.get_one_body_integrals()[0], one_body)
 
-    def test_two_body_integrals(self):
-        """Test two-body integral access."""
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+
+        # Verify three-center storage (returns pair for aa, bb; restricted shares same data)
+        tc_aa, tc_bb = container.get_three_center_integrals()
+        assert np.allclose(tc_aa, three_center)
+        assert np.allclose(tc_bb, three_center)  # Restricted: aa == bb
+
+    def test_two_body_from_three_center_contraction(self):
+        """Test two-body integrals computed from three-center contraction.
+
+        The three_center integrals are chosen so that contraction
+        (ij|kl) = sum_P (ij|P)(P|kl) produces expected two_body values.
+        """
         one_body = np.eye(2)
-        rng = np.random.default_rng(1)
-        cholesky_vecs = rng.random((4, 10))
+        # These values produce two_body = 2.0 when contracted:
+        # 1.0^2 + 0.6^2 + 0.8^2 = 1.0 + 0.36 + 0.64 = 2.0
+        three_center = np.array(
+            [
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+            ]
+        )
         orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
-        assert h.has_two_body_integrals()
 
-    def test_two_body_element_access(self):
-        """Test individual two-body element access."""
-        one_body = np.eye(2)
-        rng = np.random.default_rng(3)
-        cholesky_vecs = rng.random((4, 10))
-        orbitals = create_test_orbitals(2)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
-        val = h.get_two_body_element(0, 1, 1, 0)
-        assert isinstance(val, float)
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+        h = Hamiltonian(container)
 
-    def test_active_space_management(self):
-        """Test core energy handling."""
-        one_body = np.eye(3)
-        cholesky_vecs = np.random.default_rng(4).random((9, 15))
-        orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 2.5, np.array([])))
-        assert h.get_core_energy() == 2.5
-
-    def test_json_serialization(self):
-        """Test JSON serialization and deserialization."""
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        cholesky_vecs = rng.random((4, 10))
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-
-        data = json.loads(h.to_json())
-        assert isinstance(data, dict)
-        assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
-
-        h2 = Hamiltonian.from_json(json.dumps(data))
-        assert h2.get_orbitals().get_num_molecular_orbitals() == 2
-        assert h2.get_core_energy() == 1.5
-        assert h2.has_one_body_integrals()
-        assert h2.has_two_body_integrals()
-        assert h2.has_orbitals()
+        aaaa, _, _ = h.get_two_body_integrals()
+        expected_two_body = 2.0 * np.ones(16)
         assert np.allclose(
-            h.get_one_body_integrals()[0],
-            h2.get_one_body_integrals()[0],
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
-            h.get_one_body_integrals()[1],
-            h2.get_one_body_integrals()[1],
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-        # Compare each component of the two-body integrals tuple
-        h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
-        h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
-        assert np.allclose(
-            h_aaaa,
-            h2_aaaa,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
-            h_aabb,
-            h2_aabb,
-            rtol=float_comparison_relative_tolerance,
-            atol=float_comparison_absolute_tolerance,
-        )
-        assert np.allclose(
-            h_bbbb,
-            h2_bbbb,
+            aaaa,
+            expected_two_body,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
 
-    def test_json_file_io(self):
-        """Test JSON file I/O."""
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        cholesky_vecs = rng.random((4, 10))
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-
-        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
-            filename = f.name
-        try:
-            h.to_json_file(filename)
-            assert Path(filename).exists()
-            h2 = Hamiltonian.from_json_file(filename)
-            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
-            assert h2.get_core_energy() == 1.5
-            assert h2.has_one_body_integrals()
-            assert h2.has_two_body_integrals()
-            assert h2.has_orbitals()
-            assert np.allclose(
-                h.get_one_body_integrals()[0],
-                h2.get_one_body_integrals()[0],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h.get_one_body_integrals()[1],
-                h2.get_one_body_integrals()[1],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            # Compare each component of the two-body integrals tuple
-            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
-            h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
-            assert np.allclose(
-                h_aaaa,
-                h2_aaaa,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h_aabb,
-                h2_aabb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h_bbbb,
-                h2_bbbb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-        finally:
-            Path(filename).unlink(missing_ok=True)
-
-    def test_hdf5_file_io(self):
-        """Test HDF5 file I/O."""
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        cholesky_vecs = rng.random((4, 10))
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-
-        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
-            filename = f.name
-        try:
-            h.to_hdf5_file(filename)
-            assert Path(filename).exists()
-            h2 = Hamiltonian.from_hdf5_file(filename)
-            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
-            assert h2.get_core_energy() == 1.5
-            assert h2.has_one_body_integrals()
-            assert h2.has_two_body_integrals()
-            assert h2.has_orbitals()
-            assert np.allclose(
-                h.get_one_body_integrals()[0],
-                h2.get_one_body_integrals()[0],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h.get_one_body_integrals()[1],
-                h2.get_one_body_integrals()[1],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            # Compare each component of the two-body integrals tuple
-            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
-            h2_aaaa, h2_aabb, h2_bbbb = h2.get_two_body_integrals()
-            assert np.allclose(
-                h_aaaa,
-                h2_aaaa,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h_aabb,
-                h2_aabb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-            assert np.allclose(
-                h_bbbb,
-                h2_bbbb,
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-        finally:
-            Path(filename).unlink(missing_ok=True)
-
-    def test_generic_file_io(self):
-        """Test generic file I/O with format specification."""
-        one_body = np.array([[1.0, 0.5], [0.5, 2.0]])
-        rng = np.random.default_rng(42)
-        cholesky_vecs = rng.random((4, 10))
-        coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
-        orbitals = Orbitals(coeffs, None, None, create_test_basis_set(2))
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.5, np.array([])))
-
-        # Test JSON format
-        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.json", delete=False) as f:
-            json_filename = f.name
-        try:
-            h.to_file(json_filename, "json")
-            assert Path(json_filename).exists()
-            h2 = Hamiltonian.from_file(json_filename, "json")
-            assert h2.get_orbitals().get_num_molecular_orbitals() == 2
-            assert np.allclose(
-                h.get_one_body_integrals()[0],
-                h2.get_one_body_integrals()[0],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-        finally:
-            Path(json_filename).unlink(missing_ok=True)
-
-        # Test HDF5 format
-        with tempfile.NamedTemporaryFile(suffix=".hamiltonian.h5", delete=False) as f:
-            hdf5_filename = f.name
-        try:
-            h.to_file(hdf5_filename, "hdf5")
-            assert Path(hdf5_filename).exists()
-            h3 = Hamiltonian.from_file(hdf5_filename, "hdf5")
-            assert h3.get_orbitals().get_num_molecular_orbitals() == 2
-            assert np.allclose(
-                h.get_one_body_integrals()[0],
-                h3.get_one_body_integrals()[0],
-                rtol=float_comparison_relative_tolerance,
-                atol=float_comparison_absolute_tolerance,
-            )
-        finally:
-            Path(hdf5_filename).unlink(missing_ok=True)
-
-    def test_pickling_hamiltonian(self):
-        """Test that Cholesky Hamiltonian can be pickled and unpickled correctly."""
-        one_body = np.eye(3)
-        rng = np.random.default_rng(5)
-        cholesky_vecs = rng.random((9, 15))
-        orbitals = create_test_orbitals(3)
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
-
-        # Test pickling round-trip
-        pickled_data = pickle.dumps(h)
-        h_restored = pickle.loads(pickled_data)
-
-        # Verify core properties
-        assert h_restored.has_one_body_integrals() == h.has_one_body_integrals()
-        assert h_restored.has_two_body_integrals() == h.has_two_body_integrals()
-        assert h_restored.has_orbitals() == h.has_orbitals()
-        assert h_restored.get_core_energy() == h.get_core_energy()
-
-        # Verify integral data
-        if h.has_one_body_integrals():
-            assert np.array_equal(h_restored.get_one_body_integrals()[0], h.get_one_body_integrals()[0])
-            assert np.array_equal(h_restored.get_one_body_integrals()[1], h.get_one_body_integrals()[1])
-
-        if h.has_two_body_integrals():
-            h_aaaa, h_aabb, h_bbbb = h.get_two_body_integrals()
-            h_restored_aaaa, h_restored_aabb, h_restored_bbbb = h_restored.get_two_body_integrals()
-            assert np.array_equal(h_restored_aaaa, h_aaaa)
-            assert np.array_equal(h_restored_aabb, h_aabb)
-            assert np.array_equal(h_restored_bbbb, h_bbbb)
-
-        # Verify orbital consistency
-        if h.has_orbitals():
-            orig_orbs = h.get_orbitals()
-            restored_orbs = h_restored.get_orbitals()
-            assert orig_orbs.get_num_molecular_orbitals() == restored_orbs.get_num_molecular_orbitals()
-            assert np.array_equal(orig_orbs.get_coefficients(), restored_orbs.get_coefficients())
-
-    def test_restricted_hamiltonian_construction(self):
-        """Test restricted Cholesky Hamiltonian construction and properties."""
-        # Create restricted orbitals (default behavior)
-        coeffs = np.eye(3)
-        basis_set = create_test_basis_set(3, "test-cholesky-restricted")
-        orbitals = Orbitals(coeffs, None, None, basis_set)
-
-        assert orbitals.is_restricted()
-        assert not orbitals.is_unrestricted()
-
-        # Create restricted Hamiltonian
-        rng = np.random.default_rng(42)
-        one_body = rng.random((3, 3))
-        one_body = 0.5 * (one_body + one_body.T)  # Make symmetric
-        cholesky_vecs = rng.random((9, 15))
-        inactive_fock = rng.random((3, 3))
-
-        h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 1.0, inactive_fock))
-
-        # Verify Hamiltonian properties
-        assert h.is_restricted()
-        assert not h.is_unrestricted()
-        assert h.has_one_body_integrals()
-        assert h.has_two_body_integrals()
-        assert h.has_orbitals()
-        assert h.get_core_energy() == 1.0
-
-        # Verify integral access
-        assert np.array_equal(h.get_one_body_integrals()[0], one_body)
-        assert np.array_equal(h.get_one_body_integrals()[1], one_body)
-
-    def test_unrestricted_hamiltonian_construction(self):
-        """Test unrestricted Cholesky Hamiltonian construction and properties."""
-        # Create unrestricted orbitals with different alpha/beta coefficients
+    def test_unrestricted_three_center_integrals(self):
+        """Test three-center integrals for unrestricted case."""
         coeffs_alpha = np.eye(2)
         coeffs_beta = np.array([[0.8, 0.6], [0.6, -0.8]])
-        basis_set = create_test_basis_set(2, "test-cholesky-unrestricted")
+        basis_set = create_test_basis_set(2, "test-unrestricted-df")
         orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
 
-        # Verify orbitals are unrestricted
-        assert not orbitals.is_restricted()
-        assert orbitals.is_unrestricted()
+        one_body_alpha = np.eye(2)
+        one_body_beta = np.eye(2) * 1.1
 
-        # Create unrestricted Hamiltonian with different alpha/beta integrals
-        rng = np.random.default_rng(123)
-        one_body_alpha = np.array([[1.0, 0.2], [0.2, 1.5]])
-        one_body_beta = np.array([[1.1, 0.3], [0.3, 1.6]])
-        cholesky_vecs_aa = rng.random((4, 10))
-        cholesky_vecs_bb = rng.random((4, 10))
-        inactive_fock_alpha = np.array([[0.5, 0.1], [0.1, 0.7]])
-        inactive_fock_beta = np.array([[0.6, 0.2], [0.2, 0.8]])
+        base_three_center = np.array(
+            [
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+            ]
+        )
+        three_center_aa = math.sqrt(0.5) * base_three_center
+        three_center_bb = math.sqrt(1.5) * base_three_center
 
-        h = Hamiltonian(
-            CholeskyHamiltonianContainer(
-                one_body_alpha,
-                one_body_beta,
-                cholesky_vecs_aa,
-                cholesky_vecs_bb,
-                orbitals,
-                2.0,
-                inactive_fock_alpha,
-                inactive_fock_beta,
-            )
+        container = ThreeCenterHamiltonianContainer(
+            one_body_alpha,
+            one_body_beta,
+            three_center_aa,
+            three_center_bb,
+            orbitals,
+            1.5,
+            np.eye(2),
+            np.eye(2),
         )
 
-        # Verify Hamiltonian properties
-        assert not h.is_restricted()
-        assert h.is_unrestricted()
-        assert h.has_one_body_integrals()
-        assert h.has_two_body_integrals()
-        assert h.has_orbitals()
-        assert h.get_core_energy() == 2.0
-
-        # Verify separate alpha/beta integral access
-        assert np.array_equal(h.get_one_body_integrals()[0], one_body_alpha)
-        assert np.array_equal(h.get_one_body_integrals()[1], one_body_beta)
-
-    def test_unrestricted_vs_restricted_serialization(self):
-        """Test that restricted/unrestricted nature is preserved in serialization."""
-        # Test restricted Hamiltonian
-        coeffs = np.eye(2)
-        basis_set = create_test_basis_set(2, "test-cholesky-serialization-restricted")
-        orbitals_restricted = Orbitals(coeffs, None, None, basis_set)
-
-        one_body = np.array([[1.0, 0.1], [0.1, 1.0]])
-        cholesky_vecs = np.random.default_rng(6).random((4, 8))
-        h_restricted = Hamiltonian(
-            CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals_restricted, 1.0, np.eye(2))
-        )
-
-        # Test unrestricted Hamiltonian
-        coeffs_alpha = np.eye(2)
-        coeffs_beta = np.array([[0.9, 0.1], [0.1, 0.9]])
-        orbitals_unrestricted = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
-
-        one_body_alpha = np.array([[1.0, 0.1], [0.1, 1.0]])
-        one_body_beta = np.array([[1.1, 0.2], [0.2, 1.1]])
-        cholesky_vecs_aa = np.random.default_rng(7).random((4, 8))
-        cholesky_vecs_bb = np.random.default_rng(7).random((4, 8))
-        h_unrestricted = Hamiltonian(
-            CholeskyHamiltonianContainer(
-                one_body_alpha,
-                one_body_beta,
-                cholesky_vecs_aa,
-                cholesky_vecs_bb,
-                orbitals_unrestricted,
-                2.0,
-                np.eye(2),
-                np.eye(2),
-            )
-        )
-
-        # Test JSON serialization preserves restricted/unrestricted nature
-        h_restricted_json = Hamiltonian.from_json(h_restricted.to_json())
-        assert h_restricted_json.is_restricted()
-        assert not h_restricted_json.is_unrestricted()
-
-        h_unrestricted_json = Hamiltonian.from_json(h_unrestricted.to_json())
-        assert not h_unrestricted_json.is_restricted()
-        assert h_unrestricted_json.is_unrestricted()
-
-        # Verify integral values are preserved
-        assert np.array_equal(h_restricted.get_one_body_integrals()[0], h_restricted_json.get_one_body_integrals()[0])
-        assert np.array_equal(h_restricted.get_one_body_integrals()[1], h_restricted_json.get_one_body_integrals()[1])
-        assert np.array_equal(
-            h_unrestricted.get_one_body_integrals()[0], h_unrestricted_json.get_one_body_integrals()[0]
-        )
-        assert np.array_equal(
-            h_unrestricted.get_one_body_integrals()[1], h_unrestricted_json.get_one_body_integrals()[1]
-        )
+        # Verify three-center retrieval for unrestricted
+        tc_aa, tc_bb = container.get_three_center_integrals()
+        assert np.allclose(tc_aa, three_center_aa)
+        assert np.allclose(tc_bb, three_center_bb)
 
     def test_ao_cholesky_vectors_absent_by_default(self):
         """Test that AO Cholesky vectors are None when not provided."""
@@ -1068,7 +877,7 @@ class TestCholeskyHamiltonian:
         three_center = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
+        container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
         assert container.get_ao_cholesky_vectors() is None
 
     def test_ao_cholesky_vectors_present(self):
@@ -1079,7 +888,7 @@ class TestCholeskyHamiltonian:
         ao_vecs = rng.random((9, 5))  # e.g. 3^2 AOs, 5 Cholesky vectors
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(
+        container = ThreeCenterHamiltonianContainer(
             one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         result = container.get_ao_cholesky_vectors()
@@ -1094,13 +903,13 @@ class TestCholeskyHamiltonian:
         ao_vecs = rng.random((9, 5))
         orbitals = create_test_orbitals(2)
 
-        container = CholeskyHamiltonianContainer(
+        container = ThreeCenterHamiltonianContainer(
             one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
         )
         h = Hamiltonian(container)
 
         h_roundtrip = Hamiltonian.from_json(h.to_json())
-        assert h_roundtrip.get_container_type() == "cholesky"
+        assert h_roundtrip.get_container_type() == "three_center"
 
         roundtrip_data = json.loads(h_roundtrip.to_json())
         assert "ao_cholesky_vectors" in roundtrip_data["container"]
@@ -1112,7 +921,208 @@ class TestCholeskyHamiltonian:
         )
 
 
+# =============================================================================
+# Container Equivalence Tests
+# =============================================================================
+
+
+class TestContainerEquivalence:
+    """Tests that verify both container types produce equivalent results."""
+
+    def test_both_containers_have_same_interface(self):
+        """Test that both containers expose the same Hamiltonian interface."""
+        h_canonical = create_test_hamiltonian(2, "canonical_four_center")
+        h_df = create_test_hamiltonian(2, "three_center")
+
+        # Both should have the same interface methods
+        assert h_canonical.has_one_body_integrals() == h_df.has_one_body_integrals()
+        assert h_canonical.has_two_body_integrals() == h_df.has_two_body_integrals()
+        assert h_canonical.has_orbitals() == h_df.has_orbitals()
+        assert h_canonical.is_restricted() == h_df.is_restricted()
+
+    def test_two_body_equivalence_with_matching_integrals(self):
+        """Test that both containers produce the same two-body integrals.
+
+        When three_center integrals are chosen such that their contraction
+        equals the canonical two_body integrals, both containers should
+        produce identical results.
+        """
+        one_body = np.eye(2)
+        two_body = 2.0 * np.ones(16)
+        orbitals = create_test_orbitals(2)
+
+        # Three-center chosen so contraction equals two_body
+        three_center = np.array(
+            [
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+            ]
+        )
+
+        canonical = CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 1.5, np.array([]))
+        density_fitted = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.5, np.array([]))
+
+        h_canonical = Hamiltonian(canonical)
+        h_df = Hamiltonian(density_fitted)
+
+        can_aaaa, can_aabb, can_bbbb = h_canonical.get_two_body_integrals()
+        df_aaaa, df_aabb, df_bbbb = h_df.get_two_body_integrals()
+
+        assert np.allclose(
+            df_aaaa,
+            can_aaaa,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            df_aabb,
+            can_aabb,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            df_bbbb,
+            can_bbbb,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+    def test_one_body_equivalence(self):
+        """Test that both containers have the same one-body integrals."""
+        h_canonical = create_test_hamiltonian(3, "canonical_four_center")
+        h_df = create_test_hamiltonian(3, "three_center")
+
+        can_alpha, can_beta = h_canonical.get_one_body_integrals()
+        df_alpha, df_beta = h_df.get_one_body_integrals()
+
+        assert np.allclose(df_alpha, can_alpha)
+        assert np.allclose(df_beta, can_beta)
+
+    def test_unrestricted_two_body_equivalence(self):
+        """Test that both containers produce the same two-body integrals for unrestricted case."""
+        coeffs_alpha = np.eye(2)
+        coeffs_beta = np.array([[0.8, 0.6], [0.6, -0.8]])
+        basis_set = create_test_basis_set(2, "test-equiv-unrestricted")
+        orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        one_body_alpha = np.eye(2)
+        one_body_beta = np.eye(2) * 1.1
+
+        # Canonical two-body values
+        two_body_aaaa = np.ones(16) * 1.0
+        two_body_aabb = np.ones(16) * math.sqrt(3.0)
+        two_body_bbbb = np.ones(16) * 3.0
+
+        # Three-center chosen to produce matching two-body
+        base_three_center = np.array(
+            [
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+                [1.0, 0.6, 0.8],
+            ]
+        )
+        three_center_aa = math.sqrt(0.5) * base_three_center
+        three_center_bb = math.sqrt(1.5) * base_three_center
+
+        canonical = CanonicalFourCenterHamiltonianContainer(
+            one_body_alpha,
+            one_body_beta,
+            two_body_aaaa,
+            two_body_aabb,
+            two_body_bbbb,
+            orbitals,
+            1.5,
+            np.eye(2),
+            np.eye(2),
+        )
+        density_fitted = ThreeCenterHamiltonianContainer(
+            one_body_alpha,
+            one_body_beta,
+            three_center_aa,
+            three_center_bb,
+            orbitals,
+            1.5,
+            np.eye(2),
+            np.eye(2),
+        )
+
+        h_canonical = Hamiltonian(canonical)
+        h_df = Hamiltonian(density_fitted)
+
+        can_aaaa, can_aabb, can_bbbb = h_canonical.get_two_body_integrals()
+        df_aaaa, df_aabb, df_bbbb = h_df.get_two_body_integrals()
+
+        assert np.allclose(
+            df_aaaa,
+            can_aaaa,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            df_aabb,
+            can_aabb,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert np.allclose(
+            df_bbbb,
+            can_bbbb,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+
+
 def test_hamiltonian_data_type_name():
     """Test that Hamiltonian has the correct _data_type_name class attribute."""
     assert hasattr(Hamiltonian, "_data_type_name")
     assert Hamiltonian._data_type_name == "hamiltonian"
+
+
+class TestDensityFittedHamiltonianConstructor:
+    """Integration tests for density-fitted Hamiltonian construction via the factory."""
+
+    def test_density_fitted_active_restricted_o2_mp2(self):
+        """Test density-fitted Hamiltonian with active space on O2, mirroring C++ DensityFittedActiveRestrictedO2MP2."""
+        # Create O2 molecule (bond length 2.3 Bohr)
+        coords = np.array([[0.0, 0.0, 0.0], [2.3, 0.0, 0.0]])
+        o2 = Structure(coords, [8, 8])
+
+        # RHF calculation
+        scf_solver = create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("convergence_threshold", 1e-8)
+        scf_solver.settings().set("integral_type", "four_center")
+        basis = BasisSet.from_basis_name("cc-pvdz", "cc-pvdz-rifit", o2)  # to be used for DFMP2
+        rhf_energy, hf_wavefunction = scf_solver.run(o2, 0, 1, basis)
+
+        assert abs(rhf_energy - (-149.5410413101995744)) < scf_energy_tolerance
+
+        # Valence active space selection: 12 electrons, 8 orbitals
+        valence_selector = create("active_space_selector", "qdk_valence")
+        valence_selector.settings().set("num_active_electrons", 12)
+        valence_selector.settings().set("num_active_orbitals", 8)
+        wfn_active = valence_selector.run(hf_wavefunction)
+
+        # Density-fitted Hamiltonian construction with auxiliary basis
+        ham_constructor = create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+        orbitals = wfn_active.get_orbitals()
+        df_hamiltonian = ham_constructor.run(orbitals)
+
+        assert df_hamiltonian.has_one_body_integrals()
+        assert df_hamiltonian.has_two_body_integrals()
+        assert df_hamiltonian.has_orbitals()
+        assert df_hamiltonian.is_restricted()
+        assert df_hamiltonian.get_container_type() == "three_center"
+
+        n_alpha, n_beta = wfn_active.get_active_num_electrons()
+        assert n_alpha == n_beta == 6
+
+        # MP2 energy via factory
+        ansatz = Ansatz(df_hamiltonian, wfn_active)
+        mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+        mp2_total_energy, _, _ = mp2_calculator.run(ansatz)
+
+        assert abs(mp2_total_energy - (-149.6209819271)) < mp2_energy_tolerance
