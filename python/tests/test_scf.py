@@ -404,18 +404,16 @@ class TestScfSolver:
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
 
 
-def _create_h2o_dfj_structure():
-    """Create H2O structure matching the DFJ reference calculation geometry.
+_REF_BOHR_TO_ANG = 0.52917721092
 
-    Uses the same conversion factor (0.52917721092 Å/Bohr) as the original
-    reference data to ensure exact geometry match and reproducible energies.
-    """
-    ref_bohr_to_ang = 0.52917721092
+
+def _create_h2o_dfj_structure():
+    """Create H2O structure matching the DFJ reference calculation geometry."""
     coords = np.array(
         [
-            [0.00, 0.49 / ref_bohr_to_ang, -0.79 / ref_bohr_to_ang],
-            [0.00, 0.49 / ref_bohr_to_ang, 0.79 / ref_bohr_to_ang],
-            [0.00, -0.12 / ref_bohr_to_ang, 0.00],
+            [0.00, 0.49 / _REF_BOHR_TO_ANG, -0.79 / _REF_BOHR_TO_ANG],
+            [0.00, 0.49 / _REF_BOHR_TO_ANG, 0.79 / _REF_BOHR_TO_ANG],
+            [0.00, -0.12 / _REF_BOHR_TO_ANG, 0.00],
         ]
     )
     return Structure(["H", "H", "O"], coords)
@@ -423,11 +421,10 @@ def _create_h2o_dfj_structure():
 
 def _create_o2_dfj_structure():
     """Create O2 structure matching the DFJ reference calculation geometry (bond distance 1.21 Å)."""
-    ref_bohr_to_ang = 0.52917721092
     coords = np.array(
         [
             [0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.21 / ref_bohr_to_ang],
+            [0.0, 0.0, 1.21 / _REF_BOHR_TO_ANG],
         ]
     )
     return Structure(["O", "O"], coords)
@@ -506,3 +503,18 @@ class TestScfSolverDfj:
         energy, wfn = scf_solver.run(bf, 0, 1, basis)
 
         assert abs(energy - (-122.732943463018)) < scf_energy_tolerance
+
+    def test_dfj_without_aux_basis_raises(self):
+        """Test that requesting DFJ without an auxiliary basis raises ValueError."""
+        water = _create_h2o_dfj_structure()
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("eri_method", "incore")
+        scf_solver.settings().set("integral_type", "dfj")
+
+        # Basis without auxiliary shells
+        basis = BasisSet.from_basis_name("def2-svp", water)
+        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
+            scf_solver.run(water, 0, 1, basis)
+        with pytest.raises(ValueError, match="DFJ requested but no auxiliary"):
+            scf_solver.run(water, 0, 1, "def2-svp")

@@ -178,6 +178,8 @@ Returns:
     return "<qdk_chemistry.algorithms.HamiltonianConstructor>";
   });
 
+  qdk::chemistry::python::bind_create_nested(hamiltonian_constructor);
+
   // Bind concrete microsoft::HamiltonianConstructor implementation
   py::class_<microsoft::HamiltonianConstructor, HamiltonianConstructor,
              py::smart_holder>(m, "QdkHamiltonianConstructor", R"(

@@ -327,6 +327,10 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
       _structure(structure),
       _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
+  if (_name.empty()) {
+    throw std::invalid_argument("BasisSet name cannot be empty");
+  }
+
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
@@ -535,7 +539,9 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
       _structure(structure),
-      _aux_name(aux_name) {
+      _aux_name(aux_name),
+      _ecp_name("none"),
+      _ecp_electrons(std::vector<size_t>(structure->get_num_atoms(), 0)) {
   QDK_LOG_TRACE_ENTERING();
   if (!structure) {
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
@@ -604,7 +610,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
-  if ((!ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty()) &&
+  if ((!ecp_shells.empty() || !ecp_electrons.empty() || ecp_name != "none") &&
       ecp_electrons.size() != structure->get_num_atoms()) {
     throw std::invalid_argument(
         "ECP electrons vector size must match number of atoms");
@@ -1538,6 +1544,15 @@ bool BasisSet::_is_consistent_with_structure() const {
     }
   }
 
+  // Check if any aux shell references an atom beyond the structure's atom count
+  for (size_t atom_idx = 0; atom_idx < _aux_shells_per_atom.size();
+       ++atom_idx) {
+    if (!_aux_shells_per_atom[atom_idx].empty() &&
+        atom_idx >= _structure->get_num_atoms()) {
+      return false;
+    }
+  }
+
   return true;
 }
 
@@ -2325,7 +2340,6 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
 
           aux_exponents.read(aux_all_exponents.data(),
                              H5::PredType::NATIVE_DOUBLE);
-          aux_all_coefficients.resize(aux_exp_dims[0]);
           aux_coefficients.read(aux_all_coefficients.data(),
                                 H5::PredType::NATIVE_DOUBLE);
         }

@@ -261,9 +261,8 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 }
 
-std::pair<std::shared_ptr<qcs::BasisSet>, std::shared_ptr<qcs::BasisSet>>
-convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
-                           bool normalize) {
+std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
   QDK_LOG_TRACE_ENTERING();
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
@@ -277,7 +276,7 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
     mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
   }
 
-  auto [basis_json, aux_basis_json] = convert_to_json(qdk_basis_set);
+  auto basis_json = convert_to_json_primary(qdk_basis_set);
   auto internal_basis_set =
       qcs::BasisSet::from_serialized_json(mol, basis_json);
 
@@ -286,6 +285,24 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
     internal_basis_set->mode = qcs::BasisMode::PSI4;
   }
 
+  return internal_basis_set;
+}
+
+std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(
+    const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
+  QDK_LOG_TRACE_ENTERING();
+  // Create internal Molecule from the structure
+  auto structure = qdk_basis_set.get_structure();
+  auto mol = convert_to_molecule(*structure, 0,
+                                 1);  // Default charge=0, multiplicity=1
+
+  // remove number of ecp electrons from atomic charges
+  auto ecp_electrons = qdk_basis_set.get_ecp_electrons();
+  for (size_t i = 0; i < mol->n_atoms; ++i) {
+    int n_core_electrons = static_cast<int>(ecp_electrons[i]);
+    mol->atomic_charges[i] = mol->atomic_nums[i] - n_core_electrons;
+  }
+  auto aux_basis_json = convert_to_json_auxiliary(qdk_basis_set);
   std::shared_ptr<qcs::BasisSet> internal_aux_basis_set;
   if (aux_basis_json.is_object()) {
     internal_aux_basis_set =
@@ -298,7 +315,7 @@ convert_basis_set_from_qdk(const qdk::chemistry::data::BasisSet& qdk_basis_set,
     internal_aux_basis_set->mode = qcs::BasisMode::PSI4;
   }
 
-  return {internal_basis_set, internal_aux_basis_set};
+  return internal_aux_basis_set;
 }
 
 nlohmann::ordered_json convert_to_json(
@@ -332,7 +349,7 @@ nlohmann::ordered_json convert_to_json(
   return record;
 }
 
-std::pair<nlohmann::ordered_json, nlohmann::ordered_json> convert_to_json(
+nlohmann::ordered_json convert_to_json_primary(
     const qdk::chemistry::data::BasisSet& basis_set) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -386,6 +403,22 @@ std::pair<nlohmann::ordered_json, nlohmann::ordered_json> convert_to_json(
        {"ecp_shells", json_ecp_shells},
        {"element_ecp_electrons", json_element_ecp_electrons}});
 
+  return j;
+}
+
+nlohmann::ordered_json convert_to_json_auxiliary(
+    const qdk::chemistry::data::BasisSet& basis_set) {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Build element_ecp_electrons map from ecp_electrons vector
+  auto& structure = basis_set.get_structure();
+  auto nuclear_charges = structure->get_nuclear_charges();
+
+  std::vector<unsigned> nuclear_charges_unsigned(nuclear_charges.size());
+  std::transform(nuclear_charges.begin(), nuclear_charges.end(),
+                 nuclear_charges_unsigned.begin(),
+                 [](double z) { return static_cast<unsigned>(z); });
+
   // Build auxiliary basis JSON if present
   nlohmann::ordered_json aux_j;
   if (basis_set.has_aux_basis()) {
@@ -404,7 +437,7 @@ std::pair<nlohmann::ordered_json, nlohmann::ordered_json> convert_to_json(
          {"element_ecp_electrons", nlohmann::ordered_json::array()}});
   }
 
-  return {j, aux_j};
+  return aux_j;
 }
 
 std::vector<unsigned> compute_shell_map(

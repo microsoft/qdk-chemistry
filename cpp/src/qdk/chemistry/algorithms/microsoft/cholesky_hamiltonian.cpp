@@ -483,8 +483,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   // Create internal Molecule
   auto structure = basis_set->get_structure();
 
-  // Create internal BasisSet
-  auto [internal_basis_set, internal_aux_basis_set] =
+  // Create internal BasisSet (includes ECP-adjusted nuclear charges)
+  auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
   // Create dummy SCFConfig
   auto scf_config = std::make_unique<qcs::SCFConfig>();
