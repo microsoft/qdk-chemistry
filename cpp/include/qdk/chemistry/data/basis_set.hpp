@@ -187,7 +187,6 @@ struct Shell {
 class BasisSet : public DataClass,
                  public std::enable_shared_from_this<BasisSet> {
  public:
-
   /**
    * @brief Constructor with shells
    * @param name Name of the basis set
