@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "qdk-chemistry",
+  "version-string": "1.1.0",
+  "description": "Quantum Development Kit - Chemistry Library (Windows build dependencies)",
+  "dependencies": [
+    "eigen3",
+    {
+      "name": "hdf5",
+      "features": ["cpp"]
+    },
+    "boost-headers",
+    "boost-container-hash",
+    "boost-dynamic-bitset",
+    "boost-sort",
+    "nlohmann-json",
+    "spdlog",
+    "fmt",
+    "openblas"
+  ]
+}

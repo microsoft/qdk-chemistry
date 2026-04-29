@@ -227,7 +227,7 @@ def test_measurement_data_to_json():
 
         # Verify file was created and contains expected structure
         assert Path(temp_path).exists()
-        with open(temp_path) as f:
+        with open(temp_path, encoding="utf-8") as f:
             data = json.load(f)
         assert isinstance(data, dict)
         # Should have one entry for the pauli group plus version field

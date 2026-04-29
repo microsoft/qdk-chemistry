@@ -312,7 +312,7 @@ class DataClass(_CoreDataClass):
         """
         if self._data_type_name:
             _validate_filename_suffix(filename, self._data_type_name, "write")
-        with Path(filename).open("w") as f:
+        with Path(filename).open("w", encoding="utf-8") as f:
             json.dump(self.to_json(), f, indent=2)
 
     def to_hdf5_file(self, filename: str | Path) -> None:
@@ -403,7 +403,7 @@ class DataClass(_CoreDataClass):
         """
         if cls._data_type_name:
             _validate_filename_suffix(filename, cls._data_type_name, "read")
-        with Path(filename).open("r") as f:
+        with Path(filename).open("r", encoding="utf-8") as f:
             json_data = json.load(f)
         return cls.from_json(json_data)
 

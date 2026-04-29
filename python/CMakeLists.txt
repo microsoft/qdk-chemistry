@@ -112,6 +112,19 @@ find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)
+# When the vcpkg toolchain is active its find_package wrapper may not search the isolated build environment where pip
+# installed pybind11. Ask pybind11 itself for its CMake config directory so the wrapper can find it.
+if(NOT pybind11_DIR)
+  execute_process(
+    COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
+    OUTPUT_VARIABLE _pybind11_cmakedir
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+    RESULT_VARIABLE _pybind11_result)
+  if(_pybind11_result EQUAL 0 AND _pybind11_cmakedir)
+    set(pybind11_DIR "${_pybind11_cmakedir}" CACHE PATH "" FORCE)
+  endif()
+endif()
 find_package(pybind11 REQUIRED)
 
 # Create the Python extension module
@@ -164,8 +177,12 @@ target_compile_features(_core PUBLIC cxx_std_20)
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
-        target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(_core PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND NOT MSVC)
+            target_compile_options(_core PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(_core PRIVATE --coverage)
+        else()
+            message(WARNING "Coverage build is only supported with GCC or Clang compilers")
+        endif()
     else()
         message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()
@@ -199,13 +216,50 @@ target_compile_definitions(_core PRIVATE VERSION_INFO="${QDK_FULL_VERSION}")
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES
-    BUILD_RPATH "$ORIGIN:$ORIGIN/.."
-    INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
-    BUILD_RPATH_USE_ORIGIN ON
 )
+if(NOT WIN32)
+    set_target_properties(_core PROPERTIES
+        BUILD_RPATH "$ORIGIN:$ORIGIN/.."
+        INSTALL_RPATH "$ORIGIN:$ORIGIN/.."
+        BUILD_RPATH_USE_ORIGIN ON
+    )
+endif()
 
 # Install the Python extension module
 install(TARGETS _core
   LIBRARY DESTINATION .
   COMPONENT _core
 )
+
+# Windows (Python 3.8+): DLL dependencies of .pyd files are only found if they
+# reside in the same directory as the .pyd or are registered via os.add_dll_directory().
+# PATH is NOT searched. When vcpkg provides dynamic libraries (x64-windows triplet),
+# copy the runtime DLLs next to _core.pyd so the package works out of the box.
+# With static triplets (x64-windows-static-md) all dependency code is linked directly
+# into _core.pyd, so no bundling is needed.
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "static")
+    set(_bundle_dlls_default OFF)
+else()
+    set(_bundle_dlls_default ON)
+endif()
+option(QDK_BUNDLE_RUNTIME_DLLS "Bundle vcpkg and OpenMP DLLs into the install tree (Windows only)" ${_bundle_dlls_default})
+
+if(WIN32 AND QDK_BUNDLE_RUNTIME_DLLS)
+    message(STATUS "Bundling runtime DLLs into install tree")
+    # -- vcpkg dependencies (openblas, hdf5, fmt, spdlog and their transitive deps) --
+    if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+        set(_vcpkg_bin "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/bin")
+        set(_vcpkg_runtime_dlls)
+        foreach(_dll fmt hdf5 hdf5_cpp openblas spdlog szip zlib1)
+            if(EXISTS "${_vcpkg_bin}/${_dll}.dll")
+                list(APPEND _vcpkg_runtime_dlls "${_vcpkg_bin}/${_dll}.dll")
+            endif()
+        endforeach()
+        if(_vcpkg_runtime_dlls)
+            install(FILES ${_vcpkg_runtime_dlls}
+                DESTINATION .
+                COMPONENT _core
+            )
+        endif()
+    endif()
+endif()
