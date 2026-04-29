@@ -10,14 +10,14 @@
 from qdk_chemistry.algorithms import create
 
 # Create the default mapper (pauli_sequence)
-mapper = create("controlled_evolution_circuit_mapper")
+mapper = create("controlled_circuit_mapper")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
 # Configure the power of the controlled unitary
-mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+mapper = create("controlled_circuit_mapper", "pauli_sequence")
 mapper.settings().set("power", 4)
 # end-cell-configure
 ################################################################################
@@ -46,14 +46,14 @@ qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
 qubit_ham = qubit_mapper.run(hamiltonian)
 
 # 4. Build time evolution unitary
-trotter = create("time_evolution_builder", "trotter", order=2)
+trotter = create("hamiltonian_unitary_builder", "trotter", order=2)
 evolution = trotter.run(qubit_ham, time=0.1)
 
 # 5. Create a controlled version and map to a circuit
-from qdk_chemistry.data import ControlledTimeEvolutionUnitary
+from qdk_chemistry.data import ControlledUnitary
 
-controlled = ControlledTimeEvolutionUnitary(evolution, control_indices=[0])
-mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+controlled = ControlledUnitary(evolution, control_indices=[0])
+mapper = create("controlled_circuit_mapper", "pauli_sequence")
 circuit = mapper.run(controlled)
 print("Controlled evolution circuit generated")
 # end-cell-run
@@ -64,7 +64,7 @@ print("Controlled evolution circuit generated")
 from qdk_chemistry.algorithms import registry
 
 # List all registered controlled evolution circuit mapper implementations
-implementations = registry.available("controlled_evolution_circuit_mapper")
+implementations = registry.available("controlled_circuit_mapper")
 print(implementations)  # e.g. ['pauli_sequence']
 # end-cell-list-implementations
 ################################################################################

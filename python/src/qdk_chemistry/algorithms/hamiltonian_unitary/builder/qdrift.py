@@ -18,9 +18,9 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -113,9 +113,9 @@ class QDrift(TimeEvolutionBuilder):
     Examples:
         >>> from qdk_chemistry.algorithms import create
         >>> # Create a qDRIFT builder with 500 samples
-        >>> qdrift = create("time_evolution_builder", "qdrift", num_samples=500, seed=42)
-        >>> # Use it to build time evolution for a Hamiltonian
-        >>> time_evolution = qdrift.run(qubit_hamiltonian, time=1.0)
+        >>> qdrift = create("hamiltonian_unitary_builder", "qdrift", num_samples=500, seed=42)
+        >>> # Use it to build a unitary representation for a Hamiltonian
+        >>> unitary_rep = qdrift.run(qubit_hamiltonian, time=1.0)
 
     References:
         Campbell, E. (2019). Random Compiler for Fast Hamiltonian Simulation.
@@ -159,8 +159,8 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using qDRIFT randomized sampling.
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+        r"""Construct the unitary representation using qDRIFT randomized sampling.
 
         The qDRIFT method approximates :math:`e^{-iHt}` by:
 
@@ -173,7 +173,7 @@ class QDrift(TimeEvolutionBuilder):
             time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by qDRIFT sampling.
+            UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 
         """
         seed: int = self._settings.get("seed")
@@ -205,7 +205,7 @@ class QDrift(TimeEvolutionBuilder):
             commute_fn = get_commutation_checker(self._settings.get("commutation_type"))
             terms = self._merge_duplicate_terms(terms, commute_fn=commute_fn)
 
-        return TimeEvolutionUnitary(
+        return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
                 step_terms=terms,
                 step_reps=1,  # All samples are already in the terms list
@@ -263,7 +263,7 @@ class QDrift(TimeEvolutionBuilder):
         for idx in term_indices:
             label, coeff = terms[idx]
             sign = 1.0 if coeff >= 0 else -1.0
-            mapping = TimeEvolutionBuilder._pauli_label_to_map(label)  # noqa: SLF001
+            mapping = HamiltonianUnitaryBuilder._pauli_label_to_map(label)  # noqa: SLF001
             result.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=sign * angle_magnitude))
 
         return result
@@ -341,9 +341,9 @@ class QDrift(TimeEvolutionBuilder):
         ]
 
     def name(self) -> str:
-        """Return the name of the time evolution unitary builder."""
+        """Return the name of the unitary builder."""
         return "qdrift"
 
     def type_name(self) -> str:
-        """Return time_evolution_builder as the algorithm type name."""
-        return "time_evolution_builder"
+        """Return hamiltonian_unitary_builder as the algorithm type name."""
+        return "hamiltonian_unitary_builder"

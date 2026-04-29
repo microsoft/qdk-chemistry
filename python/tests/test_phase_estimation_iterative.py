@@ -143,11 +143,11 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     )
     iqpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     iqpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 
     return iqpe.run(
@@ -175,11 +175,11 @@ def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
     )
     qpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     qpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 
     return qpe.run(
@@ -237,11 +237,11 @@ def _run_iterative_with_parameters(
     )
     iqpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     iqpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 
     return iqpe.run(
@@ -499,11 +499,11 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
     iqpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     iqpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
     noisy_result = iqpe.run(
         state_preparation=two_qubit_phase_problem.state_prep,
@@ -554,11 +554,11 @@ def test_iterative_qpe_generates_correct_number_of_circuits(
     )
     iqpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     iqpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 
     with pytest.raises(ValueError, match="No iteration circuits have been generated"):
@@ -647,11 +647,11 @@ def test_create_iteration_circuit_power_calculation() -> None:
     iqpe = IterativePhaseEstimation(num_bits=5, evolution_time=np.pi, shots_per_bit=10)
     iqpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     iqpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
     iter_0_circuit = iqpe.create_iteration_circuit(
         state_preparation=state_prep_circuit,

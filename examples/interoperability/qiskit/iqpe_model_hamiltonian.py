@@ -82,12 +82,12 @@ iqpe_1.settings().set(
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1),
 )
 iqpe_1.settings().set(
-    "evolution_builder",
-    AlgorithmRef("time_evolution_builder", "trotter"),
+    "unitary_builder",
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
 )
 iqpe_1.settings().set(
     "circuit_mapper",
-    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 result_1 = iqpe_1.run(
@@ -161,12 +161,12 @@ iqpe_2.settings().set(
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2),
 )
 iqpe_2.settings().set(
-    "evolution_builder",
-    AlgorithmRef("time_evolution_builder", "trotter"),
+    "unitary_builder",
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
 )
 iqpe_2.settings().set(
     "circuit_mapper",
-    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 result_2 = iqpe_2.run(

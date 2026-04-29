@@ -108,17 +108,18 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
 
     """
     qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
+
     qpe.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
     )
     qpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     qpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
     )
 
     return qpe.run(

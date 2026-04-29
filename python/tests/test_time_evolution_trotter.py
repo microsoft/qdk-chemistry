@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.algorithms.hamiltonian_unitary.builder.trotter import Trotter
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data.hamiltonian_unitary.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -69,7 +69,7 @@ class TestTrotter:
         builder = Trotter(num_divisions=1)
         unitary = builder.run(hamiltonian, time=0.2)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
@@ -189,7 +189,7 @@ class TestTrotter:
         builder = Trotter(num_divisions=1, order=2)
         unitary = builder.run(hamiltonian, time=0.2)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
@@ -297,7 +297,7 @@ class TestTrotter:
         builder = Trotter(num_divisions=1, order=4)
         unitary = builder.run(hamiltonian, time=0.2)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
