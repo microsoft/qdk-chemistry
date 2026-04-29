@@ -32,7 +32,43 @@
 #include <nvtx3/nvtx3.hpp>
 #endif
 
+#include <blas.hh>
+
 namespace qdk::chemistry::scf {
+
+void compute_atba_gemm(const double* A, const double* B, double* C, int m,
+                       int n, std::vector<double>& workspace,
+                       blas::Layout layout) {
+  if (A == nullptr || B == nullptr || C == nullptr) {
+    throw std::invalid_argument("compute_atba_gemm: null matrix pointer.");
+  }
+  if (m < 0 || n < 0) {
+    throw std::invalid_argument("compute_atba_gemm: negative dimensions.");
+  }
+  if (m == 0 || n == 0) {
+    return;
+  }
+
+  const size_t required_workspace_size = static_cast<size_t>(m) * n;
+  if (workspace.size() < required_workspace_size) {
+    throw std::invalid_argument(
+        "compute_atba_gemm: workspace is smaller than m * n.");
+  }
+
+  const int lda = (layout == blas::Layout::RowMajor) ? n : m;
+  const int ldb = m;
+  const int ldc = n;
+
+  const int ld_workspace = (layout == blas::Layout::RowMajor) ? n : m;
+
+  // workspace = B * A
+  blas::gemm(layout, blas::Op::NoTrans, blas::Op::NoTrans, m, n, m, 1.0, B, ldb,
+             A, lda, 0.0, workspace.data(), ld_workspace);
+
+  // C = A^T * workspace
+  blas::gemm(layout, blas::Op::Trans, blas::Op::NoTrans, n, n, m, 1.0, A, lda,
+             workspace.data(), ld_workspace, 0.0, C, ldc);
+}
 
 SCFAlgorithm::SCFAlgorithm(const SCFContext& ctx)
     : ctx_(ctx),
@@ -252,13 +288,18 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   RowMajorMatrix F_dn_mo = F_up_mo;
   RowMajorMatrix effective_F_mo = F_up_mo;
 
-  F_up_mo.noalias() = C.transpose() *
-                      F.block(0, 0, num_atomic_orbitals, num_atomic_orbitals) *
-                      C;
-  F_dn_mo.noalias() = C.transpose() *
-                      F.block(num_atomic_orbitals, 0, num_atomic_orbitals,
-                              num_atomic_orbitals) *
-                      C;
+  const double* C_block_ptr = C.data();
+  const double* F_up_block_ptr = F.data();
+  const double* F_dn_block_ptr =
+      F.data() + num_atomic_orbitals * num_atomic_orbitals;
+  std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
+                                     num_molecular_orbitals);
+  compute_atba_gemm(C_block_ptr, F_up_block_ptr, F_up_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals, atba_workspace,
+                    blas::Layout::RowMajor);
+  compute_atba_gemm(C_block_ptr, F_dn_block_ptr, F_dn_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals, atba_workspace,
+                    blas::Layout::RowMajor);
 
   auto average_block = [&effective_F_mo, &F_up_mo, &F_dn_mo](
                            int row, int col, int rows, int cols) {
