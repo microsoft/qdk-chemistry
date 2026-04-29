@@ -12,7 +12,7 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.hamiltonian_unitary.controlled_circuit_mapper.pauli_sequence_mapper import (
+from qdk_chemistry.algorithms.controlled_circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
