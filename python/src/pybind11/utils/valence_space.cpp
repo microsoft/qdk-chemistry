@@ -30,9 +30,8 @@ Returns:
     tuple: Pair of ( n_active_electrons, n_active_orbitals )
 
 Examples:
-    (active_electrons, active_orbitals) = compute_valence_space_parameters(wavefunction, charge)
-    (active_electrons, active_orbitals) = compute_valence_space_parameters(
-        wavefunction, charge, include_double_d_shell=True)
+    >>> nele, norb = compute_valence_space_parameters(wavefunction, charge)
+    >>> nele, norb = compute_valence_space_parameters(wavefunction, charge, include_double_d_shell=True)
 )",
         py::arg("wavefunction"), py::arg("charge"),
         py::arg("include_double_d_shell") = false);
