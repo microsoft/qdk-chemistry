@@ -204,9 +204,11 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 // ``compute_valence_space_parameters``; that function only consults the
 // structure, the total electron count, and ``num_molecular_orbitals``. We
 // therefore build a minimal Wavefunction directly (single dummy s-shell per
-// atom, identity orbital coefficients, Configuration string sized to the
-// requested electron count) and skip SCF entirely. This keeps the suite fast
-// and removes any dependence on a particular basis set being available.
+// atom, a zero-filled (num_atomic_orbitals x num_molecular_orbitals) MO
+// coefficient matrix whose values are unused, and a Configuration string
+// sized to the requested electron count) and skip SCF entirely. This keeps
+// the suite fast and removes any dependence on a particular basis set being
+// available.
 
 namespace {
 
