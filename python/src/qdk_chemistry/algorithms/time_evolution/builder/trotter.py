@@ -96,6 +96,7 @@ class Trotter(TimeEvolutionBuilder):
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
         optimize_term_ordering: bool = False,
+        term_groups: list[list[QubitHamiltonian]] | None = None,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -143,7 +144,8 @@ class Trotter(TimeEvolutionBuilder):
                 (default, tighter) or ``"naive"``.
             weight_threshold: Absolute threshold for filtering small
                 Hamiltonian coefficients. Defaults to 1e-12.
-            optimize_term_ordering: Whether to group commuting terms and execute them in parallel. Defaults to False.
+            optimize_term_ordering: Whether to group commuting terms and execute them in parallel.
+            term_groups: Pre-computed geometry-aware term groups (see ``heisenberg_term_groups``).
 
         """
         super().__init__()
@@ -154,6 +156,7 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("optimize_term_ordering", optimize_term_ordering)
+        self._term_groups = term_groups
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct the time evolution unitary using Trotter decomposition.
@@ -307,81 +310,53 @@ class Trotter(TimeEvolutionBuilder):
 
         # order = 2 or order = 2k with k>1
         else:
-            # \prod e^{-iH_i t/(2n)} for all Hamiltonian terms groups except the last one
-            # which is executed in the middle as e^{-iH_i t/n}
-            terms_without_last_group = []
-            for group in grouped_hamiltonians[:-1]:
-                for subgroup in group:
-                    terms_without_last_group.extend(
+            # Build an abstract schedule of (time_fraction, group_index) entries.
+            # The Strang splitting puts group 0..L-2 at half-time on the outside
+            # and group L-1 at full-time in the middle:
+            #   S2(t) = [t/2 * G0, ..., t/2 * G_{L-2}, t * G_{L-1}, t/2 * G_{L-2}, ..., t/2 * G0]
+            n_groups = len(grouped_hamiltonians)
+            schedule: list[tuple[float, int]] = []
+            for g in range(n_groups - 1):
+                schedule.append((0.5, g))
+            schedule.append((1.0, n_groups - 1))
+            for g in range(n_groups - 2, -1, -1):
+                schedule.append((0.5, g))
+
+            # Apply Suzuki recursion at the schedule level for order > 2
+            if order > 2 and order % 2 == 0:
+                for k in range(2, int(order / 2) + 1):
+                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+                    new_schedule: list[tuple[float, int]] = []
+                    # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2
+                    for _ in range(2):
+                        for frac, g in schedule:
+                            new_schedule.append((frac * u_k, g))
+                    for frac, g in schedule:
+                        new_schedule.append((frac * (1 - 4 * u_k), g))
+                    for _ in range(2):
+                        for frac, g in schedule:
+                            new_schedule.append((frac * u_k, g))
+                    schedule = new_schedule
+
+            # Reduce the schedule: merge consecutive entries with the same group index
+            reduced: list[tuple[float, int]] = []
+            for frac, g in schedule:
+                if reduced and reduced[-1][1] == g:
+                    reduced[-1] = (reduced[-1][0] + frac, g)
+                else:
+                    reduced.append((frac, g))
+            schedule = reduced
+
+            # Expand the schedule into exponentiated Pauli terms
+            for frac, g in schedule:
+                for subgroup in grouped_hamiltonians[g]:
+                    terms.extend(
                         self._exponentiate_commuting(
                             subgroup,
-                            time=time / 2,
+                            time=time * frac,
                             atol=atol,
                         )
                     )
-
-            terms.extend(terms_without_last_group)
-            # e^{-iH_i t/n} for all terms in the last group
-            for subgroup in grouped_hamiltonians[-1]:
-                terms.extend(
-                    self._exponentiate_commuting(
-                        subgroup,
-                        time=time,
-                        atol=atol,
-                    )
-                )
-            terms.extend(terms_without_last_group[::-1])  # reverse all but the last group and append
-
-            # Construct order 2k formula bottom up dynamic-programming style
-            if order > 2 and order % 2 == 0:
-                step_terms = terms.copy()
-                for k in range(2, int(order / 2) + 1):
-                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
-                    new_terms = []
-
-                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
-                    for _ in range(2):
-                        for term in step_terms:
-                            new_terms.append(
-                                ExponentiatedPauliTerm(
-                                    pauli_term=term.pauli_term,
-                                    angle=term.angle * u_k,
-                                )
-                            )
-                    # S_{2k-2}((1-4u_k) t)
-                    for term in step_terms:
-                        new_terms.append(
-                            ExponentiatedPauliTerm(
-                                pauli_term=term.pauli_term,
-                                angle=term.angle * (1 - 4 * u_k),
-                            )
-                        )
-
-                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
-                    for _ in range(2):
-                        for term in step_terms:
-                            new_terms.append(
-                                ExponentiatedPauliTerm(
-                                    pauli_term=term.pauli_term,
-                                    angle=term.angle * u_k,
-                                )
-                            )
-
-                    step_terms = new_terms
-                terms = step_terms
-
-            # Merge adjacent terms with the same pauli_term by summing angles.
-            merged_terms: list[ExponentiatedPauliTerm] = []
-            for term in terms:
-                if merged_terms and merged_terms[-1].pauli_term == term.pauli_term:
-                    last = merged_terms[-1]
-                    merged_terms[-1] = ExponentiatedPauliTerm(
-                        pauli_term=last.pauli_term,
-                        angle=last.angle + term.angle,
-                    )
-                else:
-                    merged_terms.append(term)
-            terms = merged_terms
 
         return terms
 
@@ -413,6 +388,9 @@ class Trotter(TimeEvolutionBuilder):
             ``QubitHamiltonian`` sub-groups (parallelizable layers).
 
         """
+        if self._term_groups is not None:
+            return self._term_groups
+
         if not optimize_term_ordering:
             return [
                 [

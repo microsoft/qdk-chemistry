@@ -507,8 +507,11 @@ class TestTrotter:
 
         terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
 
-        assert len(terms) == 1
-        assert terms[0].pauli_term == {0: "Z"}
+        # All terms should be Z only (X filtered out).
+        # The 4th-order Suzuki schedule produces multiple entries for the single group,
+        # each with a different time fraction. The total angle should sum to coeff * time.
+        assert all(t.pauli_term == {0: "Z"} for t in terms)
+        assert abs(sum(t.angle for t in terms) - 1.0) < 1e-12
 
     def test_trotter_x_z_example_higher_order(self):
         """Correctness check for fourth-order Trotter decomposition."""
