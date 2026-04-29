@@ -77,7 +77,7 @@ set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI S
 # #pragma omp atomic accumulation on shared matrices, which is racy under
 # LLVM libomp and causes NaN/divergence in SCF.  Keep OpenMP for the rest of
 # the project (MACIS, our own code).  Re-enable once upstream fixes the race.
-# See: GauXC reference_replicated_xc_host_integrator_exc_vxc.hpp
+# See: https://github.com/wavefunction91/GauXC/issues/196
 if(MSVC)
   set(GAUXC_ENABLE_OPENMP OFF CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
 else()
