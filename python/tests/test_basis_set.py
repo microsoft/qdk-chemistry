@@ -1737,7 +1737,8 @@ def test_auxiliary_basis_set_from_basis_name_database():
 
 class TestBasisSetConstructorDispatch:
     """Tests for the BasisSet __init__ dispatcher covering all constructor
-    signatures with positional, keyword, and mixed calling conventions."""
+    signatures with positional, keyword, and mixed calling conventions.
+    """
 
     @pytest.fixture
     def shell(self):
