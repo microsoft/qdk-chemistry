@@ -275,10 +275,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 #endif
 
   // Convert QDK basis set to internal format
-  auto [ms_basis_set, ms_aux_basis_set] =
+  auto ms_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set);
-  auto [ms_raw_basis_set, ms_raw_aux_basis_set] =
+  auto ms_raw_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
+  auto ms_aux_basis_set =
+      utils::microsoft::convert_aux_basis_set_from_qdk(*qdk_raw_basis_set);
 
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;

@@ -469,7 +469,7 @@ StabilityChecker::_run_impl(
   std::transform(method.begin(), method.end(), method.begin(), ::toupper);
 
   // Convert QDK basis set to internal format
-  auto [basis_set_internal, aux_basis_set_internal] =
+  auto basis_set_internal =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set_qdk);
 
   // Create SCF configuration
