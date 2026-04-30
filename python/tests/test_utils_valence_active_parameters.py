@@ -30,7 +30,7 @@ def solve_wavefunction(structure, charge, multiplicity, basis="STO-3G"):
     return wavefunction
 
 
-def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_orbitals):
+def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_orbitals=100):
     """Build a minimal Wavefunction directly, without running SCF.
 
     ``compute_valence_space_parameters`` only consults the structure (atom
@@ -39,8 +39,8 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     orbital coefficient matrix with the documented
     ``(num_atomic_orbitals, num_molecular_orbitals)`` shape, and a
     Configuration string that yields exactly ``(n_alpha, n_beta)`` electrons.
-    This avoids basis set dependencies and SCF convergence flakiness in tests
-    that only validate counting logic.
+    The default ``num_molecular_orbitals=100`` is comfortably above any
+    valence space these tests use.
     """
     pair_count = min(n_alpha, n_beta)
     single_count = abs(n_alpha - n_beta)
@@ -53,9 +53,8 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
 
     structure = Structure(symbols, np.asarray(coords, dtype=float))
 
-    exps = np.array([1.0])
-    coefs = np.array([1.0])
-    shells = [Shell(i, OrbitalType.S, exps, coefs) for i in range(len(symbols))]
+    one = np.array([1.0])
+    shells = [Shell(i, OrbitalType.S, one, one) for i in range(len(symbols))]
     basis_set = BasisSet("dummy", shells, structure, AOType.Spherical)
 
     coeffs = np.zeros((basis_set.get_num_atomic_orbitals(), num_molecular_orbitals))
@@ -73,9 +72,7 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     return Wavefunction(container)
 
 
-def make_single_atom_wavefunction(symbol, n_alpha, n_beta, num_mo):
-    """Single-atom Wavefunction at the origin."""
-    return make_minimal_wavefunction([symbol], [[0.0, 0.0, 0.0]], n_alpha, n_beta, num_mo)
+ORIGIN = [[0.0, 0.0, 0.0]]
 
 
 class TestValenceParameters:
@@ -188,7 +185,7 @@ TM_SINGLE_ATOM_CASES = [
 def test_make_minimal_wavefunction_rejects_too_few_molecular_orbitals():
     """Helper raises if num_molecular_orbitals can't fit the requested electrons."""
     with pytest.raises(ValueError, match="num_molecular_orbitals"):
-        make_minimal_wavefunction(["He"], [[0.0, 0.0, 0.0]], 2, 0, 1)
+        make_minimal_wavefunction(["He"], ORIGIN, 2, 0, 1)
 
 
 class TestTransitionMetalValenceParameters:
@@ -212,9 +209,7 @@ class TestTransitionMetalValenceParameters:
     )
     def test_toggle_sizing(self, symbol, n_alpha, n_beta, expected_nele, expected_norb_on, expected_norb_off):
         """Toggle on adds the d' shell on d-block atoms; toggle off preserves historical sizing."""
-        # 4*Z is comfortably above any valence space we test.
-        z = int(Structure.symbol_to_element(symbol))
-        wfn = make_single_atom_wavefunction(symbol, n_alpha, n_beta, 4 * z)
+        wfn = make_minimal_wavefunction([symbol], ORIGIN, n_alpha, n_beta)
 
         nele_on, norb_on = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
         assert (nele_on, norb_on) == (expected_nele, expected_norb_on)
@@ -224,7 +219,7 @@ class TestTransitionMetalValenceParameters:
 
     def test_silver_hydride(self):
         """AgH: Ag (period 5) gets the d' shell; the H spectator does not."""
-        wfn = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24, 60)
+        wfn = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24)
 
         nele_on, norb_on = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
         assert (nele_on, norb_on) == (12, 15)  # Ag (11+14) + H (1+1)
@@ -236,6 +231,6 @@ class TestTransitionMetalValenceParameters:
         """The d' shell can't push num_active_orbitals above num_mo - num_core_mos."""
         # Cu, num_mo=16. num_core_mos = (29-11)/2 = 9, so cap = 16-9 = 7,
         # well below the 14 the toggle would otherwise add.
-        wfn = make_single_atom_wavefunction("Cu", 15, 14, 16)
+        wfn = make_minimal_wavefunction(["Cu"], ORIGIN, 15, 14, num_molecular_orbitals=16)
         nele, norb = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
         assert (nele, norb) == (11, 7)

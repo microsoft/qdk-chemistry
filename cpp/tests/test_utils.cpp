@@ -210,11 +210,13 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 
 namespace {
 
+constexpr size_t kRoomyMo = 100;  // Above any valence space these tests use.
+
 // Build a minimal valid Wavefunction for sizing tests (no SCF). Throws if
 // num_molecular_orbitals can't hold the requested electron count.
 std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     const std::vector<std::string>& symbols, const Eigen::MatrixXd& coords,
-    size_t n_alpha, size_t n_beta, size_t num_molecular_orbitals) {
+    size_t n_alpha, size_t n_beta, size_t num_molecular_orbitals = kRoomyMo) {
   const size_t pair_count = std::min(n_alpha, n_beta);
   const size_t single_count =
       (n_alpha > n_beta) ? n_alpha - n_beta : n_beta - n_alpha;
@@ -249,17 +251,10 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
                                                    orbitals));
 }
 
-// Convenience for single-atom cases at the origin.
-std::shared_ptr<Wavefunction> single_atom(const std::string& symbol,
-                                          size_t n_alpha, size_t n_beta,
-                                          size_t num_mo) {
-  Eigen::MatrixXd coords(1, 3);
-  coords << 0.0, 0.0, 0.0;
-  return make_minimal_wavefunction({symbol}, coords, n_alpha, n_beta, num_mo);
-}
+const Eigen::MatrixXd kOrigin = Eigen::MatrixXd::Zero(1, 3);
 
 // Single-atom row: element + spin split + expected sizing for both toggle
-// states. n_alpha + n_beta is just the neutral electron count for the symbol.
+// states.
 struct TmCase {
   std::string symbol;
   size_t n_alpha;
@@ -274,17 +269,14 @@ class TransitionMetalValenceTest : public ::testing::TestWithParam<TmCase> {};
 }  // namespace
 
 TEST(MakeMinimalWavefunctionTest, RejectsTooFewMolecularOrbitals) {
-  Eigen::MatrixXd coords(1, 3);
-  coords << 0.0, 0.0, 0.0;
-  EXPECT_THROW(make_minimal_wavefunction({"He"}, coords, 2, 0, 1),
+  EXPECT_THROW(make_minimal_wavefunction({"He"}, kOrigin, 2, 0, 1),
                std::invalid_argument);
 }
 
 TEST_P(TransitionMetalValenceTest, ToggleSizing) {
   const auto& tc = GetParam();
-  // Default num_mo = 4*Z, comfortably above any valence space we test.
-  const size_t z = static_cast<size_t>(Structure::symbol_to_element(tc.symbol));
-  auto wfn = single_atom(tc.symbol, tc.n_alpha, tc.n_beta, 4 * z);
+  auto wfn =
+      make_minimal_wavefunction({tc.symbol}, kOrigin, tc.n_alpha, tc.n_beta);
 
   auto [nele_on, norb_on] = compute_valence_space_parameters(
       wfn, /*charge=*/0, /*include_double_d_shell=*/true);
@@ -310,12 +302,12 @@ INSTANTIATE_TEST_SUITE_P(
       return info.param.symbol;
     });
 
-// AgH: period-5 d-block alongside an H spectator, confirming per-atom sums.
+// AgH: period-5 d-block alongside a non-d-block spectator, confirming
+// per-atom contributions sum correctly.
 TEST(TransitionMetalValenceTest, SilverHydride) {
-  std::vector<std::string> symbols = {"Ag", "H"};
   Eigen::MatrixXd coords(2, 3);
   coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.617;
-  auto wfn = make_minimal_wavefunction(symbols, coords, 24, 24, 60);
+  auto wfn = make_minimal_wavefunction({"Ag", "H"}, coords, 24, 24);
 
   auto [nele_on, norb_on] =
       compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
@@ -332,7 +324,7 @@ TEST(TransitionMetalValenceTest, SilverHydride) {
 TEST(TransitionMetalValenceTest, ToggleRespectsBasisCap) {
   // Cu doublet, num_mo = 16. num_core_mos = (29-11)/2 = 9, so the cap is
   // 16 - 9 = 7, well below the 14 the toggle would otherwise add.
-  auto wfn = single_atom("Cu", 15, 14, /*num_mo=*/16);
+  auto wfn = make_minimal_wavefunction({"Cu"}, kOrigin, 15, 14, /*num_mo=*/16);
   auto [nele, norb] =
       compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
   EXPECT_EQ(nele, 11u);
