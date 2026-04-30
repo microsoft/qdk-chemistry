@@ -16,6 +16,7 @@
 #endif
 #include <qdk/chemistry/scf/util/env_helper.h>
 
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -1035,7 +1036,8 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
 
 std::pair<double, RowMajorMatrix>
 SCFImpl::evaluate_trial_density_energy_and_fock(
-    const RowMajorMatrix& P_matrix, const std::source_location& loc) const {
+    const RowMajorMatrix& P_matrix, double* J_out, double* K_out,
+    const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
 
   QDK_LOGGER().debug(
@@ -1056,6 +1058,15 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
       num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
   eri_->build_JK(P_matrix.data(), J_matrix.data(), K_matrix.data(), alpha, beta,
                  omega);
+
+  if (J_out != nullptr) {
+    std::memcpy(J_out, J_matrix.data(),
+                sizeof(double) * static_cast<size_t>(J_matrix.size()));
+  }
+  if (K_out != nullptr) {
+    std::memcpy(K_out, K_matrix.data(),
+                sizeof(double) * static_cast<size_t>(K_matrix.size()));
+  }
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   throw std::runtime_error("PCM is not supported in trial density evaluation.");
 #endif

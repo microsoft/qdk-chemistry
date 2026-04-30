@@ -245,8 +245,6 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
         "Coefficient matrix rows do not match orbital set count");
   }
 
-  // For ASAHF and ROHF, the density matrix construction is different and
-  // will be handled in the overridden methods
   const double occupancy_factor = unrestricted ? 1.0 : 2.0;
   for (int i = 0; i < num_orbital_sets; ++i) {
     const int n_occ = (i == 0) ? nelec_alpha : nelec_beta;

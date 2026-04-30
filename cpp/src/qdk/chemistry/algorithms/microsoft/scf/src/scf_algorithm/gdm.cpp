@@ -234,16 +234,18 @@ static void compute_restricted_unrestricted_gradient(
  * The gradient is packed as (iw, wa, ia) blocks following the same
  * segmentation used by the ROHF kappa vector.
  *
- * @param[in] scf_impl SCF implementation for J/K construction
+ * @param[in] scf_impl SCF implementation for core Hamiltonian access
  * @param[in] C Molecular orbital coefficient matrix
- * @param[in] density_matrix Density matrix in AO basis
+ * @param[in] J_ao Coulomb matrix in AO basis for alpha/beta blocks
+ * @param[in] K_ao Exchange matrix in AO basis for alpha/beta blocks
  * @param[in] num_electrons Occupied orbital counts (alpha, beta)
  * @param[in] rotation_size Rotation size for the ROHF kappa vector
  * @param[out] gradient Output gradient vector
  */
 static void compute_restricted_open_shell_gradient(
     const SCFImpl& scf_impl, const RowMajorMatrix& C,
-    const RowMajorMatrix& density_matrix, const std::vector<int>& num_electrons,
+    const RowMajorMatrix& J_ao, const RowMajorMatrix& K_ao,
+    const std::vector<int>& num_electrons,
     const std::vector<int>& rotation_size, Eigen::VectorXd& gradient) {
   const int total_rotation_size = rotation_size[0];
   gradient.setZero(total_rotation_size);
@@ -259,12 +261,6 @@ static void compute_restricted_open_shell_gradient(
   const auto& H_ao_full = scf_impl.get_core_hamiltonian();
   const RowMajorMatrix H_ao =
       H_ao_full.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
-
-  RowMajorMatrix J_ao =
-      RowMajorMatrix::Zero(2 * num_atomic_orbitals, num_atomic_orbitals);
-  RowMajorMatrix K_ao =
-      RowMajorMatrix::Zero(2 * num_atomic_orbitals, num_atomic_orbitals);
-  scf_impl.build_jk_matrices(density_matrix, J_ao, K_ao);
 
   const auto J_alpha_ao = Eigen::Map<const RowMajorMatrix>(
       J_ao.data(), num_atomic_orbitals, num_atomic_orbitals);
@@ -393,6 +389,14 @@ class GDMLineFunctor {
         num_molecular_orbitals_(static_cast<int>(C_pseudo_canonical.cols())),
         scf_orbital_type_(scf_orbital_type),
         cached_kappa_(Eigen::VectorXd()),
+        cached_J_(scf_orbital_type == SCFOrbitalType::RestrictedOpenShell
+                      ? RowMajorMatrix::Zero(2 * num_atomic_orbitals_,
+                                             num_atomic_orbitals_)
+                      : RowMajorMatrix()),
+        cached_K_(scf_orbital_type == SCFOrbitalType::RestrictedOpenShell
+                      ? RowMajorMatrix::Zero(2 * num_atomic_orbitals_,
+                                             num_atomic_orbitals_)
+                      : RowMajorMatrix()),
         cached_energy_(std::numeric_limits<double>::infinity()) {
     if (scf_orbital_type == SCFOrbitalType::Unrestricted &&
         (C_pseudo_canonical.rows() % 2 != 0)) {
@@ -458,6 +462,8 @@ class GDMLineFunctor {
   Eigen::VectorXd cached_kappa_;  // Cached kappa vector
   double cached_energy_;
   RowMajorMatrix cached_F_;  // Needed for gradient computation
+  RowMajorMatrix cached_J_;  // Needed for ROHF gradient computation
+  RowMajorMatrix cached_K_;  // Needed for ROHF gradient computation
   RowMajorMatrix cached_C_;  // For writing back to scf_impl
   RowMajorMatrix cached_P_;  // For writing back to scf_impl
 };
@@ -517,8 +523,16 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
   }
 
   // Evaluate energy and Fock matrix using trial density matrix
-  auto [energy, F_trial] =
-      scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
+  double energy;
+  RowMajorMatrix F_trial;
+  if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
+    std::tie(energy, F_trial) =
+        scf_impl_.evaluate_trial_density_energy_and_fock(
+            cached_P_, cached_J_.data(), cached_K_.data());
+  } else {
+    std::tie(energy, F_trial) =
+        scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
+  }
 
   // Cache all results for potential grad() call at same kappa
   cached_energy_ = energy;
@@ -537,9 +551,9 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
 
   Eigen::VectorXd gradient;
   if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
-    compute_restricted_open_shell_gradient(scf_impl_, cached_C_, cached_P_,
-                                           num_electrons_, rotation_size_,
-                                           gradient);
+    compute_restricted_open_shell_gradient(scf_impl_, cached_C_, cached_J_,
+                                           cached_K_, num_electrons_,
+                                           rotation_size_, gradient);
   } else {
     compute_restricted_unrestricted_gradient(
         cached_F_, cached_C_, num_electrons_, rotation_offset_, rotation_size_,
@@ -610,6 +624,8 @@ class GDM {
    * @param[in] F Fock matrix in AO basis
    * @param[in,out] C Molecular orbital coefficient matrix
    * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
+   * @param[in] num_orbital_spin_blocks Number of spin blocks (1 for RHF, 2
+   * for UHF)
    * @param[in,out] history_kappa_spin Block reference to history kappa for this
    * spin
    * @param[in,out] history_dgrad_spin Block reference to history dgrad for this
@@ -1239,9 +1255,15 @@ void GDM::iterate(SCFImpl& scf_impl) {
   }
 
   if (cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    compute_restricted_open_shell_gradient(
-        scf_impl, C, scf_impl.get_density_matrix(), num_electrons_,
-        rotation_size_, current_gradient_);
+    const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
+    RowMajorMatrix J_ao =
+        RowMajorMatrix::Zero(2 * num_atomic_orbitals, num_atomic_orbitals);
+    RowMajorMatrix K_ao =
+        RowMajorMatrix::Zero(2 * num_atomic_orbitals, num_atomic_orbitals);
+    scf_impl.build_jk_matrices(scf_impl.get_density_matrix(), J_ao, K_ao);
+    compute_restricted_open_shell_gradient(scf_impl, C, J_ao, K_ao,
+                                           num_electrons_, rotation_size_,
+                                           current_gradient_);
   } else {
     compute_restricted_unrestricted_gradient(
         F, C, num_electrons_, rotation_offset_, rotation_size_,
