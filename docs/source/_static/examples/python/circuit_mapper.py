@@ -1,4 +1,4 @@
-"""Controlled evolution circuit mapper usage examples."""
+"""Controlled circuit mapper usage examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -55,7 +55,7 @@ print("Controlled evolution circuit generated")
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-# List all registered controlled evolution circuit mapper implementations
+# List all registered controlled circuit mapper implementations
 implementations = registry.available("controlled_circuit_mapper")
 print(implementations)  # e.g. ['pauli_sequence']
 # end-cell-list-implementations
