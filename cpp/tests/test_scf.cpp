@@ -1158,7 +1158,7 @@ TEST_F(ScfTest, WaterRhfDfj) {
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
   EXPECT_NEAR(energy, -75.955848898587732, testing::scf_energy_tolerance);
-  // TODO: test this when Hailtonian and orbital restrictness are consistent
+  // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
 }
 
@@ -1173,7 +1173,7 @@ TEST_F(ScfTest, WaterRksDfjPbe) {
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
   EXPECT_NEAR(energy, -76.271464794036, testing::scf_energy_tolerance);
-  // TODO: test this when Hailtonian and orbital restrictness are consistent
+  // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
 }
 
@@ -1188,7 +1188,7 @@ TEST_F(ScfTest, WaterRksDfjM062x) {
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
   EXPECT_NEAR(energy, -76.320941901587, testing::scf_energy_tolerance);
-  // TODO: test this when Hailtonian and orbital restrictness are consistent
+  // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
 }
 
@@ -1202,7 +1202,7 @@ TEST_F(ScfTest, OxygenTripletUhfDfj) {
   auto [energy, wfn] = scf_solver->run(o2, 0, 3, basis);
 
   EXPECT_NEAR(energy, -149.489993170463, testing::scf_energy_tolerance);
-  // TODO: test this when Hailtonian and orbital restrictness are consistent
+  // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_FALSE(wfn->get_orbitals()->is_restricted());
 }
 
@@ -1217,7 +1217,7 @@ TEST_F(ScfTest, BfUksDfjPbe) {
   auto [energy, wfn] = scf_solver->run(bf, 0, 1, basis);
 
   EXPECT_NEAR(energy, -122.732943463018, testing::scf_energy_tolerance);
-  // TODO: test this when Hailtonian and orbital restrictness are consistent
+  // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_FALSE(wfn->get_orbitals()->is_restricted());
 }
 
