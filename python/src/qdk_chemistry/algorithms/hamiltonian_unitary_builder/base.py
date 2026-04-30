@@ -10,7 +10,7 @@ from abc import abstractmethod
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 
-__all__: list[str] = []
+__all__: list[str] = ["HamiltonianUnitaryBuilder", "HamiltonianUnitaryBuilderFactory", "TimeEvolutionBuilder"]
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
