@@ -20,6 +20,8 @@ References:
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
@@ -27,7 +29,14 @@ from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
+from qdk_chemistry.data import (
+    FlatPartition,
+    LayeredPartition,
+    QubitHamiltonian,
+    Settings,
+    TermPartition,
+    TimeEvolutionUnitary,
+)
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -145,7 +154,10 @@ class Trotter(TimeEvolutionBuilder):
             weight_threshold: Absolute threshold for filtering small
                 Hamiltonian coefficients. Defaults to 1e-12.
             optimize_term_ordering: Whether to group commuting terms and execute them in parallel.
-            term_groups: Pre-computed geometry-aware term groups (see ``heisenberg_term_groups``).
+            term_groups: Pre-computed term groups (deprecated). Prefer populating
+                ``QubitHamiltonian.term_partition`` (e.g. via the ``term_grouper`` algorithm or by
+                building Hamiltonians with ``include_term_groups=True``); when ``term_partition``
+                is set the builder consumes it automatically.
 
         """
         super().__init__()
@@ -156,6 +168,15 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("optimize_term_ordering", optimize_term_ordering)
+        if term_groups is not None:
+            warnings.warn(
+                "Trotter(term_groups=...) is deprecated; populate "
+                "QubitHamiltonian.term_partition instead (for example by passing "
+                "include_term_groups=True to create_*_hamiltonian or by running "
+                "the 'term_grouper' algorithm).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self._term_groups = term_groups
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
@@ -368,28 +389,41 @@ class Trotter(TimeEvolutionBuilder):
     ) -> list[list[QubitHamiltonian]]:
         """Group Hamiltonian terms into commuting and concurrent sets.
 
-        When *optimize_term_ordering* is ``True``:
-        1. Partition using :meth:`QubitHamiltonian.group_commuting`.
-        2. Within each group, merge terms with identical Pauli strings
-           by summing their coefficients.
-        3. Within each group, split terms into parallelizable layers
-           (terms whose Pauli supports are disjoint).
-        4. Move the group with the most multi-qubit terms to the end.
+        Resolution order (first match wins):
 
-        When ``False``, each Pauli string is returned as its own
-        single-term group with no reordering.
+        1. The deprecated ``term_groups`` constructor argument, if supplied.
+        2. ``qubit_hamiltonian.term_partition`` — preferred. Both
+           :class:`~qdk_chemistry.data.LayeredPartition` (group → layer →
+           index) and :class:`~qdk_chemistry.data.FlatPartition`
+           (group → index) are accepted; flat partitions are treated as
+           a single layer per group. When a partition is present, groups
+           are sorted by ascending layer count so the smallest group sits on
+           the outside of the Strang splitting and merges across boundaries.
+        3. ``optimize_term_ordering`` flag:
+
+           * ``True``: partition by full commutation
+             (:meth:`~qdk_chemistry.data.QubitHamiltonian._group_commuting_impl`),
+             merge identical labels, split each group into parallelisable
+             layers by disjoint qubit support.
+           * ``False``: every Pauli string becomes its own single-term group
+             with no reordering.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to group.
-            optimize_term_ordering: Whether to group commuting terms together.
+            optimize_term_ordering: Whether to group commuting terms together
+                when no partition is available.
 
         Returns:
             A list of groups, where each group is a list of
-            ``QubitHamiltonian`` sub-groups (parallelizable layers).
+            ``QubitHamiltonian`` sub-groups (parallelisable layers).
 
         """
         if self._term_groups is not None:
             return self._term_groups
+
+        partition = qubit_hamiltonian.term_partition
+        if partition is not None:
+            return self._groups_from_partition(qubit_hamiltonian, partition)
 
         if not optimize_term_ordering:
             return [
@@ -412,7 +446,7 @@ class Trotter(TimeEvolutionBuilder):
             encoding=qubit_hamiltonian.encoding,
         )
 
-        sub_hamiltonians = qubit_hamiltonian.group_commuting(qubit_wise=False)
+        sub_hamiltonians = qubit_hamiltonian._group_commuting_impl(qubit_wise=False)  # noqa: SLF001
 
         result: list[list[QubitHamiltonian]] = []
         for sub_h in sub_hamiltonians:
@@ -461,6 +495,60 @@ class Trotter(TimeEvolutionBuilder):
         result.append(result.pop(max_idx))
 
         return result
+
+    def _groups_from_partition(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        partition: TermPartition,
+    ) -> list[list[QubitHamiltonian]]:
+        """Materialise a :class:`TermPartition` into Trotter sub-groups.
+
+        Both :class:`~qdk_chemistry.data.LayeredPartition` and
+        :class:`~qdk_chemistry.data.FlatPartition` are supported. A flat
+        partition's groups are treated as single layers. Groups are sorted by
+        ascending layer count so that the smallest groups sit on the outside
+        of the Strang/Suzuki splitting and merge at boundaries.
+
+        Args:
+            qubit_hamiltonian: Source Hamiltonian whose Pauli terms the partition indexes into.
+            partition: Index-based partition carried on ``qubit_hamiltonian``.
+
+        Returns:
+            List of groups; each group is a list of layer ``QubitHamiltonian`` objects.
+
+        """
+        labels = qubit_hamiltonian.pauli_strings
+        coeffs = qubit_hamiltonian.coefficients
+        encoding = qubit_hamiltonian.encoding
+
+        def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
+            return QubitHamiltonian(
+                pauli_strings=[labels[i] for i in indices],
+                coefficients=np.asarray([coeffs[i] for i in indices]),
+                encoding=encoding,
+            )
+
+        # Normalise to (group → tuple of layers of indices)
+        if isinstance(partition, LayeredPartition):
+            layered_groups = partition.groups
+        elif isinstance(partition, FlatPartition):
+            layered_groups = tuple((g,) for g in partition.groups)
+        else:
+            raise TypeError(
+                f"Unsupported TermPartition subtype: {type(partition).__name__}. "
+                "Expected FlatPartition or LayeredPartition."
+            )
+
+        groups: list[list[QubitHamiltonian]] = [
+            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
+        ]
+        # Drop empty groups (no layers / all layers empty).
+        groups = [g for g in groups if g]
+
+        # Sort groups by ascending layer count so the smallest sits on the
+        # outside of the Strang/Suzuki splitting (maximises boundary merging).
+        groups.sort(key=len)
+        return groups
 
     def _exponentiate_commuting(
         self,

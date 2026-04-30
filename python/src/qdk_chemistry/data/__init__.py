@@ -44,6 +44,8 @@ Exposed classes are:
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
+- :class:`TermPartition`: Index-based partition of Hamiltonian terms.
+  See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`TimeEvolutionUnitary`: Time evolution unitary.
 - :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -114,6 +116,7 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
 from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -145,10 +148,12 @@ __all__ = [
     "EncodingMismatchError",
     "EnergyExpectationResult",
     "FermionModeOrder",
+    "FlatPartition",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
     "LatticeGraph",
+    "LayeredPartition",
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
@@ -176,6 +181,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "TermPartition",
     "TimeEvolutionUnitary",
     "TimeEvolutionUnitaryContainer",
     "Wavefunction",
@@ -184,3 +190,42 @@ __all__ = [
     "get_current_ciaaw_version",
     "validate_encoding_compatibility",
 ]
+
+
+# ---------------------------------------------------------------------------
+# LatticeGraph.edge_coloring overlay
+# ---------------------------------------------------------------------------
+#
+# LatticeGraph is bound from C++ and stores only an adjacency matrix.  The
+# Python overlay below adds a convenience :py:meth:`edge_coloring` method that
+# returns a :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.  This
+# keeps the user-facing API ``lattice.edge_coloring()`` independent of where
+# the coloring algorithm lives, and lets callers treat the lattice topology as
+# the single source of truth for both connectivity and edge colors.
+
+
+def _lattice_edge_coloring(self, *, seed: int | None = 0, trials: int = 1):
+    """Compute an edge coloring of this lattice as a :class:`HypergraphEdgeColoring`.
+
+    Builds a :class:`~qdk_chemistry.geometry.Hypergraph` from this lattice's
+    undirected adjacency and runs the randomised greedy edge coloring routine.
+
+    Args:
+        self: The :class:`LatticeGraph` instance whose edges are to be colored.
+        seed: Random seed for reproducibility (``None`` for non-deterministic).
+        trials: Number of randomised trials; the coloring with fewest colors is returned.
+
+    Returns:
+        HypergraphEdgeColoring: A coloring whose ``hypergraph`` carries the
+        same edges as this :class:`LatticeGraph`.
+
+    """
+    # Imported lazily to avoid a circular import at module load time.
+    from qdk_chemistry.geometry.hypergraph import Hypergraph  # noqa: PLC0415
+
+    hypergraph = Hypergraph.from_lattice_graph(self)
+    return hypergraph.edge_coloring(seed=seed, trials=trials)
+
+
+LatticeGraph.edge_coloring = _lattice_edge_coloring  # type: ignore[attr-defined]
+del _lattice_edge_coloring

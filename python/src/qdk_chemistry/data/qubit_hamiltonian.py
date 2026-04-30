@@ -13,6 +13,7 @@ and quantum circuit construction or measurement workflows.
 from __future__ import annotations
 
 import re
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -23,6 +24,8 @@ from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_spa
 if TYPE_CHECKING:
     import h5py
     import scipy
+
+    from qdk_chemistry.data.term_partition import TermPartition
 
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
@@ -42,6 +45,11 @@ class QubitHamiltonian(DataClass):
         fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
             when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
             the ordering is unspecified or not applicable.
+        term_partition (TermPartition | None): Optional index-based partition of
+            :attr:`pauli_strings` into algorithm-relevant groups (and, for layered
+            partitions, into parallelisable layers within each group).  Set by
+            geometry-aware constructors and by ``term_grouper`` algorithms; reset
+            to ``None`` by transformations that change the term ordering.
 
     """
 
@@ -57,6 +65,7 @@ class QubitHamiltonian(DataClass):
         coefficients: np.ndarray,
         encoding: str | None = None,
         fermion_mode_order: FermionModeOrder | str | None = None,
+        term_partition: TermPartition | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
@@ -65,6 +74,7 @@ class QubitHamiltonian(DataClass):
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
             encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
             fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
+            term_partition (TermPartition | None): Optional ``TermPartition`` carrying group/layer metadata.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -81,6 +91,7 @@ class QubitHamiltonian(DataClass):
         self.fermion_mode_order: FermionModeOrder | None = (
             FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
         )
+        self.term_partition: TermPartition | None = term_partition
 
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
@@ -268,6 +279,14 @@ class QubitHamiltonian(DataClass):
     def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
         """Group the qubit Hamiltonian into commuting subsets.
 
+        .. deprecated::
+            Use the ``term_grouper`` algorithm instead. Either
+            ``registry.create("term_grouper", "commuting")`` or
+            ``registry.create("term_grouper", "qubit_wise_commuting")``
+            returns a new ``QubitHamiltonian`` with a populated
+            :attr:`term_partition`, which downstream algorithms (Trotter,
+            energy estimator) can consume directly.
+
         Args:
             qubit_wise (bool): Whether to use qubit-wise commuting grouping. Default is True.
 
@@ -276,6 +295,25 @@ class QubitHamiltonian(DataClass):
 
         """
         Logger.trace_entering()
+        warnings.warn(
+            "QubitHamiltonian.group_commuting() is deprecated; use the 'term_grouper' algorithm "
+            "(registry.create('term_grouper', 'commuting' | 'qubit_wise_commuting')) which populates "
+            "QubitHamiltonian.term_partition instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._group_commuting_impl(qubit_wise=qubit_wise)
+
+    def _group_commuting_impl(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
+        """Internal grouping implementation shared by the deprecated public method and ``term_grouper``.
+
+        Args:
+            qubit_wise: Use qubit-wise commutation when ``True``; otherwise use full commutation.
+
+        Returns:
+            list[QubitHamiltonian]: One ``QubitHamiltonian`` per commuting subset.
+
+        """
         commutes = do_pauli_labels_qw_commute if qubit_wise else do_pauli_labels_commute
 
         # Each group is a list of (pauli_string, coefficient)
