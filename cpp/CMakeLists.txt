@@ -137,6 +137,18 @@ if(MSVC)
     # leaving blas/defines.h empty and breaking lapackpp.
     # OpenBLAS uses lowercase + trailing underscore (see OPENBLAS_FUNDERSCORE).
     add_compile_definitions(BLAS_FORTRAN_ADD_)
+
+    # Native MSVC /openmp is OpenMP 2.0 only, which requires signed loop indices.
+    # blaspp uses size_t (unsigned) in #pragma omp parallel for, valid in 3.0+.
+    # /openmp:llvm enables the LLVM runtime with unsigned indices (OpenMP 3.0+).
+    # /openmp:experimental enables #pragma omp simd (used in pipek_mezey.cpp).
+    # Both flags together give full coverage; may produce duplicate-flag warnings.
+    # See: https://developercommunity.visualstudio.com/t/openmp:llvm-doesnt-imply-openmp:exper/1520948
+    # Available since VS 2019 16.9+. clang-cl already uses libomp natively.
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        set(OpenMP_CXX_FLAGS "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
+        set(OpenMP_C_FLAGS   "/openmp:llvm /openmp:experimental" CACHE STRING "LLVM OpenMP + SIMD" FORCE)
+    endif()
 endif()
 
 # Options
