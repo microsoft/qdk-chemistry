@@ -13,7 +13,7 @@ void bind_valence_space(py::module& m) {
   m.def("compute_valence_space_parameters",
         &qdk::chemistry::utils::compute_valence_space_parameters,
         R"(
-Get the default number of active electrons, active orbitals, which are obtained from the valence electrons and orbitals of the atomic element types in the structure.
+Get the default number of active electrons and active orbitals, which are obtained from the valence electrons and orbitals of the atomic element types in the structure.
 The structure is automatically extracted from the wavefunction.
 
 Args:

@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -41,6 +42,15 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     This avoids basis set dependencies and SCF convergence flakiness in tests
     that only validate counting logic.
     """
+    pair_count = min(n_alpha, n_beta)
+    single_count = abs(n_alpha - n_beta)
+    if pair_count + single_count > num_molecular_orbitals:
+        raise ValueError(
+            f"make_minimal_wavefunction: num_molecular_orbitals ({num_molecular_orbitals}) "
+            f"is too small for the requested electron count "
+            f"(n_alpha={n_alpha}, n_beta={n_beta})."
+        )
+
     structure = Structure(symbols, np.asarray(coords, dtype=float))
 
     exps = np.array([1.0])
@@ -48,26 +58,41 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     shells = [Shell(i, OrbitalType.S, exps, coefs) for i in range(len(symbols))]
     basis_set = BasisSet("dummy", shells, structure, AOType.Spherical)
 
-    # Coefficients are (num_atomic_orbitals, num_molecular_orbitals); their
-    # values are unused by compute_valence_space_parameters, only the shape
-    # matters here.
-    num_atomic_orbitals = basis_set.get_num_atomic_orbitals()
-    coeffs = np.zeros((num_atomic_orbitals, num_molecular_orbitals))
+    coeffs = np.zeros((basis_set.get_num_atomic_orbitals(), num_molecular_orbitals))
     orbitals = Orbitals(coeffs, None, None, basis_set)
 
-    pair_count = min(n_alpha, n_beta)
     chars = ["0"] * num_molecular_orbitals
     for i in range(pair_count):
         chars[i] = "2"
-    if n_alpha > n_beta:
-        for i in range(n_alpha - n_beta):
-            chars[pair_count + i] = "u"
-    elif n_beta > n_alpha:
-        for i in range(n_beta - n_alpha):
-            chars[pair_count + i] = "d"
+    unpaired = "u" if n_alpha > n_beta else "d"
+    for i in range(single_count):
+        chars[pair_count + i] = unpaired
+
     config = Configuration("".join(chars))
     container = SlaterDeterminantContainer(config, orbitals)
     return Wavefunction(container)
+
+
+def make_single_atom_wavefunction(symbol, charge=0, multiplicity=1, num_molecular_orbitals=None):
+    """Single-atom Wavefunction at the origin sized from ``charge`` / ``multiplicity``.
+
+    ``num_molecular_orbitals`` defaults to ``4 * Z`` -- comfortably larger than
+    any valence space these tests check, so the cap in
+    ``compute_valence_space_parameters`` does not bind unless tests pass an
+    explicit smaller value.
+    """
+    z = int(Structure.symbol_to_element(symbol))
+    n_electrons = z - charge
+    n_unpaired = multiplicity - 1  # 2S = mult - 1
+    n_alpha = (n_electrons + n_unpaired) // 2
+    n_beta = n_electrons - n_alpha
+    return make_minimal_wavefunction(
+        [symbol],
+        [[0.0, 0.0, 0.0]],
+        n_alpha,
+        n_beta,
+        num_molecular_orbitals if num_molecular_orbitals is not None else 4 * z,
+    )
 
 
 class TestValenceParameters:
@@ -164,6 +189,43 @@ class TestValenceParameters:
         assert num_active_orbitals == 5  # number of valence orbitals
 
 
+class TestMakeMinimalWavefunction:
+    """Self-tests for the no-SCF Wavefunction helper used by the TM tests."""
+
+    @pytest.mark.parametrize(
+        ("symbol", "charge", "multiplicity"),
+        [("He", 0, 1), ("Li", 0, 2), ("O", 0, 3), ("O", -1, 2), ("Cu", 0, 2), ("Pt", 0, 1)],
+    )
+    def test_produces_requested_electron_counts(self, symbol, charge, multiplicity):
+        """Helper round-trips ``(charge, multiplicity)`` through the Wavefunction."""
+        wfn = make_single_atom_wavefunction(symbol, charge=charge, multiplicity=multiplicity)
+        n_alpha, n_beta = wfn.get_total_num_electrons()
+        z = int(Structure.symbol_to_element(symbol))
+        assert n_alpha + n_beta == z - charge
+        assert n_alpha - n_beta == multiplicity - 1
+
+    def test_rejects_too_few_molecular_orbitals(self):
+        """Passing a Configuration that won't fit the requested electrons raises."""
+        # Triplet on a single atom needs >= 2 alpha (or beta) MO slots.
+        with pytest.raises(ValueError, match="num_molecular_orbitals"):
+            make_minimal_wavefunction(["He"], [[0.0, 0.0, 0.0]], 2, 0, 1)
+
+
+# Parameterized table of single-atom transition-metal cases.
+# (symbol, multiplicity, expected_active_electrons,
+#  expected_active_orbitals_with_dshell, expected_active_orbitals_default)
+#   - Period 4 d-block: 4s + 5*3d + 5*4d' + 3*4p = 14 (vs default 9).
+#   - Period 4 main-group control (K): no d' shell either way.
+#   - Period 6 d-block: 6s + 7*4f + 5*5d + 5*6d' + 3*6p = 21 (vs 16).
+TM_SINGLE_ATOM_CASES = [
+    ("Cu", 2, 11, 14, 9),
+    ("Ni", 3, 10, 14, 9),
+    ("Zn", 1, 12, 14, 9),
+    ("K", 2, 1, 9, 9),
+    ("Pt", 1, 24, 21, 16),
+]
+
+
 class TestTransitionMetalValenceParameters:
     """Tests for the optional double-d-shell valence space in transition metals.
 
@@ -182,96 +244,61 @@ class TestTransitionMetalValenceParameters:
     available.
     """
 
-    def test_copper_atom(self):
-        """Cu atom (Z=29, period 4): 11 valence electrons, 14 valence orbitals."""
-        # 29 electrons doublet: 15 alpha + 14 beta. 50 MOs >> num_core + 14.
-        wavefunction = make_minimal_wavefunction(["Cu"], [[0.0, 0.0, 0.0]], 15, 14, 50)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
+    @pytest.mark.parametrize(
+        ("symbol", "multiplicity", "expected_nele", "expected_norb_on"),
+        [(s, m, e, n_on) for (s, m, e, n_on, _n_off) in TM_SINGLE_ATOM_CASES],
+    )
+    def test_toggle_on_adds_d_prime_shell_for_d_block_only(self, symbol, multiplicity, expected_nele, expected_norb_on):
+        """include_double_d_shell=True yields the expected sizing per element."""
+        wfn = make_single_atom_wavefunction(symbol, charge=0, multiplicity=multiplicity)
+        nele, norb = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
+        assert nele == expected_nele
+        assert norb == expected_norb_on
 
-        assert num_active_electrons == 11  # 29 - 18 (Ar core)
-        assert num_active_orbitals == 14  # 4s + 5*3d + 5*4d' + 3*4p
+    @pytest.mark.parametrize(
+        ("symbol", "multiplicity", "expected_nele", "expected_norb_off"),
+        [(s, m, e, n_off) for (s, m, e, _n_on, n_off) in TM_SINGLE_ATOM_CASES],
+    )
+    def test_toggle_off_preserves_historical_sizing(self, symbol, multiplicity, expected_nele, expected_norb_off):
+        """Default (include_double_d_shell=False) preserves the pre-toggle sizing."""
+        wfn = make_single_atom_wavefunction(symbol, charge=0, multiplicity=multiplicity)
+        nele, norb = compute_valence_space_parameters(wfn, 0)
+        assert nele == expected_nele
+        assert norb == expected_norb_off
 
-    def test_nickel_atom(self):
-        """Ni atom (Z=28, period 4): 10 valence electrons, 14 valence orbitals."""
-        # 28 electrons triplet: 15 alpha + 13 beta.
-        wavefunction = make_minimal_wavefunction(["Ni"], [[0.0, 0.0, 0.0]], 15, 13, 50)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
+    def test_silver_hydride_adds_d_prime_on_ag_only(self):
+        """AgH: Ag (period 5) gets the d' shell; the H spectator does not."""
+        wfn = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24, 60)
+        nele_on, norb_on = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
+        assert nele_on == 12  # Ag valence (11) + H (1)
+        assert norb_on == 15  # Ag period-5 with d' (14) + H (1)
 
-        assert num_active_electrons == 10  # 28 - 18
-        assert num_active_orbitals == 14
+        nele_off, norb_off = compute_valence_space_parameters(wfn, 0)
+        assert nele_off == 12
+        assert norb_off == 10  # Ag period-5 default (9) + H (1)
 
-    def test_zinc_full_d_shell(self):
-        """Zn (Z=30, period 4, d10): 12 valence electrons, 14 orbitals."""
-        wavefunction = make_minimal_wavefunction(["Zn"], [[0.0, 0.0, 0.0]], 15, 15, 50)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
+    def test_toggle_adds_exactly_five_per_d_block_atom(self):
+        """Toggle delta is +5 * (number of d-block atoms), zero else; electrons unchanged."""
+        # Zero d-block atoms -> zero delta.
+        nacl = make_minimal_wavefunction(["Na", "Cl"], [[0.0, 0.0, 0.0], [0.0, 0.0, 2.361]], 14, 14, 30)
+        nacl_e_off, nacl_o_off = compute_valence_space_parameters(nacl, 0)
+        nacl_e_on, nacl_o_on = compute_valence_space_parameters(nacl, 0, include_double_d_shell=True)
+        assert nacl_e_off == nacl_e_on
+        assert nacl_o_on - nacl_o_off == 0
 
-        assert num_active_electrons == 12  # 30 - 18
-        assert num_active_orbitals == 14
+        # One d-block atom -> +5.
+        agh = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24, 60)
+        agh_e_off, agh_o_off = compute_valence_space_parameters(agh, 0)
+        agh_e_on, agh_o_on = compute_valence_space_parameters(agh, 0, include_double_d_shell=True)
+        assert agh_e_off == agh_e_on
+        assert agh_o_on - agh_o_off == 5
 
-    def test_silver_hydride(self):
-        """AgH: Ag (Z=47, period 5) also gets 14 valence orbitals with double-d-shell."""
-        # Ag (47) + H (1) = 48 electrons, singlet.
-        wavefunction = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24, 60)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
-
-        assert num_active_electrons == 12  # 11 (Ag: 47-36) + 1 (H)
-        assert num_active_orbitals == 15  # 14 (Ag) + 1 (H)
-
-    def test_period3_unaffected(self):
-        """Period 3 elements (Na, Cl) should still get 4 valence orbitals each."""
-        # Na (11) + Cl (17) = 28 electrons, singlet.
-        wavefunction = make_minimal_wavefunction(["Na", "Cl"], [[0.0, 0.0, 0.0], [0.0, 0.0, 2.361]], 14, 14, 30)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
-
-        assert num_active_electrons == 8  # 1 (Na) + 7 (Cl)
-        assert num_active_orbitals == 8  # 4 (Na) + 4 (Cl)
-
-    def test_potassium_period4_main_group(self):
-        """K (Z=19, period 4 main group): only 9 valence orbitals (no d' shell)."""
-        # 19 electrons doublet: 10 alpha + 9 beta.
-        wavefunction = make_minimal_wavefunction(["K"], [[0.0, 0.0, 0.0]], 10, 9, 30)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
-
-        assert num_active_electrons == 1  # 19 - 18
-        assert num_active_orbitals == 9  # period 4 main-group: no d' shell
-
-    def test_platinum_period6_d_block(self):
-        """Pt (Z=78, period 6 d-block): 24 valence electrons, 21 valence orbitals."""
-        # 78 electrons singlet.
-        wavefunction = make_minimal_wavefunction(["Pt"], [[0.0, 0.0, 0.0]], 39, 39, 100)
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(
-            wavefunction, 0, include_double_d_shell=True
-        )
-
-        assert num_active_electrons == 24  # 78 - 54 (Xe core)
-        assert num_active_orbitals == 21  # 6s + 7*4f + 5*5d + 5*6d' + 3*6p
-
-    def test_copper_default_no_double_d_shell(self):
-        """With the default (include_double_d_shell=False) Cu has no d' shell."""
-        wavefunction = make_minimal_wavefunction(["Cu"], [[0.0, 0.0, 0.0]], 15, 14, 50)
-        # Default: include_double_d_shell=False.
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
-
-        assert num_active_electrons == 11  # 29 - 18
-        assert num_active_orbitals == 9  # 4s + 5*3d + 3*4p (no d' shell)
-
-    def test_platinum_default_no_double_d_shell(self):
-        """With the default (include_double_d_shell=False) Pt has no d' shell."""
-        wavefunction = make_minimal_wavefunction(["Pt"], [[0.0, 0.0, 0.0]], 39, 39, 100)
-        # Default: include_double_d_shell=False.
-        (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefunction, 0)
-
-        assert num_active_electrons == 24  # 78 - 54
-        assert num_active_orbitals == 16  # 6s + 7*4f + 5*5d + 3*6p (no d' shell)
+    def test_toggle_respects_basis_cap(self):
+        """When the basis is too small for the d' shell, the cap clips num_active_orbitals."""
+        # Cu doublet with only 12 MOs total. num_core_mos = 9, so the active
+        # space is capped at 12 - 9 = 3, far below the 14 the toggle would
+        # otherwise ask for.
+        wfn = make_single_atom_wavefunction("Cu", charge=0, multiplicity=2, num_molecular_orbitals=12)
+        nele, norb = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
+        assert nele == 11  # electron count is unaffected by the orbital cap
+        assert norb == 3  # capped at num_molecular_orbitals - num_core_mos
