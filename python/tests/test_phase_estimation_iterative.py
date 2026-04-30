@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
     _validate_iteration_inputs,
@@ -666,3 +667,47 @@ def test_iterative_qpe_initialization() -> None:
 
     assert iqpe._settings.get("num_bits") == num_bits
     assert iqpe._settings.get("shots_per_bit") == shots_per_bit
+
+
+def test_raises_not_implemented_for_non_time_evolution_builder(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """IQPE raises NotImplementedError when unitary_builder is not a TimeEvolutionBuilder."""
+
+    class _MockBuilder(HamiltonianUnitaryBuilder):
+        """A non-TimeEvolutionBuilder for testing the unsupported path."""
+
+        def _run_impl(self, qubit_hamiltonian: QubitHamiltonian):  # noqa: ARG002
+            return None
+
+        def name(self):
+            return "mock"
+
+        def type_name(self):
+            return "mock_unitary_builder"
+
+    iqpe = IterativePhaseEstimation(
+        num_bits=two_qubit_phase_problem.num_bits,
+        shots_per_bit=two_qubit_phase_problem.shots_iterative,
+    )
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+    )
+
+    # Override cached_property with a non-TimeEvolutionBuilder instance
+    iqpe.__dict__["unitary_builder"] = _MockBuilder()
+
+    with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
+        iqpe.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )

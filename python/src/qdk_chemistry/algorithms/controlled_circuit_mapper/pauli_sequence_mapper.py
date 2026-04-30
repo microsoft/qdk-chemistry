@@ -30,9 +30,6 @@ class PauliSequenceMapper(ControlledCircuitMapper):
         :math:`e^{-i\,\theta_j\,P_j} \;\rightarrow\; \text{CRZ}(2 \theta_j)`.
     4. The basis rotations and entangling operations are uncomputed.
 
-    The process repeats for all terms in :math:`U_{\mathrm{step}}`, for :math:`r` step repetitions,
-    and for the specified power.
-
     Notes:
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
@@ -60,7 +57,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
             controlled_unitary.target_indices.
 
         Returns:
-            Circuit: A quantum circuit implementing the controlled unitary :math:`U^{\text{power}}`
+            Circuit: A quantum circuit implementing the controlled unitary :math:`U(t)`
             where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
 
         Raises:
