@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -230,161 +231,76 @@ Examples:
   // Also support fully-keyword calls: BasisSet(name=..., shells=..., ...).
   // -----------------------------------------------------------------------
   basis_set.def(
-      py::init([](py::args args, py::kwargs kwargs) -> BasisSet {
-        // --- Helper: check whether a Python type name equals a target -----
-        auto type_name = [](const py::object& obj) -> std::string {
-          return py::str(obj.get_type().attr("__name__")).cast<std::string>();
-        };
 
-        // --- Helper: true when any Shell in a py::list has rpowers --------
-        // ECP shells carry rpowers; auxiliary shells do not.
-        auto list_has_ecp_shells = [](const py::list& lst) -> bool {
-          for (auto& item : lst) {
-            if (item.cast<Shell>().has_radial_powers()) return true;
-          }
-          return false;
-        };
+      py::init([](const std::string& name, const std::vector<Shell>& shells,
+                  std::optional<std::string> ecp_name,
+                  std::optional<std::vector<Shell>> ecp_shells,
+                  std::optional<std::vector<size_t>> ecp_electrons,
+                  std::optional<std::string> aux_name,
+                  std::optional<std::vector<Shell>> aux_shells,
+                  std::optional<Structure> structure,
+                  AOType atomic_orbital_type) -> BasisSet {
+        const bool has_ecp =
+            ecp_shells.has_value() || ecp_electrons.has_value();
+        const bool has_aux = aux_shells.has_value();
 
-        // --- Collect positional args into a mutable vector ----------------
-        std::vector<py::object> a;
-        a.reserve(args.size());
-        for (size_t i = 0; i < args.size(); ++i)
-          a.push_back(args[i].cast<py::object>());
-
-        // If last positional arg is AOType, pop it.
-        AOType ao = AOType::Spherical;
-        if (!a.empty() && type_name(a.back()) == "AOType") {
-          ao = a.back().cast<AOType>();
-          a.pop_back();
-        }
-        // Keyword override
-        if (kwargs.contains("atomic_orbital_type"))
-          ao = kwargs["atomic_orbital_type"].cast<AOType>();
-
-        // --- Merge keyword args into positional vector --------------------
-        auto throw_multiple_values = [](const char* arg_name) {
-          throw py::type_error(std::string("BasisSet() got multiple values for "
-                                           "argument '") +
-                               arg_name + "'");
-        };
-        auto reject_unexpected_kwargs =
-            [&kwargs](std::initializer_list<const char*> allowed) {
-              for (auto item : kwargs) {
-                auto key = py::cast<std::string>(item.first);
-                bool recognised = false;
-                for (auto allowed_key : allowed) {
-                  if (key == allowed_key) {
-                    recognised = true;
-                    break;
-                  }
-                }
-                if (!recognised) {
-                  throw py::type_error(
-                      "BasisSet() got an unexpected keyword "
-                      "argument '" +
-                      key + "'");
-                }
-              }
-            };
-        const size_t initial_n = a.size();
-        // Copy constructor: BasisSet(other)
-        if (initial_n == 1 && py::isinstance<BasisSet>(a[0])) {
-          if (!kwargs.empty()) {
-            throw py::type_error(
-                "BasisSet() copy constructor does not accept keyword "
-                "arguments");
-          }
-          return BasisSet(a[0].cast<const BasisSet&>());
-        }
-        // Supports mixed and fully-keyword calls by pulling recognised kwargs
-        // into the positional vector when the corresponding slot is not yet
-        // filled. Expected positional order: name, shells, structure, ...
-        reject_unexpected_kwargs(
-            {"name", "shells", "structure", "atomic_orbital_type"});
-        if (kwargs.contains("name")) {
-          if (a.size() > 0) throw_multiple_values("name");
-          a.push_back(kwargs["name"].cast<py::object>());
-        }
-        if (kwargs.contains("shells")) {
-          if (a.size() > 1) throw_multiple_values("shells");
-          if (a.size() == 1) {
-            a.push_back(kwargs["shells"].cast<py::object>());
-          }
-        }
-        if (kwargs.contains("structure")) {
-          if (a.size() > 2) throw_multiple_values("structure");
-          if (a.size() < 2)
-            throw py::type_error(
-                "BasisSet() 'structure' keyword requires 'name' and "
-                "'shells' to be provided");
-          a.push_back(kwargs["structure"].cast<py::object>());
-        }
-        const size_t n = a.size();
-
-        if (n < 2 || !py::isinstance<py::str>(a[0]) ||
-            !py::isinstance<py::list>(a[1]))
+        // Validate ECP: shells and electrons must come together
+        if (ecp_shells.has_value() != ecp_electrons.has_value()) {
           throw py::type_error(
-              "BasisSet() expects (name: str, shells: list[Shell], ...)");
-
-        auto name = a[0].cast<std::string>();
-        auto shells = to_shell_vec(a[1].cast<py::list>());
-
-        // (name, shells)
-        if (n == 2) return BasisSet(name, shells, ao);
-
-        // (name, shells, structure)
-        if (n == 3 && py::isinstance<Structure>(a[2]))
-          return BasisSet(name, shells, a[2].cast<Structure>(), ao);
-
-        // (name, shells, <list>, structure)  -- n==4
-        // Disambiguate: if shells in a[2] have rpowers → ECP path (needs
-        // ecp_electrons); if not → auxiliary path.
-        if (n == 4 && py::isinstance<py::list>(a[2]) &&
-            py::isinstance<Structure>(a[3])) {
-          auto extra = a[2].cast<py::list>();
-          if (list_has_ecp_shells(extra)) {
-            throw py::type_error(
-                "BasisSet() with ECP shells requires explicit "
-                "ecp_electrons: use (name, shells, ecp_shells, "
-                "ecp_electrons, structure)");
-          }
-          // Auxiliary shells path
-          return BasisSet(name, shells, to_shell_vec(extra),
-                          a[3].cast<Structure>(), ao);
+              "BasisSet() requires both 'ecp_shells' and 'ecp_electrons' "
+              "to be provided together");
         }
 
-        if (n == 5) {
-          if (py::isinstance<py::str>(a[2])) {
-            // (name, shells, aux_name, aux_shells, structure)
-            return BasisSet(name, shells, a[2].cast<std::string>(),
-                            to_shell_vec(a[3].cast<py::list>()),
-                            a[4].cast<Structure>(), ao);
-          }
-          // (name, shells, ecp_shells, ecp_electrons, structure)
-          return BasisSet(name, shells, to_shell_vec(a[2].cast<py::list>()),
-                          a[3].cast<std::vector<size_t>>(),
-                          a[4].cast<Structure>(), ao);
+        // ECP and aux paths require a structure
+        if ((has_ecp || has_aux) && !structure.has_value()) {
+          throw py::type_error(
+              "BasisSet() requires 'structure' when ECP or auxiliary "
+              "shells are provided");
         }
 
-        // (name, shells, ecp_name, ecp_shells, ecp_electrons, structure)
-        if (n == 6 && py::isinstance<py::str>(a[2]))
-          return BasisSet(name, shells, a[2].cast<std::string>(),
-                          to_shell_vec(a[3].cast<py::list>()),
-                          a[4].cast<std::vector<size_t>>(),
-                          a[5].cast<Structure>(), ao);
-
-        // (name, shells, ecp_name, ecp_shells, ecp_electrons,
-        //  aux_name, aux_shells, structure)
-        if (n == 8 && py::isinstance<py::str>(a[2]))
+        // Full constructor: ECP + auxiliary
+        if (has_ecp && has_aux) {
           return BasisSet(
-              name, shells, a[2].cast<std::string>(),
-              to_shell_vec(a[3].cast<py::list>()),
-              a[4].cast<std::vector<size_t>>(), a[5].cast<std::string>(),
-              to_shell_vec(a[6].cast<py::list>()), a[7].cast<Structure>(), ao);
+              name, shells,
+              ecp_name.value_or(std::string(BasisSet::custom_ecp_name)),
+              *ecp_shells, *ecp_electrons, aux_name.value_or(std::string("")),
+              *aux_shells, *structure, atomic_orbital_type);
+        }
 
-        throw py::type_error(
-            "No matching BasisSet constructor for the given arguments");
+        // ECP only
+        if (has_ecp) {
+          if (ecp_name.has_value()) {
+            return BasisSet(name, shells, *ecp_name, *ecp_shells,
+                            *ecp_electrons, *structure, atomic_orbital_type);
+          }
+          return BasisSet(name, shells, *ecp_shells, *ecp_electrons, *structure,
+                          atomic_orbital_type);
+        }
+
+        // Auxiliary only
+        if (has_aux) {
+          if (aux_name.has_value()) {
+            return BasisSet(name, shells, *aux_name, *aux_shells, *structure,
+                            atomic_orbital_type);
+          }
+          return BasisSet(name, shells, *aux_shells, *structure,
+                          atomic_orbital_type);
+        }
+
+        // With structure only
+        if (structure.has_value()) {
+          return BasisSet(name, shells, *structure, atomic_orbital_type);
+        }
+
+        // Minimal: name + shells
+        return BasisSet(name, shells, atomic_orbital_type);
       }),
+      py::arg("name"), py::arg("shells"), py::arg("ecp_name") = std::nullopt,
+      py::arg("ecp_shells") = std::nullopt,
+      py::arg("ecp_electrons") = std::nullopt,
+      py::arg("aux_name") = std::nullopt, py::arg("aux_shells") = std::nullopt,
+      py::arg("structure") = std::nullopt,
+      py::arg("atomic_orbital_type") = AOType::Spherical,
       R"(
 BasisSet constructor.
 
