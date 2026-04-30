@@ -239,27 +239,21 @@ static void compute_restricted_unrestricted_gradient(
  * @param[in] density_matrix Density matrix in AO basis
  * @param[in] num_electrons Occupied orbital counts (alpha, beta)
  * @param[in] rotation_size Rotation size for the ROHF kappa vector
- * @param[in] num_molecular_orbitals Total molecular orbitals in the system
- * @param[out] generalized_fock_mo Preallocated generalized Fock matrix in MO
  * @param[out] gradient Output gradient vector
  */
 static void compute_restricted_open_shell_gradient(
     const SCFImpl& scf_impl, const RowMajorMatrix& C,
     const RowMajorMatrix& density_matrix, const std::vector<int>& num_electrons,
-    const std::vector<int>& rotation_size, int num_molecular_orbitals,
-    RowMajorMatrix& generalized_fock_mo, Eigen::VectorXd& gradient) {
+    const std::vector<int>& rotation_size, Eigen::VectorXd& gradient) {
   const int total_rotation_size = rotation_size[0];
   gradient.setZero(total_rotation_size);
 
+  const int num_molecular_orbitals = static_cast<int>(C.cols());
   const int num_closed_orbitals = num_electrons[1];
   const int num_open_orbitals = num_electrons[0] - num_closed_orbitals;
   const int num_virtual_orbitals = num_molecular_orbitals - num_electrons[0];
-
-  if (generalized_fock_mo.rows() != num_molecular_orbitals ||
-      generalized_fock_mo.cols() != num_molecular_orbitals) {
-    throw std::invalid_argument(
-        "generalized_fock_mo must be preallocated to MO dimensions.");
-  }
+  RowMajorMatrix generalized_fock_mo =
+      RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
   const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   const auto& H_ao_full = scf_impl.get_core_hamiltonian();
@@ -543,11 +537,9 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
 
   Eigen::VectorXd gradient;
   if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
-    RowMajorMatrix generalized_fock_mo =
-        RowMajorMatrix::Zero(num_molecular_orbitals_, num_molecular_orbitals_);
-    compute_restricted_open_shell_gradient(
-        scf_impl_, cached_C_, cached_P_, num_electrons_, rotation_size_,
-        num_molecular_orbitals_, generalized_fock_mo, gradient);
+    compute_restricted_open_shell_gradient(scf_impl_, cached_C_, cached_P_,
+                                           num_electrons_, rotation_size_,
+                                           gradient);
   } else {
     compute_restricted_unrestricted_gradient(
         cached_F_, cached_C_, num_electrons_, rotation_offset_, rotation_size_,
@@ -710,9 +702,6 @@ class GDM {
   /// Eigenvalues of pseudo-canonical orbitals, used for building Hessian
   Eigen::VectorXd pseudo_canonical_eigenvalues_;
 
-  /// Generalized Fock matrix in MO basis for ROHF
-  RowMajorMatrix generalized_fock_mo_;
-
   Eigen::VectorXd kappa_;  // vertical rotation matrix of this step
 
   /// Energy of the last accepted step, used to decide if we rescale the kappa
@@ -753,12 +742,6 @@ GDM::GDM(const SCFContext& ctx, int history_size_limit)
   num_electrons_ = {num_alpha_electrons, num_beta_electrons};
   history_size_ = 0;
   pseudo_canonical_eigenvalues_ = Eigen::VectorXd::Zero(num_molecular_orbitals);
-  if (cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    generalized_fock_mo_ =
-        RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  } else {
-    generalized_fock_mo_ = RowMajorMatrix(0, 0);
-  }
   if (history_size_limit < 1) {
     throw std::invalid_argument(
         "GDM history size limit must be at least 1, got: " +
@@ -948,6 +931,7 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
     Eigen::Block<RowMajorMatrix> history_kappa_spin,
     Eigen::Block<RowMajorMatrix> history_dgrad_spin,
     Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin) {
+  const int num_atomic_orbitals = C.rows();
   const int num_molecular_orbitals = C.cols();
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
@@ -967,12 +951,12 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
 
   RowMajorMatrix F_MO =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  const int spin_block_offset =
-      num_molecular_orbitals * num_molecular_orbitals * spin_index;
-  const double* C_block_ptr = C.data() + spin_block_offset;
-  const double* F_block_ptr = F.data() + spin_block_offset;
-  std::vector<double> atba_workspace(
-      static_cast<size_t>(num_molecular_orbitals) * num_molecular_orbitals);
+  const double* C_block_ptr =
+      C.data() + num_atomic_orbitals * num_molecular_orbitals * spin_index;
+  const double* F_block_ptr =
+      F.data() + num_molecular_orbitals * num_molecular_orbitals * spin_index;
+  std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
+                                     num_molecular_orbitals);
   compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
                     num_molecular_orbitals, num_molecular_orbitals,
                     atba_workspace);
@@ -1251,11 +1235,9 @@ void GDM::iterate(SCFImpl& scf_impl) {
   }
 
   if (cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    generalized_fock_mo_.setZero();
     compute_restricted_open_shell_gradient(
         scf_impl, C, scf_impl.get_density_matrix(), num_electrons_,
-        rotation_size_, num_molecular_orbitals, generalized_fock_mo_,
-        current_gradient_);
+        rotation_size_, current_gradient_);
   } else {
     compute_restricted_unrestricted_gradient(
         F, C, num_electrons_, rotation_offset_, rotation_size_,
