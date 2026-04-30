@@ -611,45 +611,51 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
       },
       std::runtime_error);
 
-  // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
-                 std::vector<size_t> beta_active_indices{0, 1};
-                 std::vector<size_t> alpha_inactive_indices{};
-                 std::vector<size_t> beta_inactive_indices{2};
-                 // Create unrestricted orbitals with only beta active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  // Test that unrestricted orbitals throw when alpha is empty.
+  // GCC statement expressions ({...}) are not supported by MSVC, so we use
+  // a named lambda invoked inside the macro to avoid unprotected commas.
+  {
+    auto throw_empty_alpha = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{};  // Empty alpha
+      std::vector<size_t> beta_active_indices{0, 1};
+      std::vector<size_t> alpha_inactive_indices{};
+      std::vector<size_t> beta_inactive_indices{2};
+      // Create unrestricted orbitals with only beta active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          std::make_tuple(std::move(alpha_active_indices),
+                          std::move(beta_active_indices),
+                          std::move(alpha_inactive_indices),
+                          std::move(beta_inactive_indices)));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_alpha(), std::runtime_error);
+  }
 
   // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{0, 1};
-                 std::vector<size_t> beta_active_indices{};  // Empty beta
-                 std::vector<size_t> alpha_inactive_indices{2};
-                 std::vector<size_t> beta_inactive_indices{};
-                 // Create unrestricted orbitals with only alpha active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     std::make_tuple(std::move(alpha_active_indices),
-                                     std::move(beta_active_indices),
-                                     std::move(alpha_inactive_indices),
-                                     std::move(beta_inactive_indices)));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  {
+    auto throw_empty_beta = [&]() {
+      Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+      Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+      std::vector<size_t> alpha_active_indices{0, 1};
+      std::vector<size_t> beta_active_indices{};  // Empty beta
+      std::vector<size_t> alpha_inactive_indices{2};
+      std::vector<size_t> beta_inactive_indices{};
+      // Create unrestricted orbitals with only alpha active space
+      auto orbitals = std::make_shared<Orbitals>(
+          coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+          basis_set,
+          std::make_tuple(std::move(alpha_active_indices),
+                          std::move(beta_active_indices),
+                          std::move(alpha_inactive_indices),
+                          std::move(beta_inactive_indices)));
+      hc->run(orbitals);
+    };
+    EXPECT_THROW(throw_empty_beta(), std::runtime_error);
+  }
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
