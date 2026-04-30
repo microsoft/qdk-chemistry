@@ -15,14 +15,6 @@ mapper = create("controlled_circuit_mapper")
 ################################################################################
 
 ################################################################################
-# start-cell-configure
-# Configure the power of the controlled unitary
-mapper = create("controlled_circuit_mapper", "pauli_sequence")
-mapper.settings().set("power", 4)
-# end-cell-configure
-################################################################################
-
-################################################################################
 # start-cell-run
 import numpy as np
 from qdk_chemistry.algorithms import create

@@ -115,7 +115,6 @@ iqpe = create(
     "phase_estimation",
     "iterative",
     num_bits=M_PRECISION,
-    evolution_time=T_TIME,
     shots_per_bit=SHOTS_PER_BIT,
 )
 iqpe.settings().set(
@@ -124,7 +123,7 @@ iqpe.settings().set(
 )
 iqpe.settings().set(
     "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=T_TIME),
 )
 iqpe.settings().set(
     "circuit_mapper",

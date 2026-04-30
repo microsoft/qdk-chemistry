@@ -22,7 +22,6 @@ qpe = create("phase_estimation", "qiskit_standard")
 # Configure iterative phase estimation
 iqpe = create("phase_estimation", "iterative")
 iqpe.settings().set("num_bits", 10)
-iqpe.settings().set("evolution_time", 0.1)
 iqpe.settings().set("shots_per_bit", 10)
 # end-cell-configure-iqpe
 ################################################################################
@@ -32,7 +31,6 @@ iqpe.settings().set("shots_per_bit", 10)
 # Configure standard QFT-based phase estimation
 qpe = create("phase_estimation", "qiskit_standard")
 qpe.settings().set("num_bits", 10)
-qpe.settings().set("evolution_time", 0.1)
 qpe.settings().set("shots", 100)
 qpe.settings().set("qft_do_swaps", True)
 # end-cell-configure-standard
@@ -74,14 +72,12 @@ circuit = state_prep.run(wfn_cas)
 # 7. Create and run IQPE with nested algorithm settings
 from qdk_chemistry.data import AlgorithmRef
 
-iqpe = create(
-    "phase_estimation", "iterative", num_bits=10, evolution_time=0.1, shots_per_bit=10
-)
+iqpe = create("phase_estimation", "iterative", num_bits=10, shots_per_bit=10)
 
 # Configure nested algorithms — kwargs override the algorithm's defaults
 iqpe.settings().set(
     "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2, time=0.1),
 )
 iqpe.settings().set(
     "circuit_executor",

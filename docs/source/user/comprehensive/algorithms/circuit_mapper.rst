@@ -52,15 +52,6 @@ ControlledUnitary
       :start-after: # start-cell-create
       :end-before: # end-cell-create
 
-.. rubric:: Configuring settings
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/circuit_mapper.py
-      :language: python
-      :start-after: # start-cell-configure
-      :end-before: # end-cell-configure
-
 .. rubric:: Running the mapper
 
 .. tab:: Python API
@@ -98,20 +89,6 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 
 .. note::
    The current implementation supports a single control qubit.
-
-.. rubric:: Settings
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 60
-
-   * - Setting
-     - Type
-     - Description
-   * - ``power``
-     - int
-     - Number of times the unitary is repeated (:math:`U^{\text{power}}`). Default is 1.
-
 
 Related classes
 ---------------
