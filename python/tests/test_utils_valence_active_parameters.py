@@ -167,9 +167,11 @@ class TestValenceParameters:
 class TestTransitionMetalValenceParameters:
     """Tests for the optional double-d-shell valence space in transition metals.
 
-    When ``include_double_d_shell=True``, periods 4-5 transition metals get a
-    correlating d' shell: 14 valence orbitals per TM atom
-    (ns + 5*(n-1)d + 5*nd' + 3*np) instead of 9 (ns + 5*(n-1)d + 3*np).
+    When ``include_double_d_shell=True``, periods 4-6 d-block elements (Sc-Zn,
+    Y-Cd, Hf-Hg) get a correlating d' shell: 14 valence orbitals per period
+    4-5 TM atom (ns + 5*(n-1)d + 5*nd' + 3*np) instead of 9, and 21 valence
+    orbitals per period 6 TM atom (6s + 7*4f + 5*5d + 5*6d' + 3*6p) instead
+    of 16.
 
     These tests only validate the valence-space sizing logic in
     ``compute_valence_space_parameters``; that function only consults the

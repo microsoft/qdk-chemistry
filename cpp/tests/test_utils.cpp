@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -196,9 +197,11 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 }
 
 // ========== Transition metal double-d-shell tests ==========
-// Periods 4-5 include a correlating d' shell when ``include_double_d_shell``
-// is enabled: 14 valence orbitals per atom
-// (ns + 5*(n-1)d + 5*nd' + 3*np) instead of the default 9.
+// Periods 4-6 d-block elements (Sc-Zn, Y-Cd, Hf-Hg) include a correlating
+// d' shell when ``include_double_d_shell`` is enabled: 14 valence orbitals
+// per period 4-5 atom (ns + 5*(n-1)d + 5*nd' + 3*np) instead of the default
+// 9, and 21 valence orbitals per period 6 atom (6s + 7*4f + 5*5d + 5*6d' +
+// 3*6p) instead of the default 16.
 //
 // These tests only validate the valence-space sizing logic in
 // ``compute_valence_space_parameters``; that function only consults the
