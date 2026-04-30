@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -299,8 +300,9 @@ Examples:
         // Supports mixed and fully-keyword calls by pulling recognised kwargs
         // into the positional vector when the corresponding slot is not yet
         // filled. Expected positional order: name, shells, structure, ...
-        reject_unexpected_kwargs(
-            {"name", "shells", "structure", "atomic_orbital_type"});
+        reject_unexpected_kwargs({"name", "shells", "ecp_name", "ecp_shells",
+                                  "ecp_electrons", "aux_name", "aux_shells",
+                                  "structure", "atomic_orbital_type"});
         if (kwargs.contains("name")) {
           if (a.size() > 0) throw_multiple_values("name");
           a.push_back(kwargs["name"].cast<py::object>());
@@ -317,8 +319,112 @@ Examples:
             throw py::type_error(
                 "BasisSet() 'structure' keyword requires 'name' and "
                 "'shells' to be provided");
-          a.push_back(kwargs["structure"].cast<py::object>());
+          // structure is appended later for keyword-driven ECP/aux paths;
+          // only append here when no ECP/aux kwargs are present.
+          if (!kwargs.contains("ecp_shells") && !kwargs.contains("ecp_name") &&
+              !kwargs.contains("ecp_electrons") &&
+              !kwargs.contains("aux_shells") && !kwargs.contains("aux_name")) {
+            a.push_back(kwargs["structure"].cast<py::object>());
+          }
         }
+        // --- Keyword-driven ECP / auxiliary path --------------------------
+        // When any of the ECP or auxiliary kwargs are provided we dispatch
+        // directly to the appropriate constructor instead of relying on the
+        // positional-index logic below.
+        bool has_ecp_kw = kwargs.contains("ecp_shells") ||
+                          kwargs.contains("ecp_name") ||
+                          kwargs.contains("ecp_electrons");
+        bool has_aux_kw =
+            kwargs.contains("aux_shells") || kwargs.contains("aux_name");
+
+        if (has_ecp_kw || has_aux_kw) {
+          // Need at least name and shells
+          if (a.size() < 2 || !py::isinstance<py::str>(a[0]) ||
+              !py::isinstance<py::list>(a[1]))
+            throw py::type_error(
+                "BasisSet() expects (name: str, shells: list[Shell], ...)");
+
+          auto kw_name = a[0].cast<std::string>();
+          auto kw_shells = to_shell_vec(a[1].cast<py::list>());
+
+          // Extract optional structure
+          std::optional<Structure> kw_structure;
+          if (kwargs.contains("structure"))
+            kw_structure.emplace(kwargs["structure"].cast<Structure>());
+
+          // ECP + Aux path
+          if (has_ecp_kw && has_aux_kw) {
+            if (!kwargs.contains("ecp_shells") ||
+                !kwargs.contains("ecp_electrons"))
+              throw py::type_error(
+                  "BasisSet() ECP path requires both 'ecp_shells' and "
+                  "'ecp_electrons'");
+            if (!kwargs.contains("aux_shells"))
+              throw py::type_error(
+                  "BasisSet() auxiliary path requires 'aux_shells'");
+            auto ecp_shells_vec =
+                to_shell_vec(kwargs["ecp_shells"].cast<py::list>());
+            auto ecp_electrons_vec =
+                kwargs["ecp_electrons"].cast<std::vector<size_t>>();
+            auto aux_shells_vec =
+                to_shell_vec(kwargs["aux_shells"].cast<py::list>());
+            std::string ecp_name_str =
+                kwargs.contains("ecp_name")
+                    ? kwargs["ecp_name"].cast<std::string>()
+                    : "";
+            std::string aux_name_str =
+                kwargs.contains("aux_name")
+                    ? kwargs["aux_name"].cast<std::string>()
+                    : "";
+            if (!kw_structure.has_value())
+              throw py::type_error(
+                  "BasisSet() with ECP+aux requires 'structure'");
+            return BasisSet(kw_name, kw_shells, ecp_name_str, ecp_shells_vec,
+                            ecp_electrons_vec, aux_name_str, aux_shells_vec,
+                            kw_structure.value(), ao);
+          }
+
+          // ECP-only path
+          if (has_ecp_kw) {
+            if (!kwargs.contains("ecp_shells") ||
+                !kwargs.contains("ecp_electrons"))
+              throw py::type_error(
+                  "BasisSet() ECP path requires both 'ecp_shells' and "
+                  "'ecp_electrons'");
+            auto ecp_shells_vec =
+                to_shell_vec(kwargs["ecp_shells"].cast<py::list>());
+            auto ecp_electrons_vec =
+                kwargs["ecp_electrons"].cast<std::vector<size_t>>();
+            if (!kw_structure.has_value())
+              throw py::type_error("BasisSet() with ECP requires 'structure'");
+            if (kwargs.contains("ecp_name")) {
+              return BasisSet(
+                  kw_name, kw_shells, kwargs["ecp_name"].cast<std::string>(),
+                  ecp_shells_vec, ecp_electrons_vec, kw_structure.value(), ao);
+            }
+            return BasisSet(kw_name, kw_shells, ecp_shells_vec,
+                            ecp_electrons_vec, kw_structure.value(), ao);
+          }
+
+          // Aux-only path
+          if (has_aux_kw) {
+            if (!kwargs.contains("aux_shells"))
+              throw py::type_error(
+                  "BasisSet() auxiliary path requires 'aux_shells'");
+            auto aux_shells_vec =
+                to_shell_vec(kwargs["aux_shells"].cast<py::list>());
+            if (!kw_structure.has_value())
+              throw py::type_error("BasisSet() with aux requires 'structure'");
+            if (kwargs.contains("aux_name")) {
+              return BasisSet(kw_name, kw_shells,
+                              kwargs["aux_name"].cast<std::string>(),
+                              aux_shells_vec, kw_structure.value(), ao);
+            }
+            return BasisSet(kw_name, kw_shells, aux_shells_vec,
+                            kw_structure.value(), ao);
+          }
+        }
+
         const size_t n = a.size();
 
         if (n < 2 || !py::isinstance<py::str>(a[0]) ||

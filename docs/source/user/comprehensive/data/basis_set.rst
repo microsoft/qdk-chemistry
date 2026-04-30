@@ -252,51 +252,42 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 .. code-block:: json
 
    {
+     "version": "0.1.0",
+     "name": "6-31G",
+     "atomic_orbital_type": "spherical",
+     "num_atomic_orbitals": 9,
+     "num_shells": 3,
+     "num_atoms": 2,
      "atoms": [
        {
          "atom_index": 0,
          "shells": [
            {
-             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
+             "orbital_type": "s",
              "exponents": [3.425250914, 0.6239137298, 0.168855404],
-             "orbital_type": "s"
+             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422]
+           }
+         ],
+         "ecp_shells": [
+           {
+             "orbital_type": "s",
+             "exponents": [10.0, 5.0],
+             "coefficients": [50.0, 20.0],
+             "rpowers": [2, 2]
+           }
+         ],
+         "aux_shells": [
+           {
+             "orbital_type": "s",
+             "exponents": [5.0],
+             "coefficients": [2.0]
            }
          ]
        }
      ],
-     "basis_type": "spherical",
-     "name": "6-31G",
-     "num_atoms": 2,
-     "num_basis_functions": 9,
-     "num_shells": 3,
      "ecp_name": "my-ecp",
      "ecp_electrons": [28, 0],
-     "ecp_atoms": [
-       {
-         "atom_index": 0,
-         "shells": [
-           {
-             "coefficients": [50.0, 20.0],
-             "exponents": [10.0, 5.0],
-             "orbital_type": "s",
-             "rpowers": [0, 2]
-           }
-         ]
-       }
-     ],
-     "aux_name": "my-aux-fit",
-     "aux_atoms": [
-       {
-         "atom_index": 0,
-         "shells": [
-           {
-             "coefficients": [2.0],
-             "exponents": [5.0],
-             "orbital_type": "s"
-           }
-         ]
-       }
-     ]
+     "aux_name": "my-aux-fit"
    }
 
 HDF5 format
@@ -306,31 +297,40 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. code-block:: text
 
-   /
-   ├── shells/             # Group
-   │   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
-   │   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
-   │   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
-   │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
-   │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
-   ├── ecp_shells/         # Group (present when ECP is defined)
-   │   ├── atom_indices    # Dataset: uint32
-   │   ├── coefficients    # Dataset: float64
-   │   ├── exponents       # Dataset: float64
-   │   ├── rpowers         # Dataset: int32, 1D Array of radial powers per primitive
-   │   ├── num_primitives  # Dataset: uint32
-   │   └── orbital_types   # Dataset: int32
-   ├── aux_shells/         # Group (present when auxiliary basis is defined)
-   │   ├── atom_indices    # Dataset: uint32
-   │   ├── coefficients    # Dataset: float64
-   │   ├── exponents       # Dataset: float64
-   │   ├── num_primitives  # Dataset: uint32
-   │   └── orbital_types   # Dataset: int32
-   └── metadata/           # Group
-       ├── name            # Attribute: string value of the basis set name
-       ├── ecp_name        # Attribute: string (optional)
-       ├── ecp_electrons   # Dataset: uint64 (optional)
-       └── aux_name        # Attribute: string (optional)
+   /basis_set                                     (Group - top-level)
+   ├── @version = "0.1.0"                         (Attribute, variable-length string)
+   ├── @ecp_name = "lanl2dz"                      (Attribute, variable-length string, optional)
+   ├── @aux_name = "cc-pVDZ-RI"                   (Attribute, variable-length string, optional)
+   │
+   ├── metadata/                                  (Group)
+   │   ├── @name = "cc-pVDZ"                      (Attribute, variable-length string)
+   │   └── @atomic_orbital_type = "spherical"     (Attribute, variable-length string)
+   │
+   ├── shells/                                    (Group, present if num_shells > 0)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │
+   ├── ecp_shells/                                (Group, optional - present if ECP shells exist)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   ├── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │   └── rpowers                                (Dataset: int32, 1D, flattened across shells)
+   │
+   ├── ecp_electrons                              (Dataset: uint64, 1D per atom, optional)
+   │
+   ├── aux_shells/                                (Group, optional - present if auxiliary basis exists)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │
+   └── structure/                                 (Group, optional - nested Structure object)
 
 .. tab:: C++ API
 

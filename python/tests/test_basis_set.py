@@ -1726,10 +1726,27 @@ class TestBasisSetConstructorDispatch:
         assert b.has_aux_basis()
         assert b.get_atomic_orbital_type() == AOType.Cartesian
 
+    def test_name_shells_aux_structure_kwargs(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, aux_shells=aux_shells, structure=structure)
+        assert b.has_aux_basis()
+        assert b.get_num_aux_shells() == 1
+        assert b.has_structure()
+
+    def test_name_shells_aux_structure_kwargs_with_ao(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, aux_shells=aux_shells, structure=structure, atomic_orbital_type=AOType.Cartesian)
+        assert b.has_aux_basis()
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
     # --- (name, shells, aux_name, aux_shells, structure) --- n==5 str path
 
     def test_name_shells_auxname_aux_structure_positional(self, shells, aux_shells, structure):
         b = BasisSet("test", shells, "my-aux", aux_shells, structure)
+        assert b.has_aux_basis()
+        assert b.get_aux_name() == "my-aux"
+        assert b.has_structure()
+
+    def test_name_shells_auxname_aux_structure_kwargs(self, shells, aux_shells, structure):
+        b = BasisSet("test", shells, aux_shells=aux_shells, aux_name="my-aux", structure=structure)
         assert b.has_aux_basis()
         assert b.get_aux_name() == "my-aux"
         assert b.has_structure()
@@ -1742,10 +1759,34 @@ class TestBasisSetConstructorDispatch:
         assert b.get_num_ecp_shells() == 1
         assert list(b.get_ecp_electrons()) == [2]
 
+    def test_name_shells_ecp_ecpelec_structure_kwargs(self, shells, ecp_shells, structure):
+        b = BasisSet("test", shells, ecp_shells=ecp_shells, ecp_electrons=[2], structure=structure)
+        assert b.has_ecp_shells()
+        assert b.get_num_ecp_shells() == 1
+        assert list(b.get_ecp_electrons()) == [2]
+
+    def test_name_shells_ecp_ecpelec_structure_kwargs_with_ao(self, shells, ecp_shells, structure):
+        b = BasisSet(
+            "test",
+            shells,
+            ecp_shells=ecp_shells,
+            ecp_electrons=[2],
+            structure=structure,
+            atomic_orbital_type=AOType.Cartesian,
+        )
+        assert b.has_ecp_shells()
+        assert b.get_atomic_orbital_type() == AOType.Cartesian
+
     # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6 list path
 
     def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
         b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
+        assert b.has_ecp_shells()
+        assert b.get_ecp_name() == "my-ecp"
+        assert list(b.get_ecp_electrons()) == [2]
+
+    def test_name_shells_ecpname_ecp_ecpelec_structure_kwargs(self, shells, ecp_shells, structure):
+        b = BasisSet("test", shells, ecp_shells=ecp_shells, ecp_name="my-ecp", ecp_electrons=[2], structure=structure)
         assert b.has_ecp_shells()
         assert b.get_ecp_name() == "my-ecp"
         assert list(b.get_ecp_electrons()) == [2]
@@ -1758,6 +1799,36 @@ class TestBasisSetConstructorDispatch:
         assert b.get_ecp_name() == "my-ecp"
         assert b.has_aux_basis()
         assert b.get_aux_name() == "my-aux"
+        assert b.has_structure()
+
+    def test_full_8arg_constructor_kwargs(self, shells, ecp_shells, aux_shells, structure):
+        b = BasisSet(
+            "test",
+            shells,
+            ecp_name="my-ecp",
+            ecp_shells=ecp_shells,
+            ecp_electrons=[2],
+            aux_name="my-aux",
+            aux_shells=aux_shells,
+            structure=structure,
+        )
+        assert b.has_ecp_shells()
+        assert b.get_ecp_name() == "my-ecp"
+        assert b.has_aux_basis()
+        assert b.get_aux_name() == "my-aux"
+        assert b.has_structure()
+
+    def test_full_8arg_constructor_kwargs_without_names(self, shells, ecp_shells, aux_shells, structure):
+        b = BasisSet(
+            "test",
+            shells,
+            ecp_shells=ecp_shells,
+            ecp_electrons=[2],
+            aux_shells=aux_shells,
+            structure=structure,
+        )
+        assert b.has_ecp_shells()
+        assert b.has_aux_basis()
         assert b.has_structure()
 
     # --- Error cases: unexpected kwargs ---
