@@ -224,7 +224,9 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     throw std::invalid_argument(
         "make_minimal_wavefunction: num_molecular_orbitals (" +
         std::to_string(num_molecular_orbitals) +
-        ") is too small for the requested electron count.");
+        ") is too small for n_alpha=" + std::to_string(n_alpha) +
+        ", n_beta=" + std::to_string(n_beta) + "; requires at least " +
+        std::to_string(pair_count + single_count) + " molecular orbitals.");
   }
 
   auto structure = std::make_shared<Structure>(coords, symbols);

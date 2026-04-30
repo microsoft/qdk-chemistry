@@ -47,8 +47,8 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     if pair_count + single_count > num_molecular_orbitals:
         raise ValueError(
             f"make_minimal_wavefunction: num_molecular_orbitals ({num_molecular_orbitals}) "
-            f"is too small for the requested electron count "
-            f"(n_alpha={n_alpha}, n_beta={n_beta})."
+            f"is too small for n_alpha={n_alpha}, n_beta={n_beta}; "
+            f"requires at least {pair_count + single_count} molecular orbitals."
         )
 
     structure = Structure(symbols, np.asarray(coords, dtype=float))
