@@ -441,8 +441,14 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     _shells_per_atom[atom_index].push_back(shell);
   }
 
-  // Organize ECP shells by atom index
+  // Organize AUX shells by atom index
   for (const auto& aux_shell : aux_shells) {
+    if (aux_shell.has_radial_powers()) {
+      throw std::invalid_argument(
+          "Expect auxiliary shells to not have radial powers. Do you mean to "
+          "use another constructor for ECP shells?");
+    }
+
     size_t atom_index = aux_shell.atom_index;
 
     // Ensure we have enough space for this atom
