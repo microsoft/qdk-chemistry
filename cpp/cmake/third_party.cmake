@@ -45,12 +45,22 @@ set(_libint2_source_subdir "SOURCE_SUBDIR;libint-2.9.0")
 if(APPLE)
     set(_libint2_source_subdir "")
 endif()
+# MSVC native cl does not define __SSE__ / __SSE2__ macros on x64, which causes
+# the AVX section of vector_x86.h to reference VectorSSEDouble before it's defined.
+# Apply a patch to define these macros under MSVC x64.
+set(_libint2_patch_args "")
+if(MSVC AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(_libint2_patch_args FETCHCONTENT_ARGS
+        PATCH_COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_LIST_DIR}/patches/libint2-msvc-sse-macros.cmake"
+    )
+endif()
 handle_dependency(libint2
   URL https://github.com/evaleev/libint/releases/download/v2.9.0/libint-2.9.0-mpqc4.tgz
   BUILD_TARGET Libint2::cxx
   INSTALL_TARGET Libint2::cxx
   ${_libint2_source_subdir}
   ${DEPENDENCY_BUILD_FLAGS}
+  ${_libint2_patch_args}
   REQUIRED
 )
 

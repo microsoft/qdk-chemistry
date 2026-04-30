@@ -111,12 +111,19 @@ if(MSVC)
     # MSVC CRT doesn't define M_PI etc. without this.
     add_compile_definitions(_USE_MATH_DEFINES)
 
+    # MSVC reports __cplusplus as 199711L by default regardless of the actual
+    # standard. /Zc:__cplusplus makes it report the correct value. Required by
+    # libint2's cxxstd.h which checks __cplusplus >= 201103L for C++11 support.
+    # /Zc:preprocessor enables the standards-conforming preprocessor. Required by
+    # libint2's engine.impl.h which uses Boost.Preprocessor macros that rely on
+    # correct macro expansion order (the legacy preprocessor concatenates tokens
+    # incorrectly). Available since VS 2019 16.5.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /Zc:preprocessor")
+
     # lapackpp's lartg.cc uses std::complex without #include <complex>.
     # On libstdc++ it's transitively included; on MSVC STL it isn't.
-    # Use CMAKE_CXX_FLAGS (not add_compile_options) so it only applies to C++ files,
-    # avoiding STL1003 errors when C files get the C++ <complex> header.
-    # Force-include <complex> for C++ only — GauXC has C files that would break.
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FI complex")
+    # CMAKE_CXX_FLAGS only applies to C++ files, so GauXC's C sources are safe.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FIcomplex")
 
     # gau2grid_helper.c calls exit() without #include <stdlib.h>.
     # Clang-cl treats implicit function declarations as errors in C99+.
