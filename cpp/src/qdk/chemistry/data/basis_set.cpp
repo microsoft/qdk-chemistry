@@ -1535,6 +1535,11 @@ bool BasisSet::_is_consistent_with_structure() const {
     return false;
   }
 
+  if (has_ecp_electrons() &&
+      (_ecp_electrons.size() != _structure->get_num_atoms())) {
+    return false;
+  }
+
   // Check if any atom has shells but is beyond the structure's atom count
   for (size_t atom_idx = 0; atom_idx < _shells_per_atom.size(); ++atom_idx) {
     if (!_shells_per_atom[atom_idx].empty() &&
@@ -1547,6 +1552,15 @@ bool BasisSet::_is_consistent_with_structure() const {
   for (size_t atom_idx = 0; atom_idx < _aux_shells_per_atom.size();
        ++atom_idx) {
     if (!_aux_shells_per_atom[atom_idx].empty() &&
+        atom_idx >= _structure->get_num_atoms()) {
+      return false;
+    }
+  }
+
+  // Check if any ECP shell references an atom beyond the structure's atom count
+  for (size_t atom_idx = 0; atom_idx < _ecp_shells_per_atom.size();
+       ++atom_idx) {
+    if (!_ecp_shells_per_atom[atom_idx].empty() &&
         atom_idx >= _structure->get_num_atoms()) {
       return false;
     }
