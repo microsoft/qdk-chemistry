@@ -154,7 +154,7 @@ The storage size scales as :math:`O(N^4)` where :math:`N` is the number of molec
 - Small to medium active spaces
 
 Three-center Hamiltonian container
-~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A memory-efficient container that stores two-electron integrals using density fitting (also known as resolution-of-the-identity, RI) approximation or Cholesky decomposition.
 Instead of directly storing four-center integrals in the molecular orbital basis :math:`( ij|kl )`, it stores three-center integrals :math:`(ij|P)` where :math:`P` indexes an auxiliary basis set in case of density fitting or the Cholesky vectors in case of Cholesky decomposition.
