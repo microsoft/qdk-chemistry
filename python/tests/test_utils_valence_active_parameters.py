@@ -295,10 +295,11 @@ class TestTransitionMetalValenceParameters:
 
     def test_toggle_respects_basis_cap(self):
         """When the basis is too small for the d' shell, the cap clips num_active_orbitals."""
-        # Cu doublet with only 12 MOs total. num_core_mos = 9, so the active
-        # space is capped at 12 - 9 = 3, far below the 14 the toggle would
-        # otherwise ask for.
-        wfn = make_single_atom_wavefunction("Cu", charge=0, multiplicity=2, num_molecular_orbitals=12)
+        # Cu doublet with only 16 MOs total. num_core_mos = (29-11)/2 = 9, so
+        # the active space is capped at 16 - 9 = 7, well below the 14 the
+        # toggle would otherwise ask for. (16 is the smallest MO count larger
+        # than the 15 alpha slots Cu's 29 electrons require.)
+        wfn = make_single_atom_wavefunction("Cu", charge=0, multiplicity=2, num_molecular_orbitals=16)
         nele, norb = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
         assert nele == 11  # electron count is unaffected by the orbital cap
-        assert norb == 3  # capped at num_molecular_orbitals - num_core_mos
+        assert norb == 7  # capped at num_molecular_orbitals - num_core_mos

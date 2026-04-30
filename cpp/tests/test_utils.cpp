@@ -414,16 +414,17 @@ TEST(TransitionMetalValenceTest, ToggleAddsExactlyFivePerDBlockAtom) {
 // num_active_orbitals is bounded above by num_molecular_orbitals -
 // num_core_mos.
 TEST(TransitionMetalValenceTest, ToggleRespectsBasisCap) {
-  // Cu doublet with only 12 MOs total. num_core_mos = 9, so the active space
-  // is capped at 12 - 9 = 3, far below the 14 the toggle would otherwise ask
-  // for.
+  // Cu doublet with only 16 MOs total. num_core_mos = (29-11)/2 = 9, so the
+  // active space is capped at 16 - 9 = 7, well below the 14 the toggle would
+  // otherwise ask for. (16 is the smallest MO count larger than the 15 alpha
+  // slots Cu's 29 electrons require.)
   auto wfn = make_single_atom_wavefunction("Cu", /*charge=*/0,
                                            /*multiplicity=*/2,
-                                           /*num_molecular_orbitals=*/12);
+                                           /*num_molecular_orbitals=*/16);
   auto [nele, norb] = compute_valence_space_parameters(
       wfn, /*charge=*/0, /*include_double_d_shell=*/true);
   EXPECT_EQ(nele, 11u);  // electron count is unaffected by the orbital cap
-  EXPECT_EQ(norb, 3u);   // capped at num_molecular_orbitals - num_core_mos
+  EXPECT_EQ(norb, 7u);   // capped at num_molecular_orbitals - num_core_mos
 }
 
 // Test fixture for orbital rotation
