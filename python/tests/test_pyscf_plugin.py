@@ -2592,7 +2592,14 @@ class TestQDKChemistryPySCFBasisConversion:
         shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
         ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
         ecp_electrons = [10]
-        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ecp_electrons, ag_structure, AOType.Spherical)
+        qdk_basis_no_meta = BasisSet(
+            "test-basis",
+            shells,
+            ecp_shells=ecp_shells,
+            ecp_electrons=ecp_electrons,
+            structure=ag_structure,
+            atomic_orbital_type=AOType.Spherical,
+        )
 
         assert qdk_basis_no_meta.has_ecp_shells()
         assert qdk_basis_no_meta.get_num_ecp_shells() == 1

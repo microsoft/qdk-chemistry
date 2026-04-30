@@ -213,9 +213,9 @@ A shell represents a group of atomic orbitals with the same atom, angular moment
 Examples:
     Create a simple basis set:
 
-    >>> from qdk_chemistry.data import BasisSet, OrbitalType
-    >>> basis = BasisSet("STO-3G")
-    >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
+    >>> from qdk_chemistry.data import BasisSet, OrbitalType, Shell
+    >>> shell = Shell(0, OrbitalType.S, [1.0], [1.0])
+    >>> basis = BasisSet("STO-3G", [shell])
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
 )");
 
@@ -304,17 +304,32 @@ Examples:
       R"(
 BasisSet constructor.
 
-Supported signatures (atomic_orbital_type is always optional, default Spherical)::
+Args:
+    name (str): Name of the basis set (e.g., "6-31G", "cc-pVDZ").
+    shells (list[Shell]): List of Shell objects defining the basis functions.
+    ecp_name (str | None): Name of the ECP basis set. Defaults to None.
+    ecp_shells (list[Shell] | None): List of ECP Shell objects. Defaults to None.
+    ecp_electrons (list[int] | None): Number of ECP electrons per atom. Defaults to None.
+    aux_name (str | None): Name of the auxiliary basis set. Defaults to None.
+    aux_shells (list[Shell] | None): List of auxiliary Shell objects. Defaults to None.
+    structure (Structure | None): Molecular structure. Required when ECP or auxiliary
+        shells are provided. Defaults to None.
+    atomic_orbital_type (AOType): Spherical or Cartesian. Defaults to AOType.Spherical.
 
-    BasisSet(other: BasisSet)
-    BasisSet(name, shells)
-    BasisSet(name, shells, structure)
-    BasisSet(name, shells, aux_shells, structure)
-    BasisSet(name, shells, aux_name, aux_shells, structure)
-    BasisSet(name, shells, ecp_shells, ecp_electrons, structure)
-    BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons, structure)
-    BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
-             aux_name, aux_shells, structure)
+Note:
+    ``ecp_shells`` and ``ecp_electrons`` must be provided together.
+    ``structure`` is required when ECP or auxiliary shells are provided.
+
+Examples:
+    >>> basis = BasisSet("STO-3G", shells)
+    >>> basis = BasisSet("STO-3G", shells, structure=structure)
+    >>> basis = BasisSet("STO-3G", shells, ecp_shells=ecp_shells,
+    ...                  ecp_electrons=ecp_electrons, structure=structure)
+    >>> basis = BasisSet("STO-3G", shells, ecp_name="my-ecp",
+    ...                  ecp_shells=ecp_shells, ecp_electrons=ecp_electrons,
+    ...                  structure=structure)
+    >>> basis = BasisSet("STO-3G", shells, aux_name="aux-fit",
+    ...                  aux_shells=aux_shells, structure=structure)
 )");
 
   // Basis type management
