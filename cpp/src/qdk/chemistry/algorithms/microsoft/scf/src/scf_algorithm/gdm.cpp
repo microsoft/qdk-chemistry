@@ -35,13 +35,22 @@ namespace impl {
  * @param[in] spin_index Spin index (0 for alpha, 1 for beta)
  * @param[in] kappa_vector The kappa vector to apply for rotation
  * @param[in] num_occupied_orbitals Number of occupied orbitals for this spin
- * @param[in] num_molecular_orbitals Number of molecular orbitals
+ * @param[in] num_orbital_spin_blocks Number of spin blocks (1 for RHF, 2 for
+ * UHF)
  */
 static void apply_restricted_unrestricted_orbital_rotation(
     RowMajorMatrix& C, const int spin_index,
     const Eigen::VectorXd& kappa_vector, const int num_occupied_orbitals,
-    const int num_molecular_orbitals) {
+    const int num_orbital_spin_blocks) {
   QDK_LOG_TRACE_ENTERING();
+  const int num_molecular_orbitals = C.cols();
+  const int num_atomic_orbitals =
+      (num_orbital_spin_blocks == 2) ? C.rows() / 2 : C.rows();
+
+  if (num_orbital_spin_blocks == 2 && (C.rows() % 2 != 0)) {
+    throw std::invalid_argument("In UHF or UKS, C row count must be even!");
+  }
+
   const int num_virtual_orbitals =
       num_molecular_orbitals - num_occupied_orbitals;
 
@@ -61,18 +70,17 @@ static void apply_restricted_unrestricted_orbital_rotation(
   matrix_exp(kappa_complete.data(), exp_kappa.data(), num_molecular_orbitals);
 
   // Rotate C: C' = C * exp(kappa)
+  const int C_block_offset =
+      num_atomic_orbitals * num_molecular_orbitals * spin_index;
   RowMajorMatrix C_before_rotate =
-      C.block(num_molecular_orbitals * spin_index, 0, num_molecular_orbitals,
+      C.block(spin_index * num_atomic_orbitals, 0, num_atomic_orbitals,
               num_molecular_orbitals);
+  const double* C_before_rotate_ptr = C_before_rotate.data();
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_molecular_orbitals, num_molecular_orbitals,
-             num_molecular_orbitals, 1.0, C_before_rotate.data(),
+             num_atomic_orbitals, num_molecular_orbitals,
+             num_molecular_orbitals, 1.0, C_before_rotate_ptr,
              num_molecular_orbitals, exp_kappa.data(), num_molecular_orbitals,
-             0.0,
-             C.block(num_molecular_orbitals * spin_index, 0,
-                     num_molecular_orbitals, num_molecular_orbitals)
-                 .data(),
-             num_molecular_orbitals);
+             0.0, C.data() + C_block_offset, num_molecular_orbitals);
 }
 
 /**
@@ -81,12 +89,13 @@ static void apply_restricted_unrestricted_orbital_rotation(
  * @param[in,out] C Molecular orbital coefficient matrix
  * @param[in] num_electrons Occupied orbital counts (alpha, beta)
  * @param[in] kappa_vector Concatenated ROHF rotation parameters
- * @param[in] num_molecular_orbitals Total molecular orbitals in the system
  */
 static void apply_restricted_open_shell_orbital_rotation(
     RowMajorMatrix& C, const std::vector<int>& num_electrons,
-    const Eigen::VectorXd& kappa_vector, const int num_molecular_orbitals) {
+    const Eigen::VectorXd& kappa_vector) {
   QDK_LOG_TRACE_ENTERING();
+  const int num_atomic_orbitals = C.rows();
+  const int num_molecular_orbitals = C.cols();
   const int num_closed_orbitals = num_electrons[1];
   const int num_open_orbitals = num_electrons[0] - num_closed_orbitals;
   const int num_virtual_orbitals = num_molecular_orbitals - num_electrons[0];
@@ -138,7 +147,7 @@ static void apply_restricted_open_shell_orbital_rotation(
 
   RowMajorMatrix C_before_rotate = C;
   blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-             num_molecular_orbitals, num_molecular_orbitals,
+             num_atomic_orbitals, num_molecular_orbitals,
              num_molecular_orbitals, 1.0, C_before_rotate.data(),
              num_molecular_orbitals, exp_kappa.data(), num_molecular_orbitals,
              0.0, C.data(), num_molecular_orbitals);
@@ -153,7 +162,6 @@ static void apply_restricted_open_shell_orbital_rotation(
  * @param[in] rotation_size Number of rotation parameters per spin
  * (n_occ*n_virt)
  * @param[in] num_orbital_spin_blocks Number of spin blocks to iterate
- * @param[in] num_molecular_orbitals Total molecular orbitals in the system
  * @param[out] gradient Output gradient vector (concatenated across spins)
  */
 static void compute_restricted_unrestricted_gradient(
@@ -161,7 +169,15 @@ static void compute_restricted_unrestricted_gradient(
     const std::vector<int>& num_electrons,
     const std::vector<int>& rotation_offset,
     const std::vector<int>& rotation_size, int num_orbital_spin_blocks,
-    int num_molecular_orbitals, Eigen::VectorXd& gradient) {
+    Eigen::VectorXd& gradient) {
+  const int num_molecular_orbitals = C.cols();
+  const int num_atomic_orbitals =
+      (num_orbital_spin_blocks == 2) ? C.rows() / 2 : C.rows();
+
+  if (num_orbital_spin_blocks == 2 && (C.rows() % 2 != 0)) {
+    throw std::invalid_argument("In UHF or UKS, C row count must be even!");
+  }
+
   int total_rotation_size = 0;
   for (int i = 0; i < num_orbital_spin_blocks; ++i) {
     total_rotation_size += rotation_size[i];
@@ -183,12 +199,14 @@ static void compute_restricted_unrestricted_gradient(
 
     RowMajorMatrix F_MO =
         RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-    const int spin_block_offset =
-        num_molecular_orbitals * num_molecular_orbitals * spin_index;
-    const double* C_block_ptr = C.data() + spin_block_offset;
-    const double* F_block_ptr = F.data() + spin_block_offset;
+    const int C_block_offset =
+        num_atomic_orbitals * num_molecular_orbitals * spin_index;
+    const int F_block_offset =
+        num_atomic_orbitals * num_atomic_orbitals * spin_index;
+    const double* C_block_ptr = C.data() + C_block_offset;
+    const double* F_block_ptr = F.data() + F_block_offset;
     compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
-                      num_molecular_orbitals, num_molecular_orbitals,
+                      num_atomic_orbitals, num_molecular_orbitals,
                       atba_workspace);
 
     // Extract occupied-virtual block and compute gradient
@@ -353,11 +371,10 @@ class GDMLineFunctor {
   /**
    * @brief Bind functor to a specific SCF state for line search evaluations.
    * @param scf_impl Reference to `SCFImpl` used to evaluate trial densities
-   * @param C_pseudo_canonical Molecular orbitals in pseudo-canonical basis
+   * @param C_pseudo_canonical Pseudo-canonical molecular orbital coefficients
    * @param num_electrons Occupied orbital counts per spin component
    * @param rotation_offset Starting index for each spin's rotation slice
    * @param rotation_size Number of rotation parameters per spin (n_occ*n_virt)
-   * @param num_molecular_orbitals Total molecular orbitals in the system
    * @param scf_orbital_type Spin symmetry used across SCF algorithms
    */
   GDMLineFunctor(const SCFImpl& scf_impl,
@@ -365,7 +382,7 @@ class GDMLineFunctor {
                  const std::vector<int>& num_electrons,
                  const std::vector<int>& rotation_offset,
                  const std::vector<int>& rotation_size,
-                 int num_molecular_orbitals, SCFOrbitalType scf_orbital_type)
+                 SCFOrbitalType scf_orbital_type)
       : scf_impl_(scf_impl),
         C_pseudo_canonical_(C_pseudo_canonical),
         num_electrons_(num_electrons),
@@ -375,10 +392,19 @@ class GDMLineFunctor {
             scf_orbital_type == SCFOrbitalType::Unrestricted ? 2 : 1),
         num_density_matrices_(
             scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2),
-        num_molecular_orbitals_(num_molecular_orbitals),
+        num_atomic_orbitals_(scf_orbital_type == SCFOrbitalType::Unrestricted
+                                 ? static_cast<int>(C_pseudo_canonical.rows()) /
+                                       2
+                                 : static_cast<int>(C_pseudo_canonical.rows())),
+        num_molecular_orbitals_(static_cast<int>(C_pseudo_canonical.cols())),
         scf_orbital_type_(scf_orbital_type),
         cached_kappa_(Eigen::VectorXd()),
-        cached_energy_(std::numeric_limits<double>::infinity()) {}
+        cached_energy_(std::numeric_limits<double>::infinity()) {
+    if (scf_orbital_type == SCFOrbitalType::Unrestricted &&
+        (C_pseudo_canonical.rows() % 2 != 0)) {
+      throw std::invalid_argument("In UHF or UKS, C row count must be even!");
+    }
+  }
 
   /**
    * @brief Evaluate energy at given kappa vector x
@@ -430,6 +456,7 @@ class GDMLineFunctor {
   // Value parameters
   const int num_orbital_spin_blocks_;
   const int num_density_matrices_;
+  const int num_atomic_orbitals_;
   const int num_molecular_orbitals_;
   const SCFOrbitalType scf_orbital_type_;
 
@@ -454,45 +481,45 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
 
   // Apply rotation for all spins with kappa_trial
   if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
-    apply_restricted_open_shell_orbital_rotation(
-        cached_C_, num_electrons_, kappa_trial, num_molecular_orbitals_);
+    apply_restricted_open_shell_orbital_rotation(cached_C_, num_electrons_,
+                                                 kappa_trial);
   } else {
     for (int i = 0; i < num_orbital_spin_blocks_; i++) {
       auto kappa_spin =
           kappa_trial.segment(rotation_offset_[i], rotation_size_[i]);
-      apply_restricted_unrestricted_orbital_rotation(
-          cached_C_, i, kappa_spin, num_electrons_[i], num_molecular_orbitals_);
+      apply_restricted_unrestricted_orbital_rotation(cached_C_, i, kappa_spin,
+                                                     num_electrons_[i],
+                                                     num_orbital_spin_blocks_);
     }
   }
 
   // Compute P_trial from rotated C (for all spins)
-  cached_P_ = RowMajorMatrix::Zero(
-      num_density_matrices_ * num_molecular_orbitals_, num_molecular_orbitals_);
+  cached_P_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
+                                   num_atomic_orbitals_);
 
   for (int i = 0; i < num_density_matrices_; i++) {
     const int num_occupied_orbitals = num_electrons_[i];
     const double occupation_factor =
         (scf_orbital_type_ == SCFOrbitalType::Restricted) ? 2.0 : 1.0;
-    auto P_block =
-        cached_P_.block(num_molecular_orbitals_ * i, 0, num_molecular_orbitals_,
-                        num_molecular_orbitals_);
+    auto P_block = cached_P_.block(num_atomic_orbitals_ * i, 0,
+                                   num_atomic_orbitals_, num_atomic_orbitals_);
 
     double* C_block_data = nullptr;
     if (scf_orbital_type_ == SCFOrbitalType::RestrictedOpenShell) {
       auto C_block =
-          cached_C_.block(0, 0, num_molecular_orbitals_, num_occupied_orbitals);
+          cached_C_.block(0, 0, num_atomic_orbitals_, num_occupied_orbitals);
       C_block_data = C_block.data();
     } else {
       auto C_block =
-          cached_C_.block(num_molecular_orbitals_ * i, 0,
-                          num_molecular_orbitals_, num_occupied_orbitals);
+          cached_C_.block(num_atomic_orbitals_ * i, 0, num_atomic_orbitals_,
+                          num_occupied_orbitals);
       C_block_data = C_block.data();
     }
     blas::gemm(blas::Layout::RowMajor, blas::Op::NoTrans, blas::Op::Trans,
-               num_molecular_orbitals_, num_molecular_orbitals_,
+               num_atomic_orbitals_, num_atomic_orbitals_,
                num_occupied_orbitals, occupation_factor, C_block_data,
                num_molecular_orbitals_, C_block_data, num_molecular_orbitals_,
-               0.0, P_block.data(), num_molecular_orbitals_);
+               0.0, P_block.data(), num_atomic_orbitals_);
   }
 
   // Evaluate energy and Fock matrix using trial density matrix
@@ -524,7 +551,7 @@ Eigen::VectorXd GDMLineFunctor::grad(const Eigen::VectorXd& x) {
   } else {
     compute_restricted_unrestricted_gradient(
         cached_F_, cached_C_, num_electrons_, rotation_offset_, rotation_size_,
-        num_orbital_spin_blocks_, num_molecular_orbitals_, gradient);
+        num_orbital_spin_blocks_, gradient);
   }
 
   return gradient;
@@ -1046,7 +1073,7 @@ void GDM::generate_restricted_open_shell_pseudo_canonical_orbital_(
   const double* C_block_ptr = C.data();
   const double* F_up_block_ptr = F.data();
   const double* F_dn_block_ptr =
-      F.data() + num_atomic_orbitals * num_molecular_orbitals;
+      F.data() + num_atomic_orbitals * num_atomic_orbitals;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
 
@@ -1232,7 +1259,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   } else {
     compute_restricted_unrestricted_gradient(
         F, C, num_electrons_, rotation_offset_, rotation_size_,
-        num_orbital_spin_blocks_, num_molecular_orbitals, current_gradient_);
+        num_orbital_spin_blocks_, current_gradient_);
   }
 
   if (gdm_step_count_ != 0) {
@@ -1383,7 +1410,7 @@ void GDM::iterate(SCFImpl& scf_impl) {
   // Create line search functor for energy evaluation
   GDMLineFunctor line_functor(scf_impl, C_pseudo_canonical, num_electrons_,
                               rotation_offset_, rotation_size_,
-                              num_molecular_orbitals, cfg->scf_orbital_type);
+                              cfg->scf_orbital_type);
 
   Eigen::VectorXd start_kappa = Eigen::VectorXd::Zero(kappa_.size());
   Eigen::VectorXd kappa_dir = kappa_;  // Search direction
