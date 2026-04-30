@@ -1,4 +1,4 @@
-"""QDK/Chemistry controlled circuit mapper abstractions."""
+"""QDK/Chemistry circuit mapper for controlled-unitary abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -15,21 +15,18 @@ __all__: list[str] = ["ControlledCircuitMapper", "ControlledCircuitMapperFactory
 
 
 class ControlledCircuitMapper(Algorithm):
-    """Base class for controlled circuit mapper in QDK/Chemistry algorithms."""
+    """Base class for circuit mapper for controlled-unitary in QDK/Chemistry algorithms."""
 
     def __init__(self):
         """Initialize the ControlledCircuitMapper."""
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, controlled_unitary: ControlledUnitary, *args, **kwargs) -> Circuit:
+    def _run_impl(self, controlled_unitary: ControlledUnitary) -> Circuit:
         """Construct a Circuit representing the controlled unitary for the given ControlledUnitary.
 
         Args:
             controlled_unitary: The controlled unitary.
-            *args: Positional arguments, where the first argument is expected to be the
-                controlled unitary.
-            **kwargs: Additional keyword arguments for concrete implementation.
 
         Returns:
             Circuit: A Circuit representing the controlled unitary for the given ControlledUnitary.
