@@ -620,6 +620,7 @@ class GDM {
    */
   void generate_restricted_unrestricted_pseudo_canonical_orbital_(
       const RowMajorMatrix& F, RowMajorMatrix& C, const int spin_index,
+      const int num_orbital_spin_blocks,
       Eigen::Block<RowMajorMatrix> history_kappa_spin,
       Eigen::Block<RowMajorMatrix> history_dgrad_spin,
       Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin);
@@ -928,10 +929,12 @@ static void rotate_gradient_to_pseudo_canonical_basis(
 
 void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
     const RowMajorMatrix& F, RowMajorMatrix& C, const int spin_index,
+    const int num_orbital_spin_blocks,
     Eigen::Block<RowMajorMatrix> history_kappa_spin,
     Eigen::Block<RowMajorMatrix> history_dgrad_spin,
     Eigen::VectorBlock<Eigen::VectorXd> current_gradient_spin) {
-  const int num_atomic_orbitals = C.rows();
+  const int num_atomic_orbitals =
+      (num_orbital_spin_blocks == 2) ? C.rows() / 2 : C.rows();
   const int num_molecular_orbitals = C.cols();
   const int num_occupied_orbitals = num_electrons_[spin_index];
   const int num_virtual_orbitals =
@@ -1013,7 +1016,8 @@ void GDM::build_restricted_unrestricted_pseudo_canonical_orbitals_hessian_(
 
     // Generate pseudo-canonical orbitals and transform gradient and history
     generate_restricted_unrestricted_pseudo_canonical_orbital_(
-        F, C, i, history_kappa_spin, history_dgrad_spin, current_gradient_spin);
+        F, C, i, num_orbital_spin_blocks_, history_kappa_spin,
+        history_dgrad_spin, current_gradient_spin);
 
     // Build this spin's segment of initial Hessian
     // Reference: Helgaker, T., Jorgensen, P., & Olsen, J. (2000). Molecular
