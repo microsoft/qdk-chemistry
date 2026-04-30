@@ -7,9 +7,8 @@
 
 ################################################################################
 # start-cell-loading
-from pathlib import Path
-
 import numpy as np
+from pathlib import Path
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
 # Load a water molecule structure from XYZ file
@@ -53,9 +52,7 @@ shell1 = Shell(atom_index, orbital_type, exponents, coefficients)
 shell2 = Shell(1, OrbitalType.S, [0.5], [1.0])
 
 # Create a basis set from the shells
-basis_set = BasisSet(
-    "6-31G", [shell1, shell2], structure=structure, atomic_orbital_type=AOType.Spherical
-)
+basis_set = BasisSet("6-31G", [shell1, shell2], structure, AOType.Spherical)
 # end-cell-create
 ################################################################################
 
@@ -145,12 +142,7 @@ ecp_shell = Shell(0, OrbitalType.S, ecp_exponents, ecp_coefficients, ecp_rpowers
 ecp_shells = [ecp_shell]
 ecp_electrons = [28, 0, 0]  # 28 core electrons replaced on the first atom
 basis_with_ecp = BasisSet(
-    "my-basis",
-    [shell1, shell2],
-    ecp_name="my-ecp",
-    ecp_shells=ecp_shells,
-    ecp_electrons=ecp_electrons,
-    structure=structure,
+    "my-basis", [shell1, shell2], "my-ecp", ecp_shells, ecp_electrons, structure
 )
 
 # Query ECP data
@@ -171,11 +163,7 @@ aux_shells = [
 
 # Construct a basis set with a named auxiliary basis
 basis_with_aux_manual = BasisSet(
-    "my-basis",
-    [shell1, shell2],
-    aux_name="my-aux-fit",
-    aux_shells=aux_shells,
-    structure=structure,
+    "my-basis", [shell1, shell2], "my-aux-fit", aux_shells, structure
 )
 
 # Query auxiliary data
