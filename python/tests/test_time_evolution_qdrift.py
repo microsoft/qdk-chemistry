@@ -73,7 +73,8 @@ class TestQDriftConstruction:
         """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder.settings().set("time", 0.1)
+        unitary = builder.run(hamiltonian)
 
         assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
@@ -84,7 +85,8 @@ class TestQDriftConstruction:
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
         builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder.settings().set("time", 0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         # Duplicate-term merging may reduce the count below num_samples
@@ -96,7 +98,8 @@ class TestQDriftConstruction:
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
         builder = QDrift(num_samples=num_samples, seed=42, merge_duplicate_terms=False)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder.settings().set("time", 0.1)
+        unitary = builder.run(hamiltonian)
 
         assert len(unitary.get_container().step_terms) == num_samples
 
@@ -107,8 +110,11 @@ class TestQDriftConstruction:
         builder1 = QDrift(num_samples=20, seed=12345)
         builder2 = QDrift(num_samples=20, seed=12345)
 
-        unitary1 = builder1.run(hamiltonian, time=0.1)
-        unitary2 = builder2.run(hamiltonian, time=0.1)
+        builder1.settings().set("time", 0.1)
+
+        unitary1 = builder1.run(hamiltonian)
+        builder2.settings().set("time", 0.1)
+        unitary2 = builder2.run(hamiltonian)
 
         terms1 = unitary1.get_container().step_terms
         terms2 = unitary2.get_container().step_terms
@@ -128,8 +134,11 @@ class TestQDriftConstruction:
         builder1 = QDrift(num_samples=30, seed=42)
         builder2 = QDrift(num_samples=30, seed=123)
 
-        unitary1 = builder1.run(hamiltonian, time=0.1)
-        unitary2 = builder2.run(hamiltonian, time=0.1)
+        builder1.settings().set("time", 0.1)
+
+        unitary1 = builder1.run(hamiltonian)
+        builder2.settings().set("time", 0.1)
+        unitary2 = builder2.run(hamiltonian)
 
         terms1 = [(t.pauli_term, t.angle) for t in unitary1.get_container().step_terms]
         terms2 = [(t.pauli_term, t.angle) for t in unitary2.get_container().step_terms]
@@ -152,7 +161,8 @@ class TestQDriftSampling:
         num_samples = 10000
         time = 1.0
         builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder.settings().set("time", time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
 
@@ -181,7 +191,8 @@ class TestQDriftSampling:
         num_samples = 10
 
         builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder.settings().set("time", time)
+        unitary = builder.run(hamiltonian)
 
         # λ = |0.6| + |0.4| = 1.0
         # Sum of |merged_angle| across all terms should equal λ * t = 0.5,
@@ -202,7 +213,8 @@ class TestQDriftEdgeCases:
         """Test that even very small coefficients are included (no filtering)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-10])
         builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder.settings().set("time", 0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         # Single term: all 10 identical samples merge into one rotation
@@ -215,7 +227,8 @@ class TestQDriftEdgeCases:
         num_samples = 20
         time = 0.1
         builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder.settings().set("time", time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
         # All 20 identical samples merge into a single X rotation
@@ -236,10 +249,9 @@ class TestQDriftEdgeCases:
             pauli_strings=["X"],
             coefficients=[1.0 + 0.5j],
         )
-        builder = QDrift(num_samples=10, seed=42)
-
+        builder = QDrift(num_samples=10, seed=42, time=0.1)
         with pytest.raises(ValueError, match="Non-Hermitian"):
-            builder.run(hamiltonian, time=0.1)
+            builder.run(hamiltonian)
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled correctly."""
@@ -250,7 +262,8 @@ class TestQDriftEdgeCases:
         time = 0.1
         num_samples = 20
         builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder.settings().set("time", time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
 
@@ -278,7 +291,8 @@ class TestQDriftEdgeCases:
             coefficients=[1.0, 0.5, 0.3, 0.2],
         )
         builder = QDrift(num_samples=50, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder.settings().set("time", 0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         assert container.num_qubits == 2
@@ -292,7 +306,8 @@ class TestQDriftEdgeCases:
             coefficients=[0.3, 0.3, 0.4],
         )
         builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder.settings().set("time", 1.0)
+        unitary = builder.run(hamiltonian)
 
         assert unitary.get_container().num_qubits == 4
 

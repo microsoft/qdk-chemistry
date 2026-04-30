@@ -25,8 +25,9 @@ from __future__ import annotations
 
 import numpy as np
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
-from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -36,7 +37,7 @@ from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
 
 
-class PartiallyRandomizedSettings(Settings):
+class PartiallyRandomizedSettings(TimeEvolutionSettings):
     """Settings for partially randomized product formula builder.
 
     The partially randomized method splits the Hamiltonian into:
@@ -144,8 +145,9 @@ class PartiallyRandomized(QDrift):
         ...     weight_threshold=0.1,  # Terms with |h_j| >= 0.1 treated deterministically
         ...     num_random_samples=200,
         ...     trotter_order=2,
+        ...     time=1.0,
         ... )
-        >>> unitary_rep = builder.run(qubit_hamiltonian, time=1.0)
+        >>> unitary_rep = builder.run(qubit_hamiltonian)
 
     References:
         Günther, J., Witteveen, F., et al. Phase estimation with partially
@@ -155,6 +157,8 @@ class PartiallyRandomized(QDrift):
 
     def __init__(
         self,
+        *,
+        time: float = 0.0,
         weight_threshold: float = -1.0,
         trotter_order: int = 2,
         num_random_samples: int = 100,
@@ -162,10 +166,13 @@ class PartiallyRandomized(QDrift):
         tolerance: float = 1e-12,
         merge_duplicate_terms: bool = True,
         commutation_type: str = "general",
+        power: int = 1,
+        power_strategy: str = "repeat",
     ):
         r"""Initialize partially randomized builder with specified settings.
 
         Args:
+            time: The evolution time. Defaults to 0.0.
             weight_threshold: Terms with \|h_j\| >= threshold are treated
                 deterministically with Trotter. Use -1.0 for automatic
                 determination (top 10% of terms by weight).
@@ -186,10 +193,16 @@ class PartiallyRandomized(QDrift):
                 pair to commute individually — stricter but always safe.
                 ``"general"`` (default) uses standard Pauli commutation (even number of
                 anti-commuting positions), which allows larger merge groups.
+            power: The power to raise the unitary to. Defaults to 1.
+            power_strategy: Strategy for U^power: ``"rescale"`` scales
+                time, ``"repeat"`` repeats the circuit. Defaults to ``"repeat"``.
 
         """
         super().__init__()
         self._settings = PartiallyRandomizedSettings()
+        self._settings.set("time", time)
+        self._settings.set("power", power)
+        self._settings.set("power_strategy", power_strategy)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("trotter_order", trotter_order)
         self._settings.set("num_random_samples", num_random_samples)
@@ -198,7 +211,7 @@ class PartiallyRandomized(QDrift):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         r"""Construct the unitary representation using partially randomized product formula.
 
         The algorithm:
@@ -208,13 +221,14 @@ class PartiallyRandomized(QDrift):
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The total evolution time (δ in the formula).
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the
                 partially randomized method.
 
         """
+        effective_time, power_repetitions = self._resolve_power()
+        time: float = effective_time
         tolerance: float = self._settings.get("tolerance")
         trotter_order: int = self._settings.get("trotter_order")
         num_random_samples: int = self._settings.get("num_random_samples")
@@ -294,7 +308,7 @@ class PartiallyRandomized(QDrift):
         return UnitaryRepresentation(
             container=PauliProductFormulaContainer(
                 step_terms=all_terms,
-                step_reps=1,
+                step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
             )
         )

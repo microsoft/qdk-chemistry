@@ -8,9 +8,14 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 
-__all__: list[str] = ["HamiltonianUnitaryBuilder", "HamiltonianUnitaryBuilderFactory", "TimeEvolutionBuilder"]
+__all__: list[str] = [
+    "HamiltonianUnitaryBuilder",
+    "HamiltonianUnitaryBuilderFactory",
+    "TimeEvolutionBuilder",
+    "TimeEvolutionSettings",
+]
 
 
 class HamiltonianUnitaryBuilder(Algorithm):
@@ -32,11 +37,6 @@ class HamiltonianUnitaryBuilder(Algorithm):
 
         """
 
-    # ------------------------------------------------------------------
-    # Shared helpers used by Trotter, qDRIFT, and partially-randomized
-    # builders.
-    # ------------------------------------------------------------------
-
     @staticmethod
     def _pauli_label_to_map(label: str) -> dict[int, str]:
         """Translate a Pauli label to a mapping ``qubit -> {X, Y, Z}``.
@@ -55,6 +55,31 @@ class HamiltonianUnitaryBuilder(Algorithm):
         return mapping
 
 
+class TimeEvolutionSettings(Settings):
+    """Base settings for time evolution builders."""
+
+    def __init__(self):
+        """Initialize TimeEvolutionSettings with default values.
+
+        Attributes:
+            time: The evolution time.
+            power: The power to raise the unitary to (e.g. 2k for U^{2k}).
+            power_strategy: How to realize U^power. ``"rescale"`` multiplies
+                the time by the power; ``"repeat"`` repeats the base circuit.
+
+        """
+        super().__init__()
+        self._set_default("time", "float", 0.0, "The evolution time.")
+        self._set_default("power", "int", 1, "The power to raise the unitary to.")
+        self._set_default(
+            "power_strategy",
+            "string",
+            "repeat",
+            "Strategy for U^power: 'rescale' scales time, 'repeat' repeats the circuit.",
+            ["rescale", "repeat"],
+        )
+
+
 class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
     """Base class for time evolution Builders in QDK/Chemistry algorithms."""
 
@@ -62,13 +87,30 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Initialize the TimeEvolutionBuilder."""
         super().__init__()
 
+    def _resolve_power(self) -> tuple[float, int]:
+        """Resolve the power setting into effective time scale and power repetitions.
+
+        Based on the ``power`` and ``power_strategy`` settings, returns:
+        - For ``"rescale"``: (time * power, 1) — scales the evolution time.
+        - For ``"repeat"``: (time, power) — repeats the base circuit.
+
+        Returns:
+            A tuple (effective_time, power_repetitions).
+
+        """
+        time: float = self._settings.get("time")
+        power: int = self._settings.get("power")
+        strategy: str = self._settings.get("power_strategy")
+        if strategy == "rescale":
+            return time * power, 1
+        return time, power
+
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float = 0.0) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian.
-            time: The evolution time.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitHamiltonian.

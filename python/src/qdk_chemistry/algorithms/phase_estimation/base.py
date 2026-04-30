@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from functools import cached_property
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -16,7 +17,6 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
-    UnitaryRepresentation,
 )
 
 __all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory", "PhaseEstimationSettings"]
@@ -34,12 +34,6 @@ class PhaseEstimationSettings(Settings):
         """
         super().__init__()
         self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
-        self._set_default(
-            "evolution_time",
-            "float",
-            0.0,
-            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
-        )
         self._set_default(
             "unitary_builder",
             "algorithm_ref",
@@ -60,19 +54,16 @@ class PhaseEstimationSettings(Settings):
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self, num_bits: int = -1, evolution_time: float = 0.0):
+    def __init__(self, num_bits: int = -1):
         """Initialize the PhaseEstimation with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value.
 
         """
         super().__init__()
         self._settings = PhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
-        self._settings.set("evolution_time", evolution_time)
 
     def type_name(self) -> str:
         """Return the algorithm type name as phase_estimation."""
@@ -106,40 +97,35 @@ class PhaseEstimation(Algorithm):
 
         """
 
-    def _create_unitary(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Create the unitary representation for the given Hamiltonian.
-
-        Creates the unitary builder from the nested ``unitary_builder`` setting
-        and passes the ``evolution_time`` from the phase estimation settings.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-
-        Returns:
-            The unitary representation.
-
-        """
-        unitary_builder = self._create_nested("unitary_builder")
-        return unitary_builder.run(qubit_hamiltonian, time=self.settings().get("evolution_time"))
+    @cached_property
+    def unitary_builder(self):
+        """The nested unitary builder algorithm instance."""
+        return self._create_nested("unitary_builder")
 
     def _create_controlled_circuit(
         self,
-        controlled_unitary: ControlledUnitary,
+        qubit_hamiltonian: QubitHamiltonian,
         power: int,
     ) -> Circuit:
-        """Create the controlled circuit for the given Hamiltonian and power.
+        r"""Create the controlled circuit for the given Hamiltonian and power.
+
+        Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
+        according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            controlled_unitary: The controlled unitary.
-            power: The power to which the controlled unitary should be raised.
+            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            power: The power to which the unitary should be raised.
 
         Returns:
-            The controlled circuit.
+            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
 
         """
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("circuit_mapper")
-        circuit_mapper.settings().update("power", power)
-        return circuit_mapper._run_impl(controlled_unitary=controlled_unitary)  # noqa: SLF001
+        return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
 class PhaseEstimationFactory(AlgorithmFactory):

@@ -72,8 +72,8 @@ qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
 qubit_ham = qubit_mapper.run(hamiltonian)
 
 # 5. Build time evolution unitary
-trotter = create("hamiltonian_unitary_builder", "trotter", order=2)
-evolution = trotter.run(qubit_ham, time=0.1)
+trotter = create("hamiltonian_unitary_builder", "trotter", order=2, time=0.1)
+evolution = trotter.run(qubit_ham)
 
 print(f"Container type: {evolution.get_container_type()}")
 print(f"Number of qubits: {evolution.get_num_qubits()}")

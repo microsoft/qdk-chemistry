@@ -5,11 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from collections.abc import Sequence
-
 from qdk import qsharp
 
-from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -17,22 +14,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
-
-
-class PauliSequenceMapperSettings(Settings):
-    """Settings for PauliSequenceMapper."""
-
-    def __init__(self):
-        """Initialize PauliSequenceMapperSettings with default values.
-
-        Attributes:
-            power: The power of the controlled unitary to be constructed. It controls
-                how many times the controlled evolution operator :math:`U` is repeated.
-
-        """
-        super().__init__()
-        self._set_default("power", "int", 1, "The power of the controlled unitary to be constructed.")
+__all__: list[str] = ["PauliSequenceMapper"]
 
 
 class PauliSequenceMapper(ControlledCircuitMapper):
@@ -57,17 +39,9 @@ class PauliSequenceMapper(ControlledCircuitMapper):
 
     """
 
-    def __init__(self, power: int = 1):
-        """Initialize the PauliSequenceMapper.
-
-        Args:
-            power: The power of the controlled unitary to be constructed. It controls
-                how many times the controlled evolution operator :math:`U` is repeated.
-
-        """
+    def __init__(self):
+        """Initialize the PauliSequenceMapper."""
         super().__init__()
-        self._settings = PauliSequenceMapperSettings()
-        self._settings.set("power", power)
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -77,14 +51,13 @@ class PauliSequenceMapper(ControlledCircuitMapper):
         """Return controlled_circuit_mapper as the algorithm type name."""
         return "controlled_circuit_mapper"
 
-    def _run_impl(self, controlled_unitary: ControlledUnitary, target_indices: Sequence[int] | None = None) -> Circuit:
+    def _run_impl(self, controlled_unitary: ControlledUnitary) -> Circuit:
         r"""Construct a quantum circuit implementing the controlled unitary.
 
         Args:
             controlled_unitary: The controlled unitary containing the Hamiltonian
-            and evolution parameters.
-            target_indices: Indices of the target qubits in the circuit. If None, defaults to all
-            qubits except the control qubits at controlled_unitary.control_indices.
+            and evolution parameters. Target indices are read from
+            controlled_unitary.target_indices.
 
         Returns:
             Circuit: A quantum circuit implementing the controlled unitary :math:`U^{\text{power}}`
@@ -105,17 +78,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
         if len(controlled_unitary.control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
-        total_qubits = controlled_unitary.get_num_total_qubits()
-
-        if target_indices is None:
-            target_indices = [i for i in range(total_qubits) if i not in controlled_unitary.control_indices]
-        else:
-            target_indices_set = set(target_indices)
-            control_indices_set = set(controlled_unitary.control_indices)
-            if target_indices_set & control_indices_set:
-                raise ValueError("target_indices and control_indices must not overlap.")
-            if target_indices_set | control_indices_set != set(range(total_qubits)):
-                raise ValueError("target_indices and control_indices must cover all qubits.")
+        target_indices = controlled_unitary.target_indices
 
         pauli_terms: list[list[qsharp.Pauli]] = []
         angles: list[float] = []
@@ -126,20 +89,10 @@ class PauliSequenceMapper(ControlledCircuitMapper):
             pauli_terms.append(base_terms.copy())
             angles.append(term.angle)
 
-        flattened_pauli_terms: list[list[qsharp.Pauli]] = []
-        flattened_angles: list[float] = []
-        for _ in range(unitary_container.step_reps):
-            flattened_pauli_terms.extend(pauli_terms)
-            flattened_angles.extend(angles)
-
-        power = self._settings.get("power")
-        if power < 1:
-            raise ValueError("PauliSequenceMapper requires 'power' to be an integer greater than or equal to 1.")
-
         controlled_evo_params = QSHARP_UTILS.ControlledPauliExp.RepControlledPauliExpParams(
-            pauliExponents=flattened_pauli_terms,
-            pauliCoefficients=flattened_angles,
-            repetitions=power,
+            pauliExponents=pauli_terms,
+            pauliCoefficients=angles,
+            repetitions=unitary_container.step_reps,
             control=controlled_unitary.control_indices[0],
             systems=target_indices,
         )

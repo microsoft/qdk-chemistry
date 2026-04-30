@@ -14,9 +14,9 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import (
     Circuit,
-    ControlledUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -56,23 +56,19 @@ class IterativePhaseEstimation(PhaseEstimation):
     def __init__(
         self,
         num_bits: int = -1,
-        evolution_time: float = 0.0,
         shots_per_bit: int = 3,
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value.
             shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, evolution_time=evolution_time)
+        super().__init__(num_bits=num_bits)
         self._settings = IterativePhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
-        self._settings.set("evolution_time", evolution_time)
         self._settings.set("shots_per_bit", shots_per_bit)
         self._iteration_circuits: list[Circuit] | None = None
 
@@ -135,11 +131,18 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_fraction = phase_fraction_from_feedback(phase_feedback)
         self._iteration_circuits = iter_circuits
         # Create and return the result
-        return QpeResult.from_phase_fraction(
-            method=self.name(),
-            phase_fraction=phase_fraction,
-            evolution_time=self.settings().get("evolution_time"),
-            bits_msb_first=bits,
+
+        if isinstance(self.unitary_builder, TimeEvolutionBuilder):
+            evolution_time = self.unitary_builder.settings().get("time")
+            return QpeResult.from_phase_fraction(
+                method=self.name(),
+                phase_fraction=phase_fraction,
+                evolution_time=evolution_time,
+                bits_msb_first=bits,
+            )
+        raise NotImplementedError(
+            "IQPE result construction currently only supports post-processing from time evolution. "
+            f"Got {type(self.unitary_builder)} instead."
         )
 
     def create_iteration_circuit(
@@ -167,10 +170,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
         num_system_qubits = qubit_hamiltonian.num_qubits
-        unitary_rep = self._create_unitary(qubit_hamiltonian)
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(controlled_unitary, power)
+        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(

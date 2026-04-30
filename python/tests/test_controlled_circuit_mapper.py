@@ -67,7 +67,7 @@ class TestPauliSequenceMapper:
 
     def test_basic_mapping(self, controlled_unitary):
         """Test basic mapping of ControlledUnitary to Circuit."""
-        mapper = PauliSequenceMapper(power=1)
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -104,20 +104,20 @@ class TestPauliSequenceMapper:
 
         assert set(control_qubits) == {2}
 
-    def test_target_indices_validation(self, controlled_unitary):
+    def test_target_indices_validation(self, simple_ppf_container):
         """Test that invalid target indices raise ValueError."""
-        mapper = PauliSequenceMapper()
+        teu = UnitaryRepresentation(container=simple_ppf_container)
 
         # Overlapping target and control indices
         with pytest.raises(ValueError, match="must not overlap"):
-            mapper.run(controlled_unitary, target_indices=[1, 2])
+            ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[1, 2])
 
-        # Target and control indices do not cover all qubits
-        with pytest.raises(ValueError, match="must cover all qubits"):
-            mapper.run(controlled_unitary, target_indices=[0])
+        # Non-overlapping indices in a larger circuit are valid
+        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[0])
+        assert cu.target_indices == [0]
 
-        with pytest.raises(ValueError, match="must cover all qubits"):
-            mapper.run(controlled_unitary, target_indices=[3, 4])
+        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[3, 4])
+        assert cu.target_indices == [3, 4]
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
@@ -144,7 +144,7 @@ class TestPauliSequenceMapper:
 
     def test_rotation_parameters(self, controlled_unitary):
         """Test that rotation parameters are correctly set in the mapped circuit."""
-        mapper = PauliSequenceMapper(power=1)
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -176,7 +176,7 @@ class TestPauliSequenceMapper:
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_controlled_u_circuit_matrix(self, controlled_unitary):
         """Test that the constructed controlled-U circuit has the expected matrix."""
-        mapper = PauliSequenceMapper(power=1)
+        mapper = PauliSequenceMapper()
         circuit = mapper.run(controlled_unitary)
 
         # Extract angles from the container

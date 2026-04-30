@@ -107,7 +107,7 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
         QPE result including dominant bitstring, phase fraction, and energy.
 
     """
-    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
+    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits)
 
     qpe.settings().set(
         "circuit_executor",
@@ -119,7 +119,7 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
     )
     qpe.settings().set(
         "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
     )
 
     return qpe.run(

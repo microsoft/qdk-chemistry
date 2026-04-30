@@ -25,17 +25,41 @@ class ControlledUnitary(DataClass):
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, unitary: UnitaryRepresentation, control_indices: list[int]):
+    def __init__(
+        self, unitary: UnitaryRepresentation, control_indices: list[int], target_indices: list[int] | None = None
+    ):
         """Initialize a ControlledUnitary.
 
         Args:
             unitary: The unitary to be controlled.
             control_indices: The control qubit indices.
+            target_indices: The target qubit indices. If None, defaults to all qubit indices
+                in range(total_qubits) that are not in control_indices.
 
         """
         self.unitary = unitary
         self.control_indices = control_indices
+        if target_indices is not None:
+            target_indices_set = set(target_indices)
+            control_indices_set = set(control_indices)
+            if target_indices_set & control_indices_set:
+                raise ValueError("target_indices and control_indices must not overlap.")
+        self._target_indices = target_indices
         super().__init__()
+
+    @property
+    def target_indices(self) -> list[int]:
+        """Get the target qubit indices.
+
+        Returns:
+            The target qubit indices. If not explicitly set, returns all qubit indices
+            excluding the control indices.
+
+        """
+        if self._target_indices is not None:
+            return self._target_indices
+        total_qubits = self.get_num_total_qubits()
+        return [i for i in range(total_qubits) if i not in self.control_indices]
 
     def get_unitary_container_type(self) -> str:
         """Get the type of the unitary container.
@@ -65,6 +89,7 @@ class ControlledUnitary(DataClass):
         data: dict[str, Any] = {}
         data["unitary"] = self.unitary.to_json()
         data["control_indices"] = self.control_indices
+        data["target_indices"] = self.target_indices
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -78,6 +103,7 @@ class ControlledUnitary(DataClass):
 
         # Write simple attributes
         group.attrs["control_indices"] = self.control_indices
+        group.attrs["target_indices"] = self.target_indices
 
         # Create subgroup for the nested object
         unitary_group = group.create_group("unitary")
@@ -96,9 +122,11 @@ class ControlledUnitary(DataClass):
         """
         unitary = UnitaryRepresentation.from_json(json_data["unitary"])
         control_indices = json_data["control_indices"]
+        target_indices = json_data.get("target_indices")
         return cls(
             unitary=unitary,
             control_indices=control_indices,
+            target_indices=target_indices,
         )
 
     @classmethod
@@ -117,6 +145,7 @@ class ControlledUnitary(DataClass):
 
         # Load simple attributes
         control_indices = list(group.attrs["control_indices"])
+        target_indices = list(group.attrs["target_indices"]) if "target_indices" in group.attrs else None
 
         # Load nested UnitaryRepresentation
         unitary_group = group["unitary"]
@@ -125,6 +154,7 @@ class ControlledUnitary(DataClass):
         return cls(
             unitary=unitary,
             control_indices=control_indices,
+            target_indices=target_indices,
         )
 
     def get_summary(self) -> str:

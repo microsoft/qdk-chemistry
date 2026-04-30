@@ -46,8 +46,8 @@ qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
 qubit_ham = qubit_mapper.run(hamiltonian)
 
 # 4. Build time evolution unitary
-trotter = create("hamiltonian_unitary_builder", "trotter", order=2)
-evolution = trotter.run(qubit_ham, time=0.1)
+trotter = create("hamiltonian_unitary_builder", "trotter", order=2, time=0.1)
+evolution = trotter.run(qubit_ham)
 
 # 5. Create a controlled version and map to a circuit
 from qdk_chemistry.data import ControlledUnitary
