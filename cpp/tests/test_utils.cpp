@@ -18,7 +18,6 @@
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 #include <stdexcept>
-#include <tuple>
 #include <vector>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
@@ -204,26 +203,15 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 // 9, and 21 valence orbitals per period 6 atom (6s + 7*4f + 5*5d + 5*6d' +
 // 3*6p) instead of the default 16.
 //
-// These tests only validate the valence-space sizing logic in
-// ``compute_valence_space_parameters``; that function only consults the
-// structure, the total electron count, and ``num_molecular_orbitals``. We
-// therefore build a minimal Wavefunction directly (single dummy s-shell per
-// atom, a zero-filled (num_atomic_orbitals x num_molecular_orbitals) MO
-// coefficient matrix whose values are unused, and a Configuration string
-// sized to the requested electron count) and skip SCF entirely. This keeps
-// the suite fast and removes any dependence on a particular basis set being
-// available.
+// ``compute_valence_space_parameters`` only reads the structure, the total
+// electron count, and ``num_molecular_orbitals``, so we build a minimal
+// Wavefunction directly (single dummy s-shell per atom; coefficient values
+// are unused) and skip SCF entirely.
 
 namespace {
 
-// Build a minimal valid Wavefunction without running SCF, given a structure
-// and an electron count split into (n_alpha, n_beta). The orbital coefficient
-// matrix has the documented (num_atomic_orbitals x num_molecular_orbitals)
-// shape; its values are unused by compute_valence_space_parameters. The
-// Configuration string encodes (n_alpha, n_beta) by filling
-// pair_count = min(n_alpha, n_beta) doubly-occupied slots followed by
-// |n_alpha - n_beta| singly-occupied slots; ``num_molecular_orbitals`` must
-// be large enough to hold both.
+// Build a minimal valid Wavefunction for sizing tests (no SCF). Throws if
+// num_molecular_orbitals can't hold the requested electron count.
 std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     const std::vector<std::string>& symbols, const Eigen::MatrixXd& coords,
     size_t n_alpha, size_t n_beta, size_t num_molecular_orbitals) {
@@ -234,22 +222,17 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     throw std::invalid_argument(
         "make_minimal_wavefunction: num_molecular_orbitals (" +
         std::to_string(num_molecular_orbitals) +
-        ") is too small for the requested electron count (n_alpha=" +
-        std::to_string(n_alpha) + ", n_beta=" + std::to_string(n_beta) + ").");
+        ") is too small for the requested electron count.");
   }
 
   auto structure = std::make_shared<Structure>(coords, symbols);
-
   std::vector<Shell> shells;
-  Eigen::VectorXd exps(1);
-  exps << 1.0;
-  Eigen::VectorXd coefs(1);
-  coefs << 1.0;
+  Eigen::VectorXd one(1);
+  one << 1.0;
   for (size_t i = 0; i < symbols.size(); ++i) {
-    shells.emplace_back(i, OrbitalType::S, exps, coefs);
+    shells.emplace_back(i, OrbitalType::S, one, one);
   }
   auto basis_set = std::make_shared<BasisSet>("dummy", shells, structure);
-
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Zero(
       basis_set->get_num_atomic_orbitals(), num_molecular_orbitals);
   auto orbitals =
@@ -261,133 +244,82 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
   for (size_t i = 0; i < single_count; ++i)
     config_str[pair_count + i] = unpaired;
 
-  auto container = std::make_unique<SlaterDeterminantContainer>(
-      Configuration(config_str), orbitals);
-  return std::make_shared<Wavefunction>(std::move(container));
+  return std::make_shared<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(Configuration(config_str),
+                                                   orbitals));
 }
 
-// Build a single-atom Wavefunction at the origin. Z is taken from the symbol
-// and used to derive (n_alpha, n_beta) from ``charge`` and ``multiplicity``;
-// num_molecular_orbitals defaults to 4*Z which is comfortably larger than any
-// valence space we test (so the cap in compute_valence_space_parameters does
-// not bind unless tests explicitly request a small value).
-std::shared_ptr<Wavefunction> make_single_atom_wavefunction(
-    const std::string& symbol, int charge = 0, size_t multiplicity = 1,
-    std::optional<size_t> num_molecular_orbitals = std::nullopt) {
+// Convenience for single-atom cases at the origin.
+std::shared_ptr<Wavefunction> single_atom(const std::string& symbol,
+                                          size_t n_alpha, size_t n_beta,
+                                          size_t num_mo) {
   Eigen::MatrixXd coords(1, 3);
   coords << 0.0, 0.0, 0.0;
-  const size_t z = static_cast<size_t>(Structure::symbol_to_element(symbol));
-  // Compute n_electrons in signed arithmetic so negative charges (anions)
-  // don't underflow size_t, then range-check before narrowing.
-  const long long n_electrons_signed =
-      static_cast<long long>(z) - static_cast<long long>(charge);
-  if (n_electrons_signed < 0) {
-    throw std::invalid_argument(
-        "make_single_atom_wavefunction: charge yields a negative electron "
-        "count for " +
-        symbol + ".");
-  }
-  const size_t n_electrons = static_cast<size_t>(n_electrons_signed);
-  const size_t n_unpaired = multiplicity - 1;  // 2S = mult - 1
-  const size_t n_alpha = (n_electrons + n_unpaired) / 2;
-  const size_t n_beta = n_electrons - n_alpha;
-  return make_minimal_wavefunction({symbol}, coords, n_alpha, n_beta,
-                                   num_molecular_orbitals.value_or(4 * z));
+  return make_minimal_wavefunction({symbol}, coords, n_alpha, n_beta, num_mo);
 }
 
+// Single-atom row: element + spin split + expected sizing for both toggle
+// states. n_alpha + n_beta is just the neutral electron count for the symbol.
 struct TmCase {
   std::string symbol;
-  size_t multiplicity;
-  size_t expected_active_electrons;
-  size_t expected_active_orbitals_with_dshell;
-  size_t expected_active_orbitals_default;
+  size_t n_alpha;
+  size_t n_beta;
+  size_t expected_nele;
+  size_t expected_norb_on;
+  size_t expected_norb_off;
 };
 
 class TransitionMetalValenceTest : public ::testing::TestWithParam<TmCase> {};
 
 }  // namespace
 
-// Self-test: the helper actually produces the requested electron count.
-TEST(MakeMinimalWavefunctionTest, ProducesRequestedElectronCounts) {
-  // Singlet, doublet, triplet, charged species — the helper must round-trip.
-  for (const auto& [symbol, charge, mult] :
-       std::vector<std::tuple<std::string, int, size_t>>{{"He", 0, 1},
-                                                         {"Li", 0, 2},
-                                                         {"O", 0, 3},
-                                                         {"O", -1, 2},
-                                                         {"Cu", 0, 2},
-                                                         {"Pt", 0, 1}}) {
-    auto wfn = make_single_atom_wavefunction(symbol, charge, mult);
-    auto [na, nb] = wfn->get_total_num_electrons();
-    const long long z =
-        static_cast<long long>(Structure::symbol_to_element(symbol));
-    EXPECT_EQ(static_cast<long long>(na + nb), z - charge)
-        << symbol << " charge=" << charge << " mult=" << mult;
-    EXPECT_EQ(na - nb, mult - 1)
-        << symbol << " charge=" << charge << " mult=" << mult;
-  }
-}
-
-// Self-test: the helper rejects an MO count that cannot fit the electrons.
 TEST(MakeMinimalWavefunctionTest, RejectsTooFewMolecularOrbitals) {
   Eigen::MatrixXd coords(1, 3);
   coords << 0.0, 0.0, 0.0;
-  // Triplet on a single atom needs >= 2 alpha (or beta) MO slots.
-  EXPECT_THROW(make_minimal_wavefunction({"He"}, coords,
-                                         /*n_alpha=*/2, /*n_beta=*/0,
-                                         /*num_molecular_orbitals=*/1),
+  EXPECT_THROW(make_minimal_wavefunction({"He"}, coords, 2, 0, 1),
                std::invalid_argument);
 }
 
-// Parametric coverage of the double-d-shell expansion across every period
-// the toggle affects, plus a non-d-block period-4 control (K).
-TEST_P(TransitionMetalValenceTest, ToggleOnAddsDPrimeShellForDBlockOnly) {
+TEST_P(TransitionMetalValenceTest, ToggleSizing) {
   const auto& tc = GetParam();
-  auto wfn =
-      make_single_atom_wavefunction(tc.symbol, /*charge=*/0, tc.multiplicity);
-  auto [nele, norb] = compute_valence_space_parameters(
-      wfn, /*charge=*/0, /*include_double_d_shell=*/true);
-  EXPECT_EQ(nele, tc.expected_active_electrons);
-  EXPECT_EQ(norb, tc.expected_active_orbitals_with_dshell);
-}
+  // Default num_mo = 4*Z, comfortably above any valence space we test.
+  const size_t z = static_cast<size_t>(Structure::symbol_to_element(tc.symbol));
+  auto wfn = single_atom(tc.symbol, tc.n_alpha, tc.n_beta, 4 * z);
 
-TEST_P(TransitionMetalValenceTest, ToggleOffPreservesHistoricalSizing) {
-  const auto& tc = GetParam();
-  auto wfn =
-      make_single_atom_wavefunction(tc.symbol, /*charge=*/0, tc.multiplicity);
-  auto [nele, norb] = compute_valence_space_parameters(wfn, /*charge=*/0);
-  EXPECT_EQ(nele, tc.expected_active_electrons);
-  EXPECT_EQ(norb, tc.expected_active_orbitals_default);
+  auto [nele_on, norb_on] = compute_valence_space_parameters(
+      wfn, /*charge=*/0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele_on, tc.expected_nele);
+  EXPECT_EQ(norb_on, tc.expected_norb_on);
+
+  auto [nele_off, norb_off] = compute_valence_space_parameters(wfn, 0);
+  EXPECT_EQ(nele_off, tc.expected_nele);
+  EXPECT_EQ(norb_off, tc.expected_norb_off);
 }
 
 INSTANTIATE_TEST_SUITE_P(
     Atoms, TransitionMetalValenceTest,
     ::testing::Values(
         // Period 4 d-block: 4s + 5*3d + 5*4d' + 3*4p = 14 (vs default 9).
-        TmCase{"Cu", 2, /*nele=*/11, /*orb_on=*/14, /*orb_off=*/9},
-        TmCase{"Ni", 3, 10, 14, 9}, TmCase{"Zn", 1, 12, 14, 9},
+        TmCase{"Cu", 15, 14, /*nele=*/11, /*on=*/14, /*off=*/9},
+        TmCase{"Ni", 15, 13, 10, 14, 9}, TmCase{"Zn", 15, 15, 12, 14, 9},
         // Period 4 main-group control (no d' shell either way).
-        TmCase{"K", 2, 1, 9, 9},
+        TmCase{"K", 10, 9, 1, 9, 9},
         // Period 6 d-block: 6s + 7*4f + 5*5d + 5*6d' + 3*6p = 21 (vs 16).
-        TmCase{"Pt", 1, 24, 21, 16}),
+        TmCase{"Pt", 39, 39, 24, 21, 16}),
     [](const ::testing::TestParamInfo<TmCase>& info) {
       return info.param.symbol;
     });
 
-// AgH: covers the period-5 d-block case alongside an H spectator atom and
-// confirms per-atom contributions sum correctly.
-TEST(TransitionMetalValenceTest, SilverHydrideAddsDPrimeOnAgOnly) {
+// AgH: period-5 d-block alongside an H spectator, confirming per-atom sums.
+TEST(TransitionMetalValenceTest, SilverHydride) {
   std::vector<std::string> symbols = {"Ag", "H"};
   Eigen::MatrixXd coords(2, 3);
   coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.617;
-  // Ag (47) + H (1) = 48 electrons, singlet.
-  auto wfn =
-      make_minimal_wavefunction(symbols, coords, /*n_alpha=*/24,
-                                /*n_beta=*/24, /*num_molecular_orbitals=*/60);
+  auto wfn = make_minimal_wavefunction(symbols, coords, 24, 24, 60);
 
-  auto [nele_on, norb_on] = compute_valence_space_parameters(
-      wfn, /*charge=*/0, /*include_double_d_shell=*/true);
-  EXPECT_EQ(nele_on, 12u);  // Ag valence (11) + H (1)
+  auto [nele_on, norb_on] =
+      compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele_on, 12u);  // Ag (11) + H (1)
   EXPECT_EQ(norb_on, 15u);  // Ag period-5 with d' (14) + H (1)
 
   auto [nele_off, norb_off] = compute_valence_space_parameters(wfn, 0);
@@ -395,47 +327,16 @@ TEST(TransitionMetalValenceTest, SilverHydrideAddsDPrimeOnAgOnly) {
   EXPECT_EQ(norb_off, 10u);  // Ag period-5 default (9) + H (1)
 }
 
-// Toggle-invariant property: enabling the d' shell only adds 5 orbitals per
-// d-block atom and changes nothing else (electrons, non-d-block atoms).
-TEST(TransitionMetalValenceTest, ToggleAddsExactlyFivePerDBlockAtom) {
-  // NaCl: zero d-block atoms -> zero delta.
-  std::vector<std::string> nacl_symbols = {"Na", "Cl"};
-  Eigen::MatrixXd nacl_coords(2, 3);
-  nacl_coords << 0.0, 0.0, 0.0, 0.0, 0.0, 2.361;
-  auto nacl = make_minimal_wavefunction(nacl_symbols, nacl_coords, 14, 14, 30);
-
-  auto [nacl_e_off, nacl_o_off] = compute_valence_space_parameters(nacl, 0);
-  auto [nacl_e_on, nacl_o_on] = compute_valence_space_parameters(nacl, 0, true);
-  EXPECT_EQ(nacl_e_off, nacl_e_on);
-  EXPECT_EQ(nacl_o_on - nacl_o_off, 0u);
-
-  // AgH: one d-block atom -> +5.
-  std::vector<std::string> agh_symbols = {"Ag", "H"};
-  Eigen::MatrixXd agh_coords(2, 3);
-  agh_coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.617;
-  auto agh = make_minimal_wavefunction(agh_symbols, agh_coords, 24, 24, 60);
-
-  auto [agh_e_off, agh_o_off] = compute_valence_space_parameters(agh, 0);
-  auto [agh_e_on, agh_o_on] = compute_valence_space_parameters(agh, 0, true);
-  EXPECT_EQ(agh_e_off, agh_e_on);
-  EXPECT_EQ(agh_o_on - agh_o_off, 5u);
-}
-
-// Cap interaction: when the basis is too small to hold the extra d' shell,
-// num_active_orbitals is bounded above by num_molecular_orbitals -
-// num_core_mos.
+// Cap interaction: the d' shell can't push num_active_orbitals above
+// num_molecular_orbitals - num_core_mos.
 TEST(TransitionMetalValenceTest, ToggleRespectsBasisCap) {
-  // Cu doublet with only 16 MOs total. num_core_mos = (29-11)/2 = 9, so the
-  // active space is capped at 16 - 9 = 7, well below the 14 the toggle would
-  // otherwise ask for. (16 is the smallest MO count larger than the 15 alpha
-  // slots Cu's 29 electrons require.)
-  auto wfn = make_single_atom_wavefunction("Cu", /*charge=*/0,
-                                           /*multiplicity=*/2,
-                                           /*num_molecular_orbitals=*/16);
-  auto [nele, norb] = compute_valence_space_parameters(
-      wfn, /*charge=*/0, /*include_double_d_shell=*/true);
-  EXPECT_EQ(nele, 11u);  // electron count is unaffected by the orbital cap
-  EXPECT_EQ(norb, 7u);   // capped at num_molecular_orbitals - num_core_mos
+  // Cu doublet, num_mo = 16. num_core_mos = (29-11)/2 = 9, so the cap is
+  // 16 - 9 = 7, well below the 14 the toggle would otherwise add.
+  auto wfn = single_atom("Cu", 15, 14, /*num_mo=*/16);
+  auto [nele, norb] =
+      compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele, 11u);
+  EXPECT_EQ(norb, 7u);
 }
 
 // Test fixture for orbital rotation
