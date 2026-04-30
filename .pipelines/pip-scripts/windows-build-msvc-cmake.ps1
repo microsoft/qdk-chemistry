@@ -263,7 +263,8 @@ if (-not $SkipCpp) {
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
             -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
-            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
+            -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
     } else {
         Write-Host "=== Step 1: Skipping configure (incremental build) ===" -ForegroundColor DarkGray

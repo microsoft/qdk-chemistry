@@ -13,9 +13,17 @@
     "boost-container-hash",
     "boost-dynamic-bitset",
     "boost-sort",
+    "catch2",
+    "gtest",
     "nlohmann-json",
     "spdlog",
     "fmt",
     "openblas"
+  ],
+  "overrides": [
+    {
+      "name": "catch2",
+      "version": "2.13.9#1"
+    }
   ]
 }
