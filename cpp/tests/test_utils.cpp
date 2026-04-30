@@ -277,7 +277,17 @@ std::shared_ptr<Wavefunction> make_single_atom_wavefunction(
   Eigen::MatrixXd coords(1, 3);
   coords << 0.0, 0.0, 0.0;
   const size_t z = static_cast<size_t>(Structure::symbol_to_element(symbol));
-  const size_t n_electrons = z - charge;
+  // Compute n_electrons in signed arithmetic so negative charges (anions)
+  // don't underflow size_t, then range-check before narrowing.
+  const long long n_electrons_signed =
+      static_cast<long long>(z) - static_cast<long long>(charge);
+  if (n_electrons_signed < 0) {
+    throw std::invalid_argument(
+        "make_single_atom_wavefunction: charge yields a negative electron "
+        "count for " +
+        symbol + ".");
+  }
+  const size_t n_electrons = static_cast<size_t>(n_electrons_signed);
   const size_t n_unpaired = multiplicity - 1;  // 2S = mult - 1
   const size_t n_alpha = (n_electrons + n_unpaired) / 2;
   const size_t n_beta = n_electrons - n_alpha;
@@ -309,8 +319,9 @@ TEST(MakeMinimalWavefunctionTest, ProducesRequestedElectronCounts) {
                                                          {"Pt", 0, 1}}) {
     auto wfn = make_single_atom_wavefunction(symbol, charge, mult);
     auto [na, nb] = wfn->get_total_num_electrons();
-    const size_t z = static_cast<size_t>(Structure::symbol_to_element(symbol));
-    EXPECT_EQ(na + nb, z - charge)
+    const long long z =
+        static_cast<long long>(Structure::symbol_to_element(symbol));
+    EXPECT_EQ(static_cast<long long>(na + nb), z - charge)
         << symbol << " charge=" << charge << " mult=" << mult;
     EXPECT_EQ(na - nb, mult - 1)
         << symbol << " charge=" << charge << " mult=" << mult;
