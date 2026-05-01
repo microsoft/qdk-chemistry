@@ -119,7 +119,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
                 bits_msb_first=dominant_bitstring,
             )
         raise NotImplementedError(
-            "IQPE result construction currently only supports post-processing from time evolution. "
+            "QPE result construction currently only supports post-processing from time evolution. "
             f"Got {type(self.unitary_builder)} instead."
         )
 

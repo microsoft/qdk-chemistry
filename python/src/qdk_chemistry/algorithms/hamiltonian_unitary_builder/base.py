@@ -13,6 +13,7 @@ from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
     "HamiltonianUnitaryBuilderFactory",
+    "HamiltonianUnitaryBuilderSettings",
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
 ]

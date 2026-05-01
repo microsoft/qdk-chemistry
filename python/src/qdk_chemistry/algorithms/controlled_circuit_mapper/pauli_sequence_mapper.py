@@ -57,7 +57,7 @@ class PauliSequenceMapper(ControlledCircuitMapper):
             controlled_unitary.target_indices.
 
         Returns:
-            Circuit: A quantum circuit implementing the controlled unitary :math:`U(t)`
+            Circuit: A quantum circuit implementing the controlled unitary :math:`U`
             where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
 
         Raises:

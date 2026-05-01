@@ -39,10 +39,17 @@ class ControlledUnitary(DataClass):
         """
         self.unitary = unitary
         self.control_indices = control_indices
+        if len(control_indices) != len(set(control_indices)):
+            raise ValueError("control_indices must not contain duplicates.")
         if target_indices is not None:
-            target_indices_set = set(target_indices)
-            control_indices_set = set(control_indices)
-            if target_indices_set & control_indices_set:
+            if len(target_indices) != len(set(target_indices)):
+                raise ValueError("target_indices must not contain duplicates.")
+            if len(target_indices) != unitary.get_num_qubits():
+                raise ValueError(
+                    f"target_indices length ({len(target_indices)}) must match "
+                    f"unitary qubit count ({unitary.get_num_qubits()})."
+                )
+            if set(target_indices) & set(control_indices):
                 raise ValueError("target_indices and control_indices must not overlap.")
         self._target_indices = target_indices
         super().__init__()

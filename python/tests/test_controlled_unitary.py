@@ -8,6 +8,7 @@
 from typing import Any
 
 import h5py
+import pytest
 
 from qdk_chemistry.data import ControlledUnitary, UnitaryContainer, UnitaryRepresentation
 
@@ -109,3 +110,27 @@ class TestControlledUnitary:
         assert "Controlled Unitary" in summary
         assert "Control Indices: [5]" in summary
         assert "Mock Unitary" in summary
+
+    def test_rejects_duplicate_control_indices(self):
+        """Test that duplicate control indices raise ValueError."""
+        unitary_rep = create_mock_unitary(num_qubits=4)
+        with pytest.raises(ValueError, match="control_indices must not contain duplicates"):
+            ControlledUnitary(unitary_rep, control_indices=[0, 0])
+
+    def test_rejects_duplicate_target_indices(self):
+        """Test that duplicate target indices raise ValueError."""
+        unitary_rep = create_mock_unitary(num_qubits=3)
+        with pytest.raises(ValueError, match="target_indices must not contain duplicates"):
+            ControlledUnitary(unitary_rep, control_indices=[0], target_indices=[1, 1, 2])
+
+    def test_rejects_target_indices_length_mismatch(self):
+        """Test that target_indices length must match unitary qubit count."""
+        unitary_rep = create_mock_unitary(num_qubits=4)
+        with pytest.raises(ValueError, match="target_indices length"):
+            ControlledUnitary(unitary_rep, control_indices=[0], target_indices=[1, 2])
+
+    def test_rejects_overlapping_control_and_target(self):
+        """Test that overlapping control and target indices raise ValueError."""
+        unitary_rep = create_mock_unitary(num_qubits=3)
+        with pytest.raises(ValueError, match="must not overlap"):
+            ControlledUnitary(unitary_rep, control_indices=[0], target_indices=[0, 1, 2])
