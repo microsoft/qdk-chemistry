@@ -184,8 +184,8 @@ static void compute_restricted_unrestricted_gradient(
   }
   gradient.setZero(total_rotation_size);
 
-  std::vector<double> atba_workspace(
-      static_cast<size_t>(num_molecular_orbitals) * num_molecular_orbitals);
+  std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
+                                     num_molecular_orbitals);
 
   for (int spin_index = 0; spin_index < num_orbital_spin_blocks; ++spin_index) {
     const int num_occupied_orbitals = num_electrons[spin_index];
@@ -259,8 +259,6 @@ static void compute_restricted_open_shell_gradient(
 
   const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
   const auto& H_ao_full = scf_impl.get_core_hamiltonian();
-  const RowMajorMatrix H_ao =
-      H_ao_full.block(0, 0, num_atomic_orbitals, num_atomic_orbitals);
 
   const auto J_alpha_ao = Eigen::Map<const RowMajorMatrix>(
       J_ao.data(), num_atomic_orbitals, num_atomic_orbitals);
@@ -282,8 +280,9 @@ static void compute_restricted_open_shell_gradient(
   // Calculate Generalized Fock matrix in MO basis
   RowMajorMatrix H_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
-  compute_atba_gemm(C_ao_mo_ptr, H_ao.data(), H_mo.data(), num_atomic_orbitals,
-                    num_molecular_orbitals, atba_workspace);
+  compute_atba_gemm(C_ao_mo_ptr, H_ao_full.data(), H_mo.data(),
+                    num_atomic_orbitals, num_molecular_orbitals,
+                    atba_workspace);
 
   RowMajorMatrix J_alpha_mo =
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
@@ -976,9 +975,8 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
       F.data() + num_molecular_orbitals * num_molecular_orbitals * spin_index;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
-  compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(),
-                    num_molecular_orbitals, num_molecular_orbitals,
-                    atba_workspace);
+  compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(), num_atomic_orbitals,
+                    num_molecular_orbitals, atba_workspace);
 
   // Perform pseudo-canonical transformation
   // Diagonalize occupied/virtual blocks and rotate orbitals to the
