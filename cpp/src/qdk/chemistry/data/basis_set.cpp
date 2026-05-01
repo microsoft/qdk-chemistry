@@ -441,8 +441,14 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     _shells_per_atom[atom_index].push_back(shell);
   }
 
-  // Organize ECP shells by atom index
+  // Organize auxiliary shells by atom index
   for (const auto& aux_shell : aux_shells) {
+    if (aux_shell.has_radial_powers()) {
+      throw std::invalid_argument(
+          "Auxiliary shells contains a shell with radial powers; did you pass "
+          "ECP shells by mistake? ECP basis must be constructed with both ECP "
+          "shells and ECP electrons.");
+    }
     size_t atom_index = aux_shell.atom_index;
 
     // Ensure we have enough space for this atom
@@ -560,6 +566,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
   // Organize auxiliary shells by atom index
   for (const auto& aux_shell : aux_shells) {
+    if (aux_shell.has_radial_powers()) {
+      throw std::invalid_argument(
+          "aux_shells contains a shell with radial powers; did you pass "
+          "ECP shells by mistake? ECP basis must be constructed with both ECP "
+          "shells and ECP electrons.");
+    }
     size_t atom_index = aux_shell.atom_index;
 
     // Ensure we have enough space for this atom
@@ -635,6 +647,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
   // Organize auxiliary shells by atom index
   for (const auto& aux_shell : aux_shells) {
+    if (aux_shell.has_radial_powers()) {
+      throw std::invalid_argument(
+          "Auxiliary shells contains a shell with radial powers; did you pass "
+          "ECP shells by mistake? ECP basis must be constructed with both ECP "
+          "shells and ECP electrons.");
+    }
     size_t atom_index = aux_shell.atom_index;
     if (atom_index >= _aux_shells_per_atom.size()) {
       _aux_shells_per_atom.resize(atom_index + 1);

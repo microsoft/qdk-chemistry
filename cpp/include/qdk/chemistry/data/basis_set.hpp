@@ -139,7 +139,7 @@ struct Shell {
   /**
    * @brief Check if this shell has radial powers (i.e., is an ECP shell)
    */
-  bool has_radial_powers() const { return rpowers.size() > 0; }
+  bool has_radial_powers() const { return rpowers.size() > 0 && rpowers.any(); }
 
   /**
    * @brief Get number of atomic orbitals in this shell
