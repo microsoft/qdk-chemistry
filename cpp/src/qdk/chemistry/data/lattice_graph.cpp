@@ -65,10 +65,12 @@ LatticeGraph::LatticeGraph(
   _is_symmetric = _check_symmetry(adjacency_);
 }
 
-LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency)
+LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
+                           std::optional<EdgeColoring> coloring)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
-      _is_symmetric(_check_symmetry(adjacency_)) {}
+      _is_symmetric(_check_symmetry(adjacency_)),
+      _edge_coloring(std::move(coloring)) {}
 
 LatticeGraph LatticeGraph::from_dense_matrix(
     const Eigen::MatrixXd& adjacency_matrix) {
@@ -157,10 +159,8 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph graph(std::move(adj));
-  graph._coloring_cache =
-      detail::chain_coloring(static_cast<std::int64_t>(N), periodic);
-  return graph;
+  return LatticeGraph(std::move(adj),
+                      chain_coloring(static_cast<std::int64_t>(N), periodic));
 }
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
@@ -207,9 +207,8 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph graph(std::move(adj));
-  graph._coloring_cache = detail::square_coloring(Nx, Ny, periodic_x, periodic_y);
-  return graph;
+  return LatticeGraph(std::move(adj),
+                      square_coloring(Nx, Ny, periodic_x, periodic_y));
 }
 
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
@@ -267,11 +266,7 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph graph(std::move(adj));
-  // No proven deterministic coloring; pre-populate with greedy heuristic.
-  graph._coloring_cache = detail::greedy_edge_coloring(
-      detail::undirected_edges(graph.adjacency_), 0, 32);
-  return graph;
+  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
 }
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -323,13 +318,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph graph(std::move(adj));
-  // Honeycomb is bipartite with max degree 3; deterministic 3-coloring
-  // via bond classification: intra-cell=0, horizontal inter-cell=1,
-  // vertical inter-cell=2.
-  graph._coloring_cache =
-      detail::honeycomb_coloring(Nx, Ny, periodic_x, periodic_y);
-  return graph;
+  return LatticeGraph(std::move(adj),
+                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -401,17 +391,13 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  LatticeGraph graph(std::move(adj));
-  // No proven deterministic coloring; pre-populate with greedy heuristic.
-  graph._coloring_cache = detail::greedy_edge_coloring(
-      detail::undirected_edges(graph.adjacency_), 0, 32);
-  return graph;
+  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
 }
 
 namespace detail {
 
 // Collect every undirected edge (i, j) with i < j from the adjacency matrix.
-static std::vector<std::pair<std::uint64_t, std::uint64_t>> undirected_edges(
+std::vector<std::pair<std::uint64_t, std::uint64_t>> undirected_edges(
     const Eigen::SparseMatrix<double>& adj) {
   std::vector<std::pair<std::uint64_t, std::uint64_t>> edges;
   for (int k = 0; k < adj.outerSize(); ++k) {
@@ -425,17 +411,19 @@ static std::vector<std::pair<std::uint64_t, std::uint64_t>> undirected_edges(
   return edges;
 }
 
+}  // namespace detail
+
 // Greedy edge coloring: place each edge in the lowest-index color whose
 // vertices do not already touch that color.  Optionally retry with shuffled
 // edge orders and keep the result with fewest colors.
-static LatticeGraph::EdgeColoring greedy_edge_coloring(
-    const std::vector<std::pair<std::uint64_t, std::uint64_t>>& edges_in,
-    int seed, int trials) {
+EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
+                                  int seed, int trials) {
+  auto edges_in = detail::undirected_edges(adj);
   if (edges_in.empty() || trials < 1) {
     return {};
   }
 
-  LatticeGraph::EdgeColoring best;
+  EdgeColoring best;
   int best_count = std::numeric_limits<int>::max();
   std::mt19937 rng(static_cast<std::uint32_t>(seed));
 
@@ -447,7 +435,7 @@ static LatticeGraph::EdgeColoring greedy_edge_coloring(
       std::shuffle(order.begin(), order.end(), rng);
     }
 
-    LatticeGraph::EdgeColoring coloring;
+    EdgeColoring coloring;
     // For each vertex, the set of colors already incident to it.
     std::map<std::uint64_t, std::set<int>> vertex_colors;
     int max_color = -1;
@@ -478,9 +466,8 @@ static LatticeGraph::EdgeColoring greedy_edge_coloring(
 // Deterministic two-coloring of an open chain: edge (i, i+1) gets color i % 2.
 // For periodic chains, even N keeps two colors, odd N requires a third for
 // the wrap edge to satisfy the no-incident-same-color constraint.
-static LatticeGraph::EdgeColoring chain_coloring(std::int64_t n,
-                                                 bool periodic) {
-  LatticeGraph::EdgeColoring out;
+EdgeColoring chain_coloring(std::int64_t n, bool periodic) {
+  EdgeColoring out;
   for (std::int64_t i = 0; i + 1 < n; ++i) {
     out[{static_cast<std::uint64_t>(i), static_cast<std::uint64_t>(i + 1)}] =
         static_cast<int>(i % 2);
@@ -496,11 +483,9 @@ static LatticeGraph::EdgeColoring chain_coloring(std::int64_t n,
 // edges live on disjoint axes; each axis can be 2-colored by alternating.
 // With periodic boundaries, an odd extent on that axis forces a third color
 // on its wrap edges.  Total colors: 2 (open) up to 4 (both axes odd-periodic).
-static LatticeGraph::EdgeColoring square_coloring(std::int64_t Nx,
-                                                  std::int64_t Ny,
-                                                  bool periodic_x,
-                                                  bool periodic_y) {
-  LatticeGraph::EdgeColoring out;
+EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny,
+                             bool periodic_x, bool periodic_y) {
+  EdgeColoring out;
   auto idx = [Nx](std::int64_t x, std::int64_t y) {
     return static_cast<std::uint64_t>(y * Nx + x);
   };
@@ -547,11 +532,9 @@ static LatticeGraph::EdgeColoring square_coloring(std::int64_t Nx,
 // horizontal inter-cell (B–A right), vertical inter-cell (B–A up).
 // Each bond type gets its own color, which is valid because no vertex
 // is incident to two bonds of the same type.
-static LatticeGraph::EdgeColoring honeycomb_coloring(std::int64_t Nx,
-                                                     std::int64_t Ny,
-                                                     bool periodic_x,
-                                                     bool periodic_y) {
-  LatticeGraph::EdgeColoring out;
+EdgeColoring honeycomb_coloring(std::int64_t Nx, std::int64_t Ny,
+                                bool periodic_x, bool periodic_y) {
+  EdgeColoring out;
   auto idxA = [Nx](std::int64_t x, std::int64_t y) -> std::uint64_t {
     return static_cast<std::uint64_t>(2 * (y * Nx + x));
   };
@@ -584,41 +567,8 @@ static LatticeGraph::EdgeColoring honeycomb_coloring(std::int64_t Nx,
   return out;
 }
 
-}  // namespace detail
-
-const LatticeGraph::EdgeColoring& LatticeGraph::edge_coloring(
-    int seed, int trials) const {
-  if (_coloring_cache.has_value()) {
-    return *_coloring_cache;
-  }
-
-  // No pre-populated coloring; fall back to greedy heuristic.
-  EdgeColoring coloring = detail::greedy_edge_coloring(
-      detail::undirected_edges(adjacency_), seed, std::max(trials, 1));
-
-  std::set<int> distinct;
-  for (const auto& [edge, c] : coloring) {
-    distinct.insert(c);
-  }
-  _chromatic_index = static_cast<int>(distinct.size());
-  _coloring_cache = std::move(coloring);
-  return *_coloring_cache;
-}
-
-int LatticeGraph::chromatic_index() const {
-  if (_chromatic_index < 0) {
-    edge_coloring();
-  }
-  return _chromatic_index;
-}
-
-void LatticeGraph::set_edge_coloring(EdgeColoring coloring) const {
-  std::set<int> distinct;
-  for (const auto& [edge, c] : coloring) {
-    distinct.insert(c);
-  }
-  _chromatic_index = static_cast<int>(distinct.size());
-  _coloring_cache = std::move(coloring);
+const std::optional<EdgeColoring>& LatticeGraph::edge_coloring() const {
+  return _edge_coloring;
 }
 
 bool LatticeGraph::_check_symmetry(const Eigen::SparseMatrix<double>& mat) {

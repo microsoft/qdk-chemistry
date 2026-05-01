@@ -164,12 +164,13 @@ class TestTermGrouperRegistry:
 class TestLatticeEdgeColoring:
     def test_chain_two_colors(self):
         lat = LatticeGraph.chain(4, periodic=True)
-        coloring = lat.edge_coloring(seed=0, trials=5)
+        coloring = lat.edge_coloring
+        assert coloring is not None
         assert len(set(coloring.values())) == 2
 
-    def test_returns_dict(self):
+    def test_returns_dict_or_none(self):
         lat = LatticeGraph.chain(3, periodic=False)
-        coloring = lat.edge_coloring()
+        coloring = lat.edge_coloring
         assert isinstance(coloring, dict)
 
 

@@ -309,14 +309,12 @@ For detailed information about serialization in QDK/Chemistry, see the :doc:`Ser
 Edge coloring
 -------------
 
-Calling ``lattice.edge_coloring()`` returns a ``dict[tuple[int, int], int]`` that assigns a color index to each undirected edge such that edges sharing a vertex receive distinct colors.
-The number of distinct colors (the chromatic index) is available via ``lattice.chromatic_index``.
+The ``edge_coloring`` property returns an optional ``dict[tuple[int, int], int]`` that assigns a color index to each undirected edge such that edges sharing a vertex receive distinct colors.
+Factory methods for recognised topologies (chain, square, honeycomb) pre-populate this with a deterministic optimal coloring; triangular and kagome lattices use a greedy heuristic.
+Custom lattices built from raw adjacency matrices have ``edge_coloring`` set to ``None`` — callers can compute and supply their own coloring.
 
 This coloring is the topological ingredient that powers geometry-aware Trotter scheduling: edges of the same color have disjoint qubit supports, so their Pauli exponentials can be applied in parallel inside one Trotter step.
 The :doc:`spin model Hamiltonian builders <../model_hamiltonians>` consume the coloring automatically when ``include_term_groups=True`` and store the result on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`.
-
-For recognised lattice geometries (chain, square, honeycomb) the coloring is deterministic and optimal.
-Custom lattices use a randomised greedy heuristic; pass ``trials > 1`` for tighter results.
 
 Related classes
 ---------------

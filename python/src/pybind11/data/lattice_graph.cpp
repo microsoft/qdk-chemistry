@@ -216,60 +216,29 @@ Returns:
 )",
                     py::arg("i"), py::arg("j"));
 
-  lattice_graph.def_property_readonly("chromatic_index",
-                                      &LatticeGraph::chromatic_index, R"(
-Number of distinct colors in the cached edge coloring.
-
-Triggers an :meth:`edge_coloring` computation if no coloring has
-been cached yet.
-
-Returns:
-    int: Chromatic index attained by :meth:`edge_coloring`.
-)");
-
-  lattice_graph.def(
-      "_edge_coloring_raw",
-      [](const LatticeGraph &self, int seed, int trials) {
-        const auto &coloring = self.edge_coloring(seed, trials);
+  lattice_graph.def_property_readonly(
+      "edge_coloring",
+      [](const LatticeGraph &self) -> std::optional<py::dict> {
+        const auto &coloring = self.edge_coloring();
+        if (!coloring.has_value()) {
+          return std::nullopt;
+        }
         py::dict out;
-        for (const auto &[edge, color] : coloring) {
+        for (const auto &[edge, color] : *coloring) {
           out[py::make_tuple(edge.first, edge.second)] = color;
         }
         return out;
       },
       R"(
-Return the C++-computed edge coloring as a ``{(i, j): color}`` dict.
+Edge coloring stored at construction time, or ``None``.
 
-Args:
-    seed (int): Random seed for the greedy fallback. Defaults to 0.
-    trials (int): Number of randomised trials for the greedy fallback (the lowest-color-count outcome wins). Defaults to 1.
+Factory methods for recognised topologies pre-populate this field.
+Returns ``None`` for lattices constructed without a coloring.
 
 Returns:
-    dict[tuple[int, int], int]: Mapping of canonical edges (``i < j``) to non-negative color labels.
-)",
-      py::arg("seed") = 0, py::arg("trials") = 1);
-
-  lattice_graph.def(
-      "set_edge_coloring",
-      [](const LatticeGraph &self, py::dict coloring_dict) {
-        LatticeGraph::EdgeColoring coloring;
-        for (auto item : coloring_dict) {
-          auto key = item.first.cast<py::tuple>();
-          auto i = key[0].cast<std::uint64_t>();
-          auto j = key[1].cast<std::uint64_t>();
-          auto color = item.second.cast<int>();
-          auto edge = std::minmax(i, j);
-          coloring[{edge.first, edge.second}] = color;
-        }
-        self.set_edge_coloring(std::move(coloring));
-      },
-      R"(
-Set a caller-provided edge coloring, replacing any cached coloring.
-
-Args:
-    coloring_dict (dict[tuple[int, int], int]): Mapping of edges ``(i, j)`` to non-negative color labels.
-)",
-      py::arg("coloring"));
+    dict[tuple[int, int], int] | None: Mapping of canonical edges (``i < j``)
+    to non-negative color labels, or ``None``.
+)");
 
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(

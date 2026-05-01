@@ -191,36 +191,3 @@ __all__ = [
     "validate_encoding_compatibility",
 ]
 
-
-# ---------------------------------------------------------------------------
-# LatticeGraph.edge_coloring overlay
-# ---------------------------------------------------------------------------
-#
-# LatticeGraph is bound from C++ and computes its edge coloring in C++ via
-# :meth:`LatticeGraph._edge_coloring_raw`, returning a ``{(i, j): color}`` dict.
-# The Python overlay exposes this as the public ``edge_coloring`` method.
-# Cached colorings on the C++ side mean repeat calls are cheap.
-
-
-def _lattice_edge_coloring(self, *, seed: int | None = 0, trials: int = 1) -> dict[tuple[int, int], int]:
-    """Compute an edge coloring of this lattice.
-
-    Delegates to the C++ implementation on :class:`LatticeGraph` (which uses
-    deterministic optimal colorings for recognised lattice geometries and
-    a cached randomised greedy coloring otherwise) and returns the result as
-    a plain dictionary.
-
-    Args:
-        self: The :class:`LatticeGraph` instance whose edges are to be colored.
-        seed: Random seed for the greedy fallback (ignored for deterministic kinds; ``None`` is treated as 0).
-        trials: Number of randomised trials for the greedy fallback; the coloring with the fewest colors is returned.
-
-    Returns:
-        dict[tuple[int, int], int]: Mapping of canonical edges ``(i, j)`` with ``i < j`` to non-negative color labels.
-
-    """
-    return self._edge_coloring_raw(seed=0 if seed is None else int(seed), trials=int(trials))
-
-
-LatticeGraph.edge_coloring = _lattice_edge_coloring  # type: ignore[attr-defined]
-del _lattice_edge_coloring

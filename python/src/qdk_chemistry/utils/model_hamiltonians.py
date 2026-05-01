@@ -62,7 +62,7 @@ def _build_geometry_grouped_hamiltonian(
         graph: Lattice graph defining connectivity.
         couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\"XX\", jx)]``).
         fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
-        coloring: Optional pre-computed edge coloring as ``{(i, j): color}`` with ``i < j``. When ``None``, ``graph.edge_coloring()`` is invoked to compute one.
+        coloring: Optional pre-computed edge coloring as ``{(i, j): color}`` with ``i < j``. When ``None``, ``graph.edge_coloring`` is read.
 
     Returns:
         QubitHamiltonian: The assembled Hamiltonian carrying a ``LayeredPartition``
@@ -73,7 +73,12 @@ def _build_geometry_grouped_hamiltonian(
     adj = graph.adjacency_matrix()
 
     if coloring is None:
-        coloring = graph.edge_coloring()
+        coloring = graph.edge_coloring
+    if coloring is None:
+        raise ValueError(
+            "No edge coloring available on the lattice graph. "
+            "Use a factory method that provides one, or pass an explicit coloring."
+        )
 
     pauli_strings: list[str] = []
     coefficients: list[complex] = []
