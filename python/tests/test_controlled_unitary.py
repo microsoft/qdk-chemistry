@@ -134,3 +134,23 @@ class TestControlledUnitary:
         unitary_rep = create_mock_unitary(num_qubits=3)
         with pytest.raises(ValueError, match="must not overlap"):
             ControlledUnitary(unitary_rep, control_indices=[0], target_indices=[0, 1, 2])
+
+    def test_default_target_indices_skips_controls(self):
+        """Test that default target_indices assigns first available indices, skipping controls."""
+        unitary_rep = create_mock_unitary(num_qubits=3)
+
+        # Control at index 0 → targets should be [1, 2, 3]
+        cu = ControlledUnitary(unitary_rep, control_indices=[0])
+        assert cu.target_indices == [1, 2, 3]
+
+        # Control at index 2 → targets should be [0, 1, 3]
+        cu = ControlledUnitary(unitary_rep, control_indices=[2])
+        assert cu.target_indices == [0, 1, 3]
+
+        # Controls at indices 0 and 2 → targets should be [1, 3, 4]
+        cu = ControlledUnitary(unitary_rep, control_indices=[0, 2])
+        assert cu.target_indices == [1, 3, 4]
+
+        # Controls at indices 4 → default targets should be [0, 1, 2]
+        cu = ControlledUnitary(unitary_rep, control_indices=[4])
+        assert cu.target_indices == [0, 1, 2]

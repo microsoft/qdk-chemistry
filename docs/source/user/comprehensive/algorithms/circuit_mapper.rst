@@ -19,10 +19,9 @@ That is, the target register is left unchanged when the control is :math:`|0\ran
 The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` synthesises these controlled operations from the abstract :class:`~qdk_chemistry.data.UnitaryRepresentation` representation produced by a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
 This is a core component of algorithms such as :doc:`PhaseEstimation <phase_estimation>`, which requires repeated controlled applications :math:`C\text{-}U^{2^k}`.
 
-The mapper takes two inputs:
+The mapper takes inputs:
 
 1. A :class:`~qdk_chemistry.data.ControlledUnitary` — which pairs a :class:`~qdk_chemistry.data.UnitaryRepresentation` with the control qubit indices
-2. An optional power parameter that controls how many times the unitary is repeated (:math:`U^{\text{power}}`)
 
 The resulting :class:`~qdk_chemistry.data.Circuit` implements the controlled unitary and can be executed by a :doc:`CircuitExecutor <circuit_executor>`.
 

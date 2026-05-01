@@ -59,14 +59,22 @@ class ControlledUnitary(DataClass):
         """Get the target qubit indices.
 
         Returns:
-            The target qubit indices. If not explicitly set, returns all qubit indices
-            excluding the control indices.
+            The target qubit indices. If not explicitly set, assigns the first
+            ``unitary.get_num_qubits()`` qubit indices (starting from 0) that
+            are not occupied by control qubits.
 
         """
         if self._target_indices is not None:
             return self._target_indices
-        total_qubits = self.get_num_total_qubits()
-        return [i for i in range(total_qubits) if i not in self.control_indices]
+        control_set = set(self.control_indices)
+        num_target = self.unitary.get_num_qubits()
+        targets: list[int] = []
+        i = 0
+        while len(targets) < num_target:
+            if i not in control_set:
+                targets.append(i)
+            i += 1
+        return targets
 
     def get_unitary_container_type(self) -> str:
         """Get the type of the unitary container.
