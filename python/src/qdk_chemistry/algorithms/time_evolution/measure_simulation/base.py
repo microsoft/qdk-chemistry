@@ -13,6 +13,7 @@ from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEst
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper.base import EvolutionCircuitMapper
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     EnergyExpectationResult,
     MeasurementData,
@@ -146,10 +147,20 @@ class MeasureSimulation(Algorithm):
         post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
+        # The energy_estimator instantiates its own circuit_executor from the
+        # ``circuit_executor`` setting (an AlgorithmRef).  Forward the caller's
+        # executor by configuring that setting from the provided instance.
+        energy_estimator.settings().set(
+            "circuit_executor",
+            AlgorithmRef(
+                circuit_executor.type_name(),
+                circuit_executor.name(),
+                circuit_executor.settings(),
+            ),
+        )
         energy_result, measurement_data = energy_estimator.run(
             circuit,
             observable,
-            circuit_executor,
             total_shots=shots,
             noise_model=noise,
             device_backend_name=device_backend_name,

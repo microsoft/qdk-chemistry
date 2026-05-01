@@ -519,8 +519,10 @@ static void check_valid_edge_coloring(
 TEST_F(LatticeGraphTest, ColorCount) {
   auto chain_open = LatticeGraph::chain(5, false);
   ASSERT_TRUE(chain_open.edge_coloring().has_value());
-  EXPECT_EQ(std::set<int>(chain_open.edge_coloring()->begin(),
-                           chain_open.edge_coloring()->end()).size() > 0, true);
+  std::set<int> chain_open_colors;
+  for (const auto& [e, c] : *chain_open.edge_coloring())
+    chain_open_colors.insert(c);
+  EXPECT_GT(chain_open_colors.size(), 0u);
 
   auto chain_periodic_even = LatticeGraph::chain(6, true);
   ASSERT_TRUE(chain_periodic_even.edge_coloring().has_value());
