@@ -18,7 +18,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_site_param,
 )
 from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitHamiltonian
-from qdk_chemistry.geometry.hypergraph import HypergraphEdgeColoring
+
 
 __all__ = [
     "create_heisenberg_hamiltonian",
@@ -46,7 +46,7 @@ def _build_geometry_grouped_hamiltonian(
     *,
     couplings: list[tuple[str, np.ndarray | float]],
     fields: list[tuple[str, np.ndarray | float]],
-    coloring: HypergraphEdgeColoring | None = None,
+    coloring: dict[tuple[int, int], int] | None = None,
 ) -> QubitHamiltonian:
     r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
 
@@ -62,8 +62,7 @@ def _build_geometry_grouped_hamiltonian(
         graph: Lattice graph defining connectivity.
         couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\"XX\", jx)]``).
         fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
-        coloring: Optional pre-computed edge coloring of ``graph``. When ``None``,
-            ``graph.edge_coloring()`` is invoked to compute one.
+        coloring: Optional pre-computed edge coloring as ``{(i, j): color}`` with ``i < j``. When ``None``, ``graph.edge_coloring()`` is invoked to compute one.
 
     Returns:
         QubitHamiltonian: The assembled Hamiltonian carrying a ``LayeredPartition``
@@ -99,19 +98,12 @@ def _build_geometry_grouped_hamiltonian(
     for pauli_label, coupling in couplings:
         coupling_mat = to_pair_param(coupling, graph, "coupling")
         color_to_indices: dict[int, list[int]] = {}
-        for edge in coloring.hypergraph.edges():
-            verts = edge.vertices
-            if len(verts) != 2:
-                continue
-            i, j = verts
+        for (i, j), c in coloring.items():
             edge_weight = adj[i, j]
             if edge_weight == 0.0:
                 continue
             coeff_val = coupling_mat[i, j] * edge_weight
             if coeff_val == 0.0:
-                continue
-            c = coloring.color(verts)
-            if c is None or c < 0:
                 continue
             ps = ["I"] * n
             ps[i] = pauli_label[0]

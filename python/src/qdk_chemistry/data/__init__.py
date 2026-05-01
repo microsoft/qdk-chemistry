@@ -198,43 +198,28 @@ __all__ = [
 #
 # LatticeGraph is bound from C++ and computes its edge coloring in C++ via
 # :meth:`LatticeGraph._edge_coloring_raw`, returning a ``{(i, j): color}`` dict.
-# The Python overlay below wraps that dict in a
-# :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`, the richer Python
-# representation used by downstream consumers (e.g. the spin-model Hamiltonian
-# builders).  Cached colorings on the C++ side mean repeat calls are cheap.
+# The Python overlay exposes this as the public ``edge_coloring`` method.
+# Cached colorings on the C++ side mean repeat calls are cheap.
 
 
-def _lattice_edge_coloring(self, *, seed: int | None = 0, trials: int = 1):
+def _lattice_edge_coloring(self, *, seed: int | None = 0, trials: int = 1) -> dict[tuple[int, int], int]:
     """Compute an edge coloring of this lattice.
 
     Delegates to the C++ implementation on :class:`LatticeGraph` (which uses
-    a deterministic optimal coloring for ``CHAIN`` and ``SQUARE`` kinds and
-    a cached randomised greedy coloring otherwise) and wraps the result in a
-    :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.
+    deterministic optimal colorings for recognised lattice geometries and
+    a cached randomised greedy coloring otherwise) and returns the result as
+    a plain dictionary.
 
     Args:
         self: The :class:`LatticeGraph` instance whose edges are to be colored.
-        seed: Random seed for the greedy fallback (ignored for deterministic
-            kinds; ``None`` is treated as 0).
-        trials: Number of randomised trials for the greedy fallback; the
-            coloring with the fewest colors is returned.
+        seed: Random seed for the greedy fallback (ignored for deterministic kinds; ``None`` is treated as 0).
+        trials: Number of randomised trials for the greedy fallback; the coloring with the fewest colors is returned.
 
     Returns:
-        :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`: A coloring
-        whose ``hypergraph`` carries the same undirected edges as this
-        :class:`LatticeGraph`.
+        dict[tuple[int, int], int]: Mapping of canonical edges ``(i, j)`` with ``i < j`` to non-negative color labels.
 
     """
-    # Imported lazily to avoid a circular import at module load time.
-    from qdk_chemistry.geometry.hypergraph import Hyperedge, Hypergraph, HypergraphEdgeColoring  # noqa: PLC0415
-
-    raw = self._edge_coloring_raw(seed=0 if seed is None else int(seed), trials=int(trials))
-    edges = [Hyperedge(list(e)) for e in raw]
-    hypergraph = Hypergraph(edges)
-    coloring = HypergraphEdgeColoring(hypergraph)
-    for edge in edges:
-        coloring.add_edge(edge, raw[tuple(edge.vertices)])
-    return coloring
+    return self._edge_coloring_raw(seed=0 if seed is None else int(seed), trials=int(trials))
 
 
 LatticeGraph.edge_coloring = _lattice_edge_coloring  # type: ignore[attr-defined]

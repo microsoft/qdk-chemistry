@@ -216,30 +216,6 @@ Returns:
 )",
                     py::arg("i"), py::arg("j"));
 
-  py::enum_<LatticeKind>(lattice_graph, "LatticeKind", R"(
-Tag identifying which factory built a :class:`LatticeGraph`.
-
-Used by :meth:`LatticeGraph.edge_coloring` to dispatch to a deterministic
-optimal coloring routine when the connectivity is one of the recognised
-pre-ordained geometries; ``CUSTOM`` lattices fall back to a
-randomised greedy coloring.
-)")
-      .value("CUSTOM", LatticeKind::CUSTOM)
-      .value("CHAIN", LatticeKind::CHAIN)
-      .value("SQUARE", LatticeKind::SQUARE)
-      .value("TRIANGULAR", LatticeKind::TRIANGULAR)
-      .value("HONEYCOMB", LatticeKind::HONEYCOMB)
-      .value("KAGOME", LatticeKind::KAGOME);
-
-  lattice_graph.def_property_readonly("kind", &LatticeGraph::kind, R"(
-Lattice kind tag set by the deterministic factory methods.
-
-Returns:
-    LatticeGraph.LatticeKind: ``CUSTOM`` for lattices built from raw
-    matrices, deserialised from disk, or constructed via
-    :meth:`make_bidirectional`; otherwise the matching enum value.
-)");
-
   lattice_graph.def_property_readonly("chromatic_index",
                                       &LatticeGraph::chromatic_index, R"(
 Number of distinct colors in the cached edge coloring.
@@ -264,21 +240,36 @@ Returns:
       R"(
 Return the C++-computed edge coloring as a ``{(i, j): color}`` dict.
 
-This is the raw C++-side result.  Most users should call
-:meth:`edge_coloring`, which wraps the result in a
-:class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.
-
 Args:
-    seed (int): Random seed for the greedy fallback (ignored for
-        deterministic kinds). Defaults to 0.
-    trials (int): Number of randomised trials for the greedy fallback
-        (the lowest-color-count outcome wins). Defaults to 1.
+    seed (int): Random seed for the greedy fallback. Defaults to 0.
+    trials (int): Number of randomised trials for the greedy fallback (the lowest-color-count outcome wins). Defaults to 1.
 
 Returns:
-    dict[tuple[int, int], int]: Mapping of canonical edges (``i < j``) to
-    non-negative color labels.
+    dict[tuple[int, int], int]: Mapping of canonical edges (``i < j``) to non-negative color labels.
 )",
       py::arg("seed") = 0, py::arg("trials") = 1);
+
+  lattice_graph.def(
+      "set_edge_coloring",
+      [](const LatticeGraph &self, py::dict coloring_dict) {
+        LatticeGraph::EdgeColoring coloring;
+        for (auto item : coloring_dict) {
+          auto key = item.first.cast<py::tuple>();
+          auto i = key[0].cast<std::uint64_t>();
+          auto j = key[1].cast<std::uint64_t>();
+          auto color = item.second.cast<int>();
+          auto edge = std::minmax(i, j);
+          coloring[{edge.first, edge.second}] = color;
+        }
+        self.set_edge_coloring(std::move(coloring));
+      },
+      R"(
+Set a caller-provided edge coloring, replacing any cached coloring.
+
+Args:
+    coloring_dict (dict[tuple[int, int], int]): Mapping of edges ``(i, j)`` to non-negative color labels.
+)",
+      py::arg("coloring"));
 
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(

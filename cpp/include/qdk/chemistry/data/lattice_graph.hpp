@@ -21,24 +21,6 @@
 namespace qdk::chemistry::data {
 
 /**
- * @brief Tag identifying which factory built a :class:`LatticeGraph`.
- *
- * Used by :meth:`LatticeGraph::edge_coloring` to dispatch to a deterministic
- * optimal coloring routine when the connectivity is one of the recognised
- * pre-ordained geometries.  Lattices constructed from raw matrices,
- * deserialised from disk, or built by :meth:`LatticeGraph::make_bidirectional`
- * carry ``LatticeKind::CUSTOM`` and fall back to a randomised greedy coloring.
- */
-enum class LatticeKind {
-  CUSTOM = 0,
-  CHAIN,
-  SQUARE,
-  TRIANGULAR,
-  HONEYCOMB,
-  KAGOME,
-};
-
-/**
  * @brief Weighted graph representing a lattice connectivity structure.
  *
  * Stores the lattice topology as a sparse adjacency matrix and provides
@@ -348,19 +330,15 @@ class LatticeGraph : public DataClass {
   /**
    * @brief Compute (and cache) an edge coloring of this lattice.
    *
-   * For pre-ordained kinds (chain, square) this returns a deterministic
-   * optimal coloring derived from the construction parameters.  For
-   * triangular, honeycomb, kagome, and ``CUSTOM`` lattices the routine
-   * falls back to randomised greedy coloring with the supplied seed and
-   * trial count and returns the best result.
+   * Returns a pre-populated coloring if one was set by a factory method
+   * or by :meth:`set_edge_coloring`.  Otherwise falls back to a randomised
+   * greedy coloring with the supplied seed and trial count.
    *
    * The coloring is cached on first computation; subsequent calls return
    * the same coloring without recomputing, regardless of the ``seed`` and
-   * ``trials`` arguments.  The cache is invalidated only by mutations that
-   * change the topology (none currently exposed).
+   * ``trials`` arguments.
    *
-   * @param seed   Random seed for the greedy fallback (ignored for
-   *               deterministic kinds).  Default: 0.
+   * @param seed   Random seed for the greedy fallback.  Default: 0.
    * @param trials Number of randomised trials for the greedy fallback;
    *               the lowest-color-count outcome wins.  Default: 1.
    * @return Const reference to the cached edge coloring.
@@ -376,13 +354,17 @@ class LatticeGraph : public DataClass {
   int chromatic_index() const;
 
   /**
-   * @brief Lattice kind tag used to dispatch edge-coloring strategies.
+   * @brief Set a caller-provided edge coloring, replacing any cached
+   *        coloring.
    *
-   * Set by the deterministic factory methods (:meth:`chain`, :meth:`square`,
-   * :meth:`triangular`, :meth:`honeycomb`, :meth:`kagome`); ``CUSTOM`` for
-   * everything else.
+   * The coloring maps ordered pairs ``(i, j)`` with ``i < j`` to
+   * non-negative integer color labels.  No validation is performed;
+   * it is the caller's responsibility to ensure the coloring is valid
+   * (edges sharing a vertex receive distinct colors).
+   *
+   * @param coloring The edge coloring to set.
    */
-  LatticeKind kind() const;
+  void set_edge_coloring(EdgeColoring coloring) const;
 
   /**
    * @brief Get the data type name for this class.
@@ -477,17 +459,8 @@ class LatticeGraph : public DataClass {
   /// Flag indicating whether the adjacency matrix is symmetric (undirected
   /// graph)
   bool _is_symmetric;
-  /// Tag identifying the construction recipe (used by edge_coloring()).
-  LatticeKind _kind = LatticeKind::CUSTOM;
-  /// Construction parameters captured by the deterministic factory methods.
-  /// Encoding is per-kind; ignored when ``_kind == CUSTOM``.
-  ///   CHAIN     : { N, periodic ? 1 : 0 }
-  ///   SQUARE    : { Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0 }
-  ///   TRIANGULAR: { Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0 }
-  ///   HONEYCOMB : { Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0 }
-  ///   KAGOME    : { Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0 }
-  std::vector<std::int64_t> _kind_params;
-  /// Lazily-computed edge coloring cache, populated by edge_coloring().
+  /// Lazily-computed edge coloring cache, populated by edge_coloring()
+  /// or set_edge_coloring().
   mutable std::optional<EdgeColoring> _coloring_cache;
   /// Number of distinct colors in ``_coloring_cache``; -1 until populated.
   mutable int _chromatic_index = -1;

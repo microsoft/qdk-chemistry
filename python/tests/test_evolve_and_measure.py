@@ -82,7 +82,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     time_steps = [float(t + 1) for t in range(steps)]
     observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
-    evolution_builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=True)
+    evolution_builder = Trotter(num_divisions=1, order=1)
     algo = EvolveAndMeasure()
     mapper = PauliSequenceMapper()
     energy_estimator = create("energy_estimator", "qdk")
@@ -112,7 +112,7 @@ def test_evolve_and_measure_with_device_backend() -> None:
     hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
     observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
-    evolution_builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=True)
+    evolution_builder = Trotter(num_divisions=1, order=1)
     algo = EvolveAndMeasure()
     mapper = PauliSequenceMapper()
     energy_estimator = create("energy_estimator", "qdk")

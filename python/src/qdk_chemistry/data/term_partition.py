@@ -2,17 +2,9 @@
 
 A :class:`TermPartition` records how the Pauli terms of a
 :class:`~qdk_chemistry.data.QubitHamiltonian` are organised into algorithm-
-relevant subsets.  Two concrete shapes are supported:
-
-* :class:`FlatPartition` — a single level of *groups*; each group is a list of
-  term indices.  Used by routines such as energy estimation, where the only
-  decision is which terms to evaluate together.
-
-* :class:`LayeredPartition` — two levels of structure: each *group* is split
-  into *layers*, and each layer is a list of term indices.  Used by Trotter
-  decomposition, where the outer level controls the splitting order and the
-  inner level identifies operators that act on disjoint qubit supports and can
-  be applied in parallel.
+relevant subsets.  Concrete subclasses include :class:`FlatPartition`
+(single-level groups) and :class:`LayeredPartition` (group → layer
+hierarchy).
 
 The partition stores **indices** into
 :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`, not nested
@@ -40,15 +32,15 @@ Lifecycle
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
+
+from qdk_chemistry.data.base import DataClass
 
 __all__ = ["FlatPartition", "LayeredPartition", "TermPartition"]
 
 
-@dataclass(frozen=True)
-class TermPartition:
-    """Abstract base class for index-based partitions of Hamiltonian terms.
+class TermPartition(DataClass):
+    """Base class for index-based partitions of Hamiltonian terms.
 
     Use :class:`FlatPartition` for single-level partitions or
     :class:`LayeredPartition` for hierarchical (group → layer) partitions.
@@ -59,7 +51,17 @@ class TermPartition:
 
     """
 
-    strategy: str
+    _data_type_name = "term_partition"
+    _serialization_version = "0.1.0"
+
+    def __init__(self, *, strategy: str) -> None:
+        """Initialize the term partition.
+
+        Args:
+            strategy: Label identifying how the partition was produced.
+
+        """
+        self.strategy = strategy
 
     @property
     def num_groups(self) -> int:
@@ -70,17 +72,26 @@ class TermPartition:
         """Return every term index referenced by the partition, in order."""
         raise NotImplementedError
 
+    def get_summary(self) -> str:
+        """Return a summary of the partition."""
+        return f"TermPartition(strategy={self.strategy!r}, num_groups={self.num_groups})"
+
     def to_json(self) -> dict[str, Any]:
         """Convert this partition to a JSON-serialisable dictionary."""
         raise NotImplementedError
+
+    def to_hdf5(self, group) -> None:
+        """Save this partition to an HDF5 group."""
+        import json as _json  # noqa: PLC0415
+
+        group.attrs["term_partition"] = _json.dumps(self.to_json())
 
     @staticmethod
     def from_json(data: dict[str, Any]) -> TermPartition:
         """Reconstruct a :class:`TermPartition` from :meth:`to_json` output.
 
         Args:
-            data: Dict produced by :meth:`to_json` of either :class:`FlatPartition`
-                or :class:`LayeredPartition`.
+            data: Dict produced by :meth:`to_json` of either :class:`FlatPartition` or :class:`LayeredPartition`.
 
         Returns:
             The reconstructed partition.
@@ -99,8 +110,23 @@ class TermPartition:
             )
         raise ValueError(f"Unknown TermPartition kind: {kind!r}. Expected 'flat' or 'layered'.")
 
+    @classmethod
+    def from_hdf5(cls, group) -> TermPartition:
+        """Load a :class:`TermPartition` from an HDF5 group."""
+        import json as _json  # noqa: PLC0415
 
-@dataclass(frozen=True)
+        data = _json.loads(group.attrs["term_partition"])
+        return cls.from_json(data)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, TermPartition):
+            return NotImplemented
+        return type(self) is type(other) and self.strategy == other.strategy
+
+    def __hash__(self) -> int:
+        return hash((type(self).__name__, self.strategy))
+
+
 class FlatPartition(TermPartition):
     """Single-level partition: each group is a list of term indices.
 
@@ -115,12 +141,18 @@ class FlatPartition(TermPartition):
 
     """
 
-    groups: tuple[tuple[int, ...], ...]
+    def __init__(self, *, strategy: str, groups: tuple[tuple[int, ...], ...]) -> None:
+        """Initialize a flat partition.
 
-    def __post_init__(self) -> None:
-        """Normalise ``groups`` into a tuple of tuples of ints."""
-        normalised = tuple(tuple(int(i) for i in group) for group in self.groups)
-        object.__setattr__(self, "groups", normalised)
+        Args:
+            strategy: Label identifying how the partition was produced.
+            groups: Tuple of groups; each group is a tuple of term indices.
+
+        """
+        super().__init__(strategy=strategy)
+        self.groups: tuple[tuple[int, ...], ...] = tuple(tuple(int(i) for i in group) for group in groups)
+        # Freeze after all attributes are set.
+        DataClass.__init__(self)
 
     @property
     def num_groups(self) -> int:
@@ -131,6 +163,10 @@ class FlatPartition(TermPartition):
         """Return every term index referenced by the partition, in order."""
         return [i for group in self.groups for i in group]
 
+    def get_summary(self) -> str:
+        """Return a summary of the flat partition."""
+        return f"FlatPartition(strategy={self.strategy!r}, num_groups={self.num_groups})"
+
     def to_json(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict of this :class:`FlatPartition`."""
         return {
@@ -139,8 +175,15 @@ class FlatPartition(TermPartition):
             "groups": [list(group) for group in self.groups],
         }
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, FlatPartition):
+            return NotImplemented
+        return self.strategy == other.strategy and self.groups == other.groups
 
-@dataclass(frozen=True)
+    def __hash__(self) -> int:
+        return hash(("FlatPartition", self.strategy, self.groups))
+
+
 class LayeredPartition(TermPartition):
     """Two-level partition: each group is a sequence of parallelisable layers.
 
@@ -157,12 +200,20 @@ class LayeredPartition(TermPartition):
 
     """
 
-    groups: tuple[tuple[tuple[int, ...], ...], ...]
+    def __init__(self, *, strategy: str, groups: tuple[tuple[tuple[int, ...], ...], ...]) -> None:
+        """Initialize a layered partition.
 
-    def __post_init__(self) -> None:
-        """Normalise ``groups`` into nested tuples of ints."""
-        normalised = tuple(tuple(tuple(int(i) for i in layer) for layer in group) for group in self.groups)
-        object.__setattr__(self, "groups", normalised)
+        Args:
+            strategy: Label identifying how the partition was produced.
+            groups: Nested tuple ``(group, layer, term_index)``.
+
+        """
+        super().__init__(strategy=strategy)
+        self.groups: tuple[tuple[tuple[int, ...], ...], ...] = tuple(
+            tuple(tuple(int(i) for i in layer) for layer in group) for group in groups
+        )
+        # Freeze after all attributes are set.
+        DataClass.__init__(self)
 
     @property
     def num_groups(self) -> int:
@@ -177,6 +228,10 @@ class LayeredPartition(TermPartition):
         """Return every term index referenced by the partition, in order."""
         return [i for group in self.groups for layer in group for i in layer]
 
+    def get_summary(self) -> str:
+        """Return a summary of the layered partition."""
+        return f"LayeredPartition(strategy={self.strategy!r}, num_groups={self.num_groups})"
+
     def to_json(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict of this :class:`LayeredPartition`."""
         return {
@@ -184,3 +239,11 @@ class LayeredPartition(TermPartition):
             "strategy": self.strategy,
             "groups": [[list(layer) for layer in group] for group in self.groups],
         }
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, LayeredPartition):
+            return NotImplemented
+        return self.strategy == other.strategy and self.groups == other.groups
+
+    def __hash__(self) -> int:
+        return hash(("LayeredPartition", self.strategy, self.groups))

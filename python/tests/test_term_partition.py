@@ -165,14 +165,12 @@ class TestLatticeEdgeColoring:
     def test_chain_two_colors(self):
         lat = LatticeGraph.chain(4, periodic=True)
         coloring = lat.edge_coloring(seed=0, trials=5)
-        assert coloring.ncolors == 2
+        assert len(set(coloring.values())) == 2
 
-    def test_returns_hypergraph_edge_coloring_type(self):
-        from qdk_chemistry.geometry.hypergraph import HypergraphEdgeColoring  # noqa: PLC0415
-
+    def test_returns_dict(self):
         lat = LatticeGraph.chain(3, periodic=False)
         coloring = lat.edge_coloring()
-        assert isinstance(coloring, HypergraphEdgeColoring)
+        assert isinstance(coloring, dict)
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +214,7 @@ class TestTrotterConsumesTermPartition:
         assert unitary is not None
 
     def test_trotter_runs_without_partition(self):
-        # Falls back to the optimize_term_ordering / no-partition path.
+        # Falls back to treating each term as its own group.
         ham = QubitHamiltonian(["XXII", "IXXI", "IIXX", "ZIII"], np.array([1.0, 1.0, 1.0, 0.5]))
         assert ham.term_partition is None
         trotter = registry.create("time_evolution_builder", "trotter")

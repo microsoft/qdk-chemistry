@@ -171,45 +171,6 @@ def _append_measurement_to_circuit(base_circuit: Circuit, m_basis: str) -> Circu
     return Circuit(qasm=qasm3.dumps(qc))
 
 
-def _qubit_wise_commuting_groups(qubit_hamiltonian: QubitHamiltonian) -> list[QubitHamiltonian]:
-    """Partition a Hamiltonian into qubit-wise commuting subsets for measurement.
-
-    Uses the registered ``term_grouper`` algorithm with strategy
-    ``"qubit_wise_commuting"``: it returns a copy of ``qubit_hamiltonian`` whose
-    :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` is a flat
-    partition over qubit-wise commuting groups, which we then materialise into
-    one ``QubitHamiltonian`` per group for downstream measurement-circuit
-    construction.
-
-    Args:
-        qubit_hamiltonian: Hamiltonian to partition.
-
-    Returns:
-        List of ``QubitHamiltonian`` objects, one per qubit-wise commuting group.
-
-    """
-    from qdk_chemistry.algorithms import registry  # noqa: PLC0415
-
-    grouper = registry.create("term_grouper", "qubit_wise_commuting")
-    grouped = grouper.run(qubit_hamiltonian)
-    partition = grouped.term_partition
-
-    labels = grouped.pauli_strings
-    coeffs = grouped.coefficients
-    encoding = grouped.encoding
-    fermion_mode_order = grouped.fermion_mode_order
-
-    return [
-        QubitHamiltonian(
-            pauli_strings=[labels[i] for i in group],
-            coefficients=np.asarray([coeffs[i] for i in group]),
-            encoding=encoding,
-            fermion_mode_order=fermion_mode_order,
-        )
-        for group in partition.groups
-    ]
-
-
 class QdkEnergyEstimator(EnergyEstimator):
     """QDK implementation of the EnergyEstimator."""
 
@@ -256,18 +217,26 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
-        if qubit_hamiltonian.term_partition is not None:
-            Logger.info(
-                f"QdkEnergyEstimator: incoming QubitHamiltonian.term_partition "
-                f"(strategy={qubit_hamiltonian.term_partition.strategy!r}) is ignored; "
-                "this estimator always re-groups by qubit-wise commutation for measurement."
+
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        grouper = registry.create("term_grouper", "qubit_wise_commuting")
+        grouped = grouper.run(qubit_hamiltonian)
+        partition = grouped.term_partition
+        labels = grouped.pauli_strings
+        coeffs = grouped.coefficients
+        encoding = grouped.encoding
+        fermion_mode_order = grouped.fermion_mode_order
+
+        qubit_hamiltonians = [
+            QubitHamiltonian(
+                pauli_strings=[labels[i] for i in group],
+                coefficients=np.asarray([coeffs[i] for i in group]),
+                encoding=encoding,
+                fermion_mode_order=fermion_mode_order,
             )
-        else:
-            Logger.info(
-                "QdkEnergyEstimator: no term_partition present; "
-                "computing qubit-wise commuting measurement groups from scratch."
-            )
-        qubit_hamiltonians = _qubit_wise_commuting_groups(qubit_hamiltonian)
+            for group in partition.groups
+        ]
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(

@@ -594,7 +594,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
-        CommutingTermGrouper,
+        FullCommutingTermGrouper,
         IdentityTermGrouper,
         QubitWiseCommutingTermGrouper,
     )
@@ -620,7 +620,7 @@ def _register_python_algorithms():
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
-    register(lambda: CommutingTermGrouper())
+    register(lambda: FullCommutingTermGrouper())
     register(lambda: QubitWiseCommutingTermGrouper())
     register(lambda: IdentityTermGrouper())
     register(lambda: Trotter())

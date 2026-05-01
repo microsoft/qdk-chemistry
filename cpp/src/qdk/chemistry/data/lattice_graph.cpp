@@ -158,9 +158,8 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph graph(std::move(adj));
-  graph._kind = LatticeKind::CHAIN;
-  graph._kind_params = {static_cast<std::int64_t>(N),
-                        static_cast<std::int64_t>(periodic ? 1 : 0)};
+  graph._coloring_cache =
+      detail::chain_coloring(static_cast<std::int64_t>(N), periodic);
   return graph;
 }
 
@@ -209,8 +208,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph graph(std::move(adj));
-  graph._kind = LatticeKind::SQUARE;
-  graph._kind_params = {Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0};
+  graph._coloring_cache = detail::square_coloring(Nx, Ny, periodic_x, periodic_y);
   return graph;
 }
 
@@ -270,8 +268,9 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph graph(std::move(adj));
-  graph._kind = LatticeKind::TRIANGULAR;
-  graph._kind_params = {Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0};
+  // No proven deterministic coloring; pre-populate with greedy heuristic.
+  graph._coloring_cache = detail::greedy_edge_coloring(
+      detail::undirected_edges(graph.adjacency_), 0, 32);
   return graph;
 }
 
@@ -325,8 +324,11 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph graph(std::move(adj));
-  graph._kind = LatticeKind::HONEYCOMB;
-  graph._kind_params = {Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0};
+  // Honeycomb is bipartite with max degree 3; deterministic 3-coloring
+  // via bond classification: intra-cell=0, horizontal inter-cell=1,
+  // vertical inter-cell=2.
+  graph._coloring_cache =
+      detail::honeycomb_coloring(Nx, Ny, periodic_x, periodic_y);
   return graph;
 }
 
@@ -400,8 +402,9 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
   LatticeGraph graph(std::move(adj));
-  graph._kind = LatticeKind::KAGOME;
-  graph._kind_params = {Nx, Ny, periodic_x ? 1 : 0, periodic_y ? 1 : 0};
+  // No proven deterministic coloring; pre-populate with greedy heuristic.
+  graph._coloring_cache = detail::greedy_edge_coloring(
+      detail::undirected_edges(graph.adjacency_), 0, 32);
   return graph;
 }
 
@@ -539,6 +542,48 @@ static LatticeGraph::EdgeColoring square_coloring(std::int64_t Nx,
   return out;
 }
 
+// Deterministic 3-coloring for honeycomb lattice.  The honeycomb has max
+// degree 3 with three structurally distinct bond types: intra-cell (A–B),
+// horizontal inter-cell (B–A right), vertical inter-cell (B–A up).
+// Each bond type gets its own color, which is valid because no vertex
+// is incident to two bonds of the same type.
+static LatticeGraph::EdgeColoring honeycomb_coloring(std::int64_t Nx,
+                                                     std::int64_t Ny,
+                                                     bool periodic_x,
+                                                     bool periodic_y) {
+  LatticeGraph::EdgeColoring out;
+  auto idxA = [Nx](std::int64_t x, std::int64_t y) -> std::uint64_t {
+    return static_cast<std::uint64_t>(2 * (y * Nx + x));
+  };
+  auto idxB = [Nx](std::int64_t x, std::int64_t y) -> std::uint64_t {
+    return static_cast<std::uint64_t>(2 * (y * Nx + x) + 1);
+  };
+  auto put = [&out](std::uint64_t a, std::uint64_t b, int c) {
+    auto edge = std::minmax(a, b);
+    out[{edge.first, edge.second}] = c;
+  };
+
+  for (std::int64_t y = 0; y < Ny; ++y) {
+    for (std::int64_t x = 0; x < Nx; ++x) {
+      // Intra-cell: color 0
+      put(idxA(x, y), idxB(x, y), 0);
+      // Horizontal inter-cell: color 1
+      if (x + 1 < Nx) {
+        put(idxB(x, y), idxA(x + 1, y), 1);
+      } else if (periodic_x) {
+        put(idxB(x, y), idxA(0, y), 1);
+      }
+      // Vertical inter-cell: color 2
+      if (y + 1 < Ny) {
+        put(idxB(x, y), idxA(x, y + 1), 2);
+      } else if (periodic_y) {
+        put(idxB(x, y), idxA(x, 0), 2);
+      }
+    }
+  }
+  return out;
+}
+
 }  // namespace detail
 
 const LatticeGraph::EdgeColoring& LatticeGraph::edge_coloring(
@@ -547,26 +592,9 @@ const LatticeGraph::EdgeColoring& LatticeGraph::edge_coloring(
     return *_coloring_cache;
   }
 
-  EdgeColoring coloring;
-  switch (_kind) {
-    case LatticeKind::CHAIN:
-      coloring =
-          detail::chain_coloring(_kind_params.at(0), _kind_params.at(1) != 0);
-      break;
-    case LatticeKind::SQUARE:
-      coloring = detail::square_coloring(_kind_params.at(0), _kind_params.at(1),
-                                         _kind_params.at(2) != 0,
-                                         _kind_params.at(3) != 0);
-      break;
-    case LatticeKind::CUSTOM:
-    case LatticeKind::TRIANGULAR:
-    case LatticeKind::HONEYCOMB:
-    case LatticeKind::KAGOME:
-    default:
-      coloring = detail::greedy_edge_coloring(
-          detail::undirected_edges(adjacency_), seed, std::max(trials, 1));
-      break;
-  }
+  // No pre-populated coloring; fall back to greedy heuristic.
+  EdgeColoring coloring = detail::greedy_edge_coloring(
+      detail::undirected_edges(adjacency_), seed, std::max(trials, 1));
 
   std::set<int> distinct;
   for (const auto& [edge, c] : coloring) {
@@ -584,7 +612,14 @@ int LatticeGraph::chromatic_index() const {
   return _chromatic_index;
 }
 
-LatticeKind LatticeGraph::kind() const { return _kind; }
+void LatticeGraph::set_edge_coloring(EdgeColoring coloring) const {
+  std::set<int> distinct;
+  for (const auto& [edge, c] : coloring) {
+    distinct.insert(c);
+  }
+  _chromatic_index = static_cast<int>(distinct.size());
+  _coloring_cache = std::move(coloring);
+}
 
 bool LatticeGraph::_check_symmetry(const Eigen::SparseMatrix<double>& mat) {
   if (mat.rows() != mat.cols()) {

@@ -516,37 +516,21 @@ static void check_valid_edge_coloring(
   }
 }
 
-TEST_F(LatticeGraphTest, KindAndChromaticIndex) {
+TEST_F(LatticeGraphTest, ChromaticIndex) {
   auto chain_open = LatticeGraph::chain(5, false);
-  EXPECT_EQ(chain_open.kind(), LatticeKind::CHAIN);
   EXPECT_EQ(chain_open.chromatic_index(), 2);
 
   auto chain_periodic_even = LatticeGraph::chain(6, true);
-  EXPECT_EQ(chain_periodic_even.kind(), LatticeKind::CHAIN);
   EXPECT_EQ(chain_periodic_even.chromatic_index(), 2);
 
   auto chain_periodic_odd = LatticeGraph::chain(5, true);
-  EXPECT_EQ(chain_periodic_odd.kind(), LatticeKind::CHAIN);
   EXPECT_EQ(chain_periodic_odd.chromatic_index(), 3);
 
   auto sq = LatticeGraph::square(3, 3, false, false);
-  EXPECT_EQ(sq.kind(), LatticeKind::SQUARE);
   EXPECT_GE(sq.chromatic_index(), 2);
 
-  auto tri = LatticeGraph::triangular(3, 3, true, true);
-  EXPECT_EQ(tri.kind(), LatticeKind::TRIANGULAR);
-
   auto hc = LatticeGraph::honeycomb(3, 3, true, true);
-  EXPECT_EQ(hc.kind(), LatticeKind::HONEYCOMB);
-
-  auto kg = LatticeGraph::kagome(2, 2, true, true);
-  EXPECT_EQ(kg.kind(), LatticeKind::KAGOME);
-
-  // Custom adjacency matrix: kind should be CUSTOM.
-  using Edge = std::pair<std::uint64_t, std::uint64_t>;
-  std::map<Edge, double> edges = {{{0, 1}, 1.0}, {{1, 2}, 1.0}};
-  LatticeGraph custom(edges, 3);
-  EXPECT_EQ(custom.kind(), LatticeKind::CUSTOM);
+  EXPECT_EQ(hc.chromatic_index(), 3);
 }
 
 TEST_F(LatticeGraphTest, EdgeColoringIsValid) {

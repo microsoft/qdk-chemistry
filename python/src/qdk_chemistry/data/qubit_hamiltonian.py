@@ -27,7 +27,6 @@ if TYPE_CHECKING:
 
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 __all__: list[str] = []
 
@@ -273,50 +272,6 @@ class QubitHamiltonian(DataClass):
             encoding=self.encoding,
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
         )
-
-    def _group_commuting_impl(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
-        """Internal commuting-group helper used by the Trotter fallback path.
-
-        This is a private implementation detail. Public callers should use the
-        registered ``term_grouper`` algorithm:
-
-        * ``registry.create("term_grouper", "commuting")``
-        * ``registry.create("term_grouper", "qubit_wise_commuting")``
-
-        which return a new :class:`QubitHamiltonian` with a populated
-        :attr:`term_partition` that downstream algorithms can consume.
-
-        Args:
-            qubit_wise: Use qubit-wise commutation when ``True``; otherwise use full commutation.
-
-        Returns:
-            list[QubitHamiltonian]: One ``QubitHamiltonian`` per commuting subset.
-
-        """
-        commutes = do_pauli_labels_qw_commute if qubit_wise else do_pauli_labels_commute
-
-        # Each group is a list of (pauli_string, coefficient)
-        groups: list[list[tuple[str, complex]]] = []
-
-        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
-            placed = False
-            for group in groups:
-                if all(commutes(pauli_str, existing_str) for existing_str, _ in group):
-                    group.append((pauli_str, coeff))
-                    placed = True
-                    break
-            if not placed:
-                groups.append([(pauli_str, coeff)])
-
-        return [
-            QubitHamiltonian(
-                pauli_strings=[p for p, _ in group],
-                coefficients=np.array([c for _, c in group]),
-                encoding=self.encoding,
-                fermion_mode_order=self.fermion_mode_order,
-            )
-            for group in groups
-        ]
 
     # DataClass interface implementation
     def get_summary(self) -> str:

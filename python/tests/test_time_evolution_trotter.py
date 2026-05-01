@@ -104,18 +104,13 @@ class TestTrotter:
             rtol=float_comparison_relative_tolerance,
         )
 
-    def test_single_step_merge_identical_terms(self):
-        """Test construction of time evolution unitary with a single Trotter step."""
+    def test_single_step_no_merge_without_partition(self):
+        """Test that without term_partition, duplicate terms are not merged."""
         pauli_strings = ["XII", "IXI", "XII"]
         coefficients = [1.0, 1.0, 1.0]
 
-        # Scramble the order of the terms to ensure grouping works, using a fixed seed
-        perm = np.random.default_rng(seed=0).permutation(len(pauli_strings))
-        pauli_strings = [pauli_strings[i] for i in perm]
-        coefficients = [coefficients[i] for i in perm]
-
         hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
-        builder = Trotter(num_divisions=1, optimize_term_ordering=True)
+        builder = Trotter(num_divisions=1)
         unitary = builder.run(hamiltonian, time=1)
 
         assert isinstance(unitary, TimeEvolutionUnitary)
@@ -124,9 +119,8 @@ class TestTrotter:
         assert isinstance(container, PauliProductFormulaContainer)
         assert container.num_qubits == 3
         assert container.step_reps == 1
-        # After merging identical Pauli strings, 2 unique terms remain (XII with
-        # coeff=2 and IXI with coeff=1).  Raw Pauli terms are emitted directly.
-        assert len(container.step_terms) == 2
+        # Without a partition, each Pauli term is its own group — no merging.
+        assert len(container.step_terms) == 3
 
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
@@ -863,51 +857,21 @@ class TestTrotterAccuracyAware:
         )
 
 
-class TestOptimizeTermOrdering:
-    """Tests for the optimize_term_ordering method."""
+class TestNoPartitionFallback:
+    """Tests for Trotter behavior when no term_partition is present."""
 
-    def test_optimize_term_ordering_does_nothing_when_false(self):
-        """Test that optimize_term_ordering does nothing when optimize_term_ordering is False."""
+    def test_no_partition_treats_each_term_individually(self):
+        """Test that without term_partition, each Pauli term is its own group."""
         pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
         coefficients = [1.0] * 8
         hamiltonian = QubitHamiltonian(
             pauli_strings=pauli_strings,
             coefficients=coefficients,
         )
-        builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=False)
+        builder = Trotter(num_divisions=1, order=1)
         t = 1.0
         terms = builder.run(hamiltonian, time=t).get_container().step_terms
 
         for idx, term in enumerate(terms):
             assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
             assert term.angle == coefficients[idx] * t
-
-    def test_optimize_term_ordering_groups_when_true(self):
-        """Test that optimize_term_ordering groups commuting terms into parallelizable layers."""
-        pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
-        coefficients = [1.0] * 8
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=pauli_strings,
-            coefficients=coefficients,
-        )
-        builder = Trotter(num_divisions=1, order=1, optimize_term_ordering=True)
-        t = 1.0
-        terms = builder.run(hamiltonian, time=t).get_container().step_terms
-
-        # Convert terms back to label strings for grouping
-        def term_to_label(term):
-            num_qubits = hamiltonian.num_qubits
-            chars = ["I"] * num_qubits
-            for qubit_idx, pauli_op in term.pauli_term.items():
-                chars[num_qubits - 1 - qubit_idx] = pauli_op
-            return "".join(chars)
-
-        term_labels = [term_to_label(t) for t in terms]
-
-        # Raw Pauli terms are emitted directly (no Clifford sandwich).
-        # ZZ terms stay as their original labels; X terms stay as single-qubit X.
-        pauli_zz_labels = {"ZZII", "IIZZ", "IZZI", "ZIIZ"}
-        pauli_x_labels = {"XIII", "IXII", "IIXI", "IIIX"}
-
-        assert len(terms) == len(pauli_zz_labels) + len(pauli_x_labels)
-        assert set(term_labels) == pauli_zz_labels | pauli_x_labels
