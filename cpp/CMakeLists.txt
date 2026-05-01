@@ -147,6 +147,7 @@ endif()
 add_library(chemistry)
 add_subdirectory(src/qdk/chemistry/data)
 add_subdirectory(src/qdk/chemistry/algorithms)
+add_subdirectory(src/qdk/chemistry/cube)
 add_subdirectory(src/qdk/chemistry/utils)
 
 target_include_directories(chemistry PUBLIC
