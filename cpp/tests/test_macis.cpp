@@ -165,7 +165,7 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   // Use triplet constraints (less restrictive for this small active space)
   settings.set("constraint_level", 0);
   // Loosen pruning to discover the full CI space for this small system
-  settings.set("h_el_tol", 1e-14);
+  settings.set("search_matel_tol", 1e-14);
   settings.set("rv_prune_tol", 1e-14);
   // Use fixed core selection strategy for deterministic growth
   settings.set("core_selection_strategy", "fixed");
