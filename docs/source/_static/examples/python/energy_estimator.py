@@ -45,26 +45,10 @@ noise_model = QuantumErrorProfile(
     name="noise model",
     description="Noise model for QDK full state simulator",
     errors={
-        "rz": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "h": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "s": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "cx": {
-            "type": "depolarizing_error",
-            "rate": 0.007,
-            "num_qubits": 2,
-        },
+        "rz": {"depolarizing_error": 0.005},
+        "h": {"depolarizing_error": 0.005},
+        "s": {"depolarizing_error": 0.005},
+        "cx": {"depolarizing_error": 0.007},
     },
 )
 circuit_executor = create("circuit_executor", "qdk_full_state_simulator", type="cpu")
@@ -100,21 +84,9 @@ noise_model = QuantumErrorProfile(
     name="noise model",
     description="Noise model for Qiskit Aer simulator",
     errors={
-        "rz": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "sx": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "cx": {
-            "type": "depolarizing_error",
-            "rate": 0.007,
-            "num_qubits": 2,
-        },
+        "rz": {"depolarizing_error": 0.005},
+        "sx": {"depolarizing_error": 0.005},
+        "cx": {"depolarizing_error": 0.007},
     },
 )
 energy_expectation_results, measurement_data = qdk_estimator.run(
