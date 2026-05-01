@@ -5,11 +5,44 @@
 #pragma once
 
 #include <algorithm>
+#include <blas.hh>
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
-namespace qdk::chemistry::scf::impl {
+namespace qdk::chemistry::scf {
+
+/**
+ * @brief Compute C = A^T * B * A using BLAS GEMM only
+ *
+ * Matrix shapes:
+ * A: m x n
+ * B: m x m
+ * C: n x n
+ *
+ * @param[in] m Row count of A and dimension of square B block.
+ * @param[in] n Column count of A and dimension of square C block.
+ *
+ * Assumed leading dimensions for contiguous storage:
+ * RowMajor: lda = n, ldb = m, ldc = n
+ * ColMajor: lda = m, ldb = m, ldc = n
+ *
+ * Pointers may reference sub-block starts (not necessarily matrix origin).
+ * The intermediate workspace is provided by caller to avoid repeated
+ * allocations across consecutive calls.
+ *
+ * @param[in] A Pointer to the A matrix block.
+ * @param[in] B Pointer to the B matrix block.
+ * @param[out] C Pointer to output C matrix block.
+ * @param[in,out] workspace Temporary buffer of at least m*n doubles.
+ * @param[in] layout BLAS matrix layout (RowMajor by default).
+ */
+void compute_atba_gemm(const double* A, const double* B, double* C, int m,
+                       int n, std::vector<double>& workspace,
+                       blas::Layout layout = blas::Layout::RowMajor);
+
+namespace impl {
 
 /**
  * @brief Nocedal-Wright line search with strong Wolfe conditions.
@@ -153,4 +186,6 @@ void nocedal_wright_line_search(Functor& op,
   if (!converged) throw std::runtime_error("Line Search Failed");
 }
 
-}  // namespace qdk::chemistry::scf::impl
+}  // namespace impl
+
+}  // namespace qdk::chemistry::scf

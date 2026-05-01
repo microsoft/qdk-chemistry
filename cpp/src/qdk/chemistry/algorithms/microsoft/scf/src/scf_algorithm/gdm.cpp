@@ -15,10 +15,10 @@
 #include <vector>
 
 #include "../scf/scf_impl.h"
-#include "line_search.h"
 #include "qdk/chemistry/scf/core/scf.h"
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 #include "qdk/chemistry/scf/core/types.h"
+#include "scf_helper.h"
 #include "util/matrix_exp.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include "util/gpu/cuda_helper.h"
