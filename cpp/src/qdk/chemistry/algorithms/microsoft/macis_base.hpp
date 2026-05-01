@@ -193,7 +193,7 @@ inline data::Wavefunction build_wavefunction(
             nmo));
     auto rdm_en = std::chrono::high_resolution_clock::now();
     QDK_LOGGER().debug("RDM computation complete ({:.1f}s).",
-                      std::chrono::duration<double>(rdm_en - rdm_st).count());
+                       std::chrono::duration<double>(rdm_en - rdm_st).count());
 
     if (eval_one_rdm) {
       one_aa = Eigen::Map<Eigen::MatrixXd>(active_one_aa.data(), nmo, nmo);
@@ -234,7 +234,7 @@ inline data::Wavefunction build_wavefunction(
                                    nmo, nmo));
     auto ent_en = std::chrono::high_resolution_clock::now();
     QDK_LOGGER().debug("Entropy computation complete ({:.1f}s).",
-                      std::chrono::duration<double>(ent_en - ent_st).count());
+                       std::chrono::duration<double>(ent_en - ent_st).count());
 
     if (eval_s1) {
       computed_entropies.single_orbital =
