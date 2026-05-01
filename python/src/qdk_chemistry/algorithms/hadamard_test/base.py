@@ -1,0 +1,195 @@
+"""QDK/Chemistry Hadamard test circuit generator abstractions and utilities."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+from abc import abstractmethod
+from enum import Enum
+from typing import Any
+
+from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.data import (
+    Circuit,
+    CircuitExecutorData,
+    ControlledTimeEvolutionUnitary,
+    SettingNotFound,
+    TimeEvolutionUnitary,
+)
+
+__all__: list[str] = [
+    "HadamardTest",
+    "HadamardTestBasis",
+    "HadamardTestFactory",
+    "basis_to_qsharp_pauli",
+]
+
+
+class HadamardTestBasis(Enum):
+    """Measurement bases supported by the Hadamard test control qubit."""
+
+    X = "X"
+    Y = "Y"
+    Z = "Z"
+
+    def __str__(self) -> str:
+        """Return the string label ("X", "Y", or "Z") for this basis."""
+        return str(self.value)
+
+
+def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
+    """Map a ``HadamardTestBasis`` to ``qsharp.Pauli`` for Q# interop."""
+    try:
+        from qdk import qsharp as _qsharp  # noqa: PLC0415
+    except ModuleNotFoundError as err:
+        raise ModuleNotFoundError(
+            "qdk.qsharp is required to convert Hadamard test bases into qsharp.Pauli values."
+        ) from err
+
+    return getattr(_qsharp.Pauli, basis.value)
+
+
+class HadamardTest(Algorithm):
+    """Abstract base class for Hadamard test generators."""
+
+    def __init__(self):
+        """Initialize a Hadamard test generator."""
+        super().__init__()
+
+    def type_name(self) -> str:
+        """Return the algorithm type name as hadamard_test."""
+        return "hadamard_test"
+
+    def _run_impl(
+        self,
+        state_preparation_circuit: Circuit,
+        time_evolution_unitary: TimeEvolutionUnitary,
+        shots: int,
+        unitary_power: int,
+        mapper: ControlledEvolutionCircuitMapper | None = None,
+        simulator: CircuitExecutor | None = None,
+        simulator_seed: int = 42,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+    ) -> CircuitExecutorData:
+        r"""Run the Hadamard test by building and executing a backend-specific circuit.
+
+        Args:
+            state_preparation_circuit: Circuit that prepares the trial state on system qubits.
+            time_evolution_unitary: Time evolution unitary :math:`\exp(-i H \Delta t)`.
+            shots: Number of shots to execute the circuit.
+            unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`. If ``mapper`` is
+                provided, this value must match ``mapper.settings().get("power")``.
+            mapper: Controlled evolution circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
+                If provided, it is used as-is and must already have its ``power`` setting configured.
+            simulator: Circuit executor. If ``None``, the default ``qdk_full_state_simulator`` is used.
+            simulator_seed: Random seed used for reproducible sampling when ``simulator`` is ``None``.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
+
+        Returns:
+            CircuitExecutorData returned directly by the given simulator.
+
+        """
+        if not isinstance(test_basis, HadamardTestBasis):
+            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
+        if not isinstance(time_evolution_unitary, TimeEvolutionUnitary):
+            raise TypeError("time_evolution_unitary must be an instance of TimeEvolutionUnitary.")
+        num_system_qubits = time_evolution_unitary.get_num_qubits()
+        if not isinstance(unitary_power, int):
+            raise TypeError("unitary_power must be an integer.")
+        if unitary_power < 1:
+            raise ValueError("unitary_power must be a positive integer.")
+        if not isinstance(simulator_seed, int):
+            raise TypeError("simulator_seed must be an integer.")
+        if not isinstance(shots, int):
+            raise TypeError("shots must be an integer.")
+        if shots <= 0:
+            raise ValueError("shots must be a positive integer.")
+
+        from qdk_chemistry.algorithms import create  # noqa: PLC0415
+
+        controlled_evolution = ControlledTimeEvolutionUnitary(
+            time_evolution_unitary=time_evolution_unitary,
+            control_indices=[0],
+        )
+
+        if mapper is None:
+            try:
+                mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+            except KeyError as err:
+                raise ValueError("Unknown controlled evolution circuit mapper type: pauli_sequence.") from err
+            mapper.settings().update("power", unitary_power)
+        elif not isinstance(mapper, ControlledEvolutionCircuitMapper):
+            raise TypeError("mapper must be an instance of ControlledEvolutionCircuitMapper or None.")
+        else:
+            try:
+                mapper_power = mapper.settings().get("power")
+            except SettingNotFound as err:
+                raise ValueError(
+                    "Provided mapper must define a 'power' setting when mapper is supplied explicitly."
+                ) from err
+            if mapper_power != unitary_power:
+                raise ValueError(
+                    "unitary_power must match mapper.settings().get('power') when mapper is supplied explicitly."
+                )
+        ctrl_time_evol_unitary_circuit = mapper.run(controlled_evolution=controlled_evolution)
+
+        circuit = self._build_hadamard_test_circuit(
+            state_preparation_circuit,
+            num_system_qubits,
+            ctrl_time_evol_unitary_circuit,
+            test_basis,
+        )
+
+        if simulator is None:
+            try:
+                simulator = create("circuit_executor", "qdk_full_state_simulator")
+            except KeyError as err:
+                raise ValueError("Unknown simulator type: qdk_full_state_simulator.") from err
+            simulator.settings().update("seed", simulator_seed)
+        elif not isinstance(simulator, CircuitExecutor):
+            raise TypeError("simulator must be an instance of CircuitExecutor or None.")
+
+        return simulator.run(circuit, shots=shots)
+
+    @abstractmethod
+    def _build_hadamard_test_circuit(
+        self,
+        state_preparation_circuit: Circuit,
+        num_system_qubits: int,
+        ctrl_time_evol_unitary_circuit: Circuit,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+    ) -> Circuit:
+        r"""Build the Hadamard test circuit for a given state and controlled unitary.
+
+        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
+
+        Args:
+            state_preparation_circuit: Circuit that prepares the trial state on system qubits.
+            num_system_qubits: Number of qubits in the system register.
+            ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
+                or ``HadamardTestBasis.Z``).
+
+        Returns:
+            Circuit representing the Hadamard test workflow for the selected backend.
+
+        """
+
+
+class HadamardTestFactory(AlgorithmFactory):
+    """Factory class for creating Hadamard test generator instances."""
+
+    def __init__(self):
+        """Initialize the HadamardTestFactory."""
+        super().__init__()
+
+    def algorithm_type_name(self) -> str:
+        """Return the algorithm type name as hadamard_test."""
+        return "hadamard_test"
+
+    def default_algorithm_name(self) -> str:
+        """Return 'qdk_hadamard_test' as the default algorithm name."""
+        return "qdk_hadamard_test"
