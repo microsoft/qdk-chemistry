@@ -55,27 +55,42 @@ class HamiltonianUnitaryBuilder(Algorithm):
         return mapping
 
 
-class TimeEvolutionSettings(Settings):
+class HamiltonianUnitaryBuilderSettings(Settings):
+    """Base settings for Hamiltonian unitary builders."""
+
+    def __init__(self):
+        """Initialize HamiltonianUnitaryBuilderSettings with default values.
+
+        Attributes:
+            power: The exponent to which the unitary is raised.
+
+        """
+        super().__init__()
+        self._set_default("power", "int", 1, "The power to raise the unitary to.")
+
+
+class TimeEvolutionSettings(HamiltonianUnitaryBuilderSettings):
     """Base settings for time evolution builders."""
 
     def __init__(self):
-        """Initialize TimeEvolutionSettings with default values.
+        r"""Initialize TimeEvolutionSettings with default values.
 
         Attributes:
             time: The evolution time.
-            power: The power to raise the unitary to (e.g. 2k for U^{2k}).
-            power_strategy: How to realize U^power. ``"rescale"`` multiplies
-                the time by the power; ``"repeat"`` repeats the base circuit.
+            power_strategy: The strategy to construct :math:`U^{\\text{power}}`:
+
+                * ``"rescale"``: produce a single step with effective time :math:`t \\cdot \\text{power}`.
+                * ``"repeat"``: repeat the base :math:`U(t)` ``power`` times.
 
         """
         super().__init__()
         self._set_default("time", "float", 0.0, "The evolution time.")
-        self._set_default("power", "int", 1, "The power to raise the unitary to.")
         self._set_default(
             "power_strategy",
             "string",
             "repeat",
-            "Strategy for U^power: 'rescale' scales time, 'repeat' repeats the circuit.",
+            "The strategy to construct U^power: 'rescale' multiplies evolution time by power; "
+            "'repeat' repeats the base U power times.",
             ["rescale", "repeat"],
         )
 

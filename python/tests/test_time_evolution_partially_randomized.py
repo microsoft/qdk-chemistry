@@ -59,8 +59,7 @@ class TestPartiallyRandomizedConstruction:
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
-        builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42)
-        builder.settings().set("time", 0.1)
+        builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
 
         assert isinstance(unitary, UnitaryRepresentation)
@@ -80,8 +79,8 @@ class TestPartiallyRandomizedConstruction:
             trotter_order=2,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.2,
         )
-        builder.settings().set("time", 0.2)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -109,8 +108,8 @@ class TestPartiallyRandomizedConstruction:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.2,
         )
-        builder.settings().set("time", 0.2)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -129,13 +128,10 @@ class TestPartiallyRandomizedConstruction:
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
 
-        builder1 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345)
-        builder2 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345)
-
-        builder1.settings().set("time", 0.1)
+        builder1 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345, time=0.1)
+        builder2 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345, time=0.1)
 
         unitary1 = builder1.run(hamiltonian)
-        builder2.settings().set("time", 0.1)
         unitary2 = builder2.run(hamiltonian)
 
         terms1 = unitary1.get_container().step_terms
@@ -163,8 +159,8 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=2,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -191,8 +187,8 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -211,8 +207,8 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -240,8 +236,8 @@ class TestPartiallyRandomizedRandomPart:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=time,
         )
-        builder.settings().set("time", time)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -270,8 +266,8 @@ class TestPartiallyRandomizedRandomPart:
             num_random_samples=20,
             trotter_order=2,
             seed=42,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -286,8 +282,7 @@ class TestPartiallyRandomizedEdgeCases:
     def test_empty_hamiltonian_after_filtering(self):
         """Test handling of Hamiltonian with only negligible terms."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-15])
-        builder = PartiallyRandomized(weight_threshold=0.5, num_random_samples=10, seed=42)
-        builder.settings().set("time", 0.1)
+        builder = PartiallyRandomized(weight_threshold=0.5, num_random_samples=10, seed=42, time=0.1)
         unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
@@ -302,8 +297,8 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=10,
             trotter_order=2,
             seed=42,
+            time=0.2,
         )
-        builder.settings().set("time", 0.2)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -335,8 +330,8 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=20,
             trotter_order=1,
             seed=42,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
@@ -355,8 +350,8 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=20,
             trotter_order=2,
             seed=42,
+            time=0.1,
         )
-        builder.settings().set("time", 0.1)
         unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
