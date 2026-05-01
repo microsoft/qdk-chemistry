@@ -113,8 +113,8 @@ class TestPauliSequenceMapper:
             ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[1, 2])
 
         # Non-overlapping indices in a larger circuit are valid
-        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[0])
-        assert cu.target_indices == [0]
+        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[0, 1])
+        assert cu.target_indices == [0, 1]
 
         cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[3, 4])
         assert cu.target_indices == [3, 4]
