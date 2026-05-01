@@ -56,21 +56,21 @@ jobs:
       matrix:
         include:
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Patched, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.10'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Patched, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.13'
           cpp-test-threads: 2
           python-test-threads: 2
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Patched, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          runner: [self-hosted, 1ES.Pool=1es-gh-hb120-pool, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 120
           uarch: x86-64-v3
           python-version: '3.14'
