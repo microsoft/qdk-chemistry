@@ -141,7 +141,7 @@ inline data::Wavefunction build_wavefunction(
 
   // General Wavefunction construction
   // All the new logging in this file should be debug, not info
-  QDK_LOGGER().info(
+  QDK_LOGGER().debug(
       "Building wavefunction: converting {} determinants to "
       "configurations...",
       dets.size());
@@ -163,7 +163,7 @@ inline data::Wavefunction build_wavefunction(
 
   // evaluate spin-dependent RDMs
   if (eval_one_rdm || eval_two_rdm) {
-    QDK_LOGGER().info(
+    QDK_LOGGER().debug(
         "Computing spin-dependent RDMs ({} determinants, {} orbitals)...",
         dets.size(), nmo);
     auto rdm_st = std::chrono::high_resolution_clock::now();
@@ -192,7 +192,7 @@ inline data::Wavefunction build_wavefunction(
             eval_two_rdm ? active_two_aabb.data() : nullptr, nmo, nmo, nmo,
             nmo));
     auto rdm_en = std::chrono::high_resolution_clock::now();
-    QDK_LOGGER().info("RDM computation complete ({:.1f}s).",
+    QDK_LOGGER().debug("RDM computation complete ({:.1f}s).",
                       std::chrono::duration<double>(rdm_en - rdm_st).count());
 
     if (eval_one_rdm) {
@@ -216,7 +216,7 @@ inline data::Wavefunction build_wavefunction(
   // information
   data::OrbitalEntropies computed_entropies;
   if (eval_s1 || eval_s2 || eval_mutual_info) {
-    QDK_LOGGER().info(
+    QDK_LOGGER().debug(
         "Computing orbital entropies ({} determinants, {} "
         "orbitals)...",
         dets.size(), nmo);
@@ -233,7 +233,7 @@ inline data::Wavefunction build_wavefunction(
         macis::matrix_span<double>(eval_mutual_info ? mi_data.data() : nullptr,
                                    nmo, nmo));
     auto ent_en = std::chrono::high_resolution_clock::now();
-    QDK_LOGGER().info("Entropy computation complete ({:.1f}s).",
+    QDK_LOGGER().debug("Entropy computation complete ({:.1f}s).",
                       std::chrono::duration<double>(ent_en - ent_st).count());
 
     if (eval_s1) {
