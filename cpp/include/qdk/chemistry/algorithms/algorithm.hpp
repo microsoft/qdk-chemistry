@@ -99,6 +99,38 @@ class Algorithm {
   void lock_settings() const { this->_settings->lock(); }
 
   /**
+   * @brief Create a nested algorithm from an AlgorithmRef stored in settings.
+   *
+   * Reads the AlgorithmRef at the given settings key, uses the specified
+   * factory to create the algorithm, and applies any nested settings
+   * overrides.
+   *
+   * @tparam FactoryType The AlgorithmFactory subclass (e.g.
+   *         HamiltonianConstructorFactory)
+   * @param key The settings key holding the AlgorithmRef
+   * @return A unique pointer to the created nested algorithm
+   * @throws SettingNotFound if key doesn't exist
+   * @throws SettingTypeMismatch if the value is not an AlgorithmRef
+   * @throws std::runtime_error if the factory cannot create the algorithm
+   */
+  template <typename FactoryType>
+  typename FactoryType::return_type _create_nested(
+      const std::string& key) const {
+    auto ref = this->_settings->template get<data::AlgorithmRef>(key);
+    if (ref.get_algorithm_type() != FactoryType::algorithm_type_name()) {
+      throw std::runtime_error("AlgorithmRef type mismatch for settings key '" +
+                               key + "': expected '" +
+                               FactoryType::algorithm_type_name() +
+                               "' but got '" + ref.get_algorithm_type() + "'");
+    }
+    auto instance = FactoryType::create(ref.get_algorithm_name());
+    if (ref.get_settings()) {
+      instance->settings().update(*ref.get_settings());
+    }
+    return instance;
+  }
+
+  /**
    * @brief Implementation method that derived classes must override
    *
    * @param args Input arguments - types specified by the Args parameter pack

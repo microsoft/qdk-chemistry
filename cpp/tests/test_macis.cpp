@@ -281,7 +281,7 @@ TEST_F(MacisAsciTest, ASCISettingsConfiguration) {
   EXPECT_NO_THROW(settings.set("ntdets_max", macis_params::ntdets_max_small));
   EXPECT_NO_THROW(settings.set("ntdets_min", macis_params::ntdets_max_large));
   EXPECT_NO_THROW(settings.set("ncdets_max", macis_params::ncdets_max));
-  EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
+  EXPECT_NO_THROW(settings.set("search_matel_tol", macis_params::h_el_tol));
   EXPECT_NO_THROW(settings.set("rv_prune_tol", macis_params::rv_prune_tol));
   EXPECT_NO_THROW(settings.set("grow_factor", macis_params::grow_factor));
   EXPECT_NO_THROW(settings.set("max_refine_iter", macis_params::refine_off));
@@ -584,7 +584,7 @@ TEST_F(MacisAsciTest, ASCISettingsConversion) {
   settings.set("ntdets_max", macis_params::ntdets_max_large);
   settings.set("ntdets_min", macis_params::ntdets_min);
   settings.set("ncdets_max", macis_params::ncdets_max);
-  settings.set("h_el_tol", macis_params::h_el_tol);
+  settings.set("search_matel_tol", macis_params::h_el_tol);
   settings.set("rv_prune_tol", macis_params::rv_prune_tol);
   settings.set("pair_size_max", macis_params::pair_size_max);
 
@@ -1152,10 +1152,6 @@ TEST_F(MacisPmcTest, BasicPMCCalculation) {
       ProjectedMultiConfigurationCalculatorFactory::create("macis_pmc");
   ASSERT_NE(calculator, nullptr);
 
-  // Set minimal PMC settings for fast execution
-  auto& settings = calculator->settings();
-  settings.set("h_el_tol", macis_params::h_el_tol);
-
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
 
   // Execute PMC calculation with test configurations
@@ -1207,8 +1203,7 @@ TEST_F(MacisPmcTest, PMCSettingsConfiguration) {
 
   auto& settings = calculator->settings();
 
-  // Test setting PMC-specific parameters
-  EXPECT_NO_THROW(settings.set("h_el_tol", macis_params::h_el_tol));
+  // Test setting parameters inherited from MultiConfigurationSettings
   EXPECT_NO_THROW(
       settings.set("ci_residual_tolerance", testing::ci_energy_tolerance));
   EXPECT_NO_THROW(settings.set("max_solver_iterations",

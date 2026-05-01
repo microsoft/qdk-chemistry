@@ -36,19 +36,11 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_) {
   QDK_LOG_TRACE_ENTERING();
 
   macis::MCSCFSettings mcscf_settings;
-  // Respect MACIS native setting names
-  if (settings_.has("ci_res_tol")) {
-    SET_MACIS_SETTING(settings_, mcscf_settings, ci_res_tol, double);
-  } else {
-    mcscf_settings.ci_res_tol = settings_.get<double>("ci_residual_tolerance");
-  }
-  if (settings_.has("ci_max_subspace")) {
-    SET_MACIS_SETTING(settings_, mcscf_settings, ci_max_subspace, size_t);
-  } else {
-    mcscf_settings.ci_max_subspace =
-        settings_.get<int64_t>("max_solver_iterations");
-  }
-  SET_MACIS_SETTING(settings_, mcscf_settings, ci_matel_tol, double);
+  // CI solver — map QDK names to MACIS struct fields
+  mcscf_settings.ci_res_tol = settings_.get<double>("ci_residual_tolerance");
+  mcscf_settings.ci_max_subspace =
+      static_cast<size_t>(settings_.get<int64_t>("max_solver_iterations"));
+  mcscf_settings.ci_matel_tol = settings_.get<double>("ci_matel_tol");
   return mcscf_settings;
 }
 
@@ -59,7 +51,8 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_max, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, ntdets_min, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, ncdets_max, size_t);
-  SET_MACIS_SETTING(settings_, asci_settings, h_el_tol, double);
+  asci_settings.h_el_tol = settings_.get_or_default<double>(
+      "search_matel_tol", asci_settings.h_el_tol);
   SET_MACIS_SETTING(settings_, asci_settings, rv_prune_tol, double);
   SET_MACIS_SETTING(settings_, asci_settings, pair_size_max, size_t);
   SET_MACIS_SETTING(settings_, asci_settings, pt2_tol, double);
