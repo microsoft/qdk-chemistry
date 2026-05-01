@@ -20,8 +20,6 @@ References:
 
 from __future__ import annotations
 
-import warnings
-
 import numpy as np
 
 from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
@@ -105,7 +103,6 @@ class Trotter(TimeEvolutionBuilder):
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
         optimize_term_ordering: bool = False,
-        term_groups: list[list[QubitHamiltonian]] | None = None,
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -154,10 +151,6 @@ class Trotter(TimeEvolutionBuilder):
             weight_threshold: Absolute threshold for filtering small
                 Hamiltonian coefficients. Defaults to 1e-12.
             optimize_term_ordering: Whether to group commuting terms and execute them in parallel.
-            term_groups: Pre-computed term groups (deprecated). Prefer populating
-                ``QubitHamiltonian.term_partition`` (e.g. via the ``term_grouper`` algorithm or by
-                building Hamiltonians with ``include_term_groups=True``); when ``term_partition``
-                is set the builder consumes it automatically.
 
         """
         super().__init__()
@@ -168,16 +161,6 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("optimize_term_ordering", optimize_term_ordering)
-        if term_groups is not None:
-            warnings.warn(
-                "Trotter(term_groups=...) is deprecated; populate "
-                "QubitHamiltonian.term_partition instead (for example by passing "
-                "include_term_groups=True to create_*_hamiltonian or by running "
-                "the 'term_grouper' algorithm).",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-        self._term_groups = term_groups
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
         """Construct the time evolution unitary using Trotter decomposition.
@@ -391,20 +374,18 @@ class Trotter(TimeEvolutionBuilder):
 
         Resolution order (first match wins):
 
-        1. The deprecated ``term_groups`` constructor argument, if supplied.
-        2. ``qubit_hamiltonian.term_partition`` — preferred. Both
+        1. ``qubit_hamiltonian.term_partition`` — preferred. Both
            :class:`~qdk_chemistry.data.LayeredPartition` (group → layer →
            index) and :class:`~qdk_chemistry.data.FlatPartition`
            (group → index) are accepted; flat partitions are treated as
            a single layer per group. When a partition is present, groups
            are sorted by ascending layer count so the smallest group sits on
            the outside of the Strang splitting and merges across boundaries.
-        3. ``optimize_term_ordering`` flag:
+        2. ``optimize_term_ordering`` flag:
 
-           * ``True``: partition by full commutation
-             (:meth:`~qdk_chemistry.data.QubitHamiltonian._group_commuting_impl`),
-             merge identical labels, split each group into parallelisable
-             layers by disjoint qubit support.
+           * ``True``: partition by full commutation, merge identical
+             labels, split each group into parallelisable layers by
+             disjoint qubit support.
            * ``False``: every Pauli string becomes its own single-term group
              with no reordering.
 
@@ -418,14 +399,19 @@ class Trotter(TimeEvolutionBuilder):
             ``QubitHamiltonian`` sub-groups (parallelisable layers).
 
         """
-        if self._term_groups is not None:
-            return self._term_groups
-
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
+            Logger.info(
+                f"Trotter: consuming QubitHamiltonian.term_partition "
+                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+            )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
         if not optimize_term_ordering:
+            Logger.info(
+                "Trotter: no term_partition present and optimize_term_ordering=False; "
+                "treating each Pauli term as its own group."
+            )
             return [
                 [
                     QubitHamiltonian(
@@ -438,6 +424,9 @@ class Trotter(TimeEvolutionBuilder):
             ]
 
         # Sort terms so that Pauli strings acting on more qubits appear first.
+        Logger.info(
+            "Trotter: no term_partition present; computing commuting groups from scratch (optimize_term_ordering=True)."
+        )
         num_non_identity = [sum(c != "I" for c in ps) for ps in qubit_hamiltonian.pauli_strings]
         sorted_indices = sorted(range(len(num_non_identity)), key=lambda i: num_non_identity[i], reverse=True)
         qubit_hamiltonian = QubitHamiltonian(

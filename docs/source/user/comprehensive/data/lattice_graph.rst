@@ -306,6 +306,19 @@ For detailed information about serialization in QDK/Chemistry, see the :doc:`Ser
       :start-after: # start-cell-serialization
       :end-before: # end-cell-serialization
 
+Edge coloring
+-------------
+
+Calling ``lattice.edge_coloring()`` returns a :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring` that assigns a color index to each undirected edge such that edges sharing a vertex receive distinct colors.
+The number of distinct colors is exposed as :attr:`~qdk_chemistry.geometry.HypergraphEdgeColoring.ncolors` and equals (or upper-bounds) the chromatic index of the underlying graph.
+
+This coloring is the topological ingredient that powers geometry-aware Trotter scheduling: edges of the same color have disjoint qubit supports, so their Pauli exponentials can be applied in parallel inside one Trotter step.
+The :doc:`spin model Hamiltonian builders <../model_hamiltonians>` consume the coloring automatically when ``include_term_groups=True`` and store the result on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`.
+
+.. note::
+   The current Python overlay computes the coloring with a randomised greedy heuristic.
+   Pass ``trials > 1`` (or a deterministic ``seed``) to ``edge_coloring`` for tighter results on graphs without a known chromatic index.
+
 Related classes
 ---------------
 

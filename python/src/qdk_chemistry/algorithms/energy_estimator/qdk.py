@@ -256,6 +256,17 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
+        if qubit_hamiltonian.term_partition is not None:
+            Logger.info(
+                f"QdkEnergyEstimator: incoming QubitHamiltonian.term_partition "
+                f"(strategy={qubit_hamiltonian.term_partition.strategy!r}) is ignored; "
+                "this estimator always re-groups by qubit-wise commutation for measurement."
+            )
+        else:
+            Logger.info(
+                "QdkEnergyEstimator: no term_partition present; "
+                "computing qubit-wise commuting measurement groups from scratch."
+            )
         qubit_hamiltonians = _qubit_wise_commuting_groups(qubit_hamiltonian)
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:

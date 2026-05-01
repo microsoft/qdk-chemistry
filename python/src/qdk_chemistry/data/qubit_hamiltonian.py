@@ -13,19 +13,17 @@ and quantum circuit construction or measurement workflows.
 from __future__ import annotations
 
 import re
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.term_partition import TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
 if TYPE_CHECKING:
     import h5py
     import scipy
-
-    from qdk_chemistry.data.term_partition import TermPartition
 
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
@@ -276,36 +274,17 @@ class QubitHamiltonian(DataClass):
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
         )
 
-    def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
-        """Group the qubit Hamiltonian into commuting subsets.
-
-        .. deprecated::
-            Use the ``term_grouper`` algorithm instead. Either
-            ``registry.create("term_grouper", "commuting")`` or
-            ``registry.create("term_grouper", "qubit_wise_commuting")``
-            returns a new ``QubitHamiltonian`` with a populated
-            :attr:`term_partition`, which downstream algorithms (Trotter,
-            energy estimator) can consume directly.
-
-        Args:
-            qubit_wise (bool): Whether to use qubit-wise commuting grouping. Default is True.
-
-        Returns:
-            list[QubitHamiltonian]: A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
-
-        """
-        Logger.trace_entering()
-        warnings.warn(
-            "QubitHamiltonian.group_commuting() is deprecated; use the 'term_grouper' algorithm "
-            "(registry.create('term_grouper', 'commuting' | 'qubit_wise_commuting')) which populates "
-            "QubitHamiltonian.term_partition instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._group_commuting_impl(qubit_wise=qubit_wise)
-
     def _group_commuting_impl(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
-        """Internal grouping implementation shared by the deprecated public method and ``term_grouper``.
+        """Internal commuting-group helper used by the Trotter fallback path.
+
+        This is a private implementation detail. Public callers should use the
+        registered ``term_grouper`` algorithm:
+
+        * ``registry.create("term_grouper", "commuting")``
+        * ``registry.create("term_grouper", "qubit_wise_commuting")``
+
+        which return a new :class:`QubitHamiltonian` with a populated
+        :attr:`term_partition` that downstream algorithms can consume.
 
         Args:
             qubit_wise: Use qubit-wise commutation when ``True``; otherwise use full commutation.
@@ -377,6 +356,8 @@ class QubitHamiltonian(DataClass):
             data["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
             data["fermion_mode_order"] = str(self.fermion_mode_order)
+        if self.term_partition is not None:
+            data["term_partition"] = self.term_partition.to_json()
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -393,6 +374,10 @@ class QubitHamiltonian(DataClass):
             group.attrs["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
             group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
+        if self.term_partition is not None:
+            import json  # noqa: PLC0415
+
+            group.attrs["term_partition"] = json.dumps(self.term_partition.to_json())
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
@@ -416,11 +401,14 @@ class QubitHamiltonian(DataClass):
         else:
             # Fallback for legacy format (simple list of real numbers)
             coefficients = np.array(coeff_data)
+        partition_data = json_data.get("term_partition")
+        term_partition = TermPartition.from_json(partition_data) if partition_data is not None else None
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
             fermion_mode_order=json_data.get("fermion_mode_order"),
+            term_partition=term_partition,
         )
 
     @classmethod
@@ -447,11 +435,21 @@ class QubitHamiltonian(DataClass):
         fermion_mode_order = group.attrs.get("fermion_mode_order")
         if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
             fermion_mode_order = fermion_mode_order.decode("utf-8")
+        partition_attr = group.attrs.get("term_partition")
+        if partition_attr is not None:
+            import json  # noqa: PLC0415
+
+            if isinstance(partition_attr, bytes):
+                partition_attr = partition_attr.decode("utf-8")
+            term_partition = TermPartition.from_json(json.loads(partition_attr))
+        else:
+            term_partition = None
         return cls(
             pauli_strings=pauli_strings,
             coefficients=coefficients,
             encoding=encoding,
             fermion_mode_order=fermion_mode_order,
+            term_partition=term_partition,
         )
 
 

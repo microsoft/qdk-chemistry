@@ -29,7 +29,7 @@ class TermGrouper(Algorithm):
     :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` is populated
     with the grouping computed by the strategy.
 
-    Subclasses implement :meth:`_run_impl`, which must return a new
+    Subclasses implement ``_run_impl``, which must return a new
     ``QubitHamiltonian`` (the input must not be mutated).
 
     """

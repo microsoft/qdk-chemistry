@@ -72,3 +72,26 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`Circuit <circuit>`
      - Quantum circuit (OpenQASM, Q#, QIR, Qiskit)
      - :doc:`StatePreparation <../algorithms/state_preparation>`, User input
+
+QubitHamiltonian and term partitions
+------------------------------------
+
+A :class:`~qdk_chemistry.data.QubitHamiltonian` carries an optional :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` field describing how its Pauli terms are organised into algorithm-relevant subsets.
+The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` rather than nested ``QubitHamiltonian`` objects — so it serialises cheaply alongside the Hamiltonian.
+
+Two concrete shapes are supported:
+
+* :class:`~qdk_chemistry.data.FlatPartition` — a single level of *groups*, each group a list of term indices.
+  Used by routines such as energy estimation, where the only decision is which terms to evaluate together (for example, qubit-wise commuting groups for measurement basis selection).
+* :class:`~qdk_chemistry.data.LayeredPartition` — two levels of structure: each *group* is split into *layers*, and each layer is a list of term indices.
+  Used by Trotter decomposition, where the outer level controls the splitting order and the inner level identifies operators that act on disjoint qubit supports and can therefore be applied in parallel.
+
+The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this Hamiltonian, in which case algorithms that exploit groups fall back to computing them on the fly.
+Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitHamiltonian.to_interleaved`) reset the partition to ``None`` on the new instance.
+
+Two mechanisms populate ``term_partition``:
+
+#. The :doc:`spin model Hamiltonian builders <../model_hamiltonians>` (:func:`~qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian`, :func:`~qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian`) populate a :class:`~qdk_chemistry.data.LayeredPartition` from the lattice's edge coloring when ``include_term_groups=True`` (the default).
+#. The :ref:`term_grouper algorithm <algorithms-term-grouper>` accepts a ``QubitHamiltonian`` and returns a copy whose ``term_partition`` is populated by the requested strategy (``"commuting"``, ``"qubit_wise_commuting"``, or ``"identity"``).
+
+Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/time_evolution_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.

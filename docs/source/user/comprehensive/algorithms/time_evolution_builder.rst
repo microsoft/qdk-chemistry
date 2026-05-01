@@ -146,6 +146,22 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
 
+Consuming term partitions
+-------------------------
+
+When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the Trotter builder consumes it directly:
+
+* :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
+
+In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
+This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
+
+When ``term_partition is None`` the builder falls back to its standard behaviour: with ``optimize_term_ordering=True`` (the default) it computes commuting groups on the fly; with ``optimize_term_ordering=False`` every Pauli term is exponentiated as its own group.
+
+The :ref:`spin model Hamiltonian builders <model-term-partition>` populate ``term_partition`` automatically; for general Hamiltonians the :ref:`term_grouper algorithm <algorithms-term-grouper>` provides equivalent strategies.
+
+
 Related classes
 ---------------
 

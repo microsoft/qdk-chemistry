@@ -18,7 +18,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_site_param,
 )
 from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitHamiltonian
-from qdk_chemistry.geometry.hypergraph import Hypergraph, HypergraphEdgeColoring
+from qdk_chemistry.geometry.hypergraph import HypergraphEdgeColoring
 
 __all__ = [
     "create_heisenberg_hamiltonian",
@@ -26,8 +26,6 @@ __all__ = [
     "create_huckel_hamiltonian",
     "create_ising_hamiltonian",
     "create_ppp_hamiltonian",
-    "heisenberg_term_groups",
-    "ising_term_groups",
     "mataga_nishimoto_potential",
     "ohno_potential",
     "pairwise_potential",
@@ -178,15 +176,10 @@ def create_heisenberg_hamiltonian(
         hx: External magnetic field in the x direction. Scalar or length-n array. Defaults to 0.
         hy: External magnetic field in the y direction. Defaults to 0.
         hz: External magnetic field in the z direction. Defaults to 0.
-        include_term_groups: When ``True`` (default), populate the returned Hamiltonian's
-            :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` from the lattice
-            edge coloring.  Downstream algorithms (Trotter, energy estimator) automatically
-            exploit the partition when present.
+        include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
-        QubitHamiltonian: The Heisenberg model as a qubit Hamiltonian.  When
-        ``include_term_groups=True`` the result carries a populated
-        :class:`~qdk_chemistry.data.LayeredPartition`.
+        QubitHamiltonian: The Heisenberg model as a qubit Hamiltonian; carries a ``LayeredPartition`` when grouped.
 
     """
     if not graph.is_symmetric:
@@ -256,201 +249,10 @@ def create_ising_hamiltonian(
         graph: Lattice graph defining the connectivity.
         j: Coupling constant for ZZ interactions. Scalar or ``(n, n)`` array.
         h: Transverse field strength (x direction). Scalar or length-n array.  Defaults to 0.
-        include_term_groups: When ``True`` (default), populate the returned Hamiltonian's
-            :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` from the lattice
-            edge coloring.
+        include_term_groups: When ``True`` (default), attach a geometry-coloring term partition to the result.
 
     Returns:
         QubitHamiltonian: The Ising model as a qubit Hamiltonian.
 
     """
     return create_heisenberg_hamiltonian(graph, jx=0.0, jy=0.0, jz=j, hx=h, include_term_groups=include_term_groups)
-
-
-def _build_edge_groups(
-    graph: LatticeGraph,
-    coloring: HypergraphEdgeColoring,
-    pauli_label: str,
-    coupling: np.ndarray | float,
-) -> list[QubitHamiltonian]:
-    """Build parallelizable layers for one interaction type using edge coloring.
-
-    Each color in the coloring corresponds to a set of edges with disjoint
-    vertex sets.  Operators on those edges can be executed in parallel.
-
-    Args:
-        graph: Lattice graph defining the connectivity.
-        coloring: A :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.
-        pauli_label: Two-character Pauli label (e.g., ``"XX"``).
-        coupling: Scalar or ``(n, n)`` coupling matrix.
-
-    Returns:
-        A list of :class:`QubitHamiltonian`, one per color (parallel layer).
-
-    """
-    assert isinstance(coloring, HypergraphEdgeColoring)
-
-    n = graph.num_sites
-    adj = graph.adjacency_matrix()
-    coupling_mat = to_pair_param(coupling, graph, "coupling")
-
-    # Collect operators per color
-    color_terms: dict[int, tuple[list[str], list[complex]]] = {}
-
-    for edge in coloring.hypergraph.edges():
-        verts = edge.vertices
-        if len(verts) != 2:
-            continue
-        i, j = verts
-        edge_weight = adj[i, j]
-        if edge_weight == 0.0:
-            continue
-        coeff_val = coupling_mat[i, j] * edge_weight
-        if coeff_val == 0.0:
-            continue
-        c = coloring.color(verts)
-        if c is None or c < 0:
-            continue
-
-        # Build Pauli string: each character acts on the corresponding qubit
-        ps = ["I"] * n
-        ps[i] = pauli_label[0]
-        ps[j] = pauli_label[1]
-        ps_str = "".join(ps[::-1])  # little-endian: rightmost = qubit 0
-
-        if c not in color_terms:
-            color_terms[c] = ([], [])
-        color_terms[c][0].append(ps_str)
-        color_terms[c][1].append(coeff_val)
-
-    layers: list[QubitHamiltonian] = []
-    for c in sorted(color_terms):
-        labels, coeffs = color_terms[c]
-        layers.append(QubitHamiltonian(labels, np.array(coeffs)))
-    return layers
-
-
-def _build_field_group(
-    graph: LatticeGraph,
-    pauli_char: str,
-    field: np.ndarray | float,
-) -> list[QubitHamiltonian]:
-    """Build a single-layer group for single-site field terms.
-
-    All single-site field terms commute and have disjoint qubit support,
-    so they form a single parallelizable layer.
-
-    Args:
-        graph: Lattice graph defining the number of sites.
-        pauli_char: Single Pauli character (``"X"``, ``"Y"``, or ``"Z"``).
-        field: Scalar or length-n field array.
-
-    Returns:
-        A list containing one :class:`QubitHamiltonian` (or empty if all zero).
-
-    """
-    n = graph.num_sites
-    field_vec = to_site_param(field, graph, "field")
-
-    labels: list[str] = []
-    coeffs: list[complex] = []
-    for i in range(n):
-        if field_vec[i] == 0.0:
-            continue
-        ps = ["I"] * n
-        ps[i] = pauli_char
-        labels.append("".join(ps[::-1]))
-        coeffs.append(field_vec[i])
-
-    if not labels:
-        return []
-    return [QubitHamiltonian(labels, np.array(coeffs))]
-
-
-def heisenberg_term_groups(
-    graph: LatticeGraph,
-    jx: np.ndarray | float,
-    jy: np.ndarray | float,
-    jz: np.ndarray | float,
-    hx: np.ndarray | float = 0.0,
-    hy: np.ndarray | float = 0.0,
-    hz: np.ndarray | float = 0.0,
-    geometry: Hypergraph | None = None,
-) -> list[list[QubitHamiltonian]]:
-    r"""Compute geometry-aware Trotter term groups for a Heisenberg Hamiltonian.
-
-    Uses edge coloring of the lattice geometry to partition interaction
-    terms into parallelizable layers. Each interaction type (XX, YY, ZZ)
-    becomes a separate Trotter term group, and within each group, edges
-    of the same color have disjoint qubit supports and form a single
-    parallelizable layer.
-
-    The resulting structure is ``list[list[QubitHamiltonian]]`` suitable
-    for passing to :class:`~qdk_chemistry.algorithms.time_evolution.builder.trotter.Trotter`
-    as ``term_groups``.
-
-    Args:
-        graph: Lattice graph defining the connectivity.
-        jx: Coupling constant for XX interactions.
-        jy: Coupling constant for YY interactions.
-        jz: Coupling constant for ZZ interactions.
-        hx: External magnetic field in x direction. Defaults to 0.
-        hy: External magnetic field in y direction. Defaults to 0.
-        hz: External magnetic field in z direction. Defaults to 0.
-        geometry: Lattice geometry for edge coloring. If ``None``, built from the graph via greedy coloring.
-
-    Returns:
-        Term groups for use with the Trotter builder's ``term_groups`` parameter.
-
-    """
-    if geometry is None:
-        geometry = Hypergraph.from_lattice_graph(graph)
-
-    coloring = geometry.edge_coloring()
-
-    field_groups: list[list[QubitHamiltonian]] = []
-    coupling_groups: list[list[QubitHamiltonian]] = []
-
-    # Each interaction type is a separate Trotter term group.
-    # Within each, the edge coloring gives parallelizable layers.
-    for pauli_label, coupling_val in [("XX", jx), ("YY", jy), ("ZZ", jz)]:
-        layers = _build_edge_groups(graph, coloring, pauli_label, coupling_val)
-        if layers:
-            coupling_groups.append(layers)
-
-    # Field terms: each direction is a group with a single layer
-    for pauli_char, field in [("X", hx), ("Y", hy), ("Z", hz)]:
-        field_layers = _build_field_group(graph, pauli_char, field)
-        if field_layers:
-            field_groups.append(field_layers)
-
-    # Order: field groups first (outer in Strang), coupling groups last
-    # (middle in Strang). This maximises merging at Suzuki boundaries
-    # because the outermost group is repeated symmetrically and adjacent
-    # identical terms are combined.
-    groups: list[list[QubitHamiltonian]] = field_groups + coupling_groups
-
-    return groups
-
-
-def ising_term_groups(
-    graph: LatticeGraph,
-    j: np.ndarray | float,
-    h: np.ndarray | float = 0.0,
-    geometry: Hypergraph | None = None,
-) -> list[list[QubitHamiltonian]]:
-    r"""Compute geometry-aware Trotter term groups for an Ising Hamiltonian.
-
-    Equivalent to :func:`heisenberg_term_groups` with ``jx=0, jy=0, jz=j, hx=h``.
-
-    Args:
-        graph: Lattice graph defining the connectivity.
-        j: Coupling constant for ZZ interactions.
-        h: Transverse field strength (x direction). Defaults to 0.
-        geometry: Lattice geometry for edge coloring. If ``None``, built from the graph.
-
-    Returns:
-        Term groups for use with the Trotter builder's ``term_groups`` parameter.
-
-    """
-    return heisenberg_term_groups(graph, jx=0.0, jy=0.0, jz=j, hx=h, geometry=geometry)

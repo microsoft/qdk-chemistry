@@ -196,35 +196,45 @@ __all__ = [
 # LatticeGraph.edge_coloring overlay
 # ---------------------------------------------------------------------------
 #
-# LatticeGraph is bound from C++ and stores only an adjacency matrix.  The
-# Python overlay below adds a convenience :py:meth:`edge_coloring` method that
-# returns a :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.  This
-# keeps the user-facing API ``lattice.edge_coloring()`` independent of where
-# the coloring algorithm lives, and lets callers treat the lattice topology as
-# the single source of truth for both connectivity and edge colors.
+# LatticeGraph is bound from C++ and computes its edge coloring in C++ via
+# :meth:`LatticeGraph._edge_coloring_raw`, returning a ``{(i, j): color}`` dict.
+# The Python overlay below wraps that dict in a
+# :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`, the richer Python
+# representation used by downstream consumers (e.g. the spin-model Hamiltonian
+# builders).  Cached colorings on the C++ side mean repeat calls are cheap.
 
 
 def _lattice_edge_coloring(self, *, seed: int | None = 0, trials: int = 1):
-    """Compute an edge coloring of this lattice as a :class:`HypergraphEdgeColoring`.
+    """Compute an edge coloring of this lattice.
 
-    Builds a :class:`~qdk_chemistry.geometry.Hypergraph` from this lattice's
-    undirected adjacency and runs the randomised greedy edge coloring routine.
+    Delegates to the C++ implementation on :class:`LatticeGraph` (which uses
+    a deterministic optimal coloring for ``CHAIN`` and ``SQUARE`` kinds and
+    a cached randomised greedy coloring otherwise) and wraps the result in a
+    :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.
 
     Args:
         self: The :class:`LatticeGraph` instance whose edges are to be colored.
-        seed: Random seed for reproducibility (``None`` for non-deterministic).
-        trials: Number of randomised trials; the coloring with fewest colors is returned.
+        seed: Random seed for the greedy fallback (ignored for deterministic
+            kinds; ``None`` is treated as 0).
+        trials: Number of randomised trials for the greedy fallback; the
+            coloring with the fewest colors is returned.
 
     Returns:
-        HypergraphEdgeColoring: A coloring whose ``hypergraph`` carries the
-        same edges as this :class:`LatticeGraph`.
+        :class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`: A coloring
+        whose ``hypergraph`` carries the same undirected edges as this
+        :class:`LatticeGraph`.
 
     """
     # Imported lazily to avoid a circular import at module load time.
-    from qdk_chemistry.geometry.hypergraph import Hypergraph  # noqa: PLC0415
+    from qdk_chemistry.geometry.hypergraph import Hyperedge, Hypergraph, HypergraphEdgeColoring  # noqa: PLC0415
 
-    hypergraph = Hypergraph.from_lattice_graph(self)
-    return hypergraph.edge_coloring(seed=seed, trials=trials)
+    raw = self._edge_coloring_raw(seed=0 if seed is None else int(seed), trials=int(trials))
+    edges = [Hyperedge(list(e)) for e in raw]
+    hypergraph = Hypergraph(edges)
+    coloring = HypergraphEdgeColoring(hypergraph)
+    for edge in edges:
+        coloring.add_edge(edge, raw[tuple(edge.vertices)])
+    return coloring
 
 
 LatticeGraph.edge_coloring = _lattice_edge_coloring  # type: ignore[attr-defined]

@@ -231,3 +231,65 @@ class TestTrotterConsumesTermPartition:
         without_groups = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0, include_term_groups=False)
         assert with_groups.term_partition is not None
         assert without_groups.term_partition is None
+
+    def test_trotter_runs_with_flat_partition(self):
+        # Take a partitioned Hamiltonian and overwrite term_partition with a
+        # FlatPartition (via the term_grouper algorithm), then drive Trotter.
+        lat = LatticeGraph.chain(4, periodic=True)
+        ham = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0)
+        flat = registry.create("term_grouper", "commuting").run(ham)
+        assert isinstance(flat.term_partition, FlatPartition)
+
+        trotter = registry.create("time_evolution_builder", "trotter")
+        trotter.settings().update({"order": 2})
+        unitary = trotter.run(flat, time=0.5)
+        assert unitary is not None
+
+
+# ---------------------------------------------------------------------------
+# QubitHamiltonian round-trips term_partition through JSON / HDF5
+# ---------------------------------------------------------------------------
+
+
+class TestTermPartitionSerialisation:
+    def test_flat_partition_to_json_round_trip(self):
+        partition = FlatPartition(strategy="commuting", groups=[[0, 2], [1]])
+        data = partition.to_json()
+        assert data["kind"] == "flat"
+        restored = TermPartition.from_json(data)
+        assert isinstance(restored, FlatPartition)
+        assert restored == partition
+
+    def test_layered_partition_to_json_round_trip(self):
+        partition = LayeredPartition(strategy="geometry_coloring", groups=[[[0, 1], [2]], [[3]]])
+        data = partition.to_json()
+        assert data["kind"] == "layered"
+        restored = TermPartition.from_json(data)
+        assert isinstance(restored, LayeredPartition)
+        assert restored == partition
+
+    def test_qubit_hamiltonian_json_round_trip_preserves_partition(self):
+        partition = FlatPartition(strategy="commuting", groups=[[0, 1], [2]])
+        ham = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
+        restored = QubitHamiltonian.from_json(ham.to_json())
+        assert isinstance(restored.term_partition, FlatPartition)
+        assert restored.term_partition == partition
+
+    def test_qubit_hamiltonian_json_round_trip_with_no_partition(self):
+        ham = QubitHamiltonian(["XX", "ZZ"], np.array([0.1, 0.2]))
+        restored = QubitHamiltonian.from_json(ham.to_json())
+        assert restored.term_partition is None
+
+    def test_qubit_hamiltonian_hdf5_round_trip_preserves_partition(self, tmp_path):
+        h5py = pytest.importorskip("h5py")
+        partition = LayeredPartition(strategy="geometry_coloring", groups=[[[0], [1]], [[2]]])
+        ham = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([0.1, 0.2, 0.3]), term_partition=partition)
+
+        path = tmp_path / "ham.h5"
+        with h5py.File(path, "w") as f:
+            ham.to_hdf5(f)
+        with h5py.File(path, "r") as f:
+            restored = QubitHamiltonian.from_hdf5(f)
+
+        assert isinstance(restored.term_partition, LayeredPartition)
+        assert restored.term_partition == partition

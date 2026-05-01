@@ -500,3 +500,79 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
         kg_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
 }
+
+// Coloring helper: confirm no two same-color edges share a vertex.
+static void check_valid_edge_coloring(
+    const LatticeGraph::EdgeColoring& coloring) {
+  std::map<std::uint64_t, std::set<int>> incident;
+  for (const auto& [edge, color] : coloring) {
+    auto [a, b] = edge;
+    EXPECT_EQ(incident[a].count(color), 0u)
+        << "vertex " << a << " has two edges of color " << color;
+    EXPECT_EQ(incident[b].count(color), 0u)
+        << "vertex " << b << " has two edges of color " << color;
+    incident[a].insert(color);
+    incident[b].insert(color);
+  }
+}
+
+TEST_F(LatticeGraphTest, KindAndChromaticIndex) {
+  auto chain_open = LatticeGraph::chain(5, false);
+  EXPECT_EQ(chain_open.kind(), LatticeKind::CHAIN);
+  EXPECT_EQ(chain_open.chromatic_index(), 2);
+
+  auto chain_periodic_even = LatticeGraph::chain(6, true);
+  EXPECT_EQ(chain_periodic_even.kind(), LatticeKind::CHAIN);
+  EXPECT_EQ(chain_periodic_even.chromatic_index(), 2);
+
+  auto chain_periodic_odd = LatticeGraph::chain(5, true);
+  EXPECT_EQ(chain_periodic_odd.kind(), LatticeKind::CHAIN);
+  EXPECT_EQ(chain_periodic_odd.chromatic_index(), 3);
+
+  auto sq = LatticeGraph::square(3, 3, false, false);
+  EXPECT_EQ(sq.kind(), LatticeKind::SQUARE);
+  EXPECT_GE(sq.chromatic_index(), 2);
+
+  auto tri = LatticeGraph::triangular(3, 3, true, true);
+  EXPECT_EQ(tri.kind(), LatticeKind::TRIANGULAR);
+
+  auto hc = LatticeGraph::honeycomb(3, 3, true, true);
+  EXPECT_EQ(hc.kind(), LatticeKind::HONEYCOMB);
+
+  auto kg = LatticeGraph::kagome(2, 2, true, true);
+  EXPECT_EQ(kg.kind(), LatticeKind::KAGOME);
+
+  // Custom adjacency matrix: kind should be CUSTOM.
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  std::map<Edge, double> edges = {{{0, 1}, 1.0}, {{1, 2}, 1.0}};
+  LatticeGraph custom(edges, 3);
+  EXPECT_EQ(custom.kind(), LatticeKind::CUSTOM);
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsValid) {
+  // For every named lattice kind and a custom adjacency, the cached coloring
+  // must respect the proper edge coloring constraint.
+  std::vector<LatticeGraph> graphs;
+  graphs.emplace_back(LatticeGraph::chain(8, true));
+  graphs.emplace_back(LatticeGraph::square(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::triangular(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::honeycomb(3, 3, true, true));
+  graphs.emplace_back(LatticeGraph::kagome(2, 3, true, true));
+
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  std::map<Edge, double> custom_edges = {
+      {{0, 1}, 1.0}, {{1, 2}, 1.0}, {{2, 3}, 1.0}, {{3, 0}, 1.0}};
+  graphs.emplace_back(LatticeGraph(custom_edges, 4));
+
+  for (const auto& g : graphs) {
+    check_valid_edge_coloring(g.edge_coloring());
+  }
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsCached) {
+  auto sq = LatticeGraph::square(4, 4, true, true);
+  // The reference returned by edge_coloring() must remain stable across calls.
+  const auto& first = sq.edge_coloring();
+  const auto& second = sq.edge_coloring();
+  EXPECT_EQ(&first, &second);
+}

@@ -86,6 +86,45 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Circuit → CircuitExecutorData
 
 
+.. _algorithms-term-grouper:
+
+Term grouper
+------------
+
+The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitHamiltonian` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`.
+A grouper consumes a ``QubitHamiltonian`` and returns a *new* ``QubitHamiltonian`` whose ``term_partition`` field is populated; the input is not mutated.
+
+The following strategies are registered out of the box:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 50 20
+
+   * - Strategy
+     - Description
+     - Output kind
+   * - ``"commuting"`` (default)
+     - Greedy first-fit grouping by full Pauli commutation (``[P_i, P_j] = 0``).
+       Used by Trotter-style decompositions to exponentiate a commuting block as a single ordered product without splitting error.
+     - :class:`~qdk_chemistry.data.FlatPartition`
+   * - ``"qubit_wise_commuting"``
+     - Greedy first-fit grouping by qubit-wise commutation.
+       All members of a group can be measured in a single basis, so this strategy is the basis-selection primitive used by :class:`~qdk_chemistry.algorithms.QdkEnergyEstimator`.
+     - :class:`~qdk_chemistry.data.FlatPartition`
+   * - ``"identity"``
+     - Trivial grouping — every term is its own single-element group.
+       Useful to clear or override an existing partition while still passing through the standard ``term_grouper`` interface.
+     - :class:`~qdk_chemistry.data.FlatPartition`
+
+Example::
+
+    from qdk_chemistry.algorithms import registry
+
+    grouper = registry.create("term_grouper", "qubit_wise_commuting")
+    grouped = grouper.run(qubit_hamiltonian)
+    grouped.term_partition  # FlatPartition(strategy="qubit_wise_commuting", ...)
+
+
 Discovering implementations
 ---------------------------
 

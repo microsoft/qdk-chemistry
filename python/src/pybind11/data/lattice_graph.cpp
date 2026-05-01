@@ -216,6 +216,70 @@ Returns:
 )",
                     py::arg("i"), py::arg("j"));
 
+  py::enum_<LatticeKind>(lattice_graph, "LatticeKind", R"(
+Tag identifying which factory built a :class:`LatticeGraph`.
+
+Used by :meth:`LatticeGraph.edge_coloring` to dispatch to a deterministic
+optimal coloring routine when the connectivity is one of the recognised
+pre-ordained geometries; ``CUSTOM`` lattices fall back to a
+randomised greedy coloring.
+)")
+      .value("CUSTOM", LatticeKind::CUSTOM)
+      .value("CHAIN", LatticeKind::CHAIN)
+      .value("SQUARE", LatticeKind::SQUARE)
+      .value("TRIANGULAR", LatticeKind::TRIANGULAR)
+      .value("HONEYCOMB", LatticeKind::HONEYCOMB)
+      .value("KAGOME", LatticeKind::KAGOME);
+
+  lattice_graph.def_property_readonly("kind", &LatticeGraph::kind, R"(
+Lattice kind tag set by the deterministic factory methods.
+
+Returns:
+    LatticeGraph.LatticeKind: ``CUSTOM`` for lattices built from raw
+    matrices, deserialised from disk, or constructed via
+    :meth:`make_bidirectional`; otherwise the matching enum value.
+)");
+
+  lattice_graph.def_property_readonly("chromatic_index",
+                                      &LatticeGraph::chromatic_index, R"(
+Number of distinct colors in the cached edge coloring.
+
+Triggers an :meth:`edge_coloring` computation if no coloring has
+been cached yet.
+
+Returns:
+    int: Chromatic index attained by :meth:`edge_coloring`.
+)");
+
+  lattice_graph.def(
+      "_edge_coloring_raw",
+      [](const LatticeGraph &self, int seed, int trials) {
+        const auto &coloring = self.edge_coloring(seed, trials);
+        py::dict out;
+        for (const auto &[edge, color] : coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
+Return the C++-computed edge coloring as a ``{(i, j): color}`` dict.
+
+This is the raw C++-side result.  Most users should call
+:meth:`edge_coloring`, which wraps the result in a
+:class:`~qdk_chemistry.geometry.HypergraphEdgeColoring`.
+
+Args:
+    seed (int): Random seed for the greedy fallback (ignored for
+        deterministic kinds). Defaults to 0.
+    trials (int): Number of randomised trials for the greedy fallback
+        (the lowest-color-count outcome wins). Defaults to 1.
+
+Returns:
+    dict[tuple[int, int], int]: Mapping of canonical edges (``i < j``) to
+    non-negative color labels.
+)",
+      py::arg("seed") = 0, py::arg("trials") = 1);
+
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(
 Create a one-dimensional chain lattice.
