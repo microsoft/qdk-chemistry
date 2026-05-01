@@ -8,10 +8,9 @@
  */
 
 #pragma once
+#include <array>
 #include <macis/hamiltonian_generator/connection_build_utils.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
-
-#include <array>
 
 namespace macis {
 
@@ -152,7 +151,9 @@ class DynamicBitMaskHamiltonianGenerator
     all_pairs.reserve(total_raw);
     for (auto& tp : thread_pairs) {
       all_pairs.insert(all_pairs.end(), tp.begin(), tp.end());
-      { std::vector<uint64_t>().swap(tp); }
+      {
+        std::vector<uint64_t>().swap(tp);
+      }
     }
     detail::sort_unique_pairs(all_pairs);
 
@@ -167,8 +168,8 @@ class DynamicBitMaskHamiltonianGenerator
 
   // ---- Combo descriptor ----
   struct Combo {
-    std::vector<int> keep;   // indices of masks to keep
-    int key_bits;            // total packed bits in composite key
+    std::vector<int> keep;  // indices of masks to keep
+    int key_bits;           // total packed bits in composite key
   };
 
   // ---- Generate all C(n_masks, 4) combinations ----
@@ -225,10 +226,10 @@ class DynamicBitMaskHamiltonianGenerator
   }
 
   // ---- Assign variable orbitals to masks (round-robin by activity) ----
-  static void assign_masks(
-      const std::vector<uint32_t>& variable_orbs, int n_masks,
-      std::vector<std::vector<uint32_t>>& mask_bits,
-      std::vector<int>& bits_per_mask) {
+  static void assign_masks(const std::vector<uint32_t>& variable_orbs,
+                           int n_masks,
+                           std::vector<std::vector<uint32_t>>& mask_bits,
+                           std::vector<int>& bits_per_mask) {
     mask_bits.resize(n_masks);
     bits_per_mask.resize(n_masks, 0);
     for (auto& mb : mask_bits) mb.clear();
@@ -253,10 +254,9 @@ class DynamicBitMaskHamiltonianGenerator
   }
 
   // ---- Compose a uint64 key from kept masks ----
-  static uint64_t compose_key_u64(
-      const uint64_t* mv, int n_masks_stride,
-      const std::vector<int>& keep,
-      const std::vector<int>& bits_per_mask) {
+  static uint64_t compose_key_u64(const uint64_t* mv, int n_masks_stride,
+                                  const std::vector<int>& keep,
+                                  const std::vector<int>& bits_per_mask) {
     uint64_t key = 0;
     int shift = 0;
     for (int ki = 0; ki < static_cast<int>(keep.size()); ++ki) {
@@ -277,10 +277,10 @@ class DynamicBitMaskHamiltonianGenerator
     bool key_eq(const Key128& o) const { return lo == o.lo && hi == o.hi; }
   };
 
-  static Key128 compose_key_128(
-      const uint64_t* mv, int n_masks_stride,
-      const std::vector<int>& keep,
-      const std::vector<int>& bits_per_mask, uint32_t det_idx) {
+  static Key128 compose_key_128(const uint64_t* mv, int n_masks_stride,
+                                const std::vector<int>& keep,
+                                const std::vector<int>& bits_per_mask,
+                                uint32_t det_idx) {
     uint64_t lo = 0, hi = 0;
     int shift = 0;
     for (int ki = 0; ki < static_cast<int>(keep.size()); ++ki) {
@@ -299,12 +299,12 @@ class DynamicBitMaskHamiltonianGenerator
   }
 
   // ---- Process one combo (uint64 key path) ----
-  void process_combo_u64_(
-      const Combo& combo, size_t ndets,
-      const std::vector<uint64_t>& masked_values, int n_masks_total,
-      const std::vector<int>& bits_per_mask,
-      const WfnType* dets,
-      std::vector<uint64_t>& out_pairs) const {
+  void process_combo_u64_(const Combo& combo, size_t ndets,
+                          const std::vector<uint64_t>& masked_values,
+                          int n_masks_total,
+                          const std::vector<int>& bits_per_mask,
+                          const WfnType* dets,
+                          std::vector<uint64_t>& out_pairs) const {
     // Build (key, det_idx) pairs
     struct KeyIdx {
       uint64_t key;
@@ -314,7 +314,7 @@ class DynamicBitMaskHamiltonianGenerator
     std::vector<KeyIdx> keys(ndets);
     for (size_t d = 0; d < ndets; ++d) {
       keys[d] = {compose_key_u64(&masked_values[d * n_masks_total],
-                                  n_masks_total, combo.keep, bits_per_mask),
+                                 n_masks_total, combo.keep, bits_per_mask),
                  static_cast<uint32_t>(d)};
     }
 
@@ -343,17 +343,17 @@ class DynamicBitMaskHamiltonianGenerator
   }
 
   // ---- Process one combo (128-bit key path) ----
-  void process_combo_128_(
-      const Combo& combo, size_t ndets,
-      const std::vector<uint64_t>& masked_values, int n_masks_total,
-      const std::vector<int>& bits_per_mask,
-      const WfnType* dets,
-      std::vector<uint64_t>& out_pairs) const {
+  void process_combo_128_(const Combo& combo, size_t ndets,
+                          const std::vector<uint64_t>& masked_values,
+                          int n_masks_total,
+                          const std::vector<int>& bits_per_mask,
+                          const WfnType* dets,
+                          std::vector<uint64_t>& out_pairs) const {
     std::vector<Key128> keys(ndets);
     for (size_t d = 0; d < ndets; ++d) {
-      keys[d] = compose_key_128(&masked_values[d * n_masks_total],
-                                n_masks_total, combo.keep, bits_per_mask,
-                                static_cast<uint32_t>(d));
+      keys[d] =
+          compose_key_128(&masked_values[d * n_masks_total], n_masks_total,
+                          combo.keep, bits_per_mask, static_cast<uint32_t>(d));
     }
 
     std::sort(keys.begin(), keys.end());
@@ -384,8 +384,8 @@ class DynamicBitMaskHamiltonianGenerator
       double H_thresh) {
     const size_t ndets = std::distance(dets_begin, dets_end);
     auto [all_pairs, cache] = enumerate_connected_pairs_(dets_begin, dets_end);
-    return detail::pair_based_build_impl_<index_t>(
-        ndets, all_pairs, cache, *this, H_thresh);
+    return detail::pair_based_build_impl_<index_t>(ndets, all_pairs, cache,
+                                                   *this, H_thresh);
   }
 };
 

@@ -74,7 +74,9 @@ target_link_libraries(macis PUBLIC mdspan)
 include(macis-ips4o)
 target_include_directories(macis SYSTEM PUBLIC
   $<BUILD_INTERFACE:${ips4o_SOURCE_DIR}>)
-target_link_libraries(macis PUBLIC atomic)
+if(NOT APPLE)
+  target_link_libraries(macis PUBLIC atomic)
+endif()
 
 
 # Installation

@@ -101,8 +101,8 @@ double HamiltonianGenerator<WfnType>::matrix_element(
  * in one spin)
  *
  * Calculates the matrix element for determinants that differ by a double
- * excitation within the same spin channel. Uses antisymmetrized integrals
- * G_pqrs.
+ * excitation within the same spin channel. Uses antisymmetrized values built
+ * on the fly from V_pqrs.
  *
  * @tparam WfnType Wavefunction type defining determinant representation
  * @param bra Bra spin determinant
@@ -116,7 +116,8 @@ double HamiltonianGenerator<WfnType>::matrix_element_4(spin_det_t bra,
                                                        spin_det_t ex) const {
   auto [o1, v1, o2, v2, sign] = doubles_sign_indices(bra, ket, ex);
 
-  return sign * G_pqrs_(v1, o1, v2, o2);
+  const auto g_v1o1v2o2 = V_pqrs_(v1, o1, v2, o2) - V_pqrs_(v1, o2, v2, o1);
+  return sign * g_v1o1v2o2;
 }
 
 /**

@@ -561,7 +561,7 @@ TEST_CASE("ASCI") {
   // ASCI-PT2
   auto EPT2 = macis::asci_pt2_constraint(
       asci_settings, dets.begin(), dets.end(), E0, C, norb, ham_gen.T(),
-      ham_gen.G_red(), ham_gen.V_red(), ham_gen.G(), ham_gen.V(),
+      ham_gen.G_red(), ham_gen.V_red(), ham_gen.V(),
       ham_gen MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
   // std::cout << std::scientific << std::setprecision(12);
@@ -808,7 +808,8 @@ TEST_CASE("CoreSelectionStrategy") {
           asci_settings.ntdets_max, std::max<size_t>(100, 8 * dets.size()));
       std::tie(E0, dets, C) = macis::asci_iter<64, int32_t>(
           asci_settings, mcscf_settings, ndets_new, E0, std::move(dets),
-          std::move(C), ham_gen, norb, nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          std::move(C), ham_gen, norb,
+          nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
     }
 
     // Verify we got some determinants and the wavefunction is normalized
@@ -871,14 +872,14 @@ TEST_CASE("CoreSelectionStrategy") {
     // Run one iteration with low threshold (70%)
     auto [E0_low, dets_low, C_low] = macis::asci_iter<64, int32_t>(
         asci_settings_low, mcscf_settings, asci_settings_low.ntdets_max,
-        E0_base, dets_base, C_base, ham_gen,
-        norb, nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
+        E0_base, dets_base, C_base, ham_gen, norb,
+        nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Run one iteration with high threshold (99%)
     auto [E0_high, dets_high, C_high] = macis::asci_iter<64, int32_t>(
         asci_settings_high, mcscf_settings, asci_settings_high.ntdets_max,
-        E0_base, dets_base, C_base, ham_gen,
-        norb, nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
+        E0_base, dets_base, C_base, ham_gen, norb,
+        nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD));
 
     // Higher threshold should result in MORE determinants being kept in core
     // and thus potentially finding more new determinants

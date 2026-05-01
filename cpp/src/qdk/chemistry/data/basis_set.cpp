@@ -62,6 +62,13 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
     std::filesystem::create_directories(temp_dir);
   }
 
+  // Check if basis set JSON already exists (avoids tar race in parallel runs)
+  std::filesystem::path expected_json =
+      temp_dir / "basis" / (normalized_name + ".json");
+  if (std::filesystem::exists(expected_json)) {
+    return temp_dir;
+  }
+
   // unpack the tar.gz file
   auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
              temp_dir.generic_string() + "\"";

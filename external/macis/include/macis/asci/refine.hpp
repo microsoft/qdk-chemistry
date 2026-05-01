@@ -9,7 +9,6 @@
 
 #pragma once
 #include <algorithm>
-
 #include <macis/asci/iteration.hpp>
 
 namespace macis {
@@ -131,8 +130,8 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
         std::vector<wfn_t<N>> union_wfn;
         union_wfn.reserve(wfn.size() + prev_wfn.size());
-        std::set_union(prev_wfn.begin(), prev_wfn.end(), wfn.begin(),
-                       wfn.end(), std::back_inserter(union_wfn), wfn_comp{});
+        std::set_union(prev_wfn.begin(), prev_wfn.end(), wfn.begin(), wfn.end(),
+                       std::back_inserter(union_wfn), wfn_comp{});
 
         logger->info(
             "  Oscillation detected — stabilizing via union of last two "
@@ -140,8 +139,8 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
             prev_wfn.size(), wfn.size(), union_wfn.size());
 
         // Rediagonalize in the enlarged space — keep the cache since the
-        // union is a superset of the cached dets (high overlap → patched build).
-        // Warm-start from current X mapped onto the union ordering.
+        // union is a superset of the cached dets (high overlap → patched
+        // build). Warm-start from current X mapped onto the union ordering.
         std::vector<double> X_union(union_wfn.size(), 0.0);
         {
           // wfn is sorted and is a subset of union_wfn (also sorted).
@@ -174,8 +173,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
             if (n % ws) {
               auto wr = comm_rank(comm);
               auto* rem = X_full.data() + ws * lc;
-              if (wr == ws - 1)
-                std::copy_n(X_union.data() + lc, n % ws, rem);
+              if (wr == ws - 1) std::copy_n(X_union.data() + lc, n % ws, rem);
               MPI_Bcast(rem, n % ws, MPI_DOUBLE, ws - 1, comm);
             }
             X_union = std::move(X_full);
@@ -187,9 +185,9 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
         // Extend iteration budget by the number of oscillation iterations
         // that were wasted, capped so we don't loop forever.
-        const size_t extension = std::min(
-            static_cast<size_t>(oscillation_count),
-            max_extensions - total_extensions);
+        const size_t extension =
+            std::min(static_cast<size_t>(oscillation_count),
+                     max_extensions - total_extensions);
         if (extension > 0) {
           max_iter += extension;
           total_extensions += extension;
@@ -221,11 +219,10 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   else {
     std::string msg = "ASCI Refine did not converge";
     if (total_extensions > 0) {
-      msg +=
-          " (oscillation detected, " + std::to_string(total_extensions) +
-          " extra iterations granted). "
-          "Consider using percentage core_selection_strategy, increasing "
-          "ncdets_max, or loosening refine_energy_tol.";
+      msg += " (oscillation detected, " + std::to_string(total_extensions) +
+             " extra iterations granted). "
+             "Consider using percentage core_selection_strategy, increasing "
+             "ncdets_max, or loosening refine_energy_tol.";
     }
     throw std::runtime_error(msg);
   }
