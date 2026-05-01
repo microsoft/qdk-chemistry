@@ -1973,12 +1973,13 @@ void BasisSet::to_hdf5(H5::Group& group) const {
     }
 
     // Save ECP name and electrons if present
-    if (has_ecp_electrons() || !_ecp_name.empty()) {
+    if (!_ecp_name.empty()) {
       // Save ECP name as attribute
       H5::Attribute ecp_name_attr =
           group.createAttribute("ecp_name", string_type, scalar_space);
       ecp_name_attr.write(string_type, _ecp_name);
-
+    }
+    if (has_ecp_electrons()) {
       // Save ECP electrons array as dataset
       if (!_ecp_electrons.empty()) {
         hsize_t ecp_dims[1] = {_ecp_electrons.size()};
@@ -2416,10 +2417,12 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       H5::Group structure_group = group.openGroup("structure");
       auto structure = Structure::from_hdf5(structure_group);
       if (!aux_shells.empty()) {
-        // Aux exists: use full constructor; ecp params may be empty
+        // Aux exists: use full constructor; treat empty ecp_name as absent.
+        const std::string normalized_ecp_name =
+            ecp_name.empty() ? "none" : ecp_name;
         basis_set = std::make_shared<BasisSet>(
-            name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name,
-            aux_shells, *structure, atomic_orbital_type);
+            name, shells, normalized_ecp_name, ecp_shells, ecp_electrons,
+            aux_name, aux_shells, *structure, atomic_orbital_type);
       } else if (!ecp_shells.empty()) {
         if (!ecp_name.empty() && !ecp_electrons.empty()) {
           basis_set = std::make_shared<BasisSet>(
@@ -2557,10 +2560,10 @@ nlohmann::json BasisSet::to_json() const {
     }
   }
 
-  if (has_ecp_electrons() || !_ecp_name.empty()) {
-    j["ecp_name"] = _ecp_name;
-    j["ecp_electrons"] = _ecp_electrons;
-  }
+  if (has_ecp_electrons() || !_ecp_name != "none")) {
+      j["ecp_name"] = _ecp_name;
+      j["ecp_electrons"] = _ecp_electrons;
+    }
 
   if (has_aux_basis() || !_aux_name.empty()) {
     j["aux_name"] = _aux_name;
