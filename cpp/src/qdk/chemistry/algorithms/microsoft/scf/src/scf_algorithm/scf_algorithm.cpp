@@ -261,12 +261,13 @@ void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,
   }
 }
 
-bool SCFAlgorithm::try_get_rohf_convergence_matrices(
-    const SCFImpl& scf_impl, const RowMajorMatrix*& fock_matrix,
-    const RowMajorMatrix*& density_matrix) {
+std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
+SCFAlgorithm::try_get_rohf_convergence_matrices(const SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type != SCFOrbitalType::RestrictedOpenShell) {
-    return false;
+    throw std::logic_error(
+        "ROHF convergence matrices are only available for "
+        "RestrictedOpenShell calculations");
   }
 
   const auto nelec_vec = scf_impl.get_num_electrons();
@@ -275,9 +276,8 @@ bool SCFAlgorithm::try_get_rohf_convergence_matrices(
       scf_impl.get_density_matrix(), nelec_vec[0], nelec_vec[1],
       rohf_effective_fock_, rohf_total_density_);
 
-  fock_matrix = &get_rohf_convergence_fock_matrix();
-  density_matrix = &get_rohf_convergence_density_matrix();
-  return true;
+  return {get_rohf_convergence_fock_matrix(),
+          get_rohf_convergence_density_matrix()};
 }
 
 void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
@@ -479,14 +479,13 @@ bool SCFAlgorithm::check_convergence(const SCFImpl& scf_impl) {
   RowMajorMatrix error_matrix;
   int num_orbital_sets = scf_impl.get_num_orbital_spin_blocks();
 
-  const RowMajorMatrix* F_ptr;
-  const RowMajorMatrix* P_ptr;
+  const RowMajorMatrix* F_ptr = nullptr;
+  const RowMajorMatrix* P_ptr = nullptr;
 
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    if (!try_get_rohf_convergence_matrices(scf_impl, F_ptr, P_ptr)) {
-      throw std::logic_error(
-          "ROHF convergence matrices are not provided by this SCF algorithm");
-    }
+    const auto rohf_matrices = try_get_rohf_convergence_matrices(scf_impl);
+    F_ptr = &rohf_matrices.first;
+    P_ptr = &rohf_matrices.second;
   } else {
     F_ptr = &scf_impl.get_fock_matrix();
     P_ptr = &scf_impl.get_density_matrix();

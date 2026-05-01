@@ -116,21 +116,19 @@ class SCFAlgorithm {
                                      int nelec_beta);
 
   /**
-   * @brief Try to provide ROHF convergence matrices for OG evaluation
+   * @brief Provide ROHF convergence matrices for OG evaluation
    *
    * For ROHF, some algorithms evaluate convergence using an effective Fock
    * matrix and total density matrix rather than the spin-blocked SCFImpl
-   * matrices. Derived algorithms can override this hook and provide pointers
-   * to those matrices.
+   * matrices. Derived algorithms can override this hook and provide
+   * references to those matrices.
    *
    * @param[in] scf_impl SCF implementation object
-   * @param[out] fock_matrix Pointer to convergence Fock matrix
-   * @param[out] density_matrix Pointer to convergence density matrix
-   * @return true if matrices were provided by the algorithm, false otherwise
+   * @return Pair of references to convergence Fock and density matrices
+   * @throws std::logic_error If ROHF convergence matrices are unavailable
    */
-  virtual bool try_get_rohf_convergence_matrices(
-      const SCFImpl& scf_impl, const RowMajorMatrix*& fock_matrix,
-      const RowMajorMatrix*& density_matrix);
+  virtual std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
+  try_get_rohf_convergence_matrices(const SCFImpl& scf_impl);
 
   /**
    * @brief Calculate orbital gradient (OG) error for convergence checking

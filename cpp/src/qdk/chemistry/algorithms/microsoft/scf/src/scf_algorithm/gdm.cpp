@@ -972,7 +972,7 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
   const double* C_block_ptr =
       C.data() + num_atomic_orbitals * num_molecular_orbitals * spin_index;
   const double* F_block_ptr =
-      F.data() + num_molecular_orbitals * num_molecular_orbitals * spin_index;
+      F.data() + num_atomic_orbitals * num_atomic_orbitals * spin_index;
   std::vector<double> atba_workspace(static_cast<size_t>(num_atomic_orbitals) *
                                      num_molecular_orbitals);
   compute_atba_gemm(C_block_ptr, F_block_ptr, F_MO.data(), num_atomic_orbitals,
@@ -983,8 +983,8 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
   // pseudo-canonical basis.
   RowMajorMatrix Uii =
       F_MO.block(0, 0, num_occupied_orbitals, num_occupied_orbitals);
-  auto C_occ_view = C.block(num_molecular_orbitals * spin_index, 0,
-                            num_molecular_orbitals, num_occupied_orbitals);
+  auto C_occ_view = C.block(num_atomic_orbitals * spin_index, 0,
+                            num_atomic_orbitals, num_occupied_orbitals);
   calculate_pseudo_canonical_orbital_block(
       Uii, num_occupied_orbitals, pseudo_canonical_eigenvalues_, 0, C_occ_view,
       num_molecular_orbitals, num_molecular_orbitals);
@@ -992,8 +992,8 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
   RowMajorMatrix Uaa = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                                   num_virtual_orbitals, num_virtual_orbitals);
   auto C_virt_view =
-      C.block(num_molecular_orbitals * spin_index, num_occupied_orbitals,
-              num_molecular_orbitals, num_virtual_orbitals);
+      C.block(num_atomic_orbitals * spin_index, num_occupied_orbitals,
+              num_atomic_orbitals, num_virtual_orbitals);
   calculate_pseudo_canonical_orbital_block(
       Uaa, num_virtual_orbitals, pseudo_canonical_eigenvalues_,
       num_occupied_orbitals, C_virt_view, num_molecular_orbitals,

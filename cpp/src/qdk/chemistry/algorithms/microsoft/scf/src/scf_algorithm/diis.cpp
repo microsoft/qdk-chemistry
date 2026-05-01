@@ -329,12 +329,8 @@ std::pair<RowMajorMatrix&, const RowMajorMatrix&> DIIS::select_working_matrices(
     SCFImpl& scf_impl) {
   QDK_LOG_TRACE_ENTERING();
   if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-    const RowMajorMatrix* rohf_fock = nullptr;
-    const RowMajorMatrix* rohf_density = nullptr;
-    if (!try_get_rohf_convergence_matrices(scf_impl, rohf_fock, rohf_density)) {
-      throw std::logic_error("ROHF convergence matrices are unavailable");
-    }
-    return {rohf_convergence_density_matrix(), *rohf_fock};
+    const auto rohf_matrices = try_get_rohf_convergence_matrices(scf_impl);
+    return {rohf_convergence_density_matrix(), rohf_matrices.first};
   }
   return {scf_impl.density_matrix(), scf_impl.get_fock_matrix()};
 }
