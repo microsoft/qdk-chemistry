@@ -1149,7 +1149,7 @@ def test_basis_set_ecp_functionality():
 
     # Test default ECP state
     assert not basis.has_ecp_electrons()
-    assert basis.get_ecp_name() == "none"
+    assert basis.get_ecp_name() == ""
     assert basis.get_ecp_electrons() == [0, 0, 0]
 
     # Test creating ECP with constructor
