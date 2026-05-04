@@ -1469,6 +1469,13 @@ def test_basis_set_from_element_map():
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 15
 
+    # Test from_element_map with auxiliary basis set
+    element_aux_map = {"H": "def2-universal-jfit", "O": "def2-universal-jfit"}
+    basis_with_aux = BasisSet.from_element_map(element_basis_map, element_aux_map, structure)
+    assert basis_with_aux.get_name() == "custom_basis_set"
+    assert basis_with_aux.has_aux_basis()
+    assert basis_with_aux.get_num_aux_shells() > 0
+
 
 def test_basis_set_from_index_map():
     """Test creating basis set using from_index_map static method."""
@@ -1494,6 +1501,17 @@ def test_basis_set_from_index_map():
     # Check number of orbitals
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 24
+
+    # Test from_index_map with auxiliary basis set
+    index_aux_map = {
+        0: "def2-universal-jfit",
+        1: "def2-universal-jfit",
+        2: "def2-universal-jfit",
+    }
+    basis_with_aux = BasisSet.from_index_map(index_basis_map, index_aux_map, structure)
+    assert basis_with_aux.get_name() == "custom_basis_set"
+    assert basis_with_aux.has_aux_basis()
+    assert basis_with_aux.get_num_aux_shells() > 0
 
 
 def test_basis_set_static_constants():

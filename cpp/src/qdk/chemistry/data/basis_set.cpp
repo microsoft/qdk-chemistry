@@ -1313,7 +1313,11 @@ std::vector<Shell> BasisSet::get_aux_shells() const {
 const std::vector<Shell>& BasisSet::get_aux_shells_for_atom(
     size_t atom_index) const {
   QDK_LOG_TRACE_ENTERING();
-  _validate_atom_index(atom_index);
+  if (atom_index >= _aux_shells_per_atom.size()) {
+    throw std::out_of_range("Atom index " + std::to_string(atom_index) +
+                            " is out of range. Maximum index: " +
+                            std::to_string(_aux_shells_per_atom.size() - 1));
+  }
   if (atom_index >= _aux_shells_per_atom.size()) {
     static const std::vector<Shell> empty_vector;
     return empty_vector;
