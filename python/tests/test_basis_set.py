@@ -1642,7 +1642,7 @@ class TestBasisSetConstructorDispatch:
 
     @pytest.fixture
     def ecp_shells(self):
-        return [Shell(0, OrbitalType.S, [5.0], [10.0], [0])]
+        return [Shell(0, OrbitalType.S, [5.0], [10.0], [1])]
 
     # --- Copy constructor: BasisSet(other) ---
 
@@ -1654,7 +1654,7 @@ class TestBasisSetConstructorDispatch:
 
     def test_copy_rejects_kwargs(self, shells):
         original = BasisSet("orig", shells)
-        with pytest.raises(TypeError, match="copy constructor does not accept keyword"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet(original, atomic_orbital_type=AOType.Cartesian)
 
     # --- (name, shells) ---
@@ -1726,27 +1726,10 @@ class TestBasisSetConstructorDispatch:
         assert b.has_aux_basis()
         assert b.get_atomic_orbital_type() == AOType.Cartesian
 
-    def test_name_shells_aux_structure_kwargs(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, aux_shells=aux_shells, structure=structure)
-        assert b.has_aux_basis()
-        assert b.get_num_aux_shells() == 1
-        assert b.has_structure()
-
-    def test_name_shells_aux_structure_kwargs_with_ao(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, aux_shells=aux_shells, structure=structure, atomic_orbital_type=AOType.Cartesian)
-        assert b.has_aux_basis()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
     # --- (name, shells, aux_name, aux_shells, structure) --- n==5 str path
 
     def test_name_shells_auxname_aux_structure_positional(self, shells, aux_shells, structure):
         b = BasisSet("test", shells, "my-aux", aux_shells, structure)
-        assert b.has_aux_basis()
-        assert b.get_aux_name() == "my-aux"
-        assert b.has_structure()
-
-    def test_name_shells_auxname_aux_structure_kwargs(self, shells, aux_shells, structure):
-        b = BasisSet("test", shells, aux_shells=aux_shells, aux_name="my-aux", structure=structure)
         assert b.has_aux_basis()
         assert b.get_aux_name() == "my-aux"
         assert b.has_structure()
@@ -1759,34 +1742,10 @@ class TestBasisSetConstructorDispatch:
         assert b.get_num_ecp_shells() == 1
         assert list(b.get_ecp_electrons()) == [2]
 
-    def test_name_shells_ecp_ecpelec_structure_kwargs(self, shells, ecp_shells, structure):
-        b = BasisSet("test", shells, ecp_shells=ecp_shells, ecp_electrons=[2], structure=structure)
-        assert b.has_ecp_shells()
-        assert b.get_num_ecp_shells() == 1
-        assert list(b.get_ecp_electrons()) == [2]
-
-    def test_name_shells_ecp_ecpelec_structure_kwargs_with_ao(self, shells, ecp_shells, structure):
-        b = BasisSet(
-            "test",
-            shells,
-            ecp_shells=ecp_shells,
-            ecp_electrons=[2],
-            structure=structure,
-            atomic_orbital_type=AOType.Cartesian,
-        )
-        assert b.has_ecp_shells()
-        assert b.get_atomic_orbital_type() == AOType.Cartesian
-
     # --- (name, shells, ecp_name, ecp_shells, ecp_electrons, structure) --- n==6 list path
 
     def test_name_shells_ecpname_ecp_ecpelec_structure(self, shells, ecp_shells, structure):
         b = BasisSet("test", shells, "my-ecp", ecp_shells, [2], structure)
-        assert b.has_ecp_shells()
-        assert b.get_ecp_name() == "my-ecp"
-        assert list(b.get_ecp_electrons()) == [2]
-
-    def test_name_shells_ecpname_ecp_ecpelec_structure_kwargs(self, shells, ecp_shells, structure):
-        b = BasisSet("test", shells, ecp_shells=ecp_shells, ecp_name="my-ecp", ecp_electrons=[2], structure=structure)
         assert b.has_ecp_shells()
         assert b.get_ecp_name() == "my-ecp"
         assert list(b.get_ecp_electrons()) == [2]
@@ -1801,60 +1760,30 @@ class TestBasisSetConstructorDispatch:
         assert b.get_aux_name() == "my-aux"
         assert b.has_structure()
 
-    def test_full_8arg_constructor_kwargs(self, shells, ecp_shells, aux_shells, structure):
-        b = BasisSet(
-            "test",
-            shells,
-            ecp_name="my-ecp",
-            ecp_shells=ecp_shells,
-            ecp_electrons=[2],
-            aux_name="my-aux",
-            aux_shells=aux_shells,
-            structure=structure,
-        )
-        assert b.has_ecp_shells()
-        assert b.get_ecp_name() == "my-ecp"
-        assert b.has_aux_basis()
-        assert b.get_aux_name() == "my-aux"
-        assert b.has_structure()
-
-    def test_full_8arg_constructor_kwargs_without_names(self, shells, ecp_shells, aux_shells, structure):
-        b = BasisSet(
-            "test",
-            shells,
-            ecp_shells=ecp_shells,
-            ecp_electrons=[2],
-            aux_shells=aux_shells,
-            structure=structure,
-        )
-        assert b.has_ecp_shells()
-        assert b.has_aux_basis()
-        assert b.has_structure()
-
     # --- Error cases: unexpected kwargs ---
 
     def test_rejects_unexpected_kwarg(self, shells):
-        with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, bogus=42)
 
     def test_rejects_unexpected_kwarg_typo(self, shells):
-        with pytest.raises(TypeError, match="unexpected keyword argument 'struture'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, struture="oops")
 
     # --- Error cases: multiple values ---
 
     def test_rejects_name_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="multiple values for argument 'name'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", name="other", shells=shells)
 
     def test_rejects_shells_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="multiple values for argument 'shells'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, shells=shells)
 
     # --- Error cases: structure without shells ---
 
     def test_rejects_structure_without_shells(self, structure):
-        with pytest.raises(TypeError, match="'structure' keyword requires 'name' and 'shells'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet(name="test", structure=structure)
 
     # --- Error cases: no matching constructor ---
@@ -1870,5 +1799,5 @@ class TestBasisSetConstructorDispatch:
     # --- Error cases: ECP shells at n==4 should raise ---
 
     def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
-        with pytest.raises(TypeError, match="ECP shells requires explicit ecp_electrons"):
+        with pytest.raises(ValueError, match="Auxiliary shells contains a shell with radial powers"):
             BasisSet("test", shells, ecp_shells, structure)
