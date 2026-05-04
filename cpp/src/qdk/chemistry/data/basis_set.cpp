@@ -2557,9 +2557,9 @@ nlohmann::json BasisSet::to_json() const {
   }
 
   if (has_ecp_electrons() || _ecp_name != "none") {
-      j["ecp_name"] = _ecp_name;
-      j["ecp_electrons"] = _ecp_electrons;
-    }
+    j["ecp_name"] = _ecp_name;
+    j["ecp_electrons"] = _ecp_electrons;
+  }
 
   if (has_aux_basis() || !_aux_name.empty()) {
     j["aux_name"] = _aux_name;
@@ -2828,8 +2828,8 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     std::shared_ptr<BasisSet> basis_set;
     if (j.contains("structure")) {
       auto structure = Structure::from_json(j["structure"]);
-      bool has_ecp = !ecp_shells.empty() || !ecp_electrons.empty() ||
-                     !ecp_name.empty();
+      bool has_ecp =
+          !ecp_shells.empty() || !ecp_electrons.empty() || !ecp_name.empty();
       if (!aux_shells.empty() && has_ecp) {
         // Both aux and ECP present: use full 8-arg constructor
         basis_set = std::make_shared<BasisSet>(
@@ -2837,9 +2837,9 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
             aux_shells, *structure, atomic_orbital_type);
       } else if (!aux_shells.empty()) {
         // Aux only
-        basis_set = std::make_shared<BasisSet>(
-            name, shells, aux_name, aux_shells, *structure,
-            atomic_orbital_type);
+        basis_set =
+            std::make_shared<BasisSet>(name, shells, aux_name, aux_shells,
+                                       *structure, atomic_orbital_type);
       } else if (!ecp_shells.empty()) {
         if (!ecp_name.empty() && !ecp_electrons.empty()) {
           basis_set = std::make_shared<BasisSet>(
