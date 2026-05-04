@@ -4,11 +4,18 @@
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
-#   .\windows-build-clang-pip.ps1                  # Full build (static vcpkg deps, default)
-#   .\windows-build-clang-pip.ps1 -DynamicDeps     # Full build (dynamic vcpkg deps, bundles DLLs)
-#   .\windows-build-clang-pip.ps1 -SkipPrereqs     # Skip prerequisite installation
-#   .\windows-build-clang-pip.ps1 -SkipBuild       # Skip build, only run tests
-#   .\windows-build-clang-pip.ps1 -SkipTests       # Skip test runs
+#   .\windows-build-clang-pip.ps1
+#
+# This will run a full build. It will check for prerequisites (VS Build Tools with C++ and Clang components, vcpkg, ud)
+# and dependencies, and install them if missing. Then it will configure, build, and test the C++ library, install it,
+# and finally build and test the Python package. By default, it uses static linking for dependencies (no DLLs).
+#
+# Optional switches:
+#   -DynamicDeps    # Use dynamic linking for dependencies (DLLs) instead of static.
+#                   # This requires copying DLLs to the Python package folder.
+#   -SkipPrereqs    # Skip prerequisite installation (VS Build tools, vcpkg, etc)
+#   -SkipBuild      # Skip the build step, only run tests
+#   -SkipTests      # Skip test runs
 
 param(
     [switch]$DynamicDeps,

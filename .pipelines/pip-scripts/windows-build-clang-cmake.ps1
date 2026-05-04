@@ -3,13 +3,20 @@
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
-#   .\windows-build-clang-cmake.ps1                  # Full build (static vcpkg deps, default)
-#   .\windows-build-clang-cmake.ps1 -DynamicDeps     # Full build (dynamic vcpkg deps, bundles DLLs)
-#   .\windows-build-clang-cmake.ps1 -SkipPrereqs     # Skip prerequisite installation
-#   .\windows-build-clang-cmake.ps1 -SkipCpp         # Skip C++ build, only do Python
-#   .\windows-build-clang-cmake.ps1 -SkipConfigure   # Skip CMake configure, incremental build only
-#   .\windows-build-clang-cmake.ps1 -SkipPython      # Skip Python build, only do C++
-#   .\windows-build-clang-cmake.ps1 -SkipTests       # Skip test runs
+#   .\windows-build-clang-cmake.ps1
+#
+# This will run a full build. It will check for prerequisites (VS Build Tools with C++ and Clang components, vcpkg, ud)
+# and dependencies, and install them if missing. Then it will configure, build, and test the C++ library, install it,
+# and finally build and test the Python package. By default, it uses static linking for dependencies (no DLLs).
+#
+# Optional switches:
+#   -DynamicDeps    # Use dynamic linking for dependencies (DLLs) instead of static.
+#                   # This requires copying DLLs to the Python package folder.
+#   -SkipPrereqs    # Skip prerequisite installation (VS Build tools, vcpkg, etc)
+#   -SkipCpp        # Skip C++ build, only do pip install step (assumes C++ library is already built and installed)
+#   -SkipConfigure  # Skip CMake configure, incremental build only
+#   -SkipPython     # Skip Python build, only do C++
+#   -SkipTests      # Skip test runs
 
 param(
     [switch]$DynamicDeps,

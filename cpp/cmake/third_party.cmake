@@ -2,10 +2,9 @@
 include(DependencyManager)
 
 # Extract QDK_UARCH FLAGS
-if(MSVC)
-    set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS}")
-else()
-    set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
+set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS}")
+if(NOT MSVC)
+    set(DEPENDENCY_BUILD_FLAGS "${DEPENDENCY_BUILD_FLAGS} -fPIC")
 endif()
 
 # Save current warning settings
@@ -73,11 +72,8 @@ set(GAUXC_ENABLE_MAGMA   OFF CACHE BOOL "Enable gauxc MAGMA Support"   FORCE)
 set(GAUXC_ENABLE_CUTLASS ON  CACHE BOOL "Enable gauxc CUTLASS Support" FORCE)
 set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA Support" FORCE)
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
-# Disable OpenMP in GauXC on Windows: its XC integrator uses element-by-element
-# #pragma omp atomic accumulation on shared matrices, which is racy under
-# LLVM libomp and causes NaN/divergence in SCF.  Keep OpenMP for the rest of
-# the project (MACIS, our own code).  Re-enable once upstream fixes the race.
-# See: https://github.com/wavefunction91/GauXC/issues/196
+# Disable OpenMP in GauXC on Windows due to open issue: https://github.com/wavefunction91/GauXC/issues/196
+# Keep OpenMP for the rest of the project (MACIS, our own code). Re-enable once the upstream issue is fixed.
 if(MSVC)
   set(GAUXC_ENABLE_OPENMP OFF CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
 else()
