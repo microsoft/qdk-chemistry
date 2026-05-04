@@ -18,8 +18,8 @@ parameters:
   type: string
   default: 2.6.15
 - name: runSlowTests
-  type: string
-  default: '1'
+  type: boolean
+  default: true
 
 steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:

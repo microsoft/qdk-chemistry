@@ -14,8 +14,11 @@ jobs:
   trigger-slow-tests:
     name: Trigger Slow Tests
     if: >
-      github.event.issue.pull_request &&
-      contains(github.event.comment.body, '@copilot run slow tests')
+      github.event.issue.pull_request && (
+        contains(github.event.comment.body, '@copilot run slow tests') ||
+        contains(github.event.comment.body, '@copilot run slow-tests') ||
+        contains(github.event.comment.body, '@copilot run tests')
+      )
     runs-on: ubuntu-latest
     steps:
     - name: Get PR head SHA
@@ -52,6 +55,6 @@ jobs:
             workflow_id: 'build-and-test.yaml',
             ref: '${{ steps.pr.outputs.ref }}',
             inputs: {
-              run_slow_tests: '1'
+              run_slow_tests: 'true'
             }
           });
