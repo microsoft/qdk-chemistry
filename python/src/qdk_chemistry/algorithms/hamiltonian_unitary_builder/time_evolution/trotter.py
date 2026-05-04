@@ -18,13 +18,13 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -33,7 +33,7 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = ["Trotter", "TrotterSettings"]
 
 
-class TrotterSettings(Settings):
+class TrotterSettings(TimeEvolutionSettings):
     """Settings for Trotter decomposition builder."""
 
     def __init__(self):
@@ -80,10 +80,13 @@ class Trotter(TimeEvolutionBuilder):
         self,
         order: int = 1,
         *,
+        time: float = 0.0,
         target_accuracy: float = 0.0,
         num_divisions: int = 0,
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
+        power: int = 1,
+        power_strategy: str = "repeat",
     ):
         r"""Initialize Trotter builder with specified Trotter decomposition settings.
 
@@ -119,6 +122,7 @@ class Trotter(TimeEvolutionBuilder):
         Args:
             order: The order of the Trotter decomposition (currently only
                 first order is supported). Defaults to 1.
+            time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for automatic step computation.
                 Must be positive to enable automatic computation.
                 Use 0.0 (default) to disable.
@@ -131,34 +135,42 @@ class Trotter(TimeEvolutionBuilder):
                 (default, tighter) or ``"naive"``.
             weight_threshold: Absolute threshold for filtering small
                 Hamiltonian coefficients. Defaults to 1e-12.
+            power: The power to raise the unitary to. Defaults to 1.
+            power_strategy: Strategy for U^power: ``"rescale"`` scales
+                time, ``"repeat"`` repeats the circuit. Defaults to ``"repeat"``.
 
         """
         super().__init__()
         self._settings = TrotterSettings()
+        self._settings.set("time", time)
+        self._settings.set("power", power)
+        self._settings.set("power_strategy", power_strategy)
         self._settings.set("order", order)
         self._settings.set("target_accuracy", target_accuracy)
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        """Construct the time evolution unitary using Trotter decomposition.
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+        """Construct the unitary representation using Trotter decomposition.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
-            time: The total evolution time.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
+        effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
         if order in {1, 2} or (order > 2 and order % 2 == 0):
-            return self._trotter(qubit_hamiltonian, time)
+            return self._trotter(qubit_hamiltonian, effective_time, power_repetitions)
         raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
 
-    def _trotter(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        r"""Construct the time evolution unitary using the Trotter decomposition.
+    def _trotter(
+        self, qubit_hamiltonian: QubitHamiltonian, time: float, power_repetitions: int = 1
+    ) -> UnitaryRepresentation:
+        r"""Construct the unitary representation using the Trotter decomposition.
 
         The First Order Trotter method approximates the time evolution operator :math:`e^{-iHt}`
         by decomposing the Hamiltonian H into a sum of terms and using the product formula:
@@ -176,9 +188,11 @@ class Trotter(TimeEvolutionBuilder):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
             time: The total evolution time.
+            power_repetitions: Number of times the full Trotter product is repeated
+                (used by the "repeat" power strategy). Defaults to 1.
 
         Returns:
-            TimeEvolutionUnitary: The time evolution unitary built by the Trotter decomposition.
+            UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
         weight_threshold = self._settings.get("weight_threshold")
@@ -193,11 +207,11 @@ class Trotter(TimeEvolutionBuilder):
 
         container = PauliProductFormulaContainer(
             step_terms=terms,
-            step_reps=num_divisions,
+            step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
         )
 
-        return TimeEvolutionUnitary(container=container)
+        return UnitaryRepresentation(container=container)
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
         """Determine the number of Trotter divisions to use.
@@ -345,9 +359,9 @@ class Trotter(TimeEvolutionBuilder):
         return terms
 
     def name(self) -> str:
-        """Return the name of the time evolution unitary builder."""
+        """Return the name of the unitary builder."""
         return "trotter"
 
     def type_name(self) -> str:
-        """Return time_evolution_builder as the algorithm type name."""
-        return "time_evolution_builder"
+        """Return unitary_builder as the algorithm type name."""
+        return "hamiltonian_unitary_builder"
