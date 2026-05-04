@@ -15,9 +15,10 @@ jobs:
     name: Trigger Slow Tests
     if: >
       github.event.issue.pull_request && (
-        contains(github.event.comment.body, '@copilot run slow tests') ||
-        contains(github.event.comment.body, '@copilot run slow-tests') ||
-        contains(github.event.comment.body, '@copilot run tests')
+        contains(github.event.comment.body, '/qdk run slow tests') ||
+        contains(github.event.comment.body, '/qdk run slow-tests') ||
+        contains(github.event.comment.body, '/qdk run tests') ||
+        contains(github.event.comment.body, '/qdk tests')
       )
     runs-on: ubuntu-latest
     steps:
