@@ -1327,10 +1327,7 @@ const std::vector<Shell>& BasisSet::get_aux_shells_for_atom(
                             " is out of range. Maximum index: " +
                             std::to_string(_aux_shells_per_atom.size() - 1));
   }
-  if (atom_index >= _aux_shells_per_atom.size()) {
-    static const std::vector<Shell> empty_vector;
-    return empty_vector;
-  }
+
   return _aux_shells_per_atom[atom_index];
 }
 
