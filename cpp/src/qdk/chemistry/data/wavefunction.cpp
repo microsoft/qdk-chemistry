@@ -577,6 +577,113 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
       "entropies.");
 }
 
+double WavefunctionContainer::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+  //       - sum_{ij} Gamma^{aabb}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{aaaa}(i,j,j,i)
+  //       - 1/4 * sum_{ij} Gamma^{bbbb}(i,j,j,i)
+  //       - 1/2 * sum_{ij} Gamma^{aabb}(i,i,j,j)
+  //
+  // Uses QDK convention: Gamma(p,q,r,s) = <a†_p a†_r a_s a_q>
+  // Flat index: p*n^3 + q*n^2 + r*n + s
+
+  if (!has_one_rdm_spin_traced()) {
+    throw std::runtime_error(
+        "Spin-traced or spin-dependent 1-RDM data is required to compute "
+        "<S^2>");
+  }
+  if (!has_two_rdm_spin_dependent()) {
+    throw std::runtime_error(
+        "Spin-dependent 2-RDMs are required to compute <S^2>");
+  }
+
+  const auto& one_rdm_traced_var = get_active_one_rdm_spin_traced();
+
+  if (detail::is_matrix_variant_complex(one_rdm_traced_var)) {
+    throw std::runtime_error(
+        "Complex 1-RDM <S^2> calculation not yet implemented");
+  }
+
+  const auto& one_rdm_traced = std::get<Eigen::MatrixXd>(one_rdm_traced_var);
+  int norbs = one_rdm_traced.rows();
+  double one_rdm_trace = one_rdm_traced.trace();
+
+  const auto& two_rdm_aabb_var =
+      std::get<0>(get_active_two_rdm_spin_dependent());
+  const auto& two_rdm_aaaa_var =
+      std::get<1>(get_active_two_rdm_spin_dependent());
+  const auto& two_rdm_bbbb_var =
+      std::get<2>(get_active_two_rdm_spin_dependent());
+
+  const std::size_t expected_two_rdm_size =
+      static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs) *
+      static_cast<std::size_t>(norbs) * static_cast<std::size_t>(norbs);
+  auto validate_two_rdm_size = [expected_two_rdm_size, norbs](
+                                   const auto& two_rdm_var,
+                                   const char* block_name) {
+    std::visit(
+        [expected_two_rdm_size, norbs, block_name](const auto& vec) {
+          if (vec.size() != expected_two_rdm_size) {
+            std::ostringstream error;
+            error << "Invalid size for spin-dependent 2-RDM block '"
+                  << block_name << "' in compute_s_squared(): got "
+                  << vec.size() << " elements, expected "
+                  << expected_two_rdm_size << " (= norbs^4 for norbs=" << norbs
+                  << ")";
+            throw std::runtime_error(error.str());
+          }
+        },
+        two_rdm_var);
+  };
+
+  validate_two_rdm_size(two_rdm_aabb_var, "aabb");
+  validate_two_rdm_size(two_rdm_aaaa_var, "aaaa");
+  validate_two_rdm_size(two_rdm_bbbb_var, "bbbb");
+  // sum_{ij} Gamma(i,j,j,i): O(n^2)
+  auto sum_ijji = [norbs](const auto& vec) -> double {
+    double sum = 0.0;
+    for (int i = 0; i < norbs; ++i) {
+      for (int j = 0; j < norbs; ++j) {
+        int idx = i * norbs * norbs * norbs + j * norbs * norbs + j * norbs + i;
+        sum += std::real(vec[idx]);
+      }
+    }
+    return sum;
+  };
+
+  // sum_{ij} Gamma(i,i,j,j): O(n^2)
+  auto sum_iijj = [norbs](const auto& vec) -> double {
+    double sum = 0.0;
+    for (int i = 0; i < norbs; ++i) {
+      for (int j = 0; j < norbs; ++j) {
+        int idx = i * norbs * norbs * norbs + i * norbs * norbs + j * norbs + j;
+        using ValueType =
+            std::decay_t<decltype(vec[static_cast<Eigen::Index>(0)])>;
+        if constexpr (std::is_same_v<ValueType, std::complex<double>>) {
+          sum += vec[idx].real();
+        } else {
+          sum += vec[idx];
+        }
+      }
+    }
+    return sum;
+  };
+
+  double aabb_ijji =
+      std::visit([&](const auto& v) { return sum_ijji(v); }, two_rdm_aabb_var);
+  double aaaa_ijji =
+      std::visit([&](const auto& v) { return sum_ijji(v); }, two_rdm_aaaa_var);
+  double bbbb_ijji =
+      std::visit([&](const auto& v) { return sum_ijji(v); }, two_rdm_bbbb_var);
+  double aabb_iijj =
+      std::visit([&](const auto& v) { return sum_iijj(v); }, two_rdm_aabb_var);
+
+  return 0.75 * one_rdm_trace - aabb_ijji - 0.25 * aaaa_ijji -
+         0.25 * bbbb_ijji - 0.5 * aabb_iijj;
+}
+
 void WavefunctionContainer::_clear_rdms() const {
   QDK_LOG_TRACE_ENTERING();
   _one_rdm_spin_traced.reset();
@@ -1450,6 +1557,11 @@ bool Wavefunction::has_two_rdm_spin_dependent() const {
 bool Wavefunction::has_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->has_two_rdm_spin_traced();
+}
+
+double Wavefunction::compute_s_squared() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->compute_s_squared();
 }
 
 // Cache management
