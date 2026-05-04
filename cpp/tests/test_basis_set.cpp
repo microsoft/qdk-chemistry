@@ -545,7 +545,7 @@ TEST_F(BasisSetTest, ECPDefaultInitialization) {
 
   // Check default ECP values
   EXPECT_FALSE(basis.has_ecp_electrons());
-  EXPECT_EQ("none", basis.get_ecp_name());
+  EXPECT_EQ("", basis.get_ecp_name());
   EXPECT_EQ(2u, basis.get_ecp_electrons().size());
   EXPECT_EQ(0u, basis.get_ecp_electrons()[0]);
   EXPECT_EQ(0u, basis.get_ecp_electrons()[1]);
@@ -835,7 +835,7 @@ TEST_F(BasisSetTest, ECPJSONSerialization) {
   auto json_no_ecp = basis_without_ecp.to_json();
   auto loaded_no_ecp = BasisSet::from_json(json_no_ecp);
   EXPECT_FALSE(loaded_no_ecp->has_ecp_electrons());
-  EXPECT_EQ("none", loaded_no_ecp->get_ecp_name());
+  EXPECT_EQ("", loaded_no_ecp->get_ecp_name());
   EXPECT_FALSE(loaded_no_ecp->has_ecp_shells());
   EXPECT_EQ(0u, loaded_no_ecp->get_num_ecp_shells());
 }
