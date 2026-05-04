@@ -331,9 +331,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -375,9 +383,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -390,6 +406,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   // Organize ECP shells by atom index
   for (const auto& ecp_shell : ecp_shells) {
     size_t atom_index = ecp_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "ECP shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _ecp_shells_per_atom.size()) {
@@ -425,9 +447,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -446,6 +476,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
           "shells and ECP electrons.");
     }
     size_t atom_index = aux_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Auxiliary shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _aux_shells_per_atom.size()) {
@@ -495,9 +531,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
         "ECP electrons vector size must match number of atoms");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -510,6 +554,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   // Organize ECP shells by atom index
   for (const auto& ecp_shell : ecp_shells) {
     size_t atom_index = ecp_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "ECP shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _ecp_shells_per_atom.size()) {
@@ -548,9 +598,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _shells_per_atom.size()) {
@@ -569,6 +627,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
           "shells and ECP electrons.");
     }
     size_t atom_index = aux_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Auxiliary shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
 
     // Ensure we have enough space for this atom
     if (atom_index >= _aux_shells_per_atom.size()) {
@@ -623,9 +687,17 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
         "ECP electrons vector size must match number of atoms");
   }
 
+  const size_t num_atoms = structure->get_num_atoms();
+
   // Organize shells by atom index
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
     if (atom_index >= _shells_per_atom.size()) {
       _shells_per_atom.resize(atom_index + 1);
     }
@@ -635,6 +707,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   // Organize ECP shells by atom index
   for (const auto& ecp_shell : ecp_shells) {
     size_t atom_index = ecp_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "ECP shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
     if (atom_index >= _ecp_shells_per_atom.size()) {
       _ecp_shells_per_atom.resize(atom_index + 1);
     }
@@ -650,6 +728,12 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
           "shells and ECP electrons.");
     }
     size_t atom_index = aux_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(
+          "Auxiliary shell atom_index (" + std::to_string(atom_index) +
+          ") is out of range for structure with " +
+          std::to_string(num_atoms) + " atoms");
+    }
     if (atom_index >= _aux_shells_per_atom.size()) {
       _aux_shells_per_atom.resize(atom_index + 1);
     }

@@ -213,9 +213,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string integral_type = _settings->get<std::string>("integral_type");
   std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
   bool has_embedded_aux_basis = qdk_raw_basis_set->has_aux_basis();
-  // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ
-  // unless the user has explicitly provided an auxiliary basis via the
-  // 'aux_basis' setting
+   // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ for
+   // "auto" and "dfj". If both an embedded auxiliary basis and the
+   // 'aux_basis' setting are present, the embedded auxiliary basis takes
+   // precedence downstream.
   bool use_dfj = (integral_type == "dfj");
   if ((integral_type == "auto" || integral_type == "dfj") &&
       has_embedded_aux_basis) {
@@ -229,6 +230,12 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
       throw std::invalid_argument(
           "DFJ requested but no auxiliary basis set provided. "
           "Set 'aux_basis' or use a BasisSet with an auxiliary basis.");
+    }
+    if (ms_scf_config->eri.method != qcs::ERIMethod::Incore) {
+      throw std::invalid_argument(
+          "Density-fitted Coulomb (DFJ) is only supported with the 'incore' "
+          "ERI method. Set eri_method='incore' (or remove the explicit "
+          "'direct' setting) when using DFJ.");
     }
     ms_scf_config->do_dfj = true;
     if (!aux_basis_name_setting.empty()) {
