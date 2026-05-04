@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution base module."""
+"""QDK/Chemistry unitary representation base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -11,51 +11,51 @@ import h5py
 
 from qdk_chemistry.data.base import DataClass
 
-from .containers.base import TimeEvolutionUnitaryContainer
+from .containers.base import UnitaryContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 
 __all__: list[str] = []
 
 
-class TimeEvolutionUnitary(DataClass):
-    """Data class for a time evolution unitary.
+class UnitaryRepresentation(DataClass):
+    """Data class for a unitary representation.
 
     Attributes:
-        container (TimeEvolutionUnitaryContainer): The container for representing the time evolution unitary.
+        container (UnitaryContainer): The container for representing the unitary.
 
     """
 
     # Class attribute for filename validation
-    _data_type_name = "time_evolution_unitary"
+    _data_type_name = "unitary_representation"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
 
-    def __init__(self, container: TimeEvolutionUnitaryContainer) -> None:
-        """Initialize a TimeEvolutionUnitary."""
+    def __init__(self, container: UnitaryContainer) -> None:
+        """Initialize a UnitaryRepresentation."""
         self._container = container
         super().__init__()
 
     def get_container_type(self) -> str:
-        """Get the type of the time evolution unitary container.
+        """Get the type of the unitary container.
 
         Returns:
-            The type of the time evolution unitary.
+            The type of the unitary.
 
         """
         return self._container.type
 
-    def get_container(self) -> TimeEvolutionUnitaryContainer:
-        """Get the time evolution unitary container.
+    def get_container(self) -> UnitaryContainer:
+        """Get the unitary container.
 
         Returns:
-            The time evolution unitary container.
+            The unitary container.
 
         """
         return self._container
 
     def get_num_qubits(self) -> int:
-        """Get the number of qubits the time evolution unitary acts on.
+        """Get the number of qubits the unitary acts on.
 
         Returns:
             The number of qubits.
@@ -64,16 +64,16 @@ class TimeEvolutionUnitary(DataClass):
         return self._container.num_qubits
 
     def to_json(self) -> dict[str, Any]:
-        """Convert the TimeEvolutionUnitary to a dictionary for JSON serialization.
+        """Convert the UnitaryRepresentation to a dictionary for JSON serialization.
 
         Returns:
-            dict: Dictionary representation of the TimeEvolutionUnitary
+            dict: Dictionary representation of the UnitaryRepresentation
 
         """
         return self._container.to_json()
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the TimeEvolutionUnitary to an HDF5 group.
+        """Save the UnitaryRepresentation to an HDF5 group.
 
         Args:
             group: HDF5 group or file to write data to
@@ -82,23 +82,23 @@ class TimeEvolutionUnitary(DataClass):
         self._container.to_hdf5(group)
 
     def get_summary(self) -> str:
-        """Get summary of time evolution unitary.
+        """Get summary of unitary representation.
 
         Returns:
-            str: Summary string describing the TimeEvolutionUnitary's contents and properties
+            str: Summary string describing the UnitaryRepresentation's contents and properties
 
         """
         return self._container.get_summary()
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "TimeEvolutionUnitary":
-        """Create TimeEvolutionUnitary from a JSON dictionary.
+    def from_json(cls, json_data: dict[str, Any]) -> "UnitaryRepresentation":
+        """Create UnitaryRepresentation from a JSON dictionary.
 
         Args:
             json_data: Dictionary containing the serialized data
 
         Returns:
-            TimeEvolutionUnitary
+            UnitaryRepresentation
 
         """
         if "container_type" not in json_data:
@@ -113,14 +113,14 @@ class TimeEvolutionUnitary(DataClass):
         return cls(container=container)
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "TimeEvolutionUnitary":
+    def from_hdf5(cls, group: h5py.Group) -> "UnitaryRepresentation":
         """Load an instance from an HDF5 group.
 
         Args:
             group: HDF5 group or file to read data from
 
         Returns:
-            TimeEvolutionUnitary
+            UnitaryRepresentation
 
         """
         container_type = group.attrs.get("container_type")
