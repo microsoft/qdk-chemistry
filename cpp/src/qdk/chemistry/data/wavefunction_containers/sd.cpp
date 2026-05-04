@@ -277,10 +277,57 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
           "active space sizes");
     }
     if (_one_rdm_spin_dependent_aa != nullptr &&
-        _one_rdm_spin_dependent_bb != nullptr) {
+        _one_rdm_spin_dependent_bb != nullptr && _orbitals->is_restricted()) {
       _one_rdm_spin_traced = detail::add_matrix_variants(
           *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+    } else if (!_orbitals->is_restricted()) {
+      // Unrestricted: C_alpha != C_beta.
+      // Express the spin-traced 1-RDM in the alpha MO basis:
+      //   D = diag(n_alpha) + T * diag(n_beta) * T^T
+      // where T = C_alpha_active^T * S * C_beta_active.
+      auto [alpha_occupations, beta_occupations] =
+          get_active_orbital_occupations();
+      size_t n_orbs = _orbitals->get_active_space_indices().first.size();
+
+      if (!_orbitals->has_overlap_matrix()) {
+        throw std::runtime_error(
+            "Overlap matrix is required for the unrestricted spin-traced "
+            "1-RDM computation.");
+      }
+      const auto& overlap = _orbitals->get_overlap_matrix();
+      const auto& c_alpha = _orbitals->get_coefficients_alpha();
+      const auto& c_beta = _orbitals->get_coefficients_beta();
+      const auto& active_a = _orbitals->get_active_space_indices().first;
+      const auto& active_b = _orbitals->get_active_space_indices().second;
+
+      // Extract active subblocks of the MO coefficient matrices
+      Eigen::MatrixXd ca_active(c_alpha.rows(), n_orbs);
+      Eigen::MatrixXd cb_active(c_beta.rows(), n_orbs);
+      for (size_t i = 0; i < n_orbs; ++i) {
+        ca_active.col(i) = c_alpha.col(active_a[i]);
+        cb_active.col(i) = c_beta.col(active_b[i]);
+      }
+
+      // T = C_alpha_active^T * S * C_beta_active  (MO overlap)
+      Eigen::MatrixXd t_matrix = ca_active.transpose() * overlap * cb_active;
+
+      // D_alpha = diag(n_alpha)
+      Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+      for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+        if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
+      }
+
+      // D_beta in alpha basis = T * diag(n_beta) * T^T
+      Eigen::VectorXd n_beta_vec = Eigen::VectorXd::Zero(n_orbs);
+      for (size_t i = 0; i < beta_occupations.size(); ++i) {
+        if (beta_occupations(i) > 0.0) n_beta_vec(i) = 1.0;
+      }
+      tmp_one_rdm += t_matrix * n_beta_vec.asDiagonal() * t_matrix.transpose();
+
+      _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
+          std::move(tmp_one_rdm));
     } else {
+      // Restricted: C_alpha == C_beta, so D = diag(n_alpha + n_beta)
       auto [alpha_occupations, beta_occupations] =
           get_active_orbital_occupations();
       size_t n_orbs = _orbitals->get_active_space_indices().first.size();
