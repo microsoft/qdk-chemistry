@@ -16,7 +16,9 @@ endif()
 set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
 message( WARNING "Turning off GPU Backend for BLAS++/LAPACK++")
 set(build_tests OFF CACHE BOOL "Build BLAS++/LAPACK++ tests" FORCE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+endif()
 
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
@@ -33,6 +35,15 @@ include( FetchContent )
   FetchContent_MakeAvailable( blaspp )
   FetchContent_MakeAvailable( lapackpp )
   target_compile_definitions( lapackpp PUBLIC LAPACK_COMPLEX_CPP )
+
+  # On Windows, blaspp's try_run() mangling detection fails because the
+  # OpenBLAS DLL is not on PATH during CMake configure.  OpenBLAS uses
+  # lowercase-with-underscore Fortran mangling (e.g. sgetrf_), so force
+  # BLAS_FORTRAN_ADD_ on both blaspp and lapackpp targets.
+  if(WIN32)
+      target_compile_definitions( blaspp   PUBLIC BLAS_FORTRAN_ADD_ )
+      target_compile_definitions( lapackpp PUBLIC BLAS_FORTRAN_ADD_ )
+  endif()
 endif()
 
 add_library( lobpcgxx INTERFACE )

@@ -2,7 +2,10 @@
 include(DependencyManager)
 
 # Extract QDK_UARCH FLAGS
-set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS} -fPIC")
+set(DEPENDENCY_BUILD_FLAGS BUILD_ARGS "${QDK_UARCH_FLAGS}")
+if(NOT MSVC)
+    set(DEPENDENCY_BUILD_FLAGS "${DEPENDENCY_BUILD_FLAGS} -fPIC")
+endif()
 
 # Save current warning settings
 get_property(_old_warn_deprecated CACHE CMAKE_WARN_DEPRECATED PROPERTY VALUE)
@@ -69,11 +72,17 @@ set(GAUXC_ENABLE_MAGMA   OFF CACHE BOOL "Enable gauxc MAGMA Support"   FORCE)
 set(GAUXC_ENABLE_CUTLASS ON  CACHE BOOL "Enable gauxc CUTLASS Support" FORCE)
 set(GAUXC_ENABLE_CUDA ${QDK_CHEMISTRY_ENABLE_GPU} CACHE BOOL "Enable gauxc CUDA Support" FORCE)
 set(GAUXC_ENABLE_MPI  ${QDK_CHEMISTRY_ENABLE_MPI} CACHE BOOL "Enable gauxc MPI Support"  FORCE)
-set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
+# Disable OpenMP in GauXC on Windows due to open issue: https://github.com/wavefunction91/GauXC/issues/196
+# Keep OpenMP for the rest of the project (MACIS, our own code). Re-enable once the upstream issue is fixed.
+if(MSVC)
+  set(GAUXC_ENABLE_OPENMP OFF CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
+else()
+  set(GAUXC_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "Enable gauxc OpenMP Support" FORCE)
+endif()
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG 62fea07c9306dbd83dd18b6957358827ac9b3da0
+  GIT_TAG 2c4a2bd785eae44ae0049f06057c23ca0239ae33
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}

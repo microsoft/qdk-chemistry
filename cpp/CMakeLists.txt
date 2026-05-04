@@ -68,9 +68,96 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Add compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG_INIT "-g -O0 -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
+# Set per-config compile flags.
+# We append to CMAKE_CXX_FLAGS_<CONFIG> (rather than replacing) to preserve toolchain defaults like /EHsc, /MD, etc.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG   " -g -O0 -Wall -Wextra")
+    string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -DNDEBUG")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG " -g -O0 -Wall -Wextra")
+    if(MSVC)
+        # clang-cl: CMake already sets /O2 /DNDEBUG; just suppress warnings
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -Wno-all -Wno-extra")
+    else()
+        string(APPEND CMAKE_CXX_FLAGS_RELEASE " -O3 -DNDEBUG -Wno-all -Wno-extra")
+    endif()
+    # Suppress noisy clang warnings from FetchContent dependencies.
+    add_compile_options(
+        -Wno-c++98-compat
+        -Wno-c++98-compat-extra-semi
+        -Wno-c++98-compat-pedantic
+        -Wno-cast-function-type-strict
+        -Wno-cast-qual
+        -Wno-covered-switch-default
+        -Wno-defaulted-function-deleted
+        -Wno-deprecated-copy-with-dtor
+        -Wno-deprecated-declarations
+        -Wno-disabled-macro-expansion
+        -Wno-documentation
+        -Wno-documentation-pedantic
+        -Wno-documentation-unknown-command
+        -Wno-double-promotion
+        -Wno-exit-time-destructors
+        -Wno-extra-semi
+        -Wno-extra-semi-stmt
+        -Wno-float-conversion
+        -Wno-float-equal
+        -Wno-format-nonliteral
+        -Wno-global-constructors
+        -Wno-implicit-float-conversion
+        -Wno-implicit-int-float-conversion
+        -Wno-inconsistent-missing-destructor-override
+        -Wno-inconsistent-missing-override
+        -Wno-macro-redefined
+        -Wno-missing-noreturn
+        -Wno-missing-prototypes
+        -Wno-newline-eof
+        -Wno-old-style-cast
+        -Wno-reserved-identifier
+        -Wno-reserved-macro-identifier
+        -Wno-shorten-64-to-32
+        -Wno-sign-conversion
+        -Wno-sign-compare
+        -Wno-suggest-override
+        -Wno-suggest-destructor-override
+        -Wno-switch-default
+        -Wno-switch-enum
+        -Wno-undefined-func-template
+        -Wno-unsafe-buffer-usage
+        -Wno-unsafe-buffer-usage-in-libc-call
+        -Wno-unused-macros
+        -Wno-unused-parameter
+        -Wno-unused-variable
+    )
+elseif(MSVC)
+    string(APPEND CMAKE_CXX_FLAGS_DEBUG   " /Zi /Od /W3")
+    string(APPEND CMAKE_CXX_FLAGS_RELEASE " /O2 /W1 /DNDEBUG")
+endif()
+
+if(MSVC)
+    # MSVC CRT doesn't define M_PI etc. without this.
+    add_compile_definitions(_USE_MATH_DEFINES)
+
+    # lapackpp's lartg.cc uses std::complex without #include <complex>.
+    # On libstdc++ it's transitively included; on MSVC STL it isn't.
+    # Use CMAKE_CXX_FLAGS (not add_compile_options) so it only applies to C++ files,
+    # avoiding STL1003 errors when C files get the C++ <complex> header.
+    # Force-include <complex> for C++ only — GauXC has C files that would break.
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /FI complex")
+
+    # gau2grid_helper.c calls exit() without #include <stdlib.h>.
+    # Clang-cl treats implicit function declarations as errors in C99+.
+    # Native MSVC cl.exe allows them by default, so no flag needed there.
+    if(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-implicit-function-declaration")
+    endif()
+
+    # blaspp's BLASFinder.cmake uses try_run() to detect Fortran name mangling,
+    # but on Windows the test executable can't find openblas.dll at runtime,
+    # leaving blas/defines.h empty and breaking lapackpp.
+    # OpenBLAS uses lowercase + trailing underscore (see OPENBLAS_FUNDERSCORE).
+    add_compile_definitions(BLAS_FORTRAN_ADD_)
+endif()
 
 # Options
 option(QDK_CHEMISTRY_ENABLE_COVERAGE    "Enable coverage build" OFF)
@@ -83,6 +170,12 @@ option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
 # Enable OpenMP by default, except on Apple platforms with AppleClang
+# On Windows with clang-cl, CMake resolves OpenMP to:
+#   OpenMP_CXX_FLAGS = -Xclang -fopenmp
+#   OpenMP_libomp_LIBRARY = .../VC/Tools/MSVC/.../lib/x64/libomp.lib
+# This uses LLVM's libomp runtime (not MSVC's vcomp*.dll). libomp.dll must
+# be present at runtime alongside the built binaries. It is found in:
+#   %VS_INSTALL_DIR%\VC\Tools\Llvm\x64\bin\libomp.dll
 cmake_dependent_option(QDK_ENABLE_OPENMP
     "Enable OpenMP support" ON
     "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
@@ -145,6 +238,56 @@ endif()
 
 # Create library
 add_library(chemistry)
+
+# Re-enable warnings for our own code that were globally suppressed for FetchContent dependencies.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang")
+    target_compile_options(chemistry PRIVATE
+        -Wcast-function-type-strict
+        -Wcast-qual
+        # -Wcovered-switch-default
+        -Wdisabled-macro-expansion
+        # -Wdefaulted-function-deleted
+        -Wdeprecated-copy-with-dtor
+        -Wdeprecated-declarations
+        # -Wdocumentation
+        # -Wdocumentation-pedantic
+        # -Wdocumentation-unknown-command
+        # -Wdouble-promotion
+        # -Wexit-time-destructors
+        # -Wextra-semi
+        # -Wextra-semi-stmt
+        # -Wfloat-conversion
+        # -Wfloat-equal
+        # -Wformat-nonliteral
+        # -Wglobal-constructors
+        # -Wimplicit-float-conversion
+        # -Wimplicit-int-float-conversion
+        # -Winconsistent-missing-destructor-override
+        # -Winconsistent-missing-override
+        # -Wmacro-redefined
+        # -Wmissing-noreturn
+        # -Wmissing-prototypes
+        # -Wnewline-eof
+        # -Wold-style-cast
+        -Wreserved-identifier
+        -Wreserved-macro-identifier
+        # -Wshorten-64-to-32
+        # -Wsign-compare
+        # -Wsign-conversion
+        # -Wsuggest-override
+        # -Wsuggest-destructor-override
+        # -Wswitch-default
+        # -Wswitch-enum
+        -Wundefined-func-template
+        -Wunreachable-code
+        -Wunreachable-code-return
+        # -Wunsafe-buffer-usage
+        # -Wunsafe-buffer-usage-in-libc-call
+        # -Wunused-macros
+        # -Wunused-parameter
+        # -Wunused-variable
+    )
+endif()
 add_subdirectory(src/qdk/chemistry/data)
 add_subdirectory(src/qdk/chemistry/algorithms)
 add_subdirectory(src/qdk/chemistry/utils)
@@ -191,8 +334,12 @@ set_target_properties(chemistry PROPERTIES OUTPUT_NAME "qdk_chemistry")
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
-        target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(chemistry PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND NOT MSVC)
+            target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(chemistry PRIVATE --coverage)
+        else()
+            message(WARNING "Coverage build is only supported with GCC or Clang compilers")
+        endif()
     else()
         message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()

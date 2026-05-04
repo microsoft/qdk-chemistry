@@ -21,8 +21,9 @@ def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:
         cwd=cwd,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
-        env=os.environ.copy(),
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
     )
 
 

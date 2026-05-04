@@ -5,6 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -24,16 +27,67 @@ from .reference_tolerances import float_comparison_absolute_tolerance, float_com
 
 def test_profile_dumping(simple_error_profile):
     """Test dumping quantum error profile to YAML."""
-    with tempfile.NamedTemporaryFile() as tmp_file:
-        simple_error_profile.to_yaml_file(tmp_file.name)
+    # NOTE: Use delete=False so the file handle is closed when the with-block exits, allowing C++ code to open it.
+    # On Windows the default (delete=True) keeps an exclusive lock on the file. We delete the file manually in `finally`
+    # via Path.unlink(). This pattern is used throughout the test suite.
+    # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        filename = tmp_file.name
+    try:
+        simple_error_profile.to_yaml_file(filename)
+    finally:
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_yaml_save_and_load_equivalence(simple_error_profile):
     """Test that a saved error profile gives the same values on loading."""
-    with tempfile.NamedTemporaryFile() as tmp_file:
-        simple_error_profile.to_yaml_file(tmp_file.name)
-        loaded_profile = QuantumErrorProfile.from_yaml_file(tmp_file.name)
+    with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+        filename = tmp_file.name
+    try:
+        simple_error_profile.to_yaml_file(filename)
+        loaded_profile = QuantumErrorProfile.from_yaml_file(filename)
         assert simple_error_profile == loaded_profile
+    finally:
+        Path(filename).unlink(missing_ok=True)
+
+
+def test_yaml_unicode_round_trip_and_stdout(tmp_path):
+    """Test Unicode YAML round-trip and subprocess stdout decoding."""
+    script_path = tmp_path / "utf8_roundtrip.py"
+    yaml_path = tmp_path / "unicode.quantum_error_profile.yaml"
+    script_path.write_text(
+        "\n".join(
+            [
+                "from pathlib import Path",
+                "import sys",
+                "from qdk_chemistry.data.noise_models import QuantumErrorProfile",
+                "",
+                "yaml_path = Path(sys.argv[1])",
+                "profile = QuantumErrorProfile(",
+                "    name='φ-profile Å',",
+                "    description='ΔE αβγ 你好',",
+                "    errors={'h': {'depolarizing_error': 0.01}},",
+                ")",
+                "profile.to_yaml_file(yaml_path)",
+                "loaded = QuantumErrorProfile.from_yaml_file(yaml_path)",
+                "assert loaded.name == 'φ-profile Å'",
+                "assert loaded.description == 'ΔE αβγ 你好'",
+                "print('UTF-8 ok: φ Å ΔE αβγ 你好')",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(script_path), str(yaml_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=True,
+        env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+    )
+
+    assert "UTF-8 ok: φ Å ΔE αβγ 你好" in result.stdout
 
 
 def test_basis_gates(simple_error_profile):

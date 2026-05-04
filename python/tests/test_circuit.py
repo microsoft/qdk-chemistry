@@ -283,7 +283,7 @@ class TestCircuitSerialization:
         try:
             circuit.to_json_file(tmp_path)
 
-            with open(tmp_path) as f:
+            with open(tmp_path, encoding="utf-8") as f:
                 loaded_data = json.load(f)
 
             assert "qasm" in loaded_data

@@ -17,11 +17,13 @@ dist/
 downloads/
 eggs/
 .eggs/
+install/
 lib/
 lib64/
 parts/
 sdist/
 var/
+vcpkg_installed/
 wheels/
 share/python-wheels/
 *.egg-info/

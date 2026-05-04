@@ -60,6 +60,7 @@ dev = [
   "mypy",
   "nbclient",
   "nbformat",
+  "pre-commit",
   "pytest",
   "pytest-env",
   "ruff"
@@ -244,7 +245,7 @@ cmake.build-type = "Release"
 # Build in current directory (python/)
 cmake.source-dir = "."
 # Enable verbose output for debugging
-cmake.verbose = true
+build.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
 metadata.version.provider = "_dev_version"
 metadata.version.provider-path = "."

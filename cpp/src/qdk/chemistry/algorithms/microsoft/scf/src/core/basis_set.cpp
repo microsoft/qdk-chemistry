@@ -245,7 +245,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
               "basis" / (normalized_path + ".json");
     name = normalized_path;
   } else {
-    name = bs_path.stem();
+    name = bs_path.stem().string();
   }
   if (!std::filesystem::exists(bs_path)) {
     auto compressed_path = QDKChemistryConfig::get_resources_dir() /
@@ -425,7 +425,7 @@ Shell Shell::from_json(const nlohmann::ordered_json& rec,
                        const std::shared_ptr<Molecule> mol) {
   QDK_LOG_TRACE_ENTERING();
 
-  Shell sh;
+  Shell sh{};
   sh.atom_index = rec["atom"].template get<uint64_t>();
   sh.angular_momentum = rec["am"].template get<uint64_t>();
 
