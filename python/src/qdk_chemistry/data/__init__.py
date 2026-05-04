@@ -113,6 +113,15 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.resource_estimator_data import (
+    CircuitCounts,
+    ErrorBudget,
+    EstimationConfig,
+    LogicalCounts,
+    LogicalQubit,
+    PhysicalCounts,
+    ResourceEstimatorData,
+)
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
 from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
@@ -134,6 +143,7 @@ __all__ = [
     "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
+    "CircuitCounts",
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
@@ -144,11 +154,15 @@ __all__ = [
     "Element",
     "EncodingMismatchError",
     "EnergyExpectationResult",
+    "ErrorBudget",
+    "EstimationConfig",
     "FermionModeOrder",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
     "LatticeGraph",
+    "LogicalCounts",
+    "LogicalQubit",
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
@@ -157,9 +171,11 @@ __all__ = [
     "PauliOperator",
     "PauliProductFormulaContainer",
     "PauliTermAccumulator",
+    "PhysicalCounts",
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
+    "ResourceEstimatorData",
     "SciWavefunctionContainer",
     "SettingNotFound",
     "SettingNotFoundError",
