@@ -1,13 +1,11 @@
-"""QDK/Chemistry phase estimation algorithms module.
-
-This module provides quantum phase estimation algorithms for estimating
-the eigenvalues of unitary operators.
-"""
+"""QDK/Chemistry controlled circuit mapper module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from .base import PhaseEstimationFactory
 
-__all__: list[str] = ["PhaseEstimationFactory"]
+from .base import ControlledCircuitMapperFactory
+from .pauli_sequence_mapper import PauliSequenceMapper
+
+__all__ = ["ControlledCircuitMapperFactory", "PauliSequenceMapper"]

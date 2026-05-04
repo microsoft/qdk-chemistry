@@ -22,7 +22,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    stability_checker
    state_preparation
    phase_estimation
-   time_evolution_builder
+   hamiltonian_unitary_builder
    circuit_mapper
    circuit_executor
 
@@ -75,12 +75,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`PhaseEstimation <phase_estimation>`
      - Quantum phase estimation
      - Circuit + QubitHamiltonian → QpeResult
-   * - :doc:`TimeEvolutionBuilder <time_evolution_builder>`
+   * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
-     - QubitHamiltonian → TimeEvolutionUnitary
-   * - :doc:`ControlledEvolutionCircuitMapper <circuit_mapper>`
+     - QubitHamiltonian → UnitaryRepresentation
+   * - :doc:`ControlledCircuitMapper <circuit_mapper>`
      - Controlled-unitary circuit synthesis
-     - TimeEvolutionUnitary → Circuit
+     - UnitaryRepresentation → Circuit
    * - :doc:`CircuitExecutor <circuit_executor>`
      - Quantum circuit execution
      - Circuit → CircuitExecutorData
