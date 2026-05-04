@@ -2526,6 +2526,12 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
                                                atomic_orbital_type);
       }
     } else {
+      if (!aux_shells.empty() || !ecp_shells.empty() ||
+          !ecp_electrons.empty() || !ecp_name.empty() || !aux_name.empty()) {
+        throw std::runtime_error(
+            "HDF5 BasisSet contains ECP or auxiliary data but no structure; "
+            "cannot reconstruct without losing information");
+      }
       basis_set = std::make_shared<BasisSet>(name, shells, atomic_orbital_type);
     }
 
