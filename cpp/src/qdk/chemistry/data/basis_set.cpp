@@ -1322,12 +1322,11 @@ std::vector<Shell> BasisSet::get_aux_shells() const {
 const std::vector<Shell>& BasisSet::get_aux_shells_for_atom(
     size_t atom_index) const {
   QDK_LOG_TRACE_ENTERING();
+  _validate_atom_index(atom_index);
   if (atom_index >= _aux_shells_per_atom.size()) {
-    throw std::out_of_range("Atom index " + std::to_string(atom_index) +
-                            " is out of range. Maximum index: " +
-                            std::to_string(_aux_shells_per_atom.size() - 1));
+    static const std::vector<Shell> empty_vector;
+    return empty_vector;
   }
-
   return _aux_shells_per_atom[atom_index];
 }
 
@@ -2526,8 +2525,11 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
                                                atomic_orbital_type);
       }
     } else {
-      if (!aux_shells.empty() || !ecp_shells.empty() ||
-          !ecp_electrons.empty() || !ecp_name.empty() || !aux_name.empty()) {
+      const bool has_real_ecp_electrons =
+          std::any_of(ecp_electrons.begin(), ecp_electrons.end(),
+                      [](size_t n) { return n != 0; });
+      if (!aux_shells.empty() || !ecp_shells.empty() || !aux_name.empty() ||
+          has_real_ecp_electrons) {
         throw std::runtime_error(
             "HDF5 BasisSet contains ECP or auxiliary data but no structure; "
             "cannot reconstruct without losing information");
