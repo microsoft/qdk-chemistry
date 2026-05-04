@@ -231,9 +231,18 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
           "DFJ requested but no auxiliary basis set provided. "
           "Set 'aux_basis' or use a BasisSet with an auxiliary basis.");
     }
-    if (ms_scf_config->eri.method != qcs::ERIMethod::Incore) {
+    bool dfj_eri_supported =
+        (ms_scf_config->eri.method == qcs::ERIMethod::Incore);
+#ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
+    dfj_eri_supported = dfj_eri_supported ||
+                        (ms_scf_config->eri.method == qcs::ERIMethod::LibintX);
+#endif
+    if (!dfj_eri_supported) {
       throw std::invalid_argument(
           "Density-fitted Coulomb (DFJ) is only supported with the 'incore' "
+#ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
+          "or 'LibintX' "
+#endif
           "ERI method. Set eri_method='incore' (or remove the explicit "
           "'direct' setting) when using DFJ.");
     }
