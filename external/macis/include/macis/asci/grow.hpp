@@ -9,6 +9,7 @@
 
 #pragma once
 #include <macis/asci/iteration.hpp>
+#include <macis/bitset_operations.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/transform.hpp>
 
@@ -47,6 +48,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
                HamiltonianGenerator<wfn_t<N>>& ham_gen,
                size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
+  assert_fast_bitset_word_access_runtime_once();
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
