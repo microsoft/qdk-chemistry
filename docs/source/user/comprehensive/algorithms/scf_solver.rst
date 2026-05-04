@@ -146,6 +146,7 @@ The solver will automatically detect the auxiliary shells and enable DF-J.
 
 .. note::
    When using density fitting, ``eri_method`` must be set to ``"incore"``.
+   If QDK/Chemistry is built with LibintX support enabled, ``eri_method="LibintX"`` is also supported for DF-J.
    The ``integral_type`` setting defaults to ``"auto"``, which automatically enables DF-J when an auxiliary basis is detected.
 
 
@@ -316,11 +317,11 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``integral_type``
      - string
      - ``"auto"``
-     - How to evaluate two-electron integrals: ``"four_center"`` for standard ERIs, ``"dfj"`` for density-fitted Coulomb (J) integrals, or ``"auto"`` to select automatically based on whether an auxiliary basis is present.
+     - How to evaluate two-electron integrals: ``"four_center"`` for standard ERIs, ``"dfj"`` for density-fitted Coulomb (J) integrals, or ``"auto"`` to select automatically based on whether an auxiliary basis is present. When ``"dfj"`` is used, an auxiliary basis must be provided either embedded in the :class:`~qdk_chemistry.data.BasisSet` object or via the ``aux_basis`` setting. If the BasisSet already contains an auxiliary basis, it takes precedence over ``aux_basis``.
    * - ``aux_basis``
      - string
      - ``""``
-     - Auxiliary basis set name for density-fitted Coulomb integrals (e.g., ``"def2-universal-jfit"``). Only used when ``integral_type`` is ``"dfj"`` or ``"auto"`` and the :class:`~qdk_chemistry.data.BasisSet` includes auxiliary shells.
+     - Auxiliary basis set name for density-fitted Coulomb integrals (e.g., ``"def2-universal-jfit"``). Only used when ``integral_type`` is ``"dfj"``. Ignored if the :class:`~qdk_chemistry.data.BasisSet` object already contains an auxiliary basis.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

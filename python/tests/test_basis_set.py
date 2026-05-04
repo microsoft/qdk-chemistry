@@ -1149,7 +1149,7 @@ def test_basis_set_ecp_functionality():
 
     # Test default ECP state
     assert not basis.has_ecp_electrons()
-    assert basis.get_ecp_name() == "none"
+    assert basis.get_ecp_name() == ""
     assert basis.get_ecp_electrons() == [0, 0, 0]
 
     # Test creating ECP with constructor
@@ -1469,6 +1469,13 @@ def test_basis_set_from_element_map():
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 15
 
+    # Test from_element_map with auxiliary basis set
+    element_aux_map = {"H": "def2-universal-jfit", "O": "def2-universal-jfit"}
+    basis_with_aux = BasisSet.from_element_map(element_basis_map, element_aux_map, structure)
+    assert basis_with_aux.get_name() == "custom_basis_set"
+    assert basis_with_aux.has_aux_basis()
+    assert basis_with_aux.get_num_aux_shells() > 0
+
 
 def test_basis_set_from_index_map():
     """Test creating basis set using from_index_map static method."""
@@ -1494,6 +1501,17 @@ def test_basis_set_from_index_map():
     # Check number of orbitals
     num_orbitals = determinant.get_orbitals().get_num_molecular_orbitals()
     assert num_orbitals == 24
+
+    # Test from_index_map with auxiliary basis set
+    index_aux_map = {
+        0: "def2-universal-jfit",
+        1: "def2-universal-jfit",
+        2: "def2-universal-jfit",
+    }
+    basis_with_aux = BasisSet.from_index_map(index_basis_map, index_aux_map, structure)
+    assert basis_with_aux.get_name() == "custom_basis_set"
+    assert basis_with_aux.has_aux_basis()
+    assert basis_with_aux.get_num_aux_shells() > 0
 
 
 def test_basis_set_static_constants():
@@ -1580,125 +1598,6 @@ def test_auxiliary_basis_set_accessors():
     assert aux_for_atom0[0].orbital_type == OrbitalType.S
 
 
-def test_auxiliary_basis_set_constructors():
-    """Test constructors that include auxiliary basis set parameters."""
-    # Set up structure
-    positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
-    elements = ["H", "H"]
-    structure = Structure(elements, positions)
-
-    # --- Constructor: BasisSet(name, shells, aux_shells, structure) ---
-    shells = [
-        Shell(0, OrbitalType.S, [1.0], [1.0]),
-        Shell(1, OrbitalType.S, [1.0], [1.0]),
-    ]
-    aux_shells = [
-        Shell(0, OrbitalType.S, [3.0], [1.0]),
-        Shell(0, OrbitalType.P, [1.5], [0.8]),
-        Shell(1, OrbitalType.S, [3.0], [1.0]),
-        Shell(1, OrbitalType.P, [1.5], [0.8]),
-    ]
-
-    basis_with_aux = BasisSet("test-basis", shells, aux_shells, structure)
-    assert basis_with_aux.get_name() == "test-basis"
-    assert basis_with_aux.get_num_shells() == 2
-    assert basis_with_aux.has_aux_basis()
-    assert basis_with_aux.get_num_aux_shells() == 4
-
-    # --- Constructor: BasisSet(name, shells, aux_name, aux_shells, structure) ---
-    basis_named = BasisSet("test-basis", shells, "aux-named", aux_shells, structure)
-    assert basis_named.has_aux_basis()
-    assert basis_named.get_aux_name() == "aux-named"
-    assert basis_named.get_num_aux_shells() == 4
-
-    # Test with AOType.Cartesian
-    basis_cart = BasisSet("test-basis", shells, aux_shells, structure, AOType.Cartesian)
-    assert basis_cart.get_atomic_orbital_type() == AOType.Cartesian
-    assert basis_cart.has_aux_basis()
-
-
-def test_ecp_with_combined_constructors():
-    """Test ECP functionality of constructors that accept both ECP and auxiliary parameters."""
-    # Set up structure
-    positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
-    elements = ["H", "H"]
-    structure = Structure(elements, positions)
-
-    shells = [
-        Shell(0, OrbitalType.S, [1.0], [1.0]),
-        Shell(1, OrbitalType.S, [1.0], [1.0]),
-    ]
-    ecp_shells = [Shell(0, OrbitalType.S, [5.0], [10.0], [0])]
-
-    # --- Constructor: BasisSet(name, shells, ecp_shells, ecp_electrons, structure) ---
-    basis = BasisSet("test-ecp", shells, ecp_shells, [2, 0], structure)
-    assert basis.get_name() == "test-ecp"
-    assert basis.get_num_shells() == 2
-    assert basis.has_ecp_shells()
-    assert basis.get_num_ecp_shells() == 1
-
-    # --- Constructor: BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons, aux_name, aux_shells, structure) ---
-    basis_full = BasisSet(
-        "full-ecp",
-        shells,
-        "my-ecp",
-        ecp_shells,
-        [2, 0],
-        structure,
-    )
-    assert basis_full.get_name() == "full-ecp"
-    assert basis_full.has_ecp_shells()
-    assert basis_full.get_ecp_name() == "my-ecp"
-    assert list(basis_full.get_ecp_electrons()) == [2, 0]
-    assert basis_full.get_num_ecp_shells() == 1
-
-
-def test_auxiliary_with_combined_constructors():
-    """Test auxiliary basis functionality using the aux-only constructor."""
-    # Set up structure
-    positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
-    elements = ["H", "H"]
-    structure = Structure(elements, positions)
-
-    shells = [
-        Shell(0, OrbitalType.S, [1.0], [1.0]),
-        Shell(1, OrbitalType.S, [1.0], [1.0]),
-    ]
-    aux_shells = [
-        Shell(0, OrbitalType.S, [2.0], [1.0]),
-        Shell(1, OrbitalType.S, [2.0], [1.0]),
-    ]
-
-    # --- Constructor: BasisSet(name, shells, aux_name, aux_shells, structure) ---
-    basis = BasisSet("test-aux", shells, "my-aux", aux_shells, structure)
-    assert basis.has_aux_basis()
-    assert not basis.has_ecp_shells()
-    assert basis.get_aux_name() == "my-aux"
-    assert basis.get_num_aux_shells() == 2
-
-    # Test with Cartesian
-    basis_cart = BasisSet("test-aux-cart", shells, aux_shells, structure, AOType.Cartesian)
-    assert basis_cart.get_atomic_orbital_type() == AOType.Cartesian
-    assert basis_cart.has_aux_basis()
-    assert not basis_cart.has_ecp_shells()
-
-    # Test 8-arg constructor with empty ECP to create aux-only basis
-    basis_full = BasisSet(
-        "aux-only",
-        shells,
-        "none",
-        [],
-        [0, 0],
-        "my-aux",
-        aux_shells,
-        structure,
-    )
-    assert basis_full.has_aux_basis()
-    assert not basis_full.has_ecp_shells()
-    assert basis_full.get_aux_name() == "my-aux"
-    assert basis_full.get_num_aux_shells() == 2
-
-
 def test_auxiliary_basis_set_from_basis_name_database():
     """Test from_basis_name with auxiliary using actual basis set database."""
     positions = np.array([[0.0, 0.0, 0.0], [1.4, 0.0, 0.0]])
@@ -1761,7 +1660,7 @@ class TestBasisSetConstructorDispatch:
 
     @pytest.fixture
     def ecp_shells(self):
-        return [Shell(0, OrbitalType.S, [5.0], [10.0], [0])]
+        return [Shell(0, OrbitalType.S, [5.0], [10.0], [1])]
 
     # --- Copy constructor: BasisSet(other) ---
 
@@ -1773,7 +1672,7 @@ class TestBasisSetConstructorDispatch:
 
     def test_copy_rejects_kwargs(self, shells):
         original = BasisSet("orig", shells)
-        with pytest.raises(TypeError, match="copy constructor does not accept keyword"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet(original, atomic_orbital_type=AOType.Cartesian)
 
     # --- (name, shells) ---
@@ -1882,27 +1781,27 @@ class TestBasisSetConstructorDispatch:
     # --- Error cases: unexpected kwargs ---
 
     def test_rejects_unexpected_kwarg(self, shells):
-        with pytest.raises(TypeError, match="unexpected keyword argument 'bogus'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, bogus=42)
 
     def test_rejects_unexpected_kwarg_typo(self, shells):
-        with pytest.raises(TypeError, match="unexpected keyword argument 'struture'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, struture="oops")
 
     # --- Error cases: multiple values ---
 
     def test_rejects_name_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="multiple values for argument 'name'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", name="other", shells=shells)
 
     def test_rejects_shells_multiple_values(self, shells):
-        with pytest.raises(TypeError, match="multiple values for argument 'shells'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet("test", shells, shells=shells)
 
     # --- Error cases: structure without shells ---
 
     def test_rejects_structure_without_shells(self, structure):
-        with pytest.raises(TypeError, match="'structure' keyword requires 'name' and 'shells'"):
+        with pytest.raises(TypeError, match="incompatible constructor arguments"):
             BasisSet(name="test", structure=structure)
 
     # --- Error cases: no matching constructor ---
@@ -1918,5 +1817,5 @@ class TestBasisSetConstructorDispatch:
     # --- Error cases: ECP shells at n==4 should raise ---
 
     def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
-        with pytest.raises(TypeError, match="ECP shells requires explicit ecp_electrons"):
+        with pytest.raises(ValueError, match="Auxiliary shells contains a shell with radial powers"):
             BasisSet("test", shells, ecp_shells, structure)

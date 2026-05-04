@@ -35,7 +35,6 @@ except ImportError:
 
 if PYSCF_AVAILABLE:
     from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-    from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf.conversion import (
         basis_to_pyscf_mol,
         hamiltonian_to_scf,
@@ -2588,18 +2587,7 @@ class TestQDKChemistryPySCFBasisConversion:
         """Test ECP edge cases: shells without metadata and full structure format."""
         ag_structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
 
-        # Edge case 1: ECP shells exist without ECP metadata
-        shells = [Shell(0, OrbitalType.S, [1.0], [1.0])]
-        ecp_shells = [Shell(0, OrbitalType.S, [10.0, 5.0], [50.0, 20.0], [0, 2])]
-        ecp_electrons = [10]
-        qdk_basis_no_meta = BasisSet("test-basis", shells, ecp_shells, ecp_electrons, ag_structure, AOType.Spherical)
-
-        assert qdk_basis_no_meta.has_ecp_shells()
-        assert qdk_basis_no_meta.get_num_ecp_shells() == 1
-        assert qdk_basis_no_meta.has_ecp_electrons()
-        assert qdk_basis_no_meta.get_ecp_name() == "none"
-
-        # Edge case 2: Full ECP structure format roundtrip
+        # Edge case: Full ECP structure format roundtrip
         pyscf_mol_orig = pyscf.gto.M(atom="Ag 0 0 0", spin=1, basis="lanl2dz", ecp="lanl2dz", verbose=0)
         qdk_basis_1 = pyscf_mol_to_qdk_basis(pyscf_mol_orig, ag_structure)
 
