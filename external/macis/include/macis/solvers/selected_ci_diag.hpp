@@ -19,6 +19,7 @@
 #include <sparsexx/io/write_dist_mm.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/util/submatrix.hpp>
+#include <stdexcept>
 
 namespace macis {
 
@@ -186,6 +187,14 @@ double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
 
   const size_t ndets = std::distance(dets_begin, dets_end);
   const bool incremental = cache != nullptr;
+
+#ifdef MACIS_ENABLE_MPI
+  if (incremental) {
+    throw std::runtime_error(
+        "selected_ci_diag: incremental mode is not supported when "
+        "MACIS_ENABLE_MPI is enabled");
+  }
+#endif
 
   logger->info("[Selected CI Solver{}]:", incremental ? " (incremental)" : "");
   logger->info("  {} = {:6}, {} = {:.5e}, {} = {:.5e}, {} = {:4}", "NDETS",
