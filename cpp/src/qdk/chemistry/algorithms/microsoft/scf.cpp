@@ -213,10 +213,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   std::string integral_type = _settings->get<std::string>("integral_type");
   std::string aux_basis_name_setting = _settings->get<std::string>("aux_basis");
   bool has_embedded_aux_basis = qdk_raw_basis_set->has_aux_basis();
-   // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ for
-   // "auto" and "dfj". If both an embedded auxiliary basis and the
-   // 'aux_basis' setting are present, the embedded auxiliary basis takes
-   // precedence downstream.
+  // Auto-detect: if the BasisSet carries an auxiliary basis, enable DFJ for
+  // "auto" and "dfj". If both an embedded auxiliary basis and the
+  // 'aux_basis' setting are present, the embedded auxiliary basis takes
+  // precedence downstream.
   bool use_dfj = (integral_type == "dfj");
   if ((integral_type == "auto" || integral_type == "dfj") &&
       has_embedded_aux_basis) {
