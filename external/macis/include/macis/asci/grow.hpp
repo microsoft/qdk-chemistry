@@ -9,7 +9,6 @@
 
 #pragma once
 #include <macis/asci/iteration.hpp>
-#include <macis/bitset_operations.hpp>
 #include <macis/util/mpi.hpp>
 #include <macis/util/transform.hpp>
 

@@ -14,43 +14,8 @@
 #include <cstring>
 #include <iostream>
 #include <macis/types.hpp>
-#include <type_traits>
 
 namespace macis {
-
-namespace detail {
-
-template <size_t N>
-inline bool bitset_word_layout_valid_runtime() {
-  static_assert(N % 64 == 0, "N must be 64-bit word aligned");
-
-  std::bitset<N> bits;
-  bits.reset();
-  bits.set(63);
-
-  uint64_t u = 0;
-  std::memcpy(&u, &bits, sizeof(uint64_t));
-
-  return u == (uint64_t(1) << 63);
-}
-
-template <size_t N>
-inline void assert_bitset_word_access_valid_runtime_once() {
-#ifndef NDEBUG
-  static_assert(N % 64 == 0, "N must be 64-bit word aligned");
-  static const bool kValid = bitset_word_layout_valid_runtime<N>();
-  assert(kValid &&
-         "reinterpret_cast<uint64_t*> path requires bitset storage to map to "
-         "packed 64-bit words with expected cross-word bit positions");
-#endif
-}
-
-}  // namespace detail
-
-inline void assert_fast_bitset_word_access_runtime_once() {
-  detail::assert_bitset_word_access_valid_runtime_once<64>();
-  detail::assert_bitset_word_access_valid_runtime_once<128>();
-}
 
 /**
  *  @brief Typesafe CLZ

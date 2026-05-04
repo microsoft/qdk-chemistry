@@ -10,7 +10,6 @@
 #pragma once
 #include <algorithm>
 #include <macis/asci/iteration.hpp>
-#include <macis/bitset_operations.hpp>
 
 namespace macis {
 
