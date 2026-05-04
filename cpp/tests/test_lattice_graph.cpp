@@ -500,3 +500,66 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
         kg_pxy.adjacency_matrix().isApprox(expected_pxy.adjacency_matrix()));
   }
 }
+
+// Coloring helper: confirm no two same-color edges share a vertex.
+static void check_valid_edge_coloring(
+    const EdgeColoring& coloring) {
+  std::map<std::uint64_t, std::set<int>> incident;
+  for (const auto& [edge, color] : coloring) {
+    auto [a, b] = edge;
+    EXPECT_EQ(incident[a].count(color), 0u)
+        << "vertex " << a << " has two edges of color " << color;
+    EXPECT_EQ(incident[b].count(color), 0u)
+        << "vertex " << b << " has two edges of color " << color;
+    incident[a].insert(color);
+    incident[b].insert(color);
+  }
+}
+
+TEST_F(LatticeGraphTest, ColorCount) {
+  auto chain_open = LatticeGraph::chain(5, false);
+  ASSERT_TRUE(chain_open.edge_coloring().has_value());
+  std::set<int> chain_open_colors;
+  for (const auto& [e, c] : *chain_open.edge_coloring())
+    chain_open_colors.insert(c);
+  EXPECT_GT(chain_open_colors.size(), 0u);
+
+  auto chain_periodic_even = LatticeGraph::chain(6, true);
+  ASSERT_TRUE(chain_periodic_even.edge_coloring().has_value());
+
+  auto hc = LatticeGraph::honeycomb(3, 3, true, true);
+  ASSERT_TRUE(hc.edge_coloring().has_value());
+  // Honeycomb uses exactly 3 colors.
+  std::set<int> hc_colors;
+  for (const auto& [e, c] : *hc.edge_coloring()) hc_colors.insert(c);
+  EXPECT_EQ(hc_colors.size(), 3u);
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsValid) {
+  // For every factory-built lattice, the coloring must be present and valid.
+  std::vector<LatticeGraph> graphs;
+  graphs.emplace_back(LatticeGraph::chain(8, true));
+  graphs.emplace_back(LatticeGraph::square(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::triangular(4, 4, true, true));
+  graphs.emplace_back(LatticeGraph::honeycomb(3, 3, true, true));
+  graphs.emplace_back(LatticeGraph::kagome(2, 3, true, true));
+
+  for (const auto& g : graphs) {
+    ASSERT_TRUE(g.edge_coloring().has_value());
+    check_valid_edge_coloring(*g.edge_coloring());
+  }
+
+  // Custom adjacency: no coloring by default.
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  std::map<Edge, double> custom_edges = {
+      {{0, 1}, 1.0}, {{1, 2}, 1.0}, {{2, 3}, 1.0}, {{3, 0}, 1.0}};
+  LatticeGraph custom(custom_edges, 4);
+  EXPECT_FALSE(custom.edge_coloring().has_value());
+}
+
+TEST_F(LatticeGraphTest, EdgeColoringIsImmutable) {
+  auto sq = LatticeGraph::square(4, 4, true, true);
+  const auto& first = sq.edge_coloring();
+  const auto& second = sq.edge_coloring();
+  EXPECT_EQ(&first, &second);
+}

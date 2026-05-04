@@ -72,3 +72,15 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`Circuit <circuit>`
      - Quantum circuit (OpenQASM, Q#, QIR, Qiskit)
      - :doc:`StatePreparation <../algorithms/state_preparation>`, User input
+
+QubitHamiltonian and term partitions
+------------------------------------
+
+A :class:`~qdk_chemistry.data.QubitHamiltonian` carries an optional :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` field describing how its Pauli terms are organised into algorithm-relevant subsets.
+The partition is index-based — it stores indices into :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` rather than nested ``QubitHamiltonian`` objects — so it serialises cheaply alongside the Hamiltonian.
+
+A :class:`~qdk_chemistry.data.TermPartition` can represent single-level groupings (see :class:`~qdk_chemistry.data.FlatPartition`) or hierarchical group-and-layer structures (see :class:`~qdk_chemistry.data.LayeredPartition`).
+The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this Hamiltonian.
+Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitHamiltonian.to_interleaved`) reset the partition to ``None`` on the new instance.
+
+Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/time_evolution_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.

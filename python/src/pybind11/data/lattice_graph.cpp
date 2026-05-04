@@ -216,6 +216,30 @@ Returns:
 )",
                     py::arg("i"), py::arg("j"));
 
+  lattice_graph.def_property_readonly(
+      "edge_coloring",
+      [](const LatticeGraph &self) -> std::optional<py::dict> {
+        const auto &coloring = self.edge_coloring();
+        if (!coloring.has_value()) {
+          return std::nullopt;
+        }
+        py::dict out;
+        for (const auto &[edge, color] : *coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
+Edge coloring stored at construction time, or ``None``.
+
+Factory methods for recognised topologies pre-populate this field.
+Returns ``None`` for lattices constructed without a coloring.
+
+Returns:
+    dict[tuple[int, int], int] | None: Mapping of canonical edges (``i < j``)
+    to non-negative color labels, or ``None``.
+)");
+
   // Static factory methods
   lattice_graph.def_static("chain", &LatticeGraph::chain, R"(
 Create a one-dimensional chain lattice.

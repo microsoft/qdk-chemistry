@@ -13,10 +13,31 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+
+def _group_commuting(qh: QubitHamiltonian, *, qubit_wise: bool = True) -> list[QubitHamiltonian]:
+    """Materialise commuting groups via the term_grouper algorithm.
+
+    Replacement for the removed ``QubitHamiltonian.group_commuting`` method
+    used by the legacy tests below.
+    """
+    strategy = "qubit_wise_commuting" if qubit_wise else "commuting"
+    grouped = registry.create("term_grouper", strategy).run(qh)
+    partition = grouped.term_partition
+    return [
+        QubitHamiltonian(
+            pauli_strings=[grouped.pauli_strings[i] for i in group],
+            coefficients=np.asarray([grouped.coefficients[i] for i in group]),
+            encoding=grouped.encoding,
+            fermion_mode_order=grouped.fermion_mode_order,
+        )
+        for group in partition.groups
+    ]
 
 
 def _pauli_matrix(label):
@@ -69,7 +90,7 @@ class TestQubitHamiltonian:
     def test_group_commuting(self):
         """Test group_commuting."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = qubit_hamiltonian.group_commuting(qubit_wise=False)
+        grouped = _group_commuting(qubit_hamiltonian, qubit_wise=False)
         assert len(grouped) == 2
 
         # Verify coefficients are preserved
@@ -86,7 +107,7 @@ class TestQubitHamiltonian:
     def test_group_commuting_qubitwise(self):
         """Test group_commuting without qubit-wise commuting."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = qubit_hamiltonian.group_commuting(qubit_wise=True)
+        grouped = _group_commuting(qubit_hamiltonian, qubit_wise=True)
         assert len(grouped) == 4  # Qubit-wise commuting returns four groups
 
         # Check that all original Pauli strings are present across all groups
@@ -100,7 +121,7 @@ class TestQubitHamiltonian:
         """Test that fully commuting operators go into one group."""
         # ZI, IZ, ZZ all commute with each other
         qh = QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, -0.5, 0.3]))
-        grouped = qh.group_commuting(qubit_wise=False)
+        grouped = _group_commuting(qh, qubit_wise=False)
         assert len(grouped) == 1
         assert len(grouped[0].pauli_strings) == 3
 
@@ -108,13 +129,13 @@ class TestQubitHamiltonian:
         """Test that non-commuting operators each get their own group."""
         # X and Z anticommute; Y and X anticommute; Y and Z anticommute
         qh = QubitHamiltonian(["X", "Z", "Y"], np.array([1.0, -0.5, 0.3]))
-        grouped = qh.group_commuting(qubit_wise=False)
+        grouped = _group_commuting(qh, qubit_wise=False)
         assert len(grouped) == 3
 
     def test_group_commuting_single_term(self):
         """Test group_commuting with a single term."""
         qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
-        grouped = qh.group_commuting(qubit_wise=False)
+        grouped = _group_commuting(qh, qubit_wise=False)
         assert len(grouped) == 1
         assert grouped[0].pauli_strings == ["ZZ"]
 
@@ -125,7 +146,7 @@ class TestQubitHamiltonian:
             np.array([-0.8, 0.17, -0.17, 0.12, 0.04, 0.04]),
         )
         # General commuting: all diagonal terms commute, XX and YY commute with each other and with diag terms
-        grouped = qh.group_commuting(qubit_wise=False)
+        grouped = _group_commuting(qh, qubit_wise=False)
         total_terms = sum(len(g.pauli_strings) for g in grouped)
         assert total_terms == 6
         # Verify ground state energy via eigenvalues
@@ -144,7 +165,7 @@ class TestQubitHamiltonian:
         coeffs = np.array([0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15])
         qh = QubitHamiltonian(labels, coeffs)
         original_mat = qh.to_matrix()
-        groups = qh.group_commuting(qubit_wise=True)
+        groups = _group_commuting(qh, qubit_wise=True)
         reconstructed = np.zeros_like(original_mat)
         for g in groups:
             reconstructed += g.to_matrix()
@@ -537,7 +558,7 @@ class TestFermionModeOrder:
             np.array([1.0, 0.5, -0.5]),
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
-        for group in qh.group_commuting(qubit_wise=True):
+        for group in _group_commuting(qh, qubit_wise=True):
             assert group.fermion_mode_order == FermionModeOrder.BLOCKED
 
     def test_to_interleaved_sets_order(self):

@@ -510,6 +510,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledEvolutionCircuitMapperFactory,
@@ -517,6 +518,7 @@ def _register_python_factories():
 
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
+    register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
     register_factory(TimeEvolutionBuilderFactory())
@@ -585,6 +587,11 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
+        FullCommutingTermGrouper,
+        IdentityTermGrouper,
+        QubitWiseCommutingTermGrouper,
+    )
     from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
@@ -603,6 +610,9 @@ def _register_python_algorithms():
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
+    register(lambda: FullCommutingTermGrouper())
+    register(lambda: QubitWiseCommutingTermGrouper())
+    register(lambda: IdentityTermGrouper())
     register(lambda: Trotter())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())

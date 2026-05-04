@@ -3,11 +3,16 @@
 // license information.
 
 #include <Eigen/Sparse>
+#include <algorithm>
 #include <cstdint>
 #include <fstream>
+#include <limits>
 #include <nlohmann/json.hpp>
+#include <numeric>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <random>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -60,10 +65,12 @@ LatticeGraph::LatticeGraph(
   _is_symmetric = _check_symmetry(adjacency_);
 }
 
-LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency)
+LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
+                           std::optional<EdgeColoring> coloring)
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
-      _is_symmetric(_check_symmetry(adjacency_)) {}
+      _is_symmetric(_check_symmetry(adjacency_)),
+      _edge_coloring(std::move(coloring)) {}
 
 LatticeGraph LatticeGraph::from_dense_matrix(
     const Eigen::MatrixXd& adjacency_matrix) {
@@ -152,7 +159,8 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t) {
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj));
+  return LatticeGraph(std::move(adj),
+                      chain_coloring(static_cast<std::int64_t>(N), periodic));
 }
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
@@ -199,7 +207,8 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj));
+  return LatticeGraph(std::move(adj),
+                      square_coloring(Nx, Ny, periodic_x, periodic_y));
 }
 
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
@@ -257,7 +266,7 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj));
+  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
 }
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -309,7 +318,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj));
+  return LatticeGraph(std::move(adj),
+                      honeycomb_coloring(Nx, Ny, periodic_x, periodic_y));
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
@@ -381,7 +391,184 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj));
+  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
+}
+
+namespace detail {
+
+// Collect every undirected edge (i, j) with i < j from the adjacency matrix.
+std::vector<std::pair<std::uint64_t, std::uint64_t>> undirected_edges(
+    const Eigen::SparseMatrix<double>& adj) {
+  std::vector<std::pair<std::uint64_t, std::uint64_t>> edges;
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      if (it.row() < it.col() && it.value() != 0.0) {
+        edges.emplace_back(static_cast<std::uint64_t>(it.row()),
+                           static_cast<std::uint64_t>(it.col()));
+      }
+    }
+  }
+  return edges;
+}
+
+}  // namespace detail
+
+// Greedy edge coloring: place each edge in the lowest-index color whose
+// vertices do not already touch that color.  Optionally retry with shuffled
+// edge orders and keep the result with fewest colors.
+EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
+                                  int seed, int trials) {
+  auto edges_in = detail::undirected_edges(adj);
+  if (edges_in.empty() || trials < 1) {
+    return {};
+  }
+
+  EdgeColoring best;
+  int best_count = std::numeric_limits<int>::max();
+  std::mt19937 rng(static_cast<std::uint32_t>(seed));
+
+  std::vector<std::size_t> order(edges_in.size());
+  std::iota(order.begin(), order.end(), 0);
+
+  for (int trial = 0; trial < trials; ++trial) {
+    if (trial > 0) {
+      std::shuffle(order.begin(), order.end(), rng);
+    }
+
+    EdgeColoring coloring;
+    // For each vertex, the set of colors already incident to it.
+    std::map<std::uint64_t, std::set<int>> vertex_colors;
+    int max_color = -1;
+
+    for (std::size_t pos : order) {
+      const auto& edge = edges_in[pos];
+      const auto& used_i = vertex_colors[edge.first];
+      const auto& used_j = vertex_colors[edge.second];
+      int chosen = 0;
+      while (used_i.count(chosen) != 0 || used_j.count(chosen) != 0) {
+        ++chosen;
+      }
+      coloring[edge] = chosen;
+      vertex_colors[edge.first].insert(chosen);
+      vertex_colors[edge.second].insert(chosen);
+      if (chosen > max_color) max_color = chosen;
+    }
+
+    int distinct = max_color + 1;
+    if (distinct < best_count) {
+      best_count = distinct;
+      best = std::move(coloring);
+    }
+  }
+  return best;
+}
+
+// Deterministic two-coloring of an open chain: edge (i, i+1) gets color i % 2.
+// For periodic chains, even N keeps two colors, odd N requires a third for
+// the wrap edge to satisfy the no-incident-same-color constraint.
+EdgeColoring chain_coloring(std::int64_t n, bool periodic) {
+  EdgeColoring out;
+  for (std::int64_t i = 0; i + 1 < n; ++i) {
+    out[{static_cast<std::uint64_t>(i), static_cast<std::uint64_t>(i + 1)}] =
+        static_cast<int>(i % 2);
+  }
+  if (periodic && n > 2) {
+    int wrap_color = (n % 2 == 0) ? 1 : 2;  // last edge color is (n-2)%2
+    out[{0, static_cast<std::uint64_t>(n - 1)}] = wrap_color;
+  }
+  return out;
+}
+
+// Deterministic edge coloring for the square lattice.  Horizontal and vertical
+// edges live on disjoint axes; each axis can be 2-colored by alternating.
+// With periodic boundaries, an odd extent on that axis forces a third color
+// on its wrap edges.  Total colors: 2 (open) up to 4 (both axes odd-periodic).
+EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny,
+                             bool periodic_x, bool periodic_y) {
+  EdgeColoring out;
+  auto idx = [Nx](std::int64_t x, std::int64_t y) {
+    return static_cast<std::uint64_t>(y * Nx + x);
+  };
+  auto put = [&out](std::uint64_t a, std::uint64_t b, int c) {
+    auto edge = std::minmax(a, b);
+    out[{edge.first, edge.second}] = c;
+  };
+
+  // Horizontal edges use colors {0, 1}; vertical edges use {2, 3}.  When a
+  // periodic dimension has odd extent the wrap edge needs its own color
+  // (4 for x-wrap parity-conflict, 5 for y-wrap parity-conflict).
+  for (std::int64_t y = 0; y < Ny; ++y) {
+    for (std::int64_t x = 0; x + 1 < Nx; ++x) {
+      put(idx(x, y), idx(x + 1, y), static_cast<int>(x % 2));
+    }
+    if (periodic_x && Nx > 2) {
+      int wrap_color = (Nx % 2 == 0) ? 1 : 4;
+      put(idx(Nx - 1, y), idx(0, y), wrap_color);
+    }
+  }
+  for (std::int64_t x = 0; x < Nx; ++x) {
+    for (std::int64_t y = 0; y + 1 < Ny; ++y) {
+      put(idx(x, y), idx(x, y + 1), 2 + static_cast<int>(y % 2));
+    }
+    if (periodic_y && Ny > 2) {
+      int wrap_color = (Ny % 2 == 0) ? 3 : 5;
+      put(idx(x, Ny - 1), idx(x, 0), wrap_color);
+    }
+  }
+
+  // Compact the color labels so the result is in 0..(distinct-1).
+  std::map<int, int> remap;
+  for (const auto& [edge, c] : out) {
+    remap.emplace(c, static_cast<int>(remap.size()));
+  }
+  for (auto& [edge, c] : out) {
+    c = remap.at(c);
+  }
+  return out;
+}
+
+// Deterministic 3-coloring for honeycomb lattice.  The honeycomb has max
+// degree 3 with three structurally distinct bond types: intra-cell (A–B),
+// horizontal inter-cell (B–A right), vertical inter-cell (B–A up).
+// Each bond type gets its own color, which is valid because no vertex
+// is incident to two bonds of the same type.
+EdgeColoring honeycomb_coloring(std::int64_t Nx, std::int64_t Ny,
+                                bool periodic_x, bool periodic_y) {
+  EdgeColoring out;
+  auto idxA = [Nx](std::int64_t x, std::int64_t y) -> std::uint64_t {
+    return static_cast<std::uint64_t>(2 * (y * Nx + x));
+  };
+  auto idxB = [Nx](std::int64_t x, std::int64_t y) -> std::uint64_t {
+    return static_cast<std::uint64_t>(2 * (y * Nx + x) + 1);
+  };
+  auto put = [&out](std::uint64_t a, std::uint64_t b, int c) {
+    auto edge = std::minmax(a, b);
+    out[{edge.first, edge.second}] = c;
+  };
+
+  for (std::int64_t y = 0; y < Ny; ++y) {
+    for (std::int64_t x = 0; x < Nx; ++x) {
+      // Intra-cell: color 0
+      put(idxA(x, y), idxB(x, y), 0);
+      // Horizontal inter-cell: color 1
+      if (x + 1 < Nx) {
+        put(idxB(x, y), idxA(x + 1, y), 1);
+      } else if (periodic_x) {
+        put(idxB(x, y), idxA(0, y), 1);
+      }
+      // Vertical inter-cell: color 2
+      if (y + 1 < Ny) {
+        put(idxB(x, y), idxA(x, y + 1), 2);
+      } else if (periodic_y) {
+        put(idxB(x, y), idxA(x, 0), 2);
+      }
+    }
+  }
+  return out;
+}
+
+const std::optional<EdgeColoring>& LatticeGraph::edge_coloring() const {
+  return _edge_coloring;
 }
 
 bool LatticeGraph::_check_symmetry(const Eigen::SparseMatrix<double>& mat) {

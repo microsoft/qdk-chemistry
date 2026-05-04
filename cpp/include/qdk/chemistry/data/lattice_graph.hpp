@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <map>
 #include <nlohmann/json_fwd.hpp>
+#include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <stdexcept>
@@ -18,6 +19,54 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
+
+/**
+ * @brief Edge coloring as a map from ordered (i, j) (with i < j) to a
+ *        non-negative integer color label.
+ *
+ * Two edges sharing the same color have disjoint vertex sets and may be
+ * exponentiated in parallel by Trotter-style decompositions.
+ */
+using EdgeColoring =
+    std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
+
+// ---- Free coloring functions ------------------------------------------------
+// These compute edge colorings for known lattice topologies.  They are
+// called by the factory methods to pre-populate the coloring at
+// construction time, and can also be called directly by users who need
+// a coloring for a topology not covered by the built-in factories.
+
+/**
+ * @brief Greedy randomised edge coloring of an arbitrary graph.
+ *
+ * Shuffles the edge order and assigns each edge the lowest colour not
+ * incident to either endpoint.  Repeats for ``trials`` shuffles (with
+ * deterministic PRNG seeded by ``seed``) and returns the result with
+ * the fewest colours.
+ *
+ * @param adj   Sparse adjacency matrix of the graph.
+ * @param seed  Random seed.  Default: 0.
+ * @param trials Number of random-order trials.  Default: 1.
+ */
+EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
+                                  int seed = 0, int trials = 1);
+
+/**
+ * @brief Deterministic optimal edge coloring for a chain (path / ring).
+ */
+EdgeColoring chain_coloring(std::int64_t n, bool periodic);
+
+/**
+ * @brief Deterministic optimal edge coloring for a square lattice.
+ */
+EdgeColoring square_coloring(std::int64_t nx, std::int64_t ny,
+                             bool periodic_x, bool periodic_y);
+
+/**
+ * @brief Deterministic optimal 3-coloring for a honeycomb lattice.
+ */
+EdgeColoring honeycomb_coloring(std::int64_t nx, std::int64_t ny,
+                                bool periodic_x, bool periodic_y);
 
 /**
  * @brief Weighted graph representing a lattice connectivity structure.
@@ -318,6 +367,14 @@ class LatticeGraph : public DataClass {
                              double t = 1.0);
 
   /**
+   * @brief Edge coloring stored at construction time, if any.
+   *
+   * Factory methods for recognised topologies pre-populate this field.
+   * Returns ``std::nullopt`` for lattices constructed without a coloring.
+   */
+  const std::optional<EdgeColoring>& edge_coloring() const;
+
+  /**
    * @brief Get the data type name for this class.
    * @return "lattice_graph"
    */
@@ -395,8 +452,10 @@ class LatticeGraph : public DataClass {
    * make_bidirectional().
    *
    * @param adjacency Sparse square adjacency matrix (moved in).
+   * @param coloring  Optional edge coloring (moved in).
    */
-  explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency);
+  explicit LatticeGraph(Eigen::SparseMatrix<double> adjacency,
+                        std::optional<EdgeColoring> coloring = std::nullopt);
 
   /** @brief Check if a sparse matrix is symmetric within a numerical tolerance.
    */
@@ -410,6 +469,8 @@ class LatticeGraph : public DataClass {
   /// Flag indicating whether the adjacency matrix is symmetric (undirected
   /// graph)
   bool _is_symmetric;
+  /// Edge coloring, populated at construction for recognised topologies.
+  std::optional<EdgeColoring> _edge_coloring;
 };
 
 static_assert(DataClassCompliant<LatticeGraph>,
