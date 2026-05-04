@@ -146,6 +146,7 @@ The solver will automatically detect the auxiliary shells and enable DF-J.
 
 .. note::
    When using density fitting, ``eri_method`` must be set to ``"incore"``.
+   If QDK/Chemistry is built with LibintX support enabled, ``eri_method="LibintX"`` is also supported for DF-J.
    The ``integral_type`` setting defaults to ``"auto"``, which automatically enables DF-J when an auxiliary basis is detected.
 
 
