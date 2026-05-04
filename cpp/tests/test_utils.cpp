@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -193,6 +194,143 @@ TEST_F(ValenceActiveParametersTest, OxygenHydrogenMoleculeNegativeChargeTest) {
 
   EXPECT_EQ(num_active_electrons, 8);
   EXPECT_EQ(num_active_orbitals, 5);
+}
+
+// ========== Transition metal double-d-shell tests ==========
+// Periods 4-6 d-block elements (Sc-Zn, Y-Cd, Hf-Hg) include a correlating
+// d' shell when ``include_double_d_shell`` is enabled: 14 valence orbitals
+// per period 4-5 atom (ns + 5*(n-1)d + 5*nd' + 3*np) instead of the default
+// 9, and 21 valence orbitals per period 6 atom (6s + 7*4f + 5*5d + 5*6d' +
+// 3*6p) instead of the default 16.
+//
+// ``compute_valence_space_parameters`` only reads the structure, the total
+// electron count, and ``num_molecular_orbitals``, so we build a minimal
+// Wavefunction directly (single dummy s-shell per atom; coefficient values
+// are unused) and skip SCF entirely.
+
+namespace {
+
+constexpr size_t kRoomyMo = 100;  // Above any valence space these tests use.
+
+// Build a minimal valid Wavefunction for sizing tests (no SCF). Throws if
+// num_molecular_orbitals can't hold the requested electron count.
+std::shared_ptr<Wavefunction> make_minimal_wavefunction(
+    const std::vector<std::string>& symbols, const Eigen::MatrixXd& coords,
+    size_t n_alpha, size_t n_beta, size_t num_molecular_orbitals = kRoomyMo) {
+  const size_t pair_count = std::min(n_alpha, n_beta);
+  const size_t single_count =
+      (n_alpha > n_beta) ? n_alpha - n_beta : n_beta - n_alpha;
+  if (pair_count + single_count > num_molecular_orbitals) {
+    throw std::invalid_argument(
+        "make_minimal_wavefunction: num_molecular_orbitals (" +
+        std::to_string(num_molecular_orbitals) +
+        ") is too small for n_alpha=" + std::to_string(n_alpha) +
+        ", n_beta=" + std::to_string(n_beta) + "; requires at least " +
+        std::to_string(pair_count + single_count) + " molecular orbitals.");
+  }
+
+  auto structure = std::make_shared<Structure>(coords, symbols);
+  std::vector<Shell> shells;
+  Eigen::VectorXd one(1);
+  one << 1.0;
+  for (size_t i = 0; i < symbols.size(); ++i) {
+    shells.emplace_back(i, OrbitalType::S, one, one);
+  }
+  auto basis_set = std::make_shared<BasisSet>("dummy", shells, structure);
+  Eigen::MatrixXd coeffs = Eigen::MatrixXd::Zero(
+      basis_set->get_num_atomic_orbitals(), num_molecular_orbitals);
+  auto orbitals =
+      std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt, basis_set);
+
+  std::string config_str(num_molecular_orbitals, '0');
+  for (size_t i = 0; i < pair_count; ++i) config_str[i] = '2';
+  const char unpaired = (n_alpha > n_beta) ? 'u' : 'd';
+  for (size_t i = 0; i < single_count; ++i)
+    config_str[pair_count + i] = unpaired;
+
+  return std::make_shared<Wavefunction>(
+      std::make_unique<SlaterDeterminantContainer>(Configuration(config_str),
+                                                   orbitals));
+}
+
+const Eigen::MatrixXd kOrigin = Eigen::MatrixXd::Zero(1, 3);
+
+// Single-atom row: element + spin split + expected sizing for both toggle
+// states.
+struct TmCase {
+  std::string symbol;
+  size_t n_alpha;
+  size_t n_beta;
+  size_t expected_nele;
+  size_t expected_norb_on;
+  size_t expected_norb_off;
+};
+
+class TransitionMetalValenceTest : public ::testing::TestWithParam<TmCase> {};
+
+}  // namespace
+
+TEST(MakeMinimalWavefunctionTest, RejectsTooFewMolecularOrbitals) {
+  EXPECT_THROW(make_minimal_wavefunction({"He"}, kOrigin, 2, 0, 1),
+               std::invalid_argument);
+}
+
+TEST_P(TransitionMetalValenceTest, ToggleSizing) {
+  const auto& tc = GetParam();
+  auto wfn =
+      make_minimal_wavefunction({tc.symbol}, kOrigin, tc.n_alpha, tc.n_beta);
+
+  auto [nele_on, norb_on] = compute_valence_space_parameters(
+      wfn, /*charge=*/0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele_on, tc.expected_nele);
+  EXPECT_EQ(norb_on, tc.expected_norb_on);
+
+  auto [nele_off, norb_off] = compute_valence_space_parameters(wfn, 0);
+  EXPECT_EQ(nele_off, tc.expected_nele);
+  EXPECT_EQ(norb_off, tc.expected_norb_off);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Atoms, TransitionMetalValenceTest,
+    ::testing::Values(
+        // Period 4 d-block: 4s + 5*3d + 5*4d' + 3*4p = 14 (vs default 9).
+        TmCase{"Cu", 15, 14, /*nele=*/11, /*on=*/14, /*off=*/9},
+        TmCase{"Ni", 15, 13, 10, 14, 9}, TmCase{"Zn", 15, 15, 12, 14, 9},
+        // Period 4 main-group control (no d' shell either way).
+        TmCase{"K", 10, 9, 1, 9, 9},
+        // Period 6 d-block: 6s + 7*4f + 5*5d + 5*6d' + 3*6p = 21 (vs 16).
+        TmCase{"Pt", 39, 39, 24, 21, 16}),
+    [](const ::testing::TestParamInfo<TmCase>& info) {
+      return info.param.symbol;
+    });
+
+// AgH: period-5 d-block alongside a non-d-block spectator, confirming
+// per-atom contributions sum correctly.
+TEST(TransitionMetalValenceTest, SilverHydride) {
+  Eigen::MatrixXd coords(2, 3);
+  coords << 0.0, 0.0, 0.0, 0.0, 0.0, 1.617;
+  auto wfn = make_minimal_wavefunction({"Ag", "H"}, coords, 24, 24);
+
+  auto [nele_on, norb_on] =
+      compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele_on, 12u);  // Ag (11) + H (1)
+  EXPECT_EQ(norb_on, 15u);  // Ag period-5 with d' (14) + H (1)
+
+  auto [nele_off, norb_off] = compute_valence_space_parameters(wfn, 0);
+  EXPECT_EQ(nele_off, 12u);
+  EXPECT_EQ(norb_off, 10u);  // Ag period-5 default (9) + H (1)
+}
+
+// Cap interaction: the d' shell can't push num_active_orbitals above
+// num_molecular_orbitals - num_core_mos.
+TEST(TransitionMetalValenceTest, ToggleRespectsBasisCap) {
+  // Cu doublet, num_mo = 16. num_core_mos = (29-11)/2 = 9, so the cap is
+  // 16 - 9 = 7, well below the 14 the toggle would otherwise add.
+  auto wfn = make_minimal_wavefunction({"Cu"}, kOrigin, 15, 14, /*num_mo=*/16);
+  auto [nele, norb] =
+      compute_valence_space_parameters(wfn, 0, /*include_double_d_shell=*/true);
+  EXPECT_EQ(nele, 11u);
+  EXPECT_EQ(norb, 7u);
 }
 
 // Test fixture for orbital rotation
