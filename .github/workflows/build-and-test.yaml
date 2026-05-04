@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       run_slow_tests:
-        description: 'Run slow tests'
+        description: Run slow tests
         required: false
         default: false
         type: boolean
