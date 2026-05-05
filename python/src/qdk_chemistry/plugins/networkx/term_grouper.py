@@ -7,13 +7,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import networkx as nx
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
 from qdk_chemistry.data import FlatPartition, QubitHamiltonian
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 __all__ = ["NxFullCommutingTermGrouper", "NxQubitWiseCommutingTermGrouper"]
 
