@@ -299,8 +299,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Convert QDK basis set to internal format
   auto ms_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set);
-  auto ms_aux_basis_set =
-      utils::microsoft::convert_aux_basis_set_from_qdk(*qdk_raw_basis_set);
+  auto ms_aux_basis_set = use_dfj ?
+      utils::microsoft::convert_aux_basis_set_from_qdk(*qdk_raw_basis_set) : nullptr;
   auto ms_raw_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*qdk_raw_basis_set, false);
 
