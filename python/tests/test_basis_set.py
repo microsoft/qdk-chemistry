@@ -359,6 +359,7 @@ def test_json_serialization():
     assert basis_in.has_aux_basis()
     assert basis_in.get_aux_name() == "aux-fit"
     assert basis_in.get_num_aux_shells() == 2
+    assert basis_in.get_num_auxiliary_orbitals() == 6
 
     # Test file-based serialization
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
@@ -375,6 +376,8 @@ def test_json_serialization():
         assert basis_file.get_num_atomic_orbitals() == 4
         assert basis_file.get_aux_name() == "aux-fit"
         assert basis_file.get_num_aux_shells() == 2
+        assert basis_out.get_num_auxiliary_orbitals() == 6
+        assert basis_file.get_num_auxiliary_orbitals() == 6
     finally:
         Path(filename).unlink()
 
@@ -1817,5 +1820,5 @@ class TestBasisSetConstructorDispatch:
     # --- Error cases: ECP shells at n==4 should raise ---
 
     def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
-        with pytest.raises(ValueError, match="Auxiliary shells contains a shell with radial powers"):
+        with pytest.raises(ValueError, match="Auxiliary shells contain a shell with radial powers"):
             BasisSet("test", shells, ecp_shells, structure)
