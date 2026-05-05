@@ -13,11 +13,12 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.term_partition import FlatPartition
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import group_commuting as _group_commuting
 
 
 def _pauli_matrix(label):
@@ -68,74 +69,79 @@ class TestQubitHamiltonian:
             QubitHamiltonian(pauli_strings=[], coefficients=[])
 
     def test_group_commuting(self):
-        """Test group_commuting."""
+        """Test full-commuting term grouper produces correct groups."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = _group_commuting(qubit_hamiltonian, qubit_wise=False)
-        assert len(grouped) == 2
+        grouped = registry.create("term_grouper", "commuting").run(qubit_hamiltonian)
+        partition = grouped.term_partition
+        assert isinstance(partition, FlatPartition)
+        assert partition.num_groups == 2
 
         # Verify coefficients are preserved
-        coeff_map = dict(zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True))
-        for group in grouped:
-            for pauli_str, coeff in zip(group.pauli_strings, group.coefficients, strict=True):
+        for group_indices in partition.groups:
+            for idx in group_indices:
                 assert np.isclose(
-                    coeff,
-                    coeff_map[pauli_str],
+                    grouped.coefficients[idx],
+                    qubit_hamiltonian.coefficients[idx],
                     atol=float_comparison_absolute_tolerance,
                     rtol=float_comparison_relative_tolerance,
                 )
 
     def test_group_commuting_qubitwise(self):
-        """Test group_commuting without qubit-wise commuting."""
+        """Test qubit-wise commuting grouper."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = _group_commuting(qubit_hamiltonian, qubit_wise=True)
-        assert len(grouped) == 4  # Qubit-wise commuting returns four groups
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qubit_hamiltonian)
+        partition = grouped.term_partition
+        assert isinstance(partition, FlatPartition)
+        assert partition.num_groups == 4
 
-        # Check that all original Pauli strings are present across all groups
-        all_grouped_strings = []
-        for group in grouped:
-            assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
-            all_grouped_strings.extend(group.pauli_strings)
-        assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+        # Each group should contain exactly one term
+        for group_indices in partition.groups:
+            assert len(group_indices) == 1
+        # All original terms are present
+        all_indices = sorted(partition.all_indices())
+        assert all_indices == list(range(4))
 
     def test_group_commuting_all_commute(self):
         """Test that fully commuting operators go into one group."""
-        # ZI, IZ, ZZ all commute with each other
         qh = QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, -0.5, 0.3]))
-        grouped = _group_commuting(qh, qubit_wise=False)
-        assert len(grouped) == 1
-        assert len(grouped[0].pauli_strings) == 3
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 1
+        assert len(grouped.term_partition.groups[0]) == 3
 
     def test_group_commuting_none_commute(self):
         """Test that non-commuting operators each get their own group."""
-        # X and Z anticommute; Y and X anticommute; Y and Z anticommute
         qh = QubitHamiltonian(["X", "Z", "Y"], np.array([1.0, -0.5, 0.3]))
-        grouped = _group_commuting(qh, qubit_wise=False)
-        assert len(grouped) == 3
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 3
 
     def test_group_commuting_single_term(self):
-        """Test group_commuting with a single term."""
+        """Test grouping with a single term."""
         qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
-        grouped = _group_commuting(qh, qubit_wise=False)
-        assert len(grouped) == 1
-        assert grouped[0].pauli_strings == ["ZZ"]
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 1
+        assert grouped.pauli_strings == ["ZZ"]
 
     def test_group_commuting_reconstruct_matrix(self):
-        """Test group_commuting with matrix verification."""
+        """Test that grouped terms reconstruct the same matrix."""
         qh = QubitHamiltonian(
             ["II", "IZ", "ZI", "ZZ", "XX", "YY"],
             np.array([-0.8, 0.17, -0.17, 0.12, 0.04, 0.04]),
         )
-        # General commuting: all diagonal terms commute, XX and YY commute with each other and with diag terms
-        grouped = _group_commuting(qh, qubit_wise=False)
-        total_terms = sum(len(g.pauli_strings) for g in grouped)
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        partition = grouped.term_partition
+        total_terms = sum(len(g) for g in partition.groups)
         assert total_terms == 6
-        # Verify ground state energy via eigenvalues
+
         mat = qh.to_matrix()
         gs_energy = np.min(np.linalg.eigvalsh(mat))
         # Reconstruct from groups and check same ground state energy
         full_mat = np.zeros_like(mat)
-        for g in grouped:
-            full_mat += g.to_matrix()
+        for group_indices in partition.groups:
+            sub = QubitHamiltonian(
+                [grouped.pauli_strings[i] for i in group_indices],
+                np.array([grouped.coefficients[i] for i in group_indices]),
+            )
+            full_mat += sub.to_matrix()
         gs_energy_grouped = np.min(np.linalg.eigvalsh(full_mat))
         assert np.isclose(gs_energy, gs_energy_grouped, atol=float_comparison_absolute_tolerance)
 
@@ -145,10 +151,16 @@ class TestQubitHamiltonian:
         coeffs = np.array([0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15])
         qh = QubitHamiltonian(labels, coeffs)
         original_mat = qh.to_matrix()
-        groups = _group_commuting(qh, qubit_wise=True)
+
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
+        partition = grouped.term_partition
         reconstructed = np.zeros_like(original_mat)
-        for g in groups:
-            reconstructed += g.to_matrix()
+        for group_indices in partition.groups:
+            sub = QubitHamiltonian(
+                [grouped.pauli_strings[i] for i in group_indices],
+                np.array([grouped.coefficients[i] for i in group_indices]),
+            )
+            reconstructed += sub.to_matrix()
         assert np.allclose(
             reconstructed,
             original_mat,
@@ -532,14 +544,14 @@ class TestFermionModeOrder:
         assert restored.fermion_mode_order is None
 
     def test_group_commuting_preserves(self):
-        """group_commuting preserves fermion_mode_order."""
+        """term_grouper preserves fermion_mode_order."""
         qh = QubitHamiltonian(
             ["XX", "YY", "ZZ"],
             np.array([1.0, 0.5, -0.5]),
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
-        for group in _group_commuting(qh, qubit_wise=True):
-            assert group.fermion_mode_order == FermionModeOrder.BLOCKED
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
+        assert grouped.fermion_mode_order == FermionModeOrder.BLOCKED
 
     def test_to_interleaved_sets_order(self):
         """to_interleaved sets fermion_mode_order to INTERLEAVED."""

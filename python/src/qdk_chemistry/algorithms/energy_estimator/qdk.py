@@ -244,12 +244,17 @@ class QdkEnergyEstimator(EnergyEstimator):
 
     @staticmethod
     def _resolve_measurement_groups(qubit_hamiltonian: QubitHamiltonian) -> list[QubitHamiltonian]:
-        """Resolve the Hamiltonian into qubit-wise commuting measurement groups.
+        """Resolve the Hamiltonian into simultaneously-measurable groups.
 
         If ``qubit_hamiltonian`` carries a
-        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` whose
-        strategy is ``"qubit_wise_commuting"``, the partition is consumed
-        directly.  Otherwise each Pauli term is measured individually.
+        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the
+        partition is consumed and each group becomes one measurement circuit.
+        The groups must be compatible with the measurement backend — at
+        present, each group must be qubit-wise commuting so that a single
+        Pauli basis suffices.
+
+        When no partition is present, each Pauli term is measured
+        individually.
 
         Args:
             qubit_hamiltonian: The Hamiltonian to partition for measurement.
@@ -257,24 +262,11 @@ class QdkEnergyEstimator(EnergyEstimator):
         Returns:
             A list of ``QubitHamiltonian`` objects, one per measurement group.
 
-        Raises:
-            ValueError: If a ``term_partition`` is present but uses a strategy
-                incompatible with qubit-wise commuting measurement (only
-                ``"qubit_wise_commuting"`` is currently supported).
-
         """
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
             from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
 
-            if partition.strategy != "qubit_wise_commuting":
-                raise ValueError(
-                    f"QdkEnergyEstimator requires qubit-wise commuting measurement groups, "
-                    f"but the Hamiltonian carries a term_partition with "
-                    f"strategy={partition.strategy!r}.  Either pre-group with the "
-                    f"'qubit_wise_commuting' term_grouper, or remove the partition "
-                    f"to measure each term individually."
-                )
             if not isinstance(partition, FlatPartition):
                 raise TypeError(
                     f"QdkEnergyEstimator expects a FlatPartition for measurement grouping, "
@@ -294,7 +286,7 @@ class QdkEnergyEstimator(EnergyEstimator):
                 for group in partition.groups
             ]
 
-        Logger.info("EnergyEstimator: no compatible term_partition; measuring each term individually.")
+        Logger.info("EnergyEstimator: no term_partition; measuring each term individually.")
         return [
             QubitHamiltonian(
                 pauli_strings=[label],

@@ -169,16 +169,47 @@ Example::
     from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
     from qdk_chemistry.algorithms import registry
 
-    graph = LatticeGraph.square(4, 4, periodic_x=True, periodic_y=True)
+    # 4-site open Ising chain: H = Σ Z_i Z_{i+1} + 0.5 Σ X_i
+    graph = LatticeGraph.chain(4, periodic=False)
     hamiltonian = create_ising_hamiltonian(graph, j=1.0, h=0.5)
 
-    # The Hamiltonian already carries a LayeredPartition from the edge coloring.
+    # The edge coloring partitions ZZ terms into two layers by color:
+    #   group 0 (field):  1 layer  → [X₀, X₁, X₂, X₃]
+    #   group 1 (ZZ):     2 layers → [{Z₀Z₁, Z₂Z₃}, {Z₁Z₂}]
     print(hamiltonian.term_partition)
+    # LayeredPartition(strategy='geometry_coloring', num_groups=2)
 
-    # The Trotter builder consumes it automatically.
+    # Second-order Trotter with 1 division produces the Strang splitting:
+    #   S₂(t) = e^{fields·t/2}  e^{ZZ_layer0·t}  e^{ZZ_layer1·t}
+    #           e^{fields·t/2}
+    # where same-layer ZZ terms (e.g. Z₀Z₁ and Z₂Z₃) have disjoint
+    # qubit support and are exponentiated independently within one step.
     trotter = registry.create("time_evolution_builder", "trotter")
-    trotter.settings().set("order", 2)
+    trotter.settings().update({"order": 2, "num_divisions": 1})
     evolution = trotter.run(hamiltonian, time=1.0)
+    container = evolution.get_container()
+
+    # The grouped schedule uses 11 exponentiated terms per step,
+    # vs. 13 for the ungrouped fallback — a 15% reduction that
+    # compounds at higher Suzuki orders.
+    print(f"{len(container.step_terms)} terms per Trotter step")
+    for term in container.step_terms:
+        label = ['I'] * 4
+        for q, p in term.pauli_term.items():
+            label[q] = p
+        print(f"  exp(-i * {term.angle:+.4f} * {''.join(reversed(label))})")
+    # Output:
+    #   exp(-i * +0.2500 * IIIX)
+    #   exp(-i * +0.2500 * IIXI)
+    #   exp(-i * +0.2500 * IXII)
+    #   exp(-i * +0.2500 * XIII)
+    #   exp(-i * +1.0000 * IIZZ)
+    #   exp(-i * +1.0000 * ZZII)
+    #   exp(-i * +1.0000 * IZZI)
+    #   exp(-i * +0.2500 * IIIX)
+    #   exp(-i * +0.2500 * IIXI)
+    #   exp(-i * +0.2500 * IXII)
+    #   exp(-i * +0.2500 * XIII)
 
 
 Related classes
