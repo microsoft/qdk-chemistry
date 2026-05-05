@@ -867,7 +867,12 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   // sort ecp shells
   detail::sort_shells_inplace(all_ecp_shells);
 
-  return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
+  const bool has_ecp_data =
+    !all_ecp_shells.empty() ||
+    std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
+                [](size_t electron_count) { return electron_count > 0; });
+  const std::string ecp_name = has_ecp_data ? basis_name : "";
+  return std::make_shared<BasisSet>(basis_name, all_basis_shells, ecp_name,
                                     all_ecp_shells, all_ecp_electrons,
                                     structure, atomic_orbital_type);
 }
@@ -957,10 +962,15 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   // sort ecp shells
   detail::sort_shells_inplace(all_ecp_shells);
 
+  const bool has_ecp_data =
+      !all_ecp_shells.empty() ||
+      std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
+                  [](size_t electron_count) { return electron_count > 0; });
+  const std::string ecp_name =
+      has_ecp_data ? std::string(BasisSet::custom_ecp_name) : std::string();
   return std::make_shared<BasisSet>(
-      std::string(BasisSet::custom_name), all_basis_shells,
-      std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
-      structure, atomic_orbital_type);
+      std::string(BasisSet::custom_name), all_basis_shells, ecp_name,
+      all_ecp_shells, all_ecp_electrons, structure, atomic_orbital_type);
 }
 
 std::shared_ptr<BasisSet> BasisSet::from_basis_name(
@@ -1019,7 +1029,12 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   detail::sort_shells_inplace(all_ecp_shells);
   detail::sort_shells_inplace(all_aux_shells);
 
-  return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
+  const bool has_ecp_data =
+    !all_ecp_shells.empty() ||
+    std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
+                [](size_t electron_count) { return electron_count > 0; });
+  const std::string ecp_name = has_ecp_data ? basis_name : "";
+  return std::make_shared<BasisSet>(basis_name, all_basis_shells, ecp_name,
                                     all_ecp_shells, all_ecp_electrons,
                                     aux_name_lower, all_aux_shells, structure,
                                     atomic_orbital_type);
@@ -1139,9 +1154,15 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   detail::sort_shells_inplace(all_ecp_shells);
   detail::sort_shells_inplace(all_aux_shells);
 
+  const bool has_ecp_data =
+      !all_ecp_shells.empty() ||
+      std::any_of(all_ecp_electrons.begin(), all_ecp_electrons.end(),
+                  [](size_t electron_count) { return electron_count > 0; });
+  const std::string ecp_name =
+      has_ecp_data ? std::string(BasisSet::custom_ecp_name) : std::string();
   return std::make_shared<BasisSet>(
-      std::string(BasisSet::custom_name), all_basis_shells,
-      std::string(BasisSet::custom_ecp_name), all_ecp_shells, all_ecp_electrons,
+      std::string(BasisSet::custom_name), all_basis_shells, ecp_name,
+      all_ecp_shells, all_ecp_electrons,
       std::string(BasisSet::custom_aux_name), all_aux_shells, structure,
       atomic_orbital_type);
 }
