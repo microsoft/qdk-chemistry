@@ -196,7 +196,7 @@ def create_heisenberg_hamiltonian(
                 couplings=[("XX", jx), ("YY", jy), ("ZZ", jz)],
                 fields=[("X", hx), ("Y", hy), ("Z", hz)],
             )
-        Logger.info("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
+        Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
 
     n = graph.num_sites
     adj = graph.adjacency_matrix()

@@ -370,13 +370,13 @@ class Trotter(TimeEvolutionBuilder):
         """
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            Logger.info(
+            Logger.debug(
                 f"Trotter: consuming QubitHamiltonian.term_partition "
                 f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
             )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
-        Logger.info("Trotter: no term_partition present; treating each Pauli term as its own group.")
+        Logger.debug("Trotter: no term_partition present; treating each Pauli term as its own group.")
         return [
             [
                 QubitHamiltonian(

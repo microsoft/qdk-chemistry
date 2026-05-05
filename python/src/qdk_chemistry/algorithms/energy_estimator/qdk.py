@@ -268,7 +268,7 @@ class QdkEnergyEstimator(EnergyEstimator):
             from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
 
             if isinstance(partition, FlatPartition):
-                Logger.info(
+                Logger.debug(
                     f"EnergyEstimator: consuming term_partition "
                     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
@@ -282,12 +282,12 @@ class QdkEnergyEstimator(EnergyEstimator):
                     for group in partition.groups
                 ]
 
-            Logger.info(
+            Logger.debug(
                 f"EnergyEstimator: ignoring unsupported partition type "
                 f"{type(partition).__name__}; measuring each term individually."
             )
 
-        Logger.info("EnergyEstimator: no term_partition; measuring each term individually.")
+        Logger.debug("EnergyEstimator: no term_partition; measuring each term individually.")
         return [
             QubitHamiltonian(
                 pauli_strings=[label],
