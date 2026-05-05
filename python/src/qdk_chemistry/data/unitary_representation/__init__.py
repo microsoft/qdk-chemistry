@@ -1,4 +1,4 @@
-"""Subpackage for local time-evolution algorithm extensions (circuit_mapper, measure_simulation)."""
+"""QDK/Chemistry Hamiltonian unitary data module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

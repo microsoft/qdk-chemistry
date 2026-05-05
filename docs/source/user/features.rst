@@ -33,7 +33,7 @@ Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
 
 Phase estimation implementations include post-processing with automatic phase wrapping, energy alias detection and resolution, and full serialization of results.
 
-See :doc:`comprehensive/algorithms/phase_estimation` for detailed documentation on available implementations and usage, and :doc:`comprehensive/algorithms/time_evolution_builder` for the Hamiltonian simulation methods that underpin phase estimation.
+See :doc:`comprehensive/algorithms/phase_estimation` for detailed documentation on available implementations and usage, and :doc:`comprehensive/algorithms/hamiltonian_unitary_builder` for the Hamiltonian simulation methods that underpin phase estimation.
 
 State Preparation
 """""""""""""""""

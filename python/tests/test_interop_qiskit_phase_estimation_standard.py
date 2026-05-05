@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, QpeResult, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -107,18 +108,19 @@ def _extract_traditional_results(problem: TraditionalProblem) -> QpeResult:
         QPE result including dominant bitstring, phase fraction, and energy.
 
     """
-    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, evolution_time=problem.evolution_time)
+    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits)
+
     qpe.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
     )
     qpe.settings().set(
         "circuit_mapper",
-        AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
     qpe.settings().set(
-        "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter"),
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
     )
 
     return qpe.run(
@@ -195,3 +197,44 @@ def test_traditional_phase_estimation_four_qubit_problem(four_qubit_phase_proble
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
+
+
+def test_raises_not_implemented_for_non_time_evolution_builder(
+    two_qubit_phase_problem: TraditionalProblem,
+) -> None:
+    """Standard QPE raises NotImplementedError when unitary_builder is not a TimeEvolutionBuilder."""
+
+    class _MockBuilder(HamiltonianUnitaryBuilder):
+        """A non-TimeEvolutionBuilder for testing the unsupported path."""
+
+        def _run_impl(self, qubit_hamiltonian: QubitHamiltonian):  # noqa: ARG002
+            return None
+
+        def name(self):
+            return "mock"
+
+        def type_name(self):
+            return "mock_unitary_builder"
+
+    qpe = QiskitStandardPhaseEstimation(num_bits=two_qubit_phase_problem.num_bits)
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    qpe.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+    )
+
+    # Override cached_property with a non-TimeEvolutionBuilder instance
+    qpe.__dict__["unitary_builder"] = _MockBuilder()
+
+    with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
+        qpe.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )

@@ -9,8 +9,8 @@ from qdk import qsharp
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -59,7 +59,7 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
         """Return evolution_circuit_mapper as the algorithm type name."""
         return "evolution_circuit_mapper"
 
-    def _run_impl(self, evolution: TimeEvolutionUnitary) -> Circuit:
+    def _run_impl(self, evolution: UnitaryRepresentation) -> Circuit:
         r"""Construct a quantum circuit implementing the time evolution unitary.
 
         Args:

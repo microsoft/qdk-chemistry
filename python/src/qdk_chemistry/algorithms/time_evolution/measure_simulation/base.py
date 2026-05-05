@@ -16,7 +16,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
-    TimeEvolutionUnitary,
+    UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -33,7 +33,7 @@ class MeasureSimulationSettings(Settings):
         self._set_default(
             "evolution_builder",
             "algorithm_ref",
-            AlgorithmRef("time_evolution_builder", "trotter"),
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
         )
         self._set_default(
             "circuit_mapper",
@@ -104,14 +104,15 @@ class MeasureSimulation(Algorithm):
         self,
         qubit_hamiltonian: QubitHamiltonian,
         time: float,
-    ) -> TimeEvolutionUnitary:
+    ) -> UnitaryRepresentation:
         """Create the time-evolution unitary for current settings."""
         evolution_builder = self._create_nested("evolution_builder")
-        return evolution_builder.run(qubit_hamiltonian, time)
+        evolution_builder.settings().set("time", time)
+        return evolution_builder.run(qubit_hamiltonian)
 
     def _map_time_evolution_to_circuit(
         self,
-        evolution: TimeEvolutionUnitary,
+        evolution: UnitaryRepresentation,
     ) -> Circuit:
         """Map a time-evolution unitary into an executable circuit."""
         circuit_mapper = self._create_nested("circuit_mapper")

@@ -1,4 +1,4 @@
-"""QDK/Chemistry time evolution data module."""
+"""QDK/Chemistry Hamiltonian uniatry builder for time evolution."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

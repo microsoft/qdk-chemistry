@@ -14,8 +14,8 @@ import scipy
 
 from qdk_chemistry.algorithms.time_evolution.circuit_mapper.pauli_sequence_mapper import PauliSequenceMapper
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -28,8 +28,8 @@ if QDK_CHEMISTRY_HAS_QISKIT:
 
 
 @pytest.fixture
-def simple_unitary() -> TimeEvolutionUnitary:
-    """Create a simple TimeEvolutionUnitary for testing."""
+def simple_unitary() -> UnitaryRepresentation:
+    """Create a simple UnitaryRepresentation for testing."""
     container = PauliProductFormulaContainer(
         step_terms=[
             ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
@@ -38,7 +38,7 @@ def simple_unitary() -> TimeEvolutionUnitary:
         step_reps=2,
         num_qubits=2,
     )
-    return TimeEvolutionUnitary(container=container)
+    return UnitaryRepresentation(container=container)
 
 
 class TestPauliSequenceMapperNonControlled:

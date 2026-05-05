@@ -1,7 +1,7 @@
 """QDK/Chemistry phase estimation algorithms module.
 
 This module provides quantum phase estimation algorithms for estimating
-the eigenvalues of time evolution unitary operators.
+the eigenvalues of unitary operators.
 """
 
 # --------------------------------------------------------------------------------------------

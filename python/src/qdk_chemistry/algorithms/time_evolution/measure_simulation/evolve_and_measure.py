@@ -11,7 +11,7 @@ from qdk_chemistry.data import (
     MeasurementData,
     QuantumErrorProfile,
     QubitHamiltonian,
-    TimeEvolutionUnitary,
+    UnitaryRepresentation,
 )
 from qdk_chemistry.utils import Logger
 
@@ -139,7 +139,7 @@ class EvolveAndMeasure(MeasureSimulation):
 
         for i in range(1, len(qubit_hamiltonians)):
             delta_t = times[i] - times[i - 1]
-            evolution = TimeEvolutionUnitary(
+            evolution = UnitaryRepresentation(
                 evolution.get_container().combine(
                     self._create_time_evolution(qubit_hamiltonians[i], delta_t).get_container(),
                 )

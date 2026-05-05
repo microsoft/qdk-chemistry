@@ -9,7 +9,7 @@ from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
 __all__: list[str] = ["EvolutionCircuitMapper", "EvolutionCircuitMapperFactory"]
 
@@ -22,8 +22,8 @@ class EvolutionCircuitMapper(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, evolution: TimeEvolutionUnitary, *args, **kwargs) -> Circuit:
-        """Construct a Circuit representing the unitary for the given TimeEvolutionUnitary.
+    def _run_impl(self, evolution: UnitaryRepresentation, *args, **kwargs) -> Circuit:
+        """Construct a Circuit representing the unitary for the given UnitaryRepresentation.
 
         Args:
             evolution: The time evolution unitary.
@@ -32,7 +32,7 @@ class EvolutionCircuitMapper(Algorithm):
             **kwargs: Additional keyword arguments for concrete implementation.
 
         Returns:
-            Circuit: A Circuit representing the unitary for the given TimeEvolutionUnitary.
+            Circuit: A Circuit representing the unitary for the given UnitaryRepresentation.
 
         """
 

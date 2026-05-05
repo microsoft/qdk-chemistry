@@ -82,7 +82,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     algo = EvolveAndMeasure()
     algo.settings().set(
         "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
     )
     algo.settings().set(
         "circuit_executor",
@@ -112,7 +112,7 @@ def test_evolve_and_measure_with_device_backend() -> None:
     algo = EvolveAndMeasure()
     algo.settings().set(
         "evolution_builder",
-        AlgorithmRef("time_evolution_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
     )
     algo.settings().set(
         "circuit_executor",
