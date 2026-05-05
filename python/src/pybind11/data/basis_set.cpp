@@ -65,7 +65,7 @@ std::shared_ptr<BasisSet> basis_set_from_json_file_wrapper(
 // (list_iterator does not support weak references, which smart_holder tries
 // to install).
 std::vector<Shell> to_shell_vec(const py::iterable& items) {
-    py::list lst(items);
+  py::list lst(items);
   const ssize_t n = py::len(lst);
   std::vector<Shell> result;
   result.reserve(static_cast<size_t>(n));
@@ -235,14 +235,13 @@ Examples:
                 "Copy constructor. Creates a deep copy of the basis set.");
 
   // BasisSet(name, shells [, atomic_orbital_type])
-  basis_set.def(
-            py::init([](const std::string& name, const py::iterable& shells,
-                                    AOType ao) {
-        return BasisSet(name, to_shell_vec(shells), ao);
-      }),
-      py::arg("name"), py::arg("shells"),
-      py::arg("atomic_orbital_type") = AOType::Spherical,
-      R"(
+  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
+                            AOType ao) {
+                  return BasisSet(name, to_shell_vec(shells), ao);
+                }),
+                py::arg("name"), py::arg("shells"),
+                py::arg("atomic_orbital_type") = AOType::Spherical,
+                R"(
 Create a basis set from a name and shells.
 
 Args:
@@ -252,14 +251,13 @@ Args:
 )");
 
   // BasisSet(name, shells, structure [, atomic_orbital_type])
-    basis_set.def(py::init([](const std::string& name,
-                                                        const py::iterable& shells,
-                                                        const Structure& structure, AOType ao) {
-                                    return BasisSet(name, to_shell_vec(shells), structure, ao);
-                                }),
-                                py::arg("name"), py::arg("shells"), py::arg("structure"),
-                                py::arg("atomic_orbital_type") = AOType::Spherical,
-                                R"(
+  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
+                            const Structure& structure, AOType ao) {
+                  return BasisSet(name, to_shell_vec(shells), structure, ao);
+                }),
+                py::arg("name"), py::arg("shells"), py::arg("structure"),
+                py::arg("atomic_orbital_type") = AOType::Spherical,
+                R"(
 Create a basis set from a name, shells, and molecular structure.
 
 Args:
@@ -270,10 +268,9 @@ Args:
 )");
 
   // BasisSet(name, shells, aux_shells, structure [, atomic_orbital_type])
-    basis_set.def(py::init([](const std::string& name,
-                                                        const py::iterable& shells,
-                                                        const py::iterable& aux_shells,
-                                                        const Structure& structure, AOType ao) {
+  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
+                            const py::iterable& aux_shells,
+                            const Structure& structure, AOType ao) {
                   return BasisSet(name, to_shell_vec(shells),
                                   to_shell_vec(aux_shells), structure, ao);
                 }),
@@ -295,8 +292,7 @@ Args:
   //          [, atomic_orbital_type])
   basis_set.def(
       py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& aux_name,
-                  const py::iterable& aux_shells,
+                  const std::string& aux_name, const py::iterable& aux_shells,
                   const Structure& structure, AOType ao) {
         return BasisSet(name, to_shell_vec(shells), aux_name,
                         to_shell_vec(aux_shells), structure, ao);
@@ -318,11 +314,10 @@ Args:
 
   // BasisSet(name, shells, ecp_shells, ecp_electrons, structure
   //          [, atomic_orbital_type])
-    basis_set.def(py::init([](const std::string& name,
-                                                        const py::iterable& shells,
-                                                        const py::iterable& ecp_shells,
-                                                        const std::vector<size_t>& ecp_electrons,
-                                                        const Structure& structure, AOType ao) {
+  basis_set.def(py::init([](const std::string& name, const py::iterable& shells,
+                            const py::iterable& ecp_shells,
+                            const std::vector<size_t>& ecp_electrons,
+                            const Structure& structure, AOType ao) {
                   return BasisSet(name, to_shell_vec(shells),
                                   to_shell_vec(ecp_shells), ecp_electrons,
                                   structure, ao);
@@ -346,8 +341,7 @@ Args:
   //          [, atomic_orbital_type])
   basis_set.def(
       py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& ecp_name,
-                  const py::iterable& ecp_shells,
+                  const std::string& ecp_name, const py::iterable& ecp_shells,
                   const std::vector<size_t>& ecp_electrons,
                   const Structure& structure, AOType ao) {
         return BasisSet(name, to_shell_vec(shells), ecp_name,
@@ -373,11 +367,9 @@ Args:
   //          aux_name, aux_shells, structure [, atomic_orbital_type])
   basis_set.def(
       py::init([](const std::string& name, const py::iterable& shells,
-                  const std::string& ecp_name,
-                  const py::iterable& ecp_shells,
+                  const std::string& ecp_name, const py::iterable& ecp_shells,
                   const std::vector<size_t>& ecp_electrons,
-                  const std::string& aux_name,
-                  const py::iterable& aux_shells,
+                  const std::string& aux_name, const py::iterable& aux_shells,
                   const Structure& structure, AOType ao) {
         return BasisSet(name, to_shell_vec(shells), ecp_name,
                         to_shell_vec(ecp_shells), ecp_electrons, aux_name,
