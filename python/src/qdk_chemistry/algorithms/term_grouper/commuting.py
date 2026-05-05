@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from collections.abc import Callable
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
@@ -14,15 +16,14 @@ from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pa
 __all__ = ["FullCommutingTermGrouper", "QubitWiseCommutingTermGrouper"]
 
 
-def _greedy_commutation_grouping(
+def _color_non_commutation_graph(
     pauli_strings: list[str],
     commutes: Callable[[str, str], bool],
 ) -> tuple[tuple[int, ...], ...]:
     """Partition Pauli labels into commuting groups via greedy graph coloring.
 
-    Builds a non-commutation adjacency structure and greedily assigns each
-    label the lowest-index group in which it commutes with all existing
-    members.
+    Builds the non-commutation graph and greedily assigns each label the
+    lowest-index group in which it commutes with all existing members.
 
     Args:
         pauli_strings: Pauli labels to partition.
@@ -36,8 +37,6 @@ def _greedy_commutation_grouping(
     if n == 0:
         return ()
 
-    # Pre-compute which pairs do NOT commute for O(1) lookup during grouping.
-    # Store as a list of sets: non_commuting[i] = {j, ...} for j < i.
     non_commuting: list[set[int]] = [set() for _ in range(n)]
     for i in range(1, n):
         for j in range(i):
@@ -89,7 +88,7 @@ class FullCommutingTermGrouper(TermGrouper):
             QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"commuting"``).
 
         """
-        groups = _greedy_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
+        groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
         partition = FlatPartition(strategy="commuting", groups=groups)
         return QubitHamiltonian(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
@@ -125,7 +124,7 @@ class QubitWiseCommutingTermGrouper(TermGrouper):
             QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"qubit_wise_commuting"``).
 
         """
-        groups = _greedy_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
+        groups = _color_non_commutation_graph(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
         partition = FlatPartition(strategy="qubit_wise_commuting", groups=groups)
         return QubitHamiltonian(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
