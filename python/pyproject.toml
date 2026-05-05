@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,plugins,qiskit-extras,openfermion-extras]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,plugins,qiskit-extras,openfermion-extras,networkx-extras]"
 ]
 coverage = [
   "coverage",
@@ -92,6 +92,9 @@ qiskit-extras = [
 ]
 openfermion-extras = [
   "openfermion>=1.0.0"
+]
+networkx-extras = [
+  "networkx>=3.0"
 ]
 
 [project.urls]

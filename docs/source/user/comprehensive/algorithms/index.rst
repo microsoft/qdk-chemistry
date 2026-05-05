@@ -86,6 +86,26 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Circuit → CircuitExecutorData
 
 
+.. _algorithms-term-grouper:
+
+Term grouper
+------------
+
+The ``term_grouper`` algorithm type partitions the Pauli terms of a :class:`~qdk_chemistry.data.QubitHamiltonian` into algorithm-relevant subsets and stores the result on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`.
+A grouper consumes a ``QubitHamiltonian`` and returns a *new* ``QubitHamiltonian`` whose ``term_partition`` field is populated; the input is not mutated.
+
+Strategies include full commutation grouping, qubit-wise commutation grouping, and trivial (identity) grouping.
+Use ``registry.available("term_grouper")`` to list implementations.
+
+Example::
+
+    from qdk_chemistry.algorithms import registry
+
+    grouper = registry.create("term_grouper", "qubit_wise_commuting")
+    grouped = grouper.run(qubit_hamiltonian)
+    grouped.term_partition  # FlatPartition(strategy="qubit_wise_commuting", ...)
+
+
 Discovering implementations
 ---------------------------
 

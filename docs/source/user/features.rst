@@ -98,7 +98,9 @@ This generally involves the following steps:
    The target operator (e.g., the electronic Hamiltonian) is decomposed into a sum of measurable components, often expressed in terms of Pauli operators.
    This decomposition facilitates efficient measurement on quantum hardware.
    Starting from a qubit-mapped Hamiltonian, this task generally involves grouping Pauli terms into sets of mutually commuting operators that can be measured simultaneously.
-   QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the :class:`~qdk_chemistry.data.QubitHamiltonian.group_commuting` method.
+   QDK/Chemistry provides utilities for Pauli grouping by qubit-wise commutativity via the ``term_grouper`` algorithm
+   (e.g., ``registry.create("term_grouper", "qubit_wise_commuting")``), which attaches a
+   :class:`~qdk_chemistry.data.FlatPartition` to a :class:`~qdk_chemistry.data.QubitHamiltonian` for downstream consumers.
 2. **Circuit Execution and Measurement**:
    Given the state preparation circuit and the decomposed operator, quantum circuits are executed on quantum hardware or simulators to obtain measurement outcomes.
 3. **Classical Post-Processing**:
