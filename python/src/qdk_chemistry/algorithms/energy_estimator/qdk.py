@@ -267,24 +267,25 @@ class QdkEnergyEstimator(EnergyEstimator):
         if partition is not None:
             from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
 
-            if not isinstance(partition, FlatPartition):
-                raise TypeError(
-                    f"QdkEnergyEstimator expects a FlatPartition for measurement grouping, "
-                    f"got {type(partition).__name__}."
+            if isinstance(partition, FlatPartition):
+                Logger.info(
+                    f"EnergyEstimator: consuming term_partition "
+                    f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
+                return [
+                    QubitHamiltonian(
+                        pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
+                        coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
+                        encoding=qubit_hamiltonian.encoding,
+                        fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+                    )
+                    for group in partition.groups
+                ]
+
             Logger.info(
-                f"EnergyEstimator: consuming term_partition "
-                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+                f"EnergyEstimator: ignoring unsupported partition type "
+                f"{type(partition).__name__}; measuring each term individually."
             )
-            return [
-                QubitHamiltonian(
-                    pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
-                    coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
-                    encoding=qubit_hamiltonian.encoding,
-                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-                )
-                for group in partition.groups
-            ]
 
         Logger.info("EnergyEstimator: no term_partition; measuring each term individually.")
         return [

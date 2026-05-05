@@ -678,6 +678,16 @@ nlohmann::json LatticeGraph::to_json() const {
   j["num_sites"] = _num_sites;
   j["is_symmetric"] = _is_symmetric;
   j["adjacency_sparse"] = edges;
+
+  if (_edge_coloring.has_value()) {
+    nlohmann::json coloring_json = nlohmann::json::array();
+    for (const auto& [edge, color] : *_edge_coloring) {
+      coloring_json.push_back(
+          {edge.first, edge.second, color});
+    }
+    j["edge_coloring"] = coloring_json;
+  }
+
   return j;
 }
 
@@ -731,6 +741,24 @@ void LatticeGraph::to_hdf5(H5::Group& group) const {
     H5::DataSet dataset = group.createDataSet(
         "adjacency_sparse", H5::PredType::NATIVE_DOUBLE, dataspace);
     dataset.write(buffer.data(), H5::PredType::NATIVE_DOUBLE);
+
+    // Serialize edge coloring as Nx3 dataset: [i, j, color]
+    if (_edge_coloring.has_value()) {
+      auto nc = static_cast<hsize_t>(_edge_coloring->size());
+      hsize_t cdims[2] = {nc, 3};
+      H5::DataSpace cspace(2, cdims);
+      std::vector<double> cbuf(nc * 3);
+      hsize_t ci = 0;
+      for (const auto& [edge, color] : *_edge_coloring) {
+        cbuf[ci * 3 + 0] = static_cast<double>(edge.first);
+        cbuf[ci * 3 + 1] = static_cast<double>(edge.second);
+        cbuf[ci * 3 + 2] = static_cast<double>(color);
+        ++ci;
+      }
+      H5::DataSet cds = group.createDataSet(
+          "edge_coloring", H5::PredType::NATIVE_DOUBLE, cspace);
+      cds.write(cbuf.data(), H5::PredType::NATIVE_DOUBLE);
+    }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in LatticeGraph::to_hdf5: " +
                              std::string(e.getCDetailMsg()));
@@ -810,7 +838,20 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
                                      static_cast<Eigen::Index>(n));
   sparse.setFromTriplets(triplets.begin(), triplets.end());
   sparse.makeCompressed();
-  return LatticeGraph(std::move(sparse));
+
+  std::optional<EdgeColoring> coloring;
+  if (j.contains("edge_coloring")) {
+    EdgeColoring c;
+    for (const auto& entry : j["edge_coloring"]) {
+      auto i = entry[0].get<std::uint64_t>();
+      auto k = entry[1].get<std::uint64_t>();
+      auto color = entry[2].get<int>();
+      c[{i, k}] = color;
+    }
+    coloring = std::move(c);
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring));
 }
 
 LatticeGraph LatticeGraph::from_hdf5_file(const std::string& filename) {
@@ -879,7 +920,27 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
                                      static_cast<Eigen::Index>(n));
   sparse.setFromTriplets(triplets.begin(), triplets.end());
   sparse.makeCompressed();
-  return LatticeGraph(std::move(sparse));
+
+  std::optional<EdgeColoring> coloring;
+  if (group.nameExists("edge_coloring")) {
+    H5::DataSet cds = group.openDataSet("edge_coloring");
+    H5::DataSpace cspace = cds.getSpace();
+    hsize_t cdims[2];
+    cspace.getSimpleExtentDims(cdims);
+    auto nc = cdims[0];
+    std::vector<double> cbuf(nc * 3);
+    cds.read(cbuf.data(), H5::PredType::NATIVE_DOUBLE);
+    EdgeColoring c;
+    for (hsize_t ci = 0; ci < nc; ++ci) {
+      auto ei = static_cast<std::uint64_t>(cbuf[ci * 3 + 0]);
+      auto ej = static_cast<std::uint64_t>(cbuf[ci * 3 + 1]);
+      auto color = static_cast<int>(cbuf[ci * 3 + 2]);
+      c[{ei, ej}] = color;
+    }
+    coloring = std::move(c);
+  }
+
+  return LatticeGraph(std::move(sparse), std::move(coloring));
 }
 
 }  // namespace qdk::chemistry::data
