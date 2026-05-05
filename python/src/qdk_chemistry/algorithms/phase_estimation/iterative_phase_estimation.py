@@ -13,8 +13,8 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import BlockEncodingBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -23,7 +23,10 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
+from qdk_chemistry.utils.phase import (
+    iterative_phase_feedback_update,
+    phase_fraction_from_feedback,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import PhaseEstimation, PhaseEstimationSettings
@@ -134,10 +137,19 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         if isinstance(self.unitary_builder, TimeEvolutionBuilder):
             evolution_time = self.unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
+            return QpeResult.from_time_evolution_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,
                 evolution_time=evolution_time,
+                bits_msb_first=bits,
+            )
+        if isinstance(self.unitary_builder, BlockEncodingBuilder):
+            # For block-encoding builders (qubitization), use E = λ cos(2πφ).
+            lambda_val = qubit_hamiltonian.schatten_norm
+            return QpeResult.from_block_encoding_result(
+                method=self.name(),
+                phase_fraction=phase_fraction,
+                lambda_val=lambda_val,
                 bits_msb_first=bits,
             )
         raise NotImplementedError(
@@ -169,13 +181,12 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
-        num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, num_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
+                state_preparation, ctrl_unitary_circuit, phase_correction, num_qubits
             )
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():

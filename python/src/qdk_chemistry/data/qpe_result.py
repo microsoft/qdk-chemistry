@@ -14,7 +14,12 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import energy_alias_candidates, energy_from_phase, resolve_energy_aliases
+from qdk_chemistry.utils.phase import (
+    energy_alias_candidates,
+    energy_from_phase,
+    energy_from_phase_qubitization,
+    resolve_energy_aliases,
+)
 
 __all__: list[str] = []
 
@@ -47,7 +52,7 @@ class QpeResult(DataClass):
 
         Args:
             method: Identifier for the algorithm or workflow that produced the result.
-            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
+            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``. 0 if not applicable.
             phase_fraction:  Raw measured phase fraction in ``[0, 1)``.
             phase_angle: Raw measured phase angle in radians.
             canonical_phase_fraction:  Alias-resolved phase fraction consistent with the selected energy branch.
@@ -77,7 +82,7 @@ class QpeResult(DataClass):
         super().__init__()
 
     @classmethod
-    def from_phase_fraction(
+    def from_time_evolution_result(
         cls,
         *,
         method: str,
@@ -155,6 +160,65 @@ class QpeResult(DataClass):
             raw_energy=raw_energy,
             branching=branching,
             resolved_energy=resolved,
+            bits_msb_first=normalized_bits,
+            bitstring_msb_first=bitstring,
+            metadata=metadata_copy,
+        )
+
+    @classmethod
+    def from_block_encoding_result(
+        cls,
+        *,
+        method: str,
+        phase_fraction: float,
+        lambda_val: float,
+        bits_msb_first: Sequence[int] | None = None,
+        bitstring_msb_first: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> "QpeResult":
+        r"""Construct a :class:`QpeResult` from a block-encoding (qubitization) phase measurement.
+
+        For qubitization the walk operator has eigenvalues :math:`e^{\pm i \arccos(E/\lambda)}`,
+        so the energy is recovered as :math:`E = \lambda \cos(2\pi\varphi)`.
+
+        Args:
+            method: Phase estimation algorithm or workflow label.
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            lambda_val: The 1-norm :math:`\lambda = \sum_j |\alpha_j|` of the Hamiltonian.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            metadata: Optional dictionary copied into the result for caller-defined context.
+
+        Returns:
+            QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        """
+        Logger.trace_entering()
+        method_label = str(method.value) if hasattr(method, "value") else str(method)
+
+        normalized_phase = float(phase_fraction % 1.0)
+        phase_angle = float(normalized_phase * (2 * np.pi))
+        raw_energy = energy_from_phase_qubitization(normalized_phase, lambda_val=lambda_val)
+
+        normalized_bits: tuple[int, ...] | None = None
+        bitstring = bitstring_msb_first
+        if bits_msb_first is not None:
+            normalized_bits = tuple(int(bit) for bit in bits_msb_first)
+            if bitstring is None:
+                bitstring = "".join(str(bit) for bit in normalized_bits)
+
+        metadata_copy = dict(metadata) if metadata is not None else None
+
+        return cls(
+            method=method_label,
+            evolution_time=1.0,
+            phase_fraction=normalized_phase,
+            phase_angle=phase_angle,
+            canonical_phase_fraction=normalized_phase,
+            canonical_phase_angle=phase_angle,
+            raw_energy=raw_energy,
+            branching=(raw_energy,),
+            resolved_energy=None,
             bits_msb_first=normalized_bits,
             bitstring_msb_first=bitstring,
             metadata=metadata_copy,

@@ -669,10 +669,10 @@ def test_iterative_qpe_initialization() -> None:
     assert iqpe._settings.get("shots_per_bit") == shots_per_bit
 
 
-def test_raises_not_implemented_for_non_time_evolution_builder(
+def test_raises_not_implemented_for_postprocessing(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
-    """IQPE raises NotImplementedError when unitary_builder is not a TimeEvolutionBuilder."""
+    """IQPE raises NotImplementedError when unitary_builder is not a TimeEvolutionBuilder or a BlockEncodingBuilder."""
 
     class _MockBuilder(HamiltonianUnitaryBuilder):
         """A non-TimeEvolutionBuilder for testing the unsupported path."""

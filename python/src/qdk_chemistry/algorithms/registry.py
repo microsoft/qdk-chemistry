@@ -576,8 +576,14 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        BlockEncodingMapper,
+        PauliSequenceMapper,
+    )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
+        BlockEncodingBuilder,
+    )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
     )
@@ -598,7 +604,9 @@ def _register_python_algorithms():
     register(lambda: Trotter())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
+    register(lambda: BlockEncodingBuilder())
     register(lambda: PauliSequenceMapper())
+    register(lambda: BlockEncodingMapper())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())

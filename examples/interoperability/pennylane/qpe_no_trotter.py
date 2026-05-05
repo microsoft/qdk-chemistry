@@ -166,7 +166,7 @@ phase_fraction = dominant_index / (2**M_PRECISION)
 # 5. Process and display results
 ########################################################################################
 
-result = QpeResult.from_phase_fraction(
+result = QpeResult.from_time_evolution_result(
     method="pennylane_qpe",
     phase_fraction=phase_fraction,
     evolution_time=T_TIME,
