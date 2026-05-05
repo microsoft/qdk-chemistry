@@ -10,7 +10,7 @@
 from qdk_chemistry.data import QpeResult
 
 # Construct a QpeResult from a measured phase fraction
-result = QpeResult.from_phase_fraction(
+result = QpeResult.from_time_evolution_result(
     method="iterative",
     phase_fraction=0.423828125,
     evolution_time=0.1,
@@ -40,7 +40,7 @@ print(result.get_summary())
 ################################################################################
 # start-cell-alias
 # Construct without a reference energy — no alias resolution
-result_no_ref = QpeResult.from_phase_fraction(
+result_no_ref = QpeResult.from_time_evolution_result(
     method="iterative",
     phase_fraction=0.423828125,
     evolution_time=0.1,

@@ -112,7 +112,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         if isinstance(self.unitary_builder, TimeEvolutionBuilder):
             evolution_time = self.unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
+            return QpeResult.from_time_evolution_result(
                 method=self.name(),
                 phase_fraction=raw_phase,
                 evolution_time=evolution_time,
@@ -196,7 +196,7 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
             power: The power to which the controlled unitary is raised.
 
         """
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
         cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]

@@ -12,6 +12,7 @@ import h5py
 from qdk_chemistry.data.base import DataClass
 
 from .containers.base import UnitaryContainer
+from .containers.block_encoding import BlockEncodingContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
 
 __all__: list[str] = []
@@ -107,6 +108,8 @@ class UnitaryRepresentation(DataClass):
 
         if container_type == "pauli_product_formula":
             container = PauliProductFormulaContainer.from_json(json_data)
+        elif container_type == "block_encoding":
+            container = BlockEncodingContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
 
@@ -126,6 +129,8 @@ class UnitaryRepresentation(DataClass):
         container_type = group.attrs.get("container_type")
         if container_type == "pauli_product_formula":
             container = PauliProductFormulaContainer.from_hdf5(group)
+        elif container_type == "block_encoding":
+            container = BlockEncodingContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)

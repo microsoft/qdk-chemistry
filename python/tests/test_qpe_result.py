@@ -15,7 +15,7 @@ from qdk_chemistry.data import QpeResult
 
 def test_qpe_result_creation():
     """Test basic QpeResult creation."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.25,
         evolution_time=1.0,
@@ -31,7 +31,7 @@ def test_qpe_result_creation():
 
 def test_qpe_result_json_serialization():
     """Test QPE result JSON serialization round-trip."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.125,
         evolution_time=2.0,
@@ -51,7 +51,7 @@ def test_qpe_result_json_serialization():
 
 def test_qpe_result_json_file_io():
     """Test QPE result JSON file I/O."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="QPE",
         phase_fraction=0.5,
         evolution_time=1.0,
@@ -79,7 +79,7 @@ def test_qpe_result_json_file_io():
 
 def test_qpe_result_hdf5_file_io():
     """Test QPE result HDF5 file I/O."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.375,
         evolution_time=3.0,
@@ -109,7 +109,7 @@ def test_qpe_result_hdf5_file_io():
 
 def test_qpe_result_summary():
     """Test QPE result summary string."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.25,
         evolution_time=1.0,
@@ -125,7 +125,7 @@ def test_qpe_result_summary():
 
 def test_qpe_result_immutability():
     """Test that QpeResult is immutable after construction."""
-    qpe = QpeResult.from_phase_fraction(method="IQPE", phase_fraction=0.25, evolution_time=1.0)
+    qpe = QpeResult.from_time_evolution_result(method="IQPE", phase_fraction=0.25, evolution_time=1.0)
 
     try:
         qpe.method = "different"
@@ -192,7 +192,7 @@ def test_qpe_result_from_json_minimal():
 
 def test_qpe_result_json_roundtrip():
     """Test QPE result JSON serialization/deserialization roundtrip."""
-    original = QpeResult.from_phase_fraction(
+    original = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.375,
         evolution_time=2.5,
@@ -224,7 +224,7 @@ def test_qpe_result_json_roundtrip():
 
 def test_qpe_result_hdf5_roundtrip():
     """Test QPE result HDF5 serialization/deserialization roundtrip."""
-    original = QpeResult.from_phase_fraction(
+    original = QpeResult.from_time_evolution_result(
         method="QPE",
         phase_fraction=0.125,
         evolution_time=1.0,
@@ -264,7 +264,7 @@ def test_qpe_result_hdf5_roundtrip():
 
 def test_qpe_result_from_file_json():
     """Test QPE result loading from file with explicit JSON format."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="IQPE",
         phase_fraction=0.25,
         evolution_time=1.0,
@@ -286,7 +286,7 @@ def test_qpe_result_from_file_json():
 
 def test_qpe_result_from_file_hdf5():
     """Test QPE result loading from file with explicit HDF5 format."""
-    result = QpeResult.from_phase_fraction(
+    result = QpeResult.from_time_evolution_result(
         method="QPE",
         phase_fraction=0.5,
         evolution_time=2.0,
