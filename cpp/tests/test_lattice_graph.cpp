@@ -522,10 +522,24 @@ TEST_F(LatticeGraphTest, ColorCount) {
   std::set<int> chain_open_colors;
   for (const auto& [e, c] : *chain_open.edge_coloring())
     chain_open_colors.insert(c);
-  EXPECT_GT(chain_open_colors.size(), 0u);
+  // Open chain uses exactly 2 colors (alternating)
+  EXPECT_EQ(chain_open_colors.size(), 2u);
 
   auto chain_periodic_even = LatticeGraph::chain(6, true);
   ASSERT_TRUE(chain_periodic_even.edge_coloring().has_value());
+  std::set<int> chain_even_colors;
+  for (const auto& [e, c] : *chain_periodic_even.edge_coloring())
+    chain_even_colors.insert(c);
+  // Even periodic chain uses exactly 2 colors
+  EXPECT_EQ(chain_even_colors.size(), 2u);
+
+  // Odd periodic chain needs 3 colors
+  auto chain_periodic_odd = LatticeGraph::chain(5, true);
+  ASSERT_TRUE(chain_periodic_odd.edge_coloring().has_value());
+  std::set<int> chain_odd_colors;
+  for (const auto& [e, c] : *chain_periodic_odd.edge_coloring())
+    chain_odd_colors.insert(c);
+  EXPECT_EQ(chain_odd_colors.size(), 3u);
 
   auto hc = LatticeGraph::honeycomb(3, 3, true, true);
   ASSERT_TRUE(hc.edge_coloring().has_value());
@@ -562,4 +576,57 @@ TEST_F(LatticeGraphTest, EdgeColoringIsImmutable) {
   const auto& first = sq.edge_coloring();
   const auto& second = sq.edge_coloring();
   EXPECT_EQ(&first, &second);
+}
+
+TEST_F(LatticeGraphTest, TrivialEdgeColoring) {
+  // Build a small graph and check trivial coloring assigns unique colors.
+  auto chain = LatticeGraph::chain(5);
+  const auto& adj = chain.sparse_adjacency_matrix();
+  auto coloring = trivial_edge_coloring(adj);
+
+  // 4 edges in a 5-site open chain
+  EXPECT_EQ(coloring.size(), 4u);
+
+  // Each edge should have a distinct color 0..3
+  std::set<int> colors;
+  for (const auto& [edge, c] : coloring) {
+    colors.insert(c);
+  }
+  EXPECT_EQ(colors.size(), 4u);
+  EXPECT_EQ(*colors.begin(), 0);
+  EXPECT_EQ(*colors.rbegin(), 3);
+
+  // Also valid as an edge coloring (trivially, since all colors differ)
+  check_valid_edge_coloring(coloring);
+}
+
+TEST_F(LatticeGraphTest, TrivialEdgeColoringEmpty) {
+  // Single-site graph has no edges → empty coloring
+  auto single = LatticeGraph::chain(1);
+  auto coloring = trivial_edge_coloring(single.sparse_adjacency_matrix());
+  EXPECT_TRUE(coloring.empty());
+}
+
+TEST_F(LatticeGraphTest, ColoringSeedDeterministic) {
+  // Same seed → same coloring.
+  auto tri_a = LatticeGraph::triangular(3, 3, true, true, 1.0, 42);
+  auto tri_b = LatticeGraph::triangular(3, 3, true, true, 1.0, 42);
+  ASSERT_TRUE(tri_a.edge_coloring().has_value());
+  ASSERT_TRUE(tri_b.edge_coloring().has_value());
+  EXPECT_EQ(*tri_a.edge_coloring(), *tri_b.edge_coloring());
+
+  // Different seed may produce a different coloring (or same, but at
+  // least both must be valid).
+  auto tri_c = LatticeGraph::triangular(3, 3, true, true, 1.0, 99);
+  ASSERT_TRUE(tri_c.edge_coloring().has_value());
+  check_valid_edge_coloring(*tri_c.edge_coloring());
+}
+
+TEST_F(LatticeGraphTest, KagomeColoringSeed) {
+  auto kg_a = LatticeGraph::kagome(2, 2, true, true, 1.0, 7);
+  auto kg_b = LatticeGraph::kagome(2, 2, true, true, 1.0, 7);
+  ASSERT_TRUE(kg_a.edge_coloring().has_value());
+  ASSERT_TRUE(kg_b.edge_coloring().has_value());
+  EXPECT_EQ(*kg_a.edge_coloring(), *kg_b.edge_coloring());
+  check_valid_edge_coloring(*kg_a.edge_coloring());
 }

@@ -18,7 +18,7 @@ from qdk_chemistry._core.utils.model_hamiltonians import (
     to_site_param,
 )
 from qdk_chemistry.data import LatticeGraph, LayeredPartition, PauliOperator, QubitHamiltonian
-
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "create_heisenberg_hamiltonian",
@@ -50,11 +50,18 @@ def _build_geometry_grouped_hamiltonian(
 ) -> QubitHamiltonian:
     r"""Assemble a Heisenberg-like Hamiltonian with a populated ``term_partition``.
 
-    Builds the Pauli-string list grouped first by single-body field direction
-    (one *Trotter group* per direction, each containing a single layer because
-    field terms have disjoint support), then by two-body coupling type (one
-    Trotter group per ``XX``/``YY``/``ZZ`` block, each split into layers by
-    edge color).  Term indices in
+    This helper exists separately from the ungrouped construction path
+    because it builds the Pauli-string list in a specific order dictated
+    by the lattice edge coloring, then records that order as a
+    :class:`~qdk_chemistry.data.LayeredPartition`.  The ungrouped path
+    constructs terms from the adjacency matrix directly without regard
+    to color structure.
+
+    Groups are organised first by single-body field direction (one group
+    per direction, each containing a single layer because field terms
+    have disjoint support), then by two-body coupling type (one group
+    per ``XX``/``YY``/``ZZ`` block, each split into layers by edge
+    color).  Term indices in
     :attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` align with the
     indices stored in the returned :class:`LayeredPartition`.
 
@@ -62,7 +69,7 @@ def _build_geometry_grouped_hamiltonian(
         graph: Lattice graph defining connectivity.
         couplings: ``[(label, value), ...]`` for two-body terms (e.g. ``[(\"XX\", jx)]``).
         fields: ``[(char, value), ...]`` for single-body terms (e.g. ``[(\"X\", hx)]``).
-        coloring: Optional pre-computed edge coloring as ``{(i, j): color}`` with ``i < j``. When ``None``, ``graph.edge_coloring`` is read.
+        coloring: Optional edge coloring ``{(i, j): color}`` (``i < j``). Reads ``graph.edge_coloring`` when ``None``.
 
     Returns:
         QubitHamiltonian: The assembled Hamiltonian carrying a ``LayeredPartition``
@@ -183,10 +190,14 @@ def create_heisenberg_hamiltonian(
         raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
 
     if include_term_groups:
-        return _build_geometry_grouped_hamiltonian(
-            graph,
-            couplings=[("XX", jx), ("YY", jy), ("ZZ", jz)],
-            fields=[("X", hx), ("Y", hy), ("Z", hz)],
+        if graph.edge_coloring is not None:
+            return _build_geometry_grouped_hamiltonian(
+                graph,
+                couplings=[("XX", jx), ("YY", jy), ("ZZ", jz)],
+                fields=[("X", hx), ("Y", hy), ("Z", hz)],
+            )
+        Logger.info(
+            "No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction."
         )
 
     n = graph.num_sites

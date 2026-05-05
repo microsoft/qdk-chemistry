@@ -9,28 +9,13 @@ import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import create, registry
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian
-
-
-def _group_commuting(qh: QubitHamiltonian, *, qubit_wise: bool = True) -> list[QubitHamiltonian]:
-    """Materialise commuting groups via the term_grouper algorithm."""
-    strategy = "qubit_wise_commuting" if qubit_wise else "commuting"
-    grouped = registry.create("term_grouper", strategy).run(qh)
-    partition = grouped.term_partition
-    return [
-        QubitHamiltonian(
-            pauli_strings=[grouped.pauli_strings[i] for i in group],
-            coefficients=np.asarray([grouped.coefficients[i] for i in group]),
-            encoding=grouped.encoding,
-            fermion_mode_order=grouped.fermion_mode_order,
-        )
-        for group in partition.groups
-    ]
+from .test_helpers import group_commuting as _group_commuting
 
 
 def test_circuit_encoding_metadata():

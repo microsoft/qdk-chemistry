@@ -14,16 +14,15 @@ from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pa
 __all__ = ["FullCommutingTermGrouper", "QubitWiseCommutingTermGrouper"]
 
 
-def _greedy_color_partition(
+def _greedy_commutation_grouping(
     pauli_strings: list[str],
     commutes: Callable[[str, str], bool],
 ) -> tuple[tuple[int, ...], ...]:
     """Partition Pauli labels into commuting groups via greedy graph coloring.
 
-    Conceptually builds the non-commutation graph (an edge between every pair
-    of labels that do *not* commute) and colors it greedily, assigning each
-    label the lowest color not used by any non-commuting neighbour.  Labels
-    sharing a color form a commuting group.
+    Builds a non-commutation adjacency structure and greedily assigns each
+    label the lowest-index group in which it commutes with all existing
+    members.
 
     Args:
         pauli_strings: Pauli labels to partition.
@@ -33,20 +32,34 @@ def _greedy_color_partition(
         Tuple of groups; each group is a tuple of indices into ``pauli_strings``.
 
     """
-    groups: list[list[int]] = []
-    group_labels: list[list[str]] = []
+    n = len(pauli_strings)
+    if n == 0:
+        return ()
 
-    for i, pauli_str in enumerate(pauli_strings):
+    # Pre-compute which pairs do NOT commute for O(1) lookup during grouping.
+    # Store as a list of sets: non_commuting[i] = {j, ...} for j < i.
+    non_commuting: list[set[int]] = [set() for _ in range(n)]
+    for i in range(1, n):
+        for j in range(i):
+            if not commutes(pauli_strings[i], pauli_strings[j]):
+                non_commuting[i].add(j)
+                non_commuting[j].add(i)
+
+    groups: list[list[int]] = []
+    group_members: list[set[int]] = []
+
+    for i in range(n):
         placed = False
-        for group, labels in zip(groups, group_labels, strict=True):
-            if all(commutes(pauli_str, existing) for existing in labels):
-                group.append(i)
-                labels.append(pauli_str)
+        conflicts_i = non_commuting[i]
+        for g_idx, members in enumerate(group_members):
+            if not conflicts_i & members:
+                groups[g_idx].append(i)
+                members.add(i)
                 placed = True
                 break
         if not placed:
             groups.append([i])
-            group_labels.append([pauli_str])
+            group_members.append({i})
 
     return tuple(tuple(g) for g in groups)
 
@@ -73,10 +86,10 @@ class FullCommutingTermGrouper(TermGrouper):
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance carrying a :class:`~qdk_chemistry.data.FlatPartition` with strategy ``"commuting"``.
+            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"commuting"``).
 
         """
-        groups = _greedy_color_partition(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
+        groups = _greedy_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
         partition = FlatPartition(strategy="commuting", groups=groups)
         return QubitHamiltonian(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),
@@ -109,10 +122,10 @@ class QubitWiseCommutingTermGrouper(TermGrouper):
             qubit_hamiltonian: Hamiltonian to partition.
 
         Returns:
-            QubitHamiltonian: New instance carrying a :class:`~qdk_chemistry.data.FlatPartition` with strategy ``"qubit_wise_commuting"``.
+            QubitHamiltonian: New instance with a ``FlatPartition`` (strategy ``"qubit_wise_commuting"``).
 
         """
-        groups = _greedy_color_partition(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
+        groups = _greedy_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
         partition = FlatPartition(strategy="qubit_wise_commuting", groups=groups)
         return QubitHamiltonian(
             pauli_strings=list(qubit_hamiltonian.pauli_strings),

@@ -4,6 +4,7 @@
 
 #include <Eigen/Sparse>
 #include <algorithm>
+#include <cassert>
 #include <cstdint>
 #include <fstream>
 #include <limits>
@@ -70,7 +71,33 @@ LatticeGraph::LatticeGraph(Eigen::SparseMatrix<double> adjacency,
     : _num_sites(static_cast<std::uint64_t>(adjacency.rows())),
       adjacency_(std::move(adjacency)),
       _is_symmetric(_check_symmetry(adjacency_)),
-      _edge_coloring(std::move(coloring)) {}
+      _edge_coloring(std::move(coloring)) {
+#ifndef NDEBUG
+  if (_edge_coloring.has_value()) {
+    // Verify every edge in the coloring exists in the adjacency matrix.
+    for (const auto& [edge, color] : *_edge_coloring) {
+      assert(edge.first < _num_sites && edge.second < _num_sites &&
+             "coloring edge vertex out of range");
+      assert(edge.first < edge.second && "coloring edge not canonical (i < j)");
+      assert(adjacency_.coeff(static_cast<Eigen::Index>(edge.first),
+                              static_cast<Eigen::Index>(edge.second)) != 0.0 &&
+             "coloring contains edge not in adjacency matrix");
+    }
+    // Verify every upper-triangular edge in adjacency appears in coloring.
+    for (int k = 0; k < adjacency_.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(adjacency_, k); it;
+           ++it) {
+        if (it.row() < it.col() && it.value() != 0.0) {
+          auto key = std::make_pair(static_cast<std::uint64_t>(it.row()),
+                                    static_cast<std::uint64_t>(it.col()));
+          assert(_edge_coloring->count(key) != 0 &&
+                 "adjacency edge missing from coloring");
+        }
+      }
+    }
+  }
+#endif
+}
 
 LatticeGraph LatticeGraph::from_dense_matrix(
     const Eigen::MatrixXd& adjacency_matrix) {
@@ -213,7 +240,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
 
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
                                       bool periodic_x, bool periodic_y,
-                                      double t) {
+                                      double t, int coloring_seed) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("triangular: nx and ny must be > 0.");
   }
@@ -266,7 +293,10 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
+  // No known deterministic coloring for triangular lattices with arbitrary
+  // periodic boundaries; use greedy with multiple trials instead.
+  return LatticeGraph(std::move(adj),
+                      greedy_edge_coloring(adj, coloring_seed, 32));
 }
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
@@ -323,7 +353,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
 }
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
-                                  bool periodic_x, bool periodic_y, double t) {
+                                  bool periodic_x, bool periodic_y, double t,
+                                  int coloring_seed) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("kagome: nx and ny must be > 0.");
   }
@@ -391,7 +422,8 @@ LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
   Eigen::SparseMatrix<double> adj(N, N);
   adj.setFromTriplets(triplets.begin(), triplets.end());
   adj.makeCompressed();
-  return LatticeGraph(std::move(adj), greedy_edge_coloring(adj, 0, 32));
+  return LatticeGraph(std::move(adj),
+                      greedy_edge_coloring(adj, coloring_seed, 32));
 }
 
 namespace detail {
@@ -400,6 +432,7 @@ namespace detail {
 std::vector<std::pair<std::uint64_t, std::uint64_t>> undirected_edges(
     const Eigen::SparseMatrix<double>& adj) {
   std::vector<std::pair<std::uint64_t, std::uint64_t>> edges;
+  edges.reserve(static_cast<std::size_t>(adj.nonZeros()) / 2);
   for (int k = 0; k < adj.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
       if (it.row() < it.col() && it.value() != 0.0) {
@@ -423,6 +456,16 @@ EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
     return {};
   }
 
+  // Compute max degree to bound the colour count.
+  auto num_vertices = static_cast<std::size_t>(adj.rows());
+  std::vector<int> degree(num_vertices, 0);
+  for (const auto& [u, v] : edges_in) {
+    ++degree[u];
+    ++degree[v];
+  }
+  int max_degree = *std::max_element(degree.begin(), degree.end());
+  int max_colors = 2 * max_degree;  // upper bound: 2*Δ - 1 rounded up
+
   EdgeColoring best;
   int best_count = std::numeric_limits<int>::max();
   std::mt19937 rng(static_cast<std::uint32_t>(seed));
@@ -436,21 +479,23 @@ EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
     }
 
     EdgeColoring coloring;
-    // For each vertex, the set of colors already incident to it.
-    std::map<std::uint64_t, std::set<int>> vertex_colors;
+    // For each vertex, a bitset of colours already incident to it.
+    std::vector<std::vector<bool>> vertex_used(
+        num_vertices, std::vector<bool>(max_colors, false));
     int max_color = -1;
 
     for (std::size_t pos : order) {
       const auto& edge = edges_in[pos];
-      const auto& used_i = vertex_colors[edge.first];
-      const auto& used_j = vertex_colors[edge.second];
+      const auto& used_i = vertex_used[edge.first];
+      const auto& used_j = vertex_used[edge.second];
       int chosen = 0;
-      while (used_i.count(chosen) != 0 || used_j.count(chosen) != 0) {
+      while (chosen < max_colors &&
+             (used_i[chosen] || used_j[chosen])) {
         ++chosen;
       }
       coloring[edge] = chosen;
-      vertex_colors[edge.first].insert(chosen);
-      vertex_colors[edge.second].insert(chosen);
+      vertex_used[edge.first][chosen] = true;
+      vertex_used[edge.second][chosen] = true;
       if (chosen > max_color) max_color = chosen;
     }
 
@@ -470,7 +515,7 @@ EdgeColoring chain_coloring(std::int64_t n, bool periodic) {
   EdgeColoring out;
   for (std::int64_t i = 0; i + 1 < n; ++i) {
     out[{static_cast<std::uint64_t>(i), static_cast<std::uint64_t>(i + 1)}] =
-        static_cast<int>(i % 2);
+        i % 2;
   }
   if (periodic && n > 2) {
     int wrap_color = (n % 2 == 0) ? 1 : 2;  // last edge color is (n-2)%2
@@ -499,7 +544,7 @@ EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny,
   // (4 for x-wrap parity-conflict, 5 for y-wrap parity-conflict).
   for (std::int64_t y = 0; y < Ny; ++y) {
     for (std::int64_t x = 0; x + 1 < Nx; ++x) {
-      put(idx(x, y), idx(x + 1, y), static_cast<int>(x % 2));
+      put(idx(x, y), idx(x + 1, y), x % 2);
     }
     if (periodic_x && Nx > 2) {
       int wrap_color = (Nx % 2 == 0) ? 1 : 4;
@@ -508,7 +553,7 @@ EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny,
   }
   for (std::int64_t x = 0; x < Nx; ++x) {
     for (std::int64_t y = 0; y + 1 < Ny; ++y) {
-      put(idx(x, y), idx(x, y + 1), 2 + static_cast<int>(y % 2));
+      put(idx(x, y), idx(x, y + 1), 2 + y % 2);
     }
     if (periodic_y && Ny > 2) {
       int wrap_color = (Ny % 2 == 0) ? 3 : 5;
@@ -561,6 +606,20 @@ EdgeColoring honeycomb_coloring(std::int64_t Nx, std::int64_t Ny,
         put(idxB(x, y), idxA(x, y + 1), 2);
       } else if (periodic_y) {
         put(idxB(x, y), idxA(x, 0), 2);
+      }
+    }
+  }
+  return out;
+}
+
+EdgeColoring trivial_edge_coloring(const Eigen::SparseMatrix<double>& adj) {
+  EdgeColoring out;
+  int color = 0;
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      if (it.row() < it.col() && it.value() != 0.0) {
+        out[{static_cast<std::uint64_t>(it.row()),
+             static_cast<std::uint64_t>(it.col())}] = color++;
       }
     }
   }

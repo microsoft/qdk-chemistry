@@ -190,4 +190,3 @@ __all__ = [
     "get_current_ciaaw_version",
     "validate_encoding_compatibility",
 ]
-

@@ -59,6 +59,31 @@ void bind_lattice_graph(pybind11::module &m) {
 
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
+  // Module-level free function: trivial_edge_coloring
+  m.def(
+      "trivial_edge_coloring",
+      [](const Eigen::SparseMatrix<double> &adj) -> py::dict {
+        auto coloring = trivial_edge_coloring(adj);
+        py::dict out;
+        for (const auto &[edge, color] : coloring) {
+          out[py::make_tuple(edge.first, edge.second)] = color;
+        }
+        return out;
+      },
+      R"(
+Trivial edge coloring where every edge receives a unique color.
+
+Useful as a fallback when no topology-aware coloring is available.
+
+Args:
+    adj (scipy.sparse matrix): Sparse adjacency matrix of the graph.
+
+Returns:
+    dict[tuple[int, int], int]: Mapping of canonical edges to distinct
+    color labels 0, 1, 2, ... in iteration order.
+)",
+      py::arg("adj"));
+
   py::class_<LatticeGraph, DataClass, py::smart_holder> lattice_graph(
       m, "LatticeGraph", R"(
 Lattice graph defining the connectivity and geometry of a model Hamiltonian.
@@ -338,6 +363,7 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
 Returns:
     LatticeGraph: Triangular lattice with nx * ny sites.
@@ -347,7 +373,8 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("coloring_seed") = 0);
 
   lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
 Create a two-dimensional honeycomb lattice.
@@ -432,6 +459,7 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
 Returns:
     LatticeGraph: Kagome lattice with 3 * nx * ny sites.
@@ -441,7 +469,8 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("coloring_seed") = 0);
 
   lattice_graph.def("__repr__", [](const LatticeGraph &self) {
     return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +

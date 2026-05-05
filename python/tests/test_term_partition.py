@@ -110,7 +110,7 @@ class TestQubitHamiltonianTermPartition:
 class TestTermGrouperRegistry:
     def test_available_strategies(self):
         names = registry.available("term_grouper")
-        assert set(names) == {"commuting", "qubit_wise_commuting", "identity"}
+        assert {"commuting", "qubit_wise_commuting", "identity"} <= set(names)
 
     def test_default_strategy_is_commuting(self):
         grouper = registry.create("term_grouper")
@@ -224,12 +224,22 @@ class TestTrotterConsumesTermPartition:
 
     def test_partition_produces_smaller_or_equal_step_count_at_order_2(self):
         # With group sorting + schedule reduction, populating the partition
-        # should never produce more groups than the ungrouped fallback.
+        # should never produce more step terms than the ungrouped fallback.
         lat = LatticeGraph.chain(4, periodic=True)
         with_groups = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0, include_term_groups=True)
         without_groups = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0, include_term_groups=False)
         assert with_groups.term_partition is not None
         assert without_groups.term_partition is None
+
+        trotter = registry.create("time_evolution_builder", "trotter")
+        trotter.settings().update({"order": 2, "num_divisions": 1})
+        grouped_steps = len(trotter.run(with_groups, time=1.0).get_container().step_terms)
+
+        trotter2 = registry.create("time_evolution_builder", "trotter")
+        trotter2.settings().update({"order": 2, "num_divisions": 1})
+        ungrouped_steps = len(trotter2.run(without_groups, time=1.0).get_container().step_terms)
+
+        assert grouped_steps <= ungrouped_steps
 
     def test_trotter_runs_with_flat_partition(self):
         # Take a partitioned Hamiltonian and overwrite term_partition with a

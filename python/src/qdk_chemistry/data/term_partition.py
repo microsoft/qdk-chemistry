@@ -7,9 +7,8 @@ relevant subsets.  Concrete subclasses include :class:`FlatPartition`
 hierarchy).
 
 The partition stores **indices** into
-:attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings`, not nested
-``QubitHamiltonian`` objects, so that it serialises trivially and remains
-small.
+:attr:`~qdk_chemistry.data.QubitHamiltonian.pauli_strings` so that it
+serialises trivially and remains small.
 
 Lifecycle
 ---------
@@ -32,6 +31,7 @@ Lifecycle
 
 from __future__ import annotations
 
+import json as _json
 from typing import Any
 
 from qdk_chemistry.data.base import DataClass
@@ -82,8 +82,6 @@ class TermPartition(DataClass):
 
     def to_hdf5(self, group) -> None:
         """Save this partition to an HDF5 group."""
-        import json as _json  # noqa: PLC0415
-
         group.attrs["term_partition"] = _json.dumps(self.to_json())
 
     @staticmethod
@@ -113,17 +111,20 @@ class TermPartition(DataClass):
     @classmethod
     def from_hdf5(cls, group) -> TermPartition:
         """Load a :class:`TermPartition` from an HDF5 group."""
-        import json as _json  # noqa: PLC0415
-
-        data = _json.loads(group.attrs["term_partition"])
+        raw = group.attrs["term_partition"]
+        if isinstance(raw, bytes):
+            raw = raw.decode("utf-8")
+        data = _json.loads(raw)
         return cls.from_json(data)
 
     def __eq__(self, other: object) -> bool:
+        """Check equality by type and strategy."""
         if not isinstance(other, TermPartition):
             return NotImplemented
         return type(self) is type(other) and self.strategy == other.strategy
 
     def __hash__(self) -> int:
+        """Return hash."""
         return hash((type(self).__name__, self.strategy))
 
 
@@ -176,11 +177,13 @@ class FlatPartition(TermPartition):
         }
 
     def __eq__(self, other: object) -> bool:
+        """Check equality by strategy and groups."""
         if not isinstance(other, FlatPartition):
             return NotImplemented
         return self.strategy == other.strategy and self.groups == other.groups
 
     def __hash__(self) -> int:
+        """Return hash."""
         return hash(("FlatPartition", self.strategy, self.groups))
 
 
@@ -241,9 +244,11 @@ class LayeredPartition(TermPartition):
         }
 
     def __eq__(self, other: object) -> bool:
+        """Check equality by strategy and groups."""
         if not isinstance(other, LayeredPartition):
             return NotImplemented
         return self.strategy == other.strategy and self.groups == other.groups
 
     def __hash__(self) -> int:
+        """Return hash."""
         return hash(("LayeredPartition", self.strategy, self.groups))

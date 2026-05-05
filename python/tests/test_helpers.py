@@ -7,6 +7,7 @@
 
 import numpy as np
 
+from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
@@ -16,6 +17,7 @@ from qdk_chemistry.data import (
     Hamiltonian,
     Orbitals,
     OrbitalType,
+    QubitHamiltonian,
     Shell,
     Structure,
     Wavefunction,
@@ -247,3 +249,30 @@ def create_test_ansatz(num_orbitals: int = 2):
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def group_commuting(qh: QubitHamiltonian, *, qubit_wise: bool = True) -> list[QubitHamiltonian]:
+    """Materialise commuting groups via the term_grouper algorithm.
+
+    Test helper replacing the removed ``QubitHamiltonian.group_commuting`` method.
+
+    Args:
+        qh: QubitHamiltonian to partition.
+        qubit_wise: Use qubit-wise commutation (default) or full commutation.
+
+    Returns:
+        List of ``QubitHamiltonian`` objects, one per commuting group.
+
+    """
+    strategy = "qubit_wise_commuting" if qubit_wise else "commuting"
+    grouped = registry.create("term_grouper", strategy).run(qh)
+    partition = grouped.term_partition
+    return [
+        QubitHamiltonian(
+            pauli_strings=[grouped.pauli_strings[i] for i in group],
+            coefficients=np.asarray([grouped.coefficients[i] for i in group]),
+            encoding=grouped.encoding,
+            fermion_mode_order=grouped.fermion_mode_order,
+        )
+        for group in partition.groups
+    ]

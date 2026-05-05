@@ -133,11 +133,11 @@ class Trotter(TimeEvolutionBuilder):
         is exponentiated as its own group.
 
         Args:
-            order: The order of the Trotter decomposition (currently only first order is supported). Defaults to 1.
-            target_accuracy: Target accuracy for automatic step computation. Must be positive to enable automatic computation. Use 0.0 (default) to disable.
-            num_divisions: Explicit number of divisions within a Trotter step. When both *num_divisions* and *target_accuracy* are given the larger value is used. Use 0 (default) for automatic determination.
-            error_bound: Strategy for computing the Trotter error bound when *target_accuracy* is set. Either ``"commutator"`` (default, tighter) or ``"naive"``.
-            weight_threshold: Absolute threshold for filtering small Hamiltonian coefficients. Defaults to 1e-12.
+            order: Trotter decomposition order (1, 2, or any positive even integer). Defaults to 1.
+            target_accuracy: Target accuracy for auto step computation. Use 0.0 (default) to disable.
+            num_divisions: Divisions per Trotter step. Max of this and auto value is used. Defaults to 0.
+            error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
+            weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
 
         """
         super().__init__()
@@ -194,9 +194,7 @@ class Trotter(TimeEvolutionBuilder):
 
         delta = time / num_divisions
 
-        terms = self._decompose_trotter_step(
-            qubit_hamiltonian, time=delta, atol=weight_threshold
-        )
+        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -280,6 +278,10 @@ class Trotter(TimeEvolutionBuilder):
 
         order = self._settings.get("order")
         grouped_hamiltonians = self._group_terms(qubit_hamiltonian)
+
+        if not grouped_hamiltonians:
+            Logger.warn("Term partition produced no groups; returning empty term list.")
+            return terms
 
         if order == 1:
             for group in grouped_hamiltonians:
@@ -374,16 +376,14 @@ class Trotter(TimeEvolutionBuilder):
             )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
-        Logger.info(
-            "Trotter: no term_partition present; "
-            "treating each Pauli term as its own group."
-        )
+        Logger.info("Trotter: no term_partition present; treating each Pauli term as its own group.")
         return [
             [
                 QubitHamiltonian(
                     pauli_strings=[label],
                     coefficients=[coeff],
                     encoding=qubit_hamiltonian.encoding,
+                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
                 )
             ]
             for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
@@ -413,12 +413,14 @@ class Trotter(TimeEvolutionBuilder):
         labels = qubit_hamiltonian.pauli_strings
         coeffs = qubit_hamiltonian.coefficients
         encoding = qubit_hamiltonian.encoding
+        fmo = qubit_hamiltonian.fermion_mode_order
 
         def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
             return QubitHamiltonian(
                 pauli_strings=[labels[i] for i in indices],
                 coefficients=np.asarray([coeffs[i] for i in indices]),
                 encoding=encoding,
+                fermion_mode_order=fmo,
             )
 
         # Normalise to (group → tuple of layers of indices)
@@ -454,8 +456,8 @@ class Trotter(TimeEvolutionBuilder):
 
         Each term :math:`P_j` with coefficient :math:`c_j` is converted to
         the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
-        group commute and :meth:`_group_terms` ensures they have disjoint
-        qubit supports, the rotations can be applied in any order.
+        group commute, the product of rotations equals the exponential of
+        the sum regardless of ordering.
 
         Args:
             group: The group of commuting Hamiltonian terms to exponentiate.

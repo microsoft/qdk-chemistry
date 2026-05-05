@@ -12,6 +12,7 @@ and quantum circuit construction or measurement workflows.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -330,8 +331,6 @@ class QubitHamiltonian(DataClass):
         if self.fermion_mode_order is not None:
             group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
         if self.term_partition is not None:
-            import json  # noqa: PLC0415
-
             group.attrs["term_partition"] = json.dumps(self.term_partition.to_json())
 
     @classmethod
@@ -392,8 +391,6 @@ class QubitHamiltonian(DataClass):
             fermion_mode_order = fermion_mode_order.decode("utf-8")
         partition_attr = group.attrs.get("term_partition")
         if partition_attr is not None:
-            import json  # noqa: PLC0415
-
             if isinstance(partition_attr, bytes):
                 partition_attr = partition_attr.decode("utf-8")
             term_partition = TermPartition.from_json(json.loads(partition_attr))

@@ -160,6 +160,26 @@ This typically reduces the number of distinct exponentials per Trotter step and 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
 
+For lattice models, the edge coloring stored on :class:`~qdk_chemistry.data.LatticeGraph` feeds directly into the partition: edges of the same color have disjoint qubit supports and form a single parallelisable layer.
+The :ref:`model Hamiltonian builders <model-term-partition>` consume this coloring automatically, so no manual geometry handling is required.
+
+Example::
+
+    from qdk_chemistry.data import LatticeGraph
+    from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
+    from qdk_chemistry.algorithms import registry
+
+    graph = LatticeGraph.square(4, 4, periodic_x=True, periodic_y=True)
+    hamiltonian = create_ising_hamiltonian(graph, j=1.0, h=0.5)
+
+    # The Hamiltonian already carries a LayeredPartition from the edge coloring.
+    print(hamiltonian.term_partition)
+
+    # The Trotter builder consumes it automatically.
+    trotter = registry.create("time_evolution_builder", "trotter")
+    trotter.settings().set("order", 2)
+    evolution = trotter.run(hamiltonian, time=1.0)
+
 
 Related classes
 ---------------

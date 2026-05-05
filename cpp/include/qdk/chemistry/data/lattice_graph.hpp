@@ -24,8 +24,7 @@ namespace qdk::chemistry::data {
  * @brief Edge coloring as a map from ordered (i, j) (with i < j) to a
  *        non-negative integer color label.
  *
- * Two edges sharing the same color have disjoint vertex sets and may be
- * exponentiated in parallel by Trotter-style decompositions.
+ * Two edges sharing the same color have disjoint vertex sets.
  */
 using EdgeColoring =
     std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
@@ -47,26 +46,55 @@ using EdgeColoring =
  * @param adj   Sparse adjacency matrix of the graph.
  * @param seed  Random seed.  Default: 0.
  * @param trials Number of random-order trials.  Default: 1.
+ * @return Edge coloring with the fewest distinct colours found.
  */
 EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
                                   int seed = 0, int trials = 1);
 
 /**
  * @brief Deterministic optimal edge coloring for a chain (path / ring).
+ *
+ * @param n        Number of sites in the chain.
+ * @param periodic Whether the chain wraps around (ring topology).
+ * @return Edge coloring using 2 colours (open or even-periodic) or 3
+ *         colours (odd-periodic).
  */
 EdgeColoring chain_coloring(std::int64_t n, bool periodic);
 
 /**
  * @brief Deterministic optimal edge coloring for a square lattice.
+ *
+ * @param nx         Number of sites along x.
+ * @param ny         Number of sites along y.
+ * @param periodic_x Whether periodic boundary conditions are applied along x.
+ * @param periodic_y Whether periodic boundary conditions are applied along y.
+ * @return Edge coloring using 2–4 colours depending on periodicity and parity.
  */
 EdgeColoring square_coloring(std::int64_t nx, std::int64_t ny,
                              bool periodic_x, bool periodic_y);
 
 /**
  * @brief Deterministic optimal 3-coloring for a honeycomb lattice.
+ *
+ * @param nx         Number of unit cells along x.
+ * @param ny         Number of unit cells along y.
+ * @param periodic_x Whether periodic boundary conditions are applied along x.
+ * @param periodic_y Whether periodic boundary conditions are applied along y.
+ * @return Edge coloring using exactly 3 colours (one per bond type).
  */
 EdgeColoring honeycomb_coloring(std::int64_t nx, std::int64_t ny,
                                 bool periodic_x, bool periodic_y);
+
+/**
+ * @brief Trivial edge coloring where every edge receives a unique color.
+ *
+ * Useful as a fallback when no topology-aware coloring is available.
+ *
+ * @param adj Sparse adjacency matrix of the graph.
+ * @return Edge coloring mapping each undirected edge to a distinct colour
+ *         label 0, 1, 2, … in iteration order.
+ */
+EdgeColoring trivial_edge_coloring(const Eigen::SparseMatrix<double>& adj);
 
 /**
  * @brief Weighted graph representing a lattice connectivity structure.
@@ -272,11 +300,13 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
                                  bool periodic_x = false,
-                                 bool periodic_y = false, double t = 1.0);
+                                 bool periodic_y = false, double t = 1.0,
+                                 int coloring_seed = 0);
 
   /**
    * @brief Create a two-dimensional honeycomb lattice.
@@ -360,17 +390,20 @@ class LatticeGraph : public DataClass {
    * @param periodic_y If true, apply periodic boundary conditions along y.
    * Requires ny >= 2. Default: false.
    * @param t          Uniform hopping weight. Default: 1.0.
+   * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @throws std::invalid_argument If nx or ny is 0.
    */
   static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
                              bool periodic_x = false, bool periodic_y = false,
-                             double t = 1.0);
+                             double t = 1.0, int coloring_seed = 0);
 
   /**
    * @brief Edge coloring stored at construction time, if any.
    *
    * Factory methods for recognised topologies pre-populate this field.
    * Returns ``std::nullopt`` for lattices constructed without a coloring.
+   *
+   * @return Reference to the optional edge coloring.
    */
   const std::optional<EdgeColoring>& edge_coloring() const;
 
