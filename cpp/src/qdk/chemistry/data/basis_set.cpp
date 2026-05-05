@@ -481,7 +481,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   for (const auto& aux_shell : aux_shells) {
     if (aux_shell.has_radial_powers()) {
       throw std::invalid_argument(
-          "Auxiliary shells contains a shell with radial powers; did you pass "
+          "Auxiliary shells contain a shell with radial powers; did you pass "
           "ECP shells by mistake? ECP basis must be constructed with both ECP "
           "shells and ECP electrons.");
     }
