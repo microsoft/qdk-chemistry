@@ -8,6 +8,7 @@
  */
 
 #pragma once
+#include <algorithm>
 #include <macis/asci/iteration.hpp>
 
 namespace macis {
@@ -74,11 +75,19 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   bool converged = false;
   double prev_E_delta = 0.0;
   int oscillation_count = 0;
-  for (size_t iter = 0; iter < asci_settings.max_refine_iter; ++iter) {
+  size_t max_iter = asci_settings.max_refine_iter;
+  // Cap total extensions at the original budget to prevent runaway loops
+  size_t total_extensions = 0;
+  const size_t max_extensions = asci_settings.max_refine_iter;
+  std::vector<wfn_t<N>> prev_wfn;  // saved for union stabilization
+  // Incremental H_build cache — carried across refine iterations
+  CachedHamiltonianState<wfn_t<N>, index_t> h_cache;
+
+  for (size_t iter = 0; iter < max_iter; ++iter) {
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
-        ham_gen, norb MACIS_MPI_CODE(, comm));
+        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
 
     // Check if wavefunction size changed
     if (wfn.size() != ndets) {
@@ -112,25 +121,111 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     if (iter > 0 && prev_E_delta * E_delta < 0 &&
         std::abs(prev_E_delta + E_delta) < asci_settings.refine_energy_tol) {
       oscillation_count++;
-      if (oscillation_count > 2) {
-        throw std::runtime_error(
-            "ASCI Refine detected oscillation. "
-            "Consider using another core_selection_strategy, increasing "
-            "core_selection_threshold, ncdets_max, or ntdets_max, or loosening "
-            "refine_energy_tol.");
+
+      if (oscillation_count >= 2 && !prev_wfn.empty()) {
+        // Stabilize by rediagonalizing in the union of the two oscillating
+        // determinant sets.
+        using wfn_comp =
+            typename wavefunction_traits<wfn_t<N>>::spin_comparator;
+
+        std::vector<wfn_t<N>> union_wfn;
+        union_wfn.reserve(wfn.size() + prev_wfn.size());
+        std::set_union(prev_wfn.begin(), prev_wfn.end(), wfn.begin(), wfn.end(),
+                       std::back_inserter(union_wfn), wfn_comp{});
+
+        logger->info(
+            "  Oscillation detected — stabilizing via union of last two "
+            "det sets ({} + {} → {} unique dets)",
+            prev_wfn.size(), wfn.size(), union_wfn.size());
+
+        // Rediagonalize in the enlarged space — keep the cache since the
+        // union is a superset of the cached dets (high overlap → patched
+        // build). Warm-start from current X mapped onto the union ordering.
+        std::vector<double> X_union(union_wfn.size(), 0.0);
+        {
+          // wfn is sorted and is a subset of union_wfn (also sorted).
+          // Binary-search each wfn det into union_wfn to map coefficients.
+          for (size_t i = 0; i < wfn.size(); ++i) {
+            auto it = std::lower_bound(union_wfn.begin(), union_wfn.end(),
+                                       wfn[i], wfn_comp{});
+            if (it != union_wfn.end() && *it == wfn[i]) {
+              X_union[static_cast<size_t>(
+                  std::distance(union_wfn.begin(), it))] = X[i];
+            }
+          }
+        }
+        double E_union = selected_ci_diag<index_t>(
+            union_wfn.begin(), union_wfn.end(), ham_gen,
+            mcscf_settings.ci_matel_tol, mcscf_settings.ci_max_subspace,
+            mcscf_settings.ci_res_tol, X_union, &h_cache,
+            asci_settings.min_patch_overlap MACIS_MPI_CODE(, comm));
+
+        // In MPI builds, X_union is the local portion — gather it.
+#ifdef MACIS_ENABLE_MPI
+        {
+          auto ws = comm_size(comm);
+          if (ws > 1) {
+            const size_t n = union_wfn.size();
+            const size_t lc = n / ws;
+            std::vector<double> X_full(n);
+            MPI_Allgather(X_union.data(), lc, MPI_DOUBLE, X_full.data(), lc,
+                          MPI_DOUBLE, comm);
+            if (n % ws) {
+              auto wr = comm_rank(comm);
+              auto* rem = X_full.data() + ws * lc;
+              if (wr == ws - 1) std::copy_n(X_union.data() + lc, n % ws, rem);
+              MPI_Bcast(rem, n % ws, MPI_DOUBLE, ws - 1, comm);
+            }
+            X_union = std::move(X_full);
+          }
+        }
+#endif
+
+        logger->info("  Union diag: E = {:20.12e}", E_union);
+
+        // Extend iteration budget by the number of oscillation iterations
+        // that were wasted, capped so we don't loop forever.
+        const size_t extension =
+            std::min(static_cast<size_t>(oscillation_count),
+                     max_extensions - total_extensions);
+        if (extension > 0) {
+          max_iter += extension;
+          total_extensions += extension;
+          logger->info(
+              "  Extending max_iter by {} → {} (total extended: {}/{})",
+              extension, max_iter, total_extensions, max_extensions);
+        }
+
+        wfn = std::move(union_wfn);
+        X = std::move(X_union);
+        ndets = wfn.size();  // allow the enlarged set through
+        E0 = E_union;
+        prev_wfn.clear();
+        oscillation_count = 0;
+        prev_E_delta = 0.0;
+        continue;  // re-enter refinement loop for real convergence check
       }
     } else {
       oscillation_count = 0;
     }
     prev_E_delta = E_delta;
+    prev_wfn = wfn;
 
     E0 = E;
   }  // Refinement loop
 
   if (converged)
     logger->info("ASCI Refine Converged!");
-  else
-    throw std::runtime_error("ASCI Refine did not converge");
+  else {
+    std::string msg = "ASCI Refine did not converge";
+    if (total_extensions > 0) {
+      msg += " (oscillation detected, " + std::to_string(total_extensions) +
+             " extra iterations granted). "
+             "Consider using percentage core_selection_strategy, increasing "
+             "ncdets_max, or loosening refine_energy_tol.";
+    }
+    throw std::runtime_error(msg);
+  }
 
   return std::make_tuple(E0, wfn, X);
 }

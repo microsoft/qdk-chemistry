@@ -8,6 +8,8 @@
  */
 
 #pragma once
+#include <spdlog/spdlog.h>
+
 #include <chrono>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
@@ -436,6 +438,15 @@ class SortedDoubleLoopHamiltonianGenerator
     auto duration_thresh =
         std::chrono::duration<double>(thresh_en - thresh_st).count();
 
+    auto h_logger = spdlog::get("h_build");
+    if (h_logger) {
+      h_logger->info(
+          "  H_BUILD: setup={:.2e}s count={:.2e}s alloc={:.2e}s "
+          "fill={:.2e}s sort={:.2e}s thresh={:.2e}s",
+          duration_setup, duration_compute, duration_alloc, duration_fill,
+          duration_sort, duration_thresh);
+    }
+
     return csr_mat;
   }
 
@@ -624,6 +635,10 @@ class SortedDoubleLoopHamiltonianGenerator
     using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
+    auto rdm_logger = spdlog::get("rdm");
+    if (rdm_logger)
+      rdm_logger->info("  RDM_SD(SDL): starting  ndets={}", nbra_dets);
+    auto rdm_wall_st = std::chrono::high_resolution_clock::now();
 
     const bool is_symm = bra_begin == ket_begin and bra_end == ket_end;
 #ifdef MACIS_ENABLE_MPI
@@ -729,6 +744,12 @@ class SortedDoubleLoopHamiltonianGenerator
         }
       }
     }
+    auto rdm_wall_en = std::chrono::high_resolution_clock::now();
+    if (rdm_logger)
+      rdm_logger->info(
+          "  RDM_SD(SDL): {:.2e}s  ndets={} unique_alpha={}",
+          std::chrono::duration<double>(rdm_wall_en - rdm_wall_st).count(),
+          nbra_dets, nuniq_bra);
   }
 
   void form_entropies(full_det_iterator bra_begin, full_det_iterator bra_end,
@@ -741,6 +762,10 @@ class SortedDoubleLoopHamiltonianGenerator
     using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
     const size_t nbra_dets = std::distance(bra_begin, bra_end);
     const size_t nket_dets = std::distance(ket_begin, ket_end);
+    auto ent_logger = spdlog::get("rdm");
+    if (ent_logger)
+      ent_logger->info("  ENTROPY(SDL): starting  ndets={}", nbra_dets);
+    auto ent_wall_st = std::chrono::high_resolution_clock::now();
 
     const bool need_s2 =
         s2_entropy.data_handle() || mutual_information.data_handle();
@@ -869,6 +894,12 @@ class SortedDoubleLoopHamiltonianGenerator
                                  mutual_information);
       }
     }
+    auto ent_wall_en = std::chrono::high_resolution_clock::now();
+    if (ent_logger)
+      ent_logger->info(
+          "  ENTROPY(SDL): {:.2e}s  ndets={}",
+          std::chrono::duration<double>(ent_wall_en - ent_wall_st).count(),
+          nbra_dets);
   }
 
  public:

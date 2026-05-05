@@ -15,6 +15,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <chrono>
 #include <fstream>
 #include <iomanip>
@@ -147,6 +148,33 @@ struct ASCISettings {
   /// @brief Energy convergence tolerance for refinement
   double refine_energy_tol = 1e-6;
 
+  /// @brief Enable warm-starting Davidson from previous eigenvector.
+  /// When true, CI coefficients from the previous iteration are mapped
+  /// onto the new determinant set and used as the initial guess.
+  bool warm_start_davidson = true;
+
+  /// @brief Minimum projected vector norm for warm-starting Davidson.
+  /// After mapping old CI coefficients onto the new determinant set, the
+  /// L2 norm of the projected vector measures how much of the old
+  /// eigenvector's weight is retained.  Below this threshold, the
+  /// warm-start guess is discarded in favour of a diagonal guess.
+  double min_warm_start_overlap = 0.5;
+
+  /// @brief Minimum determinant overlap fraction for using the incremental
+  /// (patched) Hamiltonian build.  When the fraction of current dets that
+  /// also appear in the cached set drops below this threshold, a full CSR
+  /// rebuild is triggered and the cache is refreshed.  Range: (0, 1].
+  double min_patch_overlap = 0.3;
+
+  /// @brief CI residual tolerance used during the grow phase.
+  /// A looser tolerance here speeds up growth iterations where tight
+  /// convergence is unnecessary.  Set to 0 to use the refine tolerance.
+  double grow_ci_residual_tolerance = 0;
+
+  /// @brief Growth factor applied when the next expansion would exceed
+  /// ntdets_max.  0 disables tapering (the normal grow_factor is used).
+  double taper_grow_factor = 0;
+
   /// @brief Enable growing with rotations
   bool grow_with_rot = false;
   /// @brief Starting size for rotations
@@ -161,6 +189,14 @@ struct ASCISettings {
   int pt2_min_constraint_level = 0;
   /// @brief Force constraint refinement for PT2 calculations
   int64_t pt2_constraint_refine_force = 0;
+
+  /// @brief Hamiltonian build algorithm for diagonal blocks.
+  /// "" or "sorted_double_loop" = default alpha-sorted double loop;
+  /// "residue_arrays" = Algorithm 5 from Tubman et al. (arXiv:1807.00821);
+  /// "dynamic_bit_masking" = Algorithm 6 from Tubman et al.;
+  /// "dynamic_bit_masking_8" = same with 8 masks (C(8,4)=70 combos, fewer
+  ///   passes but more false positives).
+  std::string h_build_algo;
 };
 
 /**
@@ -182,7 +218,6 @@ struct ASCISettings {
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @return Container of ASCI contributions with their associated scores
@@ -192,8 +227,8 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     ASCISettings asci_settings, wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs, HamiltonianGenerator<wfn_t<N>>& ham_gen) {
+    const double* G_red, const double* V_red, const double* V_pqrs,
+    HamiltonianGenerator<wfn_t<N>>& ham_gen) {
   using wfn_traits = wavefunction_traits<wfn_t<N>>;
   using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
@@ -241,13 +276,13 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<Spin::Alpha>(
           coeff, state, state_alpha, state_beta, occ_alpha, vir_alpha, occ_beta,
-          eps_alpha.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_alpha.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - BBBB
       append_ss_doubles_asci_contributions<Spin::Beta>(
           coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
-          eps_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
           asci_pairs);
 
       // Doubles - AABB
@@ -307,7 +342,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
@@ -319,8 +353,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
+    const double* G_red, const double* V_red, const double* V_pqrs,
     HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -417,6 +450,12 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     }
   }
 
+  // Precompute cumulative alpha offsets for direct indexing
+  std::vector<size_t> uniq_alpha_ioff(nuniq_alpha);
+  std::transform_exclusive_scan(
+      uniq_alpha.begin(), uniq_alpha.end(), uniq_alpha_ioff.begin(), 0ul,
+      std::plus<size_t>(), [](const auto& p) { return p.second; });
+
   const auto num_alpha_occupied_orbitals =
       spin_wfn_traits::count(uniq_alpha[0].first);
   const auto num_alpha_virtual_orbitals = norb - num_alpha_occupied_orbitals;
@@ -455,13 +494,44 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     logger->info("  * Will Generate up to {}", cl_string);
   }
 
+  // Use total worker count (MPI ranks * OpenMP threads) so constraints
+  // are split finely enough for thread-level load balancing.
+  int num_threads = 1;
+#ifdef _OPENMP
+  num_threads = omp_get_max_threads();
+#endif
+  const int total_workers = world_size * num_threads;
+
+  logger->info("  * NUNIQ_ALPHA = {}, NCDETS = {}", nuniq_alpha, ncdets);
+  logger->info("  * NS_ALPHA = {}, ND_ALPHA = {}", n_sing_alpha, n_doub_alpha);
+  logger->info("  * NS_BETA  = {}, ND_BETA  = {}", n_sing_beta, n_doub_beta);
+  logger->info("  * MPI_RANKS = {}, OMP_THREADS = {}, TOTAL_WORKERS = {}",
+               world_size, num_threads, total_workers);
+
   auto gen_c_st = clock_type::now();
   auto constraints = gen_constraints_general<wfn_t<N>>(
       asci_settings.constraint_level, norb, n_sing_beta, n_doub_beta,
-      uniq_alpha, world_size);
+      uniq_alpha, total_workers);
   auto gen_c_en = clock_type::now();
   duration_type gen_c_dur = gen_c_en - gen_c_st;
-  logger->info("  * GEN_DUR = {:.2e} ms", gen_c_dur.count());
+  logger->info("  * NCONSTRAINTS = {}, GEN_DUR = {:.2e} ms", constraints.size(),
+               gen_c_dur.count());
+
+  // Log constraint work distribution for load-balance diagnostics (debug only)
+  if (logger->should_log(spdlog::level::debug) && !constraints.empty()) {
+    size_t total_cwork = 0, max_cwork = 0;
+    for (const auto& [c, w] : constraints) {
+      total_cwork += w;
+      if (w > max_cwork) max_cwork = w;
+    }
+    size_t avg_per_worker = total_cwork / total_workers;
+    logger->debug(
+        "  * CONSTRAINT_WORK: total={}, max_single={}, avg/worker={}, "
+        "max/avg={:.2f}",
+        total_cwork, max_cwork, avg_per_worker,
+        avg_per_worker > 0 ? static_cast<double>(max_cwork) / avg_per_worker
+                           : 1.0);
+  }
 
   size_t max_size =
       std::min(std::min(ntdets, asci_settings.pair_size_max),
@@ -479,16 +549,46 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
   std::atomic<size_t> nxtval(0);
 #endif /* MACIS_ENABLE_MPI */
 
-  asci_contrib_container<wfn_t<N>> asci_pairs_total;
+  // Each thread writes its accumulated results to its own slot;
+  // merged serially after the parallel region (no omp critical needed).
+  std::vector<asci_contrib_container<wfn_t<N>>> thread_pairs(num_threads);
+  const bool debug_timing = logger->should_log(spdlog::level::debug);
+  std::vector<double> thread_wall(debug_timing ? num_threads : 0, 0.0);
 #pragma omp parallel
   {
-    // Process ASCI pair contributions for each constraint
-    asci_contrib_container<wfn_t<N>> asci_pairs;
-    asci_pairs.reserve(max_size);
+#ifdef _OPENMP
+    const int tid = omp_get_thread_num();
+#else
+    const int tid = 0;
+#endif
+    const asci_contrib_topk_comparator<wfn_t<N>> contrib_cmp{};
+    auto t_wall_st = clock_type::now();
+
+    // Accumulated results from all constraints processed by this thread.
+    asci_contrib_container<wfn_t<N>> accumulated_pairs;
+    const size_t per_thread_reserve =
+        std::max(size_t(1024), max_size / num_threads);
+    accumulated_pairs.reserve(per_thread_reserve);
+
+    // Running top-k cutoff for this thread-local accumulator.
+    bool threshold_ready = false;
+    double threshold_abs_rv = 0.0;
+
+    // Working set for the current constraint — grows during excitation
+    // generation, then gets S&A'd and merged into accumulated_pairs.
+    // clear() preserves capacity, so after the first constraint this
+    // buffer never allocates again.
+    asci_contrib_container<wfn_t<N>> working_pairs;
+
+    // Thread-local reusable buffers — capacity persists across iterations,
+    // so subsequent calls reuse existing memory.
+    std::vector<uint32_t> occ_alpha_buf;
+    using spin_wfn_type = spin_wfn_t<wfn_t<N>>;
+    std::vector<spin_wfn_type> O_buf, V_buf;
+    std::vector<uint32_t> virt_ind_buf, occ_ind_buf;
 
     size_t ic = 0;
     while (ic < ncon_total) {
-      auto size_before = asci_pairs.size();
       const double h_el_tol = asci_settings.h_el_tol;
 
       // Atomically get the next task ID and increment for other
@@ -502,15 +602,20 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
       const size_t c_end = std::min(ncon_total, ic + ntake);
       for (; ic < c_end; ++ic) {
         const auto& con = constraints[ic].first;
+        working_pairs.clear();
 
-        for (size_t i_alpha = 0, iw = 0; i_alpha < nuniq_alpha; ++i_alpha) {
+        for (size_t i_alpha = 0; i_alpha < nuniq_alpha; ++i_alpha) {
           const auto& alpha_det = uniq_alpha[i_alpha].first;
-          const auto occ_alpha = bits_to_indices(alpha_det);
+          const auto ncon_alpha = constraint_histogram(alpha_det, 1, 1, con);
+          if (!ncon_alpha) continue;
+          bits_to_indices(alpha_det, occ_alpha_buf);
+          const auto& occ_alpha = occ_alpha_buf;
           const bool alpha_satisfies_con = satisfies_constraint(alpha_det, con);
 
           const auto& bcd = uad[i_alpha];
           const size_t nbeta = bcd.size();
-          for (size_t j_beta = 0; j_beta < nbeta; ++j_beta, ++iw) {
+          for (size_t j_beta = 0; j_beta < nbeta; ++j_beta) {
+            const size_t iw = uniq_alpha_ioff[i_alpha] + j_beta;
             const auto w = *(cdets_begin + iw);
             const auto c = C[iw];
             const auto& beta_det = bcd[j_beta].beta_string;
@@ -524,80 +629,144 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                ham_gen, working_pairs);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
-                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), G_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
+                norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
+                V_buf, virt_ind_buf, occ_ind_buf);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                ham_gen, working_pairs);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                  h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
-                  orb_ens_beta.data(), G_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, asci_pairs);
+                  orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
+                  ham_gen, working_pairs);
 
               // No excitation (push inf to remove from list)
-              asci_pairs.push_back(
+              working_pairs.push_back(
                   {w, std::numeric_limits<double>::infinity(), 1.0});
             }
           }
 
-          // Prune Down Contributions
-          if (asci_pairs.size() > asci_settings.pair_size_max) {
+          // Prune working set if it gets too large
+          if (working_pairs.size() > asci_settings.pair_size_max) {
             logger->info("  * PRUNING AT CON = {} IALPHA = {}", ic, i_alpha);
-            auto uit = sort_and_accumulate_asci_pairs(
-                asci_pairs.begin() + size_before, asci_pairs.end());
-            asci_pairs.erase(uit, asci_pairs.end());
+            auto uit = sort_and_accumulate_asci_pairs(working_pairs.begin(),
+                                                      working_pairs.end());
+            working_pairs.erase(uit, working_pairs.end());
           }
-
         }  // Unique Alpha Loop
 
-        // Local S&A for each quad
+        // S&A the working set and prune small contributions
         {
-          auto uit = sort_and_accumulate_asci_pairs(
-              asci_pairs.begin() + size_before, asci_pairs.end());
-          asci_pairs.erase(uit, asci_pairs.end());
+          sort_and_accumulate_asci_pairs(working_pairs);
 
-          // Remove small contributions
-          uit = std::partition(asci_pairs.begin() + size_before,
-                               asci_pairs.end(), [=](const auto& x) {
-                                 return std::abs(x.rv()) >
-                                        asci_settings.rv_prune_tol;
-                               });
-          asci_pairs.erase(uit, asci_pairs.end());
+          auto uit = std::partition(
+              working_pairs.begin(), working_pairs.end(), [=](const auto& x) {
+                return std::abs(x.rv()) > asci_settings.rv_prune_tol;
+              });
+          working_pairs.erase(uit, working_pairs.end());
         }
+
+        // If top-k cutoff is active, keep only candidates that can survive.
+        if (threshold_ready) {
+          auto keep_end = std::partition(
+              working_pairs.begin(), working_pairs.end(),
+              [threshold_abs_rv](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold_abs_rv;
+              });
+          working_pairs.erase(keep_end, working_pairs.end());
+        }
+
+        bool merged_new_candidates = !working_pairs.empty();
+        if (merged_new_candidates) {
+          // Merge filtered candidates into accumulated results.
+          accumulated_pairs.insert(
+              accumulated_pairs.end(),
+              std::make_move_iterator(working_pairs.begin()),
+              std::make_move_iterator(working_pairs.end()));
+        }
+        working_pairs.clear();
+        size_t accumulated_size = accumulated_pairs.size();
+
+        const bool need_initial_threshold =
+            (!threshold_ready && ntdets > 0 && accumulated_size >= ntdets);
+        const bool need_threshold_refresh =
+            (threshold_ready && merged_new_candidates && ntdets > 0 &&
+             accumulated_size > ntdets);
+
+        if (need_initial_threshold || need_threshold_refresh) {
+          const size_t cutoff_idx = ntdets - 1;
+          std::nth_element(accumulated_pairs.begin(),
+                           accumulated_pairs.begin() + cutoff_idx,
+                           accumulated_pairs.end(), contrib_cmp);
+          threshold_abs_rv = std::abs(accumulated_pairs[cutoff_idx].rv());
+          threshold_ready = true;
+          // Repartition only the tail so entries tied at the cutoff are moved
+          // directly behind the nth position before trimming.
+          auto new_end = std::partition(
+              accumulated_pairs.begin() + cutoff_idx + 1,
+              accumulated_pairs.end(), [threshold_abs_rv](const auto& contrib) {
+                return std::abs(contrib.rv()) >= threshold_abs_rv;
+              });
+          accumulated_pairs.erase(new_end, accumulated_pairs.end());
+        }
+
+        logger->debug("thread {}, threshold_abs_rv = {} at CON = {}", tid,
+                      threshold_abs_rv, ic);
       }  // Loc constraint loop
     }  // Constraint Loop
 
-// Insert into list
-#pragma omp critical
-    {
-      if (asci_pairs_total.size()) {
-        // Preallocate space for insertion
-        asci_pairs_total.reserve(asci_pairs.size() + asci_pairs_total.size());
-        asci_pairs_total.insert(asci_pairs_total.end(), asci_pairs.begin(),
-                                asci_pairs.end());
-      } else {
-        asci_pairs_total = std::move(asci_pairs);
-      }
-      asci_contrib_container<wfn_t<N>>().swap(asci_pairs);
+    // Move thread results to shared slot — no synchronization needed
+    // since each thread writes to its own index.
+    thread_pairs[tid] = std::move(accumulated_pairs);
+    if (debug_timing) {
+      auto t_wall_en = clock_type::now();
+      thread_wall[tid] = duration_type(t_wall_en - t_wall_st).count();
     }
 
   }  // OpenMP
+
+  // Log per-thread load balance (debug only)
+  if (debug_timing) {
+    double t_max = *std::max_element(thread_wall.begin(), thread_wall.end());
+    double t_min = *std::min_element(thread_wall.begin(), thread_wall.end());
+    double t_sum = 0;
+    for (auto t : thread_wall) t_sum += t;
+    double t_avg = t_sum / num_threads;
+    logger->debug(
+        "  * THREAD_WALL: min={:.3f}s max={:.3f}s avg={:.3f}s "
+        "imbalance={:.2f}x efficiency={:.1f}%",
+        t_min, t_max, t_avg, t_avg > 0 ? t_max / t_avg : 1.0,
+        t_max > 0 ? 100.0 * t_avg / t_max : 100.0);
+  }
+
+  // Serial merge: compute total size, reserve once, concatenate.
+  size_t total_size = 0;
+  for (const auto& tp : thread_pairs) total_size += tp.size();
+  asci_contrib_container<wfn_t<N>> asci_pairs_total;
+  asci_pairs_total.reserve(total_size);
+  for (auto& tp : thread_pairs) {
+    asci_pairs_total.insert(asci_pairs_total.end(),
+                            std::make_move_iterator(tp.begin()),
+                            std::make_move_iterator(tp.end()));
+    // Release thread-local memory immediately
+    asci_contrib_container<wfn_t<N>>().swap(tp);
+  }
 
   return asci_pairs_total;
 }
@@ -632,7 +801,6 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
  * @param[in] T_pq One-electron integral matrix
  * @param[in] G_red Reduced same-spin two-electron integral tensor
  * @param[in] V_red Reduced opposite-spin two-electron integral tensor
- * @param[in] G_pqrs Full same-spin two-electron integral tensor
  * @param[in] V_pqrs Full opposite-spin two-electron integral tensor
  * @param[in] ham_gen Hamiltonian generator for matrix element evaluation
  * @param[in] comm MPI communicator for parallel execution (if MPI enabled)
@@ -644,8 +812,7 @@ std::vector<wfn_t<N>> asci_search(
     wavefunction_iterator_t<N> cdets_begin,
     wavefunction_iterator_t<N> cdets_end, const double E_ASCI,
     const std::vector<double>& C, size_t norb, const double* T_pq,
-    const double* G_red, const double* V_red, const double* G_pqrs,
-    const double* V_pqrs,
+    const double* G_red, const double* V_red, const double* V_pqrs,
     HamiltonianGenerator<wfn_t<N>>& ham_gen MACIS_MPI_CODE(, MPI_Comm comm)) {
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double>;
@@ -683,14 +850,44 @@ std::vector<wfn_t<N>> asci_search(
   // Print Search Header to logger
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
   logger->info("[ASCI Search Settings]:");
+  logger->info("  * NCDETS                 = {}", ncdets);
+  logger->info("  * NDETS_MAX              = {}", ndets_max);
+  logger->info("  * NORB                   = {}", norb);
+  logger->info("  * H_EL_TOL               = {:.4e}", asci_settings.h_el_tol);
+  logger->info("  * RV_PRUNE_TOL           = {:.4e}",
+               asci_settings.rv_prune_tol);
+  logger->info("  * PAIR_SIZE_MAX          = {}", asci_settings.pair_size_max);
+  logger->info("  * JUST_SINGLES           = {}", asci_settings.just_singles);
+  logger->info("  * CONSTRAINT_LEVEL       = {}",
+               asci_settings.constraint_level);
+  logger->info("  * GROW_FACTOR            = {:.2f}",
+               asci_settings.grow_factor);
+  logger->info("  * MIN_GROW_FACTOR        = {:.2f}",
+               asci_settings.min_grow_factor);
+  logger->info("  * GROWTH_BACKOFF_RATE    = {:.2f}",
+               asci_settings.growth_backoff_rate);
+  logger->info("  * GROWTH_RECOVERY_RATE   = {:.2f}",
+               asci_settings.growth_recovery_rate);
+  logger->info("  * MAX_REFINE_ITER        = {}",
+               asci_settings.max_refine_iter);
+  logger->info("  * REFINE_ENERGY_TOL      = {:.4e}",
+               asci_settings.refine_energy_tol);
   logger->info(
-      "  NCDETS = {:6}, NDETS_MAX = {:9}, H_EL_TOL = {:4e}, RV_TOL = {:4e}",
-      ncdets, ndets_max, asci_settings.h_el_tol, asci_settings.rv_prune_tol);
-  logger->info("  MAX_RV_SIZE = {}, JUST_SINGLES = {}",
-               asci_settings.pair_size_max, asci_settings.just_singles);
-  logger->info("  CDET_SUM = {:.2e}",
+      "  * CORE_SELECTION         = {}",
+      core_selection_strategy_to_string(asci_settings.core_selection_strategy));
+  logger->info("  * CORE_SELECT_THRESHOLD  = {:.4f}",
+               asci_settings.core_selection_threshold);
+  logger->info("  * NCDETS_MAX             = {}", asci_settings.ncdets_max);
+  logger->info("  * NXTVAL_BCOUNT_THRESH   = {}",
+               asci_settings.nxtval_bcount_thresh);
+  logger->info("  * NXTVAL_BCOUNT_INC      = {}",
+               asci_settings.nxtval_bcount_inc);
+  logger->info("  * GROW_WITH_ROT          = {}", asci_settings.grow_with_rot);
+  logger->info("  * E_ASCI                 = {:.10e}", E_ASCI);
+  logger->info("  * CDET_SUM               = {:.6e}",
                std::accumulate(C.begin(), C.begin() + ncdets, 0.0,
                                [](auto s, auto c) { return s + c * c; }));
+  logger->info("");
 
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto asci_search_st = clock_type::now();
@@ -700,7 +897,7 @@ std::vector<wfn_t<N>> asci_search(
   asci_contrib_container<wfn_t<N>> asci_pairs;
   asci_pairs = asci_contributions_constraint(
       asci_settings, ndets_max, cdets_begin, cdets_end, E_ASCI, C, norb, T_pq,
-      G_red, V_red, G_pqrs, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
+      G_red, V_red, V_pqrs, ham_gen MACIS_MPI_CODE(, comm));
   auto pairs_en = clock_type::now();
 
   {
@@ -737,7 +934,7 @@ std::vector<wfn_t<N>> asci_search(
   // Accumulate unique score contributions
   // MPI + Constraint Search already does S&A
   auto bit_sort_st = clock_type::now();
-  if (world_size == 1) sort_and_accumulate_asci_pairs(asci_pairs);
+  if (world_size == 1) parallel_sort_and_accumulate_asci_pairs(asci_pairs);
   auto bit_sort_en = clock_type::now();
 
   {

@@ -8,9 +8,11 @@
  */
 
 #pragma once
+#include <blas.hh>
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
+#include <numeric>
 
 namespace macis {
 
@@ -47,7 +49,9 @@ template <size_t N, typename index_t>
 auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                size_t ndets_max, double E0, std::vector<wfn_t<N>> wfn,
                std::vector<double> X, HamiltonianGenerator<wfn_t<N>>& ham_gen,
-               size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
+               size_t norb,
+               CachedHamiltonianState<wfn_t<N>, index_t>* h_cache =
+                   nullptr MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   // Sort wfn on coefficient weights
   if (wfn.size() > 1) reorder_ci_on_coeff(wfn, X);
 
@@ -97,22 +101,78 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   if (wfn.size() > 1)
     reorder_ci_on_alpha(wfn.begin(), wfn.begin() + nkeep, X.data());
 
+  // Save old (det → coeff) mapping before the search replaces wfn.
+  // Only the kept core dets (first nkeep) plus their reordered X matter;
+  // the search will return a superset.  We store *all* old dets so that
+  // during refine (where most dets are kept) the warm-start is effective.
+  using wfn_traits = wavefunction_traits<wfn_t<N>>;
+  using wfn_comp = typename wfn_traits::spin_comparator;
+
+  // Capture old wfn for warm-start before asci_search takes ownership
+  std::vector<wfn_t<N>> old_wfn;
+  std::vector<double> old_X;
+  if (asci_settings.warm_start_davidson) {
+    old_wfn = wfn;  // copy — wfn is about to be overwritten
+    old_X = X;
+  }
+
   // Perform the ASCI search
   wfn = asci_search(asci_settings, ndets_max, wfn.begin(), wfn.begin() + nkeep,
                     E0, X, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
-                    ham_gen.G(), ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
+                    ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
 
-  // std::sort(wfn.begin(), wfn.end(), bitset_less_comparator<N>{});
-  using wfn_traits = wavefunction_traits<wfn_t<N>>;
-  using wfn_comp = typename wfn_traits::spin_comparator;
   std::sort(wfn.begin(), wfn.end(), wfn_comp{});
 
-  // Rediagonalize
-  std::vector<double> X_local;  // Precludes guess reuse
-  auto E = selected_ci_diag<index_t>(
+  // Rediagonalize — optionally warm-start Davidson from previous coefficients.
+  // Only warm-start when the determinant overlap is high; during aggressive
+  // growth the old eigenvector can point toward the wrong eigenstate in the
+  // much larger space, causing Davidson to stall.
+  std::vector<double> X_local;
+  if (asci_settings.warm_start_davidson && !old_wfn.empty()) {
+    // new wfn is already sorted by wfn_comp.  Iterate unsorted old dets
+    // and binary-search each into the new wfn.  This avoids sorting the
+    // old wfn (O(D log D) on large bitsets) and the associated permutation
+    // temporaries.
+    X_local.resize(wfn.size(), 0.0);
+    size_t n_matched = 0;
+    const size_t old_size = old_wfn.size();
+    for (size_t i = 0; i < old_size; ++i) {
+      auto it =
+          std::lower_bound(wfn.begin(), wfn.end(), old_wfn[i], wfn_comp{});
+      if (it != wfn.end() && *it == old_wfn[i]) {
+        size_t new_idx = static_cast<size_t>(std::distance(wfn.begin(), it));
+        X_local[new_idx] = old_X[i];
+        ++n_matched;
+      }
+    }
+    old_wfn.clear();
+    old_X.clear();
+
+    // Use the projected vector norm as the warm-start quality metric.
+    // ||P·ψ_old||₂ measures how much of the old eigenvector's weight lives
+    // in the new determinant space.  Near 1.0 → excellent guess; near 0.0
+    // → most weight was on determinants that were dropped.
+    double norm = blas::nrm2(X_local.size(), X_local.data(), 1);
+    if (logger) {
+      logger->info("  WARM_START: matched={}/{}, projected_norm={:.4f}",
+                   n_matched, wfn.size(), norm);
+    }
+    if (norm < asci_settings.min_warm_start_overlap) {
+      X_local.clear();  // triggers identity guess in selected_ci_diag
+      if (logger)
+        logger->info(
+            "  WARM_START: norm {:.4f} < {:.4f} threshold, using diagonal "
+            "guess",
+            norm, asci_settings.min_warm_start_overlap);
+    } else {
+      blas::scal(X_local.size(), 1.0 / norm, X_local.data(), 1);
+    }
+  }
+
+  double E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
-      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
-      X_local MACIS_MPI_CODE(, comm));
+      mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, X_local,
+      h_cache, asci_settings.min_patch_overlap MACIS_MPI_CODE(, comm));
 
 #ifdef MACIS_ENABLE_MPI
   auto world_size = comm_size(comm);

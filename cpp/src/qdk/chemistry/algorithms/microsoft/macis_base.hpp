@@ -5,11 +5,13 @@
 #pragma once
 
 #include <Eigen/Core>
+#include <chrono>
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -138,6 +140,11 @@ inline data::Wavefunction build_wavefunction(
   using VV = typename Container::VectorVariant;
 
   // General Wavefunction construction
+  // All the new logging in this file should be debug, not info
+  QDK_LOGGER().debug(
+      "Building wavefunction: converting {} determinants to "
+      "configurations...",
+      dets.size());
   Eigen::VectorXd C_vector(coeffs.size());
   std::copy(coeffs.begin(), coeffs.end(), C_vector.data());
   std::vector<data::Configuration> dets_configs;
@@ -156,6 +163,10 @@ inline data::Wavefunction build_wavefunction(
 
   // evaluate spin-dependent RDMs
   if (eval_one_rdm || eval_two_rdm) {
+    QDK_LOGGER().debug(
+        "Computing spin-dependent RDMs ({} determinants, {} orbitals)...",
+        dets.size(), nmo);
+    auto rdm_st = std::chrono::high_resolution_clock::now();
     std::vector<double> active_one_aa(eval_one_rdm ? nmo * nmo : 0, 0.0);
     std::vector<double> active_one_bb(eval_one_rdm ? nmo * nmo : 0, 0.0);
     std::vector<double> active_two_aaaa(
@@ -180,6 +191,9 @@ inline data::Wavefunction build_wavefunction(
         macis::rank4_span<double>(
             eval_two_rdm ? active_two_aabb.data() : nullptr, nmo, nmo, nmo,
             nmo));
+    auto rdm_en = std::chrono::high_resolution_clock::now();
+    QDK_LOGGER().debug("RDM computation complete ({:.1f}s).",
+                       std::chrono::duration<double>(rdm_en - rdm_st).count());
 
     if (eval_one_rdm) {
       one_aa = Eigen::Map<Eigen::MatrixXd>(active_one_aa.data(), nmo, nmo);
@@ -202,6 +216,11 @@ inline data::Wavefunction build_wavefunction(
   // information
   data::OrbitalEntropies computed_entropies;
   if (eval_s1 || eval_s2 || eval_mutual_info) {
+    QDK_LOGGER().debug(
+        "Computing orbital entropies ({} determinants, {} "
+        "orbitals)...",
+        dets.size(), nmo);
+    auto ent_st = std::chrono::high_resolution_clock::now();
     std::vector<double> s1_vec(nmo, 0.0);
     std::vector<double> s2_data(eval_s2 ? nmo * nmo : 0, 0.0);
     std::vector<double> mi_data(eval_mutual_info ? nmo * nmo : 0, 0.0);
@@ -213,6 +232,9 @@ inline data::Wavefunction build_wavefunction(
                                    nmo),
         macis::matrix_span<double>(eval_mutual_info ? mi_data.data() : nullptr,
                                    nmo, nmo));
+    auto ent_en = std::chrono::high_resolution_clock::now();
+    QDK_LOGGER().debug("Entropy computation complete ({:.1f}s).",
+                       std::chrono::duration<double>(ent_en - ent_st).count());
 
     if (eval_s1) {
       computed_entropies.single_orbital =
@@ -289,7 +311,7 @@ inline data::Wavefunction build_wavefunction(
  * The calculation automatically adapts to the size of the active space and
  * selects the appropriate internal representation for the wavefunction.
  *
- * @note Currently supports up to 128 orbitals in the active space.
+ * @note Currently supports up to 2048 orbitals in the active space.
  *
  * @see qdk::chemistry::algorithms::MultiConfigurationCalculator
  * @see qdk::chemistry::data::Hamiltonian

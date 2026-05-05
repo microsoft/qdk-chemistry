@@ -52,8 +52,7 @@ double compute_casci_rdms(
   auto dets = generate_hilbert_space<wfn_type>(norb.get(), nalpha, nbeta);
   double E0 = selected_ci_diag<int64_t>(
       dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
-      settings.ci_max_subspace, settings.ci_res_tol, C,
-      MACIS_MPI_CODE(comm, ) true);
+      settings.ci_max_subspace, settings.ci_res_tol, C MACIS_MPI_CODE(, comm));
 
   // Compute RDMs
   if (ORDM and TRDM)
