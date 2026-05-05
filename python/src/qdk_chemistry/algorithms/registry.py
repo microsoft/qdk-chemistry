@@ -511,6 +511,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.resource_estimator import ResourceEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
 
     register_factory(EnergyEstimatorFactory())
@@ -521,6 +522,7 @@ def _register_python_factories():
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(ResourceEstimatorFactory())
 
 
 _ = _register_cpp_factories()
@@ -588,6 +590,7 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.resource_estimator.qdk import QdkQreV1  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
 
     register(lambda: QdkEnergyEstimator())
@@ -602,6 +605,7 @@ def _register_python_algorithms():
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: QdkQreV1())
 
 
 _register_python_algorithms()

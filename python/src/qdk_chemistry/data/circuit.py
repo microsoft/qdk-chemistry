@@ -19,7 +19,6 @@ from typing import Any
 
 import h5py
 import qsharp._native
-import qsharp.estimator
 import qsharp.openqasm
 from qsharp.openqasm import OutputSemantics
 
@@ -192,33 +191,6 @@ class Circuit(DataClass):
             return qsharp.openqasm.circuit(self.qasm)
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
-
-    def estimate(
-        self,
-        params: dict[str, Any] | list[Any] | qsharp.estimator.EstimatorParams | None = None,
-    ) -> qsharp.estimator.EstimatorResult:
-        """Estimate resources for the quantum circuit.
-
-        Args:
-            params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
-
-        Returns:
-            qsharp.estimator.EstimatorResult: The estimated resources.
-
-        Raises:
-            RuntimeError: If no suitable circuit representation is available for estimation.
-
-        """
-        if self._qsharp_factory is not None:
-            return qsharp.estimate(
-                self._qsharp_factory.program,
-                params,
-                *self._qsharp_factory.parameter.values(),
-            )
-        if self.qasm is not None:
-            return qsharp.openqasm.estimate(self.qasm, params)
-
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
