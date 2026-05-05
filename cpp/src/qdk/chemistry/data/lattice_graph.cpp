@@ -489,8 +489,7 @@ EdgeColoring greedy_edge_coloring(const Eigen::SparseMatrix<double>& adj,
       const auto& used_i = vertex_used[edge.first];
       const auto& used_j = vertex_used[edge.second];
       int chosen = 0;
-      while (chosen < max_colors &&
-             (used_i[chosen] || used_j[chosen])) {
+      while (chosen < max_colors && (used_i[chosen] || used_j[chosen])) {
         ++chosen;
       }
       coloring[edge] = chosen;
@@ -528,8 +527,8 @@ EdgeColoring chain_coloring(std::int64_t n, bool periodic) {
 // edges live on disjoint axes; each axis can be 2-colored by alternating.
 // With periodic boundaries, an odd extent on that axis forces a third color
 // on its wrap edges.  Total colors: 2 (open) up to 4 (both axes odd-periodic).
-EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny,
-                             bool periodic_x, bool periodic_y) {
+EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny, bool periodic_x,
+                             bool periodic_y) {
   EdgeColoring out;
   auto idx = [Nx](std::int64_t x, std::int64_t y) {
     return static_cast<std::uint64_t>(y * Nx + x);

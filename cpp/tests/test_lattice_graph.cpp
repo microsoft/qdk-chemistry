@@ -502,8 +502,7 @@ TEST_F(LatticeGraphTest, KagomeConstructor) {
 }
 
 // Coloring helper: confirm no two same-color edges share a vertex.
-static void check_valid_edge_coloring(
-    const EdgeColoring& coloring) {
+static void check_valid_edge_coloring(const EdgeColoring& coloring) {
   std::map<std::uint64_t, std::set<int>> incident;
   for (const auto& [edge, color] : coloring) {
     auto [a, b] = edge;

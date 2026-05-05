@@ -26,8 +26,7 @@ namespace qdk::chemistry::data {
  *
  * Two edges sharing the same color have disjoint vertex sets.
  */
-using EdgeColoring =
-    std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
+using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 
 // ---- Free coloring functions ------------------------------------------------
 // These compute edge colorings for known lattice topologies.  They are
@@ -70,8 +69,8 @@ EdgeColoring chain_coloring(std::int64_t n, bool periodic);
  * @param periodic_y Whether periodic boundary conditions are applied along y.
  * @return Edge coloring using 2–4 colours depending on periodicity and parity.
  */
-EdgeColoring square_coloring(std::int64_t nx, std::int64_t ny,
-                             bool periodic_x, bool periodic_y);
+EdgeColoring square_coloring(std::int64_t nx, std::int64_t ny, bool periodic_x,
+                             bool periodic_y);
 
 /**
  * @brief Deterministic optimal 3-coloring for a honeycomb lattice.
