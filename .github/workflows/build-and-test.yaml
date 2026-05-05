@@ -9,6 +9,12 @@ on:
     - '**'
   merge_group:
   workflow_dispatch:
+    inputs:
+      run_slow_tests:
+        description: Run slow tests
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -345,7 +351,7 @@ jobs:
     - name: Run Python tests
       env:
         OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
-        QDK_CHEMISTRY_RUN_SLOW_TESTS: 0
+        QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ inputs.run_slow_tests && '1' || '0' }}
       working-directory: python
       run: |
         set -e

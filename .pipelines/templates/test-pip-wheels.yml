@@ -17,6 +17,9 @@ parameters:
 - name: pyenvVersion
   type: string
   default: 2.6.15
+- name: runSlowTests
+  type: boolean
+  default: true
 
 steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
@@ -25,6 +28,7 @@ steps:
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -e QSHARP_PYTHON_TELEMETRY=false \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
@@ -38,6 +42,7 @@ steps:
   - script: |
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
+      export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }} \
                                                         ${{ parameters.pyenvVersion }}
