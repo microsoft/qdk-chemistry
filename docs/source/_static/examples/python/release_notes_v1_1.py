@@ -108,7 +108,7 @@ qubit_hamiltonian = _qubit_hamiltonian  # alias for display
 
 ################################################################################
 # start-cell-trotter
-from qdk_chemistry.algorithms.time_evolution.builder.trotter import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import (
     Trotter,
 )
 
@@ -123,7 +123,7 @@ unitary = builder.run(qubit_hamiltonian, time=1.0)
 
 ################################################################################
 # start-cell-trotter-error
-from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
 )
 

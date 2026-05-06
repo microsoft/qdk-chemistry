@@ -44,6 +44,8 @@ Exposed classes are:
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
+- :class:`TermPartition`: Index-based partition of Hamiltonian terms.
+  See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`UnitaryRepresentation`: Unitary representation.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -115,6 +117,7 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -145,10 +148,12 @@ __all__ = [
     "EncodingMismatchError",
     "EnergyExpectationResult",
     "FermionModeOrder",
+    "FlatPartition",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
     "LatticeGraph",
+    "LayeredPartition",
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
@@ -176,6 +181,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "TermPartition",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

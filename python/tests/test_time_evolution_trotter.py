@@ -10,7 +10,7 @@ import pytest
 import scipy
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import FlatPartition, QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -103,6 +103,24 @@ class TestTrotter:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_single_step_no_merge_without_partition(self):
+        """Test that without term_partition, duplicate terms are not merged."""
+        pauli_strings = ["XII", "IXI", "XII"]
+        coefficients = [1.0, 1.0, 1.0]
+
+        hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+        builder = Trotter(num_divisions=1, time=1.0)
+        unitary = builder.run(hamiltonian)
+
+        assert isinstance(unitary, UnitaryRepresentation)
+        container = unitary.get_container()
+
+        assert isinstance(container, PauliProductFormulaContainer)
+        assert container.num_qubits == 3
+        assert container.step_reps == 1
+        # Without a partition, each Pauli term is its own group — no merging.
+        assert len(container.step_terms) == 3
 
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
@@ -483,8 +501,11 @@ class TestTrotter:
 
         terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
 
-        assert len(terms) == 1
-        assert terms[0].pauli_term == {0: "Z"}
+        # All terms should be Z only (X filtered out).
+        # After Suzuki recursion and schedule reduction, the total rotation
+        # angle across all Z terms must equal coeff * time = 1.0.
+        assert all(t.pauli_term == {0: "Z"} for t in terms)
+        assert abs(sum(t.angle for t in terms) - 1.0) < 1e-12
 
     def test_trotter_x_z_example_higher_order(self):
         """Correctness check for fourth-order Trotter decomposition."""
@@ -834,3 +855,67 @@ class TestTrotterAccuracyAware:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+
+class TestNoPartitionFallback:
+    """Tests for Trotter behavior when no term_partition is present."""
+
+    def test_no_partition_treats_each_term_individually(self):
+        """Test that without term_partition, each Pauli term is its own group."""
+        pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
+        coefficients = [1.0] * 8
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+        )
+        t = 1.0
+        builder = Trotter(num_divisions=1, order=1, time=t)
+        terms = builder.run(hamiltonian).get_container().step_terms
+
+        for idx, term in enumerate(terms):
+            assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
+            assert term.angle == coefficients[idx] * t
+
+
+class TestPartitionGrouping:
+    """Tests for Trotter behavior when term_partition groups commuting terms."""
+
+    def test_flat_partition_groups_commuting_terms(self):
+        """Test that a FlatPartition groups commuting terms into parallelizable layers."""
+        pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
+        coefficients = [1.0] * 8
+
+        # Group ZZ terms together (indices 0,2,4,6) and X terms together (indices 1,3,5,7)
+        partition = FlatPartition(strategy="commuting", groups=[[0, 2, 4, 6], [1, 3, 5, 7]])
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+            term_partition=partition,
+        )
+        builder = Trotter(num_divisions=1, order=1, time=1.0)
+        terms = builder.run(hamiltonian).get_container().step_terms
+
+        # All 8 terms should be present
+        assert len(terms) == 8
+
+        # Convert terms back to label strings
+        def term_to_label(term):
+            num_qubits = hamiltonian.num_qubits
+            chars = ["I"] * num_qubits
+            for qubit_idx, pauli_op in term.pauli_term.items():
+                chars[num_qubits - 1 - qubit_idx] = pauli_op
+            return "".join(chars)
+
+        term_labels = [term_to_label(t) for t in terms]
+
+        pauli_zz_labels = {"ZZII", "IIZZ", "IZZI", "ZIIZ"}
+        pauli_x_labels = {"XIII", "IXII", "IIXI", "IIIX"}
+        assert set(term_labels) == pauli_zz_labels | pauli_x_labels
+
+        # With first-order Trotter, grouped terms should appear contiguously:
+        # all ZZ terms first (group 0), then all X terms (group 1), or vice versa.
+        # Check that the groups are contiguous (not interleaved).
+        zz_indices = [i for i, label in enumerate(term_labels) if label in pauli_zz_labels]
+        x_indices = [i for i, label in enumerate(term_labels) if label in pauli_x_labels]
+        assert zz_indices == list(range(zz_indices[0], zz_indices[0] + len(zz_indices)))
+        assert x_indices == list(range(x_indices[0], x_indices[0] + len(x_indices)))

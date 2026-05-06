@@ -18,12 +18,22 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
+import numpy as np
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import (
+    FlatPartition,
+    LayeredPartition,
+    QubitHamiltonian,
+    TermPartition,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -119,22 +129,18 @@ class Trotter(TimeEvolutionBuilder):
         * ``"naive"``: uses the triangle-inequality bound.
           :math:`N = \lceil (\sum_j|\alpha_j|)^{2}t^{2}/\epsilon \rceil`
 
+        When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated
+        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the builder consumes it
+        directly for schedule-level grouping.  When no partition is present, each Pauli term
+        is exponentiated as its own group.
+
         Args:
-            order: The order of the Trotter decomposition (currently only
-                first order is supported). Defaults to 1.
+            order: Trotter decomposition order (1, 2, or any positive even integer). Defaults to 1.
             time: The evolution time. Defaults to 0.0.
-            target_accuracy: Target accuracy for automatic step computation.
-                Must be positive to enable automatic computation.
-                Use 0.0 (default) to disable.
-            num_divisions: Explicit number of divisions within a Trotter
-                step.  When both *num_divisions* and *target_accuracy*
-                are given the larger value is used.  Use 0 (default) for
-                automatic determination.
-            error_bound: Strategy for computing the Trotter error bound
-                when *target_accuracy* is set.  Either ``"commutator"``
-                (default, tighter) or ``"naive"``.
-            weight_threshold: Absolute threshold for filtering small
-                Hamiltonian coefficients. Defaults to 1e-12.
+            target_accuracy: Target accuracy for auto step computation. Use 0.0 (default) to disable.
+            num_divisions: Divisions per Trotter step. Max of this and auto value is used. Defaults to 0.
+            error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
+            weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` scales
                 time, ``"repeat"`` repeats the circuit. Defaults to ``"repeat"``.
@@ -251,7 +257,11 @@ class Trotter(TimeEvolutionBuilder):
         return max(manual, auto)
 
     def _decompose_trotter_step(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, *, atol: float = 1e-12
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        time: float,
+        *,
+        atol: float = 1e-12,
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Trotter step into exponentiated Pauli terms.
 
@@ -261,7 +271,6 @@ class Trotter(TimeEvolutionBuilder):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be decomposed.
             time: The evolution time for the single step.
-
             atol: Absolute tolerance for filtering small coefficients.
 
         Returns:
@@ -273,8 +282,6 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        order = self._settings.get("order")
-
         coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
         # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
         # there is nothing to decompose; return the empty list of terms.
@@ -282,80 +289,204 @@ class Trotter(TimeEvolutionBuilder):
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms
 
+        order = self._settings.get("order")
+        grouped_hamiltonians = self._group_terms(qubit_hamiltonian)
+
+        if not grouped_hamiltonians:
+            Logger.warn("Term partition produced no groups; returning empty term list.")
+            return terms
+
         if order == 1:
-            for label, coeff in coeffs:
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+            for group in grouped_hamiltonians:
+                for subgroup in group:
+                    terms.extend(
+                        self._exponentiate_commuting(
+                            subgroup,
+                            time=time,
+                            atol=atol,
+                        )
+                    )
+
         # order = 2 or order = 2k with k>1
         else:
-            # \prod_{i=1}^{L-1} e^{-iH_i t/(2n)}
-            for label, coeff in coeffs[:-1]:
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time / 2
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-            # e^{-iH_L t/n}
-            label, coeff = coeffs[-1]
+            # Build an abstract schedule of (time_fraction, group_index) entries.
+            # The Strang splitting puts group 0..L-2 at half-time on the outside
+            # and group L-1 at full-time in the middle:
+            #   S2(t) = [t/2 * G0, ..., t/2 * G_{L-2}, t * G_{L-1}, t/2 * G_{L-2}, ..., t/2 * G0]
+            n_groups = len(grouped_hamiltonians)
+            schedule: list[tuple[float, int]] = []
+            for g in range(n_groups - 1):
+                schedule.append((0.5, g))
+            schedule.append((1.0, n_groups - 1))
+            for g in range(n_groups - 2, -1, -1):
+                schedule.append((0.5, g))
+
+            # Apply Suzuki recursion at the schedule level for order > 2
+            if order > 2 and order % 2 == 0:
+                for k in range(2, int(order / 2) + 1):
+                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
+                    new_schedule: list[tuple[float, int]] = []
+                    # S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2
+                    for _ in range(2):
+                        for frac, g in schedule:
+                            new_schedule.append((frac * u_k, g))
+                    for frac, g in schedule:
+                        new_schedule.append((frac * (1 - 4 * u_k), g))
+                    for _ in range(2):
+                        for frac, g in schedule:
+                            new_schedule.append((frac * u_k, g))
+                    schedule = new_schedule
+
+            # Reduce the schedule: merge consecutive entries with the same group index
+            reduced: list[tuple[float, int]] = []
+            for frac, g in schedule:
+                if reduced and reduced[-1][1] == g:
+                    reduced[-1] = (reduced[-1][0] + frac, g)
+                else:
+                    reduced.append((frac, g))
+            schedule = reduced
+
+            # Expand the schedule into exponentiated Pauli terms
+            for frac, g in schedule:
+                for subgroup in grouped_hamiltonians[g]:
+                    terms.extend(
+                        self._exponentiate_commuting(
+                            subgroup,
+                            time=time * frac,
+                            atol=atol,
+                        )
+                    )
+
+        return terms
+
+    def _group_terms(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+    ) -> list[list[QubitHamiltonian]]:
+        """Group Hamiltonian terms for Trotter decomposition.
+
+        When the Hamiltonian carries a populated
+        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, it is
+        consumed directly.  Both :class:`~qdk_chemistry.data.LayeredPartition`
+        and :class:`~qdk_chemistry.data.FlatPartition` are accepted.
+
+        When no partition is present, each Pauli term is treated as its own
+        single-term group with no reordering.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian to group.
+
+        Returns:
+            A list of groups, where each group is a list of
+            ``QubitHamiltonian`` sub-groups (parallelisable layers).
+
+        """
+        partition = qubit_hamiltonian.term_partition
+        if partition is not None:
+            Logger.debug(
+                f"Trotter: consuming QubitHamiltonian.term_partition "
+                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+            )
+            return self._groups_from_partition(qubit_hamiltonian, partition)
+
+        Logger.debug("Trotter: no term_partition present; treating each Pauli term as its own group.")
+        return [
+            [
+                QubitHamiltonian(
+                    pauli_strings=[label],
+                    coefficients=[coeff],
+                    encoding=qubit_hamiltonian.encoding,
+                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+                )
+            ]
+            for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
+        ]
+
+    def _groups_from_partition(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        partition: TermPartition,
+    ) -> list[list[QubitHamiltonian]]:
+        """Materialise a :class:`TermPartition` into Trotter sub-groups.
+
+        Both :class:`~qdk_chemistry.data.LayeredPartition` and
+        :class:`~qdk_chemistry.data.FlatPartition` are supported. A flat
+        partition's groups are treated as single layers. Groups are sorted by
+        ascending layer count so that the smallest groups sit on the outside
+        of the Strang/Suzuki splitting and merge at boundaries.
+
+        Args:
+            qubit_hamiltonian: Source Hamiltonian whose Pauli terms the partition indexes into.
+            partition: Index-based partition carried on ``qubit_hamiltonian``.
+
+        Returns:
+            List of groups; each group is a list of layer ``QubitHamiltonian`` objects.
+
+        """
+        labels = qubit_hamiltonian.pauli_strings
+        coeffs = qubit_hamiltonian.coefficients
+        encoding = qubit_hamiltonian.encoding
+        fmo = qubit_hamiltonian.fermion_mode_order
+
+        def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
+            return QubitHamiltonian(
+                pauli_strings=[labels[i] for i in indices],
+                coefficients=np.asarray([coeffs[i] for i in indices]),
+                encoding=encoding,
+                fermion_mode_order=fmo,
+            )
+
+        # Normalise to (group → tuple of layers of indices)
+        if isinstance(partition, LayeredPartition):
+            layered_groups = partition.groups
+        elif isinstance(partition, FlatPartition):
+            layered_groups = tuple((g,) for g in partition.groups)
+        else:
+            raise TypeError(
+                f"Unsupported TermPartition subtype: {type(partition).__name__}. "
+                "Expected FlatPartition or LayeredPartition."
+            )
+
+        groups: list[list[QubitHamiltonian]] = [
+            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
+        ]
+        # Drop empty groups (no layers / all layers empty).
+        groups = [g for g in groups if g]
+
+        # Sort groups by ascending layer count so the smallest sits on the
+        # outside of the Strang/Suzuki splitting (maximises boundary merging).
+        groups.sort(key=len)
+        return groups
+
+    def _exponentiate_commuting(
+        self,
+        group: QubitHamiltonian,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Exponentiate a group of commuting Pauli terms.
+
+        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
+        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
+        group commute, the product of rotations equals the exponential of
+        the sum regardless of ordering.
+
+        Args:
+            group: The group of commuting Hamiltonian terms to exponentiate.
+            time: The evolution time used to compute rotation angles
+                (:math:`\theta_j = c_j \cdot t`).
+            atol: Absolute tolerance for filtering small coefficients.
+
+        Returns:
+            A flat list of :class:`ExponentiatedPauliTerm`.
+
+        """
+        terms: list[ExponentiatedPauliTerm] = []
+        for label, coeff in group.get_real_coefficients(tolerance=atol):
             mapping = self._pauli_label_to_map(label)
             angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
-            # \prod_{i=L-1}^1 e^{-iH_i t/(2n)}
-            for label, coeff in reversed(coeffs[:-1]):
-                mapping = self._pauli_label_to_map(label)
-                angle = coeff * time / 2
-                terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-
-            # Construct order 2k formula bottom up dynamic-programming style
-            if order > 2:
-                step_terms = terms.copy()
-                for k in range(2, int(order / 2) + 1):
-                    u_k = 1 / (4 - 4 ** (1 / (2 * k - 1)))
-                    new_terms = []
-
-                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
-                    for _ in range(2):
-                        for term in step_terms:
-                            new_terms.append(
-                                ExponentiatedPauliTerm(
-                                    pauli_term=term.pauli_term,
-                                    angle=term.angle * u_k,
-                                )
-                            )
-                    # S_{2k-2}((1-4u_k) t)
-                    for term in step_terms:
-                        new_terms.append(
-                            ExponentiatedPauliTerm(
-                                pauli_term=term.pauli_term,
-                                angle=term.angle * (1 - 4 * u_k),
-                            )
-                        )
-
-                    # S_{2k-2}(u_k t)^2 = S_{2k-2}(u_k t) S_{2k-2}(u_k t)
-                    for _ in range(2):
-                        for term in step_terms:
-                            new_terms.append(
-                                ExponentiatedPauliTerm(
-                                    pauli_term=term.pauli_term,
-                                    angle=term.angle * u_k,
-                                )
-                            )
-
-                    step_terms = new_terms
-                terms = step_terms
-
-            # Merge adjacent terms with the same pauli_term by summing angles.
-            merged_terms: list[ExponentiatedPauliTerm] = []
-            for term in terms:
-                if merged_terms and merged_terms[-1].pauli_term == term.pauli_term:
-                    last = merged_terms[-1]
-                    merged_terms[-1] = ExponentiatedPauliTerm(
-                        pauli_term=last.pauli_term,
-                        angle=last.angle + term.angle,
-                    )
-                else:
-                    merged_terms.append(term)
-            terms = merged_terms
         return terms
 
     def name(self) -> str:
