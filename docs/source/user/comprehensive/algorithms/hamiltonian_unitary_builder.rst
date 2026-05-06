@@ -1,46 +1,43 @@
-Time evolution builder
-======================
+Hamiltonian Unitary Builder
+===========================
 
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` algorithm in QDK/Chemistry constructs quantum circuits that implement the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and a time parameter as input and produces a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` as output.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitHamiltonian` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
-Hamiltonian simulation — constructing the unitary :math:`U(t) = e^{-iHt}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
 QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
 These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
-The resulting :class:`~qdk_chemistry.data.TimeEvolutionUnitary` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
 
 
-Using the TimeEvolutionBuilder
-------------------------------
+Using the HamiltonianUnitaryBuilder
+------------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
 
-This section demonstrates how to create, configure, and run a time evolution builder.
-The ``run`` method returns a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., :doc:`PhaseEstimation <phase_estimation>`).
+This section demonstrates how to create, configure, and run a Hamiltonian unitary builder.
+The ``run`` method returns a :class:`~qdk_chemistry.data.UnitaryRepresentation` object that can be used by any algorithm that requires a Hamiltonian simulation unitary (e.g., :doc:`PhaseEstimation <phase_estimation>`).
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` requires the following inputs:
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
 QubitHamiltonian
    A :class:`~qdk_chemistry.data.QubitHamiltonian` containing the Pauli-string representation of the Hamiltonian.
    This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
-Time
-   A float specifying the evolution time :math:`t` in :math:`U(t) = e^{-iHt}`.
-
 .. rubric:: Creating a builder
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
@@ -52,7 +49,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-configure-trotter
       :end-before: # end-cell-configure-trotter
@@ -61,7 +58,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
@@ -69,12 +66,12 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.TimeEvolutionBuilder` provides a unified interface for Hamiltonian simulation methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/time_evolution_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
@@ -215,14 +212,14 @@ Example::
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.TimeEvolutionUnitary`: Output data class wrapping the exponentiated Pauli sequence
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or linear combinations of unitaries
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
 - :doc:`PhaseEstimation <phase_estimation>`: One consumer of time-evolution unitaries
 
 Further reading
 ---------------
 
-- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/time_evolution_builder.py>`_ script.
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hamiltonian_unitary_builder.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Quantum phase estimation algorithms
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - :doc:`Settings <settings>`: Configuration settings for algorithms

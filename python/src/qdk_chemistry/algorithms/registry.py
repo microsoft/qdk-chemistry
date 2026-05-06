@@ -505,24 +505,22 @@ def _register_python_factories():
     be called by users.
     """
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledCircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.builder import TimeEvolutionBuilderFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
-        ControlledEvolutionCircuitMapperFactory,
-    )
 
     register_factory(EnergyEstimatorFactory())
     register_factory(StatePreparationFactory())
     register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
-    register_factory(TimeEvolutionBuilderFactory())
-    register_factory(ControlledEvolutionCircuitMapperFactory())
+    register_factory(HamiltonianUnitaryBuilderFactory())
+    register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(PhaseEstimationFactory())
 
@@ -580,7 +578,13 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
+        PartiallyRandomized,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
@@ -591,18 +595,6 @@ def _register_python_algorithms():
         FullCommutingTermGrouper,
         IdentityTermGrouper,
         QubitWiseCommutingTermGrouper,
-    )
-    from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import (  # noqa: PLC0415
-        PartiallyRandomized,
-    )
-    from qdk_chemistry.algorithms.time_evolution.builder.qdrift import (  # noqa: PLC0415
-        QDrift,
-    )
-    from qdk_chemistry.algorithms.time_evolution.builder.trotter import (  # noqa: PLC0415
-        Trotter,
-    )
-    from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper import (  # noqa: PLC0415
-        PauliSequenceMapper,
     )
 
     register(lambda: QdkEnergyEstimator())

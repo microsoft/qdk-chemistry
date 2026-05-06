@@ -1,8 +1,8 @@
-Controlled evolution circuit mapper
-====================================
+Controlled circuit mapper
+=========================
 
-The :class:`~qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper` algorithm in QDK/Chemistry converts a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` into a *controlled* quantum circuit.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.ControlledTimeEvolutionUnitary` as input and produces a :class:`~qdk_chemistry.data.Circuit` as output.
+The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` algorithm in QDK/Chemistry converts a :class:`~qdk_chemistry.data.UnitaryRepresentation` into a *controlled* quantum circuit.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.ControlledUnitary` as input and produces a :class:`~qdk_chemistry.data.Circuit` as output.
 
 Overview
 --------
@@ -16,19 +16,18 @@ Mathematically, for a single control qubit the controlled unitary acts as:
 
 That is, the target register is left unchanged when the control is :math:`|0\rangle` and :math:`U` is applied when the control is :math:`|1\rangle`.
 
-The :class:`~qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper` synthesises these controlled operations from the abstract :class:`~qdk_chemistry.data.TimeEvolutionUnitary` representation produced by a :doc:`TimeEvolutionBuilder <time_evolution_builder>`.
+The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` synthesises these controlled operations from the abstract :class:`~qdk_chemistry.data.UnitaryRepresentation` representation produced by a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
 This is a core component of algorithms such as :doc:`PhaseEstimation <phase_estimation>`, which requires repeated controlled applications :math:`C\text{-}U^{2^k}`.
 
-The mapper takes two inputs:
+The mapper takes inputs:
 
-1. A :class:`~qdk_chemistry.data.ControlledTimeEvolutionUnitary` — which pairs a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` with the control qubit indices
-2. An optional power parameter that controls how many times the unitary is repeated (:math:`U^{\text{power}}`)
+1. A :class:`~qdk_chemistry.data.ControlledUnitary` — which pairs a :class:`~qdk_chemistry.data.UnitaryRepresentation` with the control qubit indices
 
 The resulting :class:`~qdk_chemistry.data.Circuit` implements the controlled unitary and can be executed by a :doc:`CircuitExecutor <circuit_executor>`.
 
 
-Using the ControlledEvolutionCircuitMapper
-------------------------------------------
+Using the ControlledCircuitMapper
+---------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
@@ -38,10 +37,10 @@ This section demonstrates how to create, configure, and run the circuit mapper.
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.ControlledEvolutionCircuitMapper` requires:
+The :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` requires:
 
-ControlledTimeEvolutionUnitary
-   A :class:`~qdk_chemistry.data.ControlledTimeEvolutionUnitary` wrapping a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` and specifying which qubits serve as controls.
+ControlledUnitary
+   A :class:`~qdk_chemistry.data.ControlledUnitary` wrapping a :class:`~qdk_chemistry.data.UnitaryRepresentation` and specifying which qubits serve as controls.
 
 .. rubric:: Creating a mapper
 
@@ -51,15 +50,6 @@ ControlledTimeEvolutionUnitary
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
-
-.. rubric:: Configuring settings
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/circuit_mapper.py
-      :language: python
-      :start-after: # start-cell-configure
-      :end-before: # end-cell-configure
 
 .. rubric:: Running the mapper
 
@@ -99,33 +89,19 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 .. note::
    The current implementation supports a single control qubit.
 
-.. rubric:: Settings
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 15 60
-
-   * - Setting
-     - Type
-     - Description
-   * - ``power``
-     - int
-     - Number of times the unitary is repeated (:math:`U^{\text{power}}`). Default is 1.
-
-
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.ControlledTimeEvolutionUnitary`: Input — pairs a unitary with control qubit indices
-- :class:`~qdk_chemistry.data.TimeEvolutionUnitary`: The underlying time-evolution unitary
+- :class:`~qdk_chemistry.data.ControlledUnitary`: Input — pairs a unitary with control qubit indices
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: The underlying unitary representation
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit
-- :doc:`TimeEvolutionBuilder <time_evolution_builder>`: Produces the :class:`~qdk_chemistry.data.TimeEvolutionUnitary` that this mapper consumes
+- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Produces the :class:`~qdk_chemistry.data.UnitaryRepresentation` that this mapper consumes
 
 Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/circuit_mapper.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Uses the circuit mapper to build controlled-:math:`U` operations
-- :doc:`TimeEvolutionBuilder <time_evolution_builder>`: Constructs the input unitaries
+- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the input unitaries
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
