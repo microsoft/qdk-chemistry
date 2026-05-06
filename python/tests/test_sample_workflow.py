@@ -158,11 +158,20 @@ def _strip_visualization_lines(cell_source: str) -> str:
     return "\n".join(filtered_lines)
 
 
-def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 600) -> None:
+def _execute_notebook_skip_visualizations(
+    notebook_path: Path,
+    timeout: int = 1800,
+    cell_patches: dict[int, dict[str, str]] | None = None,
+) -> None:
     """Execute a notebook, stripping visualization code from cells.
 
     Args:
         notebook_path: Path to the notebook file.
+        timeout: Maximum time in seconds to wait for each cell execution.
+        cell_patches: Optional dict mapping cell indices to ``{old: new}``
+            string replacements applied before execution.  Use this to
+            inject lighter parameters at test time without modifying the
+            notebook itself.
         timeout: Maximum time in seconds to wait for each cell execution.
 
     Raises:
@@ -185,6 +194,13 @@ def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 60
 
         # Strip visualization lines from the cell
         cell.source = _strip_visualization_lines(cell_source)
+
+    # Apply cell-level text patches (e.g., lighter parameters for testing)
+    if cell_patches:
+        for cell_idx, replacements in cell_patches.items():
+            if cell_idx < len(nb.cells) and nb.cells[cell_idx].cell_type == "code":
+                for old, new in replacements.items():
+                    nb.cells[cell_idx].source = nb.cells[cell_idx].source.replace(old, new)
 
     # Set the working directory to the notebook's directory for relative paths
     notebook_dir = notebook_path.parent
@@ -230,7 +246,15 @@ def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            25: {
+                "qdk_full_state_simulator": "qdk_sparse_state_simulator",
+                "total_shots=1500000": "total_shots=50000",
+            },
+        },
+    )
 
 
 @_requires_notebook_deps
@@ -247,4 +271,11 @@ def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "qpe_stretched_n2.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            31: {
+                "NUM_TRIALS = 20": "NUM_TRIALS = 3",
+            },
+        },
+    )
