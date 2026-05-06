@@ -3,6 +3,7 @@
 // license information.
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -10,8 +11,8 @@
 #include <macis/util/fcidump.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -366,41 +367,44 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     file << std::setw(4) << l;
   };
 
-  // Get the two-electron integrals via the virtual accessor
-  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
+  if (has_two_body_integrals()) {
+    // Get the two-electron integrals via the virtual accessor
+    auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
 
-  auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri =
-        eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-                 k * num_molecular_orbitals + l);
+    auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
+      auto eri =
+          eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
+                   k * num_molecular_orbitals + l);
 
-    formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
-    file << "\n";
-  };
+      formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
+      file << "\n";
+    };
 
-  auto write_1body = [&](size_t i, size_t j) {
-    auto hel = (*_one_body_integrals.first)(i, j);
-
-    formatted_line(i + 1, j + 1, 0, 0, hel);
-    file << "\n";
-  };
-
-  // Write permutationally unique MO ERIs
-  for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
-      for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
-        for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
-          if (ij <= kl) {
-            write_eri(i, j, k, l);
+    // Write permutationally unique MO ERIs
+    for (size_t i = 0, ij = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = i; j < num_molecular_orbitals; ++j, ij++) {
+        for (size_t k = 0, kl = 0; k < num_molecular_orbitals; ++k)
+          for (size_t l = k; l < num_molecular_orbitals; ++l, kl++) {
+            if (ij <= kl) {
+              write_eri(i, j, k, l);
+            }
           }
-        }
-    }
+      }
+  }
 
-  // Write permutationally unique MO 1-body integrals
-  for (size_t i = 0; i < num_molecular_orbitals; ++i)
-    for (size_t j = 0; j <= i; ++j) {
-      write_1body(i, j);
-    }
+  if (has_one_body_integrals()) {
+    auto write_1body = [&](size_t i, size_t j) {
+      auto hel = (*_one_body_integrals.first)(i, j);
+
+      formatted_line(i + 1, j + 1, 0, 0, hel);
+      file << "\n";
+    };
+    // Write permutationally unique MO 1-body integrals
+    for (size_t i = 0; i < num_molecular_orbitals; ++i)
+      for (size_t j = 0; j <= i; ++j) {
+        write_1body(i, j);
+      }
+  }
 
   // Write core energy
   formatted_line(0, 0, 0, 0, _core_energy);
@@ -499,8 +503,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
   }
-  if (container_type == "cholesky") {
-    return CholeskyHamiltonianContainer::from_json(j);
+  if (container_type == "three_center") {
+    return ThreeCenterHamiltonianContainer::from_json(j);
   }
   if (container_type == "sparse") {
     return SparseHamiltonianContainer::from_json(j);
@@ -526,9 +530,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     // Forward to appropriate container implementation
     if (container_type == "canonical_four_center") {
       return CanonicalFourCenterHamiltonianContainer::from_hdf5(group);
-    }
-    if (container_type == "cholesky") {
-      return CholeskyHamiltonianContainer::from_hdf5(group);
+    } else if (container_type == "three_center") {
+      return ThreeCenterHamiltonianContainer::from_hdf5(group);
     }
     if (container_type == "sparse") {
       return SparseHamiltonianContainer::from_hdf5(group);

@@ -42,7 +42,8 @@ class KSImpl : public SCFImpl {
   KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
          const RowMajorMatrix& density_matrix,
          std::shared_ptr<BasisSet> basis_set,
-         std::shared_ptr<BasisSet> raw_basis_set);
+         std::shared_ptr<BasisSet> raw_basis_set,
+         std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
   /**
    * @brief Construct Kohn-Sham solver with initial density matrix
@@ -54,7 +55,8 @@ class KSImpl : public SCFImpl {
    */
   KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
          std::shared_ptr<BasisSet> basis_set,
-         std::shared_ptr<BasisSet> raw_basis_set);
+         std::shared_ptr<BasisSet> raw_basis_set,
+         std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
  private:
   /**

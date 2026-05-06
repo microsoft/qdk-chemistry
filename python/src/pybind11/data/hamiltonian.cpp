@@ -11,8 +11,8 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -115,7 +115,7 @@ for quantum chemistry calculations. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 Derived classes implement specific storage formats for two-electron integrals
-(e.g., canonical 4-center, density-fitted, etc.).
+(e.g., canonical 4-center, three-center, etc.).
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
@@ -238,12 +238,12 @@ Returns:
     str: Container type identifier (e.g., "canonical_four_center")
 )");
   // ============================================================================
-  // CholeskyHamiltonianContainer - Concrete implementation
+  // ThreeCenterHamiltonianContainer - Concrete implementation
   // ============================================================================
-  py::class_<CholeskyHamiltonianContainer, HamiltonianContainer,
+  py::class_<ThreeCenterHamiltonianContainer, HamiltonianContainer,
              py::smart_holder>
-      cholesky_container(data, "CholeskyHamiltonianContainer", R"(
-Represents a molecular Hamiltonian using Cholesky-decomposed three-center integrals.
+      three_center_container(data, "ThreeCenterHamiltonianContainer", R"(
+Represents a molecular Hamiltonian using three-center integrals.
 This class stores molecular Hamiltonian data for quantum chemistry calculations,
 specifically designed for active space methods. It contains:
 
@@ -260,7 +260,7 @@ Examples:
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
     >>> three_center = np.random.rand(16, 10)  # (norb^2) x naux
     >>> inactive_fock_matrix = np.random.rand(4, 4)
-    >>> container = CholeskyHamiltonianContainer(
+    >>> container = ThreeCenterHamiltonianContainer(
     ...     one_body, three_center, orbitals, 10.5, inactive_fock_matrix
     ... )
     >>> # Wrap in Hamiltonian interface
@@ -268,12 +268,12 @@ Examples:
 )");
 
   // Restricted constructor
-  cholesky_container.def(
+  three_center_container.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                std::optional<Eigen::MatrixXd>, HamiltonianType>(),
       R"(
-Constructor for restricted active space Hamiltonian with Cholesky-decomposed integrals.
+Constructor for restricted active space Hamiltonian with three-center integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
@@ -291,7 +291,7 @@ Examples:
     >>> one_body = np.random.rand(4, 4)
     >>> three_center = np.random.rand(16, 10)  # 16 = 4^2, 10 auxiliary basis functions
     >>> inactive_fock_matrix = np.random.rand(4, 4)
-    >>> container = CholeskyHamiltonianContainer(
+    >>> container = ThreeCenterHamiltonianContainer(
     ...     one_body, three_center, orbitals, 10.5, inactive_fock_matrix
     ... )
 )",
@@ -302,14 +302,14 @@ Examples:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
-  cholesky_container.def(
+  three_center_container.def(
       py::init<const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                const Eigen::MatrixXd&, const Eigen::MatrixXd&,
                std::shared_ptr<Orbitals>, double, const Eigen::MatrixXd&,
                const Eigen::MatrixXd&, std::optional<Eigen::MatrixXd>,
                HamiltonianType>(),
       R"(
-Constructor for unrestricted active space Hamiltonian with Cholesky-decomposed integrals.
+Constructor for unrestricted active space Hamiltonian with three-center integrals.
 
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
@@ -334,7 +334,7 @@ Examples:
     >>> three_center_bb = np.random.rand(16, 10)
     >>> fock_a = np.random.rand(4, 4)
     >>> fock_b = np.random.rand(4, 4)
-    >>> container = CholeskyHamiltonianContainer(
+    >>> container = ThreeCenterHamiltonianContainer(
     ...     one_body_a, one_body_b,
     ...     three_center_aa, three_center_bb,
     ...     orbitals, 10.5, fock_a, fock_b
@@ -350,8 +350,8 @@ Examples:
 
   // Three-center integral access
   bind_getter_as_property(
-      cholesky_container, "get_three_center_integrals",
-      &CholeskyHamiltonianContainer::get_three_center_integrals,
+      three_center_container, "get_three_center_integrals",
+      &ThreeCenterHamiltonianContainer::get_three_center_integrals,
       R"(
 Get three-center integrals in MO basis for all spin channels.
 
@@ -366,9 +366,9 @@ Raises:
       py::return_value_policy::reference_internal);
 
   // AO Cholesky vectors access
-  cholesky_container.def(
+  three_center_container.def(
       "get_ao_cholesky_vectors",
-      [](const CholeskyHamiltonianContainer& self) -> py::object {
+      [](const ThreeCenterHamiltonianContainer& self) -> py::object {
         const auto& opt = self.get_ao_cholesky_vectors();
         if (!opt) return py::none();
         const Eigen::MatrixXd& mat = *opt;
@@ -396,65 +396,69 @@ Returns:
 )");
 
   // Two-body integral access (lazily computed from three-center integrals)
-  bind_getter_as_property(cholesky_container, "get_two_body_integrals",
-                          &CholeskyHamiltonianContainer::get_two_body_integrals,
-                          R"(
+  bind_getter_as_property(
+      three_center_container, "get_two_body_integrals",
+      &ThreeCenterHamiltonianContainer::get_two_body_integrals,
+      R"(
 Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
+    where indices are ordered as i*norb³ + j*norb² + k*norb + l
 )",
-                          py::return_value_policy::reference_internal);
+      py::return_value_policy::reference_internal);
 
-  cholesky_container.def("get_two_body_element",
-                         &CholeskyHamiltonianContainer::get_two_body_element,
-                         R"(
-Get specific two-electron integral element <ij|kl>.
+  three_center_container.def(
+      "get_two_body_element",
+      &ThreeCenterHamiltonianContainer::get_two_body_element,
+      R"(
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
-                         py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
-                         py::arg("channel") = SpinChannel::aaaa);
+      py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
+      py::arg("channel") = SpinChannel::aaaa);
 
-  cholesky_container.def("has_two_body_integrals",
-                         &CholeskyHamiltonianContainer::has_two_body_integrals,
-                         R"(
+  three_center_container.def(
+      "has_two_body_integrals",
+      &ThreeCenterHamiltonianContainer::has_two_body_integrals,
+      R"(
 Check if two-body integrals are available.
 
 Returns:
     bool: True if two-body integrals have been set
 )");
 
-  cholesky_container.def("is_restricted",
-                         &CholeskyHamiltonianContainer::is_restricted,
-                         R"(
+  three_center_container.def("is_restricted",
+                             &ThreeCenterHamiltonianContainer::is_restricted,
+                             R"(
 Check if Hamiltonian is restricted (alpha == beta).
 
 Returns:
     bool: True if alpha and beta integrals are identical
 )");
 
-  cholesky_container.def("is_valid", &CholeskyHamiltonianContainer::is_valid,
-                         R"(
+  three_center_container.def("is_valid",
+                             &ThreeCenterHamiltonianContainer::is_valid,
+                             R"(
 Check if the Hamiltonian data is complete and consistent.
 
 Returns:
     bool: True if all required data is set and dimensions are consistent
 )");
 
-  cholesky_container.def(
+  three_center_container.def(
       "to_json",
-      [](const CholeskyHamiltonianContainer& self) -> std::string {
+      [](const ThreeCenterHamiltonianContainer& self) -> std::string {
         return self.to_json().dump();
       },
       R"(
@@ -464,8 +468,8 @@ Returns:
     str: JSON representation of the container
 )");
 
-  cholesky_container.def(
-      "to_fcidump_file", &CholeskyHamiltonianContainer::to_fcidump_file,
+  three_center_container.def(
+      "to_fcidump_file", &ThreeCenterHamiltonianContainer::to_fcidump_file,
       R"(
 Save Hamiltonian to FCIDUMP file.
 
@@ -493,13 +497,13 @@ specifically designed for active space methods. It contains:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 This is the standard full integral storage format where two-electron integrals
-are stored as a flattened [norb^4] vector.
+are stored as a flattened [norb⁴] vector.
 
 Examples:
     >>> import numpy as np
     >>> # Create restricted Hamiltonian
     >>> one_body = np.random.rand(4, 4)  # 4 orbitals
-    >>> two_body = np.random.rand(256)   # 4^4 elements
+    >>> two_body = np.random.rand(256)   # 4⁴ elements
     >>> fock_matrix = np.random.rand(4, 4)
     >>> container = CanonicalFourCenterHamiltonianContainer(
     ...     one_body, two_body, orbitals, 10.5, fock_matrix
@@ -518,7 +522,7 @@ Constructor for restricted active space Hamiltonian with 4-center integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): One-electron integrals matrix [norb x norb]
-    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb^4]
+    two_body_integrals (numpy.ndarray): Two-electron integrals vector [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
@@ -551,9 +555,9 @@ Constructor for unrestricted active space Hamiltonian with 4-center integrals.
 Args:
     one_body_integrals_alpha (numpy.ndarray): Alpha one-electron integrals [norb x norb]
     one_body_integrals_beta (numpy.ndarray): Beta one-electron integrals [norb x norb]
-    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb^4]
-    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb^4]
-    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb^4]
+    two_body_integrals_aaaa (numpy.ndarray): Alpha-alpha-alpha-alpha integrals [norb⁴]
+    two_body_integrals_aabb (numpy.ndarray): Alpha-beta-alpha-beta integrals [norb⁴]
+    two_body_integrals_bbbb (numpy.ndarray): Beta-beta-beta-beta integrals [norb⁴]
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
@@ -592,11 +596,11 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
+    where indices are ordered as i*norb³ + j*norb² + k*norb + l
 )",
       py::return_value_policy::reference_internal);
 
@@ -604,14 +608,14 @@ Notes:
       "get_two_body_element",
       &CanonicalFourCenterHamiltonianContainer::get_two_body_element,
       R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
       py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
       py::arg("channel") = SpinChannel::aaaa);
@@ -669,7 +673,6 @@ Args:
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
-  // ============================================================================
   // SparseHamiltonianContainer — sparse lattice-model container
   // ============================================================================
   py::class_<SparseHamiltonianContainer, HamiltonianContainer, py::smart_holder>
@@ -734,7 +737,7 @@ Construct from dense one-body and two-body integrals.
 
 Args:
     one_body_integrals (numpy.ndarray): Dense one-body integral matrix [n x n].
-    two_body_integrals (numpy.ndarray): Dense two-body integrals [n^4].
+    two_body_integrals (numpy.ndarray): Dense two-body integrals [n⁴].
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
 )",
@@ -763,7 +766,7 @@ Args:
                           R"(
 Get two-electron integrals as dense vectors for all spin channels.
 
-Materialises the sparse map into a dense n^4 vector on first access (cached).
+Materialises the sparse map into a dense n⁴ vector on first access (cached).
 Model Hamiltonians are restricted so all three channels are identical.
 
 Returns:
@@ -891,7 +894,7 @@ wrapping a HamiltonianContainer implementation. It supports:
 * Core energy contributions from inactive orbitals and nuclear repulsion
 
 The actual integral storage is handled by the underlying container, which
-can use different representations (canonical 4-center, density-fitted, etc.).
+can use different representations (canonical 4-center, three-center, etc.).
 
 Examples:
     >>> # Create a Hamiltonian from a CanonicalFourCenterHamiltonianContainer container
@@ -971,26 +974,26 @@ Get two-electron integrals in molecular orbital basis.
 
 Returns:
     tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
+    integral vectors [norb⁴] for aaaa, aabb, and bbbb spin channels.
 
 Raises:
     RuntimeError: If two-body integrals have not been set
 
 Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
+    Integrals are stored as flattened vectors in chemist notation (ij|kl)
 )",
                           py::return_value_policy::reference_internal);
 
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
                   R"(
-Get specific two-electron integral element <ij|kl>.
+Get specific two-electron integral element (ij|kl).
 
 Args:
     i, j, k, l (int): Orbital indices
     channel (SpinChannel): Spin channel (aaaa, aabb, or bbbb), defaults to aaaa
 
 Returns:
-    float: Value of the two-electron integral <ij|kl>
+    float: Value of the two-electron integral (ij|kl)
 )",
                   py::arg("i"), py::arg("j"), py::arg("k"), py::arg("l"),
                   py::arg("channel") = SpinChannel::aaaa);

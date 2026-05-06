@@ -9,9 +9,9 @@ Exposed classes are:
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
-- :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
+- :class:`CanonicalFourCenterHamiltonianContainer`: Hamiltonian container with canonical 4-center integrals.
 - :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
-- :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
+- :class:`ThreeCenterHamiltonianContainer`: Container for Hamiltonians represented using three-center integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
@@ -71,7 +71,6 @@ from qdk_chemistry._core.data import (
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
-    CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
     CoupledClusterContainer,
@@ -99,6 +98,7 @@ from qdk_chemistry._core.data import (
     SpinChannel,
     StabilityResult,
     Structure,
+    ThreeCenterHamiltonianContainer,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -132,7 +132,6 @@ __all__ = [
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
     "CasWavefunctionContainer",
-    "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",
     "Configuration",
@@ -176,6 +175,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "ThreeCenterHamiltonianContainer",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",
