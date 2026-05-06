@@ -49,13 +49,7 @@ class PhaseEstimationBuilderSettings(Settings):
 
 
 class PhaseEstimationBuilder(Algorithm):
-    """Abstract base class for phase estimation circuit builders.
-
-    This algorithm constructs the quantum circuits needed for phase estimation
-    without executing them. It can be used independently for resource estimation,
-    circuit preview, or composed inside a full PhaseEstimation runner.
-
-    """
+    """Abstract base class for phase estimation circuit builders."""
 
     def __init__(self, num_bits: int = -1):
         """Initialize the PhaseEstimationBuilder with default settings.
@@ -78,14 +72,14 @@ class PhaseEstimationBuilder(Algorithm):
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
     ) -> list[Circuit]:
-        """Build all phase estimation iteration circuits.
+        """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
 
         Returns:
-            A list of quantum circuits, one per phase bit iteration.
+            A list of quantum circuits for phase estimation.
 
         """
 

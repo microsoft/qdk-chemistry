@@ -2,7 +2,7 @@
 
 This module provides the circuit-building component of quantum phase estimation,
 separated from the execution logic to allow standalone circuit generation
-for resource estimation and circuit preview.
+for resource estimation.
 """
 
 # --------------------------------------------------------------------------------------------

@@ -145,8 +145,9 @@ class IterativePhaseEstimation(PhaseEstimation):
         self._iteration_circuits = iter_circuits
         # Create and return the result
 
-        if isinstance(self.unitary_builder, TimeEvolutionBuilder):
-            evolution_time = self.unitary_builder.settings().get("time")
+        unitary_builder = self._create_nested("unitary_builder")
+        if isinstance(unitary_builder, TimeEvolutionBuilder):
+            evolution_time = unitary_builder.settings().get("time")
             return QpeResult.from_phase_fraction(
                 method=self.name(),
                 phase_fraction=phase_fraction,
@@ -155,7 +156,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
         raise NotImplementedError(
             "IQPE result construction currently only supports post-processing from time evolution. "
-            f"Got {type(self.unitary_builder)} instead."
+            f"Got {type(unitary_builder)} instead."
         )
 
     def create_iteration_circuit(

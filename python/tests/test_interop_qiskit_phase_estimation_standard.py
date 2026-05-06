@@ -230,8 +230,16 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
         AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
     )
 
-    # Override cached_property with a non-TimeEvolutionBuilder instance
-    qpe.__dict__["unitary_builder"] = _MockBuilder()
+    # Patch _create_nested to return the mock builder for "unitary_builder"
+    mock_builder = _MockBuilder()
+    original_create_nested = qpe._create_nested
+
+    def _patched_create_nested(key, **kwargs):
+        if key == "unitary_builder":
+            return mock_builder
+        return original_create_nested(key, **kwargs)
+
+    qpe._create_nested = _patched_create_nested
 
     with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
         qpe.run(

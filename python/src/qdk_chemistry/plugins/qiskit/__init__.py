@@ -45,14 +45,19 @@ def qiskit_load():
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation_builder import (  # noqa: PLC0415
+        QiskitStandardPhaseEstimationBuilder,
+    )
 
     register(lambda: RegularIsometryStatePreparation())
     register(lambda: QiskitStandardPhaseEstimation())
+    register(lambda: QiskitStandardPhaseEstimationBuilder())
 
     Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
-        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}]."
+        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}], "
+        f"[{QiskitStandardPhaseEstimationBuilder().type_name()}: {QiskitStandardPhaseEstimationBuilder().name()}]."
     )
 
 
