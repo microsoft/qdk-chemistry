@@ -1,0 +1,33 @@
+# blaspp bug: blaspp_defs_ (e.g. -DBLAS_FORTRAN_ADD_) is never cached.
+# On reconfigure the detection is skipped (run_=false), blaspp_defs_ is empty,
+# and blaspp_defines gets overwritten with empty (CACHE INTERNAL implies FORCE),
+# causing defines.h to lose all BLAS mangling definitions.
+# Fix: cache blaspp_defs_ and restore it in the two cached-settings paths.
+diff --git a/cmake/BLASFinder.cmake b/cmake/BLASFinder.cmake
+index 2994f85..fa494c9 100644
+--- a/cmake/BLASFinder.cmake
++++ b/cmake/BLASFinder.cmake
+@@ -26,6 +26,7 @@ if (BLAS_LIBRARIES)
+         # Already checked this BLAS_LIBRARIES; load cached results.
+         message( STATUS "Using cached BLAS_LIBRARIES settings" )
+         set( BLAS_FOUND "${blas_found_cached}" )
++        set( blaspp_defs_ "${blaspp_defs_cached}" )
+         set( run_ false )
+     else()
+         # Need to check BLAS_LIBRARIES.
+@@ -42,6 +43,7 @@ elseif (    "${blas}"          STREQUAL "${blas_cached}"
+     message( STATUS "Using cached blas settings" )
+     set( BLAS_LIBRARIES "${blas_libraries_cached}" )
+     set( BLAS_FOUND     "${blas_found_cached}" )
++    set( blaspp_defs_ "${blaspp_defs_cached}" )
+     set( run_ false )
+ else()
+     # Search blas, blas_int, etc.
+@@ -549,6 +551,7 @@ set( blas_fortran_cached   "${blas_fortran}"   CACHE INTERNAL "" )
+ set( blas_int_cached       "${blas_int}"       CACHE INTERNAL "" )
+ set( blas_threaded_cached  "${blas_threaded}"  CACHE INTERNAL "" )
+ 
++set( blaspp_defs_cached    "${blaspp_defs_}"   CACHE INTERNAL "" )
+ endif() # run_
+ #===============================================================================
+ 
