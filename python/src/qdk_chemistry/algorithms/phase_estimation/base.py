@@ -117,9 +117,7 @@ class PhaseEstimation(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_qubits) where circuit is the controlled circuit
-            implementing controlled-:math:`U^{\\text{power}}` and num_qubits is the total
-            number of qubits required by the unitary (including any ancilla).
+            A Circuit implementing controlled-:math:`U^{\text{power}}`.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
