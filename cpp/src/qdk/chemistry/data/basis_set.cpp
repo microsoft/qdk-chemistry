@@ -1739,6 +1739,38 @@ bool BasisSet::_is_valid() const {
       }
     }
   }
+  bool has_ecp = false;
+  for (const auto& atom_shells : _ecp_shells_per_atom) {
+    if (!atom_shells.empty()) {
+      has_ecp = true;
+
+      // Check if all shells have valid data
+      for (const auto& shell : atom_shells) {
+        if (shell.exponents.size() == 0 || shell.coefficients.size() == 0) {
+          return false;
+        }
+        if (shell.exponents.size() != shell.coefficients.size()) {
+          return false;
+        }
+      }
+    }
+  }
+  bool has_aux_shells = false;
+  for (const auto& atom_shells : _aux_shells_per_atom) {
+    if (!atom_shells.empty()) {
+      has_aux_shells = true;
+
+      // Check if all shells have valid data
+      for (const auto& shell : atom_shells) {
+        if (shell.exponents.size() == 0 || shell.coefficients.size() == 0) {
+          return false;
+        }
+        if (shell.exponents.size() != shell.coefficients.size()) {
+          return false;
+        }
+      }
+    }
+  }
 
   bool ecp_consistency = (has_ecp_electrons() == has_ecp_shells());
 

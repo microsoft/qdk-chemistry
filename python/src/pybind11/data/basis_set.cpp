@@ -1497,6 +1497,13 @@ Name used for custom ECP basis sets.
 Type:
     str
 )");
+  basis_set.def_readonly_static("custom_aux_name", &BasisSet::custom_aux_name,
+                                R"(
+Name used for custom auxiliary basis sets.
+
+Type:
+        str
+)");
 
   // Data type name class attribute
   basis_set.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(BasisSet);
