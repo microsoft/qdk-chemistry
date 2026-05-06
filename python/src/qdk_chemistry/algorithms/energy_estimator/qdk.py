@@ -217,21 +217,6 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
-        if device_backend_name is not None and circuit_executor.name() != "qiskit_aer_simulator":
-            raise ValueError(
-                f"device_backend_name is only supported with 'qiskit_aer_simulator', "
-                f"but circuit_executor is '{circuit_executor.name()}'."
-            )
-        if pre_transpilation_passes is not None and circuit_executor.name() != "qiskit_aer_simulator":
-            raise ValueError(
-                f"pre_transpilation_passes is only supported with 'qiskit_aer_simulator', "
-                f"but circuit_executor is '{circuit_executor.name()}'."
-            )
-        if post_transpilation_passes is not None and circuit_executor.name() != "qiskit_aer_simulator":
-            raise ValueError(
-                f"post_transpilation_passes is only supported with 'qiskit_aer_simulator', "
-                f"but circuit_executor is '{circuit_executor.name()}'."
-            )
 
         qubit_hamiltonians = self._resolve_measurement_groups(qubit_hamiltonian)
         num_observables = len(qubit_hamiltonians)
@@ -291,26 +276,27 @@ class QdkEnergyEstimator(EnergyEstimator):
         if partition is not None:
             from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
 
-            if not isinstance(partition, FlatPartition):
-                raise TypeError(
-                    f"QdkEnergyEstimator expects a FlatPartition for measurement grouping, "
-                    f"got {type(partition).__name__}."
+            if isinstance(partition, FlatPartition):
+                Logger.debug(
+                    f"EnergyEstimator: consuming term_partition "
+                    f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
-            Logger.info(
-                f"EnergyEstimator: consuming term_partition "
-                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
-            )
-            return [
-                QubitHamiltonian(
-                    pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
-                    coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
-                    encoding=qubit_hamiltonian.encoding,
-                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-                )
-                for group in partition.groups
-            ]
+                return [
+                    QubitHamiltonian(
+                        pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
+                        coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
+                        encoding=qubit_hamiltonian.encoding,
+                        fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+                    )
+                    for group in partition.groups
+                ]
 
-        Logger.info("EnergyEstimator: no term_partition; measuring each term individually.")
+            Logger.debug(
+                f"EnergyEstimator: ignoring unsupported partition type "
+                f"{type(partition).__name__}; measuring each term individually."
+            )
+
+        Logger.debug("EnergyEstimator: no term_partition; measuring each term individually.")
         return [
             QubitHamiltonian(
                 pauli_strings=[label],
@@ -413,17 +399,13 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         all_bitstring_counts: list[dict[str, int]] = []
         for circuit, shots in zip(measurement_circuits, shots_list, strict=True):
-            run_kwargs: dict = {"noise": noise_model}
-            if device_backend_name is not None:
-                run_kwargs["device_backend_name"] = device_backend_name
-            if pre_transpilation_passes is not None:
-                run_kwargs["pre_transpilation_passes"] = pre_transpilation_passes
-            if post_transpilation_passes is not None:
-                run_kwargs["post_transpilation_passes"] = post_transpilation_passes
             result = circuit_executor.run(
                 circuit,
                 shots=shots,
-                **run_kwargs,
+                noise=noise_model,
+                device_backend_name=device_backend_name,
+                pre_transpilation_passes=pre_transpilation_passes,
+                post_transpilation_passes=post_transpilation_passes,
             )
             all_bitstring_counts.append(result.bitstring_counts if result and result.bitstring_counts else {})
         return all_bitstring_counts
@@ -460,9 +442,9 @@ class QdkEnergyEstimator(EnergyEstimator):
             circuit_executor,
             shots_list,
             noise_model,
-            device_backend_name,
-            pre_transpilation_passes,
-            post_transpilation_passes,
+            device_backend_name=device_backend_name,
+            pre_transpilation_passes=pre_transpilation_passes,
+            post_transpilation_passes=post_transpilation_passes,
         )
         return MeasurementData(
             bitstring_counts=counts,

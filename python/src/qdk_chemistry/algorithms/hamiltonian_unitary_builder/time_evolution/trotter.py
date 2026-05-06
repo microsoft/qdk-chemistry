@@ -55,7 +55,6 @@ class TrotterSettings(TimeEvolutionSettings):
             num_divisions: Explicit number of divisions within a Trotter step (0 means automatic).
             error_bound: Strategy for computing the Trotter error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
-            optimize_term_ordering: Whether to group commuting terms and execute them in parallel.
 
         """
         super().__init__()
@@ -82,12 +81,6 @@ class TrotterSettings(TimeEvolutionSettings):
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
-        self._set_default(
-            "optimize_term_ordering",
-            "bool",
-            False,
-            "Whether to group commuting terms and execute them in parallel.",
-        )
 
 
 class Trotter(TimeEvolutionBuilder):
@@ -102,7 +95,6 @@ class Trotter(TimeEvolutionBuilder):
         num_divisions: int = 0,
         error_bound: str = "commutator",
         weight_threshold: float = 1e-12,
-        optimize_term_ordering: bool = False,
         power: int = 1,
         power_strategy: str = "repeat",
     ):
@@ -149,7 +141,6 @@ class Trotter(TimeEvolutionBuilder):
             num_divisions: Divisions per Trotter step. Max of this and auto value is used. Defaults to 0.
             error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
-            optimize_term_ordering: Whether to group commuting terms and execute them in parallel. Defaults to False.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` scales
                 time, ``"repeat"`` repeats the circuit. Defaults to ``"repeat"``.
@@ -165,7 +156,6 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
-        self._settings.set("optimize_term_ordering", optimize_term_ordering)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
@@ -216,10 +206,6 @@ class Trotter(TimeEvolutionBuilder):
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
 
         delta = time / num_divisions
-
-        optimize_term_ordering = self._settings.get("optimize_term_ordering")
-        if optimize_term_ordering:
-            Logger.warn("optimize_term_ordering is deprecated; use QubitHamiltonian.term_partition instead.")
 
         terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
 
@@ -397,13 +383,13 @@ class Trotter(TimeEvolutionBuilder):
         """
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            Logger.info(
+            Logger.debug(
                 f"Trotter: consuming QubitHamiltonian.term_partition "
                 f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
             )
             return self._groups_from_partition(qubit_hamiltonian, partition)
 
-        Logger.info("Trotter: no term_partition present; treating each Pauli term as its own group.")
+        Logger.debug("Trotter: no term_partition present; treating each Pauli term as its own group.")
         return [
             [
                 QubitHamiltonian(

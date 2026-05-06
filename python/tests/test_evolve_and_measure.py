@@ -14,7 +14,7 @@ import pytest
 
 import qdk_chemistry.algorithms.time_evolution.measure_simulation.base as measure_base
 from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAndMeasure
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 
 
@@ -71,8 +71,9 @@ def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
 
 def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     """Run an example EvolveAndMeasure workflow."""
-    hamiltonian_p = QubitHamiltonian(["ZZ"], np.array([1.0]))
-    hamiltonian_m = QubitHamiltonian(["ZZ"], np.array([-1.0]))
+    partition = FlatPartition(strategy="commuting", groups=[[0]])
+    hamiltonian_p = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    hamiltonian_m = QubitHamiltonian(["ZZ"], np.array([-1.0]), term_partition=partition)
 
     steps = 100
     hamiltonians = [hamiltonian_p, hamiltonian_m] * (steps // 2)
@@ -82,7 +83,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     algo = EvolveAndMeasure()
     algo.settings().set(
         "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
     )
     algo.settings().set(
         "circuit_executor",
@@ -106,13 +107,14 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
 )
 def test_evolve_and_measure_with_device_backend() -> None:
     """Run EvolveAndMeasure with a device_backend_name string."""
-    hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
+    partition = FlatPartition(strategy="commuting", groups=[[0]])
+    hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
     observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
     algo = EvolveAndMeasure()
     algo.settings().set(
         "evolution_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1, optimize_term_ordering=True),
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
     )
     algo.settings().set(
         "circuit_executor",

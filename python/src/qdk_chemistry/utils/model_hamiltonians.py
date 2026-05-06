@@ -77,10 +77,9 @@ def _build_geometry_grouped_hamiltonian(
 
     """
     n = graph.num_sites
-    adj = graph.adjacency_matrix()
 
     if coloring is None:
-        coloring = getattr(graph, "edge_coloring", None)
+        coloring = graph.edge_coloring
     if coloring is None:
         raise ValueError(
             "No edge coloring available on the lattice graph. "
@@ -111,7 +110,7 @@ def _build_geometry_grouped_hamiltonian(
         coupling_mat = to_pair_param(coupling, graph, "coupling")
         color_to_indices: dict[int, list[int]] = {}
         for (i, j), c in coloring.items():
-            edge_weight = adj[i, j]
+            edge_weight = graph.weight(i, j)
             if edge_weight == 0.0:
                 continue
             coeff_val = coupling_mat[i, j] * edge_weight
@@ -190,13 +189,13 @@ def create_heisenberg_hamiltonian(
         raise ValueError("Lattice graph must be symmetric for a valid Hamiltonian.")
 
     if include_term_groups:
-        if getattr(graph, "edge_coloring", None) is not None:
+        if graph.edge_coloring is not None:
             return _build_geometry_grouped_hamiltonian(
                 graph,
                 couplings=[("XX", jx), ("YY", jy), ("ZZ", jz)],
                 fields=[("X", hx), ("Y", hy), ("Z", hz)],
             )
-        Logger.info("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
+        Logger.debug("No edge coloring on lattice graph; falling back to ungrouped Hamiltonian construction.")
 
     n = graph.num_sites
     adj = graph.adjacency_matrix()

@@ -94,6 +94,18 @@ class QubitHamiltonian(DataClass):
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
 
+        # Validate partition coverage
+        if term_partition is not None:
+            indices = sorted(term_partition.all_indices())
+            expected = list(range(len(pauli_strings)))
+            if indices != expected:
+                missing = set(expected) - set(indices)
+                duped = {i for i in indices if indices.count(i) > 1}
+                raise ValueError(
+                    f"term_partition does not cover all {len(pauli_strings)} terms exactly once. "
+                    f"Missing: {missing or 'none'}, duplicated: {duped or 'none'}."
+                )
+
         # Make instance immutable after construction (handled by base class)
         super().__init__()
 
