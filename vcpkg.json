@@ -19,11 +19,5 @@
     "spdlog",
     "fmt",
     "openblas"
-  ],
-  "overrides": [
-    {
-      "name": "catch2",
-      "version": "2.13.9#1"
-    }
   ]
 }
