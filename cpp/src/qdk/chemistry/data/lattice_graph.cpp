@@ -682,8 +682,7 @@ nlohmann::json LatticeGraph::to_json() const {
   if (_edge_coloring.has_value()) {
     nlohmann::json coloring_json = nlohmann::json::array();
     for (const auto& [edge, color] : *_edge_coloring) {
-      coloring_json.push_back(
-          {edge.first, edge.second, color});
+      coloring_json.push_back({edge.first, edge.second, color});
     }
     j["edge_coloring"] = coloring_json;
   }
