@@ -77,7 +77,6 @@ def _build_geometry_grouped_hamiltonian(
 
     """
     n = graph.num_sites
-    adj = graph.adjacency_matrix()
 
     if coloring is None:
         coloring = graph.edge_coloring
@@ -111,7 +110,7 @@ def _build_geometry_grouped_hamiltonian(
         coupling_mat = to_pair_param(coupling, graph, "coupling")
         color_to_indices: dict[int, list[int]] = {}
         for (i, j), c in coloring.items():
-            edge_weight = adj[i, j]
+            edge_weight = graph.weight(i, j)
             if edge_weight == 0.0:
                 continue
             coeff_val = coupling_mat[i, j] * edge_weight

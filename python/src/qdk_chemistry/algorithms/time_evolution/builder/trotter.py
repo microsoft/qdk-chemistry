@@ -269,10 +269,8 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
-        # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
-        # there is nothing to decompose; return the empty list of terms.
-        if not coeffs:
+        # If all coefficients are below the tolerance, there is nothing to decompose.
+        if not any(abs(complex(c).real) > atol for c in qubit_hamiltonian.coefficients):
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms
 
