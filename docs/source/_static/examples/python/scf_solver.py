@@ -83,12 +83,17 @@ energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="c
 
 ################################################################################
 # start-cell-dfj
+import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import BasisSet, Structure
 
 # Run SCF with density-fitted Coulomb integrals (DF-J)
+# Build a small molecule for the example
+water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water = Structure(water_coords, symbols=["O", "H", "H"])
+
 # Create a basis set with an auxiliary basis for density fitting
-dfj_basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", structure)
+dfj_basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
 
 # Configure the solver to use incore ERIs (required for DF-J)
 dfj_solver = create("scf_solver")
@@ -96,7 +101,7 @@ dfj_solver.settings().set("eri_method", "incore")
 
 # Run - DF-J is automatically enabled when auxiliary basis is detected
 E_dfj, wfn_dfj = dfj_solver.run(
-    structure, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis
+    water, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis
 )
 print(f"DF-J SCF Energy: {E_dfj:.10f} Hartree")
 # end-cell-dfj
