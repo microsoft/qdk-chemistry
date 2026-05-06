@@ -67,6 +67,8 @@ class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            phase_correction: The accumulated phase feedback from prior iterations.
+                Defaults to 0.0 (no adaptive feedback).
 
         Returns:
             A list of quantum circuits, one per phase bit iteration.
@@ -84,8 +86,10 @@ class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
             )
             circuits.append(circuit)
 
-        Logger.warning(f"Builder iteration circuit with dummy phase_correction={phase_correction}. "
-                       f"This is non-adaptive and intended for resource estimation only.")
+        Logger.warning(
+            f"Builder iteration circuit with dummy phase_correction={phase_correction}. "
+            f"This is non-adaptive and intended for resource estimation only."
+        )
         return circuits
 
     def build_iteration_circuit(
