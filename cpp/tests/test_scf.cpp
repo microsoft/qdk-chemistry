@@ -539,7 +539,7 @@ TEST_F(ScfTest, CustomElementMapBasisRotatedOrbitalInitialGuessRuns) {
 
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "hf");
-  scf_solver->settings().set("max_iterations", 5);
+  scf_solver->settings().set("convergence_threshold", 1e-2);
   auto [energy_first, wfn_first] = scf_solver->run(water, 0, 1, custom_basis);
 
   auto orbitals_first = wfn_first->get_orbitals();
@@ -559,7 +559,7 @@ TEST_F(ScfTest, CustomElementMapBasisRotatedOrbitalInitialGuessRuns) {
 
   auto scf_solver_restart = ScfSolverFactory::create();
   scf_solver_restart->settings().set("method", "hf");
-  scf_solver_restart->settings().set("max_iterations", 5);
+  scf_solver_restart->settings().set("convergence_threshold", 1e-2);
 
   std::pair<double, std::shared_ptr<Wavefunction>> restart_result;
   EXPECT_NO_THROW({
