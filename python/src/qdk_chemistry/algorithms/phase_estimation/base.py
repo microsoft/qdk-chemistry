@@ -6,17 +6,17 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from functools import cached_property
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledTimeEvolutionUnitary,
+    ControlledUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
-    TimeEvolutionUnitary,
 )
 
 __all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory", "PhaseEstimationSettings"]
@@ -35,20 +35,14 @@ class PhaseEstimationSettings(Settings):
         super().__init__()
         self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
         self._set_default(
-            "evolution_time",
-            "float",
-            0.0,
-            "Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``.",
-        )
-        self._set_default(
-            "evolution_builder",
+            "unitary_builder",
             "algorithm_ref",
-            AlgorithmRef("time_evolution_builder", "trotter"),
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
         )
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
-            AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         self._set_default(
             "circuit_executor",
@@ -60,19 +54,16 @@ class PhaseEstimationSettings(Settings):
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self, num_bits: int = -1, evolution_time: float = 0.0):
+    def __init__(self, num_bits: int = -1):
         """Initialize the PhaseEstimation with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value.
 
         """
         super().__init__()
         self._settings = PhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
-        self._settings.set("evolution_time", evolution_time)
 
     def type_name(self) -> str:
         """Return the algorithm type name as phase_estimation."""
@@ -90,8 +81,8 @@ class PhaseEstimation(Algorithm):
 
         This method implements the quantum phase estimation procedure:
         1. The state preparation circuit initializes the system in the desired quantum state.
-        2. The evolution_builder constructs a time evolution unitary :math:`U = \exp(-iHt)` from the qubit Hamiltonian.
-        3. The circuit_mapper transforms the time evolution unitary into controlled-U operations,
+        2. The unitary_builder constructs a unitary from the qubit Hamiltonian.
+        3. The circuit_mapper transforms the unitary into controlled-U operations,
            where the control qubits are ancilla qubits used for phase readout.
         4. The circuit_executor runs the resulting quantum circuits on the target backend.
         5. Measurement results are processed to extract the eigenvalue phase estimates.
@@ -106,38 +97,35 @@ class PhaseEstimation(Algorithm):
 
         """
 
-    def _create_time_evolution(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> TimeEvolutionUnitary:
-        """Create the time evolution circuit for the given Hamiltonian and power.
+    @cached_property
+    def unitary_builder(self):
+        """The nested unitary builder algorithm instance."""
+        return self._create_nested("unitary_builder")
+
+    def _create_controlled_circuit(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        power: int,
+    ) -> Circuit:
+        r"""Create the controlled circuit for the given Hamiltonian and power.
+
+        Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
+        according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            time: The evolution time.
+            power: The power to which the unitary should be raised.
 
         Returns:
-            The time evolution unitary circuit.
+            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
 
         """
-        evolution_builder = self._create_nested("evolution_builder")
-        return evolution_builder.run(qubit_hamiltonian, time)
-
-    def _create_ctrl_time_evol_circuit(
-        self,
-        controlled_evolution: ControlledTimeEvolutionUnitary,
-        power: int,
-    ) -> Circuit:
-        """Create the controlled time evolution circuit for the given Hamiltonian and power.
-
-        Args:
-            controlled_evolution: The controlled time evolution unitary.
-            power: The power to which the controlled unitary should be raised.
-
-        Returns:
-            The controlled time evolution circuit.
-
-        """
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("circuit_mapper")
-        circuit_mapper.settings().update("power", power)
-        return circuit_mapper._run_impl(controlled_evolution=controlled_evolution)  # noqa: SLF001
+        return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
 class PhaseEstimationFactory(AlgorithmFactory):
