@@ -273,6 +273,49 @@ class TestScfSolver:
         assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
         assert orbitals.is_restricted()
 
+    def test_scf_solver_oh_rohf_incore_diis(self):
+        """Test SCF solver on OH system with ROHF/sto-3g using incore ERI."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", False)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("eri_method", "incore")
+
+        energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
+    def test_scf_solver_oh_rohf_gdm(self):
+        """Test SCF solver on OH system with ROHF/sto-3g and GDM enabled."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
+    def test_scf_solver_oh_roks_invalid(self):
+        """Test restricted open-shell KS request on OH doublet raises error."""
+        oh_structure = create_oh_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "pbe")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        with pytest.raises(ValueError, match="Restricted open-shell calculations are only supported"):
+            scf_solver.run(oh_structure, 0, 2, "sto-3g")
+
     def test_scf_solver_oxygen_atom_gdm(self):
         """Test SCF solver on oxygen atom with PBE/cc-pvdz."""
         oxygen = create_oxygen_structure()
