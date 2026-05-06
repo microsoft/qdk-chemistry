@@ -106,7 +106,7 @@ class PhaseEstimation(Algorithm):
         self,
         qubit_hamiltonian: QubitHamiltonian,
         power: int,
-    ) -> tuple[Circuit, int]:
+    ) -> Circuit:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
@@ -125,10 +125,9 @@ class PhaseEstimation(Algorithm):
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_qubits = unitary_rep.get_container().num_qubits
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("circuit_mapper")
-        return circuit_mapper.run(controlled_unitary=controlled_unitary), num_qubits
+        circuit_mapper = self._create_nested(setting_key="circuit_mapper")
+        return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
 class PhaseEstimationFactory(AlgorithmFactory):

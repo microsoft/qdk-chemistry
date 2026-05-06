@@ -13,10 +13,6 @@ namespace QDKChemistry.Utils.LCU {
     import Std.Intrinsic.R;
     import Std.StatePreparation.PreparePureStateD;
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Default oracle implementations (Pauli LCU)
-    // ─────────────────────────────────────────────────────────────────────────
-
     /// Parameters for the default Pauli PREPARE oracle.
     struct DefaultPrepareParams {
         amplitudes : Double[],
@@ -29,7 +25,7 @@ namespace QDKChemistry.Utils.LCU {
     }
 
     /// Default PREPARE oracle: encodes normalized amplitudes into the ancilla register
-    /// using PreparePureStateD (real-valued state preparation).
+    /// using PreparePureStateD.
     ///
     /// $$
     ///     \mathrm{PREPARE} |0\rangle_a = \sum_j \sqrt{\frac{|\alpha_j|}{\lambda}} |j\rangle_a
@@ -79,10 +75,6 @@ namespace QDKChemistry.Utils.LCU {
         }
         R(PauliI, 2.0 * PI(), ancillaRegister[0]);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Composed block encoding operations (take oracles as inputs)
-    // ─────────────────────────────────────────────────────────────────────────
 
     /// # Summary
     /// LCU block encoding: PREPARE† · SELECT · PREPARE.
@@ -141,16 +133,10 @@ namespace QDKChemistry.Utils.LCU {
         controlled adjoint auto;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Entry points: create controlled callables for IQPE
-    // ─────────────────────────────────────────────────────────────────────────
-
     /// # Summary
     /// Creates a controlled LCU block encoding callable.
-    /// Use with Hadamard test to extract expectation values.
-    ///
-    /// The systems array contains system qubits (first numSystemQubits)
-    /// followed by ancilla qubits (remaining numSelectQubits).
+    /// The caller passes system + ancilla qubits together since ancilla
+    /// becomes entangled with the control qubit during the controlled operation.
     operation MakeLCUOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -167,9 +153,8 @@ namespace QDKChemistry.Utils.LCU {
 
     /// # Summary
     /// Creates a controlled LCU quantum walk callable.
-    /// Use with QPE to extract eigenvalues from the walk operator spectrum.
-    ///
-    /// Applies W^power where W = REFLECT · B[H].
+    /// System and ancilla qubits are passed together; the caller is responsible
+    /// for allocation since the walk operator leaves ancilla entangled.
     operation MakeLCUQuantumWalkOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -185,10 +170,6 @@ namespace QDKChemistry.Utils.LCU {
             }
         }
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Circuit entry points (for resource estimation)
-    // ─────────────────────────────────────────────────────────────────────────
 
     /// Circuit entry point for LCU block encoding (allocates qubits).
     operation MakeLCUCircuit(

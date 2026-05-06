@@ -23,7 +23,6 @@ from qdk_chemistry.data.unitary_representation.containers.block_encoding import 
     BlockEncodingContainer,
     ControlledOperation,
     Prepare,
-    Reflect,
     Select,
 )
 
@@ -54,7 +53,7 @@ class BlockEncodingSettings(HamiltonianUnitaryBuilderSettings):
 
 
 class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
-    r"""LCU (Linear Combination of Unitaries) block-encoding builder."""
+    r"""LCU (Linear Combination of Unitaries) block encoding builder."""
 
     def __init__(
         self,
@@ -72,7 +71,8 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
         The PREPARE oracle encodes amplitudes :math:`\sqrt{|\alpha_j| / \lambda}` into
         an ancilla register of :math:`\lceil \log_2 L \rceil` qubits. The SELECT oracle applies
         the corresponding Pauli string :math:`P_j` (with sign correction) controlled on the
-        ancilla index.
+        ancilla index. The :math:`\alpha_j` is positive by absorbing the sign into phases of
+        the SELECT operation.
 
         Args:
             power: The power to raise the unitary to. Defaults to 1.
@@ -91,7 +91,7 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
 
         Computes normalized amplitudes, signs, and controlled operations from the
         qubit Hamiltonian, then packages them into generalized Prepare/Select/Reflect
-        sub-objects stored in an LCUContainer.
+        dataclasses stored in an LCUContainer.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
@@ -102,70 +102,64 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
         """
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
+        coefficients = qubit_hamiltonian.coefficients
+        num_terms = len(coefficients)
+        num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
 
-        prepare = self._build_prepare(qubit_hamiltonian)
-        select = self._build_select(qubit_hamiltonian)
-        reflect = self._build_reflect(qubit_hamiltonian, quantum_walk)
+        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits)
+        select = self._build_select(qubit_hamiltonian, num_prepare_qubits)
 
         container = BlockEncodingContainer(
+            power=power,
             prepare=prepare,
             select=select,
-            reflect=reflect,
-            power=power,
+            reflect=quantum_walk,
         )
 
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(qubit_hamiltonian: QubitHamiltonian) -> Prepare:
+    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int) -> Prepare:
         """Compute the PREPARE statevector from Hamiltonian coefficients."""
         coefficients = qubit_hamiltonian.coefficients
-        one_norm = qubit_hamiltonian.schatten_norm
-        num_terms = len(coefficients)
-        num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
+        schatten_norm = qubit_hamiltonian.schatten_norm
+        if schatten_norm < 1e-15:
+            raise ValueError("Schatten norm is too small, cannot build LCU block encoding.")
 
         abs_coeffs = np.abs(coefficients)
-        statevector = np.zeros_like(abs_coeffs, dtype=float) if one_norm == 0 else np.sqrt(abs_coeffs / one_norm)
+        statevector = np.sqrt(abs_coeffs / schatten_norm)
 
         return Prepare(
-            method="lcu",
             statevector=statevector,
             num_prepare_qubits=num_prepare_qubits,
+            prepare_qubits=list(range(num_prepare_qubits)),
         )
 
     @staticmethod
-    def _build_select(qubit_hamiltonian: QubitHamiltonian) -> Select:
-        """Compute SELECT controlled operations and signs from Hamiltonian terms."""
+    def _build_select(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int) -> Select:
+        """Compute SELECT controlled operations and phases from Hamiltonian terms."""
         coefficients = qubit_hamiltonian.coefficients
         pauli_strings = qubit_hamiltonian.pauli_strings
-        num_system_qubits = qubit_hamiltonian.num_qubits
         num_terms = len(coefficients)
-        num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
-
-        signs = np.where(coefficients >= 0, 1, -1)
-        ctrl_qubits = list(range(num_prepare_qubits))
-        target_qubits = list(range(num_system_qubits))
+        num_system_qubits = qubit_hamiltonian.num_qubits
+        phases = np.where(coefficients >= 0, 1, -1)
 
         controlled_ops = [
             ControlledOperation(
-                ctrl_qubits=ctrl_qubits,
                 ctrl_state=i,
-                target_qubits=target_qubits,
                 operation=pauli_strings[i],
             )
             for i in range(num_terms)
         ]
 
-        return Select(controlled_operations=controlled_ops, signs=signs, method="lcu")
-
-    @staticmethod
-    def _build_reflect(qubit_hamiltonian: QubitHamiltonian, quantum_walk: bool) -> Reflect | None:
-        """Build the REFLECT operator for quantum walk, or None for plain block encoding."""
-        if quantum_walk:
-            num_terms = len(qubit_hamiltonian.coefficients)
-            num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
-            return Reflect(qubits=list(range(num_prepare_qubits)))
-        return None
+        return Select(
+            controlled_operations=controlled_ops,
+            phases=phases,
+            num_prepare_qubits=num_prepare_qubits,
+            num_target_qubits=num_system_qubits,
+            prepare_qubits=list(range(num_prepare_qubits)),
+            target_qubits=list(range(num_prepare_qubits, num_prepare_qubits + num_system_qubits)),
+        )
 
     def name(self) -> str:
         """Return the algorithm name."""
