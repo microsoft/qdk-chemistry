@@ -86,7 +86,7 @@ class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
             )
             circuits.append(circuit)
 
-        Logger.warning(
+        Logger.warn(
             f"Builder iteration circuit with dummy phase_correction={phase_correction}. "
             f"This is non-adaptive and intended for resource estimation only."
         )

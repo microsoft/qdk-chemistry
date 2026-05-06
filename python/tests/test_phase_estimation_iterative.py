@@ -13,7 +13,10 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
-from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import _validate_iteration_inputs
+from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import (
+    IterativePhaseEstimationBuilder,
+    _validate_iteration_inputs,
+)
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
 )
@@ -711,3 +714,28 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
             state_preparation=two_qubit_phase_problem.state_prep,
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
+
+def test_builder_run_returns_circuits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+    """Validate that IterativePhaseEstimationBuilder.run produces one circuit per phase bit."""
+    builder = IterativePhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
+    builder.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+    )
+
+    circuits = builder.run(
+        state_preparation=two_qubit_phase_problem.state_prep,
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+    )
+
+    assert isinstance(circuits, list)
+    assert len(circuits) == two_qubit_phase_problem.num_bits
+    for circuit in circuits:
+        assert isinstance(circuit, Circuit)
+        result = circuit.estimate()
+        assert result is not None
+        assert hasattr(result, "logical_counts")
