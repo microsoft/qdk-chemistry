@@ -117,14 +117,14 @@ class PhaseEstimation(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
+            A Circuit implementing controlled-:math:`U^{\text{power}}`.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("circuit_mapper")
+        circuit_mapper = self._create_nested(setting_key="circuit_mapper")
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 

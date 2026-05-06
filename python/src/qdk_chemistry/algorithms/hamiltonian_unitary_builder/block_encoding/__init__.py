@@ -1,16 +1,6 @@
-"""QDK/Chemistry controlled circuit mapper module."""
+"""QDK/Chemistry Hamiltonian unitary builder for block encoding."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
-from .base import ControlledCircuitMapperFactory
-from .block_encoding_mapper import BlockEncodingMapper
-from .pauli_sequence_mapper import PauliSequenceMapper
-
-__all__ = [
-    "BlockEncodingMapper",
-    "ControlledCircuitMapperFactory",
-    "PauliSequenceMapper",
-]

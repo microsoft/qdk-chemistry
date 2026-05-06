@@ -15,6 +15,7 @@ __all__ = [
     "accumulated_phase_from_bits",
     "energy_alias_candidates",
     "energy_from_phase",
+    "energy_from_phase_qubitization",
     "iterative_phase_feedback_update",
     "phase_fraction_from_feedback",
     "resolve_energy_aliases",
@@ -37,6 +38,31 @@ def energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:
     if angle > np.pi:
         angle -= 2 * np.pi
     return float(angle / evolution_time)
+
+
+def energy_from_phase_qubitization(phase_fraction: float, *, lambda_val: float) -> float:
+    r"""Convert a measured phase fraction to energy for qubitization (block encoding).
+
+    In qubitization the walk operator has eigenvalues :math:`e^{\pm i \arccos(E/\lambda)}`,
+    so the energy is recovered as:
+
+    .. math::
+
+        E = \lambda \cos(2\pi \varphi)
+
+    where :math:`\varphi` is the measured phase fraction.
+
+    Args:
+        phase_fraction: Fractional phase :math:`\varphi \in [0, 1)` from the phase register.
+        lambda_val: The 1-norm :math:`\lambda = \sum_j |\alpha_j|` of the Hamiltonian.
+
+    Returns:
+        Energy estimate corresponding to ``phase_fraction``.
+
+    """
+    Logger.trace_entering()
+    phi = phase_fraction % 1.0
+    return float(lambda_val * np.cos(2 * np.pi * phi))
 
 
 def energy_alias_candidates(

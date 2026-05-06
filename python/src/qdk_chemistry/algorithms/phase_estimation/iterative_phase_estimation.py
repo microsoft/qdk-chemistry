@@ -13,8 +13,8 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import BlockEncodingBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -22,8 +22,12 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
+from qdk_chemistry.utils.phase import (
+    iterative_phase_feedback_update,
+    phase_fraction_from_feedback,
+)
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import PhaseEstimation, PhaseEstimationSettings
@@ -134,10 +138,19 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         if isinstance(self.unitary_builder, TimeEvolutionBuilder):
             evolution_time = self.unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
+            return QpeResult.from_time_evolution_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,
                 evolution_time=evolution_time,
+                bits_msb_first=bits,
+            )
+        if isinstance(self.unitary_builder, BlockEncodingBuilder):
+            # For block-encoding builders (qubitization), use E = λ cos(2πφ).
+            lambda_val = qubit_hamiltonian.schatten_norm
+            return QpeResult.from_block_encoding_result(
+                method=self.name(),
+                phase_fraction=phase_fraction,
+                lambda_val=lambda_val,
                 bits_msb_first=bits,
             )
         raise NotImplementedError(
@@ -169,13 +182,25 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         # Build the base circuit with registers
-        num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
+
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        container = unitary_rep.get_container()
+        num_ancilla_qubits = container.num_qubits - qubit_hamiltonian.num_qubits
+
+        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
+        circuit_mapper = self._create_nested(setting_key="circuit_mapper")
+        ctrl_unitary_circuit = circuit_mapper.run(controlled_unitary=controlled_unitary)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
+                state_preparation,
+                ctrl_unitary_circuit,
+                phase_correction,
+                qubit_hamiltonian.num_qubits,
+                num_ancilla_qubits,
             )
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
@@ -191,6 +216,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         controlled_unitary_circuit: Circuit,
         phase_correction: float,
         num_system_qubits: int,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         """Create a Circuit object from a Q# operation.
 
@@ -199,6 +225,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             controlled_unitary_circuit: Circuit object containing a Q# operation for the controlled unitary.
             phase_correction: Feedback phase angle to apply before controlled unitary.
             num_system_qubits: Number of system qubits.
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled unitary (0 if none).
 
         Returns:
             A Circuit object representing the IQPE iteration.
@@ -208,10 +235,11 @@ class IterativePhaseEstimation(PhaseEstimation):
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
         iterative_parameters = {
             "statePrep": state_prep_op,
-            "repControlledEvolution": ctrl_unitary_op,
+            "repControlledUnitary": ctrl_unitary_op,
             "accumulatePhase": phase_correction,
             "control": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
+            "numAncillaQubits": num_ancilla_qubits,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
