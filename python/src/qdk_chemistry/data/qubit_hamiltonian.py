@@ -12,12 +12,14 @@ and quantum circuit construction or measurement workflows.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.term_partition import TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
 if TYPE_CHECKING:
@@ -26,7 +28,6 @@ if TYPE_CHECKING:
 
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 __all__: list[str] = []
 
@@ -42,6 +43,11 @@ class QubitHamiltonian(DataClass):
         fermion_mode_order (FermionModeOrder | None): The fermion mode ordering convention used
             when mapping fermionic modes to qubits (``"blocked"`` or ``"interleaved"``). If None,
             the ordering is unspecified or not applicable.
+        term_partition (TermPartition | None): Optional index-based partition of
+            :attr:`pauli_strings` into algorithm-relevant groups (and, for layered
+            partitions, into parallelisable layers within each group).  Set by
+            geometry-aware constructors and by ``term_grouper`` algorithms; reset
+            to ``None`` by transformations that change the term ordering.
 
     """
 
@@ -57,6 +63,7 @@ class QubitHamiltonian(DataClass):
         coefficients: np.ndarray,
         encoding: str | None = None,
         fermion_mode_order: FermionModeOrder | str | None = None,
+        term_partition: TermPartition | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
@@ -65,6 +72,7 @@ class QubitHamiltonian(DataClass):
             coefficients (numpy.ndarray): Array of coefficients corresponding to each Pauli string.
             encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
             fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
+            term_partition (TermPartition | None): Optional ``TermPartition`` carrying group/layer metadata.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -81,9 +89,22 @@ class QubitHamiltonian(DataClass):
         self.fermion_mode_order: FermionModeOrder | None = (
             FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
         )
+        self.term_partition: TermPartition | None = term_partition
 
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
+
+        # Validate partition coverage
+        if term_partition is not None:
+            indices = sorted(term_partition.all_indices())
+            expected = list(range(len(pauli_strings)))
+            if indices != expected:
+                missing = set(expected) - set(indices)
+                duped = {i for i in indices if indices.count(i) > 1}
+                raise ValueError(
+                    f"term_partition does not cover all {len(pauli_strings)} terms exactly once. "
+                    f"Missing: {missing or 'none'}, duplicated: {duped or 'none'}."
+                )
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
@@ -265,42 +286,6 @@ class QubitHamiltonian(DataClass):
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
         )
 
-    def group_commuting(self, qubit_wise: bool = True) -> list[QubitHamiltonian]:
-        """Group the qubit Hamiltonian into commuting subsets.
-
-        Args:
-            qubit_wise (bool): Whether to use qubit-wise commuting grouping. Default is True.
-
-        Returns:
-            list[QubitHamiltonian]: A list of ``QubitHamiltonian`` representing the grouped Hamiltonian.
-
-        """
-        Logger.trace_entering()
-        commutes = do_pauli_labels_qw_commute if qubit_wise else do_pauli_labels_commute
-
-        # Each group is a list of (pauli_string, coefficient)
-        groups: list[list[tuple[str, complex]]] = []
-
-        for pauli_str, coeff in zip(self.pauli_strings, self.coefficients, strict=True):
-            placed = False
-            for group in groups:
-                if all(commutes(pauli_str, existing_str) for existing_str, _ in group):
-                    group.append((pauli_str, coeff))
-                    placed = True
-                    break
-            if not placed:
-                groups.append([(pauli_str, coeff)])
-
-        return [
-            QubitHamiltonian(
-                pauli_strings=[p for p, _ in group],
-                coefficients=np.array([c for _, c in group]),
-                encoding=self.encoding,
-                fermion_mode_order=self.fermion_mode_order,
-            )
-            for group in groups
-        ]
-
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the qubit Hamiltonian.
@@ -339,6 +324,8 @@ class QubitHamiltonian(DataClass):
             data["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
             data["fermion_mode_order"] = str(self.fermion_mode_order)
+        if self.term_partition is not None:
+            data["term_partition"] = self.term_partition.to_json()
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -355,6 +342,8 @@ class QubitHamiltonian(DataClass):
             group.attrs["encoding"] = self.encoding
         if self.fermion_mode_order is not None:
             group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
+        if self.term_partition is not None:
+            group.attrs["term_partition"] = json.dumps(self.term_partition.to_json())
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
@@ -378,11 +367,14 @@ class QubitHamiltonian(DataClass):
         else:
             # Fallback for legacy format (simple list of real numbers)
             coefficients = np.array(coeff_data)
+        partition_data = json_data.get("term_partition")
+        term_partition = TermPartition.from_json(partition_data) if partition_data is not None else None
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
             fermion_mode_order=json_data.get("fermion_mode_order"),
+            term_partition=term_partition,
         )
 
     @classmethod
@@ -409,11 +401,19 @@ class QubitHamiltonian(DataClass):
         fermion_mode_order = group.attrs.get("fermion_mode_order")
         if fermion_mode_order is not None and isinstance(fermion_mode_order, bytes):
             fermion_mode_order = fermion_mode_order.decode("utf-8")
+        partition_attr = group.attrs.get("term_partition")
+        if partition_attr is not None:
+            if isinstance(partition_attr, bytes):
+                partition_attr = partition_attr.decode("utf-8")
+            term_partition = TermPartition.from_json(json.loads(partition_attr))
+        else:
+            term_partition = None
         return cls(
             pauli_strings=pauli_strings,
             coefficients=coefficients,
             encoding=encoding,
             fermion_mode_order=fermion_mode_order,
+            term_partition=term_partition,
         )
 
 
