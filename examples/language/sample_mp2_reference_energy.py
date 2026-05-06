@@ -1,12 +1,11 @@
-"""Sample sparse-CI finder workflow combining QDK/Chemistry primitives with PMC.
+"""Sample DFMP2 workflow showcasing the difference of scf energy and reference energy.
 
-This script performs a complete SCF → CASCI → sparse-CI finder sequence for a
-user provided geometry and reports the determinant subset that reproduces the
-CASCI energy to within a specific accuracy (default 1 mHartree).
-The CLI exposes knobs for the initial valence active space selection (number of electrons and orbitals),
-active-space solver (including the MACIS ASCI solver), sparse-CI
-tolerance, and maximum determinant budget so users can explore different
-heuristics without editing the code.
+This script performs a 4 center SCF → DFMP2 sequence to showcase the difference between the
+SCF energy and the reference energy computed by the MP2 calculator.  In QDK/Chemistry, SCF
+is treated as an orbital generator, but MP2 will always recalculate the reference energy based
+on the orbital using the MP2 Hamiltonian anzatz. In this example, the SCF energy is computed
+using the full four-center integrals, whereas the MP2 calculation uses the density-fitted
+Hamiltonian, so the reference energy reported by the MP2 calculator will differ from this SCF energy.
 """
 
 # --------------------------------------------------------------------------------------------

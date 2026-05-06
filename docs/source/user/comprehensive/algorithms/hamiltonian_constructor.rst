@@ -166,52 +166,64 @@ QDK Density-Fitted
 
 .. rubric:: Factory name: ``"qdk_density_fitted_hamiltonian"``
 
-A memory-efficient implementation that uses density fitting (resolution-of-the-identity, RI) to approximate two-electron integrals.
-This implementation produces a ``ThreeCenterHamiltonianContainer`` that stores three-center integrals instead of four-center integrals, significantly reducing memory requirements for large active spaces.
-
-The density fitting approximation expresses four-center integrals as:
+A memory-efficient implementation that uses density fitting (also known as the resolution-of-the-identity, RI) to approximate the two-electron integrals.
+The four-center electron repulsion integrals (ERIs) are factorized through an auxiliary basis as
 
 .. math::
 
     (ij|kl) \approx \sum_P (ij|P)(P|kl)
 
-where :math:`P` indexes an auxiliary basis set. The four-center integrals are computed on-the-fly when needed.
+where :math:`P` index an auxiliary (fitting) basis and :math:`(ij|P)` is the three-center integrals.
+The constructor transforms :math:`(ij|P)` from the AO to the MO basis using the active orbital coefficients and stores the result in a ``ThreeCenterHamiltonianContainer``, reducing the storage from :math:`O(N^4)` to :math:`O(N_{\text{aux}} N^2)`.
+Four-center integrals are reconstructed on the fly when consumers request them.
+
+.. rubric:: Requirements
+
+- The input :doc:`Orbitals <../data/orbitals>` must reference a :doc:`BasisSet <../data/basis_set>` that carries an auxiliary basis. Auxiliary shells are attached when the basis set is constructed (e.g. via ``BasisSet::from_basis_name(basis_name, aux_basis_name, structure)``); ``run()`` throws ``std::runtime_error`` if ``has_aux_basis()`` is ``false``.
+- An active space must be defined on the orbitals. For unrestricted orbitals, the alpha and beta active spaces must contain the same number of orbitals.
 
 .. rubric:: When to use
 
 - Large active space calculations where memory is a concern
 - Systems where the density fitting approximation provides acceptable accuracy
-- Workflows already using density-fitted :term:`SCF` calculations
 
 
 .. tab:: C++ API
 
    .. code-block:: cpp
 
-      // Set the auxiliary basis set for density fitting, unless it is already set
-      if (!orbitals->get_basis_set()->has_auxiliary_basis_set()) {
-        orbitals->get_basis_set()->set_auxiliary_basis_set(aux_basis);
-      }
+      // Build a basis set that includes an auxiliary fitting basis.
+      auto basis = data::BasisSet::from_basis_name("cc-pVDZ", "cc-pVDZ-RIFIT", *structure);
 
-      // Create density-fitted Hamiltonian constructor
-      auto constructor = algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
+      // ... run SCF / orbital localization / active-space selection on `orbitals`
+      // such that orbitals->get_basis_set() == basis and an active space is set.
 
-      // Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
-      auto hamiltonian_with_aux = constructor->run(orbitals);
+      // Create the density-fitted Hamiltonian constructor.
+      auto constructor =
+          algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
+
+      // Build the active-space, density-fitted Hamiltonian.
+      auto hamiltonian = constructor->run(orbitals);
 
 .. tab:: Python API
 
    .. code-block:: python
 
-      # Set the auxiliary basis set for density fitting, unless it is already set
-      if not orbitals.get_basis_set().has_auxiliary_basis_set():
-          orbitals.get_basis_set().set_auxiliary_basis_set(aux_basis)
+      # Build a basis set that includes an auxiliary fitting basis.
+      basis = data.BasisSet.from_basis_name("cc-pVDZ", "cc-pVDZ-RIFIT", structure)
 
-      # Create density-fitted Hamiltonian constructor
-      constructor = algorithms.create("hamiltonian_constructor", "qdk_density_fitted_hamiltonian")
+      # ... run SCF / orbital localization / active-space selection on `orbitals`
+      # such that orbitals.get_basis_set() is `basis` and an active space is set.
 
-      # Build the density-fitted Hamiltonian using orbitals with an auxiliary basis set
-      hamiltonian_with_aux = constructor.run(orbitals)
+      # Create the density-fitted Hamiltonian constructor.
+      constructor = algorithms.create(
+          "hamiltonian_constructor", "qdk_density_fitted_hamiltonian"
+      )
+
+      # Build the active-space, density-fitted Hamiltonian.
+      hamiltonian = constructor.run(orbitals)
+
+See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end example combining a density-fitted SCF, active-space selection, and ``"qdk_density_fitted_hamiltonian"``.
 
 .. rubric:: Settings
 
