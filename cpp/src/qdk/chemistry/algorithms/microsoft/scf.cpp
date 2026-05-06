@@ -47,33 +47,50 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   utils::microsoft::initialize_backend();
 
   // check basis_or_guess type
+  if (basis_or_guess.valueless_by_exception()) {
+    throw std::invalid_argument(
+        "basis_or_guess is valueless due to an exception.");
+  }
   enum class BasisSetType { Explicit, FromString, FromOrbitals };
   BasisSetType basis_set_type;
 
   std::string basis_set_name;
+  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(basis_or_guess)) {
-    basis_set_name = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
-                         ->get_basis_set()
-                         ->get_name();
+    auto orbitals = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
+    if (!orbitals || !orbitals->get_basis_set()) {
+      throw std::invalid_argument(
+          "Orbitals initial guess must include a basis set.");
+    }
     basis_set_type = BasisSetType::FromOrbitals;
+    basis_set_name = orbitals->get_basis_set()->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = orbitals->get_basis_set();
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_or_guess)) {
-    basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)->get_name();
+    auto basis = std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+    if (!basis) {
+      throw std::invalid_argument(
+          "Explicit BasisSet argument must not be null.");
+    }
     basis_set_type = BasisSetType::Explicit;
+    basis_set_name = basis->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = basis;
   } else if (std::holds_alternative<std::string>(basis_or_guess)) {
-    basis_set_name = std::get<std::string>(basis_or_guess);
     basis_set_type = BasisSetType::FromString;
-  }
-  std::transform(basis_set_name.begin(), basis_set_name.end(),
-                 basis_set_name.begin(), ::tolower);
-
-  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
-  if (basis_set_name == data::BasisSet::custom_name ||
-      basis_set_type == BasisSetType::Explicit) {
-    qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
-  } else {
+    basis_set_name = std::get<std::string>(basis_or_guess);
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (basis_set_name == data::BasisSet::custom_name) {
+      throw std::invalid_argument(
+          "Custom basis name requires an explicit BasisSet or Orbitals.");
+    }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
   }
