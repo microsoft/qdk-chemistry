@@ -715,6 +715,7 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
 
+
 def test_builder_run_returns_circuits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
     """Validate that IterativePhaseEstimationBuilder.run produces one circuit per phase bit."""
     builder = IterativePhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
