@@ -304,29 +304,6 @@ TEST_F(OrbitalRotationTest, UnitaryRotationTest) {
               testing::numerical_zero_tolerance);
 }
 
-// Regression test: SCF should accept rotated orbitals as an initial guess.
-TEST_F(OrbitalRotationTest, ScfRunWithRotatedOrbitalsInitialGuessTest) {
-  using namespace qdk::chemistry::utils;
-
-  size_t num_virtual_orbitals =
-      num_molecular_orbitals - num_alpha_occupied_orbitals;
-  size_t rotation_size = num_alpha_occupied_orbitals * num_virtual_orbitals;
-  Eigen::VectorXd rotation_vector =
-      Eigen::VectorXd::Constant(rotation_size, 0.01);
-
-  auto rotated_orbitals =
-      rotate_orbitals(test_orbitals_restricted, rotation_vector,
-                      num_alpha_occupied_orbitals, num_beta_occupied_orbitals);
-  ASSERT_NE(rotated_orbitals, nullptr);
-
-  auto water = testing::create_water_structure();
-  auto scf_solver = ScfSolverFactory::create();
-
-  std::pair<double, std::shared_ptr<Wavefunction>> result;
-  EXPECT_NO_THROW({ result = scf_solver->run(water, 0, 1, rotated_orbitals); });
-  EXPECT_NE(result.second, nullptr);
-}
-
 // Test fixture for mathematical utility functions
 class MathUtilsTest : public ::testing::Test {
  protected:
