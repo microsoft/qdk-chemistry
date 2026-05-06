@@ -541,33 +541,15 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
 def test_iterative_qpe_generates_correct_number_of_circuits(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
-    """Test that create_iterations generates the correct number of iteration circuits."""
-    iqpe = IterativePhaseEstimation(
-        num_bits=two_qubit_phase_problem.num_bits,
-        shots_per_bit=two_qubit_phase_problem.shots_iterative,
-    )
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
+    """Test that the builder generates the correct number of iteration circuits."""
+    iqpe = IterativePhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
 
-    with pytest.raises(ValueError, match="No iteration circuits have been generated"):
-        iqpe.get_circuits()
-
-    iqpe.run(
+    circuits = iqpe.run(
         qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         state_preparation=two_qubit_phase_problem.state_prep,
     )
 
-    assert len(iqpe.get_circuits()) == two_qubit_phase_problem.num_bits
+    assert len(circuits) == two_qubit_phase_problem.num_bits
 
 
 def test_update_phase_feedback_with_bit_zero() -> None:
@@ -642,7 +624,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
     state_prep = QuantumCircuit(1)
     state_prep.h(0)
     state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
-    iqpe = IterativePhaseEstimation(num_bits=5, shots_per_bit=10)
+    iqpe = IterativePhaseEstimationBuilder(num_bits=5)
     iqpe.settings().set(
         "circuit_mapper",
         AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
@@ -651,7 +633,7 @@ def test_create_iteration_circuit_power_calculation() -> None:
         "unitary_builder",
         AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi)),
     )
-    iter_0_circuit = iqpe.create_iteration_circuit(
+    iter_0_circuit = iqpe.build_iteration_circuit(
         state_preparation=state_prep_circuit,
         qubit_hamiltonian=hamiltonian,
         iteration=0,

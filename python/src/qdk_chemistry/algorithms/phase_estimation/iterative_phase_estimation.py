@@ -69,7 +69,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         self._settings = IterativePhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("shots_per_bit", shots_per_bit)
-        self._iteration_circuits: list[Circuit] | None = None
 
     def _create_builder(self) -> IterativePhaseEstimationBuilder:
         """Create an IterativePhaseEstimationBuilder with settings propagated from this algorithm.
@@ -108,7 +107,6 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
-        iter_circuits: list[Circuit] = []
 
         # Iterate over the number of phase bits
         for iteration in range(self.settings().get("num_bits")):
@@ -120,7 +118,6 @@ class IterativePhaseEstimation(PhaseEstimation):
                 total_iterations=self.settings().get("num_bits"),
                 phase_correction=phase_feedback,
             )
-            iter_circuits.append(iteration_circuit)
             Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
             # Run the iteration circuit on the simulator
             executor_data = circuit_executor.run(
@@ -142,7 +139,6 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         # Compute the final phase fraction
         phase_fraction = phase_fraction_from_feedback(phase_feedback)
-        self._iteration_circuits = iter_circuits
         # Create and return the result
 
         unitary_builder = self._create_nested("unitary_builder")
@@ -158,51 +154,6 @@ class IterativePhaseEstimation(PhaseEstimation):
             "IQPE result construction currently only supports post-processing from time evolution. "
             f"Got {type(unitary_builder)} instead."
         )
-
-    def create_iteration_circuit(
-        self,
-        state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
-        *,
-        iteration: int,
-        total_iterations: int,
-        phase_correction: float = 0.0,
-    ) -> Circuit:
-        """Construct a single IQPE iteration circuit.
-
-        Args:
-            state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
-            iteration: Current iteration index (0-based), where 0 corresponds to the most-significant bit.
-            total_iterations: Total number of phase bits to measure across all iterations.
-            phase_correction: Feedback phase angle to apply before controlled unitary, defaults to 0.0.
-
-        Returns:
-            A quantum circuit implementing one IQPE iteration.
-
-        """
-        builder = self._create_builder()
-        return builder.build_iteration_circuit(
-            state_preparation=state_preparation,
-            qubit_hamiltonian=qubit_hamiltonian,
-            iteration=iteration,
-            total_iterations=total_iterations,
-            phase_correction=phase_correction,
-        )
-
-    def get_circuits(self) -> list[Circuit]:
-        """Get the list of iteration circuits generated during algorithm execution.
-
-        Returns:
-            List of quantum circuits for each IQPE iteration.
-
-        Raises:
-            ValueError: If no iteration circuits are available.
-
-        """
-        if self._iteration_circuits is not None:
-            return self._iteration_circuits
-        raise ValueError("No iteration circuits have been generated. Please run the algorithm first.")
 
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""

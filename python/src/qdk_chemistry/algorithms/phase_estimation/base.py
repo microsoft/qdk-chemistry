@@ -27,7 +27,7 @@ class PhaseEstimationSettings(Settings):
         """Initialize the settings for Phase Estimation.
 
         Includes nested algorithm references for the evolution builder,
-        circuit mapper, circuit executor, and phase estimation builder.
+        circuit mapper, and circuit executor.
 
         """
         super().__init__()
@@ -46,11 +46,6 @@ class PhaseEstimationSettings(Settings):
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        self._set_default(
-            "phase_estimation_builder",
-            "algorithm_ref",
-            AlgorithmRef("phase_estimation_builder", "iterative"),
         )
 
 
