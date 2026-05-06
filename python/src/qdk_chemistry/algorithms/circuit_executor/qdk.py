@@ -88,7 +88,6 @@ class QdkFullStateSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
-        **kwargs,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the QDK Full State Simulator.
 
@@ -147,7 +146,6 @@ class QdkSparseStateSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
-        **kwargs,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the QDK Sparse State Simulator.
 

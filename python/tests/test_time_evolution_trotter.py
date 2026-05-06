@@ -915,7 +915,7 @@ class TestPartitionGrouping:
         # With first-order Trotter, grouped terms should appear contiguously:
         # all ZZ terms first (group 0), then all X terms (group 1), or vice versa.
         # Check that the groups are contiguous (not interleaved).
-        zz_indices = [i for i, l in enumerate(term_labels) if l in pauli_zz_labels]
-        x_indices = [i for i, l in enumerate(term_labels) if l in pauli_x_labels]
+        zz_indices = [i for i, label in enumerate(term_labels) if label in pauli_zz_labels]
+        x_indices = [i for i, label in enumerate(term_labels) if label in pauli_x_labels]
         assert zz_indices == list(range(zz_indices[0], zz_indices[0] + len(zz_indices)))
         assert x_indices == list(range(x_indices[0], x_indices[0] + len(x_indices)))
