@@ -89,58 +89,56 @@ class BlockEncodingMapper(ControlledCircuitMapper):
         if len(controlled_unitary.control_indices) != 1:
             raise ValueError("BlockEncodingMapper currently only supports a single control qubit.")
 
-        num_system_qubits = unitary_container.num_system_qubits
-        num_select_qubits = unitary_container.num_select_qubits
-        power = getattr(unitary_container, "power", 1)
-        prepare_op = self._create_prepare_op(unitary_container.prepare)
-        select_op = self._create_select_op(unitary_container.select, num_system_qubits)
+        power: int = unitary_container.power
+        prepare: Prepare = unitary_container.prepare
+        select: Select = unitary_container.select
+        prepare_op = self._create_prepare_op(prepare)
+        select_op = self._create_select_op(select)
 
         lcu_parameters = {
             "prepareOp": prepare_op,
             "selectOp": select_op,
-            "numSystemQubits": num_system_qubits,
-            "numSelectQubits": num_select_qubits,
+            "numSystemQubits": select.num_target_qubits,
+            "numSelectQubits": select.num_prepare_qubits,
             "power": power,
         }
 
-        if unitary_container.reflect is not None:
+        if unitary_container.reflect:
             qsharp_factory = QsharpFactoryData(
                 program=QSHARP_UTILS.LCU.MakeLCUQuantumWalkCircuit,
                 parameter=lcu_parameters,
             )
             lcu_op = QSHARP_UTILS.LCU.MakeLCUQuantumWalkOp(
-                prepare_op, select_op, num_system_qubits, num_select_qubits, power
+                prepare_op, select_op, select.num_target_qubits, select.num_prepare_qubits, power
             )
         else:
             qsharp_factory = QsharpFactoryData(
                 program=QSHARP_UTILS.LCU.MakeLCUCircuit,
                 parameter=lcu_parameters,
             )
-            lcu_op = QSHARP_UTILS.LCU.MakeLCUOp(prepare_op, select_op, num_system_qubits, num_select_qubits, power)
+            lcu_op = QSHARP_UTILS.LCU.MakeLCUOp(
+                prepare_op, select_op, select.num_target_qubits, select.num_prepare_qubits, power
+            )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=lcu_op)
 
     @staticmethod
     def _create_prepare_op(prepare: Prepare):
         """Create the PREPARE oracle callable from Prepare sub-object."""
-        if prepare.method == "lcu":
-            amplitudes = [float(a) for a in prepare.statevector]
-            prepare_params = QSHARP_UTILS.LCU.DefaultPrepareParams(amplitudes=amplitudes)
-            return QSHARP_UTILS.LCU.MakePrepareOp(prepare_params)
-        raise NotImplementedError(f"Unsupported PREPARE method: {prepare.method}")
+        amplitudes = [float(a) for a in prepare.statevector]
+        prepare_params = QSHARP_UTILS.LCU.DefaultPrepareParams(amplitudes=amplitudes)
+        return QSHARP_UTILS.LCU.MakePrepareOp(prepare_params)
 
     @staticmethod
-    def _create_select_op(select: Select, num_system_qubits: int):
+    def _create_select_op(select: Select):
         """Create the SELECT oracle callable from Select sub-object."""
-        if select.method == "lcu":
-            pauli_terms: list[list[qsharp.Pauli]] = []
-            for op in select.controlled_operations:
-                base_paulis = [qsharp.Pauli.I] * num_system_qubits
-                for i, pauli_char in enumerate(op.operation):
-                    if pauli_char != "I":
-                        base_paulis[op.target_qubits[i]] = getattr(qsharp.Pauli, pauli_char)
-                pauli_terms.append(base_paulis)
-            signs = [int(s) for s in select.signs]
-            select_params = QSHARP_UTILS.LCU.DefaultSelectParams(pauliTerms=pauli_terms, signs=signs)
-            return QSHARP_UTILS.LCU.MakeSelectOp(select_params)
-        raise NotImplementedError(f"Unsupported SELECT method: {select.method}")
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        for op in select.controlled_operations:
+            base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
+            for i, pauli_char in enumerate(op.operation):
+                if pauli_char != "I":
+                    base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
+            pauli_terms.append(base_paulis)
+        phases = [int(s) for s in select.phases]
+        select_params = QSHARP_UTILS.LCU.DefaultSelectParams(pauliTerms=pauli_terms, signs=phases)
+        return QSHARP_UTILS.LCU.MakeSelectOp(select_params)

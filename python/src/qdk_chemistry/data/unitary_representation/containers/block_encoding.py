@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import h5py
@@ -13,106 +13,119 @@ import numpy as np
 
 from .base import UnitaryContainer
 
-__all__ = ["BlockEncodingContainer", "ControlledOperation", "Prepare", "Reflect", "Select"]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "Prepare", "Select"]
 
 
 @dataclass(frozen=True)
 class ControlledOperation:
-    """A single controlled unitary operation in the SELECT oracle.
-
-    Attributes:
-        ctrl_qubits: Indices of control qubits (relative to select register).
-        ctrl_state: Integer encoding of the control state that activates this operation.
-        target_qubits: Indices of target qubits (relative to system register).
-        operation: Operation descriptor (e.g., a Pauli string like ``"XZI"``).
-
-    """
-
-    ctrl_qubits: list[int]
-    """Indices of control qubits (relative to select register)."""
+    """A single controlled unitary operation in the SELECT oracle."""
 
     ctrl_state: int
     """Integer encoding of the control state that activates this operation."""
 
-    target_qubits: list[int]
-    """Indices of target qubits (relative to system register)."""
-
     operation: str
     """Operation descriptor (e.g., a Pauli string like ``"XZI"``)."""
+
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the ControlledOperation to an HDF5 group."""
+        group.attrs["ctrl_state"] = self.ctrl_state
+        group.attrs["operation"] = self.operation
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> "ControlledOperation":
+        """Load a ControlledOperation from an HDF5 group."""
+        return cls(
+            ctrl_state=int(group.attrs["ctrl_state"]),
+            operation=str(group.attrs["operation"]),
+        )
 
 
 @dataclass(frozen=True)
 class Prepare:
-    """Class representing the PREPARE oracle for block encoding.
-
-    Attributes:
-        method: Preparation method identifier (e.g., ``"block_encoding"`` for PreparePureStateD).
-        statevector: Array of amplitudes to prepare in the ancilla register.
-        num_prepare_qubits: Number of qubits in the prepare/ancilla register.
-
-    """
-
-    method: str
-    """Preparation method identifier (e.g., ``"block_encoding"``)."""
+    """Class representing the PREPARE oracle for block encoding."""
 
     statevector: np.ndarray
     """Pre-computed amplitude array to load into the ancilla register."""
 
     num_prepare_qubits: int
-    """Number of qubits in the prepare/ancilla register."""
+    """Number of qubits in the prepare register."""
+
+    prepare_qubits: list[int]
+    """List of qubit indices for the prepare register."""
+
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the Prepare oracle to an HDF5 group."""
+        group.create_dataset("statevector", data=self.statevector)
+        group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
+        group.attrs["prepare_qubits"] = self.prepare_qubits
+
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> "Prepare":
+        """Load a Prepare oracle from an HDF5 group."""
+        return cls(
+            statevector=np.array(group["statevector"]),
+            num_prepare_qubits=int(group.attrs["num_prepare_qubits"]),
+            prepare_qubits=list(group.attrs["prepare_qubits"]),
+        )
 
 
 @dataclass(frozen=True)
 class Select:
-    """Class representing the SELECT oracle for block encoding.
-
-    Attributes:
-        controlled_operations: List of controlled operations, each specifying
-            which control state activates which unitary on which target qubits.
-        signs: Array of +1/-1 phase corrections (uncontrolled global phase per term).
-        method: Method identifier for the SELECT oracle (e.g., ``"block_encoding"``).
-
-    """
+    """Class representing the SELECT oracle for block encoding."""
 
     controlled_operations: list[ControlledOperation]
     """List of controlled operations."""
 
-    signs: np.ndarray
+    phases: np.ndarray
     """Array of +1/-1 phase corrections (uncontrolled global phase per term)."""
 
-    method: str = "block_encoding"
-    """Method identifier for the SELECT oracle."""
+    num_prepare_qubits: int
+    """Number of control qubits."""
 
-    @property
-    def num_ctrl_qubits(self) -> int:
-        """Number of control qubits in the select register."""
-        return len(self.controlled_operations[0].ctrl_qubits)
+    num_target_qubits: int
+    """Number of target (system) qubits."""
 
-    @property
-    def num_target_qubits(self) -> int:
-        """Number of target (system) qubits."""
-        return len(self.controlled_operations[0].target_qubits)
+    prepare_qubits: list[int]
+    """List of qubit indices for the prepare register."""
 
+    target_qubits: list[int]
+    """List of qubit indices for the target (system) register."""
 
-@dataclass(frozen=True)
-class Reflect:
-    """Class representing the reflection operator for block encoding.
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the Select oracle to an HDF5 group."""
+        group.create_dataset("phases", data=self.phases)
+        group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
+        group.attrs["num_target_qubits"] = self.num_target_qubits
+        group.attrs["prepare_qubits"] = self.prepare_qubits
+        group.attrs["target_qubits"] = self.target_qubits
+        ops_group = group.create_group("controlled_operations")
+        for i, op in enumerate(self.controlled_operations):
+            op.to_hdf5(ops_group.create_group(f"op_{i}"))
 
-    Attributes:
-        qubits: Qubit indices (relative to ancilla register) to reflect upon.
-
-    """
-
-    qubits: list[int]
-    """Qubit indices (relative to ancilla register) to reflect upon."""
+    @classmethod
+    def from_hdf5(cls, group: h5py.Group) -> "Select":
+        """Load a Select oracle from an HDF5 group."""
+        ops_group = group["controlled_operations"]
+        controlled_ops = [
+            ControlledOperation.from_hdf5(ops_group[key])
+            for key in sorted(ops_group.keys(), key=lambda k: int(k.split("_")[1]))
+        ]
+        return cls(
+            controlled_operations=controlled_ops,
+            phases=np.array(group["phases"]),
+            num_prepare_qubits=int(group.attrs["num_prepare_qubits"]),
+            num_target_qubits=int(group.attrs["num_target_qubits"]),
+            prepare_qubits=list(group.attrs["prepare_qubits"]),
+            target_qubits=list(group.attrs["target_qubits"]),
+        )
 
 
 class BlockEncodingContainer(UnitaryContainer):
     r"""Container for a Linear Combination of Unitaries (LCU) decomposition.
 
-    Stores the pre-computed PREPARE, SELECT, and (optionally) REFLECT sub-objects
-    that define a block-encoding circuit. This container is agnostic to the specific
-    method used to compute these objects — that logic lives in the builder.
+    Stores the pre-computed PREPARE and SELECT sub-objects that define a
+    block-encoding circuit. This container is agnostic to the specific method
+    used to compute these objects — that logic lives in the builder.
 
     .. math::
 
@@ -131,85 +144,44 @@ class BlockEncodingContainer(UnitaryContainer):
         prepare: Prepare,
         select: Select,
         power: int = 1,
-        reflect: Reflect | None = None,
+        reflect: bool = False,
     ) -> None:
         r"""Initialize a BlockEncodingContainer.
 
         Args:
-            prepare: The PREPARE oracle sub-object.
-            select: The SELECT oracle sub-object.
             power: Number of times to apply the walk operator (for W^power in QPE).
-            reflect: The REFLECT oracle sub-object. When provided, the circuit mapper
-                wraps the block encoding with a quantum walk operator (use with QPE).
-                When None, the plain block encoding is used (use with Hadamard test).
+            prepare: The PREPARE oracle data class instance.
+            select: The SELECT oracle data class instance.
+            reflect: When True, the circuit mapper wraps the block encoding with a
+                quantum walk operator (use with QPE). When False, the plain block
+                encoding is used (use with Hadamard test).
 
         """
+        self.power = power
         self.prepare = prepare
         self.select = select
-        self.power = power
         self.reflect = reflect
 
         super().__init__()
 
-    # ── Derived properties ──
-
-    @property
-    def num_system_qubits(self) -> int:
-        """Number of system qubits, derived from the first SELECT operation."""
-        return self.select.num_target_qubits
-
-    @property
-    def num_select_qubits(self) -> int:
-        """Number of ancilla qubits for the PREPARE register."""
-        return self.prepare.num_prepare_qubits
-
     @property
     def num_qubits(self) -> int:
         """Total number of qubits (system + ancilla)."""
-        return self.num_system_qubits + self.num_select_qubits
-
-    @property
-    def quantum_walk(self) -> bool:
-        """Whether the quantum walk operator is used (reflect is not None)."""
-        return self.reflect is not None
+        return self.select.num_target_qubits + self.prepare.num_prepare_qubits
 
     @property
     def type(self) -> str:
         """Get the type of the unitary container."""
         return "block_encoding"
 
-    # ── Serialization ──
-
     def to_json(self) -> dict[str, Any]:
-        """Convert the BlockEncodingContainer to a dictionary for JSON serialization."""
-        prepare_data = {
-            "method": self.prepare.method,
-            "statevector": self.prepare.statevector.tolist(),
-            "num_prepare_qubits": self.prepare.num_prepare_qubits,
-        }
-        select_data = {
-            "controlled_operations": [
-                {
-                    "ctrl_qubits": op.ctrl_qubits,
-                    "ctrl_state": op.ctrl_state,
-                    "target_qubits": op.target_qubits,
-                    "operation": op.operation,
-                }
-                for op in self.select.controlled_operations
-            ],
-            "signs": self.select.signs.tolist(),
-            "method": self.select.method,
-        }
-        reflect_data = None
-        if self.reflect is not None:
-            reflect_data = {"qubits": self.reflect.qubits}
-
+        """Save the BlockEncodingContainer to a JSON-serializable dictionary."""
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
-            "prepare": prepare_data,
-            "select": select_data,
-            "reflect": reflect_data,
+            "prepare": asdict(self.prepare),
+            "select": asdict(self.select),
+            "reflect": self.reflect,
         }
 
         return self._add_json_version(data)
@@ -219,60 +191,67 @@ class BlockEncodingContainer(UnitaryContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
+        group.attrs["reflect"] = self.reflect
+        self.prepare.to_hdf5(group.create_group("prepare"))
+        self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "BlockEncodingContainer":
         """Create BlockEncodingContainer from a JSON dictionary."""
         cls._validate_json_version(cls._serialization_version, json_data)
 
-        # Reconstruct Prepare
         prep_data = json_data["prepare"]
         prepare = Prepare(
-            method=prep_data["method"],
             statevector=np.array(prep_data["statevector"], dtype=float),
             num_prepare_qubits=prep_data["num_prepare_qubits"],
+            prepare_qubits=prep_data["prepare_qubits"],
         )
 
-        # Reconstruct Select
         sel_data = json_data["select"]
         controlled_ops = [
             ControlledOperation(
-                ctrl_qubits=op["ctrl_qubits"],
                 ctrl_state=op["ctrl_state"],
-                target_qubits=op["target_qubits"],
                 operation=op["operation"],
             )
             for op in sel_data["controlled_operations"]
         ]
         select = Select(
             controlled_operations=controlled_ops,
-            signs=np.array(sel_data["signs"], dtype=int),
+            phases=np.array(sel_data["phases"], dtype=int),
+            num_prepare_qubits=sel_data["num_prepare_qubits"],
+            num_target_qubits=sel_data["num_target_qubits"],
+            prepare_qubits=sel_data["prepare_qubits"],
+            target_qubits=sel_data["target_qubits"],
         )
 
-        # Reconstruct Reflect
-        reflect = None
-        if json_data.get("reflect") is not None:
-            reflect = Reflect(qubits=json_data["reflect"]["qubits"])
-
         return cls(
+            power=json_data.get("power", 1),
             prepare=prepare,
             select=select,
-            power=json_data.get("power", 1),
-            reflect=reflect,
+            reflect=bool(json_data.get("reflect", False)),
         )
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "BlockEncodingContainer":
         """Load an instance from an HDF5 group."""
-        raise NotImplementedError("HDF5 deserialization not yet implemented for v0.2.0 format.")
+        prepare = Prepare.from_hdf5(group["prepare"])
+        select = Select.from_hdf5(group["select"])
+        reflect = bool(group.attrs.get("reflect", False))
+        power = int(group.attrs["power"])
+        return cls(
+            power=power,
+            prepare=prepare,
+            select=select,
+            reflect=reflect,
+        )
 
     def get_summary(self) -> str:
         """Get summary of the LCU container."""
         return (
             f"LCU Container:\n"
-            f"  Number of terms: {len(self.select.controlled_operations)}\n"
-            f"  System qubits: {self.num_system_qubits}\n"
-            f"  Select (ancilla) qubits: {self.num_select_qubits}\n"
-            f"  Prepare method: {self.prepare.method}\n"
-            f"  Quantum walk: {self.quantum_walk}"
+            f"  Power: {self.power}\n"
+            f"  Prepare: {self.prepare.num_prepare_qubits} qubits, statevector shape {self.prepare.statevector.shape}\n"
+            f"  Select: {self.select.num_prepare_qubits} control qubits, {self.select.num_target_qubits} target qubits,"
+            f" {len(self.select.controlled_operations)} controlled operations\n"
+            f"  Reflect: {'Yes' if self.reflect else 'No'}"
         )

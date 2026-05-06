@@ -39,11 +39,9 @@ class TestLCUBuilder:
         container = result.get_container()
         assert isinstance(container, BlockEncodingContainer)
         assert container.type == "block_encoding"
-        assert container.num_system_qubits == 2
         assert container.num_qubits == 3  # 2 system + 1 select
         assert len(container.select.controlled_operations) == 2
-        assert container.num_select_qubits == 1
-        assert all(s in (1, -1) for s in container.select.signs)
+        assert all(s in (1, -1) for s in container.select.phases)
 
     def test_num_select_qubits(self):
         """Test correct computation of select qubit count."""
@@ -54,7 +52,7 @@ class TestLCUBuilder:
         )
         builder = BlockEncodingBuilder()
         result = builder.run(hamiltonian)
-        assert result.get_container().num_select_qubits == 1
+        assert result.get_container().prepare.num_prepare_qubits == 1
 
         # 3 terms -> 2 select qubits (ceil(log2(3)) = 2)
         hamiltonian3 = QubitHamiltonian(
@@ -63,7 +61,7 @@ class TestLCUBuilder:
         )
         builder3 = BlockEncodingBuilder()
         result3 = builder3.run(hamiltonian3)
-        assert result3.get_container().num_select_qubits == 2
+        assert result3.get_container().prepare.num_prepare_qubits == 2
 
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder and mapper are accessible via the registry."""
@@ -117,8 +115,8 @@ class TestBlockEncodingContainer:
 
         assert restored.type == container.type
         assert restored.num_qubits == container.num_qubits
-        assert restored.num_select_qubits == container.num_select_qubits
-        assert np.array_equal(restored.select.signs, container.select.signs)
+        assert restored.prepare.num_prepare_qubits == container.prepare.num_prepare_qubits
+        assert np.array_equal(restored.select.phases, container.select.phases)
         assert [op.operation for op in restored.select.controlled_operations] == [
             op.operation for op in container.select.controlled_operations
         ]
@@ -143,7 +141,7 @@ class TestBlockEncodingContainer:
         assert isinstance(restored_container, BlockEncodingContainer)
         assert restored_container.type == "block_encoding"
         assert restored_container.num_qubits == unitary_rep.get_container().num_qubits
-        assert restored_container.num_select_qubits == unitary_rep.get_container().num_select_qubits
+        assert restored_container.prepare.num_prepare_qubits == unitary_rep.get_container().prepare.num_prepare_qubits
 
 
 class TestQPEWithLCU:
