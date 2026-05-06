@@ -12,10 +12,9 @@ state. It also includes functions to create custom pass managers based on preset
 
 import numpy as np
 from qiskit.circuit import ParameterExpression
-from qiskit.circuit.library import IGate, SdgGate, SGate, ZGate
+from qiskit.circuit.library import IGate, RZGate, SdgGate, SGate, ZGate
 from qiskit.dagcircuit import DAGCircuit
 from qiskit.transpiler.basepasses import TransformationPass
-from qiskit.transpiler.passes.optimization import Optimize1qGatesDecomposition
 
 from qdk_chemistry.data import Settings
 from qdk_chemistry.definitions import DIAGONAL_Z_1Q_GATES
@@ -26,6 +25,21 @@ __all__ = [
     "RemoveZBasisOnZeroState",
     "SubstituteCliffordRz",
 ]
+
+
+class MergeZBasisRotationsSettings(Settings):
+    """Settings configuration for MergeZBasisRotations.
+
+    MergeZBasisRotations-specific settings:
+        tolerance (double, default=float(np.finfo(np.float64).eps)): Float comparison tolerance to use.
+
+    """
+
+    def __init__(self):
+        """Initialize MergeZBasisRotationsSettings."""
+        Logger.trace_entering()
+        super().__init__()
+        self._set_default("tolerance", "double", float(np.finfo(np.float64).eps))
 
 
 class MergeZBasisRotations(TransformationPass):
@@ -62,14 +76,21 @@ class MergeZBasisRotations(TransformationPass):
 
     """
 
-    def __init__(self):
-        """Use Optimize1qGatesDecomposition to handle gate optimization to merge Z basis rotations."""
+    def __init__(self, tolerance: float = float(np.finfo(np.float64).eps)):
+        """Initialize MergeZBasisRotations."""
         Logger.trace_entering()
         super().__init__()
-        self._optimize1q_decomposition = Optimize1qGatesDecomposition(basis=["rz", "rx"])
+        self._settings = MergeZBasisRotationsSettings()
+        self._settings.set("tolerance", tolerance)
+        # Fixed angle contributions for Z-basis Clifford gates
+        self._z_fixed_angles: dict[str, float] = {"z": np.pi, "s": np.pi / 2, "sdg": -np.pi / 2}
+        self._z_basis_gates = frozenset({"rz", "z", "s", "sdg"})
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Run the pass on the given ``DAGCircuit``.
+
+        Operates in-place on the DAG using per-qubit angle accumulators, avoiding
+        intermediate DAGCircuit creation and external optimization passes.
 
         Args:
             dag: The input ``DAGCircuit`` to transform.
@@ -79,53 +100,95 @@ class MergeZBasisRotations(TransformationPass):
 
         """
         Logger.trace_entering()
-        Logger.debug("Running MergeZBasisRotations pass.")
-        new_dag = DAGCircuit()
-        for qreg in dag.qregs.values():
-            new_dag.add_qreg(qreg)
-        for creg in dag.cregs.values():
-            new_dag.add_creg(creg)
 
-        current_region = DAGCircuit()
-        for qreg in dag.qregs.values():
-            current_region.add_qreg(qreg)
-        for creg in dag.cregs.values():
-            current_region.add_creg(creg)
+        # Per-qubit state: (accumulated_angle, list_of_nodes_in_run)
+        accumulators: dict[object, tuple[float, list]] = {}
+        nodes_to_remove: list = []
+        substitutions: list[tuple] = []  # (node, new_gate)
 
         for node in dag.topological_op_nodes():
             name = node.op.name
 
-            is_z_basis_gate = name in {"rz", "z", "s", "sdg"}
-            is_id_gate = name == "id"
-
-            if is_id_gate:
-                # Remove Id gates (no effect on state)
+            if name == "id":
+                nodes_to_remove.append(node)
                 continue
 
-            if is_z_basis_gate:
-                # Add Z-basis gate to current merge region
-                current_region.apply_operation_back(node.op, node.qargs, node.cargs)
+            if name in self._z_basis_gates:
+                qubit = node.qargs[0]  # Z-basis gates are always 1-qubit
+
+                # Get angle for this gate
+                if name == "rz":
+                    angle = node.op.params[0]
+                    # Skip parameterized rotations - they act as boundaries
+                    if isinstance(angle, ParameterExpression):
+                        # Flush any pending accumulator for this qubit first
+                        if qubit in accumulators:
+                            acc_angle, acc_nodes = accumulators.pop(qubit)
+                            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
+                        # Leave parameterized gate as-is
+                        continue
+                else:
+                    angle = self._z_fixed_angles[name]
+
+                # Accumulate
+                if qubit in accumulators:
+                    acc = accumulators[qubit]
+                    accumulators[qubit] = (acc[0] + angle, acc[1] + [node])
+                else:
+                    accumulators[qubit] = (angle, [node])
 
             else:
-                # Non-Z-basis gate: process current region first
-                if current_region.size() > 0:
-                    optimized_region = self._optimize1q_decomposition.run(current_region)
-                    new_dag.compose(optimized_region, inplace=True)
-                    current_region = DAGCircuit()
-                    for qreg in dag.qregs.values():
-                        current_region.add_qreg(qreg)
-                    for creg in dag.cregs.values():
-                        current_region.add_creg(creg)
+                # Non-Z gate: flush accumulators for all affected qubits
+                for qubit in node.qargs:
+                    if qubit in accumulators:
+                        acc_angle, acc_nodes = accumulators.pop(qubit)
+                        self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
 
-                # Add this non-Z gate directly (acts as boundary)
-                new_dag.apply_operation_back(node.op, node.qargs, node.cargs)
+        # Flush remaining accumulators
+        for acc_angle, acc_nodes in accumulators.values():
+            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
 
-        # Process any remaining region
-        if current_region.size() > 0:
-            optimized_region = self._optimize1q_decomposition.run(current_region)
-            new_dag.compose(optimized_region, inplace=True)
+        # Apply substitutions before removals
+        for node, gate in substitutions:
+            dag.substitute_node(node, gate, inplace=True)
 
-        return new_dag
+        # Remove merged/identity nodes
+        for node in nodes_to_remove:
+            dag.remove_op_node(node)
+
+        return dag
+
+    @staticmethod
+    def _flush(
+        angle: float,
+        nodes: list,
+        nodes_to_remove: list,
+        substitutions: list,
+        tol: float = float(np.finfo(np.float64).eps),
+    ):
+        """Flush an accumulated Z-rotation run into a single gate or removal.
+
+        Args:
+            angle: The accumulated rotation angle.
+            nodes: The list of nodes in the accumulated run.
+            nodes_to_remove: List to append nodes that should be removed.
+            substitutions: List to append (node, new_gate) pairs for substitution.
+            tol: Tolerance for floating-point comparison to zero.
+
+        """
+        # Normalize angle to [0, 2π)
+        norm = angle % (2 * np.pi)
+        if norm < tol or (2 * np.pi - norm) < tol:
+            # Net rotation is effectively zero: remove all nodes
+            nodes_to_remove.extend(nodes)
+        elif len(nodes) == 1:
+            # Single gate: just substitute if angle changed
+            if abs(angle - nodes[0].op.params[0]) > tol if nodes[0].op.name == "rz" else True:
+                substitutions.append((nodes[0], RZGate(angle)))
+        else:
+            # Multiple gates: keep last node, substitute with merged Rz, remove rest
+            substitutions.append((nodes[-1], RZGate(angle)))
+            nodes_to_remove.extend(nodes[:-1])
 
 
 class SubstituteCliffordRzSettings(Settings):
@@ -216,7 +279,7 @@ class SubstituteCliffordRz(TransformationPass):
 
         Args:
             equivalent_gate_set (list[str] | None): List of gates to substitute rz with special
-                angles. Default is None, which means ['id', 's', 'sdg', 'z'].
+                angles. Default is None, which means ['id', 's', 'z', 'sdg'].
             tolerance (float): Angle comparison tolerance. Default is np.finfo(np.float64).eps.
 
         """
@@ -228,6 +291,25 @@ class SubstituteCliffordRz(TransformationPass):
                 raise TypeError("equivalent_gate_set must be a list of gate names or None")
             self._settings.set("equivalent_gate_set", equivalent_gate_set)
         self._settings.set("tolerance", tolerance)
+        self._factor_to_gate: tuple[tuple[int, str, type], ...] = (
+            (0, "id", IGate),
+            (2, "s", SGate),
+            (4, "z", ZGate),
+            (6, "sdg", SdgGate),
+        )
+        self._build_lookup()
+
+    def _build_lookup(self):
+        """Precompute the mod-8 lookup table from current settings."""
+        gate_set = set(self._settings.get("equivalent_gate_set"))
+        tolerance = self._settings.get("tolerance")
+        # Precompute (mod8_target, gate_instance) pairs for enabled gates
+        self._lookup: list[tuple[float, object]] = []
+        for mod8_val, name, cls in self._factor_to_gate:
+            if name in gate_set:
+                self._lookup.append((float(mod8_val), cls()))
+        self._tolerance = tolerance
+        self._inv_quarter_pi = 4.0 / np.pi  # precompute reciprocal
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Run the pass on the given ``DAGCircuit``.
@@ -240,48 +322,28 @@ class SubstituteCliffordRz(TransformationPass):
 
         """
         Logger.trace_entering()
-        equivalent_gate_set = self._settings.get("equivalent_gate_set")
-        tolerance = self._settings.get("tolerance")
-
-        if "id" not in equivalent_gate_set:
-            raise ValueError("Gate 'id' is missing in equivalent_gate_set.")
-        if len(equivalent_gate_set) != len(set(equivalent_gate_set)):
-            raise ValueError(f"Gates in equivalent_gate_set ({equivalent_gate_set}) are not unique.")
-
-        Logger.debug("SubstituteCliffordRz pass: simplification logic needs careful review.")
+        tolerance = self._tolerance
+        lookup = self._lookup
+        inv_quarter_pi = self._inv_quarter_pi
 
         for node in dag.op_nodes():
-            if node.op.name == "rz":
-                angle = node.op.params[0]
+            if node.op.name != "rz":
+                continue
 
-                # Skip parameterized rotations
-                if isinstance(angle, ParameterExpression):
-                    Logger.debug("Skipping parameterized Rz.")
-                    continue
+            angle = node.op.params[0]
 
-                factor = 2 * angle / np.pi
-                mod4_factor = np.mod(factor, 4)
-                Logger.debug(f"Rz({angle:.4f}) = {factor:.4f} * π/2 (mod 4 = {mod4_factor:.2f})")
+            # Skip parameterized rotations
+            if isinstance(angle, ParameterExpression):
+                continue
 
-                replacement_gate = None
-                if np.isclose(mod4_factor, 0, atol=tolerance) and "id" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Id.")
-                    replacement_gate = IGate()
-                elif np.isclose(mod4_factor, 1, atol=tolerance) and "s" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with S.")
-                    replacement_gate = SGate()
-                elif np.isclose(mod4_factor, 2, atol=tolerance) and "z" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Z.")
-                    replacement_gate = ZGate()
-                elif np.isclose(mod4_factor, 3, atol=tolerance) and "sdg" in equivalent_gate_set:
-                    Logger.debug(f"Substituting Rz({angle:.4f}) with Sdg.")
-                    replacement_gate = SdgGate()
+            # Compute mod-8 factor: angle = factor * (π/4)
+            factor = angle * inv_quarter_pi
+            mod8 = factor % 8.0
 
-                if replacement_gate:
-                    dag.substitute_node(node, replacement_gate, inplace=True)
-                else:
-                    Logger.debug(f"Keeping original Rz({angle:.4f}).")
-
+            for target, gate in lookup:
+                if abs(mod8 - target) <= tolerance or abs(mod8 - target - 8.0) <= tolerance:
+                    dag.substitute_node(node, gate, inplace=True)
+                    break
         return dag
 
     def settings(self) -> Settings:
@@ -318,7 +380,8 @@ class RemoveZBasisOnZeroState(TransformationPass):
         """Initialize the ``RemoveZBasisOnZeroState`` transformation pass."""
         Logger.trace_entering()
         super().__init__()
-        self._z_basis_gates = {"rz", "z", "s", "sdg"}
+        self._z_basis_gates = frozenset({"rz", "z", "s", "sdg"})
+        self._diagonal_gates = DIAGONAL_Z_1Q_GATES
 
     def run(self, dag: DAGCircuit) -> DAGCircuit:
         """Run the pass on the given ``DAGCircuit``.
@@ -331,43 +394,29 @@ class RemoveZBasisOnZeroState(TransformationPass):
 
         """
         Logger.trace_entering()
-        Logger.debug("Running RemoveZBasisOnZeroState pass.")
 
-        # Track qubits still in |0⟩ (True means untouched)
-        zero_state_qubits = dict.fromkeys(dag.qubits, True)
+        # Track qubits still in |0⟩ — use a set for fast membership
+        zero_state_qubits = set(dag.qubits)
+        z_basis = self._z_basis_gates
+        diagonal = self._diagonal_gates
+        nodes_to_remove = []
 
-        nodes_to_process = list(dag.topological_op_nodes())
-        for node in nodes_to_process:
+        for node in dag.topological_op_nodes():
             name = node.op.name
             qubits = node.qargs
 
-            # Check if Z-basis gate and qubit still in |0⟩
-            if name in self._z_basis_gates:
-                remove_gate = all(zero_state_qubits.get(q, False) for q in qubits)
-                if remove_gate:
-                    Logger.debug(f"Removing {name} on qubit {qubits} (still |0⟩)")
-                    dag.remove_op_node(node)
-                    continue  # Skip to next node
+            # Check if Z-basis gate and qubit still in |0⟩ (Z-basis gates are 1-qubit)
+            if name in z_basis and qubits[0] in zero_state_qubits:
+                nodes_to_remove.append(node)
+                continue
 
             # Mark qubits as no longer |0⟩ for non-diagonal gates
-            if name not in self._z_basis_gates and not self._is_diagonal(name):
+            if name not in diagonal:
                 for q in qubits:
-                    zero_state_qubits[q] = False
+                    zero_state_qubits.discard(q)
+
+        # Batch removal
+        for node in nodes_to_remove:
+            dag.remove_op_node(node)
 
         return dag
-
-    def _is_diagonal(self, gate_name: str) -> bool:
-        """Determine if a gate is diagonal in computational basis.
-
-        Args:
-            gate_name: Name of the gate.
-
-        Returns:
-            bool: True if the gate is diagonal, False otherwise.
-
-        Note:
-            The gate classification logic depends on the ``DIAGONAL_Z_1Q_GATES`` defined in ``definitions.py``.
-
-        """
-        Logger.trace_entering()
-        return gate_name in DIAGONAL_Z_1Q_GATES

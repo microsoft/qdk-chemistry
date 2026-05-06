@@ -13,7 +13,6 @@ Supported QDK backends include:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from collections import Counter
 from typing import Literal
 
 import qsharp
@@ -40,13 +39,25 @@ def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, i
         if no shots experienced qubit loss.
 
     """
-    bitstrings = [
-        "".join("1" if str(x) == "One" else ("L" if str(x) == "Loss" else "0") for x in reversed(one_run))
-        for one_run in raw_results
-    ]
-    clean = [b for b in bitstrings if "L" not in b]
-    lost = [b for b in bitstrings if "L" in b]
-    return dict(Counter(clean)), dict(Counter(lost)) if lost else None
+    _map = {"One": "1", "Loss": "L", "Zero": "0"}
+    clean_counts: dict[str, int] = {}
+    loss_counts: dict[str, int] = {}
+
+    for one_run in raw_results:
+        has_loss = False
+        chars = []
+        for x in reversed(one_run):
+            c = _map.get(str(x), "0")
+            if c == "L":
+                has_loss = True
+            chars.append(c)
+        key = "".join(chars)
+        if has_loss:
+            loss_counts[key] = loss_counts.get(key, 0) + 1
+        else:
+            clean_counts[key] = clean_counts.get(key, 0) + 1
+
+    return clean_counts, loss_counts if loss_counts else None
 
 
 class QdkFullStateSimulatorSettings(Settings):
@@ -54,7 +65,6 @@ class QdkFullStateSimulatorSettings(Settings):
 
     def __init__(self) -> None:
         """Initialize QDK Full State Simulator settings."""
-        Logger.trace_entering()
         super().__init__()
         self._set_default(
             "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
@@ -77,7 +87,6 @@ class QdkFullStateSimulator(CircuitExecutor):
             seed: The random seed for simulation reproducibility.
 
         """
-        Logger.trace_entering()
         super().__init__()
         self._settings = QdkFullStateSimulatorSettings()
         self._settings.set("type", simulator_type)
@@ -107,7 +116,6 @@ class QdkFullStateSimulator(CircuitExecutor):
         raw_results = run_qir(
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
-        Logger.debug(f"Measurement results obtained: {raw_results}")
         bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
@@ -168,7 +176,6 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 noise=noise_config,
                 seed=self._settings.get("seed"),
             )
-            Logger.debug(f"Measurement results obtained: {raw_results}")
             bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         else:
             qasm = circuit.get_qasm()
@@ -178,7 +185,6 @@ class QdkSparseStateSimulator(CircuitExecutor):
                 noise=noise_config,
                 seed=self._settings.get("seed"),
             )
-            Logger.debug(f"Measurement results obtained: {raw_results}")
             bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
