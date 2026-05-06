@@ -292,7 +292,7 @@ class Macis : public qdk::chemistry::algorithms::MultiConfigurationCalculator {
    */
   virtual ~Macis() noexcept override = default;
 
-  virtual std::string name() const = 0;
+  virtual std::string name() const override = 0;
 
  protected:
   /**
