@@ -395,7 +395,8 @@ nlohmann::ordered_json convert_to_json_primary(
 
   j = nlohmann::ordered_json(
       {{"name", basis_set.get_name()},
-       {"pure", (basis_set.get_atomic_orbital_type() == qdk::chemistry::data::AOType::Spherical)},
+       {"pure", (basis_set.get_atomic_orbital_type() ==
+                 qdk::chemistry::data::AOType::Spherical)},
        {"mode", "RAW"},
        {"atoms", nuclear_charges_unsigned},
        {"num_atomic_orbitals", basis_set.get_num_atomic_orbitals()},
@@ -428,7 +429,8 @@ nlohmann::ordered_json convert_to_json_auxiliary(
     }
     aux_j = nlohmann::ordered_json(
         {{"name", basis_set.get_aux_name()},
-         {"pure", (basis_set.get_atomic_orbital_type() == qdk::chemistry::data::AOType::Spherical)},
+         {"pure", (basis_set.get_atomic_orbital_type() ==
+                   qdk::chemistry::data::AOType::Spherical)},
          {"mode", "RAW"},
          {"atoms", nuclear_charges_unsigned},
          {"num_atomic_orbitals", basis_set.get_num_auxiliary_orbitals()},
