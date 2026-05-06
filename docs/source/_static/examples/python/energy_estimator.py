@@ -9,7 +9,7 @@
 # start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, QuantumErrorProfile, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QuantumErrorProfile, QubitHamiltonian
 
 # Create energy estimator using Qsharp simulator as backend
 qdk_estimator = create("energy_estimator", "qdk")
@@ -31,9 +31,13 @@ circuit = Circuit(
 qubit_hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
 # Run energy estimation using Qsharp simulator without noise
-circuit_executor = create("circuit_executor", "qdk_sparse_state_simulator")
+qdk_estimator = create(
+    "energy_estimator",
+    "qdk",
+    circuit_executor=AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+)
 energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonian, circuit_executor, total_shots=1000
+    circuit, qubit_hamiltonian, total_shots=1000
 )
 print(
     "Energy expectation value from noiseless QDK Simulator: "
@@ -45,34 +49,20 @@ noise_model = QuantumErrorProfile(
     name="noise model",
     description="Noise model for QDK full state simulator",
     errors={
-        "rz": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "h": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "s": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "cx": {
-            "type": "depolarizing_error",
-            "rate": 0.007,
-            "num_qubits": 2,
-        },
+        "rz": {"depolarizing_error": 0.005},
+        "h": {"depolarizing_error": 0.005},
+        "s": {"depolarizing_error": 0.005},
+        "cx": {"depolarizing_error": 0.007},
     },
 )
-circuit_executor = create("circuit_executor", "qdk_full_state_simulator", type="cpu")
-qdk_estimator = create("energy_estimator", "qdk")
+qdk_estimator = create(
+    "energy_estimator",
+    "qdk",
+    circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", type="cpu"),
+)
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit,
     qubit_hamiltonian,
-    circuit_executor,
     total_shots=1000,
     noise_model=noise_model,
 )
@@ -86,9 +76,13 @@ print(
 ################################################################################
 # start-cell-qiskit
 # Run energy estimation using Qiskit Aer simulator without noise
-qiskit_aer_simulator = create("circuit_executor", "qiskit_aer_simulator")
+qdk_estimator = create(
+    "energy_estimator",
+    "qdk",
+    circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
+)
 energy_expectation_results, measurement_data = qdk_estimator.run(
-    circuit, qubit_hamiltonian, qiskit_aer_simulator, total_shots=1000
+    circuit, qubit_hamiltonian, total_shots=1000
 )
 print(
     f"Energy expectation value from Qiskit Aer Simulator: {energy_expectation_results.energy_expectation_value}"
@@ -100,27 +94,19 @@ noise_model = QuantumErrorProfile(
     name="noise model",
     description="Noise model for Qiskit Aer simulator",
     errors={
-        "rz": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "sx": {
-            "type": "depolarizing_error",
-            "rate": 0.005,
-            "num_qubits": 1,
-        },
-        "cx": {
-            "type": "depolarizing_error",
-            "rate": 0.007,
-            "num_qubits": 2,
-        },
+        "rz": {"depolarizing_error": 0.005},
+        "sx": {"depolarizing_error": 0.005},
+        "cx": {"depolarizing_error": 0.007},
     },
+)
+qdk_estimator = create(
+    "energy_estimator",
+    "qdk",
+    circuit_executor=AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
 )
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit,
     qubit_hamiltonian,
-    qiskit_aer_simulator,
     total_shots=1000,
     noise_model=noise_model,
 )

@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import importlib.util
 import os
 import subprocess
@@ -26,6 +28,12 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+# Release-note example scripts are snapshots that only work with the matching
+# library version.  Parse the major.minor from the filename (e.g.
+# "release_notes_v1_1.py" → (1, 1)) and compare against the installed version.
+_INSTALLED_VERSION: str = __import__("qdk_chemistry").__version__
+_RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
 
 
 def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool]:
@@ -185,6 +193,15 @@ def _create_test_methods():
 
                 def test_method(self):
                     """Test the example file runs without errors."""
+                    # Release-note examples are version-pinned snapshots
+                    m = _RELEASE_NOTES_RE.match(filepath.name)
+                    if m:
+                        expected = f"{m.group(1)}.{m.group(2)}"
+                        if not _INSTALLED_VERSION.startswith(expected + "."):
+                            self.skipTest(
+                                f"release_notes example requires v{expected}.x "
+                                f"(installed: {_INSTALLED_VERSION})"
+                            )
                     # Skip if required packages are not available
                     if needs_pyscf and not PYSCF_AVAILABLE:
                         self.skipTest("PySCF not available")
