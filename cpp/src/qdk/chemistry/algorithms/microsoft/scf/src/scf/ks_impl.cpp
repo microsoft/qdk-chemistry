@@ -29,12 +29,13 @@
 
 namespace qdk::chemistry::scf {
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg)
-    : KSImpl(mol, cfg, nullptr, nullptr) {}
+    : KSImpl(mol, cfg, nullptr, nullptr, nullptr) {}
 
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                std::shared_ptr<BasisSet> basis_set,
-               std::shared_ptr<BasisSet> raw_basis_set)
-    : SCFImpl(mol, cfg, basis_set, raw_basis_set, true) {
+               std::shared_ptr<BasisSet> raw_basis_set,
+               std::shared_ptr<BasisSet> aux_basis_set)
+    : SCFImpl(mol, cfg, basis_set, raw_basis_set, aux_basis_set, true) {
   QDK_LOG_TRACE_ENTERING();
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
@@ -72,8 +73,9 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
 
 KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                const RowMajorMatrix& dm, std::shared_ptr<BasisSet> basis_set,
-               std::shared_ptr<BasisSet> raw_basis_set)
-    : KSImpl(mol, cfg, basis_set, raw_basis_set) {
+               std::shared_ptr<BasisSet> raw_basis_set,
+               std::shared_ptr<BasisSet> aux_basis_set)
+    : KSImpl(mol, cfg, basis_set, raw_basis_set, aux_basis_set) {
   QDK_LOG_TRACE_ENTERING();
   VERIFY(dm.rows() == num_density_matrices_ * num_atomic_orbitals_ &&
          dm.cols() == num_atomic_orbitals_);
