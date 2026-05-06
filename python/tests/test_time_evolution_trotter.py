@@ -110,8 +110,8 @@ class TestTrotter:
         coefficients = [1.0, 1.0, 1.0]
 
         hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
-        builder = Trotter(num_divisions=1)
-        unitary = builder.run(hamiltonian, time=1)
+        builder = Trotter(num_divisions=1, time=1.0)
+        unitary = builder.run(hamiltonian)
 
         assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
@@ -868,9 +868,9 @@ class TestNoPartitionFallback:
             pauli_strings=pauli_strings,
             coefficients=coefficients,
         )
-        builder = Trotter(num_divisions=1, order=1)
         t = 1.0
-        terms = builder.run(hamiltonian, time=t).get_container().step_terms
+        builder = Trotter(num_divisions=1, order=1, time=t)
+        terms = builder.run(hamiltonian).get_container().step_terms
 
         for idx, term in enumerate(terms):
             assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
