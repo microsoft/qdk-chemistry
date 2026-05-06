@@ -1,4 +1,4 @@
-"""QDK/Chemistry phase estimation abstractions and utilities."""
+"""QDK/Chemistry phase estimation builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,23 +13,25 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     ControlledUnitary,
-    QpeResult,
-    QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
 )
 
-__all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory", "PhaseEstimationSettings"]
+__all__: list[str] = [
+    "PhaseEstimationBuilder",
+    "PhaseEstimationBuilderFactory",
+    "PhaseEstimationBuilderSettings",
+]
 
 
-class PhaseEstimationSettings(Settings):
-    """Settings for the Phase Estimation algorithm."""
+class PhaseEstimationBuilderSettings(Settings):
+    """Settings for the Phase Estimation Builder algorithm."""
 
     def __init__(self):
-        """Initialize the settings for Phase Estimation.
+        """Initialize the settings for the Phase Estimation Builder.
 
-        Includes nested algorithm references for the evolution builder,
-        circuit mapper, circuit executor, and phase estimation builder.
+        Includes nested algorithm references for the evolution builder
+        and the circuit mapper used to construct phase estimation circuits.
 
         """
         super().__init__()
@@ -44,61 +46,46 @@ class PhaseEstimationSettings(Settings):
             "algorithm_ref",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
-        self._set_default(
-            "circuit_executor",
-            "algorithm_ref",
-            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        self._set_default(
-            "phase_estimation_builder",
-            "algorithm_ref",
-            AlgorithmRef("phase_estimation_builder", "iterative"),
-        )
 
 
-class PhaseEstimation(Algorithm):
-    """Abstract base class for phase estimation algorithms."""
+class PhaseEstimationBuilder(Algorithm):
+    """Abstract base class for phase estimation circuit builders.
+
+    This algorithm constructs the quantum circuits needed for phase estimation
+    without executing them. It can be used independently for resource estimation,
+    circuit preview, or composed inside a full PhaseEstimation runner.
+
+    """
 
     def __init__(self, num_bits: int = -1):
-        """Initialize the PhaseEstimation with default settings.
+        """Initialize the PhaseEstimationBuilder with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
 
         """
         super().__init__()
-        self._settings = PhaseEstimationSettings()
+        self._settings = PhaseEstimationBuilderSettings()
         self._settings.set("num_bits", num_bits)
 
     def type_name(self) -> str:
-        """Return the algorithm type name as phase_estimation."""
-        return "phase_estimation"
+        """Return the algorithm type name as phase_estimation_builder."""
+        return "phase_estimation_builder"
 
     @abstractmethod
     def _run_impl(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        *,
-        noise: QuantumErrorProfile | None = None,
-    ) -> QpeResult:
-        r"""Run the phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
-
-        This method implements the quantum phase estimation procedure:
-        1. The state preparation circuit initializes the system in the desired quantum state.
-        2. The unitary_builder constructs a unitary from the qubit Hamiltonian.
-        3. The circuit_mapper transforms the unitary into controlled-U operations,
-           where the control qubits are ancilla qubits used for phase readout.
-        4. The circuit_executor runs the resulting quantum circuits on the target backend.
-        5. Measurement results are processed to extract the eigenvalue phase estimates.
+    ) -> list[Circuit]:
+        """Build all phase estimation iteration circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            noise: The quantum error profile to simulate noise, defaults to None.
+            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
 
         Returns:
-            A QpeResult object containing the estimated phases and associated metadata.
+            A list of quantum circuits, one per phase bit iteration.
 
         """
 
@@ -133,16 +120,16 @@ class PhaseEstimation(Algorithm):
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
-class PhaseEstimationFactory(AlgorithmFactory):
-    """Factory class for creating PhaseEstimation instances."""
+class PhaseEstimationBuilderFactory(AlgorithmFactory):
+    """Factory class for creating PhaseEstimationBuilder instances."""
 
     def __init__(self):
-        """Initialize the PhaseEstimationFactory."""
+        """Initialize the PhaseEstimationBuilderFactory."""
         super().__init__()
 
     def algorithm_type_name(self) -> str:
-        """Return the algorithm type name as phase_estimation."""
-        return "phase_estimation"
+        """Return the algorithm type name as phase_estimation_builder."""
+        return "phase_estimation_builder"
 
     def default_algorithm_name(self) -> str:
         """Return the iterative as default algorithm name."""

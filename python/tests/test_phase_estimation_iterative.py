@@ -13,9 +13,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
+from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import _validate_iteration_inputs
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
     IterativePhaseEstimation,
-    _validate_iteration_inputs,
 )
 from qdk_chemistry.data import (
     AlgorithmRef,

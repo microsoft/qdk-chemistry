@@ -15,16 +15,15 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import IterativePhaseEstimationBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
 )
-from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 
@@ -72,6 +71,19 @@ class IterativePhaseEstimation(PhaseEstimation):
         self._settings.set("shots_per_bit", shots_per_bit)
         self._iteration_circuits: list[Circuit] | None = None
 
+    def _create_builder(self) -> IterativePhaseEstimationBuilder:
+        """Create an IterativePhaseEstimationBuilder with settings propagated from this algorithm.
+
+        Returns:
+            An IterativePhaseEstimationBuilder instance configured with matching
+            unitary_builder, circuit_mapper, and num_bits settings.
+
+        """
+        builder = IterativePhaseEstimationBuilder(num_bits=self.settings().get("num_bits"))
+        builder.settings().update("unitary_builder", self.settings().get("unitary_builder"))
+        builder.settings().update("circuit_mapper", self.settings().get("circuit_mapper"))
+        return builder
+
     def _run_impl(
         self,
         state_preparation: Circuit,
@@ -92,6 +104,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         # Create nested algorithms from settings
         circuit_executor = self._create_nested("circuit_executor")
+        builder = self._create_builder()
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
@@ -99,8 +112,8 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         # Iterate over the number of phase bits
         for iteration in range(self.settings().get("num_bits")):
-            # Create the iteration circuit
-            iteration_circuit = self.create_iteration_circuit(
+            # Create the iteration circuit via the builder
+            iteration_circuit = builder.build_iteration_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
                 iteration=iteration,
@@ -167,97 +180,14 @@ class IterativePhaseEstimation(PhaseEstimation):
             A quantum circuit implementing one IQPE iteration.
 
         """
-        _validate_iteration_inputs(iteration, total_iterations)
-        # Build the base circuit with registers
-        num_system_qubits = qubit_hamiltonian.num_qubits
-        power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
-
-        if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
-            return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
-            )
-
-        if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
-            return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
-
-        raise RuntimeError(
-            "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
+        builder = self._create_builder()
+        return builder.build_iteration_circuit(
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
+            iteration=iteration,
+            total_iterations=total_iterations,
+            phase_correction=phase_correction,
         )
-
-    def _create_circuit_from_qsharp_op(
-        self,
-        state_preparation: Circuit,
-        controlled_unitary_circuit: Circuit,
-        phase_correction: float,
-        num_system_qubits: int,
-    ) -> Circuit:
-        """Create a Circuit object from a Q# operation.
-
-        Args:
-            state_preparation: Circuit object containing a Q# operation for state preparation.
-            controlled_unitary_circuit: Circuit object containing a Q# operation for the controlled unitary.
-            phase_correction: Feedback phase angle to apply before controlled unitary.
-            num_system_qubits: Number of system qubits.
-
-        Returns:
-            A Circuit object representing the IQPE iteration.
-
-        """
-        state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
-        iterative_parameters = {
-            "statePrep": state_prep_op,
-            "repControlledEvolution": ctrl_unitary_op,
-            "accumulatePhase": phase_correction,
-            "control": 0,
-            "systems": [i + 1 for i in range(num_system_qubits)],
-        }
-        return Circuit(
-            qsharp_factory=QsharpFactoryData(
-                program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
-                parameter=iterative_parameters,
-            )
-        )
-
-    def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float
-    ) -> Circuit:
-        """Create a Circuit object from Qiskit QuantumCircuit objects.
-
-        Args:
-            state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
-            controlled_unitary_circuit: Circuit object containing a Qiskit QuantumCircuit for the controlled unitary.
-            phase_correction: Feedback phase angle to apply before controlled unitary.
-
-        Returns:
-            A Circuit object representing the IQPE iteration.
-
-        """
-        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
-
-        state_prep_qc = state_preparation.get_qiskit_circuit()
-        ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
-        # Parse the state preparation circuit from QASM
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
-        classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
-        circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
-        circuit.h(control)
-
-        # Apply phase correction if provided
-        if phase_correction:
-            circuit.rz(phase_correction, control)
-
-        # Append the controlled unitary circuit
-        circuit.append(ctrl_unitary_qc.to_gate(), [control, *target_qubits])
-        circuit.h(control)
-        circuit.measure(control, classical[0])
-
-        return Circuit(qasm=qasm3.dumps(circuit))
 
     def get_circuits(self) -> list[Circuit]:
         """Get the list of iteration circuits generated during algorithm execution.
@@ -276,19 +206,3 @@ class IterativePhaseEstimation(PhaseEstimation):
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""
         return "iterative"
-
-
-def _validate_iteration_inputs(iteration: int, total_iterations: int) -> None:
-    """Validate iteration parameters for IQPE circuit construction.
-
-    Args:
-        iteration: The current iteration index (0-based).
-        total_iterations: The total number of iterations.
-
-    """
-    if total_iterations <= 0:
-        raise ValueError("total_iterations must be a positive integer.")
-    if iteration < 0 or iteration >= total_iterations:
-        raise ValueError(
-            f"iteration index {iteration} is outside the valid range [0, {total_iterations - 1}].",
-        )
