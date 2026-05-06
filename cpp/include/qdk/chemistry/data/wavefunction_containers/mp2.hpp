@@ -88,7 +88,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Reference to vector of CI coefficients
    */
-  const VectorVariant& get_coefficients() const override;
+  const VectorVariant& get_coefficients() const;
 
   /**
    * @brief Get coefficient for a specific determinant
@@ -96,7 +96,7 @@ class MP2Container : public WavefunctionContainer {
    * @return Coefficient value
    * @throws std::runtime_error if determinant is not found
    */
-  ScalarVariant get_coefficient(const Configuration& det) const override;
+  ScalarVariant get_coefficient(const Configuration& det) const;
 
   /**
    * @brief Get active determinants from MP2 wavefunction
@@ -108,7 +108,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Reference to vector of determinant configurations
    */
-  const DeterminantVector& get_active_determinants() const override;
+  const DeterminantVector& get_active_determinants() const;
 
   /**
    * @brief Get T1 amplitudes
@@ -145,7 +145,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Number of determinants
    */
-  size_t size() const override;
+  size_t size() const;
 
   /**
    * @brief Not implemented for MP2 wavefunctions
@@ -201,23 +201,11 @@ class MP2Container : public WavefunctionContainer {
   void clear_caches() const override;
 
   /**
-   * @brief Serialize to JSON
-   * @return JSON representation of the container
-   */
-  nlohmann::json to_json() const override;
-
-  /**
    * @brief Deserialize from JSON
    * @param j JSON object
    * @return Unique pointer to MP2Container
    */
   static std::unique_ptr<MP2Container> from_json(const nlohmann::json& j);
-
-  /**
-   * @brief Serialize to HDF5
-   * @param group HDF5 group to write to
-   */
-  void to_hdf5(H5::Group& group) const override;
 
   /**
    * @brief Deserialize from HDF5
@@ -321,6 +309,11 @@ class MP2Container : public WavefunctionContainer {
    * @return Spin-traced two-particle RDM
    */
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
+
+ protected:
+  void _to_hdf5_impl(H5::Group& group) const override;
+  nlohmann::json _to_json_impl() const override;
+  std::string _get_summary_impl() const override;
 
  private:
   /** @brief Cached coefficients */

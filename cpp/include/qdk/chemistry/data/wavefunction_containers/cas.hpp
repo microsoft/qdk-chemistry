@@ -19,7 +19,7 @@
 
 namespace qdk::chemistry::data {
 
-class CasWavefunctionContainer : public WavefunctionContainer {
+class CasWavefunctionContainer : public DeterminantalWavefunctionContainer {
  public:
   // Use real values for default CAS
   using MatrixVariant = ContainerTypes::MatrixVariant;
@@ -199,12 +199,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   void clear_caches() const override;
 
   /**
-   * @brief Convert container to JSON format
-   * @return JSON object containing container data
-   */
-  nlohmann::json to_json() const override;
-
-  /**
    * @brief Get container type identifier for serialization
    * @return String "cas"
    */
@@ -215,12 +209,6 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    * @return True if coefficients are complex, false if real
    */
   bool is_complex() const override;
-
-  /**
-   * @brief Check if this container has coefficients data
-   * @return True if coefficients are available, false otherwise
-   */
-  bool has_coefficients() const override;
 
   /**
    * @brief Check if this container has configuration set data

@@ -410,7 +410,9 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = CasWavefunctionContainer::from_hdf5(root);
+    auto restored = std::unique_ptr<CasWavefunctionContainer>(
+        dynamic_cast<CasWavefunctionContainer*>(
+            CasWavefunctionContainer::from_hdf5(root).release()));
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -458,7 +460,9 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = CasWavefunctionContainer::from_hdf5(root2);
+    auto restored = std::unique_ptr<CasWavefunctionContainer>(
+        dynamic_cast<CasWavefunctionContainer*>(
+            CasWavefunctionContainer::from_hdf5(root2).release()));
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =
@@ -507,7 +511,9 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original.to_hdf5(root);
-    auto restored_hdf5 = CasWavefunctionContainer::from_hdf5(root);
+    auto restored_hdf5 = std::unique_ptr<CasWavefunctionContainer>(
+        dynamic_cast<CasWavefunctionContainer*>(
+            CasWavefunctionContainer::from_hdf5(root).release()));
 
     const auto& rest_coeffs_h5 =
         std::get<Eigen::VectorXcd>(restored_hdf5->get_coefficients());

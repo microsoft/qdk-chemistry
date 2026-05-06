@@ -382,7 +382,9 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = SciWavefunctionContainer::from_hdf5(root);
+    auto restored = std::unique_ptr<SciWavefunctionContainer>(
+        dynamic_cast<SciWavefunctionContainer*>(
+            SciWavefunctionContainer::from_hdf5(root).release()));
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -429,7 +431,9 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = SciWavefunctionContainer::from_hdf5(root2);
+    auto restored = std::unique_ptr<SciWavefunctionContainer>(
+        dynamic_cast<SciWavefunctionContainer*>(
+            SciWavefunctionContainer::from_hdf5(root2).release()));
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =

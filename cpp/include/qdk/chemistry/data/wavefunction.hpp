@@ -250,31 +250,6 @@ class WavefunctionContainer {
   virtual std::unique_ptr<WavefunctionContainer> clone() const = 0;
 
   /**
-   * @brief Get all coefficients
-   * @return Vector of all coefficients (real or complex)
-   */
-  virtual const VectorVariant& get_coefficients() const = 0;
-
-  /**
-   * @brief Get coefficient for a specific determinant
-   * @param det Configuration/determinant to get coefficient for
-   * @return Scalar coefficient (real or complex)
-   */
-  virtual ScalarVariant get_coefficient(const Configuration& det) const = 0;
-
-  /**
-   * @brief Get all determinants in the wavefunction
-   * @return Vector of all configurations/determinants
-   */
-  virtual const DeterminantVector& get_active_determinants() const = 0;
-
-  /**
-   * @brief Get number of determinants
-   * @return Number of determinants in the wavefunction
-   */
-  virtual size_t size() const = 0;
-
-  /**
    * @brief Calculate overlap with another wavefunction
    * @param other Other wavefunction container
    * @return Overlap value (real or complex)
@@ -439,7 +414,7 @@ class WavefunctionContainer {
    * @brief Convert container to JSON format
    * @return JSON object containing container data
    */
-  virtual nlohmann::json to_json() const = 0;
+  nlohmann::json to_json() const;
 
   /**
    * @brief Load container from JSON format
@@ -455,7 +430,7 @@ class WavefunctionContainer {
    * @param group HDF5 group to write container data to
    * @throws std::runtime_error if HDF5 I/O error occurs
    */
-  virtual void to_hdf5(H5::Group& group) const;
+  void to_hdf5(H5::Group& group) const;
 
   /**
    * @brief Load container from HDF5 group
@@ -470,6 +445,11 @@ class WavefunctionContainer {
    * @return String identifying the container type (e.g., "cas", "sci", "sd")
    */
   virtual std::string get_container_type() const = 0;
+
+  /**
+   * @brief Build a human-readable summary string
+   */
+  std::string get_summary() const;
 
   /**
    * @brief Get reference to orbital basis set
@@ -488,12 +468,6 @@ class WavefunctionContainer {
    * @return True if complex, false if real
    */
   virtual bool is_complex() const = 0;
-
-  /**
-   * @brief Check if this container has coefficients data
-   * @return True if coefficients are available, false otherwise
-   */
-  virtual bool has_coefficients() const { return false; }
 
   /**
    * @brief Check if this container has configuration set data
@@ -517,6 +491,17 @@ class WavefunctionContainer {
   WavefunctionType _type;
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
+  /// Subclass hook for ``to_hdf5``: write container-specific fields.
+  virtual void _to_hdf5_impl(H5::Group& group) const = 0;
+
+  /// Subclass hook for ``to_json``: return container-specific fields, merged
+  /// (top-level keys) into the main JSON object.
+  virtual nlohmann::json _to_json_impl() const = 0;
+
+  /// Subclass hook for ``get_summary``: return container-specific lines
+  /// (each terminated with ``\n``) appended to the universal summary.
+  virtual std::string _get_summary_impl() const { return ""; }
 
   /**
    * @brief Check if the system uses restricted orbitals with a closed-shell
@@ -586,6 +571,50 @@ class WavefunctionContainer {
                     std::optional<VectorVariant>, std::optional<MatrixVariant>,
                     std::optional<VectorVariant>>
   _deserialize_rdms_from_json(const nlohmann::json& j);
+};
+
+/**
+ * @brief Base class for wavefunctions represented as a linear expansion in
+ *        Slater determinants
+ *
+ * Guarantees that determinants and their coefficients are stored and directly
+ * accessible. Use this type to dispatch on wavefunctions with an explicit
+ * determinantal representation.
+ */
+class DeterminantalWavefunctionContainer : public WavefunctionContainer {
+ public:
+  using WavefunctionContainer::WavefunctionContainer;
+
+  ~DeterminantalWavefunctionContainer() override = default;
+
+  /**
+   * @brief Get all determinant coefficients
+   * @return Vector of all coefficients (real or complex)
+   */
+  virtual const VectorVariant& get_coefficients() const = 0;
+
+  /**
+   * @brief Get coefficient for a specific determinant
+   * @param det Determinant to look up (active space only)
+   * @return Scalar coefficient (real or complex)
+   */
+  virtual ScalarVariant get_coefficient(const Configuration& det) const = 0;
+
+  /**
+   * @brief Get all determinants in the wavefunction
+   * @return Vector of determinants, in the same order as ``get_coefficients``
+   */
+  virtual const DeterminantVector& get_active_determinants() const = 0;
+
+  /**
+   * @brief Get number of determinants in the expansion
+   */
+  virtual size_t size() const = 0;
+
+ protected:
+  void _to_hdf5_impl(H5::Group& group) const override;
+  nlohmann::json _to_json_impl() const override;
+  std::string _get_summary_impl() const override;
 };
 
 /**

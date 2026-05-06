@@ -140,37 +140,27 @@ This enum allows tagging wavefunctions based on their mathematical role:
                                                       R"(
 Abstract base class for wavefunction containers.
 
-This class provides the interface for different types of wavefunction representations (e.g., CI, MCSCF, coupled cluster).
-It uses variant types to support both real and complex arithmetic.
+Provides the interface common to all wavefunction representations. Uses variant
+types to support real or complex arithmetic.
     )")
-      .def("get_coefficient", &WavefunctionContainer::get_coefficient,
-           "Get coefficient for a specific determinant", py::arg("det"))
-      .def("get_active_determinants",
-           &WavefunctionContainer::get_active_determinants,
-           "Get all determinants in the wavefunction",
-           py::return_value_policy::reference_internal)
-      .def("size", &WavefunctionContainer::size, "Get number of determinants")
       .def("norm", &WavefunctionContainer::norm,
            "Calculate norm of the wavefunction")
       .def("get_orbitals", &WavefunctionContainer::get_orbitals,
            "Get reference to orbital basis set")
       .def("get_type", &WavefunctionContainer::get_type,
-           "Get the wavefunction type (Bra, Ket, or Both)")
+           "Get the wavefunction type (SelfDual or NotSelfDual)")
       .def("get_active_num_electrons",
            &WavefunctionContainer::get_active_num_electrons,
            "Get number of active alpha and beta electrons")
       .def("get_total_num_electrons",
            &WavefunctionContainer::get_total_num_electrons,
            "Get total number of alpha and beta electrons")
-      .def("get_orbital_occupations",
-           &WavefunctionContainer::get_active_orbital_occupations,
-           "Get orbital occupations for active orbitals")
-      .def("get_active_orbital_occupations",
-           &WavefunctionContainer::get_total_orbital_occupations,
-           "Get orbital occupations for all orbitals")
       .def("get_active_orbital_occupations",
            &WavefunctionContainer::get_active_orbital_occupations,
            "Get orbital occupations for active orbitals only")
+      .def("get_total_orbital_occupations",
+           &WavefunctionContainer::get_total_orbital_occupations,
+           "Get orbital occupations for all orbitals")
       .def("has_one_rdm_spin_dependent",
            &WavefunctionContainer::has_one_rdm_spin_dependent,
            "Check if spin-dependent one-particle RDMs for active orbitals are "
@@ -207,6 +197,27 @@ It uses variant types to support both real and complex arithmetic.
       .def("get_mutual_information",
            &WavefunctionContainer::get_mutual_information,
            "Get mutual information matrix for active orbitals");
+
+  // Bind intermediate DeterminantalWavefunctionContainer base class
+  py::class_<DeterminantalWavefunctionContainer, WavefunctionContainer,
+             py::smart_holder>(data, "DeterminantalWavefunctionContainer",
+                               R"(
+Abstract base class for wavefunction containers that store an explicit
+expansion in Slater determinants (determinants + coefficients).
+    )")
+      .def("get_coefficient",
+           &DeterminantalWavefunctionContainer::get_coefficient,
+           "Get coefficient for a specific determinant", py::arg("det"))
+      .def("get_coefficients",
+           &DeterminantalWavefunctionContainer::get_coefficients,
+           "Get all CI coefficients",
+           py::return_value_policy::reference_internal)
+      .def("get_active_determinants",
+           &DeterminantalWavefunctionContainer::get_active_determinants,
+           "Get all determinants in the wavefunction",
+           py::return_value_policy::reference_internal)
+      .def("size", &DeterminantalWavefunctionContainer::size,
+           "Get number of determinants");
 
   // Wavefunction class
   py::class_<Wavefunction, DataClass, py::smart_holder> wavefunction(
@@ -976,9 +987,9 @@ Examples:
   wavefunction.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Wavefunction);
 
   // Bind SciWavefunctionContainer
-  py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
-      data, "SciWavefunctionContainer",
-      R"(
+  py::class_<SciWavefunctionContainer, DeterminantalWavefunctionContainer,
+             py::smart_holder>(data, "SciWavefunctionContainer",
+                               R"(
 Selected CI wavefunction container implementation.
 
 This container represents wavefunctions obtained from selected configuration interaction (SCI) methods or full configuration interaction (FCI).
@@ -1108,9 +1119,9 @@ Examples:
            py::return_value_policy::reference_internal);
 
   // Bind CasWavefunctionContainer
-  py::class_<CasWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
-      data, "CasWavefunctionContainer",
-      R"(
+  py::class_<CasWavefunctionContainer, DeterminantalWavefunctionContainer,
+             py::smart_holder>(data, "CasWavefunctionContainer",
+                               R"(
 Complete Active Space (CAS) wavefunction container implementation.
 
 This container represents wavefunctions obtained from complete active space self-consistent field (CASSCF) or complete active space configuration interaction (CASCI) methods.
@@ -1485,7 +1496,7 @@ Examples:
         )");
 
   // Bind SlaterDeterminantContainer
-  py::class_<SlaterDeterminantContainer, WavefunctionContainer,
+  py::class_<SlaterDeterminantContainer, DeterminantalWavefunctionContainer,
              py::smart_holder>(data, "SlaterDeterminantContainer",
                                R"(
 Single Slater determinant wavefunction container implementation.

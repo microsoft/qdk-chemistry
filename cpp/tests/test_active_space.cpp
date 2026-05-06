@@ -423,11 +423,11 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
 }
 
 // Mock container for MockWavefunction
-class MockWavefunctionContainer : public WavefunctionContainer {
+class MockWavefunctionContainer : public DeterminantalWavefunctionContainer {
  public:
   MockWavefunctionContainer(std::shared_ptr<Orbitals> orbitals,
                             const Eigen::VectorXd& entropies)
-      : WavefunctionContainer(WavefunctionType::SelfDual),
+      : DeterminantalWavefunctionContainer(WavefunctionType::SelfDual),
         orbitals_(orbitals),
         entropies_(entropies) {
     // Create a single determinant with the correct length
@@ -524,9 +524,9 @@ class MockWavefunctionContainer : public WavefunctionContainer {
 
   void clear_caches() const override {}
 
-  nlohmann::json to_json() const override { return nlohmann::json{}; }
+  nlohmann::json _to_json_impl() const override { return nlohmann::json{}; }
 
-  void to_hdf5(H5::Group& group) const override {}
+  void _to_hdf5_impl(H5::Group& group) const override {}
 
   std::string get_container_type() const override { return "mock"; }
 
