@@ -41,8 +41,8 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& t2_amplitudes_bbbb)
     : WavefunctionContainer(
           WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
-      _wavefunction(wavefunction),
-      _orbitals(orbitals) {
+      _orbitals(orbitals),
+      _wavefunction(wavefunction) {
   QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
