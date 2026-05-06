@@ -1048,7 +1048,6 @@ def test_basis_set_pickling_and_repr():
         Shell(0, OrbitalType.S, [3.425251, 0.623914, 0.168855], [0.154329, 0.535328, 0.444635]),
         Shell(0, OrbitalType.P, [1.158, 0.325], [0.155916, 0.607684]),
     ]
-    original = BasisSet("STO-3G", shells)
 
     # Create a basis set with auxiliary shells
     positions = np.array([[0.0, 0.0, 0.0]])
