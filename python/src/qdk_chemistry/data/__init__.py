@@ -48,6 +48,7 @@ Exposed classes are:
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
+- :class:`DeterminantalWavefunctionContainer`: Intermediate base for determinant based wavefunctions.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).
 
 Exposed exceptions are:
@@ -75,6 +76,7 @@ from qdk_chemistry._core.data import (
     Configuration,
     ConfigurationSet,
     CoupledClusterContainer,
+    DeterminantalWavefunctionContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -140,6 +142,7 @@ __all__ = [
     "ControlledUnitary",
     "CoupledClusterContainer",
     "DataClass",
+    "DeterminantalWavefunctionContainer",
     "ElectronicStructureSettings",
     "Element",
     "EncodingMismatchError",

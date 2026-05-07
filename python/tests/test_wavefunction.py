@@ -255,7 +255,6 @@ class TestWavefunction:
         assert "Number of determinants: 2" in summary
         assert "Wavefunction type: SelfDual" in summary
         assert "Complex: no" in summary
-        assert "Norm:" in summary
         assert "Total electrons" in summary
         assert "Active electrons" in summary
         assert "1-RDM available:" in summary

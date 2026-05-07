@@ -65,9 +65,9 @@ CasWavefunctionContainer::CasWavefunctionContainer(
     const std::optional<VectorVariant>& two_rdm_aaaa,
     const std::optional<VectorVariant>& two_rdm_bbbb,
     const OrbitalEntropies& entropies, WavefunctionType type)
-    : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
-                            two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
-                            two_rdm_bbbb, entropies, type),
+    : DeterminantalWavefunctionContainer(
+          one_rdm_spin_traced, one_rdm_aa, one_rdm_bb, two_rdm_spin_traced,
+          two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, entropies, type),
       _coefficients(coeffs),
       _configuration_set(dets, orbitals) {
   QDK_LOG_TRACE_ENTERING();
@@ -259,11 +259,6 @@ std::pair<size_t, size_t> CasWavefunctionContainer::get_active_num_electrons()
   return {n_alpha, n_beta};
 }
 
-bool CasWavefunctionContainer::has_coefficients() const {
-  QDK_LOG_TRACE_ENTERING();
-  return !_coefficients.valueless_by_exception();
-}
-
 bool CasWavefunctionContainer::has_configuration_set() const {
   QDK_LOG_TRACE_ENTERING();
   return true;
@@ -436,50 +431,28 @@ bool CasWavefunctionContainer::is_complex() const {
   return detail::is_vector_variant_complex(_coefficients);
 }
 
-nlohmann::json CasWavefunctionContainer::to_json() const {
+std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_json(
+    const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
-
-  nlohmann::json j;
-
-  // Store version first
-  j["version"] = SERIALIZATION_VERSION;
-
-  // Store container type
-  j["container_type"] = get_container_type();
-
-  // Store wavefunction type
-  j["wavefunction_type"] =
-      (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-
-  // Store coefficients
-  bool is_complex = detail::is_vector_variant_complex(_coefficients);
-  j["is_complex"] = is_complex;
-  if (is_complex) {
-    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(_coefficients);
-    // Use NumPy's format: array of [real, imag] pairs
-    nlohmann::json coeffs_array = nlohmann::json::array();
-    for (int i = 0; i < coeffs_complex.size(); ++i) {
-      coeffs_array.push_back(
-          {coeffs_complex(i).real(), coeffs_complex(i).imag()});
-    }
-    j["coefficients"] = coeffs_array;
-  } else {
-    const auto& coeffs_real = std::get<Eigen::VectorXd>(_coefficients);
-    // No copying - use data pointer directly
-    j["coefficients"] = std::vector<double>(
-        coeffs_real.data(), coeffs_real.data() + coeffs_real.size());
+  auto base = WavefunctionContainer::from_json(j);
+  if (!dynamic_cast<CasWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "JSON does not describe a CasWavefunctionContainer");
   }
+  return std::unique_ptr<CasWavefunctionContainer>(
+      static_cast<CasWavefunctionContainer*>(base.release()));
+}
 
-  // Store configuration set (delegates to ConfigurationSet serialization)
-  j["configuration_set"] = _configuration_set.to_json();
-
-  // Serialize RDMs if available
-  _serialize_rdms_to_json(j);
-
-  // Serialize entropies if available
-  _serialize_entropies_to_json(j);
-
-  return j;
+std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
+    H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  auto base = WavefunctionContainer::from_hdf5(group);
+  if (!dynamic_cast<CasWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "HDF5 group does not describe a CasWavefunctionContainer");
+  }
+  return std::unique_ptr<CasWavefunctionContainer>(
+      static_cast<CasWavefunctionContainer*>(base.release()));
 }
 
 }  // namespace qdk::chemistry::data

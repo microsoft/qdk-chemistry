@@ -18,7 +18,7 @@
 
 namespace qdk::chemistry::data {
 
-class SciWavefunctionContainer : public WavefunctionContainer {
+class SciWavefunctionContainer : public DeterminantalWavefunctionContainer {
  public:
   // Use real values for default FCI
   using MatrixVariant = ContainerTypes::MatrixVariant;
@@ -197,28 +197,29 @@ class SciWavefunctionContainer : public WavefunctionContainer {
   void clear_caches() const override;
 
   /**
-   * @brief Convert container to JSON format
-   * @return JSON object containing container data
-   */
-  nlohmann::json to_json() const override;
-
-  /**
    * @brief Get container type identifier for serialization
    * @return String "sci"
    */
   std::string get_container_type() const override;
 
   /**
+   * @brief Deserialize from JSON
+   * @throws std::runtime_error if JSON does not describe an SCI container
+   */
+  static std::unique_ptr<SciWavefunctionContainer> from_json(
+      const nlohmann::json& j);
+
+  /**
+   * @brief Deserialize from HDF5
+   * @throws std::runtime_error if group does not describe an SCI container
+   */
+  static std::unique_ptr<SciWavefunctionContainer> from_hdf5(H5::Group& group);
+
+  /**
    * @brief Check if the wavefunction is complex-valued
    * @return True if coefficients are complex, false if real
    */
   bool is_complex() const override;
-
-  /**
-   * @brief Check if this container has coefficients data
-   * @return True if coefficients are available, false otherwise
-   */
-  bool has_coefficients() const override;
 
   /**
    * @brief Check if this container has configuration set data

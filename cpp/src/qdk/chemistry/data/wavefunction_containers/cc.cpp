@@ -358,19 +358,13 @@ void CoupledClusterContainer::clear_caches() const {
   _clear_rdms();
 }
 
-nlohmann::json CoupledClusterContainer::to_json() const {
+nlohmann::json CoupledClusterContainer::_to_json_impl() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
 
-  j["version"] = SERIALIZATION_VERSION;
-  j["container_type"] = get_container_type();
-
-  // Serialize orbitals
   if (_orbitals) {
     j["orbitals"] = _orbitals->to_json();
   }
-
-  // Serialize wfn
   if (_wavefunction) {
     j["wavefunction"] = _wavefunction->to_json();
   }
@@ -466,24 +460,9 @@ std::unique_ptr<CoupledClusterContainer> CoupledClusterContainer::from_json(
   }
 }
 
-void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
+void CoupledClusterContainer::_to_hdf5_impl(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-
-    // version
-    H5::Attribute version_attr = group.createAttribute(
-        "version", string_type, H5::DataSpace(H5S_SCALAR));
-    std::string version_str = SERIALIZATION_VERSION;
-    version_attr.write(string_type, version_str);
-    version_attr.close();
-
-    // container type
-    std::string container_type = get_container_type();
-    H5::Attribute container_type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    container_type_attr.write(string_type, container_type);
-
     // complex flag
     bool is_complex = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
@@ -1506,6 +1485,26 @@ CoupledClusterContainer::get_active_two_rdm_spin_traced() const {
       "Coupled cluster RDM computation requires the adjoint (bra) "
       "wavefunction. Use a coupled cluster method that computes lambda "
       "amplitudes.");
+}
+
+std::string CoupledClusterContainer::_get_summary_impl() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ostringstream oss;
+  oss << "  Reference wavefunction: " << (_wavefunction ? "set" : "none")
+      << "\n";
+  oss << "  T1 amplitudes:";
+  if (_t1_amplitudes_aa) oss << " aa";
+  if (_t1_amplitudes_bb) oss << " bb";
+  if (!_t1_amplitudes_aa && !_t1_amplitudes_bb) oss << " none";
+  oss << "\n";
+  oss << "  T2 amplitudes:";
+  if (_t2_amplitudes_abab) oss << " abab";
+  if (_t2_amplitudes_aaaa) oss << " aaaa";
+  if (_t2_amplitudes_bbbb) oss << " bbbb";
+  if (!_t2_amplitudes_abab && !_t2_amplitudes_aaaa && !_t2_amplitudes_bbbb)
+    oss << " none";
+  oss << "\n";
+  return oss.str();
 }
 
 }  // namespace qdk::chemistry::data
