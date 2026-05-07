@@ -114,7 +114,14 @@ class Structure : public DataClass,
    */
   Structure(Structure&& other) noexcept = default;
 
+  /**
+   * @brief Copy assignment operator
+   */
   Structure& operator=(const Structure&) = delete;
+
+  /**
+   * @brief Move assignment operator
+   */
   Structure& operator=(Structure&&) = delete;
 
   /**

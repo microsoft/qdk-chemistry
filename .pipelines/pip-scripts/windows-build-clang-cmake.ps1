@@ -1,5 +1,5 @@
 # windows-build-clang-cmake.ps1
-# Local script to build and test the QDK Chemistry Python package on Windows using Clang and CMake.
+# Local script to build and test the QDK Chemistry Python package on Windows using clang-cl and CMake.
 # Run from the repo root in an elevated PowerShell (admin) if VS Build Tools need installing.
 #
 # Usage:
@@ -197,7 +197,7 @@ if (-not $SkipPrereqs) {
 
     # --- 0d. Install vcpkg packages ---
     Write-Host ""
-    Write-Host "Installing vcpkg dependencies (this may take a while on first run)..."
+    Write-Host "Installing vcpkg dependencies with triplet '$VcpkgTriplet' (this may take a while on first run)..."
     & "$vcpkgRoot\vcpkg.exe" install `
         --triplet $VcpkgTriplet `
         --x-manifest-root="$RepoRoot" `
@@ -249,6 +249,8 @@ if (-not $SkipPrereqs) {
         }
     }
     Assert-Command "clang-cl"
+    Assert-Command "cmake"
+    Assert-Command "ninja"
 
     # Set up MSVC env
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
@@ -310,6 +312,7 @@ if (-not $SkipCpp) {
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
             -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
             -DQDK_ENABLE_OPENMP=ON `
+            -DMACIS_ENABLE_TESTS=OFF `
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
             -DCMAKE_BUILD_TYPE=Release `
@@ -318,7 +321,8 @@ if (-not $SkipCpp) {
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
             -DCMAKE_TOOLCHAIN_FILE="$env:CMAKE_TOOLCHAIN_FILE" `
             -DVCPKG_TARGET_TRIPLET="$env:VCPKG_TARGET_TRIPLET" `
-            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR"
+            -DVCPKG_INSTALLED_DIR="$env:VCPKG_INSTALLED_DIR" `
+            -DFETCHCONTENT_QUIET=OFF
         if ($LASTEXITCODE -ne 0) { Write-Error "CMake configure failed"; exit 1 }
     } else {
         Write-Host "=== Step 1: Skipping configure (incremental build) ===" -ForegroundColor DarkGray

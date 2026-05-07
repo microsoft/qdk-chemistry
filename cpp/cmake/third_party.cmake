@@ -81,8 +81,8 @@ else()
 endif()
 
 handle_dependency(gauxc
-  GIT_REPOSITORY https://github.com/wavefunction91/gauxc.git
-  GIT_TAG 2c4a2bd785eae44ae0049f06057c23ca0239ae33
+  GIT_REPOSITORY https://github.com/lorisercole/gauxc.git
+  GIT_TAG 4e18eb1c4fc3b7bc1d2f91c59d8a4826b0997a4f
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}

@@ -244,6 +244,8 @@ if (-not $SkipPrereqs) {
         }
     }
     Assert-Command "clang-cl"
+    Assert-Command "cmake"
+    Assert-Command "ninja"
 
     # Set up MSVC env
     $vcvarsall = "$vsPath\VC\Auxiliary\Build\vcvarsall.bat"
