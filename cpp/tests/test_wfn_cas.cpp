@@ -342,9 +342,7 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = CasWavefunctionContainer::from_json(j);
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
@@ -410,9 +408,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = std::unique_ptr<CasWavefunctionContainer>(
-        dynamic_cast<CasWavefunctionContainer*>(
-            CasWavefunctionContainer::from_hdf5(root).release()));
+    auto restored = CasWavefunctionContainer::from_hdf5(root);
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -460,9 +456,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = std::unique_ptr<CasWavefunctionContainer>(
-        dynamic_cast<CasWavefunctionContainer*>(
-            CasWavefunctionContainer::from_hdf5(root2).release()));
+    auto restored = CasWavefunctionContainer::from_hdf5(root2);
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =
@@ -495,9 +489,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
 
   // Test JSON
   nlohmann::json j = original.to_json();
-  auto restored_json = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored_json = CasWavefunctionContainer::from_json(j);
 
   const auto& orig_coeffs =
       std::get<Eigen::VectorXcd>(original.get_coefficients());
@@ -511,9 +503,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original.to_hdf5(root);
-    auto restored_hdf5 = std::unique_ptr<CasWavefunctionContainer>(
-        dynamic_cast<CasWavefunctionContainer*>(
-            CasWavefunctionContainer::from_hdf5(root).release()));
+    auto restored_hdf5 = CasWavefunctionContainer::from_hdf5(root);
 
     const auto& rest_coeffs_h5 =
         std::get<Eigen::VectorXcd>(restored_hdf5->get_coefficients());
@@ -563,9 +553,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = CasWavefunctionContainer::from_json(j);
 
   // Verify RDMs are available after deserialization
   EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -646,9 +634,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("two_rdm_bbbb"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = CasWavefunctionContainer::from_json(j);
 
   // Verify rdms are still there
   EXPECT_TRUE(restored->has_one_rdm_spin_dependent());

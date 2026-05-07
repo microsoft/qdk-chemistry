@@ -370,4 +370,28 @@ const ConfigurationSet& SciWavefunctionContainer::get_configuration_set()
   return _configuration_set;
 }
 
+std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_json(
+    const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+  auto base = WavefunctionContainer::from_json(j);
+  if (!dynamic_cast<SciWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "JSON does not describe a SciWavefunctionContainer");
+  }
+  return std::unique_ptr<SciWavefunctionContainer>(
+      static_cast<SciWavefunctionContainer*>(base.release()));
+}
+
+std::unique_ptr<SciWavefunctionContainer> SciWavefunctionContainer::from_hdf5(
+    H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  auto base = WavefunctionContainer::from_hdf5(group);
+  if (!dynamic_cast<SciWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "HDF5 group does not describe a SciWavefunctionContainer");
+  }
+  return std::unique_ptr<SciWavefunctionContainer>(
+      static_cast<SciWavefunctionContainer*>(base.release()));
+}
+
 }  // namespace qdk::chemistry::data

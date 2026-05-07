@@ -431,4 +431,28 @@ bool CasWavefunctionContainer::is_complex() const {
   return detail::is_vector_variant_complex(_coefficients);
 }
 
+std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_json(
+    const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+  auto base = WavefunctionContainer::from_json(j);
+  if (!dynamic_cast<CasWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "JSON does not describe a CasWavefunctionContainer");
+  }
+  return std::unique_ptr<CasWavefunctionContainer>(
+      static_cast<CasWavefunctionContainer*>(base.release()));
+}
+
+std::unique_ptr<CasWavefunctionContainer> CasWavefunctionContainer::from_hdf5(
+    H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  auto base = WavefunctionContainer::from_hdf5(group);
+  if (!dynamic_cast<CasWavefunctionContainer*>(base.get())) {
+    throw std::runtime_error(
+        "HDF5 group does not describe a CasWavefunctionContainer");
+  }
+  return std::unique_ptr<CasWavefunctionContainer>(
+      static_cast<CasWavefunctionContainer*>(base.release()));
+}
+
 }  // namespace qdk::chemistry::data

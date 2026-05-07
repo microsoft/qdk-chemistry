@@ -320,9 +320,7 @@ TEST_F(SciWavefunctionTest, JsonSerialization) {
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = SciWavefunctionContainer::from_json(j);
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
@@ -382,9 +380,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = std::unique_ptr<SciWavefunctionContainer>(
-        dynamic_cast<SciWavefunctionContainer*>(
-            SciWavefunctionContainer::from_hdf5(root).release()));
+    auto restored = SciWavefunctionContainer::from_hdf5(root);
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -431,9 +427,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = std::unique_ptr<SciWavefunctionContainer>(
-        dynamic_cast<SciWavefunctionContainer*>(
-            SciWavefunctionContainer::from_hdf5(root2).release()));
+    auto restored = SciWavefunctionContainer::from_hdf5(root2);
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =
@@ -614,9 +608,7 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = SciWavefunctionContainer::from_json(j);
 
   // Verify RDMs are available after deserialization
   EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -701,9 +693,7 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("two_rdm_bbbb"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
-          WavefunctionContainer::from_json(j).release()));
+  auto restored = SciWavefunctionContainer::from_json(j);
 
   // Verify rdms are still there
   EXPECT_TRUE(restored->has_one_rdm_spin_dependent());

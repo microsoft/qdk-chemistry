@@ -205,6 +205,19 @@ class CasWavefunctionContainer : public DeterminantalWavefunctionContainer {
   std::string get_container_type() const override;
 
   /**
+   * @brief Deserialize from JSON
+   * @throws std::runtime_error if JSON does not describe a CAS container
+   */
+  static std::unique_ptr<CasWavefunctionContainer> from_json(
+      const nlohmann::json& j);
+
+  /**
+   * @brief Deserialize from HDF5
+   * @throws std::runtime_error if group does not describe a CAS container
+   */
+  static std::unique_ptr<CasWavefunctionContainer> from_hdf5(H5::Group& group);
+
+  /**
    * @brief Check if the wavefunction is complex-valued
    * @return True if coefficients are complex, false if real
    */
