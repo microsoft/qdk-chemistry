@@ -13,6 +13,8 @@ LIBFLAME_VERSION=${9:-5.2.0}
 PYENV_VERSION=${10:-2.6.15}
 MAC_BUILD=${11:-OFF}
 
+echo -x
+
 export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
@@ -20,16 +22,16 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
-    apt-get update -q
+    apt-get update -qq
     apt install -q libc-bin
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
-    apt-get update -q
-    apt-get install -y -q \
+    apt-get update -qq
+    apt-get install -y -qq \
         python3 python3-pip python3-dev \
         libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
+        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
         libffi-dev liblzma-dev \
         libeigen3-dev \
         nlohmann-json3-dev \
@@ -64,13 +66,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     rm -r cmake-${CMAKE_VERSION}
     cmake --version
 
-    # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
-    # with qiskit's shared OpenBLAS
-    echo "Downloading and installing BLIS..."
-    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
+    # # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
+    # # with qiskit's shared OpenBLAS
+    # echo "Downloading and installing BLIS..."
+    # bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
 
-    echo "Downloading and installing libflame..."
-    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+    # echo "Downloading and installing libflame..."
+    # bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
 
     export PYENV_ROOT="/workspace/.pyenv"
 elif [ "$MAC_BUILD" == "ON" ]; then
@@ -89,17 +91,17 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     export PYENV_ROOT="$PWD/.pyenv"
 fi
 
-echo "Downloading HDF5 $HDF5_VERSION..."
-export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
-wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
-echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
-tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
-rm hdf5-${HDF5_VERSION}.tar.bz2
-mv hdf5-${HDF5_VERSION} hdf5
-echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
+# echo "Downloading HDF5 $HDF5_VERSION..."
+# export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
+# wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+# echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
+# tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
+# rm hdf5-${HDF5_VERSION}.tar.bz2
+# mv hdf5-${HDF5_VERSION} hdf5
+# echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 
-echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
+# echo "Installing HDF5..."
+# bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
 
 # Install pyenv to use non-system python3 versions
 # pyenv is used in place of a venv to prevent any collisions with the system Python
@@ -116,10 +118,18 @@ rm pyenv.zip
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
 export PATH="$PYENV_ROOT/shims:$PATH"
 
+which python3
+which python
 python3 --version
+which pip3
+pip3 --version
+which pip
+pip --version
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
+pip3 --version
+pip --version
 
 PIP_STRING="fonttools>=4.61.0 urllib3>=2.6.0"
 
@@ -128,7 +138,11 @@ if [ "${MAC_BUILD}" == "OFF" ]; then
     PIP_STRING+=" opentelemetry-api==1.23.0 opentelemetry-sdk==1.23.0 opentelemetry-exporter-otlp-proto-grpc==1.23.0"
 fi
 
-python3 -m pip install auditwheel build ${PIP_STRING}
+# python3 -m pip install auditwheel build ${PIP_STRING}
+python3 -m pip install auditwheel # build ${PIP_STRING}
+python3 -m pip install urllib3>=2.6.0
+python3 -m pip install fonttools>=4.61.0
+exit 1
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
