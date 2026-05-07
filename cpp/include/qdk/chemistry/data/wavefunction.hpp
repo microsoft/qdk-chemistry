@@ -583,6 +583,11 @@ class WavefunctionContainer {
  */
 class DeterminantalWavefunctionContainer : public WavefunctionContainer {
  public:
+  using MatrixVariant = ContainerTypes::MatrixVariant;
+  using VectorVariant = ContainerTypes::VectorVariant;
+  using ScalarVariant = ContainerTypes::ScalarVariant;
+  using DeterminantVector = ContainerTypes::DeterminantVector;
+
   using WavefunctionContainer::WavefunctionContainer;
 
   ~DeterminantalWavefunctionContainer() override = default;
