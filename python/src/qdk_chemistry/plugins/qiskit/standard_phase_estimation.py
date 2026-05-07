@@ -19,6 +19,10 @@ from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    QpeCircuitBuilder,
+    QpeCircuitBuilderSettings,
+)
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -27,20 +31,24 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = ["QiskitStandardPhaseEstimation", "QiskitStandardPhaseEstimationSettings"]
+__all__: list[str] = [
+    "QiskitStandardPhaseEstimation",
+    "QiskitStandardPhaseEstimationSettings",
+    "QiskitStandardQpeCircuitBuilder",
+    "QiskitStandardQpeCircuitBuilderSettings",
+]
 
 
-class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
-    """Settings for the Qiskit Standard Phase Estimation algorithm."""
+# ---------------------------------------------------------------------------
+# Circuit Builder
+# ---------------------------------------------------------------------------
+
+
+class QiskitStandardQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
+    """Settings for the Standard Phase Estimation Builder."""
 
     def __init__(self):
-        """Initialize the settings for Qiskit Standard Phase Estimation.
-
-        Args:
-            qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
-            shots: The number of shots to execute the circuit.
-
-        """
+        """Initialize the settings for the Standard Phase Estimation Builder."""
         super().__init__()
         self._set_default(
             "qft_do_swaps",
@@ -48,82 +56,53 @@ class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
             True,
             "Whether to include the final swap layer in the inverse QFT.",
         )
-        self._set_default(
-            "shots",
-            "int",
-            3,
-            "The number of shots to execute the circuit.",
-        )
 
 
-class QiskitStandardPhaseEstimation(PhaseEstimation):
-    """Standard QFT-based (non-iterative) phase estimation."""
+class QiskitStandardQpeCircuitBuilder(QpeCircuitBuilder):
+    """Standard QFT-based phase estimation circuit builder.
 
-    def __init__(self, num_bits: int = -1, qft_do_swaps: bool = True, shots: int = 3):
-        """Initialize the Qiskit standard phase estimation routine.
+    Constructs the full QPE circuit (state prep, controlled unitaries, inverse QFT,
+    measurements) without executing it. Can be used standalone for resource estimation
+    or composed inside QiskitStandardPhaseEstimation.
+
+    """
+
+    def __init__(self, num_bits: int = -1, qft_do_swaps: bool = True):
+        """Initialize the QiskitStandardQpeCircuitBuilder.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
-                Defaults to ``True`` so that the measured bit string is
-                ordered from most-significant to least-significant bit.
-            shots: The number of shots to execute the circuit.
 
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits)
-        self._settings = QiskitStandardPhaseEstimationSettings()
+        self._settings = QiskitStandardQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("qft_do_swaps", qft_do_swaps)
-        self._settings.set("shots", shots)
-        self._qpe_circuit: Circuit | None = None
 
     def _run_impl(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        *,
-        noise: QuantumErrorProfile | None = None,
-    ) -> QpeResult:
-        """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
+    ) -> list[Circuit]:
+        """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
-            noise: The quantum error profile to simulate noise, defaults to None.
+            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
 
         Returns:
-            A QpeResult object containing the results of the phase estimation.
+            A single-element list containing the full QPE circuit.
 
         """
-        Logger.trace_entering()
-        circuit_executor = self._create_nested("circuit_executor")
-        circuit = self.create_circuit(
+        circuit = self.build_circuit(
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
         )
-        self._qpe_circuit = circuit
-        shots = self._settings.get("shots")
-        execution_data = circuit_executor.run(circuit, shots=shots, noise=noise)
-        counts = execution_data.bitstring_counts
+        return [circuit]
 
-        dominant_bitstring = max(counts, key=counts.get)
-        raw_phase = int(dominant_bitstring, 2) / (2 ** self._settings.get("num_bits"))
-
-        if isinstance(self.unitary_builder, TimeEvolutionBuilder):
-            evolution_time = self.unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
-                method=self.name(),
-                phase_fraction=raw_phase,
-                evolution_time=evolution_time,
-                bits_msb_first=dominant_bitstring,
-            )
-        raise NotImplementedError(
-            "QPE result construction currently only supports post-processing from time evolution. "
-            f"Got {type(self.unitary_builder)} instead."
-        )
-
-    def create_circuit(
+    def build_circuit(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
@@ -202,19 +181,125 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
 
-    def get_circuit(self) -> Circuit:
-        """Get the QPE circuit generated during algorithm execution.
+    def name(self) -> str:
+        """Return the name of the builder algorithm."""
+        return "standard"
 
-        Returns:
-            The quantum circuit used in the last execution.
 
-        Raises:
-            ValueError: If no QPE circuit is available.
+# ---------------------------------------------------------------------------
+# Phase Estimation Algorithm
+# ---------------------------------------------------------------------------
+
+
+class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
+    """Settings for the Qiskit Standard Phase Estimation algorithm."""
+
+    def __init__(self):
+        """Initialize the settings for Qiskit Standard Phase Estimation.
+
+        Args:
+            qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
+            shots: The number of shots to execute the circuit.
 
         """
-        if self._qpe_circuit is not None:
-            return self._qpe_circuit
-        raise ValueError("No QPE circuit has been generated. Please run the algorithm first.")
+        super().__init__()
+        self._set_default(
+            "qft_do_swaps",
+            "bool",
+            True,
+            "Whether to include the final swap layer in the inverse QFT.",
+        )
+        self._set_default(
+            "shots",
+            "int",
+            3,
+            "The number of shots to execute the circuit.",
+        )
+
+
+class QiskitStandardPhaseEstimation(PhaseEstimation):
+    """Standard QFT-based (non-iterative) phase estimation."""
+
+    def __init__(self, num_bits: int = -1, qft_do_swaps: bool = True, shots: int = 3):
+        """Initialize the Qiskit standard phase estimation routine.
+
+        Args:
+            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
+            qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
+                Defaults to ``True`` so that the measured bit string is
+                ordered from most-significant to least-significant bit.
+            shots: The number of shots to execute the circuit.
+
+        """
+        Logger.trace_entering()
+        super().__init__(num_bits=num_bits)
+        self._settings = QiskitStandardPhaseEstimationSettings()
+        self._settings.set("num_bits", num_bits)
+        self._settings.set("qft_do_swaps", qft_do_swaps)
+        self._settings.set("shots", shots)
+
+    def _create_builder(self) -> QiskitStandardQpeCircuitBuilder:
+        """Create a QiskitStandardQpeCircuitBuilder with settings propagated from this algorithm.
+
+        Returns:
+            A QiskitStandardQpeCircuitBuilder instance configured with matching
+            unitary_builder, circuit_mapper, num_bits, and qft_do_swaps settings.
+
+        """
+        builder = QiskitStandardQpeCircuitBuilder(
+            num_bits=self.settings().get("num_bits"),
+            qft_do_swaps=self.settings().get("qft_do_swaps"),
+        )
+        builder.settings().update("unitary_builder", self.settings().get("unitary_builder"))
+        builder.settings().update("circuit_mapper", self.settings().get("circuit_mapper"))
+        return builder
+
+    def _run_impl(
+        self,
+        state_preparation: Circuit,
+        qubit_hamiltonian: QubitHamiltonian,
+        *,
+        noise: QuantumErrorProfile | None = None,
+    ) -> QpeResult:
+        """Run the standard phase estimation algorithm given the state preparation and qubit Hamiltonian.
+
+        Args:
+            state_preparation: The circuit that prepares the initial state.
+            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            noise: The quantum error profile to simulate noise, defaults to None.
+
+        Returns:
+            A QpeResult object containing the results of the phase estimation.
+
+        """
+        Logger.trace_entering()
+        circuit_executor = self._create_nested("circuit_executor")
+        builder = self._create_builder()
+        circuits = builder.run(
+            state_preparation=state_preparation,
+            qubit_hamiltonian=qubit_hamiltonian,
+        )
+        circuit = circuits[0]
+        shots = self._settings.get("shots")
+        execution_data = circuit_executor.run(circuit, shots=shots, noise=noise)
+        counts = execution_data.bitstring_counts
+
+        dominant_bitstring = max(counts, key=counts.get)
+        raw_phase = int(dominant_bitstring, 2) / (2 ** self._settings.get("num_bits"))
+
+        unitary_builder = self._create_nested("unitary_builder")
+        if isinstance(unitary_builder, TimeEvolutionBuilder):
+            evolution_time = unitary_builder.settings().get("time")
+            return QpeResult.from_phase_fraction(
+                method=self.name(),
+                phase_fraction=raw_phase,
+                evolution_time=evolution_time,
+                bits_msb_first=dominant_bitstring,
+            )
+        raise NotImplementedError(
+            "QPE result construction currently only supports post-processing from time evolution. "
+            f"Got {type(unitary_builder)} instead."
+        )
 
     def name(self) -> str:
         """Return the algorithm name as qiskit_standard."""

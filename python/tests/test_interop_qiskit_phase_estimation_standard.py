@@ -24,7 +24,10 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import (
+        QiskitStandardPhaseEstimation,
+        QiskitStandardQpeCircuitBuilder,
+    )
     from qdk_chemistry.utils.phase import energy_from_phase
 
 else:
@@ -33,6 +36,7 @@ else:
     qasm3 = object
     QiskitStatePreparation = object
     QiskitStandardPhaseEstimation = object
+    QiskitStandardQpeCircuitBuilder = object
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -230,11 +234,45 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
         AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
     )
 
-    # Override cached_property with a non-TimeEvolutionBuilder instance
-    qpe.__dict__["unitary_builder"] = _MockBuilder()
+    # Patch _create_nested to return the mock builder for "unitary_builder"
+    mock_builder = _MockBuilder()
+    original_create_nested = qpe._create_nested
+
+    def _patched_create_nested(key, **kwargs):
+        if key == "unitary_builder":
+            return mock_builder
+        return original_create_nested(key, **kwargs)
+
+    qpe._create_nested = _patched_create_nested
 
     with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
         qpe.run(
             state_preparation=two_qubit_phase_problem.state_prep,
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
+
+
+def test_builder_run_returns_circuits(two_qubit_phase_problem: TraditionalProblem) -> None:
+    """Validate that QiskitStandardQpeCircuitBuilder.run produces a single QPE circuit."""
+    builder = QiskitStandardQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
+    builder.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+    )
+
+    circuits = builder.run(
+        state_preparation=two_qubit_phase_problem.state_prep,
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+    )
+
+    assert isinstance(circuits, list)
+    assert len(circuits) == 1
+    circuit = circuits[0]
+    assert isinstance(circuit, Circuit)
+    result = circuit.estimate()
+    assert result is not None
+    assert hasattr(result, "logical_counts")
