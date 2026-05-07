@@ -44,7 +44,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
-from qdk_chemistry.algorithms.phase_estimation.builder.base import PhaseEstimationBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -70,7 +70,6 @@ __all__ = [
     "MultiConfigurationScf",
     "OrbitalLocalizer",
     "PhaseEstimation",
-    "PhaseEstimationBuilder",
     "ProjectedMultiConfigurationCalculator",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
@@ -87,6 +86,7 @@ __all__ = [
     "QdkStabilityChecker",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
+    "QpeCircuitBuilder",
     "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",

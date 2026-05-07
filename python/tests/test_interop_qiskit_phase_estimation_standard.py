@@ -24,8 +24,10 @@ if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
     from qiskit.circuit.library import StatePreparation as QiskitStatePreparation
 
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation_builder import QiskitStandardPhaseEstimationBuilder
+    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import (
+        QiskitStandardPhaseEstimation,
+        QiskitStandardQpeCircuitBuilder,
+    )
     from qdk_chemistry.utils.phase import energy_from_phase
 
 else:
@@ -34,7 +36,7 @@ else:
     qasm3 = object
     QiskitStatePreparation = object
     QiskitStandardPhaseEstimation = object
-    QiskitStandardPhaseEstimationBuilder = object
+    QiskitStandardQpeCircuitBuilder = object
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -251,8 +253,8 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
 
 
 def test_builder_run_returns_circuits(two_qubit_phase_problem: TraditionalProblem) -> None:
-    """Validate that QiskitStandardPhaseEstimationBuilder.run produces a single QPE circuit."""
-    builder = QiskitStandardPhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
+    """Validate that QiskitStandardQpeCircuitBuilder.run produces a single QPE circuit."""
+    builder = QiskitStandardQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
     builder.settings().set(
         "circuit_mapper",
         AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),

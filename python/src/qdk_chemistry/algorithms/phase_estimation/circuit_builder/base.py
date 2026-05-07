@@ -18,13 +18,13 @@ from qdk_chemistry.data import (
 )
 
 __all__: list[str] = [
-    "PhaseEstimationBuilder",
-    "PhaseEstimationBuilderFactory",
-    "PhaseEstimationBuilderSettings",
+    "QpeCircuitBuilder",
+    "QpeCircuitBuilderFactory",
+    "QpeCircuitBuilderSettings",
 ]
 
 
-class PhaseEstimationBuilderSettings(Settings):
+class QpeCircuitBuilderSettings(Settings):
     """Settings for the Phase Estimation Builder algorithm."""
 
     def __init__(self):
@@ -48,23 +48,23 @@ class PhaseEstimationBuilderSettings(Settings):
         )
 
 
-class PhaseEstimationBuilder(Algorithm):
+class QpeCircuitBuilder(Algorithm):
     """Abstract base class for phase estimation circuit builders."""
 
     def __init__(self, num_bits: int = -1):
-        """Initialize the PhaseEstimationBuilder with default settings.
+        """Initialize the QpeCircuitBuilder with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
 
         """
         super().__init__()
-        self._settings = PhaseEstimationBuilderSettings()
+        self._settings = QpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
 
     def type_name(self) -> str:
-        """Return the algorithm type name as phase_estimation_builder."""
-        return "phase_estimation_builder"
+        """Return the algorithm type name as qpe_circuit_builder."""
+        return "qpe_circuit_builder"
 
     @abstractmethod
     def _run_impl(
@@ -114,16 +114,16 @@ class PhaseEstimationBuilder(Algorithm):
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
-class PhaseEstimationBuilderFactory(AlgorithmFactory):
-    """Factory class for creating PhaseEstimationBuilder instances."""
+class QpeCircuitBuilderFactory(AlgorithmFactory):
+    """Factory class for creating QpeCircuitBuilder instances."""
 
     def __init__(self):
-        """Initialize the PhaseEstimationBuilderFactory."""
+        """Initialize the QpeCircuitBuilderFactory."""
         super().__init__()
 
     def algorithm_type_name(self) -> str:
-        """Return the algorithm type name as phase_estimation_builder."""
-        return "phase_estimation_builder"
+        """Return the algorithm type name as qpe_circuit_builder."""
+        return "qpe_circuit_builder"
 
     def default_algorithm_name(self) -> str:
         """Return the iterative as default algorithm name."""

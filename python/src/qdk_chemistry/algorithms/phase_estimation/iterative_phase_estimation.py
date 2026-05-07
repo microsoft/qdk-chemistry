@@ -15,7 +15,7 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import IterativePhaseEstimationBuilder
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import IterativeQpeCircuitBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -70,15 +70,16 @@ class IterativePhaseEstimation(PhaseEstimation):
         self._settings.set("num_bits", num_bits)
         self._settings.set("shots_per_bit", shots_per_bit)
 
-    def _create_builder(self) -> IterativePhaseEstimationBuilder:
-        """Create an IterativePhaseEstimationBuilder with settings propagated from this algorithm.
+    def _create_circuit_builder(self) -> IterativeQpeCircuitBuilder:
+        """Create an IterativeQpeCircuitBuilder with settings propagated from this algorithm.
 
         Returns:
-            An IterativePhaseEstimationBuilder instance configured with matching
+            An IterativeQpeCircuitBuilder instance configured with matching
             unitary_builder, circuit_mapper, and num_bits settings.
 
         """
-        builder = IterativePhaseEstimationBuilder(num_bits=self.settings().get("num_bits"))
+        builder = IterativeQpeCircuitBuilder()
+        builder.settings().update("num_bits", self.settings().get("num_bits"))
         builder.settings().update("unitary_builder", self.settings().get("unitary_builder"))
         builder.settings().update("circuit_mapper", self.settings().get("circuit_mapper"))
         return builder
@@ -103,7 +104,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         # Create nested algorithms from settings
         circuit_executor = self._create_nested("circuit_executor")
-        builder = self._create_builder()
+        circuit_builder = self._create_circuit_builder()
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
@@ -111,13 +112,12 @@ class IterativePhaseEstimation(PhaseEstimation):
         # Iterate over the number of phase bits
         for iteration in range(self.settings().get("num_bits")):
             # Create the iteration circuit via the builder
-            iteration_circuit = builder.build_iteration_circuit(
-                state_preparation=state_preparation,
-                qubit_hamiltonian=qubit_hamiltonian,
-                iteration=iteration,
-                total_iterations=self.settings().get("num_bits"),
-                phase_correction=phase_feedback,
+            circuit_builder.settings().update("phase_correction", phase_feedback)
+            circuit_builder.settings().update("num_iteration", iteration)
+            iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
+                state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
             )
+            iteration_circuit = iteration_circuits[0]
             Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
             # Run the iteration circuit on the simulator
             executor_data = circuit_executor.run(

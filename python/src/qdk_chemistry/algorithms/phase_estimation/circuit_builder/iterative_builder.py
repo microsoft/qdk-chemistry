@@ -19,20 +19,24 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import PhaseEstimationBuilder, PhaseEstimationBuilderSettings
+from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings
 
-__all__: list[str] = ["IterativePhaseEstimationBuilder", "IterativePhaseEstimationBuilderSettings"]
+__all__: list[str] = ["IterativeQpeCircuitBuilder", "IterativeQpeCircuitBuilderSettings"]
 
 
-class IterativePhaseEstimationBuilderSettings(PhaseEstimationBuilderSettings):
+class IterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
     """Settings for the Iterative Phase Estimation Builder."""
 
     def __init__(self):
         """Initialize the settings for the Iterative Phase Estimation Builder."""
         super().__init__()
+        self._set_default("phase_correction", "double", 0.0, "The accumulated phase feedback from prior iterations.")
+        self._set_default(
+            "num_iteration", "int", -1, "The specific iteration to build. Default to -1 to build all iterations."
+        )
 
 
-class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
+class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
     """Iterative Phase Estimation circuit builder.
 
     Constructs the quantum circuits for each IQPE iteration without executing them.
@@ -40,44 +44,57 @@ class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
 
     """
 
-    def __init__(self, num_bits: int = -1):
-        """Initialize the IterativePhaseEstimationBuilder.
+    def __init__(self, num_bits: int = -1, phase_correction: float = 0.0, num_iteration: int = -1):
+        """Initialize the IterativeQpeCircuitBuilder.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
+            phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
+            num_iteration: The specific iteration to build. Default to -1 (build all iterations).
 
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits)
-        self._settings = IterativePhaseEstimationBuilderSettings()
+        self._settings = IterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
+        self._settings.set("phase_correction", phase_correction)
+        self._settings.set("num_iteration", num_iteration)
 
     def _run_impl(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,
-        phase_correction: float = 0.0,
     ) -> list[Circuit]:
-        """Build all IQPE iteration circuits with zero phase correction.
+        """Build IQPE iteration circuits.
 
-        This produces all iteration circuits assuming no adaptive feedback
-        (phase_correction=0.0 for each iteration). Useful for resource estimation
-        and circuit preview where the actual measurement outcomes are not known.
+        Uses settings ``phase_correction`` (default 0.0) and ``num_iteration``
+        (default -1). When ``num_iteration`` is negative, all iteration circuits
+        are returned. When positive, only the circuit for that single iteration
+        (0-based) is returned.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
             qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
-            phase_correction: The accumulated phase feedback from prior iterations.
-                Defaults to 0.0 (no adaptive feedback).
 
         Returns:
-            A list of quantum circuits, one per phase bit iteration.
+            A list of quantum circuits, one per phase bit iteration (or a single-element
+            list when ``num_iteration`` is set to a specific iteration index).
+
+        Raises:
+            ValueError: If ``num_iteration`` >= ``num_bits``.
 
         """
         num_bits = self.settings().get("num_bits")
+        phase_correction = self.settings().get("phase_correction")
+        num_iteration = self.settings().get("num_iteration")
+
+        if num_iteration >= num_bits:
+            raise ValueError(f"num_iteration ({num_iteration}) must be less than num_bits ({num_bits}).")
+
+        iterations = [num_iteration] if num_iteration >= 0 else range(num_bits)
         circuits: list[Circuit] = []
-        for iteration in range(num_bits):
-            circuit = self.build_iteration_circuit(
+        for iteration in iterations:
+            circuit = self._create_iteration_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
                 iteration=iteration,
@@ -92,7 +109,7 @@ class IterativePhaseEstimationBuilder(PhaseEstimationBuilder):
         )
         return circuits
 
-    def build_iteration_circuit(
+    def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
         qubit_hamiltonian: QubitHamiltonian,

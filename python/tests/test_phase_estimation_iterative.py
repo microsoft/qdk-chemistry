@@ -13,8 +13,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
-from qdk_chemistry.algorithms.phase_estimation.builder.iterative_builder import (
-    IterativePhaseEstimationBuilder,
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
+    IterativeQpeCircuitBuilder,
     _validate_iteration_inputs,
 )
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (
@@ -538,20 +538,6 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
     )
 
 
-def test_iterative_qpe_generates_correct_number_of_circuits(
-    two_qubit_phase_problem: PhaseEstimationProblem,
-) -> None:
-    """Test that the builder generates the correct number of iteration circuits."""
-    iqpe = IterativePhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
-
-    circuits = iqpe.run(
-        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        state_preparation=two_qubit_phase_problem.state_prep,
-    )
-
-    assert len(circuits) == two_qubit_phase_problem.num_bits
-
-
 def test_update_phase_feedback_with_bit_zero() -> None:
     """Test phase feedback update when measured bit is 0."""
     current_phase = np.pi / 4
@@ -596,51 +582,6 @@ def test_phase_feedback_from_bits_multiple() -> None:
     # Verify it's equivalent to accumulated phase
     expected = accumulated_phase_from_bits(bits)
     assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
-
-
-# Tests for validation and error handling
-def test_create_iteration_circuit_invalid_iteration_negative() -> None:
-    """Test that create_iteration_circuit raises ValueError for negative iteration."""
-    with pytest.raises(ValueError, match="iteration index -1 is outside the valid range"):
-        _validate_iteration_inputs(iteration=-1, total_iterations=4)
-
-    with pytest.raises(ValueError, match="iteration index 4 is outside the valid range"):
-        _validate_iteration_inputs(iteration=4, total_iterations=4)
-
-
-def test_create_iteration_circuit_invalid_total_iterations_zero() -> None:
-    """Test that create_iteration_circuit raises ValueError for total_iterations <= 0."""
-    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
-        _validate_iteration_inputs(iteration=0, total_iterations=0)
-
-    with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
-        _validate_iteration_inputs(iteration=0, total_iterations=-1)
-
-
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_create_iteration_circuit_power_calculation() -> None:
-    """Test that the power calculation is correct for different iterations."""
-    hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
-    state_prep = QuantumCircuit(1)
-    state_prep.h(0)
-    state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
-    iqpe = IterativePhaseEstimationBuilder(num_bits=5)
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi)),
-    )
-    iter_0_circuit = iqpe.build_iteration_circuit(
-        state_preparation=state_prep_circuit,
-        qubit_hamiltonian=hamiltonian,
-        iteration=0,
-        total_iterations=5,
-    )
-    # For the first iteration, powers should be 16
-    assert iter_0_circuit.qasm.count("rz(pi)") == 2 ** (iqpe._settings.get("num_bits") - 0 - 1)
 
 
 def test_iterative_qpe_initialization() -> None:
@@ -706,27 +647,84 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
         )
 
 
-def test_builder_run_returns_circuits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Validate that IterativePhaseEstimationBuilder.run produces one circuit per phase bit."""
-    builder = IterativePhaseEstimationBuilder(num_bits=two_qubit_phase_problem.num_bits)
-    builder.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    builder.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
+class TestIterativeQpeCircuitBuilder:
+    """Tests for the IterativeQpeCircuitBuilder circuit builder."""
 
-    circuits = builder.run(
-        state_preparation=two_qubit_phase_problem.state_prep,
-        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-    )
+    def test_generates_correct_number_of_circuits(
+        self,
+        two_qubit_phase_problem: PhaseEstimationProblem,
+    ) -> None:
+        """Test that the builder generates the correct number of iteration circuits."""
+        iqpe = IterativeQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
 
-    assert isinstance(circuits, list)
-    assert len(circuits) == two_qubit_phase_problem.num_bits
-    for circuit in circuits:
-        assert isinstance(circuit, Circuit)
-        result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
+        circuits = iqpe.run(
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+            state_preparation=two_qubit_phase_problem.state_prep,
+        )
+
+        assert len(circuits) == two_qubit_phase_problem.num_bits
+
+    def test_invalid_iteration_negative(self) -> None:
+        """Test that _validate_iteration_inputs raises ValueError for negative iteration."""
+        with pytest.raises(ValueError, match="iteration index -1 is outside the valid range"):
+            _validate_iteration_inputs(iteration=-1, total_iterations=4)
+
+        with pytest.raises(ValueError, match="iteration index 4 is outside the valid range"):
+            _validate_iteration_inputs(iteration=4, total_iterations=4)
+
+    def test_invalid_total_iterations_zero(self) -> None:
+        """Test that _validate_iteration_inputs raises ValueError for total_iterations <= 0."""
+        with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+            _validate_iteration_inputs(iteration=0, total_iterations=0)
+
+        with pytest.raises(ValueError, match="total_iterations must be a positive integer"):
+            _validate_iteration_inputs(iteration=0, total_iterations=-1)
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_power_calculation(self) -> None:
+        """Test that the power calculation is correct for different iterations."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["Z"], coefficients=[1.0])
+        state_prep = QuantumCircuit(1)
+        state_prep.h(0)
+        state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
+        iqpe = IterativeQpeCircuitBuilder(num_bits=5, num_iteration=0)
+        iqpe.settings().set(
+            "circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        iqpe.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi)),
+        )
+        iter_0_circuits = iqpe.run(
+            state_preparation=state_prep_circuit,
+            qubit_hamiltonian=hamiltonian,
+        )
+        iter_0_circuit = iter_0_circuits[0]
+        # For the first iteration, powers should be 16
+        assert iter_0_circuit.qasm.count("rz(pi)") == 2 ** (iqpe._settings.get("num_bits") - 0 - 1)
+
+    def test_run_returns_circuits(self, two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+        """Validate that IterativeQpeCircuitBuilder.run produces one circuit per phase bit."""
+        builder = IterativeQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
+        builder.settings().set(
+            "circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )
+
+        assert isinstance(circuits, list)
+        assert len(circuits) == two_qubit_phase_problem.num_bits
+        for circuit in circuits:
+            assert isinstance(circuit, Circuit)
+            result = circuit.estimate()
+            assert result is not None
+            assert hasattr(result, "logical_counts")
