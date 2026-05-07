@@ -1143,8 +1143,8 @@ std::string WavefunctionContainer::get_summary() const {
   auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
   oss << "  Total electrons (α,β): (" << n_alpha_total << "," << n_beta_total
       << ")\n";
-  oss << "  Active electrons (α,β): (" << n_alpha_active << ","
-      << n_beta_active << ")\n";
+  oss << "  Active electrons (α,β): (" << n_alpha_active << "," << n_beta_active
+      << ")\n";
 
   oss << "  1-RDM available: " << (has_one_rdm_spin_dependent() ? "yes" : "no")
       << "\n";
@@ -1857,8 +1857,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
   }
 }
 
-void DeterminantalWavefunctionContainer::_to_hdf5_impl(
-    H5::Group& group) const {
+void DeterminantalWavefunctionContainer::_to_hdf5_impl(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
 
   // Store restrictedness flag
@@ -1877,15 +1876,13 @@ void DeterminantalWavefunctionContainer::_to_hdf5_impl(
 
   // Store coefficients
   if (is_complex) {
-    const auto& coeffs_complex =
-        std::get<Eigen::VectorXcd>(get_coefficients());
+    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(get_coefficients());
     hsize_t coeff_dims = coeffs_complex.size();
     H5::DataSpace coeff_space(1, &coeff_dims);
 
     H5::CompType complex_type(sizeof(std::complex<double>));
     complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
-    complex_type.insertMember("i", sizeof(double),
-                              H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("i", sizeof(double), H5::PredType::NATIVE_DOUBLE);
 
     H5::DataSet complex_dataset =
         group.createDataSet("coefficients", complex_type, coeff_space);
