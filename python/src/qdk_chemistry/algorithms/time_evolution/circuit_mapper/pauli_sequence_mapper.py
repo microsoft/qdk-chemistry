@@ -8,7 +8,7 @@
 from qdk import qsharp
 
 from qdk_chemistry.data import Settings
-from qdk_chemistry.data.circuit import Circuit
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
@@ -112,4 +112,9 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
 
         evolution_op = QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(evo_params)
 
-        return Circuit(qsharp=qsc, qir=qir, qsharp_op=evolution_op)
+        factory = QsharpFactoryData(
+            program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+            parameter={"evo_params": evo_params, "target_indices": target_indices},
+        )
+
+        return Circuit(qsharp=qsc, qir=qir, qsharp_op=evolution_op, qsharp_factory=factory)
