@@ -5,10 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
-
+import importlib.metadata
 import importlib.util
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -32,7 +32,8 @@ _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1",
 # Release-note example scripts are snapshots that only work with the matching
 # library version.  Parse the major.minor from the filename (e.g.
 # "release_notes_v1_1.py" → (1, 1)) and compare against the installed version.
-_INSTALLED_VERSION: str = __import__("qdk_chemistry").__version__
+_INSTALLED_VERSION: str = importlib.metadata.version("qdk-chemistry")
+_INSTALLED_MAJOR_MINOR = tuple(int(x) for x in _INSTALLED_VERSION.split(".")[:2])
 _RELEASE_NOTES_RE = re.compile(r"^release_notes_v(\d+)_(\d+)\.py$")
 
 
@@ -196,10 +197,10 @@ def _create_test_methods():
                     # Release-note examples are version-pinned snapshots
                     m = _RELEASE_NOTES_RE.match(filepath.name)
                     if m:
-                        expected = f"{m.group(1)}.{m.group(2)}"
-                        if not _INSTALLED_VERSION.startswith(expected + "."):
+                        expected = (int(m.group(1)), int(m.group(2)))
+                        if _INSTALLED_MAJOR_MINOR != expected:
                             self.skipTest(
-                                f"release_notes example requires v{expected}.x "
+                                f"release_notes example requires v{expected[0]}.{expected[1]}.x "
                                 f"(installed: {_INSTALLED_VERSION})"
                             )
                     # Skip if required packages are not available

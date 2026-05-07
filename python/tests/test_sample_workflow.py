@@ -172,7 +172,6 @@ def _execute_notebook_skip_visualizations(
             string replacements applied before execution.  Use this to
             inject lighter parameters at test time without modifying the
             notebook itself.
-        timeout: Maximum time in seconds to wait for each cell execution.
 
     Raises:
         CellExecutionError: If a cell fails to execute.
@@ -198,9 +197,11 @@ def _execute_notebook_skip_visualizations(
     # Apply cell-level text patches (e.g., lighter parameters for testing)
     if cell_patches:
         for cell_idx, replacements in cell_patches.items():
-            if cell_idx < len(nb.cells) and nb.cells[cell_idx].cell_type == "code":
-                for old, new in replacements.items():
-                    nb.cells[cell_idx].source = nb.cells[cell_idx].source.replace(old, new)
+            assert cell_idx < len(nb.cells), f"cell_patches: cell index {cell_idx} out of range (notebook has {len(nb.cells)} cells)"
+            assert nb.cells[cell_idx].cell_type == "code", f"cell_patches: cell {cell_idx} is not a code cell"
+            for old, new in replacements.items():
+                assert old in nb.cells[cell_idx].source, f"cell_patches: string {old!r} not found in cell {cell_idx}"
+                nb.cells[cell_idx].source = nb.cells[cell_idx].source.replace(old, new)
 
     # Set the working directory to the notebook's directory for relative paths
     notebook_dir = notebook_path.parent
@@ -250,8 +251,7 @@ def test_state_prep_energy():
         notebook_path,
         cell_patches={
             25: {
-                "qdk_full_state_simulator": "qdk_sparse_state_simulator",
-                "total_shots=1500000": "total_shots=50000",
+                "total_shots=600000": "total_shots=50000",
             },
         },
     )
