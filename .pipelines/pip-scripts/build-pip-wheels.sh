@@ -108,11 +108,13 @@ fi
 # when building with a non-system Python version.
 echo "Installing pyenv ${PYENV_VERSION}..."
 export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+rm -f pyenv.zip
+rm -rf "pyenv-${PYENV_VERSION}" "$PYENV_ROOT"
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
-unzip -q pyenv.zip
+unzip -qo pyenv.zip
 mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
-rm pyenv.zip
+rm -f pyenv.zip
 "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
 "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
