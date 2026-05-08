@@ -55,7 +55,7 @@ steps:
 - task: PipAuthenticate@1
   displayName: Pip Authenticate
   inputs:
-    artifactFeeds: ""
+    artifactFeeds: "quantum-apps-dependencies"
 
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |
@@ -96,10 +96,12 @@ steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |
       echo "Running pip wheel build (Linux)..."
+      echo PIP_INDEX_URL="$PIP_INDEX_URL"
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
         -e QDK_UARCH=${{ parameters.march }} \
+        -e PIP_INDEX_URL=$(PIP_INDEX_URL) \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \

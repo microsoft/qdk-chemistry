@@ -13,7 +13,7 @@ LIBFLAME_VERSION=${9:-5.2.0}
 PYENV_VERSION=${10:-2.6.15}
 MAC_BUILD=${11:-OFF}
 
-echo -x
+set -x
 
 export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
@@ -22,16 +22,16 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
-    apt-get update -qq
+    apt-get update -q
     apt install -q libc-bin
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
-    apt-get update -qq
-    apt-get install -y -qq \
+    apt-get update -q
+    apt-get install -y -q \
         python3 python3-pip python3-dev \
         libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-        libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
+        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
         libffi-dev liblzma-dev \
         libeigen3-dev \
         nlohmann-json3-dev \
@@ -51,20 +51,20 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         libpugixml-dev \
         python3-pybind11 pybind11-dev
 
-    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
-    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    rm cmake-${CMAKE_VERSION}.tar.gz
-    cd cmake-${CMAKE_VERSION}
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make --silent -j$(nproc)
-    make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}
-    cmake --version
+    # # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
+    # echo "Downloading and installing CMake ${CMAKE_VERSION}..."
+    # export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
+    # wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+    # echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+    # tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+    # rm cmake-${CMAKE_VERSION}.tar.gz
+    # cd cmake-${CMAKE_VERSION}
+    # ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    # make --silent -j$(nproc)
+    # make install
+    # cd ..
+    # rm -r cmake-${CMAKE_VERSION}
+    # cmake --version
 
     # # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # # with qiskit's shared OpenBLAS
