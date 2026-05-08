@@ -101,6 +101,8 @@ class MergeZBasisRotations(TransformationPass):
         """
         Logger.trace_entering()
 
+        tol = self._settings.get("tolerance")
+
         # Per-qubit state: (accumulated_angle, list_of_nodes_in_run)
         accumulators: dict[object, tuple[float, list]] = {}
         nodes_to_remove: list = []
@@ -124,7 +126,7 @@ class MergeZBasisRotations(TransformationPass):
                         # Flush any pending accumulator for this qubit first
                         if qubit in accumulators:
                             acc_angle, acc_nodes = accumulators.pop(qubit)
-                            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
+                            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions, tol)
                         # Leave parameterized gate as-is
                         continue
                 else:
@@ -142,11 +144,11 @@ class MergeZBasisRotations(TransformationPass):
                 for qubit in node.qargs:
                     if qubit in accumulators:
                         acc_angle, acc_nodes = accumulators.pop(qubit)
-                        self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
+                        self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions, tol)
 
         # Flush remaining accumulators
         for acc_angle, acc_nodes in accumulators.values():
-            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions)
+            self._flush(acc_angle, acc_nodes, nodes_to_remove, substitutions, tol)
 
         # Apply substitutions before removals
         for node, gate in substitutions:
@@ -322,6 +324,7 @@ class SubstituteCliffordRz(TransformationPass):
 
         """
         Logger.trace_entering()
+        self._build_lookup()
         tolerance = self._tolerance
         lookup = self._lookup
         inv_quarter_pi = self._inv_quarter_pi
