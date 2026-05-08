@@ -128,8 +128,10 @@ pip --version
 
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
-pip3 --version
 pip --version
+# Enable consuming packages from Python package index (PyPI), saved automatically in the artifact feed
+# https://learn.microsoft.com/en-us/azure/devops/artifacts/python/use-packages-from-pyp
+python3 -m pip install keyring artifacts-keyring
 
 PIP_STRING="fonttools>=4.61.0 urllib3>=2.6.0"
 
@@ -139,10 +141,9 @@ if [ "${MAC_BUILD}" == "OFF" ]; then
 fi
 
 # python3 -m pip install auditwheel build ${PIP_STRING}
-python3 -m pip install auditwheel # build ${PIP_STRING}
+python3 -m pip install auditwheel
 python3 -m pip install urllib3>=2.6.0
 python3 -m pip install fonttools>=4.61.0
-exit 1
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
