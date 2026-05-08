@@ -197,7 +197,9 @@ def _execute_notebook_skip_visualizations(
     # Apply cell-level text patches (e.g., lighter parameters for testing)
     if cell_patches:
         for cell_idx, replacements in cell_patches.items():
-            assert cell_idx < len(nb.cells), f"cell_patches: cell index {cell_idx} out of range (notebook has {len(nb.cells)} cells)"
+            assert cell_idx < len(nb.cells), (
+                f"cell_patches: cell index {cell_idx} out of range (notebook has {len(nb.cells)} cells)"
+            )
             assert nb.cells[cell_idx].cell_type == "code", f"cell_patches: cell {cell_idx} is not a code cell"
             for old, new in replacements.items():
                 assert old in nb.cells[cell_idx].source, f"cell_patches: string {old!r} not found in cell {cell_idx}"

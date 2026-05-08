@@ -9,7 +9,12 @@
 # start-cell-create
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import AlgorithmRef, Circuit, QuantumErrorProfile, QubitHamiltonian
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    QuantumErrorProfile,
+    QubitHamiltonian,
+)
 
 # Create energy estimator using Qsharp simulator as backend
 qdk_estimator = create("energy_estimator", "qdk")
@@ -58,7 +63,9 @@ noise_model = QuantumErrorProfile(
 qdk_estimator = create(
     "energy_estimator",
     "qdk",
-    circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", type="cpu"),
+    circuit_executor=AlgorithmRef(
+        "circuit_executor", "qdk_full_state_simulator", type="cpu"
+    ),
 )
 energy_expectation_results, measurement_data = qdk_estimator.run(
     circuit,

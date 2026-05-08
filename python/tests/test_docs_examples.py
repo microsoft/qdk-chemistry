@@ -198,7 +198,7 @@ def _create_test_methods():
                     m = _RELEASE_NOTES_RE.match(filepath.name)
                     if m:
                         expected = (int(m.group(1)), int(m.group(2)))
-                        if _INSTALLED_MAJOR_MINOR != expected:
+                        if expected != _INSTALLED_MAJOR_MINOR:
                             self.skipTest(
                                 f"release_notes example requires v{expected[0]}.{expected[1]}.x "
                                 f"(installed: {_INSTALLED_VERSION})"
