@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import importlib.util
+
 import numpy as np
 import pytest
 
@@ -22,6 +24,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
 )
+from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
 # ---------------------------------------------------------------------------
 # TermPartition data classes
@@ -172,6 +175,107 @@ class TestTermGrouperRegistry:
         qh = QubitHamiltonian(["XX", "YY"], np.array([1.0, 1.0]))
         out = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
         assert out.term_partition.num_groups == 2
+
+
+# ---------------------------------------------------------------------------
+# NetworkX-backed term groupers (requires networkx)
+# ---------------------------------------------------------------------------
+
+_has_networkx = importlib.util.find_spec("networkx") is not None
+
+
+class TestNxTermGroupers:
+    """Tests for the NetworkX-backed term groupers."""
+
+    pytestmark = pytest.mark.skipif(not _has_networkx, reason="networkx not installed")
+
+    NX_STRATEGIES = ("nx_commuting", "nx_qubit_wise_commuting")
+
+    def test_nx_strategies_are_registered(self):
+        """NetworkX plugin registers both nx_commuting and nx_qubit_wise_commuting."""
+        names = registry.available("term_grouper")
+        assert {"nx_commuting", "nx_qubit_wise_commuting"} <= set(names)
+
+    @pytest.mark.parametrize("strategy", NX_STRATEGIES)
+    def test_returns_new_hamiltonian_with_flat_partition(self, strategy):
+        """Grouper returns a new QubitHamiltonian with a FlatPartition."""
+        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 2.0, 3.0]))
+        grouper = registry.create("term_grouper", strategy)
+        out = grouper.run(qh)
+        assert out is not qh
+        assert isinstance(out.term_partition, FlatPartition)
+        assert out.term_partition.strategy == strategy
+
+    @pytest.mark.parametrize("strategy", NX_STRATEGIES)
+    def test_partition_indices_cover_all_terms_exactly_once(self, strategy):
+        """Every term index appears exactly once across all partition groups."""
+        qh = QubitHamiltonian(
+            ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII"],
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6]),
+        )
+        grouper = registry.create("term_grouper", strategy)
+        out = grouper.run(qh)
+        indices = out.term_partition.all_indices()
+        assert sorted(indices) == list(range(len(qh.pauli_strings)))
+
+    def test_nx_commuting_groups_all_commute(self):
+        """Every pair of terms within an nx_commuting group globally commutes."""
+        qh = QubitHamiltonian(
+            ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII", "XXII", "YYII"],
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]),
+        )
+        out = registry.create("term_grouper", "nx_commuting").run(qh)
+        labels = list(qh.pauli_strings)
+        for group in out.term_partition.groups:
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    assert do_pauli_labels_commute(labels[group[i]], labels[group[j]])
+
+    def test_nx_qwc_groups_are_qubit_wise_commuting(self):
+        """Every pair of terms within an nx_qubit_wise_commuting group is qubit-wise commuting."""
+        qh = QubitHamiltonian(
+            ["XIII", "IXII", "IIXI", "IIIX", "ZIII", "IZII", "XXII", "YYII"],
+            np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]),
+        )
+        out = registry.create("term_grouper", "nx_qubit_wise_commuting").run(qh)
+        labels = list(qh.pauli_strings)
+        for group in out.term_partition.groups:
+            for i in range(len(group)):
+                for j in range(i + 1, len(group)):
+                    assert do_pauli_labels_qw_commute(labels[group[i]], labels[group[j]])
+
+    def test_nx_commuting_merges_globally_commuting_terms(self):
+        """XX and YY globally commute and should be in the same nx_commuting group."""
+        qh = QubitHamiltonian(["XX", "YY", "ZZ"], np.array([1.0, 1.0, 1.0]))
+        out = registry.create("term_grouper", "nx_commuting").run(qh)
+        assert out.term_partition.num_groups == 1
+
+    def test_nx_qwc_separates_globally_only_commuting_terms(self):
+        """XX and YY globally commute but are NOT qubit-wise commuting — they must be separated."""
+        qh = QubitHamiltonian(["XX", "YY"], np.array([1.0, 1.0]))
+        out = registry.create("term_grouper", "nx_qubit_wise_commuting").run(qh)
+        assert out.term_partition.num_groups == 2
+
+    def test_preserves_coefficients_and_metadata(self):
+        """Grouper preserves coefficients, encoding, and fermion_mode_order."""
+        qh = QubitHamiltonian(
+            ["XX", "ZZ"],
+            np.array([0.1, 0.2]),
+            encoding="jordan-wigner",
+            fermion_mode_order="blocked",
+        )
+        out = registry.create("term_grouper", "nx_commuting").run(qh)
+        np.testing.assert_array_equal(out.coefficients, qh.coefficients)
+        assert out.encoding == qh.encoding
+        assert out.fermion_mode_order == qh.fermion_mode_order
+
+    def test_empty_hamiltonian(self):
+        """Grouper handles a single-term Hamiltonian without error."""
+        qh = QubitHamiltonian(["X"], np.array([1.0]))
+        out = registry.create("term_grouper", "nx_commuting").run(qh)
+        assert isinstance(out.term_partition, FlatPartition)
+        assert out.term_partition.num_groups == 1
+        assert out.term_partition.all_indices() == [0]
 
 
 # ---------------------------------------------------------------------------
