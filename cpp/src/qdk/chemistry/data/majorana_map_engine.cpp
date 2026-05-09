@@ -117,36 +117,40 @@ MajoranaMapResult majorana_map_hamiltonian(
   // ─── Two-body terms ───────────────────────────────────────────────
   // H_2 = (1/2) Σ_{pqrs,σ,τ} (pq|rs) a†_{p,σ} a†_{r,τ} a_{s,τ} a_{q,σ}
   //      = (1/2) Σ_{pqrs,σ,τ} (pq|rs) [E_{pσ,qσ} E_{rτ,sτ} - δ_{qσ,rτ} E_{pσ,sτ}]
-  //
-  // For same-spin (σ==τ), δ_{qσ,rτ} = δ_{q,r} and E_{pσ,sτ} = E_{pσ,sσ}
-  // For cross-spin (σ≠τ), δ_{qσ,rτ} = 0 (different spin)
 
-  // Helper: accumulate E_pσ E_rτ product with two-body coefficient
-  // E_pq · E_rs = (1/16) Σ_{a,b,c,d} c[a][b] c[c][d] γ_{2p+a} γ_{2q+b} γ_{2r+c} γ_{2s+d}
+  // Precompute all Majorana pair products: prod_cache[2*m+a][2*m'+b] = (phase, word)
+  // This avoids redundant multiply_uncached calls in the O(N^4) loop.
+  struct MajPairProduct {
+    std::complex<double> phase;
+    SparsePauliWord word;
+  };
+  std::vector<std::vector<MajPairProduct>> pair_cache(
+      2 * n_modes, std::vector<MajPairProduct>(2 * n_modes));
+  for (std::size_t i = 0; i < 2 * n_modes; ++i) {
+    for (std::size_t j = 0; j < 2 * n_modes; ++j) {
+      auto [ph, w] = PauliTermAccumulator::multiply_uncached(
+          mapping(i), mapping(j));
+      pair_cache[i][j] = {ph, std::move(w)};
+    }
+  }
+
+  // Helper: accumulate E_pσ E_rτ product using precomputed pair products
   auto accumulate_two_body_product = [&](std::size_t mode_p,
                                          std::size_t mode_q,
                                          std::size_t mode_r,
                                          std::size_t mode_s, double eri) {
-    // Factor: 0.5 * eri / 16 = eri * kSixteenth * 0.5
     double half_eri = 0.5 * eri;
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
         std::complex<double> c_ab = kC[a][b];
-        const auto& w_pa = mapping(2 * mode_p + a);
-        const auto& w_qb = mapping(2 * mode_q + b);
+        const auto& [phase1, prod1] =
+            pair_cache[2 * mode_p + a][2 * mode_q + b];
         for (int c = 0; c < 2; ++c) {
           for (int d = 0; d < 2; ++d) {
             std::complex<double> coeff =
                 half_eri * kSixteenth * c_ab * kC[c][d];
-            const auto& w_rc = mapping(2 * mode_r + c);
-            const auto& w_sd = mapping(2 * mode_s + d);
-
-            // Need to compute (w_pa · w_qb) · (w_rc · w_sd)
-            // Use the accumulator's multiply + accumulate
-            auto [phase1, prod1] =
-                PauliTermAccumulator::multiply_uncached(w_pa, w_qb);
-            auto [phase2, prod2] =
-                PauliTermAccumulator::multiply_uncached(w_rc, w_sd);
+            const auto& [phase2, prod2] =
+                pair_cache[2 * mode_r + c][2 * mode_s + d];
             acc.accumulate_product(prod1, prod2,
                                    coeff * phase1 * phase2);
           }
@@ -160,36 +164,62 @@ MajoranaMapResult majorana_map_hamiltonian(
     return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
   };
 
-  // Spin-free case: use spatial ERIs with both spin channels
+  // Spin-free case: use spin-summed E operators for 4x fewer products
   if (is_restricted) {
+    // Precompute spin-summed E_pq: for each spatial (p,q), accumulate
+    // the 4 Majorana pair products from both α and β into a single set.
+    // E^σ_pq = (1/4) Σ_{a,b} c[a][b] * pair_cache[2*mode+a][2*mode'+b]
+    // E_pq = E^α_pq + E^β_pq
+    struct SpinSummedE {
+      // Up to 8 terms (4 per spin, some may combine)
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
+    };
+    std::vector<SpinSummedE> ss_e(n_spatial * n_spatial);
+
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        auto& sse = ss_e[p * n_spatial + q];
+        // Collect terms from both spins
+        for (int spin = 0; spin < 2; ++spin) {
+          std::size_t mp = (spin == 0) ? mode_alpha(p) : mode_beta(p);
+          std::size_t mq = (spin == 0) ? mode_alpha(q) : mode_beta(q);
+          for (int a = 0; a < 2; ++a) {
+            for (int b = 0; b < 2; ++b) {
+              const auto& [phase, word] =
+                  pair_cache[2 * mp + a][2 * mq + b];
+              sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
+            }
+          }
+        }
+      }
+    }
+
+    // Two-body: (1/2) Σ_{pqrs} (pq|rs) [E_pq · E_rs - δ_{qr} E_ps]
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = 0; q < n_spatial; ++q) {
+        const auto& e_pq = ss_e[p * n_spatial + q];
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
             double eri = eri_aaaa[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
 
-            // αα channel
-            accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
-                                        mode_alpha(r), mode_alpha(s), eri);
-            // ββ channel (same ERI for restricted)
-            accumulate_two_body_product(mode_beta(p), mode_beta(q),
-                                        mode_beta(r), mode_beta(s), eri);
-            // αβ channel
-            accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
-                                        mode_beta(r), mode_beta(s), eri);
-            // βα channel
-            accumulate_two_body_product(mode_beta(p), mode_beta(q),
-                                        mode_alpha(r), mode_alpha(s), eri);
+            double half_eri = 0.5 * eri;
+            const auto& e_rs = ss_e[r * n_spatial + s];
 
-            // δ corrections for same-spin channels
-            if (q == r) {
-              // -0.5 * eri * E_{p,α,s,α}
-              accumulate_epq(mode_alpha(p), mode_alpha(s), -0.5 * eri);
-              // -0.5 * eri * E_{p,β,s,β}
-              accumulate_epq(mode_beta(p), mode_beta(s), -0.5 * eri);
+            // E_pq · E_rs product
+            for (const auto& [c1, w1] : e_pq.terms) {
+              for (const auto& [c2, w2] : e_rs.terms) {
+                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+              }
             }
-            // No δ correction for cross-spin channels (σ ≠ τ)
+
+            // δ_{qr} correction
+            if (q == r) {
+              const auto& e_ps = ss_e[p * n_spatial + s];
+              for (const auto& [c, w] : e_ps.terms) {
+                acc.accumulate(w, -half_eri * c);
+              }
+            }
           }
         }
       }
