@@ -10,7 +10,13 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create, registry
-from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
+from qdk_chemistry.data import (
+    Circuit,
+    EncodingMismatchError,
+    MajoranaMapping,
+    QubitHamiltonian,
+    validate_encoding_compatibility,
+)
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
@@ -199,35 +205,37 @@ def test_qiskit_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e
 def test_qiskit_qubit_mapper_injects_encoding():
     """Test that QubitMapper injects the correct encoding."""
     hamiltonian = create_test_hamiltonian(2)
+    n_modes = 2 * 2  # 2 spatial orbitals → 4 spin-orbitals
 
     # Test Jordan-Wigner
-    mapper_jw = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-    qubit_ham_jw = mapper_jw.run(hamiltonian)
+    mapper_jw = create("qubit_mapper", "qiskit")
+    qubit_ham_jw = mapper_jw.run(hamiltonian, MajoranaMapping.jordan_wigner(n_modes))
     assert qubit_ham_jw.encoding == "jordan-wigner"
 
     # Test Bravyi-Kitaev
-    mapper_bk = create("qubit_mapper", "qiskit", encoding="bravyi-kitaev")
-    qubit_ham_bk = mapper_bk.run(hamiltonian)
+    mapper_bk = create("qubit_mapper", "qiskit")
+    qubit_ham_bk = mapper_bk.run(hamiltonian, MajoranaMapping.bravyi_kitaev(n_modes))
     assert qubit_ham_bk.encoding == "bravyi-kitaev"
 
     # Test Parity
-    mapper_parity = create("qubit_mapper", "qiskit", encoding="parity")
-    qubit_ham_parity = mapper_parity.run(hamiltonian)
+    mapper_parity = create("qubit_mapper", "qiskit")
+    qubit_ham_parity = mapper_parity.run(hamiltonian, MajoranaMapping.parity(n_modes))
     assert qubit_ham_parity.encoding == "parity"
 
 
 def test_qdk_qubit_mapper_injects_encoding():
     """Test that QDK QubitMapper injects the correct encoding."""
     hamiltonian = create_test_hamiltonian(2)
+    n_modes = 2 * 2
 
     # Test Jordan-Wigner
-    mapper_jw = create("qubit_mapper", "qdk", encoding="jordan-wigner")
-    qubit_ham_jw = mapper_jw.run(hamiltonian)
+    mapper_jw = create("qubit_mapper", "qdk")
+    qubit_ham_jw = mapper_jw.run(hamiltonian, MajoranaMapping.jordan_wigner(n_modes))
     assert qubit_ham_jw.encoding == "jordan-wigner"
 
     # Test Bravyi-Kitaev
-    mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
-    qubit_ham_bk = mapper_bk.run(hamiltonian)
+    mapper_bk = create("qubit_mapper", "qdk")
+    qubit_ham_bk = mapper_bk.run(hamiltonian, MajoranaMapping.bravyi_kitaev(n_modes))
     assert qubit_ham_bk.encoding == "bravyi-kitaev"
 
 
@@ -246,8 +254,9 @@ def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):
     hamiltonian = create_test_hamiltonian(2)
 
     # Create QubitHamiltonian with Jordan-Wigner encoding
-    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
-    qubit_ham = mapper.run(hamiltonian)
+    mapper = create("qubit_mapper", "qdk")
+    mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+    qubit_ham = mapper.run(hamiltonian, mapping)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)
     prep = create("state_prep", "sparse_isometry_gf2x")
@@ -262,8 +271,9 @@ def test_end_to_end_workflow_incompatible_encodings(wavefunction_4e4o):
     hamiltonian = create_test_hamiltonian(2)
 
     # Create QubitHamiltonian with Bravyi-Kitaev encoding
-    mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
-    qubit_ham = mapper.run(hamiltonian)
+    mapper = create("qubit_mapper", "qdk")
+    mapping = MajoranaMapping.bravyi_kitaev(num_modes=4)
+    qubit_ham = mapper.run(hamiltonian, mapping)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)
     prep = create("state_prep", "sparse_isometry_gf2x")
@@ -302,9 +312,11 @@ def test_qubit_hamiltonian_summary_includes_encoding():
 def test_qdk_qubit_mapper_sets_fermion_mode_order():
     """QDK native qubit mapper sets fermion_mode_order to BLOCKED."""
     hamiltonian = create_test_hamiltonian(2)
+    n_modes = 4  # 2 spatial → 4 spin-orbitals
 
-    for encoding in ("jordan-wigner", "bravyi-kitaev"):
-        qh = create("qubit_mapper", "qdk", encoding=encoding).run(hamiltonian)
+    for factory in (MajoranaMapping.jordan_wigner, MajoranaMapping.bravyi_kitaev):
+        mapping = factory(n_modes)
+        qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
         assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
 
 
@@ -312,7 +324,9 @@ def test_qdk_qubit_mapper_sets_fermion_mode_order():
 def test_qiskit_qubit_mapper_sets_fermion_mode_order():
     """Qiskit qubit mapper sets fermion_mode_order to BLOCKED."""
     hamiltonian = create_test_hamiltonian(2)
+    n_modes = 4
 
-    for encoding in ("jordan-wigner", "bravyi-kitaev", "parity"):
-        qh = create("qubit_mapper", "qiskit", encoding=encoding).run(hamiltonian)
+    for factory in (MajoranaMapping.jordan_wigner, MajoranaMapping.bravyi_kitaev, MajoranaMapping.parity):
+        mapping = factory(n_modes)
+        qh = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
         assert qh.fermion_mode_order == FermionModeOrder.BLOCKED

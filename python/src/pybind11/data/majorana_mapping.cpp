@@ -1,0 +1,416 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+#include <pybind11/complex.h>
+#include <pybind11/numpy.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <qdk/chemistry/data/majorana_map_engine.hpp>
+#include <qdk/chemistry/data/majorana_mapping.hpp>
+#include <qdk/chemistry/data/pauli_operator.hpp>
+#include <stdexcept>
+#include <string>
+#include <vector>
+
+namespace py = pybind11;
+
+namespace {
+
+/// Map dense little-endian Pauli char to op_type (0=I, 1=X, 2=Y, 3=Z).
+std::uint8_t char_to_op(char c) {
+  switch (c) {
+    case 'I':
+    case 'i':
+      return 0;
+    case 'X':
+    case 'x':
+      return 1;
+    case 'Y':
+    case 'y':
+      return 2;
+    case 'Z':
+    case 'z':
+      return 3;
+    default:
+      throw std::invalid_argument(
+          std::string("Invalid Pauli character '") + c +
+          "' — expected I, X, Y, or Z");
+  }
+}
+
+/// Convert a dense little-endian Pauli string (qubit 0 = rightmost char)
+/// to a SparsePauliWord (sorted by qubit index, identities omitted).
+qdk::chemistry::data::SparsePauliWord dense_le_to_sparse(
+    const std::string& s) {
+  qdk::chemistry::data::SparsePauliWord word;
+  // Little-endian: qubit 0 is the rightmost character (index len-1).
+  std::size_t len = s.size();
+  for (std::size_t i = 0; i < len; ++i) {
+    std::size_t qubit = len - 1 - i;  // rightmost char = qubit 0
+    std::uint8_t op = char_to_op(s[i]);
+    if (op != 0) {
+      word.emplace_back(static_cast<std::uint64_t>(qubit), op);
+    }
+  }
+  // Sort by qubit index (required invariant)
+  std::sort(word.begin(), word.end());
+  return word;
+}
+
+/// Convert a SparsePauliWord to a dense little-endian string.
+std::string sparse_to_dense_le(
+    const qdk::chemistry::data::SparsePauliWord& word,
+    std::size_t num_qubits) {
+  // Build big-endian first (qubit 0 at index 0), then reverse
+  std::string result(num_qubits, 'I');
+  for (const auto& [qubit, op_type] : word) {
+    if (qubit < num_qubits) {
+      switch (op_type) {
+        case 1:
+          result[qubit] = 'X';
+          break;
+        case 2:
+          result[qubit] = 'Y';
+          break;
+        case 3:
+          result[qubit] = 'Z';
+          break;
+        default:
+          break;
+      }
+    }
+  }
+  // Reverse to get little-endian (qubit 0 = rightmost)
+  std::reverse(result.begin(), result.end());
+  return result;
+}
+
+}  // namespace
+
+void bind_majorana_mapping(pybind11::module& data) {
+  using namespace qdk::chemistry::data;
+
+  py::class_<MajoranaMapping> mapping(data, "MajoranaMapping", R"(
+Immutable data class mapping 2N Majorana operators to Pauli strings.
+
+A MajoranaMapping stores a table of 2N entries, one per Majorana operator
+γ_k (k = 0, ..., 2N-1), where N is the number of fermionic modes
+(spin-orbitals). Each entry is a single Pauli string representing φ(γ_k)
+under the chosen fermion-to-qubit encoding.
+
+The mapping is validated at construction time by checking the Clifford
+algebra anticommutation relations: {γ_i, γ_j} = 2δ_{ij} · I.
+
+Example:
+    >>> from qdk_chemistry._core.data import MajoranaMapping
+    >>> jw = MajoranaMapping.jordan_wigner(4)
+    >>> jw.num_modes
+    4
+    >>> jw.num_qubits
+    4
+)");
+
+  // Constructor from list of dense little-endian Pauli strings
+  mapping.def(
+      py::init([](py::list table_list, const std::string& name) {
+        Py_ssize_t n = PyList_GET_SIZE(table_list.ptr());
+        if (n == 0) {
+          throw py::value_error("MajoranaMapping table must not be empty");
+        }
+        if (n % 2 != 0) {
+          throw py::value_error(
+              "MajoranaMapping table must have an even number of entries "
+              "(2 per fermionic mode), got " +
+              std::to_string(n));
+        }
+
+        // Validate all strings have the same length and contain only IXYZ
+        Py_ssize_t expected_len = -1;
+        std::vector<SparsePauliWord> table;
+        table.reserve(static_cast<std::size_t>(n));
+
+        for (Py_ssize_t i = 0; i < n; ++i) {
+          PyObject* item = PyList_GET_ITEM(table_list.ptr(), i);
+          if (!PyUnicode_Check(item)) {
+            throw py::value_error(
+                "MajoranaMapping table entries must be strings, got " +
+                std::string(Py_TYPE(item)->tp_name) + " at index " +
+                std::to_string(i));
+          }
+          Py_ssize_t str_len;
+          const char* str_data = PyUnicode_AsUTF8AndSize(item, &str_len);
+          if (!str_data) {
+            throw py::value_error(
+                "Failed to decode string at index " + std::to_string(i));
+          }
+
+          if (expected_len < 0) {
+            expected_len = str_len;
+          } else if (str_len != expected_len) {
+            throw py::value_error(
+                "All Pauli strings must have the same length. Entry 0 has "
+                "length " +
+                std::to_string(expected_len) + " but entry " +
+                std::to_string(i) + " has length " +
+                std::to_string(str_len));
+          }
+
+          std::string s(str_data, static_cast<std::size_t>(str_len));
+          // char_to_op validates each character
+          table.push_back(dense_le_to_sparse(s));
+        }
+
+        // C++ constructor validates Clifford algebra
+        try {
+          return MajoranaMapping(std::move(table), name);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      }),
+      py::arg("table"), py::arg("name") = "",
+      R"(
+Construct a MajoranaMapping from a list of dense Pauli-string labels.
+
+Each string uses the same little-endian convention as QubitHamiltonian:
+qubit 0 is the rightmost character. The list must have 2N entries (one
+per Majorana operator), where N is the number of fermionic modes.
+
+The Clifford algebra {γ_i, γ_j} = 2δ_{ij}·I is validated at construction.
+
+Args:
+    table: List of 2N Pauli strings (e.g., ["IX", "IY", "XZ", "YZ"]).
+    name: Optional human-readable label for the encoding.
+
+Raises:
+    ValueError: If the table is invalid (wrong size, bad characters, or
+        Clifford algebra violation).
+)");
+
+  // Constructor from list of SparsePauliWord (for advanced use)
+  mapping.def(
+      py::init([](const std::vector<SparsePauliWord>& table,
+                  const std::string& name) {
+        try {
+          return MajoranaMapping(table, name);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      }),
+      py::arg("table"), py::arg("name") = "",
+      R"(
+Construct a MajoranaMapping from a list of sparse Pauli words.
+
+Each sparse word is a list of (qubit_index, op_type) tuples. This is the
+advanced constructor for users who want to avoid string parsing.
+
+Args:
+    table: List of 2N sparse Pauli words.
+    name: Optional human-readable label for the encoding.
+
+Raises:
+    ValueError: If the table is invalid.
+)");
+
+  // Properties
+  mapping.def_property_readonly(
+      "num_modes",
+      [](const MajoranaMapping& self) { return self.num_modes(); },
+      "Number of fermionic modes (spin-orbitals).");
+
+  mapping.def_property_readonly(
+      "num_qubits",
+      [](const MajoranaMapping& self) { return self.num_qubits(); },
+      "Number of qubits required by this encoding.");
+
+  mapping.def_property_readonly(
+      "name", [](const MajoranaMapping& self) { return self.name(); },
+      "Human-readable name of the encoding.");
+
+  // table property: return as list of dense little-endian strings
+  mapping.def_property_readonly(
+      "table",
+      [](const MajoranaMapping& self) -> py::tuple {
+        std::size_t nq = self.num_qubits();
+        py::tuple result(self.table().size());
+        for (std::size_t i = 0; i < self.table().size(); ++i) {
+          result[i] = py::cast(sparse_to_dense_le(self.table()[i], nq));
+        }
+        return result;
+      },
+      "Tuple of dense little-endian Pauli strings (qubit 0 = rightmost).");
+
+  // sparse_table property: return as list of SparsePauliWord
+  mapping.def_property_readonly(
+      "sparse_table",
+      [](const MajoranaMapping& self) { return self.table(); },
+      "List of sparse Pauli words [(qubit_idx, op_type), ...].");
+
+  // __call__ for γ_k lookup
+  mapping.def(
+      "__call__",
+      [](const MajoranaMapping& self, std::size_t k) -> SparsePauliWord {
+        try {
+          return self(k);
+        } catch (const std::out_of_range& e) {
+          throw py::index_error(e.what());
+        }
+      },
+      py::arg("k"),
+      R"(
+Look up the sparse Pauli word for Majorana operator γ_k.
+
+Args:
+    k: Majorana index (0 ≤ k < 2N).
+
+Returns:
+    Sparse Pauli word as list of (qubit_index, op_type) tuples.
+
+Raises:
+    IndexError: If k is out of range.
+)");
+
+  // validate()
+  mapping.def(
+      "validate",
+      [](const MajoranaMapping& self) {
+        try {
+          self.validate();
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      "Validate the Clifford algebra anticommutation relations.");
+
+  // __repr__
+  mapping.def("__repr__", [](const MajoranaMapping& self) -> std::string {
+    std::string repr = "MajoranaMapping(";
+    if (!self.name().empty()) {
+      repr += "'" + self.name() + "', ";
+    }
+    repr += "num_modes=" + std::to_string(self.num_modes()) +
+            ", num_qubits=" + std::to_string(self.num_qubits()) + ")";
+    return repr;
+  });
+
+  // Factory methods
+  mapping.def_static(
+      "jordan_wigner",
+      [](std::size_t num_modes) {
+        try {
+          return MajoranaMapping::jordan_wigner(num_modes);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("num_modes"),
+      R"(
+Construct a Jordan-Wigner encoding.
+
+Args:
+    num_modes: Number of fermionic modes (spin-orbitals).
+
+Returns:
+    MajoranaMapping with name "jordan_wigner".
+)");
+
+  mapping.def_static(
+      "bravyi_kitaev",
+      [](std::size_t num_modes) {
+        try {
+          return MajoranaMapping::bravyi_kitaev(num_modes);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("num_modes"),
+      R"(
+Construct a Bravyi-Kitaev encoding.
+
+Args:
+    num_modes: Number of fermionic modes (spin-orbitals).
+
+Returns:
+    MajoranaMapping with name "bravyi_kitaev".
+)");
+
+  mapping.def_static(
+      "parity",
+      [](std::size_t num_modes) {
+        try {
+          return MajoranaMapping::parity(num_modes);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("num_modes"),
+      R"(
+Construct a parity encoding.
+
+Args:
+    num_modes: Number of fermionic modes (spin-orbitals).
+
+Returns:
+    MajoranaMapping with name "parity".
+)");
+
+  // ─── majorana_map_hamiltonian free function ────────────────────────
+  data.def(
+      "majorana_map_hamiltonian",
+      [](const MajoranaMapping& mapping, double core_energy,
+         py::array_t<double, py::array::c_style | py::array::forcecast>
+             h1_alpha,
+         py::array_t<double, py::array::c_style | py::array::forcecast>
+             h1_beta,
+         py::array_t<double, py::array::c_style | py::array::forcecast>
+             eri_aaaa,
+         py::array_t<double, py::array::c_style | py::array::forcecast>
+             eri_aabb,
+         py::array_t<double, py::array::c_style | py::array::forcecast>
+             eri_bbbb,
+         std::size_t n_spatial, bool is_restricted, double threshold,
+         double integral_threshold) -> py::tuple {
+        auto result = majorana_map_hamiltonian(
+            mapping, core_energy, h1_alpha.data(), h1_beta.data(),
+            eri_aaaa.data(), eri_aabb.data(), eri_bbbb.data(), n_spatial,
+            is_restricted, threshold, integral_threshold);
+
+        // Convert to Python: (list[str], list[complex])
+        py::list py_strings;
+        py::list py_coeffs;
+        for (std::size_t i = 0; i < result.pauli_strings.size(); ++i) {
+          py_strings.append(result.pauli_strings[i]);
+          py_coeffs.append(result.coefficients[i]);
+        }
+        return py::make_tuple(py_strings, py_coeffs);
+      },
+      py::arg("mapping"), py::arg("core_energy"), py::arg("h1_alpha"),
+      py::arg("h1_beta"), py::arg("eri_aaaa"), py::arg("eri_aabb"),
+      py::arg("eri_bbbb"), py::arg("n_spatial"), py::arg("is_restricted"),
+      py::arg("threshold"), py::arg("integral_threshold"),
+      R"(
+Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
+
+This is the encoding-agnostic C++ mapping engine. It takes integrals
+and a MajoranaMapping, and returns (pauli_strings, coefficients).
+
+Args:
+    mapping: The MajoranaMapping encoding.
+    core_energy: Core energy (nuclear repulsion + frozen core).
+    h1_alpha: One-body integrals for alpha spin (n_spatial × n_spatial, flattened).
+    h1_beta: One-body integrals for beta spin (n_spatial × n_spatial, flattened).
+    eri_aaaa: Two-body integrals (αα|αα) (n_spatial⁴, flattened).
+    eri_aabb: Two-body integrals (αα|ββ) (n_spatial⁴, flattened).
+    eri_bbbb: Two-body integrals (ββ|ββ) (n_spatial⁴, flattened).
+    n_spatial: Number of spatial orbitals.
+    is_restricted: Whether the system is spin-free (h1_alpha == h1_beta).
+    threshold: Drop Pauli terms with |coeff| < threshold.
+    integral_threshold: Skip integrals with |value| < this.
+
+Returns:
+    Tuple of (list[str], list[complex]) with Pauli strings and coefficients.
+)");
+}

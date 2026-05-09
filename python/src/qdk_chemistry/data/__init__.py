@@ -25,6 +25,7 @@ Exposed classes are:
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
+- :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
@@ -113,6 +114,7 @@ from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
+from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -155,6 +157,7 @@ __all__ = [
     "LatticeGraph",
     "LayeredPartition",
     "MP2Container",
+    "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",

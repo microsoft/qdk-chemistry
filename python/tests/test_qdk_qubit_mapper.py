@@ -11,13 +11,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import QubitMapper, available, create
-from qdk_chemistry.algorithms.qubit_mapper.qdk_qubit_mapper import (
-    _bk_compute_ancestor_indices,
-    _bk_compute_children_indices,
-    _bk_compute_parity_indices,
-    _bk_compute_z_indices_for_y_component,
-)
-from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, QubitHamiltonian
+from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
 from .test_helpers import create_test_hamiltonian, create_test_orbitals
@@ -40,91 +34,6 @@ def _make_hamiltonian(
     return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, core_energy, fock))
 
 
-class TestBravyiKitaevSets:
-    """Tests for Bravyi-Kitaev set computation functions.
-
-    The second argument n must be a power of 2.
-    """
-
-    def test_ancestor_indices_4_qubits(self) -> None:
-        """Test ancestor indices for 4 qubit system (n=4 is already power of 2)."""
-        # U(0) = {1, 3} - qubit 0's occupation affects qubits 1 and 3
-        assert _bk_compute_ancestor_indices(0, 4) == frozenset({1, 3})
-        # U(1) = {3}
-        assert _bk_compute_ancestor_indices(1, 4) == frozenset({3})
-        # U(2) = {3}
-        assert _bk_compute_ancestor_indices(2, 4) == frozenset({3})
-        # U(3) = {} - qubit 3 is the root, no ancestors
-        assert _bk_compute_ancestor_indices(3, 4) == frozenset()
-
-    def test_ancestor_indices_8_qubits(self) -> None:
-        """Test ancestor indices for 8 qubit system."""
-        assert _bk_compute_ancestor_indices(0, 8) == frozenset({1, 3, 7})
-        assert _bk_compute_ancestor_indices(4, 8) == frozenset({5, 7})
-        assert _bk_compute_ancestor_indices(7, 8) == frozenset()
-
-    def test_parity_set_4_qubits(self) -> None:
-        """Test parity set for 4 qubit system.
-
-        P(j) follows the recursive binary tree structure.
-        """
-        assert _bk_compute_parity_indices(0, 4) == frozenset()
-        assert _bk_compute_parity_indices(1, 4) == frozenset({0})
-        assert _bk_compute_parity_indices(2, 4) == frozenset({1})
-        assert _bk_compute_parity_indices(3, 4) == frozenset({1, 2})
-
-    def test_parity_set_8_qubits(self) -> None:
-        """Test parity set for 8 qubit system."""
-        assert _bk_compute_parity_indices(0, 8) == frozenset()
-        assert _bk_compute_parity_indices(4, 8) == frozenset({3})
-        assert _bk_compute_parity_indices(5, 8) == frozenset({3, 4})
-        assert _bk_compute_parity_indices(6, 8) == frozenset({3, 5})
-        assert _bk_compute_parity_indices(7, 8) == frozenset({3, 5, 6})
-
-    def test_children_indices_4_qubits(self) -> None:
-        """Test children indices for 4 qubit system."""
-        assert _bk_compute_children_indices(0, 4) == frozenset()
-        assert _bk_compute_children_indices(1, 4) == frozenset({0})
-        assert _bk_compute_children_indices(2, 4) == frozenset()
-        assert _bk_compute_children_indices(3, 4) == frozenset({1, 2})
-
-    def test_z_indices_for_y_component_4_qubits(self) -> None:
-        """Test Z indices for Y component R(j) = P(j) - F(j) for 4 qubit system."""
-        # R(j) = P(j) - F(j) (set difference)
-        assert _bk_compute_z_indices_for_y_component(0, 4) == frozenset()  # {} - {} = {}
-        assert _bk_compute_z_indices_for_y_component(1, 4) == frozenset()  # {0} - {0} = {}
-        assert _bk_compute_z_indices_for_y_component(2, 4) == frozenset({1})  # {1} - {} = {1}
-        assert _bk_compute_z_indices_for_y_component(3, 4) == frozenset()  # {1,2} - {1,2} = {}
-
-    def test_z_indices_for_y_component_8_qubits(self) -> None:
-        """Test Z indices for Y component for 8 qubit system."""
-        assert _bk_compute_z_indices_for_y_component(4, 8) == frozenset({3})  # {3} - {} = {3}
-        assert _bk_compute_z_indices_for_y_component(5, 8) == frozenset({3})  # {3,4} - {4} = {3}
-        assert _bk_compute_z_indices_for_y_component(6, 8) == frozenset({3, 5})  # {3,5} - {} = {3,5}
-        assert _bk_compute_z_indices_for_y_component(7, 8) == frozenset()  # {3,5,6} - {3,5,6} = {}
-
-    def test_invalid_n_raises_value_error(self) -> None:
-        """Test that non-power-of-2 values for n raise ValueError."""
-        # Test various non-power-of-2 values
-        invalid_values = [0, 3, 5, 6, 7, 9, 10, 12, 15]
-        for n in invalid_values:
-            with pytest.raises(ValueError, match="n must be a power of 2"):
-                _bk_compute_parity_indices(0, n)
-            with pytest.raises(ValueError, match="n must be a power of 2"):
-                _bk_compute_ancestor_indices(0, n)
-            with pytest.raises(ValueError, match="n must be a power of 2"):
-                _bk_compute_children_indices(0, n)
-            with pytest.raises(ValueError, match="n must be a power of 2"):
-                _bk_compute_z_indices_for_y_component(0, n)
-
-    def test_n_equals_1_returns_empty_set(self) -> None:
-        """Test that n=1 (valid power of 2) returns empty frozenset."""
-        assert _bk_compute_parity_indices(0, 1) == frozenset()
-        assert _bk_compute_ancestor_indices(0, 1) == frozenset()
-        assert _bk_compute_children_indices(0, 1) == frozenset()
-        assert _bk_compute_z_indices_for_y_component(0, 1) == frozenset()
-
-
 class TestQdkQubitMapper:
     """Tests for QdkQubitMapper."""
 
@@ -139,7 +48,6 @@ class TestQdkQubitMapper:
     def test_default_settings(self) -> None:
         """Test default settings values."""
         mapper = create("qubit_mapper", "qdk")
-        assert mapper.settings().get("encoding") == "jordan-wigner"
         assert mapper.settings().get("threshold") == 1e-12
 
     def test_custom_threshold(self) -> None:
@@ -147,18 +55,13 @@ class TestQdkQubitMapper:
         mapper = create("qubit_mapper", "qdk", threshold=1e-10)
         assert mapper.settings().get("threshold") == 1e-10
 
-    def test_invalid_encoding_raises(self) -> None:
-        """Test that invalid encoding raises ValueError."""
-        mapper = create("qubit_mapper", "qdk")
-        with pytest.raises(ValueError, match="out of allowed options"):
-            mapper.settings().set("encoding", "invalid_type")
-
     def test_simple_hamiltonian(self) -> None:
         """Test mapping a simple diagonal Hamiltonian."""
         mapper = create("qubit_mapper", "qdk")
         hamiltonian = create_test_hamiltonian(2)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * 2)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
 
         assert isinstance(result, QubitHamiltonian)
         assert result.num_qubits == 4
@@ -176,8 +79,9 @@ class TestQdkQubitMapper:
         two_body = np.zeros(1)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         assert result.num_qubits == 2
@@ -195,8 +99,9 @@ class TestQdkQubitMapper:
         orbitals = create_test_orbitals(n_orbitals)
         core_energy = 5.0
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=core_energy)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         assert "II" in pauli_dict
@@ -206,8 +111,9 @@ class TestQdkQubitMapper:
         """Test that small coefficients are pruned."""
         mapper = create("qubit_mapper", "qdk", threshold=0.1)
         hamiltonian = create_test_hamiltonian(2)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * 2)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
 
         for coeff in result.coefficients:
             assert abs(coeff) >= 0.1
@@ -216,8 +122,9 @@ class TestQdkQubitMapper:
         """Test Pauli string format."""
         mapper = create("qubit_mapper", "qdk")
         hamiltonian = create_test_hamiltonian(2)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * 2)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
 
         for ps in result.pauli_strings:
             assert isinstance(ps, str)
@@ -242,8 +149,9 @@ class TestQdkQubitMapper:
         two_body = np.zeros(1)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Verify ordering: ZI should have Z on qubit 0 (alpha), I on qubit 1 (beta)
@@ -277,8 +185,9 @@ class TestQdkQubitMapper:
         two_body = np.zeros(n_orbitals**4)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected hopping terms (no Z-string for adjacent orbitals)
@@ -321,8 +230,9 @@ class TestQdkQubitMapper:
         two_body = np.zeros(n_orbitals**4)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected hopping terms WITH Z-string
@@ -364,8 +274,9 @@ class TestQdkQubitMapper:
         two_body = np.zeros(n_orbitals**4)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected: only identity and single-Z terms (number operators)
@@ -416,13 +327,13 @@ class TestQdkQubitMapper:
         two_body[0] = 2.0  # (00|00) = U = 2
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected: n_a n_b interaction
         expected = {
-            "II": 0.5,
             "ZI": -0.5,
             "IZ": -0.5,
             "ZZ": 0.5,
@@ -461,7 +372,8 @@ class TestQdkQubitMapper:
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
 
-        result = mapper.run(hamiltonian)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         expected = {
@@ -493,7 +405,8 @@ class TestQdkQubitMapper:
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
 
-        result = mapper.run(hamiltonian)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
+        result = mapper.run(hamiltonian, mapping)
 
         # All returned coefficients should be >= threshold
         for coeff in result.coefficients:
@@ -523,7 +436,8 @@ class TestQdkQubitMapper:
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
 
-        result = mapper.run(hamiltonian)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected hopping terms with double Z-string
@@ -549,10 +463,10 @@ class TestQdkQubitMapperRealHamiltonians:
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "ethylene_4e4o_2det.hamiltonian.json")
 
         mapper = create("qubit_mapper", "qdk")
-        result = mapper.run(hamiltonian)
-
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
         expected_qubits = 2 * h1_alpha.shape[0]
+        mapping = MajoranaMapping.jordan_wigner(num_modes=expected_qubits)
+        result = mapper.run(hamiltonian, mapping)
 
         assert result.num_qubits == expected_qubits
         assert len(result.pauli_strings) > 0
@@ -564,10 +478,10 @@ class TestQdkQubitMapperRealHamiltonians:
         hamiltonian = Hamiltonian.from_json_file(test_data_path / "f2_10e6o.hamiltonian.json")
 
         mapper = create("qubit_mapper", "qdk")
-        result = mapper.run(hamiltonian)
-
         h1_alpha, _ = hamiltonian.get_one_body_integrals()
         expected_qubits = 2 * h1_alpha.shape[0]
+        mapping = MajoranaMapping.jordan_wigner(num_modes=expected_qubits)
+        result = mapper.run(hamiltonian, mapping)
 
         assert result.num_qubits == expected_qubits
         assert len(result.pauli_strings) > 0
@@ -589,8 +503,10 @@ class TestQdkQubitMapperRealHamiltonians:
             FermionicOp.atol = threshold
             SparsePauliOp.atol = threshold
 
-            qdk_result = create("qubit_mapper", "qdk", threshold=threshold).run(hamiltonian)
-            qiskit_result = create("qubit_mapper", "qiskit", encoding="jordan-wigner").run(hamiltonian)
+            h1_alpha, _ = hamiltonian.get_one_body_integrals()
+            mapping = MajoranaMapping.jordan_wigner(num_modes=2 * h1_alpha.shape[0])
+            qdk_result = create("qubit_mapper", "qdk", threshold=threshold).run(hamiltonian, mapping)
+            qiskit_result = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
         finally:
             FermionicOp.atol = original_fermionic_atol
             SparsePauliOp.atol = original_sparse_atol
@@ -611,16 +527,17 @@ class TestBravyiKitaevMapper:
     """Tests for Bravyi-Kitaev mapping."""
 
     def test_bk_instantiation(self) -> None:
-        """Test BK encoding is valid via factory."""
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
-        assert mapper.settings().get("encoding") == "bravyi-kitaev"
+        """Test BK mapper can be created via factory."""
+        mapper = create("qubit_mapper", "qdk")
+        assert isinstance(mapper, QubitMapper)
 
     def test_bk_simple_hamiltonian(self) -> None:
         """Test BK mapping of simple Hamiltonian."""
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper = create("qubit_mapper", "qdk")
         hamiltonian = create_test_hamiltonian(2)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * 2)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
 
         assert isinstance(result, QubitHamiltonian)
         assert result.num_qubits == 4
@@ -639,7 +556,7 @@ class TestBravyiKitaevMapper:
         - n_1 (beta, j=1): F(1)={0}, so n_1 = 0.5*(I - Z_0*Z_1)
         Total with h_00=1: H = n_0 + n_1 = I - 0.5*Z_0 - 0.5*Z_0*Z_1
         """
-        mapper_bk = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper_bk = create("qubit_mapper", "qdk")
 
         # h_00 = 1 gives H = n_0_alpha + n_0_beta
         n_orbitals = 1
@@ -647,8 +564,9 @@ class TestBravyiKitaevMapper:
         two_body = np.zeros(1)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * n_orbitals)
 
-        result_bk = mapper_bk.run(hamiltonian)
+        result_bk = mapper_bk.run(hamiltonian, mapping)
         assert result_bk.num_qubits == 2
 
         bk_dict = dict(zip(result_bk.pauli_strings, result_bk.coefficients, strict=True))
@@ -661,7 +579,7 @@ class TestBravyiKitaevMapper:
 
     def test_bk_core_energy_not_included(self) -> None:
         """Test that core energy is not included in BK QubitHamiltonian."""
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
         one_body = np.array([[1.0]])  # Non-zero integral to generate Pauli terms
@@ -669,8 +587,9 @@ class TestBravyiKitaevMapper:
         orbitals = create_test_orbitals(n_orbitals)
         core_energy = 5.0
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals, core_energy=core_energy)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         assert "II" in pauli_dict
@@ -690,15 +609,16 @@ class TestBravyiKitaevMapper:
         For h_01 = h_10 = 1 with 2 orbitals (4 qubits, blocked ordering):
         We verify the BK result differs from JW but preserves hermiticity.
         """
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 2
         one_body = np.array([[0.0, 1.0], [1.0, 0.0]])  # h_01 = h_10 = 1
         two_body = np.zeros(n_orbitals**4)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # BK should have different structure than JW
@@ -730,15 +650,16 @@ class TestBravyiKitaevMapper:
         H = h_00*(n_0 + n_2) + h_11*(n_1 + n_3)
           = 1*(n_0 + n_2) + 2*(n_1 + n_3)
         """
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 2
         one_body = np.array([[1.0, 0.0], [0.0, 2.0]])
         two_body = np.zeros(n_orbitals**4)
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # Expected terms from BK number operators:
@@ -762,7 +683,7 @@ class TestBravyiKitaevMapper:
         The two-body term n_0a n_0b should produce ZZ interactions in BK,
         but with different structure than JW due to BK encoding.
         """
-        mapper = create("qubit_mapper", "qdk", encoding="bravyi-kitaev")
+        mapper = create("qubit_mapper", "qdk")
 
         n_orbitals = 1
         one_body = np.zeros((n_orbitals, n_orbitals))
@@ -770,8 +691,9 @@ class TestBravyiKitaevMapper:
         two_body[0] = 2.0  # U = 2
         orbitals = create_test_orbitals(n_orbitals)
         hamiltonian = _make_hamiltonian(one_body, two_body, orbitals)
+        mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * n_orbitals)
 
-        result = mapper.run(hamiltonian)
+        result = mapper.run(hamiltonian, mapping)
         pauli_dict = dict(zip(result.pauli_strings, result.coefficients, strict=True))
 
         # For 1 spatial orbital (2 qubits), BK n_0a n_0b:
@@ -808,8 +730,10 @@ class TestBravyiKitaevMapper:
             FermionicOp.atol = threshold
             SparsePauliOp.atol = threshold
 
-            qdk_result = create("qubit_mapper", "qdk", encoding="bravyi-kitaev", threshold=threshold).run(hamiltonian)
-            qiskit_result = create("qubit_mapper", "qiskit", encoding="bravyi-kitaev").run(hamiltonian)
+            h1_alpha, _ = hamiltonian.get_one_body_integrals()
+            mapping = MajoranaMapping.bravyi_kitaev(num_modes=2 * h1_alpha.shape[0])
+            qdk_result = create("qubit_mapper", "qdk", threshold=threshold).run(hamiltonian, mapping)
+            qiskit_result = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
         finally:
             FermionicOp.atol = original_fermionic_atol
             SparsePauliOp.atol = original_sparse_atol

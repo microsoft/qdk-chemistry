@@ -15,6 +15,7 @@ from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
     from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
+    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__: list[str] = []
 
@@ -22,28 +23,15 @@ __all__: list[str] = []
 class QubitMapperSettings(Settings):
     """Base settings for all QubitMapper implementations.
 
-    Common settings:
-        encoding (string, default="jordan-wigner"): Fermion-to-qubit encoding strategy.
+    Settings are variant-specific (thresholds, etc.). The encoding is
+    determined by the :class:`~qdk_chemistry.data.MajoranaMapping` passed
+    to :meth:`~QubitMapper.run`.
 
     """
 
-    def __init__(self, valid_encodings: list[str] | None = None) -> None:
-        """Initialize QubitMapperSettings.
-
-        Args:
-            valid_encodings: Allowed encoding values. Default: ``["jordan-wigner"]``.
-
-        """
+    def __init__(self) -> None:
+        """Initialize QubitMapperSettings."""
         super().__init__()
-        if valid_encodings is None:
-            valid_encodings = ["jordan-wigner"]
-        self._set_default(
-            "encoding",
-            "string",
-            "jordan-wigner",
-            "Fermion-to-qubit encoding strategy",
-            valid_encodings,
-        )
 
 
 class QubitMapper(Algorithm):
@@ -58,11 +46,17 @@ class QubitMapper(Algorithm):
         return "qubit_mapper"
 
     @abstractmethod
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
-        """Construct a QubitHamiltonian from a Hamiltonian using the mapping specified.
+    def _run_impl(
+        self,
+        hamiltonian: Hamiltonian,
+        mapping: MajoranaMapping,
+        symmetries: Symmetries | None = None,
+    ) -> QubitHamiltonian:
+        """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
+            mapping: The Majorana-to-Pauli encoding to use.
             symmetries: Optional symmetry information. Required by symmetry-exploiting algorithms.
 
         Returns:
