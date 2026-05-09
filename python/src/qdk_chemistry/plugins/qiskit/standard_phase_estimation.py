@@ -17,10 +17,10 @@ References:
 from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3
 from qiskit.synthesis.qft.qft_decompose_full import synth_qft_full
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
-    ControlledTimeEvolutionUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -59,13 +59,11 @@ class QiskitStandardPhaseEstimationSettings(PhaseEstimationSettings):
 class QiskitStandardPhaseEstimation(PhaseEstimation):
     """Standard QFT-based (non-iterative) phase estimation."""
 
-    def __init__(self, num_bits: int = -1, evolution_time: float = 0.0, qft_do_swaps: bool = True, shots: int = 3):
+    def __init__(self, num_bits: int = -1, qft_do_swaps: bool = True, shots: int = 3):
         """Initialize the Qiskit standard phase estimation routine.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-            evolution_time: Time parameter ``t`` used in the time-evolution unitary ``U = exp(-i H t)``,
-                defaults to 0.0; user needs to set a valid value.
             qft_do_swaps: Whether to include the final swap layer in the inverse QFT.
                 Defaults to ``True`` so that the measured bit string is
                 ordered from most-significant to least-significant bit.
@@ -73,10 +71,9 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, evolution_time=evolution_time)
+        super().__init__(num_bits=num_bits)
         self._settings = QiskitStandardPhaseEstimationSettings()
         self._settings.set("num_bits", num_bits)
-        self._settings.set("evolution_time", evolution_time)
         self._settings.set("qft_do_swaps", qft_do_swaps)
         self._settings.set("shots", shots)
         self._qpe_circuit: Circuit | None = None
@@ -113,11 +110,17 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
         dominant_bitstring = max(counts, key=counts.get)
         raw_phase = int(dominant_bitstring, 2) / (2 ** self._settings.get("num_bits"))
 
-        return QpeResult.from_phase_fraction(
-            method=self.name(),
-            phase_fraction=raw_phase,
-            evolution_time=self.settings().get("evolution_time"),
-            bits_msb_first=dominant_bitstring,
+        if isinstance(self.unitary_builder, TimeEvolutionBuilder):
+            evolution_time = self.unitary_builder.settings().get("time")
+            return QpeResult.from_phase_fraction(
+                method=self.name(),
+                phase_fraction=raw_phase,
+                evolution_time=evolution_time,
+                bits_msb_first=dominant_bitstring,
+            )
+        raise NotImplementedError(
+            "QPE result construction currently only supports post-processing from time evolution. "
+            f"Got {type(self.unitary_builder)} instead."
         )
 
     def create_circuit(
@@ -157,10 +160,9 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         for ancilla_idx in range(num_bits):
             power = 2**ancilla_idx
-            self._append_controlled_evolution(
+            self._append_controlled_unitary(
                 circuit=qc,
                 qubit_hamiltonian=qubit_hamiltonian,
-                time=self._settings.get("evolution_time"),
                 control_qubit=ancilla[ancilla_idx],
                 target_qubits=system,
                 power=power,
@@ -175,41 +177,27 @@ class QiskitStandardPhaseEstimation(PhaseEstimation):
 
         return Circuit(qasm3.dumps(qc))
 
-    def _append_controlled_evolution(
+    def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
         qubit_hamiltonian: QubitHamiltonian,
         control_qubit: int,
         target_qubits: list,
         *,
-        time: float,
         power: int,
     ) -> None:
-        """Apply the controlled time evolution unitary to the circuit.
+        """Apply the controlled unitary to the circuit.
 
         Args:
             circuit: The quantum circuit to modify.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
-            time: The evolution time.
-            power: The power to which the controlled evolution unitary is raised.
+            power: The power to which the controlled unitary is raised.
 
         """
-        time_evol_unitary = self._create_time_evolution(
-            qubit_hamiltonian=qubit_hamiltonian,
-            time=time,
-        )
-        ctrl_time_evol = ControlledTimeEvolutionUnitary(
-            time_evolution_unitary=time_evol_unitary,
-            control_indices=[0],
-        )
-
-        ctrl_time_evol_circuit = self._create_ctrl_time_evol_circuit(
-            controlled_evolution=ctrl_time_evol,
-            power=power,
-        )
-        cu_circuit = ctrl_time_evol_circuit.get_qiskit_circuit()
+        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)

@@ -115,7 +115,6 @@ iqpe = create(
     "phase_estimation",
     "iterative",
     num_bits=M_PRECISION,
-    evolution_time=T_TIME,
     shots_per_bit=SHOTS_PER_BIT,
 )
 iqpe.settings().set(
@@ -123,12 +122,12 @@ iqpe.settings().set(
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
 )
 iqpe.settings().set(
-    "evolution_builder",
-    AlgorithmRef("time_evolution_builder", "trotter"),
+    "unitary_builder",
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=T_TIME),
 )
 iqpe.settings().set(
     "circuit_mapper",
-    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 

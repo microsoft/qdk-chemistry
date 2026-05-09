@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.time_evolution.builder.partially_randomized import PartiallyRandomized
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import PartiallyRandomized
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -27,17 +27,17 @@ class TestPartiallyRandomizedBasics:
     def test_type_name(self):
         """Test the type_name method of PartiallyRandomized."""
         builder = PartiallyRandomized()
-        assert builder.type_name() == "time_evolution_builder"
+        assert builder.type_name() == "hamiltonian_unitary_builder"
 
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
-        builder = create("time_evolution_builder", "partially_randomized")
+        builder = create("hamiltonian_unitary_builder", "partially_randomized")
         assert isinstance(builder, PartiallyRandomized)
 
     def test_can_create_with_settings(self):
         """Test that PartiallyRandomized can be created with custom settings."""
         builder = create(
-            "time_evolution_builder",
+            "hamiltonian_unitary_builder",
             "partially_randomized",
             weight_threshold=0.5,
             num_random_samples=200,
@@ -53,16 +53,16 @@ class TestPartiallyRandomizedBasics:
 class TestPartiallyRandomizedConstruction:
     """Tests for PartiallyRandomized time evolution construction."""
 
-    def test_returns_time_evolution_unitary(self):
-        """Test that run returns a TimeEvolutionUnitary."""
+    def test_returns_unitary_representation(self):
+        """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XI", "YI", "ZI", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
-        builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = PartiallyRandomized(weight_threshold=0.4, num_random_samples=10, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
         assert isinstance(container, PauliProductFormulaContainer)
 
@@ -79,8 +79,9 @@ class TestPartiallyRandomizedConstruction:
             trotter_order=2,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.2,
         )
-        unitary = builder.run(hamiltonian, time=0.2)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # Structure should be: X(half) -> random samples -> X(half)
@@ -107,8 +108,9 @@ class TestPartiallyRandomizedConstruction:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.2,
         )
-        unitary = builder.run(hamiltonian, time=0.2)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # Structure should be: X(full) -> random samples
@@ -126,11 +128,11 @@ class TestPartiallyRandomizedConstruction:
             coefficients=[1.0, 0.5, 0.3, 0.1, 0.05],
         )
 
-        builder1 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345)
-        builder2 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345)
+        builder1 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345, time=0.1)
+        builder2 = PartiallyRandomized(weight_threshold=0.4, num_random_samples=20, seed=12345, time=0.1)
 
-        unitary1 = builder1.run(hamiltonian, time=0.1)
-        unitary2 = builder2.run(hamiltonian, time=0.1)
+        unitary1 = builder1.run(hamiltonian)
+        unitary2 = builder2.run(hamiltonian)
 
         terms1 = unitary1.get_container().step_terms
         terms2 = unitary2.get_container().step_terms
@@ -157,8 +159,9 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=2,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # 2nd order: 2 det forward + 10 random + 2 det backward = 14 total
@@ -184,8 +187,9 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # 1st order: 2 deterministic + 10 random = 12 total
@@ -203,8 +207,9 @@ class TestPartiallyRandomizedSplitting:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # 10 terms, 10% = 1 deterministic, 9 random
@@ -231,8 +236,9 @@ class TestPartiallyRandomizedRandomPart:
             trotter_order=1,
             seed=42,
             merge_duplicate_terms=False,
+            time=time,
         )
-        unitary = builder.run(hamiltonian, time=time)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # λ_R = 0.2 (only Z term)
@@ -260,8 +266,9 @@ class TestPartiallyRandomizedRandomPart:
             num_random_samples=20,
             trotter_order=2,
             seed=42,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # All 2 terms treated deterministically, no random samples
@@ -275,8 +282,8 @@ class TestPartiallyRandomizedEdgeCases:
     def test_empty_hamiltonian_after_filtering(self):
         """Test handling of Hamiltonian with only negligible terms."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-15])
-        builder = PartiallyRandomized(weight_threshold=0.5, num_random_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = PartiallyRandomized(weight_threshold=0.5, num_random_samples=10, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         assert len(container.step_terms) == 0
@@ -290,8 +297,9 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=10,
             trotter_order=2,
             seed=42,
+            time=0.2,
         )
-        unitary = builder.run(hamiltonian, time=0.2)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # 2nd order with 1 deterministic term: X(half) + X(half) = 2 terms
@@ -306,10 +314,10 @@ class TestPartiallyRandomizedEdgeCases:
             pauli_strings=["X"],
             coefficients=[1.0 + 0.5j],
         )
-        builder = PartiallyRandomized(weight_threshold=0.5, seed=42)
+        builder = PartiallyRandomized(weight_threshold=0.5, seed=42, time=0.1)
 
         with pytest.raises(ValueError, match="Non-Hermitian"):
-            builder.run(hamiltonian, time=0.1)
+            builder.run(hamiltonian)
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled correctly."""
@@ -322,8 +330,9 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=20,
             trotter_order=1,
             seed=42,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
         terms = unitary.get_container().step_terms
 
         # First term is X (deterministic) with negative angle
@@ -341,8 +350,9 @@ class TestPartiallyRandomizedEdgeCases:
             num_random_samples=20,
             trotter_order=2,
             seed=42,
+            time=0.1,
         )
-        unitary = builder.run(hamiltonian, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         assert container.num_qubits == 3

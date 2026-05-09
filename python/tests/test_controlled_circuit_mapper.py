@@ -12,17 +12,17 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.pauli_sequence_mapper import (
+from qdk_chemistry.algorithms.controlled_circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.data.controlled_unitary import (
+    ControlledUnitary,
+)
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
-)
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import (
-    ControlledTimeEvolutionUnitary,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -49,10 +49,10 @@ def simple_ppf_container():
 
 @pytest.fixture
 def controlled_unitary(simple_ppf_container):
-    """Create a ControlledTimeEvolutionUnitary for testing."""
-    teu = TimeEvolutionUnitary(container=simple_ppf_container)
-    return ControlledTimeEvolutionUnitary(
-        time_evolution_unitary=teu,
+    """Create a ControlledUnitary for testing."""
+    teu = UnitaryRepresentation(container=simple_ppf_container)
+    return ControlledUnitary(
+        unitary=teu,
         control_indices=[2],
     )
 
@@ -66,8 +66,8 @@ class TestPauliSequenceMapper:
         assert mapper.name() == "pauli_sequence"
 
     def test_basic_mapping(self, controlled_unitary):
-        """Test basic mapping of ControlledTimeEvolutionUnitary to Circuit."""
-        mapper = PauliSequenceMapper(power=1)
+        """Test basic mapping of ControlledUnitary to Circuit."""
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -104,25 +104,25 @@ class TestPauliSequenceMapper:
 
         assert set(control_qubits) == {2}
 
-    def test_target_indices_validation(self, controlled_unitary):
+    def test_target_indices_validation(self, simple_ppf_container):
         """Test that invalid target indices raise ValueError."""
-        mapper = PauliSequenceMapper()
+        teu = UnitaryRepresentation(container=simple_ppf_container)
 
         # Overlapping target and control indices
         with pytest.raises(ValueError, match="must not overlap"):
-            mapper.run(controlled_unitary, target_indices=[1, 2])
+            ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[1, 2])
 
-        # Target and control indices do not cover all qubits
-        with pytest.raises(ValueError, match="must cover all qubits"):
-            mapper.run(controlled_unitary, target_indices=[0])
+        # Non-overlapping indices in a larger circuit are valid
+        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[0, 1])
+        assert cu.target_indices == [0, 1]
 
-        with pytest.raises(ValueError, match="must cover all qubits"):
-            mapper.run(controlled_unitary, target_indices=[3, 4])
+        cu = ControlledUnitary(unitary=teu, control_indices=[2], target_indices=[3, 4])
+        assert cu.target_indices == [3, 4]
 
     def test_invalid_container_type_raises(self):
         """Test that an invalid container type raises a ValueError."""
 
-        # Create a new TimeEvolutionUnitary with invalid container type
+        # Create a new UnitaryRepresentation with invalid container type
         class MockContainer:
             """Mock container class."""
 
@@ -131,9 +131,9 @@ class TestPauliSequenceMapper:
                 """Return mock container type."""
                 return "mock_container"
 
-        invalid_teu = TimeEvolutionUnitary(container=MockContainer())
-        invalid_controlled = ControlledTimeEvolutionUnitary(
-            time_evolution_unitary=invalid_teu,
+        invalid_teu = UnitaryRepresentation(container=MockContainer())
+        invalid_controlled = ControlledUnitary(
+            unitary=invalid_teu,
             control_indices=[2],
         )
 
@@ -144,7 +144,7 @@ class TestPauliSequenceMapper:
 
     def test_rotation_parameters(self, controlled_unitary):
         """Test that rotation parameters are correctly set in the mapped circuit."""
-        mapper = PauliSequenceMapper(power=1)
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -176,11 +176,11 @@ class TestPauliSequenceMapper:
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_controlled_u_circuit_matrix(self, controlled_unitary):
         """Test that the constructed controlled-U circuit has the expected matrix."""
-        mapper = PauliSequenceMapper(power=1)
+        mapper = PauliSequenceMapper()
         circuit = mapper.run(controlled_unitary)
 
         # Extract angles from the container
-        container = controlled_unitary.time_evolution_unitary.get_container()
+        container = controlled_unitary.unitary.get_container()
         angle_x = container.step_terms[0].angle
         angle_z = container.step_terms[1].angle
 
