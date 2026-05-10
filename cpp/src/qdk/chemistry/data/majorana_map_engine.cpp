@@ -100,14 +100,43 @@ MajoranaMapResult majorana_map_hamiltonian(
 
   // ─── One-body terms ───────────────────────────────────────────────
   // H_1 = Σ_{p,q,σ} h_pq a†_{p,σ} a_{q,σ}
+  //
+  // For restricted systems, also fold in the two-body δ correction:
+  //   -1/2 Σ_{p,q,s} (pq|qs) · E_ps = Σ_{p,s} h'_ps · E_ps
+  //   where h'_ps = -1/2 Σ_q (pq|qs)
+  // This avoids a separate O(N³) δ loop.
+
+  // Compute effective one-body integrals (original + δ correction)
+  std::vector<double> h1_eff_alpha(n_spatial * n_spatial);
+  std::vector<double> h1_eff_beta(n_spatial * n_spatial);
+  for (std::size_t p = 0; p < n_spatial; ++p) {
+    for (std::size_t s = 0; s < n_spatial; ++s) {
+      double h_a = h1_alpha[p * n_spatial + s];
+      double h_b = is_restricted ? h_a : h1_beta[p * n_spatial + s];
+
+      if (is_restricted) {
+        // δ correction: h'_ps = -1/2 Σ_q (pq|qs)
+        double delta_corr = 0.0;
+        for (std::size_t q = 0; q < n_spatial; ++q) {
+          delta_corr += eri_aaaa[idx4(p, q, q, s)];
+        }
+        h_a -= 0.5 * delta_corr;
+        h_b = h_a;  // restricted: same correction for both spins
+      }
+
+      h1_eff_alpha[p * n_spatial + s] = h_a;
+      h1_eff_beta[p * n_spatial + s] = h_b;
+    }
+  }
+
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t q = 0; q < n_spatial; ++q) {
-      double h_pq_a = h1_alpha[p * n_spatial + q];
+      double h_pq_a = h1_eff_alpha[p * n_spatial + q];
       if (std::abs(h_pq_a) > integral_threshold) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
 
-      double h_pq_b = is_restricted ? h_pq_a : h1_beta[p * n_spatial + q];
+      double h_pq_b = h1_eff_beta[p * n_spatial + q];
       if (std::abs(h_pq_b) > integral_threshold) {
         accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
       }
@@ -210,14 +239,12 @@ MajoranaMapResult majorana_map_hamiltonian(
     return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
   };
 
-  // Spin-free case: use spin-summed E operators for 4x fewer products
+  // Spin-free case: exploit (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr) symmetry
+  // by using symmetrized operators S_pq = E_pq + E_qp, which merge from
+  // 8 terms down to 3-4 terms. Iterate p≤q, r≤s: ~12x fewer multiply calls.
   if (is_restricted) {
-    // Precompute spin-summed E_pq: for each spatial (p,q), accumulate
-    // the 4 Majorana pair products from both α and β into a single set.
-    // E^σ_pq = (1/4) Σ_{a,b} c[a][b] * pair_cache_σ[2*p+a, 2*q+b]
-    // E_pq = E^α_pq + E^β_pq
+    // Precompute spin-summed E_pq for all (p,q):
     struct SpinSummedE {
-      // Up to 8 terms (4 per spin, some may combine)
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
     };
     std::vector<SpinSummedE> ss_e(n_spatial * n_spatial);
@@ -225,55 +252,92 @@ MajoranaMapResult majorana_map_hamiltonian(
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         auto& sse = ss_e[p * n_spatial + q];
-        // α terms: local Majorana indices 2*p+a, 2*q+b
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
-            const auto& [phase, word] =
+            const auto& [phase_a, word_a] =
                 alpha_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
-          }
-        }
-        // β terms: same local indices but from β cache
-        for (int a = 0; a < 2; ++a) {
-          for (int b = 0; b < 2; ++b) {
-            const auto& [phase, word] =
+            sse.terms.emplace_back(kQuarter * kC[a][b] * phase_a, word_a);
+            const auto& [phase_b, word_b] =
                 beta_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
+            sse.terms.emplace_back(kQuarter * kC[a][b] * phase_b, word_b);
           }
         }
       }
     }
 
-    // Two-body: (1/2) Σ_{pqrs} (pq|rs) [E_pq · E_rs - δ_{qr} E_ps]
+    // Precompute symmetrized S_pq = E_pq + E_qp (merged) for p ≤ q.
+    // S_pp = E_pp (just merged), S_pq = E_pq + E_qp for p < q.
+    // Merging combines terms with the same Pauli word, reducing from 8-16
+    // terms down to 3-4, which is the key inner-loop speedup.
+    struct SymmetrizedE {
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
+    };
+    std::size_t sym_size = n_spatial * (n_spatial + 1) / 2;
+    std::vector<SymmetrizedE> sym_e(sym_size);
+
+    auto sym_idx = [](std::size_t p, std::size_t q) -> std::size_t {
+      // Upper-triangular index for p ≤ q
+      return p * (p + 1) / 2 + q;  // wrong — need canonical form
+    };
+    // Use flat index: for p ≤ q, index = p*n - p*(p+1)/2 + q
+    // Actually simpler: use a 2D lookup but only fill p ≤ q
+    // Let's use p*n_spatial + q mapped to the sym_e array via a helper
+    std::vector<std::size_t> sym_map(n_spatial * n_spatial);
+    {
+      std::size_t idx = 0;
+      for (std::size_t p = 0; p < n_spatial; ++p) {
+        for (std::size_t q = p; q < n_spatial; ++q) {
+          sym_map[p * n_spatial + q] = idx;
+          if (p != q) sym_map[q * n_spatial + p] = idx;
+
+          // Merge E_pq + E_qp terms
+          std::unordered_map<SparsePauliWord, std::complex<double>,
+                             SparsePauliWordHash>
+              merged;
+          for (const auto& [c, w] : ss_e[p * n_spatial + q].terms) {
+            merged[w] += c;
+          }
+          if (p != q) {
+            for (const auto& [c, w] : ss_e[q * n_spatial + p].terms) {
+              merged[w] += c;
+            }
+          }
+          auto& se = sym_e[idx];
+          for (auto& [w, c] : merged) {
+            if (std::abs(c) > 1e-15) {
+              se.terms.emplace_back(c, std::move(w));
+            }
+          }
+          ++idx;
+        }
+      }
+    }
+
+    // Two-body product term: Σ_{p≤q, r≤s} (pq|rs) S_pq · S_rs
+    // This is equivalent to Σ_{pqrs} (pq|rs) E_pq · E_rs due to
+    // the bra/ket symmetry (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr).
     for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        const auto& e_pq = ss_e[p * n_spatial + q];
+      for (std::size_t q = p; q < n_spatial; ++q) {
+        const auto& s_pq = sym_e[sym_map[p * n_spatial + q]];
         for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = 0; s < n_spatial; ++s) {
+          for (std::size_t s = r; s < n_spatial; ++s) {
             double eri = eri_aaaa[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
 
             double half_eri = 0.5 * eri;
-            const auto& e_rs = ss_e[r * n_spatial + s];
+            const auto& s_rs = sym_e[sym_map[r * n_spatial + s]];
 
-            // E_pq · E_rs product — bypass LRU cache
-            for (const auto& [c1, w1] : e_pq.terms) {
-              for (const auto& [c2, w2] : e_rs.terms) {
+            for (const auto& [c1, w1] : s_pq.terms) {
+              for (const auto& [c2, w2] : s_rs.terms) {
                 accumulate_product_uncached(w1, w2, half_eri * c1 * c2);
-              }
-            }
-
-            // δ_{qr} correction
-            if (q == r) {
-              const auto& e_ps = ss_e[p * n_spatial + s];
-              for (const auto& [c, w] : e_ps.terms) {
-                acc.accumulate(w, -half_eri * c);
               }
             }
           }
         }
       }
     }
+
+    // (δ correction is folded into the one-body integrals above)
   } else {
     // Unrestricted: explicit spin-channel ERIs
 
