@@ -103,7 +103,7 @@ SparsePauliWord packed_to_sparse(const PackedPauliWord<NW>& pw) {
 }
 
 template <std::size_t NW>
-std::pair<std::complex<double>, PackedPauliWord<NW>> multiply_packed(
+std::pair<int, PackedPauliWord<NW>> multiply_packed(
     const PackedPauliWord<NW>& p1, const PackedPauliWord<NW>& p2) {
   PackedPauliWord<NW> result;
   int phase_exp = 0;
@@ -122,9 +122,27 @@ std::pair<std::complex<double>, PackedPauliWord<NW>> multiply_packed(
     phase_exp += __builtin_popcountll(cyc);
     phase_exp -= __builtin_popcountll(anti);
   }
-  static constexpr std::complex<double> powers_of_i[4] = {
-      {1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-  return {powers_of_i[((phase_exp % 4) + 4) % 4], result};
+  // Return phase index (0..3) instead of complex — callers apply phase
+  // using branchless real/imag swap, avoiding complex<double> multiply.
+  return {phase_exp & 3, result};
+}
+
+/// Apply a phase index (0=+1, 1=+i, 2=-1, 3=-i) to a complex scale factor.
+/// Returns the scaled value without a full complex multiply.
+inline std::complex<double> apply_phase(int phase_idx,
+                                        std::complex<double> scale) {
+  switch (phase_idx) {
+    case 0:
+      return scale;
+    case 1:
+      return {-scale.imag(), scale.real()};
+    case 2:
+      return {-scale.real(), -scale.imag()};
+    case 3:
+      return {scale.imag(), -scale.real()};
+    default:
+      __builtin_unreachable();
+  }
 }
 
 template <std::size_t NW>
@@ -132,28 +150,25 @@ class PackedAccumulator {
  public:
   void accumulate(const PackedPauliWord<NW>& word,
                   std::complex<double> coeff) {
-    auto it = terms_.find(word);
-    if (it != terms_.end()) {
-      it->second += coeff;
-    } else {
-      terms_[word] = coeff;
-    }
+    // Single hash-map probe: operator[] default-constructs (0,0) on miss.
+    terms_[word] += coeff;
   }
 
   void accumulate_product(const PackedPauliWord<NW>& w1,
                           const PackedPauliWord<NW>& w2,
                           std::complex<double> scale) {
-    auto [phase, word] = multiply_packed(w1, w2);
-    accumulate(word, scale * phase);
+    auto [phase_idx, word] = multiply_packed(w1, w2);
+    terms_[word] += apply_phase(phase_idx, scale);
   }
 
-  std::vector<std::pair<std::complex<double>, SparsePauliWord>> get_terms(
-      double threshold) const {
-    std::vector<std::pair<std::complex<double>, SparsePauliWord>> result;
+  /// Extract terms above threshold as (coefficient, little-endian string) pairs.
+  std::vector<std::pair<std::complex<double>, std::string>> get_terms_as_strings(
+      double threshold, std::size_t num_qubits) const {
+    std::vector<std::pair<std::complex<double>, std::string>> result;
     result.reserve(terms_.size());
     for (const auto& [pw, coeff] : terms_) {
       if (std::abs(coeff) >= threshold) {
-        result.emplace_back(coeff, packed_to_sparse(pw));
+        result.emplace_back(coeff, packed_to_le_string(pw, num_qubits));
       }
     }
     return result;
@@ -164,6 +179,32 @@ class PackedAccumulator {
                      PackedPauliWordHash<NW>>
       terms_;
 };
+
+/// Convert a PackedPauliWord directly to a dense little-endian string,
+/// skipping the intermediate SparsePauliWord allocation.
+template <std::size_t NW>
+std::string packed_to_le_string(const PackedPauliWord<NW>& pw,
+                                std::size_t num_qubits) {
+  std::string result(num_qubits, 'I');
+  for (std::size_t wi = 0; wi < NW; ++wi) {
+    std::uint64_t x = pw.x[wi];
+    std::uint64_t z = pw.z[wi];
+    std::uint64_t active = x | z;
+    while (active) {
+      int bit = __builtin_ctzll(active);
+      std::uint64_t mask = std::uint64_t(1) << bit;
+      std::size_t qubit = wi * 64 + bit;
+      if (qubit < num_qubits) {
+        bool has_x = (x & mask) != 0;
+        bool has_z = (z & mask) != 0;
+        // Little-endian: qubit 0 = rightmost
+        result[num_qubits - 1 - qubit] = has_x ? (has_z ? 'Y' : 'X') : 'Z';
+      }
+      active &= ~mask;
+    }
+  }
+  return result;
+}
 
 /// Convert a SparsePauliWord to a dense little-endian string.
 /// (qubit 0 = rightmost character)
@@ -225,9 +266,9 @@ MajoranaMapResult majorana_map_impl(
                             double h_pq) {
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
-        auto [phase, word] = multiply_packed(
+        auto [ph, word] = multiply_packed(
             packed_mapping[2 * mode_p + a], packed_mapping[2 * mode_q + b]);
-        acc.accumulate(word, h_pq * kQuarter * kC[a][b] * phase);
+        acc.accumulate(word, apply_phase(ph, h_pq * kQuarter * kC[a][b]));
       }
     }
   };
@@ -280,7 +321,7 @@ MajoranaMapResult majorana_map_impl(
 
   // Precompute Majorana pair products in packed form (same-spin only).
   struct PackedPairProduct {
-    std::complex<double> phase;
+    int phase;  // phase index (0..3): 0=+1, 1=+i, 2=-1, 3=-i
     PackedPauliWord<NW> word;
   };
   const std::size_t maj_per_spin = 2 * n_spatial;
@@ -322,9 +363,9 @@ MajoranaMapResult majorana_map_impl(
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
             const auto& [phase_a, word_a] = alpha_pair(2*p+a, 2*q+b);
-            sse.terms.emplace_back(kQuarter * kC[a][b] * phase_a, word_a);
+            sse.terms.emplace_back(apply_phase(phase_a, kQuarter * kC[a][b]), word_a);
             const auto& [phase_b, word_b] = beta_pair(2*p+a, 2*q+b);
-            sse.terms.emplace_back(kQuarter * kC[a][b] * phase_b, word_b);
+            sse.terms.emplace_back(apply_phase(phase_b, kQuarter * kC[a][b]), word_b);
           }
         }
       }
@@ -365,21 +406,41 @@ MajoranaMapResult majorana_map_impl(
       }
     }
 
-    // Two-body product: Σ_{p≤q, r≤s} (pq|rs) S_pq · S_rs
+    // Two-body product: exploit full 8-fold ERI symmetry.
+    // Already using p≤q, r≤s (4-fold). Now add (pq)≤(rs) exchange:
+    // (pq|rs) = (rs|pq), so S_pq·S_rs + S_rs·S_pq covers both.
+    // For pq_idx < rs_idx: accumulate both products with scale 2×½·eri.
+    // For pq_idx == rs_idx: accumulate one product with scale ½·eri.
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = p; q < n_spatial; ++q) {
-        const auto& s_pq = sym_e[sym_map[p * n_spatial + q]];
+        std::size_t pq_idx = sym_map[p * n_spatial + q];
+        const auto& s_pq = sym_e[pq_idx];
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = r; s < n_spatial; ++s) {
+            std::size_t rs_idx = sym_map[r * n_spatial + s];
+            if (pq_idx > rs_idx) continue;  // skip; (rs,pq) handles this
+
             double eri = eri_aaaa[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
 
-            double half_eri = 0.5 * eri;
-            const auto& s_rs = sym_e[sym_map[r * n_spatial + s]];
+            const auto& s_rs = sym_e[rs_idx];
 
-            for (const auto& [c1, w1] : s_pq.terms) {
-              for (const auto& [c2, w2] : s_rs.terms) {
-                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+            if (pq_idx == rs_idx) {
+              // Diagonal: S_pq · S_pq (single product)
+              double half_eri = 0.5 * eri;
+              for (const auto& [c1, w1] : s_pq.terms) {
+                for (const auto& [c2, w2] : s_rs.terms) {
+                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+                }
+              }
+            } else {
+              // Off-diagonal: S_pq · S_rs + S_rs · S_pq (both products)
+              double half_eri = 0.5 * eri;
+              for (const auto& [c1, w1] : s_pq.terms) {
+                for (const auto& [c2, w2] : s_rs.terms) {
+                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+                  acc.accumulate_product(w2, w1, half_eri * c2 * c1);
+                }
               }
             }
           }
@@ -413,9 +474,10 @@ MajoranaMapResult majorana_map_impl(
             for (int d = 0; d < 2; ++d) {
               const auto& [ph2, w2] =
                   cache_rs[(2*br+c) * maj_per_spin + (2*bs+d)];
-              acc.accumulate_product(
-                  w1, w2,
-                  half_eri * kSixteenth * kC[a][b] * kC[c][d] * ph1 * ph2);
+              std::complex<double> scale =
+                  apply_phase((ph1 + ph2) & 3,
+                              half_eri * kSixteenth * kC[a][b] * kC[c][d]);
+              acc.accumulate_product(w1, w2, scale);
             }
           }
         }
@@ -485,16 +547,15 @@ MajoranaMapResult majorana_map_impl(
     }
   }
 
-  // ─── Extract results ──────────────────────────────────────────────
-  auto terms = acc.get_terms(threshold);
+  // ─── Extract results directly as strings ────────────────────────
+  auto terms = acc.get_terms_as_strings(threshold, num_qubits);
 
   MajoranaMapResult result;
   result.pauli_strings.reserve(terms.size());
   result.coefficients.reserve(terms.size());
 
-  for (auto& [coeff, word] : terms) {
-    result.pauli_strings.push_back(
-        sparse_to_le_string(word, num_qubits));
+  for (auto& [coeff, str] : terms) {
+    result.pauli_strings.push_back(std::move(str));
     result.coefficients.push_back(coeff);
   }
 
