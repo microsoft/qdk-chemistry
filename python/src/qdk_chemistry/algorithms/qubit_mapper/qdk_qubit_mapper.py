@@ -127,15 +127,25 @@ class QdkQubitMapper(QubitMapper):
         n_spatial = h1_alpha.shape[0]
         is_restricted = hamiltonian.get_orbitals().is_restricted()
 
+        # Use ravel() instead of flatten() to avoid copying contiguous arrays.
+        # For restricted Hamiltonians the containers share the same two-body
+        # vector across aaaa/aabb/bbbb, so pass the same array to avoid
+        # materializing unused copies.
+        h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
+        h1_b_flat = h1_a_flat if is_restricted else np.ascontiguousarray(h1_beta).ravel()
+        h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
+        h2_aabb_flat = h2_aaaa_flat if is_restricted else np.ascontiguousarray(h2_aabb).ravel()
+        h2_bbbb_flat = h2_aaaa_flat if is_restricted else np.ascontiguousarray(h2_bbbb).ravel()
+
         # Single C++ call: Majorana-loop engine builds all Pauli terms
         pauli_strings, coefficients = majorana_map_hamiltonian(
             mapping.core,
             0.0,  # core energy not included (QDK convention)
-            h1_alpha.flatten(),
-            h1_beta.flatten(),
-            h2_aaaa.flatten(),
-            h2_aabb.flatten(),
-            h2_bbbb.flatten(),
+            h1_a_flat,
+            h1_b_flat,
+            h2_aaaa_flat,
+            h2_aabb_flat,
+            h2_bbbb_flat,
             n_spatial,
             is_restricted,
             threshold,

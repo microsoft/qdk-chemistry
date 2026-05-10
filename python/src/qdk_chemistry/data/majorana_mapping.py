@@ -71,6 +71,8 @@ class MajoranaMapping(DataClass):
         self,
         table: list[str] | tuple[str, ...],
         name: str = "",
+        *,
+        _core: _CoreMajoranaMapping | None = None,
     ) -> None:
         """Initialize a MajoranaMapping from a list of dense Pauli-string labels.
 
@@ -82,10 +84,15 @@ class MajoranaMapping(DataClass):
             ValueError: If table size is odd, empty, strings differ in length, contain non-IXYZ characters, or the Clifford algebra validation fails.
 
         """
-        # Build C++ core object (validates Clifford algebra)
-        self._core = _CoreMajoranaMapping(list(table), name)
+        if _core is not None:
+            # Fast path: accept a pre-validated C++ core object directly
+            # (used by factory classmethods to skip re-parsing and re-validation)
+            self._core = _core
+        else:
+            # Build C++ core object (validates Clifford algebra)
+            self._core = _CoreMajoranaMapping(list(table), name)
 
-        # Cache immutable tuple from the core
+        # Cache immutable properties from the core
         self._table = self._core.table
         self._name = self._core.name
         self._num_modes = self._core.num_modes
@@ -131,7 +138,7 @@ class MajoranaMapping(DataClass):
 
         """
         core = _CoreMajoranaMapping.jordan_wigner(num_modes)
-        return cls._from_core(core)
+        return cls(table=[], _core=core)
 
     @classmethod
     def bravyi_kitaev(cls, num_modes: int) -> MajoranaMapping:
@@ -141,11 +148,11 @@ class MajoranaMapping(DataClass):
             num_modes (int): Number of fermionic modes (spin-orbitals).
 
         Returns:
-            MajoranaMapping: Mapping with name ``"bravyi_kitaev"``.
+            MajoranaMapping: Mapping with name ``"bravyi-kitaev"``.
 
         """
         core = _CoreMajoranaMapping.bravyi_kitaev(num_modes)
-        return cls._from_core(core)
+        return cls(table=[], _core=core)
 
     @classmethod
     def parity(cls, num_modes: int) -> MajoranaMapping:
@@ -159,7 +166,7 @@ class MajoranaMapping(DataClass):
 
         """
         core = _CoreMajoranaMapping.parity(num_modes)
-        return cls._from_core(core)
+        return cls(table=[], _core=core)
 
     @classmethod
     def from_mode_pairs(
@@ -189,8 +196,7 @@ class MajoranaMapping(DataClass):
     @classmethod
     def _from_core(cls, core: _CoreMajoranaMapping) -> MajoranaMapping:
         """Construct from an already-validated C++ core object."""
-        # Re-use the table from the core (already validated, so construction is fast)
-        return cls(table=list(core.table), name=core.name)
+        return cls(table=[], _core=core)
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the mapping.
