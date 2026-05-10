@@ -35,6 +35,174 @@ constexpr double kQuarter = 0.25;
 // 1/16 factor for two-body (product of two E operators, each with 1/4)
 constexpr double kSixteenth = 0.0625;
 
+// ─── Bitpacked Pauli representation ────────────────────────────────
+//
+// Represents a Pauli string as a pair of bitmasks (x_bits, z_bits)
+// using the symplectic encoding:
+//   I: x=0, z=0    X: x=1, z=0    Z: x=0, z=1    Y: x=1, z=1
+//
+// Each uint64_t covers 64 qubits. A vector of uint64_t scales to
+// arbitrary qubit counts for FTQC applications.
+//
+// Multiplication is O(num_words) via XOR + popcount for phase:
+//   (x1,z1) * (x2,z2) = phase * (x1^x2, z1^z2)
+//   where phase = i^{2 * popcount(x1 & z2)} * (-1)^{popcount(z1 & x2 & ~(x1&z2))}
+//   (simplified: see multiply implementation below)
+
+struct PackedPauliWord {
+  std::vector<std::uint64_t> x;  // X-component bitmask
+  std::vector<std::uint64_t> z;  // Z-component bitmask
+
+  bool operator==(const PackedPauliWord& other) const = default;
+};
+
+struct PackedPauliWordHash {
+  std::size_t operator()(const PackedPauliWord& w) const noexcept {
+    std::size_t seed = w.x.size();
+    for (auto v : w.x) seed ^= v * 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    for (auto v : w.z) seed ^= v * 0x517cc1b727220a95ULL + (seed << 6) + (seed >> 2);
+    return seed;
+  }
+};
+
+/// Convert SparsePauliWord to packed form.
+PackedPauliWord sparse_to_packed(const SparsePauliWord& word,
+                                 std::size_t num_words) {
+  PackedPauliWord pw;
+  pw.x.resize(num_words, 0);
+  pw.z.resize(num_words, 0);
+  for (const auto& [qubit, op] : word) {
+    std::size_t wi = qubit / 64;
+    std::uint64_t bit = std::uint64_t(1) << (qubit % 64);
+    if (wi < num_words) {
+      if (op == 1 || op == 2) pw.x[wi] |= bit;  // X or Y
+      if (op == 2 || op == 3) pw.z[wi] |= bit;  // Y or Z
+    }
+  }
+  return pw;
+}
+
+/// Convert packed form back to SparsePauliWord.
+SparsePauliWord packed_to_sparse(const PackedPauliWord& pw) {
+  SparsePauliWord word;
+  for (std::size_t wi = 0; wi < pw.x.size(); ++wi) {
+    std::uint64_t x = pw.x[wi];
+    std::uint64_t z = pw.z[wi];
+    std::uint64_t active = x | z;
+    while (active) {
+      int bit = __builtin_ctzll(active);
+      std::uint64_t mask = std::uint64_t(1) << bit;
+      std::uint64_t qubit = wi * 64 + bit;
+      bool has_x = (x & mask) != 0;
+      bool has_z = (z & mask) != 0;
+      std::uint8_t op = has_x ? (has_z ? 2 : 1) : 3;  // Y:2, X:1, Z:3
+      word.emplace_back(qubit, op);
+      active &= ~mask;
+    }
+  }
+  return word;
+}
+
+/// Popcount for a vector of uint64_t words.
+inline int vec_popcount(const std::vector<std::uint64_t>& v) {
+  int count = 0;
+  for (auto w : v) count += __builtin_popcountll(w);
+  return count;
+}
+
+/// Multiply two PackedPauliWords: result = pw1 * pw2.
+/// Returns (phase, product) where phase is ±1 or ±i.
+///
+/// Using the symplectic formula:
+///   P1 * P2 = i^{phase_exp} * P_result
+///   P_result.x = P1.x ^ P2.x,  P_result.z = P1.z ^ P2.z
+///   phase_exp = 2*popcount(P1.x & P2.z) - 2*popcount(P1.z & P2.x)  (mod 4)
+///   but we need the FULL Pauli algebra phase, which is:
+///   For each qubit: op1 * op2 gives a phase from the multiplication table.
+///
+/// Efficient formula (from Dehaene & De Moor 2003):
+///   phase_exp = Σ_j f(P1_j, P2_j) mod 4
+///   where f(a,b) for symplectic vectors encodes the single-qubit phase.
+///
+/// We use the direct computation: for each qubit where both operators are
+/// non-identity, look up the phase from {X,Y,Z} × {X,Y,Z}.
+///
+/// Actually, the most efficient approach uses the identity:
+///   phase = i^{2·popcount(x1&z2)} · (-1)^{popcount(z1&x2)}
+///         · (-1)^{popcount(x1&x2&z1&z2)}
+///   (this follows from the qubit-by-qubit Pauli multiplication table)
+std::pair<std::complex<double>, PackedPauliWord> multiply_packed(
+    const PackedPauliWord& p1, const PackedPauliWord& p2) {
+  std::size_t nw = p1.x.size();
+  PackedPauliWord result;
+  result.x.resize(nw);
+  result.z.resize(nw);
+
+  // Per-qubit phase from Pauli multiplication table, vectorized over 64 bits.
+  // Cyclic pairs (XY, YZ, ZX) contribute +1; anti-cyclic (YX, ZY, XZ) give -1.
+  int phase_exp = 0;
+  for (std::size_t i = 0; i < nw; ++i) {
+    std::uint64_t x1 = p1.x[i], z1 = p1.z[i];
+    std::uint64_t x2 = p2.x[i], z2 = p2.z[i];
+
+    result.x[i] = x1 ^ x2;
+    result.z[i] = z1 ^ z2;
+
+    std::uint64_t nx1 = ~x1, nz1 = ~z1, nx2 = ~x2, nz2 = ~z2;
+    std::uint64_t cyc = (x1 & nz1 & x2 & z2) |   // XY
+                        (x1 & z1 & nx2 & z2) |    // YZ
+                        (nx1 & z1 & x2 & nz2);    // ZX
+    std::uint64_t anti = (x1 & z1 & x2 & nz2) |   // YX
+                         (nx1 & z1 & x2 & z2) |    // ZY
+                         (x1 & nz1 & nx2 & z2);    // XZ
+    phase_exp += __builtin_popcountll(cyc);
+    phase_exp -= __builtin_popcountll(anti);
+  }
+
+  static constexpr std::complex<double> powers_of_i[4] = {
+      {1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+  int mod = ((phase_exp % 4) + 4) % 4;
+  return {powers_of_i[mod], result};
+}
+
+/// Bitpacked term accumulator: maps PackedPauliWord → complex coefficient.
+class PackedAccumulator {
+ public:
+  void accumulate(const PackedPauliWord& word, std::complex<double> coeff) {
+    auto it = terms_.find(word);
+    if (it != terms_.end()) {
+      it->second += coeff;
+    } else {
+      terms_[word] = coeff;
+    }
+  }
+
+  void accumulate_product(const PackedPauliWord& w1,
+                          const PackedPauliWord& w2,
+                          std::complex<double> scale) {
+    auto [phase, word] = multiply_packed(w1, w2);
+    accumulate(word, scale * phase);
+  }
+
+  /// Extract terms above threshold, converting back to SparsePauliWord.
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> get_terms(
+      double threshold) const {
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>> result;
+    result.reserve(terms_.size());
+    for (const auto& [pw, coeff] : terms_) {
+      if (std::abs(coeff) >= threshold) {
+        result.emplace_back(coeff, packed_to_sparse(pw));
+      }
+    }
+    return result;
+  }
+
+ private:
+  std::unordered_map<PackedPauliWord, std::complex<double>,
+                     PackedPauliWordHash>
+      terms_;
+};
+
 /// Convert a SparsePauliWord to a dense little-endian string.
 /// (qubit 0 = rightmost character)
 std::string sparse_to_le_string(const SparsePauliWord& word,
@@ -70,60 +238,63 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* eri_aabb, const double* eri_bbbb, std::size_t n_spatial,
     bool is_restricted, double threshold, double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;  // spin-orbitals
-  PauliTermAccumulator acc;
+  const std::size_t num_qubits = mapping.num_qubits();
+  const std::size_t num_words = (num_qubits + 63) / 64;
 
-  // Helper: compute spin-orbital mode index from spatial + spin
-  // Blocked ordering: mode(p, α) = p, mode(p, β) = p + n_spatial
+  // Use bitpacked accumulator for O(1) hash/compare/multiply
+  PackedAccumulator acc;
+
+  // Convert all Majorana table entries to packed form
+  std::vector<PackedPauliWord> packed_mapping(2 * n_modes);
+  for (std::size_t k = 0; k < 2 * n_modes; ++k) {
+    packed_mapping[k] = sparse_to_packed(mapping(k), num_words);
+  }
+
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
     return p + n_spatial;
   };
 
-  // Helper: accumulate one-body E_pq = a†_p a_q for specific mode pair
-  // E_pq = (1/4) Σ_{a,b} c[a][b] · γ_{2p+a} · γ_{2q+b}
+  // Helper: accumulate one-body E_pq for a mode pair, using packed types
   auto accumulate_epq = [&](std::size_t mode_p, std::size_t mode_q,
                             double h_pq) {
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
-        std::complex<double> coeff =
-            h_pq * kQuarter * kC[a][b];
-        acc.accumulate_product(mapping(2 * mode_p + a),
-                               mapping(2 * mode_q + b), coeff);
+        auto [phase, word] = multiply_packed(
+            packed_mapping[2 * mode_p + a], packed_mapping[2 * mode_q + b]);
+        acc.accumulate(word, h_pq * kQuarter * kC[a][b] * phase);
       }
     }
   };
 
   // ─── Core energy ──────────────────────────────────────────────────
   if (std::abs(core_energy) > integral_threshold) {
-    acc.accumulate({}, std::complex<double>(core_energy, 0.0));
+    PackedPauliWord identity;
+    identity.x.resize(num_words, 0);
+    identity.z.resize(num_words, 0);
+    acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
-  // ─── One-body terms ───────────────────────────────────────────────
-  // H_1 = Σ_{p,q,σ} h_pq a†_{p,σ} a_{q,σ}
-  //
-  // For restricted systems, also fold in the two-body δ correction:
-  //   -1/2 Σ_{p,q,s} (pq|qs) · E_ps = Σ_{p,s} h'_ps · E_ps
-  //   where h'_ps = -1/2 Σ_q (pq|qs)
-  // This avoids a separate O(N³) δ loop.
+  auto idx4 = [n_spatial](std::size_t p, std::size_t q, std::size_t r,
+                           std::size_t s) -> std::size_t {
+    return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
+  };
 
-  // Compute effective one-body integrals (original + δ correction)
+  // ─── One-body terms (with δ correction folded in for restricted) ──
   std::vector<double> h1_eff_alpha(n_spatial * n_spatial);
   std::vector<double> h1_eff_beta(n_spatial * n_spatial);
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t s = 0; s < n_spatial; ++s) {
       double h_a = h1_alpha[p * n_spatial + s];
       double h_b = is_restricted ? h_a : h1_beta[p * n_spatial + s];
-
       if (is_restricted) {
-        // δ correction: h'_ps = -1/2 Σ_q (pq|qs)
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
           delta_corr += eri_aaaa[idx4(p, q, q, s)];
         }
         h_a -= 0.5 * delta_corr;
-        h_b = h_a;  // restricted: same correction for both spins
+        h_b = h_a;
       }
-
       h1_eff_alpha[p * n_spatial + s] = h_a;
       h1_eff_beta[p * n_spatial + s] = h_b;
     }
@@ -135,7 +306,6 @@ MajoranaMapResult majorana_map_hamiltonian(
       if (std::abs(h_pq_a) > integral_threshold) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
-
       double h_pq_b = h1_eff_beta[p * n_spatial + q];
       if (std::abs(h_pq_b) > integral_threshold) {
         accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
@@ -144,108 +314,42 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
 
   // ─── Two-body terms ───────────────────────────────────────────────
-  // H_2 = (1/2) Σ_{pqrs,σ,τ} (pq|rs) a†_{p,σ} a†_{r,τ} a_{s,τ} a_{q,σ}
-  //      = (1/2) Σ_{pqrs,σ,τ} (pq|rs) [E_{pσ,qσ} E_{rτ,sτ} - δ_{qσ,rτ} E_{pσ,sτ}]
 
-  // Precompute Majorana pair products for SAME-SPIN blocks only.
-  // Majorana indices for α: [0, 2*n_spatial), for β: [2*n_spatial, 4*n_spatial).
-  // Downstream only ever pairs indices within the same spin block.
-  // Two flat caches (α and β), each (2*n_spatial)² entries.
-  struct MajPairProduct {
+  // Precompute Majorana pair products in packed form (same-spin only).
+  struct PackedPairProduct {
     std::complex<double> phase;
-    SparsePauliWord word;
+    PackedPauliWord word;
   };
-  const std::size_t maj_per_spin = 2 * n_spatial;  // Majorana indices per spin
-  std::vector<MajPairProduct> pair_cache_alpha(maj_per_spin * maj_per_spin);
-  std::vector<MajPairProduct> pair_cache_beta(maj_per_spin * maj_per_spin);
+  const std::size_t maj_per_spin = 2 * n_spatial;
+  std::vector<PackedPairProduct> ppair_alpha(maj_per_spin * maj_per_spin);
+  std::vector<PackedPairProduct> ppair_beta(maj_per_spin * maj_per_spin);
 
   for (std::size_t i = 0; i < maj_per_spin; ++i) {
     for (std::size_t j = 0; j < maj_per_spin; ++j) {
-      // α block: Majorana indices i, j (for modes 0..n_spatial-1)
-      auto [ph_a, w_a] = PauliTermAccumulator::multiply_uncached(
-          mapping(i), mapping(j));
-      pair_cache_alpha[i * maj_per_spin + j] = {ph_a, std::move(w_a)};
+      auto [ph_a, w_a] = multiply_packed(
+          packed_mapping[i], packed_mapping[j]);
+      ppair_alpha[i * maj_per_spin + j] = {ph_a, std::move(w_a)};
 
-      // β block: Majorana indices i+2*n_spatial, j+2*n_spatial
-      auto [ph_b, w_b] = PauliTermAccumulator::multiply_uncached(
-          mapping(i + maj_per_spin), mapping(j + maj_per_spin));
-      pair_cache_beta[i * maj_per_spin + j] = {ph_b, std::move(w_b)};
+      auto [ph_b, w_b] = multiply_packed(
+          packed_mapping[i + maj_per_spin],
+          packed_mapping[j + maj_per_spin]);
+      ppair_beta[i * maj_per_spin + j] = {ph_b, std::move(w_b)};
     }
   }
 
-  // Accessor lambdas: given a mode index m and Majorana sub-index a (0 or 1),
-  // return the pair product for two Majorana operators of the same spin.
-  // For α: mode m ∈ [0, n_spatial), Majorana index = 2*m+a
-  // For β: mode m ∈ [n_spatial, 2*n_spatial), Majorana index = 2*(m-n_spatial)+a
-  auto alpha_pair = [&](std::size_t local_i, std::size_t local_j)
-      -> const MajPairProduct& {
-    return pair_cache_alpha[local_i * maj_per_spin + local_j];
+  auto alpha_pair = [&](std::size_t i, std::size_t j)
+      -> const PackedPairProduct& {
+    return ppair_alpha[i * maj_per_spin + j];
   };
-  auto beta_pair = [&](std::size_t local_i, std::size_t local_j)
-      -> const MajPairProduct& {
-    return pair_cache_beta[local_i * maj_per_spin + local_j];
+  auto beta_pair = [&](std::size_t i, std::size_t j)
+      -> const PackedPairProduct& {
+    return ppair_beta[i * maj_per_spin + j];
   };
 
-  // Helper: multiply two SparsePauliWords and accumulate, bypassing the
-  // LRU cache (the cache has near-zero hit rate in the O(N^4) loop since
-  // keys are unique across (p,q,r,s,a,b,c,d) tuples).
-  auto accumulate_product_uncached =
-      [&](const SparsePauliWord& w1, const SparsePauliWord& w2,
-          std::complex<double> scale) {
-        auto [phase, word] =
-            PauliTermAccumulator::multiply_uncached(w1, w2);
-        acc.accumulate(word, scale * phase);
-      };
-
-  // Helper: accumulate E_pσ E_rτ product using precomputed pair products
-  auto accumulate_two_body_product = [&](std::size_t mode_p,
-                                         std::size_t mode_q,
-                                         std::size_t mode_r,
-                                         std::size_t mode_s, double eri) {
-    // Determine which pair cache to use for each E operator
-    bool pq_is_alpha = mode_p < n_spatial;
-    bool rs_is_alpha = mode_r < n_spatial;
-    auto& cache_pq = pq_is_alpha ? pair_cache_alpha : pair_cache_beta;
-    auto& cache_rs = rs_is_alpha ? pair_cache_alpha : pair_cache_beta;
-    std::size_t pq_base_p = pq_is_alpha ? mode_p : (mode_p - n_spatial);
-    std::size_t pq_base_q = pq_is_alpha ? mode_q : (mode_q - n_spatial);
-    std::size_t rs_base_r = rs_is_alpha ? mode_r : (mode_r - n_spatial);
-    std::size_t rs_base_s = rs_is_alpha ? mode_s : (mode_s - n_spatial);
-
-    double half_eri = 0.5 * eri;
-    for (int a = 0; a < 2; ++a) {
-      for (int b = 0; b < 2; ++b) {
-        std::complex<double> c_ab = kC[a][b];
-        const auto& [phase1, prod1] =
-            cache_pq[(2 * pq_base_p + a) * maj_per_spin +
-                     (2 * pq_base_q + b)];
-        for (int c = 0; c < 2; ++c) {
-          for (int d = 0; d < 2; ++d) {
-            std::complex<double> coeff =
-                half_eri * kSixteenth * c_ab * kC[c][d];
-            const auto& [phase2, prod2] =
-                cache_rs[(2 * rs_base_r + c) * maj_per_spin +
-                         (2 * rs_base_s + d)];
-            accumulate_product_uncached(prod1, prod2,
-                                        coeff * phase1 * phase2);
-          }
-        }
-      }
-    }
-  };
-
-  auto idx4 = [n_spatial](std::size_t p, std::size_t q, std::size_t r,
-                           std::size_t s) -> std::size_t {
-    return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
-  };
-
-  // Spin-free case: exploit (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr) symmetry
-  // by using symmetrized operators S_pq = E_pq + E_qp, which merge from
-  // 8 terms down to 3-4 terms. Iterate p≤q, r≤s: ~12x fewer multiply calls.
   if (is_restricted) {
     // Precompute spin-summed E_pq for all (p,q):
     struct SpinSummedE {
-      std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
+      std::vector<std::pair<std::complex<double>, PackedPauliWord>> terms;
     };
     std::vector<SpinSummedE> ss_e(n_spatial * n_spatial);
 
@@ -254,11 +358,9 @@ MajoranaMapResult majorana_map_hamiltonian(
         auto& sse = ss_e[p * n_spatial + q];
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
-            const auto& [phase_a, word_a] =
-                alpha_pair(2 * p + a, 2 * q + b);
+            const auto& [phase_a, word_a] = alpha_pair(2*p+a, 2*q+b);
             sse.terms.emplace_back(kQuarter * kC[a][b] * phase_a, word_a);
-            const auto& [phase_b, word_b] =
-                beta_pair(2 * p + a, 2 * q + b);
+            const auto& [phase_b, word_b] = beta_pair(2*p+a, 2*q+b);
             sse.terms.emplace_back(kQuarter * kC[a][b] * phase_b, word_b);
           }
         }
@@ -266,34 +368,21 @@ MajoranaMapResult majorana_map_hamiltonian(
     }
 
     // Precompute symmetrized S_pq = E_pq + E_qp (merged) for p ≤ q.
-    // S_pp = E_pp (just merged), S_pq = E_pq + E_qp for p < q.
-    // Merging combines terms with the same Pauli word, reducing from 8-16
-    // terms down to 3-4, which is the key inner-loop speedup.
     struct SymmetrizedE {
-      std::vector<std::pair<std::complex<double>, SparsePauliWord>> terms;
+      std::vector<std::pair<std::complex<double>, PackedPauliWord>> terms;
     };
-    std::size_t sym_size = n_spatial * (n_spatial + 1) / 2;
-    std::vector<SymmetrizedE> sym_e(sym_size);
-
-    auto sym_idx = [](std::size_t p, std::size_t q) -> std::size_t {
-      // Upper-triangular index for p ≤ q
-      return p * (p + 1) / 2 + q;  // wrong — need canonical form
-    };
-    // Use flat index: for p ≤ q, index = p*n - p*(p+1)/2 + q
-    // Actually simpler: use a 2D lookup but only fill p ≤ q
-    // Let's use p*n_spatial + q mapped to the sym_e array via a helper
+    std::vector<SymmetrizedE> sym_e;
     std::vector<std::size_t> sym_map(n_spatial * n_spatial);
     {
       std::size_t idx = 0;
+      sym_e.resize(n_spatial * (n_spatial + 1) / 2);
       for (std::size_t p = 0; p < n_spatial; ++p) {
         for (std::size_t q = p; q < n_spatial; ++q) {
           sym_map[p * n_spatial + q] = idx;
           if (p != q) sym_map[q * n_spatial + p] = idx;
 
-          // Merge E_pq + E_qp terms
-          std::unordered_map<SparsePauliWord, std::complex<double>,
-                             SparsePauliWordHash>
-              merged;
+          std::unordered_map<PackedPauliWord, std::complex<double>,
+                             PackedPauliWordHash> merged;
           for (const auto& [c, w] : ss_e[p * n_spatial + q].terms) {
             merged[w] += c;
           }
@@ -313,9 +402,7 @@ MajoranaMapResult majorana_map_hamiltonian(
       }
     }
 
-    // Two-body product term: Σ_{p≤q, r≤s} (pq|rs) S_pq · S_rs
-    // This is equivalent to Σ_{pqrs} (pq|rs) E_pq · E_rs due to
-    // the bra/ket symmetry (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr).
+    // Two-body product: Σ_{p≤q, r≤s} (pq|rs) S_pq · S_rs
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = p; q < n_spatial; ++q) {
         const auto& s_pq = sym_e[sym_map[p * n_spatial + q]];
@@ -329,7 +416,7 @@ MajoranaMapResult majorana_map_hamiltonian(
 
             for (const auto& [c1, w1] : s_pq.terms) {
               for (const auto& [c2, w2] : s_rs.terms) {
-                accumulate_product_uncached(w1, w2, half_eri * c1 * c2);
+                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
               }
             }
           }
@@ -339,7 +426,38 @@ MajoranaMapResult majorana_map_hamiltonian(
 
     // (δ correction is folded into the one-body integrals above)
   } else {
-    // Unrestricted: explicit spin-channel ERIs
+    // Unrestricted: explicit spin-channel ERIs using packed types
+
+    auto accumulate_two_body_product = [&](std::size_t mode_p,
+                                           std::size_t mode_q,
+                                           std::size_t mode_r,
+                                           std::size_t mode_s, double eri) {
+      bool pq_is_alpha = mode_p < n_spatial;
+      bool rs_is_alpha = mode_r < n_spatial;
+      auto& cache_pq = pq_is_alpha ? ppair_alpha : ppair_beta;
+      auto& cache_rs = rs_is_alpha ? ppair_alpha : ppair_beta;
+      std::size_t bp = pq_is_alpha ? mode_p : (mode_p - n_spatial);
+      std::size_t bq = pq_is_alpha ? mode_q : (mode_q - n_spatial);
+      std::size_t br = rs_is_alpha ? mode_r : (mode_r - n_spatial);
+      std::size_t bs = rs_is_alpha ? mode_s : (mode_s - n_spatial);
+
+      double half_eri = 0.5 * eri;
+      for (int a = 0; a < 2; ++a) {
+        for (int b = 0; b < 2; ++b) {
+          const auto& [ph1, w1] =
+              cache_pq[(2*bp+a) * maj_per_spin + (2*bq+b)];
+          for (int c = 0; c < 2; ++c) {
+            for (int d = 0; d < 2; ++d) {
+              const auto& [ph2, w2] =
+                  cache_rs[(2*br+c) * maj_per_spin + (2*bs+d)];
+              acc.accumulate_product(
+                  w1, w2,
+                  half_eri * kSixteenth * kC[a][b] * kC[c][d] * ph1 * ph2);
+            }
+          }
+        }
+      }
+    };
 
     // aaaa channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
@@ -348,7 +466,6 @@ MajoranaMapResult majorana_map_hamiltonian(
           for (std::size_t s = 0; s < n_spatial; ++s) {
             double eri = eri_aaaa[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
-
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_alpha(r), mode_alpha(s), eri);
             if (q == r) {
@@ -366,7 +483,6 @@ MajoranaMapResult majorana_map_hamiltonian(
           for (std::size_t s = 0; s < n_spatial; ++s) {
             double eri = eri_bbbb[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
-
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_beta(r), mode_beta(s), eri);
             if (q == r) {
@@ -377,33 +493,29 @@ MajoranaMapResult majorana_map_hamiltonian(
       }
     }
 
-    // aabb channel (alpha-beta)
+    // aabb channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
             double eri = eri_aabb[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
-
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_beta(r), mode_beta(s), eri);
-            // No δ correction (different spin)
           }
         }
       }
     }
 
-    // bbaa channel (beta-alpha) — uses same eri_aabb
+    // bbaa channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
             double eri = eri_aabb[idx4(p, q, r, s)];
             if (std::abs(eri) < integral_threshold) continue;
-
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_alpha(r), mode_alpha(s), eri);
-            // No δ correction (different spin)
           }
         }
       }
@@ -412,14 +524,14 @@ MajoranaMapResult majorana_map_hamiltonian(
 
   // ─── Extract results ──────────────────────────────────────────────
   auto terms = acc.get_terms(threshold);
-  std::size_t num_qubits = mapping.num_qubits();
 
   MajoranaMapResult result;
   result.pauli_strings.reserve(terms.size());
   result.coefficients.reserve(terms.size());
 
   for (auto& [coeff, word] : terms) {
-    result.pauli_strings.push_back(sparse_to_le_string(word, num_qubits));
+    result.pauli_strings.push_back(
+        sparse_to_le_string(word, num_qubits));
     result.coefficients.push_back(coeff);
   }
 
