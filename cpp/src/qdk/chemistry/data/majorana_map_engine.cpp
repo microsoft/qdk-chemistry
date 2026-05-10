@@ -118,41 +118,87 @@ MajoranaMapResult majorana_map_hamiltonian(
   // H_2 = (1/2) Σ_{pqrs,σ,τ} (pq|rs) a†_{p,σ} a†_{r,τ} a_{s,τ} a_{q,σ}
   //      = (1/2) Σ_{pqrs,σ,τ} (pq|rs) [E_{pσ,qσ} E_{rτ,sτ} - δ_{qσ,rτ} E_{pσ,sτ}]
 
-  // Precompute all Majorana pair products: prod_cache[2*m+a][2*m'+b] = (phase, word)
-  // This avoids redundant multiply_uncached calls in the O(N^4) loop.
+  // Precompute Majorana pair products for SAME-SPIN blocks only.
+  // Majorana indices for α: [0, 2*n_spatial), for β: [2*n_spatial, 4*n_spatial).
+  // Downstream only ever pairs indices within the same spin block.
+  // Two flat caches (α and β), each (2*n_spatial)² entries.
   struct MajPairProduct {
     std::complex<double> phase;
     SparsePauliWord word;
   };
-  std::vector<std::vector<MajPairProduct>> pair_cache(
-      2 * n_modes, std::vector<MajPairProduct>(2 * n_modes));
-  for (std::size_t i = 0; i < 2 * n_modes; ++i) {
-    for (std::size_t j = 0; j < 2 * n_modes; ++j) {
-      auto [ph, w] = PauliTermAccumulator::multiply_uncached(
+  const std::size_t maj_per_spin = 2 * n_spatial;  // Majorana indices per spin
+  std::vector<MajPairProduct> pair_cache_alpha(maj_per_spin * maj_per_spin);
+  std::vector<MajPairProduct> pair_cache_beta(maj_per_spin * maj_per_spin);
+
+  for (std::size_t i = 0; i < maj_per_spin; ++i) {
+    for (std::size_t j = 0; j < maj_per_spin; ++j) {
+      // α block: Majorana indices i, j (for modes 0..n_spatial-1)
+      auto [ph_a, w_a] = PauliTermAccumulator::multiply_uncached(
           mapping(i), mapping(j));
-      pair_cache[i][j] = {ph, std::move(w)};
+      pair_cache_alpha[i * maj_per_spin + j] = {ph_a, std::move(w_a)};
+
+      // β block: Majorana indices i+2*n_spatial, j+2*n_spatial
+      auto [ph_b, w_b] = PauliTermAccumulator::multiply_uncached(
+          mapping(i + maj_per_spin), mapping(j + maj_per_spin));
+      pair_cache_beta[i * maj_per_spin + j] = {ph_b, std::move(w_b)};
     }
   }
+
+  // Accessor lambdas: given a mode index m and Majorana sub-index a (0 or 1),
+  // return the pair product for two Majorana operators of the same spin.
+  // For α: mode m ∈ [0, n_spatial), Majorana index = 2*m+a
+  // For β: mode m ∈ [n_spatial, 2*n_spatial), Majorana index = 2*(m-n_spatial)+a
+  auto alpha_pair = [&](std::size_t local_i, std::size_t local_j)
+      -> const MajPairProduct& {
+    return pair_cache_alpha[local_i * maj_per_spin + local_j];
+  };
+  auto beta_pair = [&](std::size_t local_i, std::size_t local_j)
+      -> const MajPairProduct& {
+    return pair_cache_beta[local_i * maj_per_spin + local_j];
+  };
+
+  // Helper: multiply two SparsePauliWords and accumulate, bypassing the
+  // LRU cache (the cache has near-zero hit rate in the O(N^4) loop since
+  // keys are unique across (p,q,r,s,a,b,c,d) tuples).
+  auto accumulate_product_uncached =
+      [&](const SparsePauliWord& w1, const SparsePauliWord& w2,
+          std::complex<double> scale) {
+        auto [phase, word] =
+            PauliTermAccumulator::multiply_uncached(w1, w2);
+        acc.accumulate(word, scale * phase);
+      };
 
   // Helper: accumulate E_pσ E_rτ product using precomputed pair products
   auto accumulate_two_body_product = [&](std::size_t mode_p,
                                          std::size_t mode_q,
                                          std::size_t mode_r,
                                          std::size_t mode_s, double eri) {
+    // Determine which pair cache to use for each E operator
+    bool pq_is_alpha = mode_p < n_spatial;
+    bool rs_is_alpha = mode_r < n_spatial;
+    auto& cache_pq = pq_is_alpha ? pair_cache_alpha : pair_cache_beta;
+    auto& cache_rs = rs_is_alpha ? pair_cache_alpha : pair_cache_beta;
+    std::size_t pq_base_p = pq_is_alpha ? mode_p : (mode_p - n_spatial);
+    std::size_t pq_base_q = pq_is_alpha ? mode_q : (mode_q - n_spatial);
+    std::size_t rs_base_r = rs_is_alpha ? mode_r : (mode_r - n_spatial);
+    std::size_t rs_base_s = rs_is_alpha ? mode_s : (mode_s - n_spatial);
+
     double half_eri = 0.5 * eri;
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
         std::complex<double> c_ab = kC[a][b];
         const auto& [phase1, prod1] =
-            pair_cache[2 * mode_p + a][2 * mode_q + b];
+            cache_pq[(2 * pq_base_p + a) * maj_per_spin +
+                     (2 * pq_base_q + b)];
         for (int c = 0; c < 2; ++c) {
           for (int d = 0; d < 2; ++d) {
             std::complex<double> coeff =
                 half_eri * kSixteenth * c_ab * kC[c][d];
             const auto& [phase2, prod2] =
-                pair_cache[2 * mode_r + c][2 * mode_s + d];
-            acc.accumulate_product(prod1, prod2,
-                                   coeff * phase1 * phase2);
+                cache_rs[(2 * rs_base_r + c) * maj_per_spin +
+                         (2 * rs_base_s + d)];
+            accumulate_product_uncached(prod1, prod2,
+                                        coeff * phase1 * phase2);
           }
         }
       }
@@ -168,7 +214,7 @@ MajoranaMapResult majorana_map_hamiltonian(
   if (is_restricted) {
     // Precompute spin-summed E_pq: for each spatial (p,q), accumulate
     // the 4 Majorana pair products from both α and β into a single set.
-    // E^σ_pq = (1/4) Σ_{a,b} c[a][b] * pair_cache[2*mode+a][2*mode'+b]
+    // E^σ_pq = (1/4) Σ_{a,b} c[a][b] * pair_cache_σ[2*p+a, 2*q+b]
     // E_pq = E^α_pq + E^β_pq
     struct SpinSummedE {
       // Up to 8 terms (4 per spin, some may combine)
@@ -179,16 +225,20 @@ MajoranaMapResult majorana_map_hamiltonian(
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         auto& sse = ss_e[p * n_spatial + q];
-        // Collect terms from both spins
-        for (int spin = 0; spin < 2; ++spin) {
-          std::size_t mp = (spin == 0) ? mode_alpha(p) : mode_beta(p);
-          std::size_t mq = (spin == 0) ? mode_alpha(q) : mode_beta(q);
-          for (int a = 0; a < 2; ++a) {
-            for (int b = 0; b < 2; ++b) {
-              const auto& [phase, word] =
-                  pair_cache[2 * mp + a][2 * mq + b];
-              sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
-            }
+        // α terms: local Majorana indices 2*p+a, 2*q+b
+        for (int a = 0; a < 2; ++a) {
+          for (int b = 0; b < 2; ++b) {
+            const auto& [phase, word] =
+                alpha_pair(2 * p + a, 2 * q + b);
+            sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
+          }
+        }
+        // β terms: same local indices but from β cache
+        for (int a = 0; a < 2; ++a) {
+          for (int b = 0; b < 2; ++b) {
+            const auto& [phase, word] =
+                beta_pair(2 * p + a, 2 * q + b);
+            sse.terms.emplace_back(kQuarter * kC[a][b] * phase, word);
           }
         }
       }
@@ -206,10 +256,10 @@ MajoranaMapResult majorana_map_hamiltonian(
             double half_eri = 0.5 * eri;
             const auto& e_rs = ss_e[r * n_spatial + s];
 
-            // E_pq · E_rs product
+            // E_pq · E_rs product — bypass LRU cache
             for (const auto& [c1, w1] : e_pq.terms) {
               for (const auto& [c2, w2] : e_rs.terms) {
-                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+                accumulate_product_uncached(w1, w2, half_eri * c1 * c2);
               }
             }
 
