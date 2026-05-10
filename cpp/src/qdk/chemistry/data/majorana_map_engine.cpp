@@ -41,51 +41,50 @@ constexpr double kSixteenth = 0.0625;
 // using the symplectic encoding:
 //   I: x=0, z=0    X: x=1, z=0    Z: x=0, z=1    Y: x=1, z=1
 //
-// Each uint64_t covers 64 qubits. A vector of uint64_t scales to
-// arbitrary qubit counts for FTQC applications.
-//
-// Multiplication is O(num_words) via XOR + popcount for phase:
-//   (x1,z1) * (x2,z2) = phase * (x1^x2, z1^z2)
-//   where phase = i^{2 * popcount(x1 & z2)} * (-1)^{popcount(z1 & x2 & ~(x1&z2))}
-//   (simplified: see multiply implementation below)
+// Each uint64_t covers 64 qubits. Templated on NW (number of uint64
+// words) to keep everything on the stack. The engine dispatches to
+// NW ∈ {1, 2, 3, 4} at runtime (covers up to 256 qubits).
 
+template <std::size_t NW>
 struct PackedPauliWord {
-  std::vector<std::uint64_t> x;  // X-component bitmask
-  std::vector<std::uint64_t> z;  // Z-component bitmask
+  std::array<std::uint64_t, NW> x{};
+  std::array<std::uint64_t, NW> z{};
 
   bool operator==(const PackedPauliWord& other) const = default;
 };
 
+template <std::size_t NW>
 struct PackedPauliWordHash {
-  std::size_t operator()(const PackedPauliWord& w) const noexcept {
-    std::size_t seed = w.x.size();
-    for (auto v : w.x) seed ^= v * 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-    for (auto v : w.z) seed ^= v * 0x517cc1b727220a95ULL + (seed << 6) + (seed >> 2);
+  std::size_t operator()(const PackedPauliWord<NW>& w) const noexcept {
+    std::size_t seed = NW;
+    for (std::size_t i = 0; i < NW; ++i) {
+      seed ^= w.x[i] * 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+    }
+    for (std::size_t i = 0; i < NW; ++i) {
+      seed ^= w.z[i] * 0x517cc1b727220a95ULL + (seed << 6) + (seed >> 2);
+    }
     return seed;
   }
 };
 
-/// Convert SparsePauliWord to packed form.
-PackedPauliWord sparse_to_packed(const SparsePauliWord& word,
-                                 std::size_t num_words) {
-  PackedPauliWord pw;
-  pw.x.resize(num_words, 0);
-  pw.z.resize(num_words, 0);
+template <std::size_t NW>
+PackedPauliWord<NW> sparse_to_packed(const SparsePauliWord& word) {
+  PackedPauliWord<NW> pw{};
   for (const auto& [qubit, op] : word) {
     std::size_t wi = qubit / 64;
     std::uint64_t bit = std::uint64_t(1) << (qubit % 64);
-    if (wi < num_words) {
-      if (op == 1 || op == 2) pw.x[wi] |= bit;  // X or Y
-      if (op == 2 || op == 3) pw.z[wi] |= bit;  // Y or Z
+    if (wi < NW) {
+      if (op == 1 || op == 2) pw.x[wi] |= bit;
+      if (op == 2 || op == 3) pw.z[wi] |= bit;
     }
   }
   return pw;
 }
 
-/// Convert packed form back to SparsePauliWord.
-SparsePauliWord packed_to_sparse(const PackedPauliWord& pw) {
+template <std::size_t NW>
+SparsePauliWord packed_to_sparse(const PackedPauliWord<NW>& pw) {
   SparsePauliWord word;
-  for (std::size_t wi = 0; wi < pw.x.size(); ++wi) {
+  for (std::size_t wi = 0; wi < NW; ++wi) {
     std::uint64_t x = pw.x[wi];
     std::uint64_t z = pw.z[wi];
     std::uint64_t active = x | z;
@@ -95,7 +94,7 @@ SparsePauliWord packed_to_sparse(const PackedPauliWord& pw) {
       std::uint64_t qubit = wi * 64 + bit;
       bool has_x = (x & mask) != 0;
       bool has_z = (z & mask) != 0;
-      std::uint8_t op = has_x ? (has_z ? 2 : 1) : 3;  // Y:2, X:1, Z:3
+      std::uint8_t op = has_x ? (has_z ? 2 : 1) : 3;
       word.emplace_back(qubit, op);
       active &= ~mask;
     }
@@ -103,72 +102,36 @@ SparsePauliWord packed_to_sparse(const PackedPauliWord& pw) {
   return word;
 }
 
-/// Popcount for a vector of uint64_t words.
-inline int vec_popcount(const std::vector<std::uint64_t>& v) {
-  int count = 0;
-  for (auto w : v) count += __builtin_popcountll(w);
-  return count;
-}
-
-/// Multiply two PackedPauliWords: result = pw1 * pw2.
-/// Returns (phase, product) where phase is ±1 or ±i.
-///
-/// Using the symplectic formula:
-///   P1 * P2 = i^{phase_exp} * P_result
-///   P_result.x = P1.x ^ P2.x,  P_result.z = P1.z ^ P2.z
-///   phase_exp = 2*popcount(P1.x & P2.z) - 2*popcount(P1.z & P2.x)  (mod 4)
-///   but we need the FULL Pauli algebra phase, which is:
-///   For each qubit: op1 * op2 gives a phase from the multiplication table.
-///
-/// Efficient formula (from Dehaene & De Moor 2003):
-///   phase_exp = Σ_j f(P1_j, P2_j) mod 4
-///   where f(a,b) for symplectic vectors encodes the single-qubit phase.
-///
-/// We use the direct computation: for each qubit where both operators are
-/// non-identity, look up the phase from {X,Y,Z} × {X,Y,Z}.
-///
-/// Actually, the most efficient approach uses the identity:
-///   phase = i^{2·popcount(x1&z2)} · (-1)^{popcount(z1&x2)}
-///         · (-1)^{popcount(x1&x2&z1&z2)}
-///   (this follows from the qubit-by-qubit Pauli multiplication table)
-std::pair<std::complex<double>, PackedPauliWord> multiply_packed(
-    const PackedPauliWord& p1, const PackedPauliWord& p2) {
-  std::size_t nw = p1.x.size();
-  PackedPauliWord result;
-  result.x.resize(nw);
-  result.z.resize(nw);
-
-  // Per-qubit phase from Pauli multiplication table, vectorized over 64 bits.
-  // Cyclic pairs (XY, YZ, ZX) contribute +1; anti-cyclic (YX, ZY, XZ) give -1.
+template <std::size_t NW>
+std::pair<std::complex<double>, PackedPauliWord<NW>> multiply_packed(
+    const PackedPauliWord<NW>& p1, const PackedPauliWord<NW>& p2) {
+  PackedPauliWord<NW> result;
   int phase_exp = 0;
-  for (std::size_t i = 0; i < nw; ++i) {
+  for (std::size_t i = 0; i < NW; ++i) {
     std::uint64_t x1 = p1.x[i], z1 = p1.z[i];
     std::uint64_t x2 = p2.x[i], z2 = p2.z[i];
-
     result.x[i] = x1 ^ x2;
     result.z[i] = z1 ^ z2;
-
     std::uint64_t nx1 = ~x1, nz1 = ~z1, nx2 = ~x2, nz2 = ~z2;
-    std::uint64_t cyc = (x1 & nz1 & x2 & z2) |   // XY
-                        (x1 & z1 & nx2 & z2) |    // YZ
-                        (nx1 & z1 & x2 & nz2);    // ZX
-    std::uint64_t anti = (x1 & z1 & x2 & nz2) |   // YX
-                         (nx1 & z1 & x2 & z2) |    // ZY
-                         (x1 & nz1 & nx2 & z2);    // XZ
+    std::uint64_t cyc = (x1 & nz1 & x2 & z2) |
+                        (x1 & z1 & nx2 & z2) |
+                        (nx1 & z1 & x2 & nz2);
+    std::uint64_t anti = (x1 & z1 & x2 & nz2) |
+                         (nx1 & z1 & x2 & z2) |
+                         (x1 & nz1 & nx2 & z2);
     phase_exp += __builtin_popcountll(cyc);
     phase_exp -= __builtin_popcountll(anti);
   }
-
   static constexpr std::complex<double> powers_of_i[4] = {
       {1, 0}, {0, 1}, {-1, 0}, {0, -1}};
-  int mod = ((phase_exp % 4) + 4) % 4;
-  return {powers_of_i[mod], result};
+  return {powers_of_i[((phase_exp % 4) + 4) % 4], result};
 }
 
-/// Bitpacked term accumulator: maps PackedPauliWord → complex coefficient.
+template <std::size_t NW>
 class PackedAccumulator {
  public:
-  void accumulate(const PackedPauliWord& word, std::complex<double> coeff) {
+  void accumulate(const PackedPauliWord<NW>& word,
+                  std::complex<double> coeff) {
     auto it = terms_.find(word);
     if (it != terms_.end()) {
       it->second += coeff;
@@ -177,14 +140,13 @@ class PackedAccumulator {
     }
   }
 
-  void accumulate_product(const PackedPauliWord& w1,
-                          const PackedPauliWord& w2,
+  void accumulate_product(const PackedPauliWord<NW>& w1,
+                          const PackedPauliWord<NW>& w2,
                           std::complex<double> scale) {
     auto [phase, word] = multiply_packed(w1, w2);
     accumulate(word, scale * phase);
   }
 
-  /// Extract terms above threshold, converting back to SparsePauliWord.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> get_terms(
       double threshold) const {
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> result;
@@ -198,8 +160,8 @@ class PackedAccumulator {
   }
 
  private:
-  std::unordered_map<PackedPauliWord, std::complex<double>,
-                     PackedPauliWordHash>
+  std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
+                     PackedPauliWordHash<NW>>
       terms_;
 };
 
@@ -232,22 +194,25 @@ std::string sparse_to_le_string(const SparsePauliWord& word,
 
 }  // namespace
 
-MajoranaMapResult majorana_map_hamiltonian(
+namespace {
+
+/// Templated engine implementation, parameterized on NW (number of uint64
+/// words per Pauli bitmask). NW is selected at runtime by the dispatcher.
+template <std::size_t NW>
+MajoranaMapResult majorana_map_impl(
     const MajoranaMapping& mapping, double core_energy,
     const double* h1_alpha, const double* h1_beta, const double* eri_aaaa,
     const double* eri_aabb, const double* eri_bbbb, std::size_t n_spatial,
     bool is_restricted, double threshold, double integral_threshold) {
-  const std::size_t n_modes = 2 * n_spatial;  // spin-orbitals
+  const std::size_t n_modes = 2 * n_spatial;
   const std::size_t num_qubits = mapping.num_qubits();
-  const std::size_t num_words = (num_qubits + 63) / 64;
 
-  // Use bitpacked accumulator for O(1) hash/compare/multiply
-  PackedAccumulator acc;
+  PackedAccumulator<NW> acc;
 
   // Convert all Majorana table entries to packed form
-  std::vector<PackedPauliWord> packed_mapping(2 * n_modes);
+  std::vector<PackedPauliWord<NW>> packed_mapping(2 * n_modes);
   for (std::size_t k = 0; k < 2 * n_modes; ++k) {
-    packed_mapping[k] = sparse_to_packed(mapping(k), num_words);
+    packed_mapping[k] = sparse_to_packed<NW>(mapping(k));
   }
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
@@ -269,9 +234,7 @@ MajoranaMapResult majorana_map_hamiltonian(
 
   // ─── Core energy ──────────────────────────────────────────────────
   if (std::abs(core_energy) > integral_threshold) {
-    PackedPauliWord identity;
-    identity.x.resize(num_words, 0);
-    identity.z.resize(num_words, 0);
+    PackedPauliWord<NW> identity{};
     acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
@@ -318,7 +281,7 @@ MajoranaMapResult majorana_map_hamiltonian(
   // Precompute Majorana pair products in packed form (same-spin only).
   struct PackedPairProduct {
     std::complex<double> phase;
-    PackedPauliWord word;
+    PackedPauliWord<NW> word;
   };
   const std::size_t maj_per_spin = 2 * n_spatial;
   std::vector<PackedPairProduct> ppair_alpha(maj_per_spin * maj_per_spin);
@@ -349,7 +312,7 @@ MajoranaMapResult majorana_map_hamiltonian(
   if (is_restricted) {
     // Precompute spin-summed E_pq for all (p,q):
     struct SpinSummedE {
-      std::vector<std::pair<std::complex<double>, PackedPauliWord>> terms;
+      std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
     std::vector<SpinSummedE> ss_e(n_spatial * n_spatial);
 
@@ -369,7 +332,7 @@ MajoranaMapResult majorana_map_hamiltonian(
 
     // Precompute symmetrized S_pq = E_pq + E_qp (merged) for p ≤ q.
     struct SymmetrizedE {
-      std::vector<std::pair<std::complex<double>, PackedPauliWord>> terms;
+      std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
     std::vector<SymmetrizedE> sym_e;
     std::vector<std::size_t> sym_map(n_spatial * n_spatial);
@@ -381,8 +344,8 @@ MajoranaMapResult majorana_map_hamiltonian(
           sym_map[p * n_spatial + q] = idx;
           if (p != q) sym_map[q * n_spatial + p] = idx;
 
-          std::unordered_map<PackedPauliWord, std::complex<double>,
-                             PackedPauliWordHash> merged;
+          std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
+                             PackedPauliWordHash<NW>> merged;
           for (const auto& [c, w] : ss_e[p * n_spatial + q].terms) {
             merged[w] += c;
           }
@@ -536,6 +499,51 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
 
   return result;
+}
+
+}  // anonymous namespace
+
+MajoranaMapResult majorana_map_hamiltonian(
+    const MajoranaMapping& mapping, double core_energy,
+    const double* h1_alpha, const double* h1_beta, const double* eri_aaaa,
+    const double* eri_aabb, const double* eri_bbbb, std::size_t n_spatial,
+    bool is_restricted, double threshold, double integral_threshold) {
+  const std::size_t num_qubits = mapping.num_qubits();
+  const std::size_t num_words = (num_qubits + 63) / 64;
+
+  // Dispatch to the appropriate template instantiation.
+  // Each instantiation uses std::array<uint64_t, NW> (stack-allocated,
+  // no heap overhead per Pauli word).
+  switch (num_words) {
+    case 0:
+    case 1:
+      return majorana_map_impl<1>(mapping, core_energy, h1_alpha, h1_beta,
+                                  eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
+                                  is_restricted, threshold,
+                                  integral_threshold);
+    case 2:
+      return majorana_map_impl<2>(mapping, core_energy, h1_alpha, h1_beta,
+                                  eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
+                                  is_restricted, threshold,
+                                  integral_threshold);
+    case 3:
+      return majorana_map_impl<3>(mapping, core_energy, h1_alpha, h1_beta,
+                                  eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
+                                  is_restricted, threshold,
+                                  integral_threshold);
+    case 4:
+      return majorana_map_impl<4>(mapping, core_energy, h1_alpha, h1_beta,
+                                  eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
+                                  is_restricted, threshold,
+                                  integral_threshold);
+    default:
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: num_qubits=" +
+          std::to_string(num_qubits) +
+          " requires " + std::to_string(num_words) +
+          " uint64 words, but max supported is 4 (256 qubits). "
+          "Contact the developers to extend the template dispatch.");
+  }
 }
 
 }  // namespace qdk::chemistry::data
