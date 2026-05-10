@@ -41,7 +41,7 @@ class MajoranaMapping {
    * @param table Vector of 2N SparsePauliWord entries (one per Majorana
    *              operator γ_0, γ_1, ..., γ_{2N-1}).
    * @param name  Optional human-readable label for the encoding (e.g.,
-   *              "jordan_wigner"). Stored but not used for dispatch.
+   *              "jordan-wigner"). Stored but not used for dispatch.
    * @throws std::invalid_argument If table size is odd, empty, or the
    *         Clifford algebra validation fails.
    */
@@ -101,7 +101,7 @@ class MajoranaMapping {
    *
    * @param num_modes Number of fermionic modes (spin-orbitals).
    *                  The encoding uses num_modes qubits.
-   * @return MajoranaMapping with name "jordan_wigner".
+   * @return MajoranaMapping with name "jordan-wigner".
    */
   static MajoranaMapping jordan_wigner(std::size_t num_modes);
 
@@ -116,7 +116,7 @@ class MajoranaMapping {
    *
    * @param num_modes Number of fermionic modes (spin-orbitals).
    *                  The encoding uses num_modes qubits.
-   * @return MajoranaMapping with name "bravyi_kitaev".
+   * @return MajoranaMapping with name "bravyi-kitaev".
    */
   static MajoranaMapping bravyi_kitaev(std::size_t num_modes);
 

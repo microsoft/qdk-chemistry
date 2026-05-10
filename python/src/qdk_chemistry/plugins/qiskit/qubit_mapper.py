@@ -55,8 +55,8 @@ class QiskitQubitMapper(QubitMapper):
     supported — use the QDK variant instead.
 
     Supported ``mapping.name`` values:
-        - ``"jordan_wigner"``
-        - ``"bravyi_kitaev"``
+        - ``"jordan-wigner"``
+        - ``"bravyi-kitaev"``
         - ``"parity"``
 
     """

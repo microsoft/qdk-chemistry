@@ -18,7 +18,7 @@ from .test_helpers import create_test_hamiltonian
 
 if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
     from qdk_chemistry.algorithms import QubitMapper, available, create
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
 
@@ -27,15 +27,19 @@ pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qis
 def test_qiskit_qubit_mappers(encoding) -> None:
     """Basic test for mapping a Hamiltonian to a Qubit Hamiltonian using Qiskit."""
     assert "qiskit" in available("qubit_mapper")
-    qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
+    qubit_mapper = create("qubit_mapper", "qiskit")
     assert isinstance(qubit_mapper, QubitMapper)
-    assert qubit_mapper.settings().get("encoding") == "jordan-wigner"
-    qubit_mapper.settings().set("encoding", encoding)
-    assert qubit_mapper.settings().get("encoding") == encoding
 
     hamiltonian = create_test_hamiltonian(2)
     assert isinstance(hamiltonian, Hamiltonian)
-    qubit_hamiltonian = qubit_mapper.run(hamiltonian)
+    n_modes = 2 * 2  # 2 spatial orbitals → 4 spin-orbitals
+    factory = {
+        "jordan-wigner": MajoranaMapping.jordan_wigner,
+        "bravyi-kitaev": MajoranaMapping.bravyi_kitaev,
+        "parity": MajoranaMapping.parity,
+    }[encoding]
+    mapping = factory(n_modes)
+    qubit_hamiltonian = qubit_mapper.run(hamiltonian, mapping)
     assert isinstance(qubit_hamiltonian, QubitHamiltonian)
     assert qubit_hamiltonian.num_qubits == 4
     assert isinstance(qubit_hamiltonian.pauli_strings, list)

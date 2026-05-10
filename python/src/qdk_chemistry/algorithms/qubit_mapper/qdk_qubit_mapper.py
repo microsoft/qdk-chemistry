@@ -125,7 +125,15 @@ class QdkQubitMapper(QubitMapper):
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
         n_spatial = h1_alpha.shape[0]
+        n_spin_orbitals = 2 * n_spatial
         is_restricted = hamiltonian.get_orbitals().is_restricted()
+
+        if mapping.num_modes != n_spin_orbitals:
+            raise ValueError(
+                f"MajoranaMapping has {mapping.num_modes} modes but the Hamiltonian has "
+                f"{n_spin_orbitals} spin-orbitals (2 x {n_spatial} spatial orbitals). "
+                f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
+            )
 
         # Use ravel() instead of flatten() to avoid copying contiguous arrays.
         # For restricted Hamiltonians the containers share the same two-body

@@ -330,3 +330,24 @@ def test_qiskit_qubit_mapper_sets_fermion_mode_order():
         mapping = factory(n_modes)
         qh = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
         assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+
+
+def test_unnamed_mapping_dispatch():
+    """QDK mapper accepts unnamed custom mappings; Qiskit mapper rejects them."""
+    hamiltonian = create_test_hamiltonian(2)
+    n_modes = 2 * 2
+
+    jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
+    unnamed = MajoranaMapping(table=list(jw.table), name="")
+    assert unnamed.name == ""
+
+    # QDK mapper works fine with unnamed mapping
+    qdk_mapper = create("qubit_mapper", "qdk")
+    result = qdk_mapper.run(hamiltonian, unnamed)
+    assert isinstance(result, QubitHamiltonian)
+
+    # Qiskit mapper rejects unnamed mapping
+    if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
+        qiskit_mapper = create("qubit_mapper", "qiskit")
+        with pytest.raises(NotImplementedError):
+            qiskit_mapper.run(hamiltonian, unnamed)

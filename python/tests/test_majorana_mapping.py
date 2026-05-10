@@ -20,18 +20,16 @@ import tempfile
 from pathlib import Path
 
 import h5py
-import numpy as np
 import pytest
 
 from qdk_chemistry._core.data import PauliTermAccumulator
 from qdk_chemistry.data import MajoranaMapping
 
-
 # ─── Helpers ─────────────────────────────────────────────────────────────
 
 
 def verify_clifford_algebra(mapping: MajoranaMapping) -> None:
-    """Verify {γ_i, γ_j} = 2δ_{ij}·I for all pairs."""
+    """Verify {gamma_i, gamma_j} = 2δ_{ij}·I for all pairs."""
     n = 2 * mapping.num_modes
     for i in range(n):
         wi = mapping.core(i)
@@ -41,12 +39,12 @@ def verify_clifford_algebra(mapping: MajoranaMapping) -> None:
             phase_ji, word_ji = PauliTermAccumulator.multiply_uncached(wj, wi)
 
             if i == j:
-                assert word_ij == [], f"γ_{i}² is not identity: word={word_ij}"
-                assert abs(phase_ij - 1.0) < 1e-12, f"γ_{i}² phase={phase_ij}, expected 1"
+                assert word_ij == [], f"gamma_{i}² is not identity: word={word_ij}"
+                assert abs(phase_ij - 1.0) < 1e-12, f"gamma_{i}² phase={phase_ij}, expected 1"
             else:
-                assert word_ij == word_ji, f"γ_{i}·γ_{j} and γ_{j}·γ_{i} produce different words"
+                assert word_ij == word_ji, f"gamma_{i}·gamma_{j} and gamma_{j}·gamma_{i} produce different words"
                 assert abs(phase_ij + phase_ji) < 1e-12, (
-                    f"{{γ_{i}, γ_{j}}} != 0: phases {phase_ij} + {phase_ji} = {phase_ij + phase_ji}"
+                    f"{{gamma_{i}, gamma_{j}}} != 0: phases {phase_ij} + {phase_ji} = {phase_ij + phase_ji}"
                 )
 
 
@@ -73,14 +71,14 @@ class TestJordanWigner:
     def test_reference_n2(self) -> None:
         """JW n=2 matches hand-computed reference (little-endian)."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        # γ_0 = X_0 → "IX" (qubit 0 rightmost = X, qubit 1 = I)
-        # γ_1 = Y_0 → "IY"
-        # γ_2 = Z_0 X_1 → "XZ" (qubit 0 = Z, qubit 1 = X)
-        # γ_3 = Z_0 Y_1 → "YZ"
+        # gamma_0 = X_0 → "IX" (qubit 0 rightmost = X, qubit 1 = I)
+        # gamma_1 = Y_0 → "IY"
+        # gamma_2 = Z_0 X_1 → "XZ" (qubit 0 = Z, qubit 1 = X)
+        # gamma_3 = Z_0 Y_1 → "YZ"
         assert jw.table == ("IX", "IY", "XZ", "YZ")
 
     def test_reference_n4(self) -> None:
-        """JW n=4 spot check: γ_6 = Z_0 Z_1 Z_2 X_3."""
+        """JW n=4 spot check: gamma_6 = Z_0 Z_1 Z_2 X_3."""
         jw = MajoranaMapping.jordan_wigner(num_modes=4)
         assert jw.table[6] == "XZZZ"  # X_3 Z_2 Z_1 Z_0 in little-endian
         assert jw.table[7] == "YZZZ"  # Y_3 Z_2 Z_1 Z_0
@@ -130,10 +128,10 @@ class TestParity:
         """Parity n=2 matches CNOT-derived reference."""
         par = MajoranaMapping.parity(num_modes=2)
         # Derived via CNOT(0,1) conjugation of JW:
-        # γ_0 = X_0 X_1 → "XX"
-        # γ_1 = Y_0 X_1 → "XY" (little-endian: qubit 0=Y, qubit 1=X)
-        # γ_2 = Z_0 X_1 → "XZ"
-        # γ_3 = Y_1     → "YI"
+        # gamma_0 = X_0 X_1 → "XX"
+        # gamma_1 = Y_0 X_1 → "XY" (little-endian: qubit 0=Y, qubit 1=X)
+        # gamma_2 = Z_0 X_1 → "XZ"
+        # gamma_3 = Y_1     → "YI"
         assert par.table == ("XX", "XY", "XZ", "YI")
 
     def test_reference_n4(self) -> None:
@@ -165,17 +163,13 @@ class TestCustomMapping:
     def test_from_mode_pairs(self) -> None:
         """from_mode_pairs produces same result as direct table."""
         direct = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="test")
-        pairs = MajoranaMapping.from_mode_pairs(
-            pairs=[("IX", "IY"), ("XZ", "YZ")], name="test"
-        )
+        pairs = MajoranaMapping.from_mode_pairs(pairs=[("IX", "IY"), ("XZ", "YZ")], name="test")
         assert direct.table == pairs.table
 
     def test_from_mode_pairs_equivalence(self) -> None:
         """from_mode_pairs matches JW factory for n=2."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        pairs = MajoranaMapping.from_mode_pairs(
-            pairs=[("IX", "IY"), ("XZ", "YZ")], name="jordan-wigner"
-        )
+        pairs = MajoranaMapping.from_mode_pairs(pairs=[("IX", "IY"), ("XZ", "YZ")], name="jordan-wigner")
         assert jw.table == pairs.table
 
 
@@ -207,17 +201,17 @@ class TestValidation:
 
     def test_clifford_violation(self) -> None:
         """Table violating Clifford algebra raises ValueError."""
-        # γ_0 = γ_1 = IX → they commute (shouldn't)
+        # gamma_0 = gamma_1 = IX → they commute (shouldn't)
         with pytest.raises(ValueError, match="Clifford"):
             MajoranaMapping(table=["IX", "IX", "XZ", "YZ"])
 
     def test_zero_modes(self) -> None:
         """Zero modes raises ValueError in factories."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="num_modes"):
             MajoranaMapping.jordan_wigner(num_modes=0)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="num_modes"):
             MajoranaMapping.bravyi_kitaev(num_modes=0)
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="num_modes"):
             MajoranaMapping.parity(num_modes=0)
 
 
@@ -300,9 +294,7 @@ class TestSerialization:
 
     def test_custom_serialization(self) -> None:
         """Custom mapping with name survives serialization."""
-        custom = MajoranaMapping(
-            table=["IX", "IY", "XZ", "YZ"], name="my-custom"
-        )
+        custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="my-custom")
         data = custom.to_json()
         loaded = MajoranaMapping.from_json(data)
         assert loaded.table == custom.table
@@ -316,14 +308,14 @@ class TestDisplay:
     """Tests for summary and repr."""
 
     def test_repr_with_name(self) -> None:
-        """repr includes name when present."""
+        """Repr includes name when present."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
         r = repr(jw)
         assert "jordan-wigner" in r
         assert "num_modes=2" in r
 
     def test_repr_without_name(self) -> None:
-        """repr works for unnamed custom mappings."""
+        """Repr works for unnamed custom mappings."""
         custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"])
         r = repr(custom)
         assert "num_modes=2" in r
@@ -334,7 +326,7 @@ class TestDisplay:
         s = jw.get_summary()
         assert "jordan-wigner" in s
         assert "Modes: 2" in s
-        assert "γ_0" in s
+        assert "gamma_0" in s
         assert "IX" in s
 
 

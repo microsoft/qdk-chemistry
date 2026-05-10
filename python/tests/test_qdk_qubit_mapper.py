@@ -11,10 +11,21 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import QubitMapper, available, create
-from qdk_chemistry.data import CanonicalFourCenterHamiltonianContainer, Hamiltonian, MajoranaMapping, QubitHamiltonian
+from qdk_chemistry.data import (
+    CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
+    MajoranaMapping,
+    Orbitals,
+    QubitHamiltonian,
+)
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
-from .test_helpers import create_test_hamiltonian, create_test_orbitals
+from .test_helpers import (
+    create_nontrivial_test_hamiltonian,
+    create_test_basis_set,
+    create_test_hamiltonian,
+    create_test_orbitals,
+)
 
 
 @pytest.fixture
@@ -453,6 +464,210 @@ class TestQdkQubitMapper:
             assert np.isclose(pauli_dict[pauli_str].real, expected_coeff, atol=1e-10), (
                 f"Coefficient mismatch for {pauli_str}: got {pauli_dict[pauli_str].real}, expected {expected_coeff}"
             )
+
+    def test_mapping_size_mismatch_raises(self) -> None:
+        """Test that mismatched mapping size raises ValueError."""
+        hamiltonian = create_test_hamiltonian(2)  # 2 spatial → 4 spin-orbitals
+        mapper = create("qubit_mapper", "qdk")
+
+        # Oversized mapping (6 modes for 4-spin-orbital Hamiltonian)
+        mapping_over = MajoranaMapping.jordan_wigner(num_modes=6)
+        with pytest.raises(ValueError, match="modes"):
+            mapper.run(hamiltonian, mapping_over)
+
+        # Undersized mapping (2 modes for 4-spin-orbital Hamiltonian)
+        mapping_under = MajoranaMapping.jordan_wigner(num_modes=2)
+        with pytest.raises(ValueError, match="modes"):
+            mapper.run(hamiltonian, mapping_under)
+
+    def test_custom_mapping_end_to_end(self) -> None:
+        """Test that a custom MajoranaMapping from JW table matches JW factory output bit-exactly."""
+        mapper = create("qubit_mapper", "qdk")
+        hamiltonian = create_test_hamiltonian(2)
+        n_modes = 2 * 2
+
+        jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
+        custom = MajoranaMapping(table=list(jw.table), name="")
+
+        result_jw = mapper.run(hamiltonian, jw)
+        result_custom = mapper.run(hamiltonian, custom)
+
+        assert result_jw.pauli_strings == result_custom.pauli_strings
+        assert np.array_equal(result_jw.coefficients, result_custom.coefficients)
+
+    def test_parity_end_to_end(self) -> None:
+        """Test parity mapping produces correct qubits, is Hermitian, and matches JW eigenvalues."""
+        hamiltonian = create_nontrivial_test_hamiltonian(2)
+        n_modes = 2 * 2
+
+        mapper = create("qubit_mapper", "qdk")
+        mapping_parity = MajoranaMapping.parity(num_modes=n_modes)
+        result_parity = mapper.run(hamiltonian, mapping_parity)
+
+        # Correct number of qubits
+        assert result_parity.num_qubits == n_modes
+
+        # All coefficients must be real (Hermitian Hamiltonian)
+        for coeff in result_parity.coefficients:
+            assert np.isclose(coeff.imag, 0.0, atol=1e-10), f"Non-real coefficient: {coeff}"
+
+        # Eigenvalues must match JW
+        mapping_jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
+        result_jw = mapper.run(hamiltonian, mapping_jw)
+
+        def _to_matrix(qh: QubitHamiltonian) -> np.ndarray:
+            n = qh.num_qubits
+            dim = 2**n
+            mat = np.zeros((dim, dim), dtype=complex)
+            pauli_mats = {
+                "I": np.eye(2, dtype=complex),
+                "X": np.array([[0, 1], [1, 0]], dtype=complex),
+                "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+                "Z": np.array([[1, 0], [0, -1]], dtype=complex),
+            }
+            for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
+                term = np.array([[1.0]], dtype=complex)
+                for ch in ps:
+                    term = np.kron(term, pauli_mats[ch])
+                mat += c * term
+            return mat
+
+        eigs_jw = np.sort(np.linalg.eigvalsh(_to_matrix(result_jw)))
+        eigs_parity = np.sort(np.linalg.eigvalsh(_to_matrix(result_parity)))
+        np.testing.assert_allclose(eigs_parity, eigs_jw, atol=1e-10)
+
+
+class TestUnrestrictedHamiltonians:
+    """Tests for unrestricted (UHF) Hamiltonian mapping."""
+
+    @staticmethod
+    def _make_unrestricted_hamiltonian(n: int, seed: int = 42):
+        """Create an unrestricted Hamiltonian with distinct alpha/beta integrals."""
+        rng = np.random.default_rng(seed)
+        coeffs_alpha = np.eye(n)
+        coeffs_beta = np.eye(n) + rng.standard_normal((n, n)) * 0.1
+        basis_set = create_test_basis_set(n, "test-uhf")
+        orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        # Symmetric one-body matrices (different for alpha/beta)
+        raw_a = rng.standard_normal((n, n)) * 0.3
+        h1_alpha = (raw_a + raw_a.T) / 2 + np.diag(np.linspace(1.0, -0.5, n))
+        raw_b = rng.standard_normal((n, n)) * 0.3
+        h1_beta = (raw_b + raw_b.T) / 2 + np.diag(np.linspace(0.8, -0.3, n))
+
+        # Two-body integrals with 8-fold symmetry (different per channel)
+        def make_symmetric_eri(n, rng):
+            h2 = np.zeros((n, n, n, n))
+            seen = set()
+            for p in range(n):
+                for q in range(n):
+                    for r in range(n):
+                        for s in range(n):
+                            perms = frozenset({
+                                (p, q, r, s), (q, p, r, s), (p, q, s, r), (q, p, s, r),
+                                (r, s, p, q), (s, r, p, q), (r, s, q, p), (s, r, q, p),
+                            })
+                            canon = min(perms)
+                            if canon in seen:
+                                continue
+                            seen.add(canon)
+                            val = rng.standard_normal() * 0.2
+                            for a, b, c, d in perms:
+                                h2[a, b, c, d] = val
+            return h2.ravel()
+
+        h2_aaaa = make_symmetric_eri(n, rng)
+        h2_aabb = make_symmetric_eri(n, rng)
+        h2_bbbb = make_symmetric_eri(n, rng)
+
+        fock_a = np.eye(0)
+        fock_b = np.eye(0)
+        return Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                h1_alpha, h1_beta, h2_aaaa, h2_aabb, h2_bbbb,
+                orbitals, 0.5, fock_a, fock_b,
+            )
+        )
+
+    def test_unrestricted_hamiltonian_is_detected(self) -> None:
+        """Verify the test helper creates an unrestricted Hamiltonian."""
+        h = self._make_unrestricted_hamiltonian(2)
+        assert not h.get_orbitals().is_restricted()
+        h1_a, h1_b = h.get_one_body_integrals()
+        assert not np.array_equal(h1_a, h1_b)
+
+    def test_unrestricted_jw_produces_hermitian(self) -> None:
+        """UHF JW mapping produces a Hermitian qubit Hamiltonian."""
+        h = self._make_unrestricted_hamiltonian(2)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+        mapper = create("qubit_mapper", "qdk")
+        qh = mapper.run(h, mapping)
+
+        assert qh.num_qubits == 4
+        for c in qh.coefficients:
+            assert abs(c.imag) < 1e-12, f"Non-real coefficient: {c}"
+
+    def test_unrestricted_eigenvalues_match_across_encodings(self) -> None:
+        """UHF eigenvalues are consistent across JW, BK, and parity."""
+        h = self._make_unrestricted_hamiltonian(2)
+        n_modes = 4
+
+        eigenvalues = {}
+        for enc in ["jordan_wigner", "bravyi_kitaev", "parity"]:
+            mapping = getattr(MajoranaMapping, enc)(num_modes=n_modes)
+            mapper = create("qubit_mapper", "qdk")
+            qh = mapper.run(h, mapping)
+            eigenvalues[enc] = np.sort(np.linalg.eigvalsh(qh.to_matrix()))
+
+        np.testing.assert_allclose(
+            eigenvalues["jordan_wigner"], eigenvalues["bravyi_kitaev"], atol=1e-10
+        )
+        np.testing.assert_allclose(
+            eigenvalues["jordan_wigner"], eigenvalues["parity"], atol=1e-10
+        )
+
+    def test_unrestricted_equals_restricted_when_channels_match(self) -> None:
+        """When alpha == beta integrals, UHF path should match restricted path."""
+        # Create a restricted Hamiltonian
+        h_res = create_nontrivial_test_hamiltonian(2)
+        h1_a, _ = h_res.get_one_body_integrals()
+        h2_aaaa, _, _ = h_res.get_two_body_integrals()
+        n = h1_a.shape[0]
+
+        # Create an "unrestricted" Hamiltonian with alpha == beta
+        coeffs_alpha = np.eye(n)
+        coeffs_beta = np.eye(n) + np.random.default_rng(99).standard_normal((n, n)) * 0.01
+        basis_set = create_test_basis_set(n, "test-uhf-eq")
+        orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        h_unres = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                h1_a, h1_a, h2_aaaa, h2_aaaa, h2_aaaa,
+                orbitals, h_res.get_core_energy(), np.eye(0), np.eye(0),
+            )
+        )
+        assert not h_unres.get_orbitals().is_restricted()
+
+        mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n)
+        qh_res = create("qubit_mapper", "qdk").run(h_res, mapping)
+        qh_unres = create("qubit_mapper", "qdk").run(h_unres, mapping)
+
+        # Eigenvalues should match
+        e_res = np.sort(np.linalg.eigvalsh(qh_res.to_matrix()))
+        e_unres = np.sort(np.linalg.eigvalsh(qh_unres.to_matrix()))
+        np.testing.assert_allclose(e_unres, e_res, atol=1e-10)
+
+    def test_unrestricted_3_orbitals(self) -> None:
+        """UHF mapping works for a larger unrestricted system."""
+        h = self._make_unrestricted_hamiltonian(3)
+        mapping = MajoranaMapping.jordan_wigner(num_modes=6)
+        mapper = create("qubit_mapper", "qdk")
+        qh = mapper.run(h, mapping)
+
+        assert qh.num_qubits == 6
+        assert len(qh.pauli_strings) > 0
+        for c in qh.coefficients:
+            assert abs(c.imag) < 1e-12
 
 
 class TestQdkQubitMapperRealHamiltonians:

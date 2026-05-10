@@ -314,7 +314,7 @@ Args:
     num_modes: Number of fermionic modes (spin-orbitals).
 
 Returns:
-    MajoranaMapping with name "jordan_wigner".
+    MajoranaMapping with name "jordan-wigner".
 )");
 
   mapping.def_static(
@@ -334,7 +334,7 @@ Args:
     num_modes: Number of fermionic modes (spin-orbitals).
 
 Returns:
-    MajoranaMapping with name "bravyi_kitaev".
+    MajoranaMapping with name "bravyi-kitaev".
 )");
 
   mapping.def_static(

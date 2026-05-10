@@ -56,9 +56,9 @@ class OpenFermionQubitMapper(QubitMapper):
     supported — use the QDK variant instead.
 
     Supported ``mapping.name`` values:
-        - ``"jordan_wigner"``
-        - ``"bravyi_kitaev"``
-        - ``"bravyi_kitaev_tree"``
+        - ``"jordan-wigner"``
+        - ``"bravyi-kitaev"``
+        - ``"bravyi-kitaev-tree"``
 
     """
 
@@ -126,8 +126,8 @@ class OpenFermionQubitMapper(QubitMapper):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            encoding: One of ``"jordan_wigner"``, ``"bravyi_kitaev"``,
-                or ``"bravyi_kitaev_tree"``.
+            encoding: One of ``"jordan-wigner"``, ``"bravyi-kitaev"``,
+                or ``"bravyi-kitaev-tree"``.
 
         Returns:
             openfermion.QubitOperator: The mapped qubit operator.

@@ -14,8 +14,9 @@ class-method factories; custom encodings can be constructed from a Pauli table.
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from qdk_chemistry._core.data import MajoranaMapping as _CoreMajoranaMapping
 from qdk_chemistry.data.base import DataClass
@@ -30,12 +31,12 @@ class MajoranaMapping(DataClass):
     """Immutable data class mapping 2N Majorana operators to Pauli strings.
 
     A ``MajoranaMapping`` stores a table of 2N entries, one per Majorana operator
-    γ_k (k = 0, ..., 2N-1), where N is the number of fermionic modes (spin-orbitals).
-    Each entry is a single Pauli string representing φ(γ_k) under the chosen
+    gamma_k (k = 0, ..., 2N-1), where N is the number of fermionic modes (spin-orbitals).
+    Each entry is a single Pauli string representing φ(gamma_k) under the chosen
     fermion-to-qubit encoding.
 
     The mapping is validated at construction time by checking the Clifford algebra
-    anticommutation relations: {γ_i, γ_j} = 2δ_{ij} · I. This guarantees that the
+    anticommutation relations: {gamma_i, gamma_j} = 2δ_{ij} · I. This guarantees that the
     mapping defines a valid encoding.
 
     Pauli strings use the same **little-endian** convention as
@@ -81,7 +82,7 @@ class MajoranaMapping(DataClass):
             name (str): Optional human-readable label for the encoding. Default ``""``.
 
         Raises:
-            ValueError: If table size is odd, empty, strings differ in length, contain non-IXYZ characters, or the Clifford algebra validation fails.
+            ValueError: If the table is invalid (wrong size, bad characters, or Clifford algebra violation).
 
         """
         if _core is not None:
@@ -134,7 +135,7 @@ class MajoranaMapping(DataClass):
             num_modes (int): Number of fermionic modes (spin-orbitals).
 
         Returns:
-            MajoranaMapping: Mapping with name ``"jordan_wigner"``.
+            MajoranaMapping: Mapping with name ``"jordan-wigner"``.
 
         """
         core = _CoreMajoranaMapping.jordan_wigner(num_modes)
@@ -174,10 +175,10 @@ class MajoranaMapping(DataClass):
         pairs: list[tuple[str, str]],
         name: str = "",
     ) -> MajoranaMapping:
-        """Construct from (γ_even, γ_odd) mode pairs.
+        """Construct from (gamma_even, gamma_odd) mode pairs.
 
         Args:
-            pairs (list[tuple[str, str]]): List of (γ_{2k}, γ_{2k+1}) Pauli string pairs, one per mode.
+            pairs (list[tuple[str, str]]): List of (gamma_{2k}, gamma_{2k+1}) Pauli string pairs, one per mode.
             name (str): Optional human-readable label. Default ``""``.
 
         Returns:
@@ -210,7 +211,7 @@ class MajoranaMapping(DataClass):
         lines.append(label)
         lines.append(f"  Modes: {self._num_modes}, Qubits: {self._num_qubits}")
         for k, pauli_str in enumerate(self._table):
-            lines.append(f"  γ_{k} → {pauli_str}")
+            lines.append(f"  gamma_{k} → {pauli_str}")
         return "\n".join(lines)
 
     def to_json(self) -> dict[str, Any]:
@@ -254,7 +255,6 @@ class MajoranaMapping(DataClass):
         group.attrs["name"] = self._name
         group.attrs["num_modes"] = self._num_modes
         # Store table as array of strings
-        import numpy as np
 
         group.create_dataset("table", data=np.array(list(self._table), dtype="S"))
 

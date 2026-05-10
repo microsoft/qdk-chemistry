@@ -16,7 +16,7 @@ import pytest
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
 )
-from .test_helpers import create_nontrivial_test_hamiltonian, create_test_ansatz, create_test_wavefunction
+from .test_helpers import create_nontrivial_test_hamiltonian
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
@@ -24,7 +24,7 @@ if OPENFERMION_AVAILABLE:
     import openfermion as of
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
-    from qdk_chemistry.data import Symmetries
+    from qdk_chemistry.data import MajoranaMapping, Symmetries
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
@@ -33,10 +33,20 @@ if OPENFERMION_AVAILABLE:
         qubit_operator_to_qubit_hamiltonian,
     )
 
+    _ENCODING_TO_MAPPING = {
+        "jordan-wigner": MajoranaMapping.jordan_wigner,
+        "bravyi-kitaev": MajoranaMapping.bravyi_kitaev,
+    }
+
 if TYPE_CHECKING:
-    from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
 
 pytestmark = pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
+
+
+def _num_spin_orbitals(hamiltonian: Hamiltonian) -> int:
+    """Return the number of spin-orbitals in *hamiltonian*."""
+    return 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
 
 
 def _assert_pauli_ops_equal(actual: QubitHamiltonian, expected: QubitHamiltonian) -> None:
@@ -61,7 +71,6 @@ def test_openfermion_mapper_create():
     mapper = create("qubit_mapper", "openfermion")
     assert isinstance(mapper, QubitMapper)
     assert mapper.name() == "openfermion"
-    assert mapper.settings().get("encoding") == "jordan-wigner"
 
 
 # -------------------------------------------------------------------------------------
@@ -73,9 +82,11 @@ def test_openfermion_mapper_create():
 def test_openfermion_matches_qdk_native(encoding):
     """OpenFermion and QDK native mappers produce identical Pauli terms."""
     hamiltonian = create_nontrivial_test_hamiltonian()
+    n = _num_spin_orbitals(hamiltonian)
+    mapping = _ENCODING_TO_MAPPING[encoding](n)
 
-    of_qh = create("qubit_mapper", "openfermion", encoding=encoding).run(hamiltonian)
-    qdk_qh = create("qubit_mapper", "qdk", encoding=encoding).run(hamiltonian)
+    of_qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
+    qdk_qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
 
     _assert_pauli_ops_equal(of_qh, qdk_qh)
 
@@ -88,8 +99,10 @@ def test_openfermion_bk_tree_encoding():
     and removing core energy.
     """
     hamiltonian = create_nontrivial_test_hamiltonian()
+    n = _num_spin_orbitals(hamiltonian)
+    mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name="bravyi-kitaev-tree")
 
-    qh = create("qubit_mapper", "openfermion", encoding="bravyi-kitaev-tree").run(hamiltonian)
+    qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
 
     # Build reference independently: blocked InteractionOperator → FermionOp → BK-tree
     iop = hamiltonian_to_interaction_operator(hamiltonian)
@@ -116,104 +129,33 @@ def test_openfermion_bk_tree_encoding():
 
 
 # -------------------------------------------------------------------------------------
-# Non-standard encodings (SCBK)
+# Error handling
 # -------------------------------------------------------------------------------------
 
 
-def test_openfermion_scbk_encoding():
-    """SCBK encoding produces a QubitHamiltonian with correct Pauli terms."""
+def test_openfermion_unsupported_mapping_raises():
+    """A mapping with an unsupported name raises NotImplementedError."""
     hamiltonian = create_nontrivial_test_hamiltonian()
+    n = _num_spin_orbitals(hamiltonian)
+    mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name="invalid-encoding")
 
-    mapper = create(
-        "qubit_mapper",
-        "openfermion",
-        encoding="symmetry-conserving-bravyi-kitaev",
-    )
-    symmetries = Symmetries(n_alpha=1, n_beta=1)
-    qh = mapper.run(hamiltonian, symmetries)
-
-    # Reference: apply SCBK directly
-    fop = hamiltonian_to_fermion_operator(hamiltonian)
-    ref_qop = of.transforms.symmetry_conserving_bravyi_kitaev(fop, 4, 2)
-    ref_qop.compress()
-
-    # Remove core energy from reference (same convention as plugin)
-    core_energy = hamiltonian.get_core_energy()
-    if abs(core_energy) > 1e-15:
-        ref_qop -= core_energy * of.QubitOperator(())
-        ref_qop.compress()
-
-    ref_qh = qubit_operator_to_qubit_hamiltonian(ref_qop, encoding="symmetry-conserving-bravyi-kitaev")
-
-    _assert_pauli_ops_equal(qh, ref_qh)
+    mapper = create("qubit_mapper", "openfermion")
+    with pytest.raises(NotImplementedError, match="invalid-encoding"):
+        mapper.run(hamiltonian, mapping)
 
 
-def test_openfermion_scbk_requires_symmetries():
-    """SCBK encoding raises ValueError when symmetries are not provided."""
+def test_symmetries_ignored_for_standard_encodings():
+    """Symmetries parameter is accepted but ignored for standard encodings."""
     hamiltonian = create_nontrivial_test_hamiltonian()
-
-    mapper = create(
-        "qubit_mapper",
-        "openfermion",
-        encoding="symmetry-conserving-bravyi-kitaev",
-    )
-    with pytest.raises(ValueError, match="Symmetries"):
-        mapper.run(hamiltonian)
-
-
-def test_openfermion_scbk_from_wavefunction():
-    """SCBK encoding works with Symmetries constructed from a Wavefunction."""
-    hamiltonian = create_nontrivial_test_hamiltonian()
-
-    wfn = create_test_wavefunction(num_orbitals=2)
-    symmetries = Symmetries.from_wavefunction(wfn)
-
-    mapper = create(
-        "qubit_mapper",
-        "openfermion",
-        encoding="symmetry-conserving-bravyi-kitaev",
-    )
-    qh = mapper.run(hamiltonian, symmetries)
-
-    # Should produce a valid QubitHamiltonian with reduced qubit count
-    assert qh.num_qubits == 2  # 4 spin-orbitals - 2 from SCBK
-
-
-def test_openfermion_scbk_from_ansatz():
-    """SCBK encoding works with Symmetries constructed from an Ansatz."""
-    hamiltonian = create_nontrivial_test_hamiltonian()
-
-    ansatz = create_test_ansatz(num_orbitals=2)
-    symmetries = Symmetries.from_ansatz(ansatz)
-
-    mapper = create(
-        "qubit_mapper",
-        "openfermion",
-        encoding="symmetry-conserving-bravyi-kitaev",
-    )
-    qh = mapper.run(hamiltonian, symmetries)
-
-    # Should produce a valid QubitHamiltonian with reduced qubit count
-    assert qh.num_qubits == 2  # 4 spin-orbitals - 2 from SCBK
-
-
-def test_openfermion_scbk_symmetries_ignored_for_jw():
-    """Symmetries parameter is accepted but ignored for non-SCBK encodings."""
-    hamiltonian = create_nontrivial_test_hamiltonian()
+    n = _num_spin_orbitals(hamiltonian)
+    mapping = MajoranaMapping.jordan_wigner(n)
     symmetries = Symmetries(n_alpha=1, n_beta=1)
 
     # Should work without error - symmetries is simply ignored
-    qh_with = create("qubit_mapper", "openfermion", encoding="jordan-wigner").run(hamiltonian, symmetries)
-    qh_without = create("qubit_mapper", "openfermion", encoding="jordan-wigner").run(hamiltonian)
+    qh_with = create("qubit_mapper", "openfermion").run(hamiltonian, mapping, symmetries)
+    qh_without = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
 
     _assert_pauli_ops_equal(qh_with, qh_without)
-
-
-def test_openfermion_invalid_encoding():
-    """An invalid encoding raises ValueError."""
-    mapper = create("qubit_mapper", "openfermion")
-    with pytest.raises(ValueError, match="out of allowed options"):
-        mapper.settings().set("encoding", "invalid-encoding")
 
 
 # -------------------------------------------------------------------------------------
@@ -330,16 +272,10 @@ def test_full_pipeline_round_trip():
 def test_openfermion_standard_sets_blocked_order(encoding):
     """Standard OpenFermion encodings set fermion_mode_order to BLOCKED."""
     hamiltonian = create_nontrivial_test_hamiltonian()
-    qh = create("qubit_mapper", "openfermion", encoding=encoding).run(hamiltonian)
+    n = _num_spin_orbitals(hamiltonian)
+    if encoding in _ENCODING_TO_MAPPING:
+        mapping = _ENCODING_TO_MAPPING[encoding](n)
+    else:
+        mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name=encoding)
+    qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
     assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
-
-
-def test_openfermion_scbk_sets_interleaved_order():
-    """SCBK encoding sets fermion_mode_order to INTERLEAVED."""
-    hamiltonian = create_nontrivial_test_hamiltonian()
-    symmetries = Symmetries(n_alpha=1, n_beta=1)
-    qh = create("qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev").run(
-        hamiltonian,
-        symmetries,
-    )
-    assert qh.fermion_mode_order == FermionModeOrder.INTERLEAVED
