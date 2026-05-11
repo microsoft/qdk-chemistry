@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 import qsharp
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper import PrepareSelectMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import PrepSelPrepMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitHamiltonian
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
@@ -60,14 +60,14 @@ class TestPrepareSelectMapper:
 
     def test_name_and_type(self):
         """Test that name and type_name return correct values."""
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         assert mapper.name() == "prepare_select"
         assert mapper.type_name() == "controlled_circuit_mapper"
 
     def test_basic_mapping_produces_circuit_with_factory(self):
         """Test that mapping produces a Circuit with both qsharp_op and qsharp_factory."""
         controlled_unitary = _build_controlled_unitary(["XX", "ZZ"], np.array([0.25, 0.5]))
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         circuit = mapper.run(controlled_unitary)
 
         assert isinstance(circuit, Circuit)
@@ -75,7 +75,7 @@ class TestPrepareSelectMapper:
         assert circuit._qsharp_factory is not None
 
     def test_rejects_non_block_encoding_container(self):
-        """Verify PrepareSelectMapper raises ValueError for non-BlockEncoding containers."""
+        """Verify PrepSelPrepMapper raises ValueError for non-BlockEncoding containers."""
 
         class MockContainer:
             """Mock container that is not a BlockEncodingContainer."""
@@ -87,16 +87,16 @@ class TestPrepareSelectMapper:
         unitary_rep = UnitaryRepresentation(container=MockContainer())
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
 
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(controlled_unitary)
 
     def test_rejects_multiple_control_qubits(self):
-        """Verify PrepareSelectMapper raises ValueError for multiple control qubits."""
+        """Verify PrepSelPrepMapper raises ValueError for multiple control qubits."""
         controlled_unitary = _build_controlled_unitary(["XX", "ZZ"], np.array([0.25, 0.5]))
         controlled_unitary = ControlledUnitary(unitary=controlled_unitary.unitary, control_indices=[0, 1])
 
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         with pytest.raises(ValueError, match="single control qubit"):
             mapper.run(controlled_unitary)
 
@@ -132,7 +132,7 @@ class TestPrepareSelectMapper:
         num_target = hamiltonian.num_qubits
 
         controlled_unitary = _build_controlled_unitary(pauli_strings, coefficients)
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         circuit = mapper.run(controlled_unitary)
         qc = circuit.get_qiskit_circuit()
         full_u = Operator(qc).data
@@ -162,7 +162,7 @@ class TestPrepareSelectMapper:
         coeffs = np.array([0.5, 0.3])
         controlled_unitary = _build_controlled_unitary(["X", "Z"], coeffs, quantum_walk=True)
 
-        mapper = PrepareSelectMapper()
+        mapper = PrepSelPrepMapper()
         circuit = mapper.run(controlled_unitary)
         full_u = Operator(circuit.get_qiskit_circuit()).data
 
@@ -196,19 +196,19 @@ class TestPrepareSelectMapper:
         state after applying Reflect.
         """
         # Ensure Q# sources are loaded
-        _ = QSHARP_UTILS.PrepareSelect.Reflect
+        _ = QSHARP_UTILS.PrepSelPrep.Reflect
 
         # Allocate a qubit (persists across eval calls in the interpreter session)
         qsharp.eval("use q = Qubit();")
 
         # R|0> = +|0>
-        qsharp.eval("QDKChemistry.Utils.PrepareSelect.Reflect([q]);")
+        qsharp.eval("QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
         state = qsharp.dump_machine()
         assert state.check_eq([1.0, 0.0]), f"R|0> should be |0>, got {state.as_dense_state()}"
 
         # State is |0> after Reflect(|0>). Apply X to get |1>, then Reflect.
         # R|1> = -|1>
-        qsharp.eval("X(q); QDKChemistry.Utils.PrepareSelect.Reflect([q]);")
+        qsharp.eval("X(q); QDKChemistry.Utils.PrepSelPrep.Reflect([q]);")
         state = qsharp.dump_machine()
         assert state.check_eq([0.0, -1.0]), f"R|1> should be -|1>, got {state.as_dense_state()}"
 

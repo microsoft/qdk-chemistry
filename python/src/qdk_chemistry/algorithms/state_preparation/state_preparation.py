@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import numpy as np
-
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
@@ -64,38 +62,6 @@ class StatePreparation(Algorithm):
 
         """
         return super().run(wavefunction)
-
-    def prepare_from_statevector(
-        self,
-        statevector: np.ndarray,
-        num_qubits: int,
-        qubit_indices: list[int],
-    ):
-        """Create a PREPARE circuit from a statevector and qubit layout.
-
-        Subclasses should override this to provide a concrete implementation.
-        The returned :class:`~qdk_chemistry.data.Circuit` wraps a Q# callable
-        with signature ``Qubit[] => Unit is Adj + Ctl`` that loads the
-        amplitudes into a qubit register.
-
-        Args:
-            statevector: A 1-D array of real amplitudes to load.
-            num_qubits: Number of qubits in the prepare register.
-            qubit_indices: Qubit indices for the prepare register.
-
-        Returns:
-            Circuit: A Circuit containing the Q# PREPARE operation and factory.
-
-        Raises:
-            NotImplementedError: If the subclass does not support statevector-based
-                preparation.
-
-        """
-        raise NotImplementedError(
-            f"{type(self).__name__} does not support prepare_from_statevector. "
-            "Use a state preparation algorithm that implements this method "
-            "(e.g., DensePureStatePreparation)."
-        )
 
 
 class StatePreparationFactory(AlgorithmFactory):

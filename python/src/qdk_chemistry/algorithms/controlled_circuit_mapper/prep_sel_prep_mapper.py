@@ -15,11 +15,11 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["PrepareSelectMapper", "PrepareSelectSettings"]
+__all__: list[str] = ["PrepSelPrepMapper", "PrepSelPrepSettings"]
 
 
-class PrepareSelectSettings(Settings):
-    """Settings for the PrepareSelectMapper.
+class PrepSelPrepSettings(Settings):
+    """Settings for the PrepSelPrepMapper.
 
     Attributes:
         prepare_mapper: Algorithm reference for the PREPARE oracle state preparation.
@@ -27,12 +27,12 @@ class PrepareSelectSettings(Settings):
             :class:`~qdk_chemistry.algorithms.state_preparation.StatePreparation`
             that implements ``prepare_from_statevector`` can be used.
         select_mapper: Algorithm reference for the SELECT oracle mapper.
-            Defaults to ``LCUSelectMapper``.
+            Defaults to ``MultiControlSelectMapper``.
 
     """
 
     def __init__(self):
-        """Initialize the settings for PrepareSelectMapper."""
+        """Initialize the settings for PrepSelPrepMapper."""
         super().__init__()
         self._set_default(
             "prepare_mapper",
@@ -42,11 +42,11 @@ class PrepareSelectSettings(Settings):
         self._set_default(
             "select_mapper",
             "algorithm_ref",
-            AlgorithmRef("select_mapper", "lcu_select"),
+            AlgorithmRef("select_mapper", "multi_control_select"),
         )
 
 
-class PrepareSelectMapper(ControlledCircuitMapper):
+class PrepSelPrepMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT pattern.
 
     Composes a controlled block encoding from two independent sub-algorithms:
@@ -81,9 +81,9 @@ class PrepareSelectMapper(ControlledCircuitMapper):
     """
 
     def __init__(self):
-        """Initialize the PrepareSelectMapper."""
+        """Initialize the PrepSelPrepMapper."""
         super().__init__()
-        self._settings = PrepareSelectSettings()
+        self._settings = PrepSelPrepSettings()
 
     def name(self) -> str:
         """Return the algorithm name.
@@ -112,9 +112,9 @@ class PrepareSelectMapper(ControlledCircuitMapper):
            to build a Q# callable that loads amplitudes into the ancilla register.
         2. **SELECT** — delegates to the nested ``select_mapper`` algorithm
            to build a Q# callable that applies controlled unitaries.
-        3. **Compose** — stitches PREPARE and SELECT into either a plain block
+        3. **Compose** — stitches controlled PREPARE-SELECT-PREPARE into either a plain block
            encoding or a quantum walk step (when ``reflect=True``), via the
-           Q# ``BlockEncoding`` / ``QuantumWalkStep`` operations.
+           Q# ``PrepSelPrep`` / ``QuantumWalkStep`` operations.
 
         Args:
             controlled_unitary: The controlled unitary containing the block-encoding
@@ -132,11 +132,11 @@ class PrepareSelectMapper(ControlledCircuitMapper):
         if not isinstance(unitary_container, BlockEncodingContainer):
             raise ValueError(
                 f"The {controlled_unitary.get_unitary_container_type()} container type is not supported. "
-                "PrepareSelectMapper only supports BlockEncodingContainer."
+                "PrepSelPrepMapper only supports BlockEncodingContainer."
             )
 
         if len(controlled_unitary.control_indices) != 1:
-            raise ValueError("PrepareSelectMapper currently only supports a single control qubit.")
+            raise ValueError("PrepSelPrepMapper currently only supports a single control qubit.")
 
         power: int = unitary_container.power
         prepare = unitary_container.prepare
@@ -170,18 +170,18 @@ class PrepareSelectMapper(ControlledCircuitMapper):
 
         if unitary_container.reflect:
             qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepareSelect.MakeQuantumWalkCircuit,
+                program=QSHARP_UTILS.PrepSelPrep.MakeQuantumWalkCircuit,
                 parameter=psp_parameters,
             )
-            qsharp_op = QSHARP_UTILS.PrepareSelect.MakeQuantumWalkOp(
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeQuantumWalkOp(
                 prepare_op, select_op, num_system, num_ancilla, power
             )
         else:
             qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepareSelect.MakePrepareSelectCircuit,
+                program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,
                 parameter=psp_parameters,
             )
-            qsharp_op = QSHARP_UTILS.PrepareSelect.MakePrepareSelectPrepareOp(
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
                 prepare_op, select_op, num_system, num_ancilla, power
             )
 

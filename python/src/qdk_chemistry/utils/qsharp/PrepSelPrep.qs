@@ -8,7 +8,7 @@
 /// block encodings and quantum walk steps.  They are agnostic to the
 /// concrete decomposition (LCU, double-factorized, etc.) — callers supply
 /// the two callables and this module handles the stitching.
-namespace QDKChemistry.Utils.PrepareSelect {
+namespace QDKChemistry.Utils.PrepSelPrep {
 
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
@@ -41,7 +41,7 @@ namespace QDKChemistry.Utils.PrepareSelect {
     /// $$
     ///     B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
     /// $$
-    operation PrepareSelectPrepare(
+    operation PrepSelPrep(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         targetRegister : Qubit[],
@@ -75,12 +75,12 @@ namespace QDKChemistry.Utils.PrepareSelect {
         ancillaRegister : Qubit[],
     ) : Unit is Adj + Ctl {
         body ... {
-            PrepareSelectPrepare(prepareOp, selectOp, targetRegister, ancillaRegister);
+            PrepSelPrep(prepareOp, selectOp, targetRegister, ancillaRegister);
             Reflect(ancillaRegister);
         }
         adjoint auto;
         controlled (ctls, ...) {
-            Controlled PrepareSelectPrepare(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
+            Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
             Reflect(ancillaRegister);
         }
         controlled adjoint auto;
@@ -91,7 +91,7 @@ namespace QDKChemistry.Utils.PrepareSelect {
     ///
     /// The caller passes system + ancilla qubits together since the ancilla
     /// becomes entangled with the control qubit during the controlled operation.
-    operation MakePrepareSelectPrepareOp(
+    operation MakePrepSelPrepOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -101,7 +101,7 @@ namespace QDKChemistry.Utils.PrepareSelect {
         (control, allQubits) => {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
-            Controlled PrepareSelectPrepare([control], (prepareOp, selectOp, systems, ancilla));
+            Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
         }
     }
 
@@ -126,8 +126,8 @@ namespace QDKChemistry.Utils.PrepareSelect {
         }
     }
 
-    /// Circuit entry point for prepare-select (allocates qubits).
-    operation MakePrepareSelectCircuit(
+    /// Circuit entry point for prep-sel-prep (allocates qubits).
+    operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -136,7 +136,7 @@ namespace QDKChemistry.Utils.PrepareSelect {
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakePrepareSelectPrepareOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakePrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 
