@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -x
 
 MARCH=${1:-x86-64-v3}
 PYTHON_VERSION=${2:-3.11}
@@ -21,7 +22,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
     apt-get update -q
-    apt install -q libc-bin
+    apt install -y -q libc-bin
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
@@ -119,16 +120,14 @@ export PATH="$PYENV_ROOT/shims:$PATH"
 python3 --version
 
 # Update pip and install build tools
-python3 -m pip install --upgrade pip
-
-PIP_STRING="fonttools>=4.61.0 urllib3>=2.6.0"
+pip3 install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-if [ "${MAC_BUILD}" == "OFF" ]; then
-    PIP_STRING+=" opentelemetry-api==1.23.0 opentelemetry-sdk==1.23.0 opentelemetry-exporter-otlp-proto-grpc==1.23.0"
+if [ "${MAC_BUILD}" == "ON" ]; then
+    pip3 install -r .pipelines/requirements-macos.txt
+else
+    pip3 install -r .pipelines/requirements-linux.txt
 fi
-
-python3 -m pip install auditwheel build ${PIP_STRING}
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
@@ -216,7 +215,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
     echo "Repairing wheel for macOS..."
-    pip install delocate==0.13.0
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
     delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl

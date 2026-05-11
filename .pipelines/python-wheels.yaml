@@ -146,7 +146,7 @@ extends:
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
@@ -156,7 +156,7 @@ extends:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
 
@@ -168,7 +168,7 @@ extends:
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
@@ -178,7 +178,7 @@ extends:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
 
