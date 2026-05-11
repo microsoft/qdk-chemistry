@@ -53,12 +53,23 @@ class OpenFermionQubitMapper(QubitMapper):
     The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
     passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
     corresponding OpenFermion transform. Custom (unnamed) mappings are not
-    supported — use the QDK variant instead.
+    supported -- use the QDK variant instead.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, separate alpha/beta spin channels are handled
+    via ``hamiltonian_to_interaction_operator``.
 
     Supported ``mapping.name`` values:
         - ``"jordan-wigner"``
         - ``"bravyi-kitaev"``
         - ``"bravyi-kitaev-tree"``
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import create
+        >>> from qdk_chemistry.data import MajoranaMapping
+        >>> mapper = create("qubit_mapper", "openfermion")
+        >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+        >>> qh = mapper.run(hamiltonian, mapping)
 
     """
 
@@ -76,10 +87,12 @@ class OpenFermionQubitMapper(QubitMapper):
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
+        Supports both restricted and unrestricted (UHF) Hamiltonians.
+
         Args:
-            hamiltonian: The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
             mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
-            symmetries: Symmetry information. Required for SCBK encoding.
+            symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.

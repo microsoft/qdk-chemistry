@@ -52,12 +52,23 @@ class QiskitQubitMapper(QubitMapper):
     The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
     passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
     corresponding Qiskit Nature mapper. Custom (unnamed) mappings are not
-    supported — use the QDK variant instead.
+    supported -- use the QDK variant instead.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, separate alpha and beta one-body and two-body
+    integrals are forwarded to Qiskit Nature's ``ElectronicEnergy``.
 
     Supported ``mapping.name`` values:
         - ``"jordan-wigner"``
         - ``"bravyi-kitaev"``
         - ``"parity"``
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import create
+        >>> from qdk_chemistry.data import MajoranaMapping
+        >>> mapper = create("qubit_mapper", "qiskit")
+        >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+        >>> qh = mapper.run(hamiltonian, mapping)
 
     """
 
@@ -77,8 +88,12 @@ class QiskitQubitMapper(QubitMapper):
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
+        Supports both restricted and unrestricted (UHF) Hamiltonians. For
+        unrestricted systems, separate alpha/beta integrals are passed to
+        Qiskit Nature's ``ElectronicEnergy.from_raw_integrals``.
+
         Args:
-            hamiltonian: The fermionic Hamiltonian.
+            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
             mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
             symmetries: Optional symmetry information. Not used by this implementation.
 

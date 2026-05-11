@@ -62,8 +62,12 @@ class QdkQubitMapper(QubitMapper):
 
     This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian.
     The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
-    passed to :meth:`run`. Any valid MajoranaMapping works — built-in
+    passed to :meth:`run`. Any valid MajoranaMapping works -- built-in
     (Jordan-Wigner, Bravyi-Kitaev, parity) or custom.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, the engine handles all four spin-channel ERI
+    blocks (aa, ab, ba, bb) independently.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
