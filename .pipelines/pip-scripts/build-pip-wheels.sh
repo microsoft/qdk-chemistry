@@ -120,6 +120,12 @@ rm -f pyenv.zip
 export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
 export PATH="$PYENV_ROOT/shims:$PATH"
 
+if [ "$MAC_BUILD" == "ON" ]; then
+    pip install -r .pipelines/pip-scripts/requirements_macos.txt --index-url $(PIP_INDEX_URL)
+elif [ "$MAC_BUILD" == "OFF" ]; then
+    pip install -r .pipelines/pip-scripts/requirements_linux.txt --index-url $(PIP_INDEX_URL)
+fi
+
 which python3
 which python
 python3 --version

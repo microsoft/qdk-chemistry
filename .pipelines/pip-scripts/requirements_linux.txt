@@ -1,0 +1,9 @@
+artifacts-keyring
+auditwheel
+build
+fonttools>=4.61.0
+keyring
+opentelemetry-api==1.23.0
+opentelemetry-exporter-otlp-proto-grpc==1.23.0
+opentelemetry-sdk==1.23.0
+urllib3>=2.6.0

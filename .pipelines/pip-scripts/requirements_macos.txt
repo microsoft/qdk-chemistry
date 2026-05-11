@@ -1,0 +1,8 @@
+artifacts-keyring
+auditwheel
+build
+delocate>=0.13.0
+fonttools>=4.61.0
+keyring
+opentelemetry-exporter-otlp-proto-grpc==1.23.0
+urllib3>=2.6.0
