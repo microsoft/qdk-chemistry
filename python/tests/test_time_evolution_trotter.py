@@ -104,6 +104,24 @@ class TestTrotter:
             rtol=float_comparison_relative_tolerance,
         )
 
+    def test_single_step_no_merge_without_partition(self):
+        """Test that without term_partition, duplicate terms are not merged."""
+        pauli_strings = ["XII", "IXI", "XII"]
+        coefficients = [1.0, 1.0, 1.0]
+
+        hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+        builder = Trotter(num_divisions=1, time=1.0)
+        unitary = builder.run(hamiltonian)
+
+        assert isinstance(unitary, UnitaryRepresentation)
+        container = unitary.get_container()
+
+        assert isinstance(container, PauliProductFormulaContainer)
+        assert container.num_qubits == 3
+        assert container.step_reps == 1
+        # Without a partition, each Pauli term is its own group — no merging.
+        assert len(container.step_terms) == 3
+
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
         builder = Trotter()
@@ -483,8 +501,11 @@ class TestTrotter:
 
         terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
 
-        assert len(terms) == 1
-        assert terms[0].pauli_term == {0: "Z"}
+        # All terms should be Z only (X filtered out).
+        # After Suzuki recursion and schedule reduction, the total rotation
+        # angle across all Z terms must equal coeff * time = 1.0.
+        assert all(t.pauli_term == {0: "Z"} for t in terms)
+        assert abs(sum(t.angle for t in terms) - 1.0) < 1e-12
 
     def test_trotter_x_z_example_higher_order(self):
         """Correctness check for fourth-order Trotter decomposition."""
@@ -834,3 +855,23 @@ class TestTrotterAccuracyAware:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+
+class TestNoPartitionFallback:
+    """Tests for Trotter behavior when no term_partition is present."""
+
+    def test_no_partition_treats_each_term_individually(self):
+        """Test that without term_partition, each Pauli term is its own group."""
+        pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
+        coefficients = [1.0] * 8
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+        )
+        t = 1.0
+        builder = Trotter(num_divisions=1, order=1, time=t)
+        terms = builder.run(hamiltonian).get_container().step_terms
+
+        for idx, term in enumerate(terms):
+            assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
+            assert term.angle == coefficients[idx] * t
