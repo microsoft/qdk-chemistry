@@ -36,6 +36,7 @@ class CircuitExecutor(Algorithm):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
+        **kwargs,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit and get measurement results.
 
@@ -43,6 +44,15 @@ class CircuitExecutor(Algorithm):
             circuit: The circuit that prepares the initial state.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
+            **kwargs: Backend-specific keyword arguments. The ``qiskit_aer_simulator``
+                backend accepts:
+
+                * **device_backend_name** (*str | None*) - Name of a fake device backend
+                  to use for noise modeling.
+                * **pre_transpilation_passes** (*list[str] | None*) - Pass names to apply
+                  before transpilation.
+                * **post_transpilation_passes** (*list[str] | None*) - Pass names to apply
+                  after transpilation.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.

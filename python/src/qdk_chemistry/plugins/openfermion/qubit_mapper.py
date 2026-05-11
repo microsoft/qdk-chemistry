@@ -1,8 +1,8 @@
 """OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.
 
 This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
-using different mapping strategies ("jordan-wigner", "bravyi-kitaev",
-"symmetry-conserving-bravyi-kitaev", and "bravyi-kitaev-tree").
+using different mapping strategies. The encoding is determined by the MajoranaMapping passed
+to :meth:`run`.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -20,93 +20,104 @@ import openfermion as of
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.openfermion.conversion import (
-    hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,
     qubit_operator_to_qubit_hamiltonian,
 )
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
+    from collections.abc import Callable
+
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 
-_VALID_ENCODINGS = [
-    "jordan-wigner",
-    "bravyi-kitaev",
-    "symmetry-conserving-bravyi-kitaev",
-    "bravyi-kitaev-tree",
-]
+_STANDARD_TRANSFORMS: dict[str, Callable[..., of.QubitOperator]] = {
+    "jordan-wigner": of.transforms.jordan_wigner,
+    "bravyi-kitaev": of.transforms.bravyi_kitaev,
+    "bravyi-kitaev-tree": of.transforms.bravyi_kitaev_tree,
+}
 
 
 class OpenFermionQubitMapperSettings(QubitMapperSettings):
-    """Settings configuration for an OpenFermionQubitMapper.
-
-    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
-
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
-        - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
-        - ``"bravyi-kitaev-tree"``
-
-    """
+    """Settings configuration for an OpenFermionQubitMapper."""
 
     def __init__(self):
         """Initialize OpenFermionQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__(valid_encodings=_VALID_ENCODINGS)
+        super().__init__()
 
 
 class OpenFermionQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.
 
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
+    The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
+    passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
+    corresponding OpenFermion transform. Custom (unnamed) mappings and
+    tapering-based encodings (symmetry-conserving Bravyi-Kitaev, parity
+    two-qubit reduction) are not supported — use the QDK mapper instead.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, separate alpha/beta spin channels are handled
+    via ``hamiltonian_to_interaction_operator``.
+
+    Supported ``mapping.name`` values:
+        - ``"jordan-wigner"``
         - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
         - ``"bravyi-kitaev-tree"``
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import create
+        >>> from qdk_chemistry.data import MajoranaMapping
+        >>> mapper = create("qubit_mapper", "openfermion")
+        >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+        >>> qh = mapper.run(hamiltonian, mapping)
 
     """
 
-    def __init__(self, encoding: str = "jordan-wigner"):
-        """Initialize OpenFermionQubitMapper with a specific mapping strategy.
-
-        Args:
-            encoding: Qubit mapping strategy. See *Available encodings* above.
-
-        """
+    def __init__(self):
+        """Initialize OpenFermionQubitMapper."""
         Logger.trace_entering()
         super().__init__()
         self._settings = OpenFermionQubitMapperSettings()
-        self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
+    def _run_impl(
+        self,
+        hamiltonian: Hamiltonian,
+        mapping: MajoranaMapping,
+    ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
+        Supports both restricted and unrestricted (UHF) Hamiltonians.
+
         Args:
-            hamiltonian: The fermionic Hamiltonian.
-            symmetries: Symmetry information. Required for SCBK encoding.
+            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
+            mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
+        Raises:
+            NotImplementedError: If ``mapping.name`` is not a supported OpenFermion encoding.
+
         """
         Logger.trace_entering()
-        encoding = self._settings.get("encoding")
-        if encoding not in _VALID_ENCODINGS:
-            raise ValueError(
-                f"Encoding '{encoding}' is unknown for OpenFermionQubitMapper.\nPlease use one of: {_VALID_ENCODINGS}"
+        encoding_name = mapping.name
+
+        if encoding_name not in _STANDARD_TRANSFORMS:
+            raise NotImplementedError(
+                f"OpenFermion plugin does not support MajoranaMapping with name {encoding_name!r}. "
+                f"Supported names: {sorted(_STANDARD_TRANSFORMS.keys())}. "
+                f"For tapering-based encodings, use the QDK mapper with "
+                f"MajoranaMapping.symmetry_conserving_bravyi_kitaev() or "
+                f"MajoranaMapping.parity(n, symmetries)."
             )
 
-        Logger.debug(f"Mapping Hamiltonian with OpenFermion encoding: {encoding}")
+        qubit_op = self._map_standard(hamiltonian, encoding_name)
+        fermion_mode_order = FermionModeOrder.BLOCKED
 
-        if encoding == "symmetry-conserving-bravyi-kitaev":
-            qubit_op = self._map_scbk(hamiltonian, symmetries)
-            fermion_mode_order = FermionModeOrder.INTERLEAVED
-        else:
-            qubit_op = self._map_standard(hamiltonian, encoding)
-            fermion_mode_order = FermionModeOrder.BLOCKED
+        Logger.debug(f"Mapping Hamiltonian with OpenFermion encoding: {encoding_name}")
 
         qubit_op.compress()
 
@@ -119,7 +130,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
         return qubit_operator_to_qubit_hamiltonian(
             qubit_op,
-            encoding=encoding,
+            encoding=encoding_name,
             fermion_mode_order=fermion_mode_order,
         )
 
@@ -139,57 +150,8 @@ class OpenFermionQubitMapper(QubitMapper):
 
         """
         fermion_op = _build_blocked_fermion_operator(hamiltonian)
-
-        transform_map = {
-            "jordan-wigner": of.transforms.jordan_wigner,
-            "bravyi-kitaev": of.transforms.bravyi_kitaev,
-            "bravyi-kitaev-tree": of.transforms.bravyi_kitaev_tree,
-        }
-        transform = transform_map[encoding]
+        transform = _STANDARD_TRANSFORMS[encoding]
         return transform(fermion_op)
-
-    def _map_scbk(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None) -> of.QubitOperator:
-        """Apply symmetry-conserving Bravyi-Kitaev transformation.
-
-        This transform reduces the qubit count by 2 by exploiting particle number
-        and spin symmetry. The number of active electrons is read from the
-        ``symmetries`` parameter.
-
-        Args:
-            hamiltonian: The fermionic Hamiltonian.
-            symmetries: Symmetry information providing the active electron count.
-
-        Returns:
-            openfermion.QubitOperator: The mapped qubit operator.
-
-        Raises:
-            ValueError: If ``symmetries`` is not provided.
-
-        """
-        if symmetries is None:
-            raise ValueError(
-                "The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries "
-                "object specifying the number of active electrons.\n"
-                "Example:\n"
-                "  from qdk_chemistry.data import Symmetries\n"
-                "  symmetries = Symmetries(n_alpha=1, n_beta=1)\n"
-                "  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)"
-            )
-
-        fermion_op = hamiltonian_to_fermion_operator(hamiltonian)
-        n_active_electrons = symmetries.n_particles
-
-        # Number of spin-orbitals
-        h1_alpha, _ = hamiltonian.get_one_body_integrals()
-        n_spinorbitals = 2 * h1_alpha.shape[0]
-
-        Logger.debug(f"SCBK: n_spinorbitals={n_spinorbitals}, n_active_electrons={n_active_electrons}")
-
-        return of.transforms.symmetry_conserving_bravyi_kitaev(
-            fermion_op,
-            n_spinorbitals,
-            n_active_electrons,
-        )
 
     def name(self) -> str:
         """Return the algorithm name ``openfermion``."""

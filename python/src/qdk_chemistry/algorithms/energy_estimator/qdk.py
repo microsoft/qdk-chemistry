@@ -188,6 +188,9 @@ class QdkEnergyEstimator(EnergyEstimator):
         qubit_hamiltonian: QubitHamiltonian,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of the Hamiltonian.
 
@@ -196,6 +199,9 @@ class QdkEnergyEstimator(EnergyEstimator):
             qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
+            device_backend_name: Optional device backend name string to pass to the circuit executor.
+            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
+            post_transpilation_passes: Optional list of pass names to apply after transpilation.
 
         Returns:
             tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:
@@ -236,6 +242,9 @@ class QdkEnergyEstimator(EnergyEstimator):
             circuit_executor=circuit_executor,
             shots_list=shots_list,
             noise_model=noise_model,
+            device_backend_name=device_backend_name,
+            pre_transpilation_passes=pre_transpilation_passes,
+            post_transpilation_passes=post_transpilation_passes,
         )
 
         return self._compute_energy_expectation_from_bitstrings(
@@ -369,6 +378,9 @@ class QdkEnergyEstimator(EnergyEstimator):
         circuit_executor: CircuitExecutor,
         shots_list: list[int],
         noise_model: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> list[dict[str, int]]:
         """Run the measurement circuits and return the bitstring counts.
 
@@ -377,6 +389,9 @@ class QdkEnergyEstimator(EnergyEstimator):
             circuit_executor: An instance of CircuitExecutor to run the circuits.
             shots_list: A list of shots allocated for each measurement circuit.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
+            device_backend_name: Optional device backend name string to pass to the circuit executor.
+            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
+            post_transpilation_passes: Optional list of pass names to apply after transpilation.
 
         Returns:
             A list of dictionaries containing the bitstring counts for each measurement circuit.
@@ -388,6 +403,9 @@ class QdkEnergyEstimator(EnergyEstimator):
                 circuit,
                 shots=shots,
                 noise=noise_model,
+                device_backend_name=device_backend_name,
+                pre_transpilation_passes=pre_transpilation_passes,
+                post_transpilation_passes=post_transpilation_passes,
             )
             all_bitstring_counts.append(result.bitstring_counts if result and result.bitstring_counts else {})
         return all_bitstring_counts
@@ -399,6 +417,9 @@ class QdkEnergyEstimator(EnergyEstimator):
         circuit_executor: CircuitExecutor,
         shots_list: list[int],
         noise_model: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> MeasurementData:
         """Get ``MeasurementData`` from running measurement circuits.
 
@@ -408,13 +429,22 @@ class QdkEnergyEstimator(EnergyEstimator):
             circuit_executor: An instance of ``CircuitExecutor`` to run the circuits.
             shots_list: A list of shots allocated for each measurement circuit.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
+            device_backend_name: Optional device backend name string to pass to the circuit executor.
+            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
+            post_transpilation_passes: Optional list of pass names to apply after transpilation.
 
         Returns:
             MeasurementData: Measurement counts paired with their corresponding ``QubitHamiltonian`` objects.
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(
-            measurement_circuits, circuit_executor, shots_list, noise_model
+            measurement_circuits,
+            circuit_executor,
+            shots_list,
+            noise_model,
+            device_backend_name=device_backend_name,
+            pre_transpilation_passes=pre_transpilation_passes,
+            post_transpilation_passes=post_transpilation_passes,
         )
         return MeasurementData(
             bitstring_counts=counts,

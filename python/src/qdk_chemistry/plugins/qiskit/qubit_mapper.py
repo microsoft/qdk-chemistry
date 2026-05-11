@@ -25,90 +25,117 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Symmetries
+    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
+_SUPPORTED_ENCODINGS: dict[str, type] = {
+    "jordan-wigner": JordanWignerMapper,
+    "bravyi-kitaev": BravyiKitaevMapper,
+    "parity": ParityMapper,
+}
+
 
 class QiskitQubitMapperSettings(QubitMapperSettings):
-    """Settings configuration for a QiskitQubitMapper.
-
-    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
-
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
-        - ``"bravyi-kitaev"``
-        - ``"parity"``
-
-    """
+    """Settings configuration for a QiskitQubitMapper."""
 
     def __init__(self):
         """Initialize QiskitQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__(valid_encodings=["jordan-wigner", "bravyi-kitaev", "parity"])
+        super().__init__()
 
 
 class QiskitQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
 
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
+    The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
+    passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
+    corresponding Qiskit Nature mapper. Custom (unnamed) mappings are not
+    supported -- use the QDK variant instead.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, separate alpha and beta one-body and two-body
+    integrals are forwarded to Qiskit Nature's ``ElectronicEnergy``.
+
+    Supported ``mapping.name`` values:
+        - ``"jordan-wigner"``
         - ``"bravyi-kitaev"``
         - ``"parity"``
 
+    Examples:
+        >>> from qdk_chemistry.algorithms import create
+        >>> from qdk_chemistry.data import MajoranaMapping
+        >>> mapper = create("qubit_mapper", "qiskit")
+        >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+        >>> qh = mapper.run(hamiltonian, mapping)
+
     """
 
-    QubitMappers: ClassVar = {
-        "bravyi-kitaev": BravyiKitaevMapper,
-        "jordan-wigner": JordanWignerMapper,
-        "parity": ParityMapper,
-    }
+    QubitMappers: ClassVar = _SUPPORTED_ENCODINGS
 
-    def __init__(self, encoding: str = "jordan-wigner"):
-        """Initialize QiskitQubitMapper with a specific mapping strategy.
-
-        Args:
-            encoding (str): Qubit mapping strategy to use ("jordan-wigner", "bravyi-kitaev", or "parity").
-                Default: "jordan-wigner".
-
-        """
+    def __init__(self):
+        """Initialize QiskitQubitMapper."""
         Logger.trace_entering()
         super().__init__()
         self._settings = QiskitQubitMapperSettings()
-        self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:  # noqa: ARG002
+    def _run_impl(
+        self,
+        hamiltonian: Hamiltonian,
+        mapping: MajoranaMapping,
+    ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
+        Supports both restricted and unrestricted (UHF) Hamiltonians. For
+        unrestricted systems, separate alpha/beta integrals are passed to
+        Qiskit Nature's ``ElectronicEnergy.from_raw_integrals``.
+
         Args:
-            hamiltonian: The fermionic Hamiltonian.
-            symmetries: Optional symmetry information. Not used by this implementation.
+            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
+            mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
+        Raises:
+            NotImplementedError: If ``mapping.name`` is not a supported Qiskit encoding.
+
         """
         Logger.trace_entering()
-        encoding = self._settings.get("encoding")
-        if encoding not in self.QubitMappers:
-            raise ValueError(
-                f"Encoding {encoding} is unknown for QiskitQubitMapper.\n"
-                f"Please use one of the following options: {self.QubitMappers.keys()}"
+        encoding_name = mapping.name
+
+        if encoding_name not in _SUPPORTED_ENCODINGS:
+            raise NotImplementedError(
+                f"Qiskit plugin does not support MajoranaMapping with name {encoding_name!r}. "
+                f"Supported names: {sorted(_SUPPORTED_ENCODINGS.keys())}. "
+                f"Use the QDK variant for custom mappings."
             )
 
-        (h1_a, _) = hamiltonian.get_one_body_integrals()
-        (h2_aa, _, _) = hamiltonian.get_two_body_integrals()
+        h1_a, h1_b = hamiltonian.get_one_body_integrals()
+        h2_aa, h2_ab, h2_bb = hamiltonian.get_two_body_integrals()
         num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
-        electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
-            h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
-        )
+        is_restricted = hamiltonian.get_orbitals().is_restricted()
+
+        if is_restricted:
+            electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
+                h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
+            )
+        else:
+            electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
+                h1_a=h1_a,
+                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h1_b=h1_b,
+                h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h2_ba=h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+            )
+
         fermionic_op = electronic_hamiltonian.second_q_op()
-        qubit_mapper = self.QubitMappers[encoding]()
+        qubit_mapper = _SUPPORTED_ENCODINGS[encoding_name]()
         qubit_op = qubit_mapper.map(fermionic_op)
         return QubitHamiltonian(
             pauli_strings=qubit_op.paulis.to_labels(),
             coefficients=qubit_op.coeffs,
-            encoding=encoding,
+            encoding=encoding_name,
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
 

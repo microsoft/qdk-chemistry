@@ -54,6 +54,9 @@ class EnergyEstimator(Algorithm):
         qubit_hamiltonian: QubitHamiltonian,
         total_shots: int,
         noise_model: QuantumErrorProfile | None = None,
+        device_backend_name: str | None = None,
+        pre_transpilation_passes: list[str] | None = None,
+        post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of the Hamiltonian.
 
@@ -65,6 +68,9 @@ class EnergyEstimator(Algorithm):
             qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
             total_shots: Total number of shots to allocate across the observable terms.
             noise_model: Optional noise model to simulate noise in the quantum circuit.
+            device_backend_name: Optional device backend name string to pass to the circuit executor.
+            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
+            post_transpilation_passes: Optional list of pass names to apply after transpilation.
 
         Returns:
             tuple[EnergyExpectationResult, MeasurementData]: Tuple containing:

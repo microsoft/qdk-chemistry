@@ -111,6 +111,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "qiskit_ibm_runtime",
     "openfermion",
     "cirq",
     "cirq_core",

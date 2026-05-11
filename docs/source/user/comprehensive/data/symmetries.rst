@@ -8,7 +8,7 @@ Overview
 --------
 
 Many quantum algorithms can reduce circuit depth, qubit count, or classical post-processing cost when the symmetries of the target quantum state are known in advance.
-The :class:`~qdk_chemistry.data.Symmetries` class encapsulates this symmetry information so that it can be passed to any algorithm that exploits it, such as the :ref:`symmetry-conserving Bravyi-Kitaev <encoding-scbk>` qubit mapping.
+The :class:`~qdk_chemistry.data.Symmetries` class encapsulates this symmetry information so that it can be passed to encoding factories like :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev` for :ref:`symmetry-conserving Bravyi-Kitaev <encoding-scbk>` qubit tapering.
 
 
 Conserved quantum numbers
@@ -98,5 +98,6 @@ Related classes
 Further reading
 ---------------
 
-- :doc:`QubitMapper <../algorithms/qubit_mapper>`: Fermion-to-qubit mapping algorithms that consume ``Symmetries``
+- :doc:`QubitMapper <../algorithms/qubit_mapper>`: Fermion-to-qubit mapping algorithms
+- :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev`: Encoding factory that consumes ``Symmetries``
 - :doc:`Design principles <../design/index>`: Data class design principles in QDK/Chemistry
