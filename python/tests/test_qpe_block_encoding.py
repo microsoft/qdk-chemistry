@@ -1,4 +1,4 @@
-"""Tests for QPE with block encoding unitary builder."""
+"""Integration tests for QPE using the LCU block encoding unitary builder."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -7,141 +7,15 @@
 
 import numpy as np
 
-from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.controlled_circuit_mapper import BlockEncodingMapper
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import BlockEncodingBuilder
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
 )
-
-
-class TestLCUBuilder:
-    """Tests for the block encoding builder algorithm."""
-
-    def test_basic_construction(self):
-        """Test that the block encoding builder produces a BlockEncodingContainer from a simple Hamiltonian."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        builder = BlockEncodingBuilder()
-        result = builder.run(hamiltonian)
-
-        container = result.get_container()
-        assert isinstance(container, BlockEncodingContainer)
-        assert container.type == "block_encoding"
-        assert container.num_qubits == 3  # 2 system + 1 select
-        assert len(container.select.controlled_operations) == 2
-        assert all(s in (1, -1) for s in container.select.phases)
-
-    def test_num_select_qubits(self):
-        """Test correct computation of select qubit count."""
-        # 2 terms -> 1 select qubit
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        builder = BlockEncodingBuilder()
-        result = builder.run(hamiltonian)
-        assert result.get_container().prepare.num_prepare_qubits == 1
-
-        # 3 terms -> 2 select qubits (ceil(log2(3)) = 2)
-        hamiltonian3 = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ", "XZ"],
-            coefficients=np.array([0.25, 0.5, 0.1]),
-        )
-        builder3 = BlockEncodingBuilder()
-        result3 = builder3.run(hamiltonian3)
-        assert result3.get_container().prepare.num_prepare_qubits == 2
-
-    def test_lcu_builder_registered_in_registry(self):
-        """Verify block encoding builder and mapper are accessible via the registry."""
-        # Block encoding builder should be registered
-        builder = registry.create("hamiltonian_unitary_builder", "block_encoding")
-        assert isinstance(builder, BlockEncodingBuilder)
-        assert builder.name() == "block_encoding"
-
-        # Block encoding circuit mapper should be registered
-        mapper = registry.create("controlled_circuit_mapper", "block_encoding")
-        assert isinstance(mapper, BlockEncodingMapper)
-        assert mapper.name() == "block_encoding"
-
-
-class TestBlockEncodingMapper:
-    """Tests for the block encoding circuit mapper algorithm."""
-
-    def test_basic_mapping(self):
-        """Test basic mapping of ControlledUnitary with BlockEncodingContainer to Circuit."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ"],
-            coefficients=np.array([0.25, 0.5]),
-        )
-        builder = BlockEncodingBuilder()
-        unitary_rep = builder.run(hamiltonian)
-
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        mapper = BlockEncodingMapper()
-        circuit = mapper.run(controlled_unitary)
-
-        assert isinstance(circuit, Circuit)
-        assert circuit._qsharp_op is not None
-
-
-class TestBlockEncodingContainer:
-    """Test for the BlockEncodingContainer data class."""
-
-    def test_lcu_container_serialization_roundtrip(self):
-        """Test JSON serialization round-trip for BlockEncodingContainer."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ", "XZ"],
-            coefficients=np.array([0.25, -0.5, 0.3]),
-        )
-        builder = BlockEncodingBuilder()
-        result = builder.run(hamiltonian)
-        container = result.get_container()
-
-        # Round-trip through JSON
-        json_data = container.to_json()
-        restored = BlockEncodingContainer.from_json(json_data)
-
-        assert restored.type == container.type
-        assert restored.num_qubits == container.num_qubits
-        assert restored.prepare.num_prepare_qubits == container.prepare.num_prepare_qubits
-        assert np.array_equal(restored.select.phases, container.select.phases)
-        assert [op.operation for op in restored.select.controlled_operations] == [
-            op.operation for op in container.select.controlled_operations
-        ]
-
-    def test_unitary_representation_serialization_roundtrip(self):
-        """Test JSON serialization round-trip via UnitaryRepresentation dispatch."""
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=["XX", "ZZ", "XZ"],
-            coefficients=np.array([0.25, -0.5, 0.3]),
-        )
-        builder = BlockEncodingBuilder()
-        unitary_rep = builder.run(hamiltonian)
-
-        # Serialize through UnitaryRepresentation
-        json_data = unitary_rep.to_json()
-        assert json_data["container_type"] == "block_encoding"
-
-        # Deserialize through UnitaryRepresentation.from_json
-        restored_rep = UnitaryRepresentation.from_json(json_data)
-        restored_container = restored_rep.get_container()
-
-        assert isinstance(restored_container, BlockEncodingContainer)
-        assert restored_container.type == "block_encoding"
-        assert restored_container.num_qubits == unitary_rep.get_container().num_qubits
-        assert restored_container.prepare.num_prepare_qubits == unitary_rep.get_container().prepare.num_prepare_qubits
 
 
 class TestQPEWithLCU:
@@ -184,7 +58,7 @@ class TestQPEWithLCU:
         )
         iqpe.settings().set(
             "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "block_encoding"),
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select"),
         )
         iqpe.settings().set(
             "unitary_builder",
@@ -304,7 +178,7 @@ class TestQPEWithLCU:
         )
         iqpe.settings().set(
             "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "block_encoding"),
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select"),
         )
         iqpe.settings().set(
             "unitary_builder",

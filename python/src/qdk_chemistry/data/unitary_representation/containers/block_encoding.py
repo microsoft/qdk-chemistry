@@ -1,10 +1,11 @@
-"""QDK/Chemistry block encoding LCU (Linear Combination of Unitaries) container module."""
+"""QDK/Chemistry block encoding container module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -13,7 +14,27 @@ import numpy as np
 
 from .base import UnitaryContainer
 
-__all__ = ["BlockEncodingContainer", "ControlledOperation", "Prepare", "Select"]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Prepare", "Select"]
+
+
+class BlockEncodingContainer(UnitaryContainer):
+    """Abstract base class for block encoding containers."""
+
+    # Class attribute for filename validation
+    _data_type_name = "block_encoding_container"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
+
+    @property
+    @abstractmethod
+    def power(self) -> int:
+        """Number of times to apply the walk operator."""
+
+    @property
+    @abstractmethod
+    def reflect(self) -> bool:
+        """Whether to wrap with a quantum walk operator."""
 
 
 @dataclass(frozen=True)
@@ -27,13 +48,26 @@ class ControlledOperation:
     """Operation descriptor (e.g., a Pauli string like ``"XZI"``)."""
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the ControlledOperation to an HDF5 group."""
+        """Save the ControlledOperation to an HDF5 group.
+
+        Args:
+            group: HDF5 group to write attributes to.
+
+        """
         group.attrs["ctrl_state"] = self.ctrl_state
         group.attrs["operation"] = self.operation
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "ControlledOperation":
-        """Load a ControlledOperation from an HDF5 group."""
+        """Load a ControlledOperation from an HDF5 group.
+
+        Args:
+            group: HDF5 group to read attributes from.
+
+        Returns:
+            ControlledOperation: The deserialized instance.
+
+        """
         return cls(
             ctrl_state=int(group.attrs["ctrl_state"]),
             operation=str(group.attrs["operation"]),
@@ -54,14 +88,27 @@ class Prepare:
     """List of qubit indices for the prepare register."""
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the Prepare oracle to an HDF5 group."""
+        """Save the Prepare oracle to an HDF5 group.
+
+        Args:
+            group: HDF5 group to write the statevector dataset and attributes to.
+
+        """
         group.create_dataset("statevector", data=self.statevector)
         group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
         group.attrs["prepare_qubits"] = self.prepare_qubits
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "Prepare":
-        """Load a Prepare oracle from an HDF5 group."""
+        """Load a Prepare oracle from an HDF5 group.
+
+        Args:
+            group: HDF5 group to read the statevector dataset and attributes from.
+
+        Returns:
+            Prepare: The deserialized instance.
+
+        """
         return cls(
             statevector=np.array(group["statevector"]),
             num_prepare_qubits=int(group.attrs["num_prepare_qubits"]),
@@ -92,7 +139,12 @@ class Select:
     """List of qubit indices for the target (system) register."""
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the Select oracle to an HDF5 group."""
+        """Save the Select oracle to an HDF5 group.
+
+        Args:
+            group: HDF5 group to write phases, attributes, and controlled operations to.
+
+        """
         group.create_dataset("phases", data=self.phases)
         group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
         group.attrs["num_target_qubits"] = self.num_target_qubits
@@ -104,7 +156,15 @@ class Select:
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "Select":
-        """Load a Select oracle from an HDF5 group."""
+        """Load a Select oracle from an HDF5 group.
+
+        Args:
+            group: HDF5 group to read phases, attributes, and controlled operations from.
+
+        Returns:
+            Select: The deserialized instance.
+
+        """
         ops_group = group["controlled_operations"]
         controlled_ops = [
             ControlledOperation.from_hdf5(ops_group[key])
@@ -120,7 +180,7 @@ class Select:
         )
 
 
-class BlockEncodingContainer(UnitaryContainer):
+class LCUContainer(BlockEncodingContainer):
     r"""Container for a Linear Combination of Unitaries (LCU) decomposition.
 
     Stores the pre-computed PREPARE and SELECT sub-objects that define a
@@ -134,7 +194,7 @@ class BlockEncodingContainer(UnitaryContainer):
     """
 
     # Class attribute for filename validation
-    _data_type_name = "block_encoding_container"
+    _data_type_name = "lcu_container"
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
@@ -146,7 +206,7 @@ class BlockEncodingContainer(UnitaryContainer):
         power: int = 1,
         reflect: bool = False,
     ) -> None:
-        r"""Initialize a BlockEncodingContainer.
+        r"""Initialize an LCUContainer.
 
         Args:
             power: Number of times to apply the walk operator (for W^power in QPE).
@@ -157,25 +217,61 @@ class BlockEncodingContainer(UnitaryContainer):
                 encoding is used (use with Hadamard test).
 
         """
-        self.power = power
+        self._power = power
         self.prepare = prepare
         self.select = select
-        self.reflect = reflect
+        self._reflect = reflect
 
         super().__init__()
 
     @property
+    def power(self) -> int:
+        """Number of times to apply the walk operator.
+
+        Returns:
+            int: The power value.
+
+        """
+        return self._power
+
+    @property
+    def reflect(self) -> bool:
+        """Whether to wrap with a quantum walk operator.
+
+        Returns:
+            bool: True if reflection is enabled.
+
+        """
+        return self._reflect
+
+    @property
     def num_qubits(self) -> int:
-        """Total number of qubits (system + ancilla)."""
+        """Total number of qubits (system + ancilla).
+
+        Returns:
+            int: The combined qubit count.
+
+        """
         return self.select.num_target_qubits + self.prepare.num_prepare_qubits
 
     @property
     def type(self) -> str:
-        """Get the type of the unitary container."""
-        return "block_encoding"
+        """Get the type of the unitary container.
+
+        Returns:
+            str: The type string ``"lcu"``.
+
+        """
+        return "lcu"
 
     def to_json(self) -> dict[str, Any]:
-        """Save the BlockEncodingContainer to a JSON-serializable dictionary."""
+        """Save the LCUContainer to a JSON-serializable dictionary.
+
+        Returns:
+            dict[str, Any]: Dictionary representation including container type, power,
+                prepare, select, and reflect fields.
+
+        """
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
@@ -187,7 +283,12 @@ class BlockEncodingContainer(UnitaryContainer):
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the BlockEncodingContainer to an HDF5 group."""
+        """Save the LCUContainer to an HDF5 group.
+
+        Args:
+            group: HDF5 group to write container data to.
+
+        """
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
@@ -196,8 +297,16 @@ class BlockEncodingContainer(UnitaryContainer):
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> "BlockEncodingContainer":
-        """Create BlockEncodingContainer from a JSON dictionary."""
+    def from_json(cls, json_data: dict[str, Any]) -> "LCUContainer":
+        """Create an LCUContainer from a JSON dictionary.
+
+        Args:
+            json_data: Dictionary containing the serialized LCU data.
+
+        Returns:
+            LCUContainer: The deserialized instance.
+
+        """
         cls._validate_json_version(cls._serialization_version, json_data)
 
         prep_data = json_data["prepare"]
@@ -232,8 +341,16 @@ class BlockEncodingContainer(UnitaryContainer):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "BlockEncodingContainer":
-        """Load an instance from an HDF5 group."""
+    def from_hdf5(cls, group: h5py.Group) -> "LCUContainer":
+        """Load an LCUContainer from an HDF5 group.
+
+        Args:
+            group: HDF5 group to read container data from.
+
+        Returns:
+            LCUContainer: The deserialized instance.
+
+        """
         prepare = Prepare.from_hdf5(group["prepare"])
         select = Select.from_hdf5(group["select"])
         reflect = bool(group.attrs.get("reflect", False))
@@ -246,7 +363,12 @@ class BlockEncodingContainer(UnitaryContainer):
         )
 
     def get_summary(self) -> str:
-        """Get summary of the LCU container."""
+        """Get a human-readable summary of the LCU container.
+
+        Returns:
+            str: Multi-line summary describing power, prepare, select, and reflect settings.
+
+        """
         return (
             f"LCU Container:\n"
             f"  Power: {self.power}\n"

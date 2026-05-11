@@ -14,7 +14,7 @@ References:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import BlockEncodingBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -144,7 +144,7 @@ class IterativePhaseEstimation(PhaseEstimation):
                 evolution_time=evolution_time,
                 bits_msb_first=bits,
             )
-        if isinstance(self.unitary_builder, BlockEncodingBuilder):
+        if isinstance(self.unitary_builder, LCUBuilder):
             # For block-encoding builders (qubitization), use E = λ cos(2πφ).
             lambda_val = qubit_hamiltonian.schatten_norm
             return QpeResult.from_block_encoding_result(
