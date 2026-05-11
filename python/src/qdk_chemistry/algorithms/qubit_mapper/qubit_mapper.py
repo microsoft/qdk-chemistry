@@ -14,7 +14,7 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Settings
 
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
     from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__: list[str] = []
@@ -50,14 +50,12 @@ class QubitMapper(Algorithm):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-        symmetries: Symmetries | None = None,
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
             mapping: The Majorana-to-Pauli encoding to use.
-            symmetries: Optional symmetry information. Required by symmetry-exploiting algorithms.
 
         Returns:
            QubitHamiltonian: An instance of the QubitHamiltonian.

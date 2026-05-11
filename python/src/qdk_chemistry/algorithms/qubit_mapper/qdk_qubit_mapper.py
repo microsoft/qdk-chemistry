@@ -24,7 +24,7 @@ from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, Symmetries
+    from qdk_chemistry.data import Hamiltonian
     from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
@@ -108,14 +108,12 @@ class QdkQubitMapper(QubitMapper):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-        symmetries: Symmetries | None = None,  # noqa: ARG002
     ) -> QubitHamiltonian:
         """Transform a fermionic Hamiltonian to a qubit Hamiltonian.
 
         Args:
             hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.
             mapping: The Majorana-to-Pauli encoding.
-            symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.
@@ -166,9 +164,27 @@ class QdkQubitMapper(QubitMapper):
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
 
-        return QubitHamiltonian(
+        qh = QubitHamiltonian(
             pauli_strings=list(pauli_strings),
             coefficients=np.array(coefficients, dtype=complex),
-            encoding=mapping.name,
+            encoding=mapping.base_encoding,
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
+
+        # Apply post-mapping tapering if specified (e.g. SCBK)
+        if mapping.tapering is not None:
+            from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
+
+            qh = taper_qubits(qh, mapping.tapering.qubit_indices, mapping.tapering.eigenvalues)
+            qh = QubitHamiltonian(
+                pauli_strings=qh.pauli_strings,
+                coefficients=qh.coefficients,
+                encoding=mapping.name,
+                fermion_mode_order=qh.fermion_mode_order,
+                tapering=mapping.tapering,
+            )
+            Logger.debug(
+                f"Tapered {mapping.tapering.num_tapered} qubits → {qh.num_qubits} qubits"
+            )
+
+        return qh

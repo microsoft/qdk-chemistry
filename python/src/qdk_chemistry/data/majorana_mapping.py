@@ -20,9 +20,12 @@ import numpy as np
 
 from qdk_chemistry._core.data import MajoranaMapping as _CoreMajoranaMapping
 from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.tapering import TaperingSpecification
 
 if TYPE_CHECKING:
     import h5py
+
+    from qdk_chemistry.data import Symmetries
 
 __all__: list[str] = []
 
@@ -73,6 +76,7 @@ class MajoranaMapping(DataClass):
         table: list[str] | tuple[str, ...],
         name: str = "",
         phases: list[int] | tuple[int, ...] | None = None,
+        tapering: TaperingSpecification | None = None,
         *,
         _core: _CoreMajoranaMapping | None = None,
     ) -> None:
@@ -82,6 +86,7 @@ class MajoranaMapping(DataClass):
             table (list[str] | tuple[str, ...]): 2N Pauli strings in little-endian format (qubit 0 = rightmost char).
             name (str): Optional human-readable label for the encoding. Default ``""``.
             phases (list[int] | None): Optional 2N sign factors (+1 or -1) per Majorana operator. Default all +1.
+            tapering (TaperingSpecification | None): Optional post-mapping tapering specification.
 
         Raises:
             ValueError: If the table is invalid (wrong size, bad characters, or Clifford algebra violation).
@@ -94,10 +99,12 @@ class MajoranaMapping(DataClass):
 
         # Cache immutable properties from the core
         self._table = self._core.table
-        self._name = self._core.name
+        # Allow Python-level name override (e.g. SCBK wraps a BK core)
+        self._name = name if name else self._core.name
         self._num_modes = self._core.num_modes
         self._num_qubits = self._core.num_qubits
         self._phases = self._core.phases
+        self._tapering = tapering
 
         # Mark immutable
         super().__init__()
@@ -114,7 +121,15 @@ class MajoranaMapping(DataClass):
 
     @property
     def num_qubits(self) -> int:
-        """Number of qubits required by this encoding."""
+        """Effective number of qubits after any tapering.
+
+        For untapered encodings this equals the number of qubits in the Pauli
+        table.  For tapering-based encodings (e.g. symmetry-conserving
+        Bravyi-Kitaev, parity with two-qubit reduction) this reflects the
+        reduced qubit count that downstream consumers will see.
+        """
+        if self._tapering is not None:
+            return self._num_qubits - self._tapering.num_tapered
         return self._num_qubits
 
     @property
@@ -126,6 +141,23 @@ class MajoranaMapping(DataClass):
     def phases(self) -> tuple[int, ...]:
         """Tuple of per-entry sign factors (+1 or -1). All +1 for standard encodings."""
         return self._phases
+
+    @property
+    def tapering(self) -> TaperingSpecification | None:
+        """Post-mapping tapering specification, or None for untapered encodings."""
+        return self._tapering
+
+    @property
+    def base_encoding(self) -> str:
+        """The base encoding name used for the Majorana-to-Pauli table.
+
+        For standard encodings this equals :attr:`name`. For tapering-based
+        encodings like symmetry-conserving Bravyi-Kitaev, this returns the
+        underlying encoding (e.g. ``"bravyi-kitaev"``) while :attr:`name`
+        returns the final encoding label
+        (e.g. ``"symmetry-conserving-bravyi-kitaev"``).
+        """
+        return self._core.name
 
     @property
     def core(self) -> _CoreMajoranaMapping:
@@ -161,18 +193,79 @@ class MajoranaMapping(DataClass):
         return cls(table=[], _core=core)
 
     @classmethod
-    def parity(cls, num_modes: int) -> MajoranaMapping:
-        """Construct a parity encoding.
+    def parity(
+        cls,
+        num_modes: int,
+        symmetries: Symmetries | None = None,
+    ) -> MajoranaMapping:
+        """Construct a parity encoding, optionally with two-qubit reduction.
+
+        When ``symmetries`` is provided, the mapping includes a
+        :class:`~qdk_chemistry.data.TaperingSpecification` that tapers the two
+        Z₂ symmetry qubits (total electron-number parity and alpha-spin
+        parity), reducing the qubit count by 2.  This is the same two-qubit
+        reduction used by Qiskit Nature's ``ParityMapper(num_particles=...)``.
 
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals).
+            symmetries (Symmetries | None): If provided, enables two-qubit reduction for the target symmetry sector.
 
         Returns:
-            MajoranaMapping: Mapping with name ``"parity"``.
+            MajoranaMapping: Mapping with name ``"parity"`` (untapered) or ``"parity-2q-reduced"`` (tapered).
 
         """
         core = _CoreMajoranaMapping.parity(num_modes)
+        if symmetries is not None:
+            tapering = TaperingSpecification.parity_two_qubit_reduction(num_modes, symmetries)
+            return cls(table=[], name="parity-2q-reduced", tapering=tapering, _core=core)
         return cls(table=[], _core=core)
+
+    @classmethod
+    def symmetry_conserving_bravyi_kitaev(
+        cls,
+        num_modes: int,
+        symmetries: Symmetries,
+    ) -> MajoranaMapping:
+        """Construct a symmetry-conserving Bravyi-Kitaev (SCBK) encoding.
+
+        Combines the standard Bravyi-Kitaev mapping with a
+        :class:`~qdk_chemistry.data.TaperingSpecification` that removes the two Z₂
+        symmetry qubits (total electron-number parity and alpha-spin parity),
+        reducing the qubit count by 2.
+
+        When passed to :meth:`~qdk_chemistry.algorithms.QubitMapper.run`, the
+        mapper applies the BK mapping first, then tapers the symmetry qubits
+        automatically.
+
+        Args:
+            num_modes (int): Number of fermionic modes (spin-orbitals). Must be even and >= 4.
+            symmetries (Symmetries): Electron counts for the target symmetry sector.
+
+        Returns:
+            MajoranaMapping: BK mapping with SCBK tapering, name ``"symmetry-conserving-bravyi-kitaev"``.
+
+        Raises:
+            ValueError: If num_modes < 4 or odd, or electron counts are invalid.
+
+        Examples:
+            >>> from qdk_chemistry.data import MajoranaMapping, Symmetries
+            >>> mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+            >>> mapping.name
+            'symmetry-conserving-bravyi-kitaev'
+            >>> mapping.base_encoding
+            'bravyi-kitaev'
+            >>> mapping.tapering.num_tapered
+            2
+
+        """
+        tapering = TaperingSpecification.symmetry_conserving_bravyi_kitaev(num_modes, symmetries)
+        core = _CoreMajoranaMapping.bravyi_kitaev(num_modes)
+        return cls(
+            table=[],
+            name="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+            _core=core,
+        )
 
     @classmethod
     def from_mode_pairs(
@@ -233,6 +326,8 @@ class MajoranaMapping(DataClass):
         # Only include phases if any are non-default (-1)
         if any(p != 1 for p in self._phases):
             data["phases"] = list(self._phases)
+        if self._tapering is not None:
+            data["tapering"] = self._tapering.to_json()
         return self._add_json_version(data)
 
     @classmethod
@@ -247,10 +342,13 @@ class MajoranaMapping(DataClass):
 
         """
         cls._validate_json_version("0.1.0", json_data)
+        tapering_data = json_data.get("tapering")
+        tapering = TaperingSpecification.from_json(tapering_data) if tapering_data else None
         return cls(
             table=json_data["table"],
             name=json_data.get("name", ""),
             phases=json_data.get("phases"),
+            tapering=tapering,
         )
 
     def to_hdf5(self, group: h5py.Group) -> None:

@@ -563,10 +563,18 @@ class TestUnrestrictedHamiltonians:
                 for q in range(n):
                     for r in range(n):
                         for s in range(n):
-                            perms = frozenset({
-                                (p, q, r, s), (q, p, r, s), (p, q, s, r), (q, p, s, r),
-                                (r, s, p, q), (s, r, p, q), (r, s, q, p), (s, r, q, p),
-                            })
+                            perms = frozenset(
+                                {
+                                    (p, q, r, s),
+                                    (q, p, r, s),
+                                    (p, q, s, r),
+                                    (q, p, s, r),
+                                    (r, s, p, q),
+                                    (s, r, p, q),
+                                    (r, s, q, p),
+                                    (s, r, q, p),
+                                }
+                            )
                             canon = min(perms)
                             if canon in seen:
                                 continue
@@ -584,8 +592,15 @@ class TestUnrestrictedHamiltonians:
         fock_b = np.eye(0)
         return Hamiltonian(
             CanonicalFourCenterHamiltonianContainer(
-                h1_alpha, h1_beta, h2_aaaa, h2_aabb, h2_bbbb,
-                orbitals, 0.5, fock_a, fock_b,
+                h1_alpha,
+                h1_beta,
+                h2_aaaa,
+                h2_aabb,
+                h2_bbbb,
+                orbitals,
+                0.5,
+                fock_a,
+                fock_b,
             )
         )
 
@@ -619,12 +634,8 @@ class TestUnrestrictedHamiltonians:
             qh = mapper.run(h, mapping)
             eigenvalues[enc] = np.sort(np.linalg.eigvalsh(qh.to_matrix()))
 
-        np.testing.assert_allclose(
-            eigenvalues["jordan_wigner"], eigenvalues["bravyi_kitaev"], atol=1e-10
-        )
-        np.testing.assert_allclose(
-            eigenvalues["jordan_wigner"], eigenvalues["parity"], atol=1e-10
-        )
+        np.testing.assert_allclose(eigenvalues["jordan_wigner"], eigenvalues["bravyi_kitaev"], atol=1e-10)
+        np.testing.assert_allclose(eigenvalues["jordan_wigner"], eigenvalues["parity"], atol=1e-10)
 
     def test_unrestricted_equals_restricted_when_channels_match(self) -> None:
         """When alpha == beta integrals, UHF path should match restricted path."""
@@ -642,8 +653,15 @@ class TestUnrestrictedHamiltonians:
 
         h_unres = Hamiltonian(
             CanonicalFourCenterHamiltonianContainer(
-                h1_a, h1_a, h2_aaaa, h2_aaaa, h2_aaaa,
-                orbitals, h_res.get_core_energy(), np.eye(0), np.eye(0),
+                h1_a,
+                h1_a,
+                h2_aaaa,
+                h2_aaaa,
+                h2_aaaa,
+                orbitals,
+                h_res.get_core_energy(),
+                np.eye(0),
+                np.eye(0),
             )
         )
         assert not h_unres.get_orbitals().is_restricted()
@@ -965,3 +983,75 @@ class TestBravyiKitaevMapper:
             assert np.isclose(qdk_dict[pauli_str], qiskit_coeff, rtol=1e-10, atol=1e-14), (
                 f"Mismatch for {pauli_str}: QDK={qdk_dict[pauli_str]}, Qiskit={qiskit_coeff}"
             )
+
+
+# ─── SCBK one-step API ───────────────────────────────────────────────────
+
+
+class TestScbkOneStep:
+    """Tests for the one-step SCBK API via MajoranaMapping.symmetry_conserving_bravyi_kitaev."""
+
+    def test_scbk_produces_reduced_qubit_count(self) -> None:
+        """One-step SCBK mapping produces n-2 qubits."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, Symmetries(1, 1))
+
+        qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        assert qh.num_qubits == n - 2
+
+    def test_scbk_sets_encoding_metadata(self) -> None:
+        """One-step SCBK sets encoding to 'symmetry-conserving-bravyi-kitaev'."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, Symmetries(1, 1))
+
+        qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        assert qh.encoding == "symmetry-conserving-bravyi-kitaev"
+
+    def test_scbk_carries_tapering_metadata(self) -> None:
+        """One-step SCBK output has tapering metadata."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, Symmetries(1, 1))
+
+        qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        assert qh.tapering is not None
+        assert qh.tapering.source_num_qubits == n
+        assert qh.tapering.num_tapered == 2
+
+    def test_scbk_matches_two_step(self) -> None:
+        """One-step symmetry-conserving BK matches explicit BK + internal taper."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+        from qdk_chemistry.utils.tapering import taper_to_scbk  # noqa: PLC0415
+
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        sym = Symmetries(1, 1)
+
+        # One-step
+        scbk_mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, sym)
+        qh_one_step = create("qubit_mapper", "qdk").run(hamiltonian, scbk_mapping)
+
+        # Two-step
+        bk_mapping = MajoranaMapping.bravyi_kitaev(n)
+        qh_bk = create("qubit_mapper", "qdk").run(hamiltonian, bk_mapping)
+        qh_two_step = taper_to_scbk(qh_bk, sym)
+
+        assert qh_one_step.equiv(qh_two_step)
+
+    def test_standard_mappings_no_tapering(self) -> None:
+        """Standard mappings produce QubitHamiltonian with tapering=None."""
+        hamiltonian = create_nontrivial_test_hamiltonian()
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+
+        for factory in [MajoranaMapping.jordan_wigner, MajoranaMapping.bravyi_kitaev, MajoranaMapping.parity]:
+            mapping = factory(n)
+            qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+            assert qh.tapering is None

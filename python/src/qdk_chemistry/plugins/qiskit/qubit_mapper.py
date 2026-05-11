@@ -25,7 +25,6 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Symmetries
     from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
@@ -84,7 +83,6 @@ class QiskitQubitMapper(QubitMapper):
         self,
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
-        symmetries: Symmetries | None = None,  # noqa: ARG002
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
@@ -95,7 +93,6 @@ class QiskitQubitMapper(QubitMapper):
         Args:
             hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
             mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
-            symmetries: Optional symmetry information. Not used by this implementation.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.

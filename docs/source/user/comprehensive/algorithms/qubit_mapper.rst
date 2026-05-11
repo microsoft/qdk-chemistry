@@ -45,7 +45,7 @@ Parity :cite:`Seeley2012`
 .. _encoding-scbk:
 
 Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
-   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires a :class:`~qdk_chemistry.data.Symmetries` object.
+   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Use :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev` with a :class:`~qdk_chemistry.data.Symmetries` object.
 
 .. _encoding-bk-tree:
 
@@ -225,7 +225,7 @@ Related classes
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
 - :doc:`MajoranaMapping <../data/majorana_mapping>`: Fermion-to-qubit encoding passed to ``run()``
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
-- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for symmetry-exploiting algorithms
+- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev`
 
 Further reading
 ---------------

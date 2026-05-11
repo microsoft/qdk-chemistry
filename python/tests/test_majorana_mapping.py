@@ -355,3 +355,108 @@ class TestCrossEncodingConsistency:
         assert len(jw.table) == 2 * n_modes
         assert len(bk.table) == 2 * n_modes
         assert len(par.table) == 2 * n_modes
+
+
+# ─── SCBK (symmetry-conserving Bravyi-Kitaev) ────────────────────────────
+
+
+class TestSymmetryConservingBravyiKitaev:
+    """Tests for the SCBK factory method and TaperingSpecification integration."""
+
+    def test_scbk_factory_creates_bk_table(self) -> None:
+        """SCBK factory uses a standard BK Majorana table underneath."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        bk = MajoranaMapping.bravyi_kitaev(8)
+        assert scbk.table == bk.table
+
+    def test_scbk_name_and_base_encoding(self) -> None:
+        """SCBK has the right name and base_encoding properties."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert scbk.name == "symmetry-conserving-bravyi-kitaev"
+        assert scbk.base_encoding == "bravyi-kitaev"
+
+    def test_scbk_has_tapering(self) -> None:
+        """SCBK mapping has a TaperingSpecification with 2 tapered qubits."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert scbk.tapering is not None
+        assert scbk.tapering.num_tapered == 2
+        assert scbk.tapering.source_num_qubits == 8
+        assert scbk.tapering.source_encoding == "bravyi-kitaev"
+
+    def test_scbk_eigenvalues_depend_on_alpha_beta(self) -> None:
+        """Different (n_alpha, n_beta) produce different eigenvalues."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk_11 = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(1, 1))
+        scbk_20 = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 0))
+        assert scbk_11.tapering.eigenvalues != scbk_20.tapering.eigenvalues
+
+    def test_scbk_num_qubits_is_posttaper_via_property(self) -> None:
+        """MajoranaMapping.num_qubits reflects the reduced qubit count."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert scbk.num_qubits == 6
+
+    def test_scbk_json_roundtrip(self) -> None:
+        """SCBK mapping with tapering survives JSON serialization."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        data = scbk.to_json()
+        loaded = MajoranaMapping.from_json(data)
+        assert loaded.name == scbk.name
+        assert loaded.table == scbk.table
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
+
+    def test_scbk_odd_modes_raises(self) -> None:
+        """SCBK with odd num_modes raises ValueError."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        with pytest.raises(ValueError, match="even"):
+            MajoranaMapping.symmetry_conserving_bravyi_kitaev(7, Symmetries(1, 1))
+
+    def test_scbk_too_few_modes_raises(self) -> None:
+        """SCBK with num_modes < 4 raises ValueError."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        with pytest.raises(ValueError, match="4"):
+            MajoranaMapping.symmetry_conserving_bravyi_kitaev(2, Symmetries(1, 0))
+
+    def test_standard_mappings_have_no_tapering(self) -> None:
+        """JW, BK, parity (without symmetries) have tapering=None."""
+        assert MajoranaMapping.jordan_wigner(4).tapering is None
+        assert MajoranaMapping.bravyi_kitaev(4).tapering is None
+        assert MajoranaMapping.parity(4).tapering is None
+
+    def test_scbk_num_qubits_is_posttaper(self) -> None:
+        """MajoranaMapping.num_qubits reflects the post-taper qubit count."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert scbk.num_qubits == 6  # 8 - 2 tapered
+
+    def test_parity_with_symmetries_has_tapering(self) -> None:
+        """Parity with symmetries bundles a TaperingSpecification."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        par = MajoranaMapping.parity(8, Symmetries(2, 2))
+        assert par.tapering is not None
+        assert par.tapering.num_tapered == 2
+        assert par.name == "parity-2q-reduced"
+        assert par.base_encoding == "parity"
+        assert par.num_qubits == 6  # 8 - 2
+
+    def test_parity_without_symmetries_no_tapering(self) -> None:
+        """Parity without symmetries has no tapering."""
+        par = MajoranaMapping.parity(8)
+        assert par.tapering is None
+        assert par.num_qubits == 8

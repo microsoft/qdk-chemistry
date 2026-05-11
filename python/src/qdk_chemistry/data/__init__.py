@@ -119,6 +119,7 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
+from qdk_chemistry.data.tapering import TaperingSpecification
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
@@ -184,6 +185,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "TaperingSpecification",
     "TermPartition",
     "UnitaryContainer",
     "UnitaryRepresentation",
