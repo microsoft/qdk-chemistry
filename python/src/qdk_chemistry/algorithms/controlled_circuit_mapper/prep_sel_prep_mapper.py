@@ -22,10 +22,8 @@ class PrepSelPrepSettings(Settings):
     """Settings for the PrepSelPrepMapper.
 
     Attributes:
-        prepare_mapper: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to ``DensePureStatePreparation``. Any
-            :class:`~qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation`
-            that implements ``prepare_from_statevector`` can be used.
+        state_prep: Algorithm reference for the PREPARE oracle state preparation.
+            Defaults to ``DensePureStatePreparation``.
         select_mapper: Algorithm reference for the SELECT oracle mapper.
             Defaults to ``MultiControlSelectMapper``.
 
@@ -35,7 +33,7 @@ class PrepSelPrepSettings(Settings):
         """Initialize the settings for PrepSelPrepMapper."""
         super().__init__()
         self._set_default(
-            "prepare_mapper",
+            "state_prep",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
         )
@@ -52,9 +50,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
     Composes a controlled block encoding from two independent sub-algorithms:
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
-       the ``prepare_mapper`` setting.  Any
-       :class:`~qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation`
-       that implements ``prepare_from_statevector`` can be plugged in.
+       the ``state_prep`` setting.  Defaults to ``DensePureStatePreparation``.
     2. **SELECT** — multi-controlled unitary application on the system register,
        resolved via the ``select_mapper`` setting.
 
@@ -108,7 +104,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         The method proceeds in three stages:
 
-        1. **PREPARE** — delegates to the nested ``prepare_mapper`` algorithm
+        1. **PREPARE** — delegates to the nested ``state_prep`` algorithm
            to build a Q# callable that loads amplitudes into the ancilla register.
         2. **SELECT** — delegates to the nested ``select_mapper`` algorithm
            to build a Q# callable that applies controlled unitaries.
@@ -143,8 +139,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         select = unitary_container.select
 
         # 1. Create PREPARE circuit via the state-preparation algorithm.
-        #    PreparePureStateD expects reversed qubit order (MSB first).
-        prepare_algorithm = self._create_nested("prepare_mapper")
+        prepare_algorithm = self._create_nested("state_prep")
         reversed_qubits = list(reversed(prepare.prepare_qubits))
         prepare_circuit = prepare_algorithm.prepare_from_statevector(
             prepare.statevector, prepare.num_prepare_qubits, reversed_qubits
