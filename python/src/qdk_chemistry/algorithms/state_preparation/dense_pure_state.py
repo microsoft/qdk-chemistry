@@ -7,6 +7,7 @@
 
 import numpy as np
 
+from qdk_chemistry.data import Wavefunction
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -21,13 +22,6 @@ class DensePureStatePreparation(StatePreparation):
     This is the simplest dense amplitude-loading strategy: given an arbitrary
     real-valued amplitude vector, it uses ``PreparePureStateD`` to prepare the
     corresponding state on a qubit register.
-
-    This algorithm is used both for:
-
-    * **Electronic-structure state preparation** (via :meth:`run` with a
-      :class:`~qdk_chemistry.data.Wavefunction`), and
-    * **Block-encoding PREPARE oracles** (via :meth:`prepare_from_statevector`
-      with a raw amplitude array).
 
     """
 
@@ -44,8 +38,12 @@ class DensePureStatePreparation(StatePreparation):
         """
         return "dense_pure_state"
 
-    def _run_impl(self, wavefunction):
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit from a Wavefunction using PreparePureStateD.
+
+        Extracts coefficients and determinants from the wavefunction, converts
+        them to a full statevector in the computational basis, normalizes it,
+        and wraps it in a Q# ``StatePreparation`` circuit.
 
         Args:
             wavefunction: The target wavefunction to prepare.
@@ -53,15 +51,56 @@ class DensePureStatePreparation(StatePreparation):
         Returns:
             Circuit: A Circuit object implementing the state preparation.
 
-        Raises:
-            NotImplementedError: Full wavefunction preparation is not yet implemented.
-                Use :meth:`prepare_from_statevector` for amplitude-vector preparation.
-
         """
-        raise NotImplementedError(
-            "Full wavefunction preparation via DensePureStatePreparation is not yet implemented. "
-            "Use prepare_from_statevector() for direct amplitude-vector preparation."
+        # Active Space Consistency Check
+        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
+        if alpha_indices != beta_indices:
+            raise ValueError(
+                f"Active space contains {len(alpha_indices)} alpha orbitals and "
+                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
+                "alpha and beta orbitals are not supported for state preparation."
+            )
+
+        coeffs = wavefunction.get_coefficients()
+        dets = wavefunction.get_active_determinants()
+        num_orbitals = len(alpha_indices)
+
+        # Convert determinants to bitstrings (little-endian convention)
+        bitstrings = []
+        for det in dets:
+            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
+            bitstring = beta_str[::-1] + alpha_str[::-1]
+            bitstrings.append(bitstring)
+
+        n_qubits = len(bitstrings[0])
+
+        # Build the full statevector: place each coefficient at the index
+        # corresponding to its bitstring
+        statevector = np.zeros(2**n_qubits, dtype=float)
+        for coeff, bitstring in zip(coeffs, bitstrings, strict=True):
+            index = int(bitstring, 2)
+            statevector[index] += coeff
+
+        # Normalize
+        norm = np.linalg.norm(statevector)
+        if norm > 0:
+            statevector /= norm
+
+        # All qubits participate in the dense preparation, no expansion ops
+        row_map = list(range(n_qubits - 1, -1, -1))
+        state_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
+            rowMap=row_map,
+            stateVector=statevector.tolist(),
+            expansionOps=[],
+            numQubits=n_qubits,
         )
+
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=vars(state_prep_params),
+        )
+        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory, encoding="jordan-wigner")
 
     def prepare_from_statevector(
         self,
@@ -82,6 +121,8 @@ class DensePureStatePreparation(StatePreparation):
 
         Returns:
             Circuit: A Circuit wrapping the Q# PREPARE callable and factory.
+
+        TODO: Refactor Wavefunction to adpot PREPARE oracle for block encoding
 
         """
         amplitudes = statevector.tolist()

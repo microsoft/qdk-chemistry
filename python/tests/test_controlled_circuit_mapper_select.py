@@ -1,4 +1,4 @@
-"""Tests for the LCU SELECT oracle mapper."""
+"""Tests for the multi-control SELECT oracle mapper."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.controlled_circuit_mapper import LCUSelectMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import MultiControlSelectMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -20,8 +20,8 @@ if QDK_CHEMISTRY_HAS_QISKIT:
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 
-class TestLCUSelectMapper:
-    """Tests for the LCU SELECT oracle mapper algorithm."""
+class TestMultiControlSelectMapper:
+    """Tests for the multi-control SELECT oracle mapper algorithm."""
 
     pauli_x = np.array([[0, 1], [1, 0]], dtype=complex)
     pauli_z = np.array([[1, 0], [0, -1]], dtype=complex)
@@ -30,14 +30,14 @@ class TestLCUSelectMapper:
 
     def test_name_and_type(self):
         """Test that name and type_name return correct values."""
-        mapper = LCUSelectMapper()
-        assert mapper.name() == "lcu_select"
+        mapper = MultiControlSelectMapper()
+        assert mapper.name() == "multi_control_select"
         assert mapper.type_name() == "select_mapper"
 
     def test_registered_in_registry(self):
-        """Verify LCU select mapper is accessible via the registry."""
-        mapper = registry.create("select_mapper", "lcu_select")
-        assert isinstance(mapper, LCUSelectMapper)
+        """Verify multi-control select mapper is accessible via the registry."""
+        mapper = registry.create("select_mapper", "multi_control_select")
+        assert isinstance(mapper, MultiControlSelectMapper)
 
     def test_select_circuit_has_factory(self):
         """Test that the SELECT circuit has both qsharp_op and qsharp_factory."""
@@ -48,7 +48,7 @@ class TestLCUSelectMapper:
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
-        mapper = LCUSelectMapper()
+        mapper = MultiControlSelectMapper()
         circuit = mapper.run(container.select)
 
         assert isinstance(circuit, Circuit)
@@ -75,7 +75,7 @@ class TestLCUSelectMapper:
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
-        mapper = LCUSelectMapper()
+        mapper = MultiControlSelectMapper()
         circuit = mapper.run(container.select)
         actual = Operator(circuit.get_qiskit_circuit()).data
 
@@ -101,7 +101,7 @@ class TestLCUSelectMapper:
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
-        mapper = LCUSelectMapper()
+        mapper = MultiControlSelectMapper()
         circuit = mapper.run(container.select)
         actual = Operator(circuit.get_qiskit_circuit()).data
 
@@ -126,7 +126,7 @@ class TestLCUSelectMapper:
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
-        mapper = LCUSelectMapper()
+        mapper = MultiControlSelectMapper()
         circuit = mapper.run(container.select)
         actual = Operator(circuit.get_qiskit_circuit()).data
 

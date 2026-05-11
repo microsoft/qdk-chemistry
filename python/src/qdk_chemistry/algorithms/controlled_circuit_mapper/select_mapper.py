@@ -1,9 +1,11 @@
-"""QDK/Chemistry LCU SELECT oracle mapper."""
+"""QDK/Chemistry SELECT oracle mappers."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+from abc import abstractmethod
 
 from qdk import qsharp
 
@@ -12,7 +14,28 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import Select
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["LCUSelectMapper", "SelectMapperFactory"]
+__all__: list[str] = ["MultiControlSelectMapper", "SelectMapper", "SelectMapperFactory"]
+
+
+class SelectMapper(Algorithm):
+    r"""Abstract base class for SELECT oracle mappers.
+
+    Subclasses implement a specific strategy for constructing the SELECT circuit
+    from a :class:`Select` data object.
+    """
+
+    def type_name(self) -> str:
+        """Return the algorithm type name.
+
+        Returns:
+            str: The type name ``"select_mapper"``.
+
+        """
+        return "select_mapper"
+
+    @abstractmethod
+    def _run_impl(self, select: Select) -> Circuit:
+        """Create a SELECT circuit from a Select data object."""
 
 
 class SelectMapperFactory(AlgorithmFactory):
@@ -23,12 +46,12 @@ class SelectMapperFactory(AlgorithmFactory):
         return "select_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return lcu_select as the default algorithm name."""
-        return "lcu_select"
+        """Return multi_control_select as the default algorithm name."""
+        return "multi_control_select"
 
 
-class LCUSelectMapper(Algorithm):
-    r"""Mapper for the multi-controlled SELECT oracle in an LCU block encoding.
+class MultiControlSelectMapper(SelectMapper):
+    r"""Multi-controlled SELECT oracle mapper for LCU block encodings.
 
     Converts a :class:`Select` data object into a Q# callable that implements
     the SELECT oracle:
@@ -43,26 +66,17 @@ class LCUSelectMapper(Algorithm):
     """
 
     def __init__(self):
-        """Initialize the LCUSelectMapper."""
+        """Initialize the MultiControlSelectMapper."""
         super().__init__()
 
     def name(self) -> str:
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"lcu_select"``.
+            str: The name ``"multi_control_select"``.
 
         """
-        return "lcu_select"
-
-    def type_name(self) -> str:
-        """Return the algorithm type name.
-
-        Returns:
-            str: The type name ``"select_mapper"``.
-
-        """
-        return "select_mapper"
+        return "multi_control_select"
 
     def _run_impl(self, select: Select) -> Circuit:
         """Create a SELECT circuit from a Select data object.
@@ -87,15 +101,15 @@ class LCUSelectMapper(Algorithm):
                     base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
             pauli_terms.append(base_paulis)
         phases = [int(s) for s in select.phases]
-        select_params = QSHARP_UTILS.LCU.DefaultSelectParams(pauliTerms=pauli_terms, signs=phases)
-        qsharp_op = QSHARP_UTILS.LCU.MakeSelectOp(select_params)
+        select_params = QSHARP_UTILS.Select.PauliSelectParams(pauliTerms=pauli_terms, signs=phases)
+        qsharp_op = QSHARP_UTILS.Select.MakeSelectOp(select_params)
         factory_params = {
             "params": select_params,
             "numSelectQubits": select.num_prepare_qubits,
             "numTargetQubits": select.num_target_qubits,
         }
         qsharp_factory = QsharpFactoryData(
-            program=QSHARP_UTILS.LCU.MakeSelectCircuit,
+            program=QSHARP_UTILS.Select.MakeSelectCircuit,
             parameter=factory_params,
         )
         return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)

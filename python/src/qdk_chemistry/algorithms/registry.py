@@ -582,9 +582,11 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         PauliSequenceMapper,
-        PrepareSelectMapper,
+        PrepSelPrepMapper,
     )
-    from qdk_chemistry.algorithms.controlled_circuit_mapper.select_mapper import LCUSelectMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper.select_mapper import (  # noqa: PLC0415
+        MultiControlSelectMapper,
+    )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
@@ -612,8 +614,8 @@ def _register_python_algorithms():
     register(lambda: PartiallyRandomized())
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
-    register(lambda: PrepareSelectMapper())
-    register(lambda: LCUSelectMapper())
+    register(lambda: PrepSelPrepMapper())
+    register(lambda: MultiControlSelectMapper())
     register(lambda: DensePureStatePreparation())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
