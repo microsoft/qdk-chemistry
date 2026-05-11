@@ -211,7 +211,8 @@ class QdkEnergyEstimator(EnergyEstimator):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
-        qubit_hamiltonians = qubit_hamiltonian.group_commuting(qubit_wise=True)
+
+        qubit_hamiltonians = self._resolve_measurement_groups(qubit_hamiltonian)
         num_observables = len(qubit_hamiltonians)
         if total_shots < num_observables:
             raise ValueError(
@@ -240,6 +241,62 @@ class QdkEnergyEstimator(EnergyEstimator):
         return self._compute_energy_expectation_from_bitstrings(
             qubit_hamiltonians, measurement_data.bitstring_counts
         ), measurement_data
+
+    @staticmethod
+    def _resolve_measurement_groups(qubit_hamiltonian: QubitHamiltonian) -> list[QubitHamiltonian]:
+        """Resolve the Hamiltonian into simultaneously-measurable groups.
+
+        If ``qubit_hamiltonian`` carries a
+        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the
+        partition is consumed and each group becomes one measurement circuit.
+        The groups must be compatible with the measurement backend — at
+        present, each group must be qubit-wise commuting so that a single
+        Pauli basis suffices.
+
+        When no partition is present, each Pauli term is measured
+        individually.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian to partition for measurement.
+
+        Returns:
+            A list of ``QubitHamiltonian`` objects, one per measurement group.
+
+        """
+        partition = qubit_hamiltonian.term_partition
+        if partition is not None:
+            from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
+
+            if isinstance(partition, FlatPartition):
+                Logger.debug(
+                    f"EnergyEstimator: consuming term_partition "
+                    f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
+                )
+                return [
+                    QubitHamiltonian(
+                        pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
+                        coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
+                        encoding=qubit_hamiltonian.encoding,
+                        fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+                    )
+                    for group in partition.groups
+                ]
+
+            Logger.debug(
+                f"EnergyEstimator: ignoring unsupported partition type "
+                f"{type(partition).__name__}; measuring each term individually."
+            )
+
+        Logger.debug("EnergyEstimator: no term_partition; measuring each term individually.")
+        return [
+            QubitHamiltonian(
+                pauli_strings=[label],
+                coefficients=np.asarray([coeff]),
+                encoding=qubit_hamiltonian.encoding,
+                fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+            )
+            for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
+        ]
 
     @staticmethod
     def _create_measurement_circuits(circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]) -> list[Circuit]:

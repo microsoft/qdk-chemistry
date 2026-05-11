@@ -9,7 +9,7 @@ import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.data import Circuit, EncodingMismatchError, QubitHamiltonian, validate_encoding_compatibility
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE
@@ -232,17 +232,13 @@ def test_qdk_qubit_mapper_injects_encoding():
 
 
 def test_group_commuting_preserves_encoding():
-    """Test that group_commuting preserves the encoding metadata."""
+    """Test that term_grouper preserves the encoding metadata."""
     pauli_strings = ["II", "ZI", "IZ", "ZZ", "XX", "YY"]
     coefficients = np.array([1.0, 0.5, 0.5, 0.25, 0.3, 0.3])
     ham = QubitHamiltonian(pauli_strings, coefficients, encoding="jordan-wigner")
 
-    # Group into commuting subsets
-    grouped = ham.group_commuting(qubit_wise=True)
-
-    # Each group should preserve the encoding
-    for group in grouped:
-        assert group.encoding == "jordan-wigner"
+    grouped = registry.create("term_grouper", "qubit_wise_commuting").run(ham)
+    assert grouped.encoding == "jordan-wigner"
 
 
 def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):

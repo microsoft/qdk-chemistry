@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.energy_estimator.qdk import (
     QdkEnergyEstimator,
     _append_measurement_to_circuit,
@@ -287,6 +287,8 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
     test_hamiltonian = QubitHamiltonian(
         ["IIIIIZII", "IXXIIXXI", "IIIIIIZI"], np.array([0.76388709, 0.1022262, 1.03502496])
     )
+    # Pre-group by QWC so the estimator uses grouped measurement.
+    test_hamiltonian = registry.create("term_grouper", "qubit_wise_commuting").run(test_hamiltonian)
     estimator = QdkEnergyEstimator()
     estimator.settings().set(
         "circuit_executor",
