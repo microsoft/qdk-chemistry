@@ -505,7 +505,10 @@ def _register_python_factories():
     be called by users.
     """
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
-    from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledCircuitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
+        ControlledCircuitMapperFactory,
+        SelectMapperFactory,
+    )
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
@@ -519,6 +522,7 @@ def _register_python_factories():
     register_factory(QubitHamiltonianSolverFactory())
     register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
+    register_factory(SelectMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(PhaseEstimationFactory())
 
@@ -577,12 +581,13 @@ def _register_python_algorithms():
         QdkSparseStateSimulator,
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
-        BlockEncodingMapper,
         PauliSequenceMapper,
+        PrepareSelectMapper,
     )
+    from qdk_chemistry.algorithms.controlled_circuit_mapper.select_mapper import LCUSelectMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
-        BlockEncodingBuilder,
+        LCUBuilder,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
@@ -595,6 +600,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
 
     register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
@@ -604,9 +610,11 @@ def _register_python_algorithms():
     register(lambda: Trotter())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
-    register(lambda: BlockEncodingBuilder())
+    register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
-    register(lambda: BlockEncodingMapper())
+    register(lambda: PrepareSelectMapper())
+    register(lambda: LCUSelectMapper())
+    register(lambda: DensePureStatePreparation())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
     register(lambda: IterativePhaseEstimation())

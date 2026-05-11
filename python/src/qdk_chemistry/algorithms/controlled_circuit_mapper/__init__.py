@@ -6,11 +6,15 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledCircuitMapperFactory
-from .block_encoding_mapper import BlockEncodingMapper
 from .pauli_sequence_mapper import PauliSequenceMapper
+from .prepare_select_mapper import PrepareSelectMapper, PrepareSelectSettings
+from .select_mapper import LCUSelectMapper, SelectMapperFactory
 
 __all__ = [
-    "BlockEncodingMapper",
     "ControlledCircuitMapperFactory",
+    "LCUSelectMapper",
     "PauliSequenceMapper",
+    "PrepareSelectMapper",
+    "PrepareSelectSettings",
+    "SelectMapperFactory",
 ]

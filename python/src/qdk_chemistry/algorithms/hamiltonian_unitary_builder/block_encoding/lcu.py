@@ -20,25 +20,27 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
 )
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
-    BlockEncodingContainer,
     ControlledOperation,
+    LCUContainer,
     Prepare,
     Select,
 )
 
-__all__: list[str] = ["BlockEncodingBuilder", "BlockEncodingSettings"]
+__all__: list[str] = ["LCUBuilder", "LCUSettings"]
 
 
-class BlockEncodingSettings(HamiltonianUnitaryBuilderSettings):
-    """Settings for the block encoding builder."""
+class LCUSettings(HamiltonianUnitaryBuilderSettings):
+    """Settings for the LCU block encoding builder."""
 
     def __init__(self):
-        """Initialize BlockEncodingSettings with default values.
+        """Initialize LCUSettings with default values.
 
         Attributes:
             power: The power to which the Hamiltonian is raised.
             quantum_walk: If True, wrap block encoding with quantum walk operator (use with QPE).
                 If False, use plain block encoding (use with Hadamard test).
+            min_schatten_norm: Minimum Schatten norm below which the LCU decomposition
+                is numerically ill-defined.
 
         """
         super().__init__()
@@ -50,9 +52,15 @@ class BlockEncodingSettings(HamiltonianUnitaryBuilderSettings):
             "If True, wrap block encoding with quantum walk operator (use with QPE). "
             "If False, use plain block encoding (use with Hadamard test).",
         )
+        self._set_default(
+            "min_schatten_norm",
+            "float",
+            1e-15,
+            "Minimum Schatten norm below which the LCU decomposition is numerically ill-defined.",
+        )
 
 
-class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
+class LCUBuilder(HamiltonianUnitaryBuilder):
     r"""LCU (Linear Combination of Unitaries) block encoding builder."""
 
     def __init__(
@@ -82,7 +90,7 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
 
         """
         super().__init__()
-        self._settings = BlockEncodingSettings()
+        self._settings = LCUSettings()
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
@@ -97,7 +105,7 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
 
         Returns:
-            UnitaryRepresentation: The unitary representation built for the LCU block encoding.
+            UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.
 
         """
         power: int = self._settings.get("power")
@@ -106,10 +114,10 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
         num_terms = len(coefficients)
         num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
 
-        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits)
+        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits, self._settings.get("min_schatten_norm"))
         select = self._build_select(qubit_hamiltonian, num_prepare_qubits)
 
-        container = BlockEncodingContainer(
+        container = LCUContainer(
             power=power,
             prepare=prepare,
             select=select,
@@ -119,11 +127,27 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int) -> Prepare:
-        """Compute the PREPARE statevector from Hamiltonian coefficients."""
+    def _build_prepare(
+        qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int, min_schatten_norm: float
+    ) -> Prepare:
+        """Compute the PREPARE statevector from Hamiltonian coefficients.
+
+        Normalizes the absolute Hamiltonian coefficients by the Schatten norm and
+        takes the element-wise square root to produce the state-preparation amplitudes.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian whose coefficients define the amplitudes.
+            num_prepare_qubits: Number of qubits in the prepare (ancilla) register.
+            min_schatten_norm: Minimum allowable Schatten norm; raises if the norm is below
+                this threshold.
+
+        Returns:
+            Prepare: The PREPARE oracle dataclass containing the statevector and qubit layout.
+
+        """
         coefficients = qubit_hamiltonian.coefficients
         schatten_norm = qubit_hamiltonian.schatten_norm
-        if schatten_norm < 1e-15:
+        if schatten_norm < min_schatten_norm:
             raise ValueError("Schatten norm is too small, cannot build LCU block encoding.")
 
         abs_coeffs = np.abs(coefficients)
@@ -137,7 +161,21 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
 
     @staticmethod
     def _build_select(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int) -> Select:
-        """Compute SELECT controlled operations and phases from Hamiltonian terms."""
+        """Compute SELECT controlled operations and phases from Hamiltonian terms.
+
+        Builds a list of controlled Pauli-string operations (one per Hamiltonian term)
+        and an array of sign phases extracted from the coefficients.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian whose Pauli strings and coefficients
+                define the controlled operations.
+            num_prepare_qubits: Number of qubits in the prepare (control) register.
+
+        Returns:
+            Select: The SELECT oracle dataclass containing controlled operations, phases,
+                and qubit layout.
+
+        """
         coefficients = qubit_hamiltonian.coefficients
         pauli_strings = qubit_hamiltonian.pauli_strings
         num_terms = len(coefficients)
@@ -162,9 +200,19 @@ class BlockEncodingBuilder(HamiltonianUnitaryBuilder):
         )
 
     def name(self) -> str:
-        """Return the algorithm name."""
+        """Return the algorithm name.
+
+        Returns:
+            str: The name ``"block_encoding"``.
+
+        """
         return "block_encoding"
 
     def type_name(self) -> str:
-        """Return hamiltonian_unitary_builder as the algorithm type name."""
+        """Return the algorithm type name.
+
+        Returns:
+            str: The type name ``"hamiltonian_unitary_builder"``.
+
+        """
         return "hamiltonian_unitary_builder"
