@@ -22,14 +22,11 @@ class EvolutionCircuitMapper(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(self, evolution: UnitaryRepresentation, *args, **kwargs) -> Circuit:
+    def _run_impl(self, evolution: UnitaryRepresentation) -> Circuit:
         """Construct a Circuit representing the unitary for the given UnitaryRepresentation.
 
         Args:
             evolution: The time evolution unitary.
-            *args: Positional arguments, where the first argument is expected to be the
-                time evolution unitary.
-            **kwargs: Additional keyword arguments for concrete implementation.
 
         Returns:
             Circuit: A Circuit representing the unitary for the given UnitaryRepresentation.

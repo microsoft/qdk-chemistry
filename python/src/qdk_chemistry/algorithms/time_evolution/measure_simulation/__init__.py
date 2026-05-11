@@ -5,6 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from .base import MeasureSimulationFactory
-from .evolve_and_measure import EvolveAndMeasure
+from .evolve_and_measure import EvolveAndMeasure, EvolveAndMeasureSettings
 
-__all__: list[str] = ["EvolveAndMeasure", "MeasureSimulationFactory"]
+__all__: list[str] = ["EvolveAndMeasure", "EvolveAndMeasureSettings", "MeasureSimulationFactory"]

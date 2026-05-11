@@ -93,7 +93,8 @@ class TestQiskitAerCircuitExecutor:
     def test_circuit_executor_with_device_backend(self, test_circuit_2: Circuit):
         """Test the Qiskit Aer circuit executor with a device backend name string."""
         executor = QiskitAerSimulator()
-        result = executor.run(test_circuit_2, shots=100, device_backend_name="fake_manila")
+        executor.settings().set("device_backend_name", "fake_manila")
+        result = executor.run(test_circuit_2, shots=100)
         counts = result.bitstring_counts
         # Circuit applies X on q[0], so only "01" (little-endian) should appear
         assert counts.get("01", 0) > 0
@@ -103,12 +104,14 @@ class TestQiskitAerCircuitExecutor:
     def test_noise_and_device_backend_raises(self, test_circuit_1: Circuit, simple_error_profile: QuantumErrorProfile):
         """Test that specifying both noise and device_backend_name raises ValueError."""
         executor = QiskitAerSimulator()
+        executor.settings().set("device_backend_name", "fake_manila")
         with pytest.raises(ValueError, match="Cannot specify both a noise model and a device backend"):
-            executor.run(test_circuit_1, shots=10, noise=simple_error_profile, device_backend_name="fake_manila")
+            executor.run(test_circuit_1, shots=10, noise=simple_error_profile)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME, reason="qiskit_ibm_runtime not installed")
     def test_invalid_device_backend_name_raises(self, test_circuit_1: Circuit):
         """Test that an invalid device_backend_name raises ValueError with a helpful message."""
         executor = QiskitAerSimulator()
+        executor.settings().set("device_backend_name", "not_a_real_backend")
         with pytest.raises(ValueError, match="Unknown device backend 'not_a_real_backend'"):
-            executor.run(test_circuit_1, shots=10, device_backend_name="not_a_real_backend")
+            executor.run(test_circuit_1, shots=10)

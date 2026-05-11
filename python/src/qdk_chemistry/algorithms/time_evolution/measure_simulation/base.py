@@ -34,21 +34,31 @@ class MeasureSimulationSettings(Settings):
             "evolution_builder",
             "algorithm_ref",
             AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+            "Time evolution builder used to construct the unitary.",
         )
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("evolution_circuit_mapper", "pauli_sequence"),
+            "Circuit mapper used to convert the unitary to a circuit.",
         )
         self._set_default(
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+            "Circuit executor used to run quantum circuits.",
         )
         self._set_default(
             "energy_estimator",
             "algorithm_ref",
             AlgorithmRef("energy_estimator", "qdk"),
+            "Energy estimator used to compute expectation values.",
+        )
+        self._set_default(
+            "shots",
+            "int",
+            1000,
+            "Number of shots per observable measurement.",
         )
 
 
@@ -70,13 +80,9 @@ class MeasureSimulation(Algorithm):
         qubit_hamiltonians: list[QubitHamiltonian],
         times: list[float],
         observables: list[QubitHamiltonian],
+        state_prep: Circuit,
         *,
-        state_prep: Circuit | None = None,
-        shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
@@ -88,12 +94,8 @@ class MeasureSimulation(Algorithm):
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
             times: List of times to evolve under the Hamiltonians.
             observables: List of observable Hamiltonians to measure after evolution.
-            state_prep: Optional circuit that prepares the initial state before time evolution.
-            shots: Number of shots to use for measurement.
+            state_prep: Circuit that prepares the initial state before time evolution.
             noise: Optional noise profile.
-            device_backend_name: Optional device backend name.
-            pre_transpilation_passes: Optional list of passes to apply before transpilation.
-            post_transpilation_passes: Optional list of passes to apply after transpilation.
 
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
@@ -119,8 +121,8 @@ class MeasureSimulation(Algorithm):
         return circuit_mapper.run(evolution)
 
     def _prepend_state_prep_circuit(self, state_prep: Circuit, circuit: Circuit, num_qubits: int) -> Circuit:
-        state_prep_op = getattr(state_prep, "_qsharp_op", None)
-        circuit_op = getattr(circuit, "_qsharp_op", None)
+        state_prep_op = state_prep._qsharp_op  # noqa: SLF001
+        circuit_op = circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None or circuit_op is None:
             raise RuntimeError("State-preparation circuit composition requires Q# operations on both circuits.")
 
@@ -151,11 +153,7 @@ class MeasureSimulation(Algorithm):
         self,
         circuit: Circuit,
         observable: QubitHamiltonian,
-        shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
         energy_estimator = self._create_nested("energy_estimator")
@@ -164,21 +162,14 @@ class MeasureSimulation(Algorithm):
         energy_result, measurement_data = energy_estimator.run(
             circuit,
             observable,
-            total_shots=shots,
+            total_shots=self._settings.get("shots"),
             noise_model=noise,
-            device_backend_name=device_backend_name,
-            pre_transpilation_passes=pre_transpilation_passes,
-            post_transpilation_passes=post_transpilation_passes,
         )
         return energy_result, measurement_data
 
 
 class MeasureSimulationFactory(AlgorithmFactory):
     """Factory class for creating evolve-and-measure algorithm instances."""
-
-    def __init__(self):
-        """Initialize the MeasureSimulationFactory."""
-        super().__init__()
 
     def algorithm_type_name(self) -> str:
         """Return the algorithm type name as measure_simulation."""

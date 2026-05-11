@@ -63,12 +63,10 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
         r"""Construct a quantum circuit implementing the time evolution unitary.
 
         Args:
-            evolution: The time evolution unitary containing the Hamiltonian
-            and evolution parameters.
+            evolution: The time evolution unitary containing the Hamiltonian and evolution parameters.
 
         Returns:
-            Circuit: A quantum circuit implementing the unitary :math:`U`
-            where :math:`U` is the time evolution operator :math:`\exp(-i H t)`.
+            Circuit: A quantum circuit implementing the time evolution unitary.
 
         Raises:
             ValueError: If the time evolution unitary container type is not supported.

@@ -15,7 +15,22 @@ import pytest
 import qdk_chemistry.algorithms.time_evolution.measure_simulation.base as measure_base
 from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAndMeasure
 from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, QubitHamiltonian
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+
+def _identity_state_prep(num_qubits: int) -> Circuit:
+    """Create a trivial state-prep circuit that leaves |0...0> unchanged."""
+    params = {"pauliExponents": [], "pauliCoefficients": [], "repetitions": 1}
+    targets = list(range(num_qubits))
+    return Circuit(
+        qsharp_op=QSHARP_UTILS.PauliExp.MakeRepPauliExpOp(params),
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.PauliExp.MakeRepPauliExpCircuit,
+            parameter={"evo_params": params, "target_indices": targets},
+        ),
+    )
 
 
 def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -89,12 +104,14 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
     )
+    algo.settings().set("shots", 1024)
 
+    state_prep = _identity_state_prep(num_qubits=2)
     measurements = algo.run(
         hamiltonians,
         times=time_steps,
         observables=[observable],
-        shots=1024,
+        state_prep=state_prep,
     )
 
     for measurement in measurements:
@@ -118,17 +135,94 @@ def test_evolve_and_measure_with_device_backend() -> None:
     )
     algo.settings().set(
         "circuit_executor",
-        AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
+        AlgorithmRef("circuit_executor", "qiskit_aer_simulator", device_backend_name="fake_manila"),
     )
+    algo.settings().set("shots", 1024)
 
+    state_prep = _identity_state_prep(num_qubits=2)
     measurements = algo.run(
         [hamiltonian],
         times=[1.0],
         observables=[observable],
-        shots=1024,
-        device_backend_name="fake_manila",
+        state_prep=state_prep,
     )
 
     for measurement in measurements:
         # With device noise the expectation value should still be close to 1.0
         assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.5)
+
+
+# ---------------------------------------------------------------------------
+# Error-path tests for _run_impl input validation
+# ---------------------------------------------------------------------------
+
+
+class TestEvolveAndMeasureValidation:
+    """Tests for EvolveAndMeasure input validation."""
+
+    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitHamiltonian:
+        labels = ["Z" + "I" * (num_qubits - 1)]
+        return QubitHamiltonian(labels, np.array([1.0]))
+
+    def _dummy_state_prep(self) -> Circuit:
+        return _identity_state_prep(num_qubits=2)
+
+    def test_empty_qubit_hamiltonians_raises(self):
+        """Empty qubit_hamiltonians list should raise ValueError."""
+        algo = EvolveAndMeasure()
+        with pytest.raises(ValueError, match="qubit_hamiltonians must not be empty"):
+            algo.run([], times=[1.0], observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+
+    def test_empty_times_raises(self):
+        """Empty times list should raise ValueError."""
+        algo = EvolveAndMeasure()
+        with pytest.raises(ValueError, match="times must not be empty"):
+            algo.run(
+                [self._make_hamiltonian()],
+                times=[],
+                observables=[self._make_hamiltonian()],
+                state_prep=self._dummy_state_prep(),
+            )
+
+    def test_length_mismatch_raises(self):
+        """Mismatched lengths of qubit_hamiltonians and times should raise ValueError."""
+        algo = EvolveAndMeasure()
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="same length"):
+            algo.run([h, h], times=[1.0], observables=[h], state_prep=self._dummy_state_prep())
+
+    def test_non_monotonic_times_raises(self):
+        """Non-monotonically-increasing times should raise ValueError."""
+        algo = EvolveAndMeasure()
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="strictly monotonically increasing"):
+            algo.run([h, h], times=[2.0, 1.0], observables=[h], state_prep=self._dummy_state_prep())
+
+    def test_duplicate_times_raises(self):
+        """Duplicate times should raise ValueError (strict monotonicity)."""
+        algo = EvolveAndMeasure()
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="strictly monotonically increasing"):
+            algo.run([h, h], times=[1.0, 1.0], observables=[h], state_prep=self._dummy_state_prep())
+
+    def test_mismatched_hamiltonian_num_qubits_raises(self):
+        """Hamiltonians with different num_qubits should raise ValueError."""
+        algo = EvolveAndMeasure()
+        h2 = self._make_hamiltonian(num_qubits=2)
+        h3 = self._make_hamiltonian(num_qubits=3)
+        with pytest.raises(ValueError, match="same number of qubits"):
+            algo.run([h2, h3], times=[1.0, 2.0], observables=[h2], state_prep=self._dummy_state_prep())
+
+    def test_mismatched_observable_num_qubits_raises(self):
+        """Observables with different num_qubits from Hamiltonians should raise ValueError."""
+        algo = EvolveAndMeasure()
+        h2 = self._make_hamiltonian(num_qubits=2)
+        obs3 = self._make_hamiltonian(num_qubits=3)
+        with pytest.raises(ValueError, match="same number of qubits"):
+            algo.run([h2], times=[1.0], observables=[obs3], state_prep=self._dummy_state_prep())
+
+    def test_get_circuit_before_run_raises(self):
+        """get_circuit() before run() should raise ValueError."""
+        algo = EvolveAndMeasure()
+        with pytest.raises(ValueError, match="No evolution circuit"):
+            algo.get_circuit()

@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import itertools
+
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -31,26 +33,21 @@ class EvolveAndMeasureSettings(MeasureSimulationSettings):
 class EvolveAndMeasure(MeasureSimulation):
     """Evolve under a Hamiltonian and measure a target observable."""
 
-    _evolution_circuit: Circuit | None = None
-
     def __init__(self):
         """Initialize EvolveAndMeasure with the given settings."""
         Logger.trace_entering()
         super().__init__()
         self._settings = EvolveAndMeasureSettings()
+        self._evolution_circuit: Circuit | None = None
 
     def _run_impl(
         self,
         qubit_hamiltonians: list[QubitHamiltonian],
         times: list[float],
         observables: list[QubitHamiltonian],
+        state_prep: Circuit,
         *,
-        state_prep: Circuit | None = None,
-        shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
@@ -60,14 +57,10 @@ class EvolveAndMeasure(MeasureSimulation):
 
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: Monotonically-increasing list of times to evolve under the Hamiltonians.
+            times: Strictly monotonically increasing list of times to evolve under the Hamiltonians.
             observables: List of observable Hamiltonians to measure after evolution.
-            state_prep: Optional circuit that prepares the initial state before time evolution.
-            shots: Number of shots to use for measurement.
+            state_prep: Circuit that prepares the initial state before time evolution.
             noise: Optional noise profile.
-            device_backend_name: Optional device backend name string to pass to the circuit executor.
-            pre_transpilation_passes: Optional list of passes to apply before transpilation.
-            post_transpilation_passes: Optional list of passes to apply after transpilation.
 
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
@@ -82,8 +75,8 @@ class EvolveAndMeasure(MeasureSimulation):
             raise ValueError("times must not be empty.")
         if len(qubit_hamiltonians) != len(times):
             raise ValueError("qubit_hamiltonians and times must have the same length.")
-        if times != sorted(times):
-            raise ValueError("times must be monotonically increasing.")
+        if not all(a < b for a, b in itertools.pairwise(times)):
+            raise ValueError("times must be strictly monotonically increasing.")
 
         # Ensure all Hamiltonians and observables have the same number of qubits.
         reference_num_qubits = qubit_hamiltonians[0].num_qubits
@@ -104,12 +97,8 @@ class EvolveAndMeasure(MeasureSimulation):
             measurements.append(
                 self._measure_observable(
                     circuit=self._evolution_circuit,
-                    shots=shots,
                     observable=observable,
                     noise=noise,
-                    device_backend_name=device_backend_name,
-                    pre_transpilation_passes=pre_transpilation_passes,
-                    post_transpilation_passes=post_transpilation_passes,
                 )
             )
         return measurements
@@ -118,8 +107,7 @@ class EvolveAndMeasure(MeasureSimulation):
         self,
         qubit_hamiltonians: list[QubitHamiltonian],
         times: list[float],
-        *,
-        state_prep: Circuit | None = None,
+        state_prep: Circuit,
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
@@ -128,8 +116,8 @@ class EvolveAndMeasure(MeasureSimulation):
 
         Args:
             qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: Monotonically-increasing list of times to evolve under the Hamiltonians.
-            state_prep: Optional circuit that prepares the initial state before time evolution.
+            times: Strictly monotonically increasing list of times to evolve under the Hamiltonians.
+            state_prep: Circuit that prepares the initial state before time evolution.
 
         Returns:
             The combined evolution circuit.
@@ -146,16 +134,21 @@ class EvolveAndMeasure(MeasureSimulation):
             )
 
         circuit = self._map_time_evolution_to_circuit(evolution)
+        return self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)
 
-        if state_prep is not None:
-            circuit = self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)
+    def get_circuit(self) -> Circuit:
+        """Get the evolution circuit generated during algorithm execution.
 
-        self._evolution_circuit = circuit
-        return circuit
+        Returns:
+            The evolution circuit.
 
-    def get_circuit(self) -> Circuit | None:
-        """Get the evolution circuit used in the simulation."""
-        return self._evolution_circuit
+        Raises:
+            ValueError: If no evolution circuit has been generated.
+
+        """
+        if self._evolution_circuit is not None:
+            return self._evolution_circuit
+        raise ValueError("No evolution circuit has been generated. Please run the algorithm first.")
 
     def name(self) -> str:
         """Return ``evolve_and_measure`` as the algorithm name."""

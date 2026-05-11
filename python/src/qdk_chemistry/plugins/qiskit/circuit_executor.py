@@ -19,12 +19,8 @@ from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
 
 import qdk_chemistry.plugins.qiskit as qiskit_plugin
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-
-if qiskit_plugin.QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
-    import qiskit_ibm_runtime.fake_provider
-
 import qdk_chemistry.plugins.qiskit._interop.transpiler as _transpiler_module
+from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
@@ -59,6 +55,19 @@ class QiskitAerSimulatorSettings(Settings):
         self._set_default("seed", "int", 42)
         self._set_default("method", "string", "statevector")
         self._set_default("transpile_optimization_level", "int", 0)
+        self._set_default("device_backend_name", "string", "", "Name of a fake device backend for noise modeling.")
+        self._set_default(
+            "pre_transpilation_passes",
+            "vector<string>",
+            [],
+            "Pass names to apply before transpilation.",
+        )
+        self._set_default(
+            "post_transpilation_passes",
+            "vector<string>",
+            [],
+            "Pass names to apply after transpilation.",
+        )
 
 
 class QiskitAerSimulator(CircuitExecutor):
@@ -90,9 +99,6 @@ class QiskitAerSimulator(CircuitExecutor):
         circuit: Circuit,
         shots: int,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> CircuitExecutorData:
         """Execute the given quantum circuit using the Qiskit Aer Simulator.
 
@@ -100,9 +106,7 @@ class QiskitAerSimulator(CircuitExecutor):
             circuit: The quantum circuit to execute.
             shots: The number of shots to execute the circuit.
             noise: Optional noise profile to apply during execution.
-            device_backend_name: Optional name of a fake device backend to use for noise modeling.
-            pre_transpilation_passes: Optional list of pass names to apply before transpilation.
-            post_transpilation_passes: Optional list of pass names to apply after transpilation.
+            **kwargs: Reserved for forward compatibility.
 
         Returns:
             CircuitExecutorData: Object containing the results of the circuit execution.
@@ -111,6 +115,10 @@ class QiskitAerSimulator(CircuitExecutor):
         Logger.trace_entering()
         meas_circuit = circuit.get_qiskit_circuit()
         Logger.debug("Qiskit QuantumCircuit loaded.")
+
+        device_backend_name = self._settings.get("device_backend_name") or None
+        pre_transpilation_passes = self._settings.get("pre_transpilation_passes") or None
+        post_transpilation_passes = self._settings.get("post_transpilation_passes") or None
 
         if noise is not None and device_backend_name is not None:
             raise ValueError("Cannot specify both a noise model and a device backend. Please choose one or the other.")
@@ -128,6 +136,8 @@ class QiskitAerSimulator(CircuitExecutor):
                     "The fake_provider module from qiskit_ibm_runtime is required for device backend simulation. "
                     "Install it with: pip install qiskit-ibm-runtime"
                 )
+
+            import qiskit_ibm_runtime.fake_provider  # noqa: PLC0415
 
             provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
             try:
