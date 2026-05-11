@@ -114,9 +114,10 @@ Example:
     4
 )");
 
-  // Constructor from list of dense little-endian Pauli strings
+  // Constructor from list of dense little-endian Pauli strings + optional phases
   mapping.def(
-      py::init([](py::list table_list, const std::string& name) {
+      py::init([](py::list table_list, const std::string& name,
+                  std::vector<std::int8_t> phases) {
         Py_ssize_t n = PyList_GET_SIZE(table_list.ptr());
         if (n == 0) {
           throw py::value_error("MajoranaMapping table must not be empty");
@@ -128,7 +129,6 @@ Example:
               std::to_string(n));
         }
 
-        // Validate all strings have the same length and contain only IXYZ
         Py_ssize_t expected_len = -1;
         std::vector<SparsePauliWord> table;
         table.reserve(static_cast<std::size_t>(n));
@@ -160,18 +160,17 @@ Example:
           }
 
           std::string s(str_data, static_cast<std::size_t>(str_len));
-          // char_to_op validates each character
           table.push_back(dense_le_to_sparse(s));
         }
 
-        // C++ constructor validates Clifford algebra
         try {
-          return MajoranaMapping(std::move(table), name);
+          return MajoranaMapping(std::move(table), name, std::move(phases));
         } catch (const std::invalid_argument& e) {
           throw py::value_error(e.what());
         }
       }),
       py::arg("table"), py::arg("name") = "",
+      py::arg("phases") = std::vector<std::int8_t>{},
       R"(
 Construct a MajoranaMapping from a list of dense Pauli-string labels.
 
@@ -248,6 +247,23 @@ Raises:
       "sparse_table",
       [](const MajoranaMapping& self) { return self.table(); },
       "List of sparse Pauli words [(qubit_idx, op_type), ...].");
+
+  // phases property
+  mapping.def_property_readonly(
+      "phases",
+      [](const MajoranaMapping& self) -> py::tuple {
+        py::tuple result(self.phases().size());
+        for (std::size_t i = 0; i < self.phases().size(); ++i) {
+          result[i] = py::cast(static_cast<int>(self.phases()[i]));
+        }
+        return result;
+      },
+      "Tuple of per-entry sign factors (+1 or -1).");
+
+  mapping.def_property_readonly(
+      "all_phases_positive",
+      [](const MajoranaMapping& self) { return self.all_phases_positive(); },
+      "True if all phases are +1 (standard encodings).");
 
   // __call__ for γ_k lookup
   mapping.def(

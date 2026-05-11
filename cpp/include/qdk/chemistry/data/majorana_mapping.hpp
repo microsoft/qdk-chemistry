@@ -39,14 +39,19 @@ class MajoranaMapping {
    * @brief Construct a MajoranaMapping from a Majorana-to-Pauli table.
    *
    * @param table Vector of 2N SparsePauliWord entries (one per Majorana
-   *              operator γ_0, γ_1, ..., γ_{2N-1}).
+   *              operator gamma_0, gamma_1, ..., gamma_{2N-1}).
    * @param name  Optional human-readable label for the encoding (e.g.,
    *              "jordan-wigner"). Stored but not used for dispatch.
-   * @throws std::invalid_argument If table size is odd, empty, or the
-   *         Clifford algebra validation fails.
+   * @param phases Optional vector of 2N sign factors (+1 or -1) such that
+   *               gamma_k = phases[k] * table[k]. If empty, all phases are
+   *               assumed +1. Encodings like SCBK produce negative phases.
+   * @throws std::invalid_argument If table size is odd, empty, phases size
+   *         doesn't match table, phases contain values other than +1/-1,
+   *         or the Clifford algebra validation fails.
    */
   explicit MajoranaMapping(std::vector<SparsePauliWord> table,
-                           std::string name = "");
+                           std::string name = "",
+                           std::vector<std::int8_t> phases = {});
 
   /**
    * @brief Number of fermionic modes (spin-orbitals).
@@ -62,18 +67,37 @@ class MajoranaMapping {
   std::size_t num_qubits() const { return num_qubits_; }
 
   /**
-   * @brief Look up the Pauli string for Majorana operator γ_k.
-   * @param k Majorana index (0 ≤ k < 2N).
-   * @return const reference to the SparsePauliWord for γ_k.
-   * @throws std::out_of_range if k ≥ 2N.
+   * @brief Look up the Pauli string for Majorana operator gamma_k.
+   * @param k Majorana index (0 <= k < 2N).
+   * @return const reference to the SparsePauliWord for gamma_k.
+   * @throws std::out_of_range if k >= 2N.
    */
   const SparsePauliWord& operator()(std::size_t k) const;
+
+  /**
+   * @brief Get the sign factor for Majorana operator gamma_k.
+   * @param k Majorana index (0 <= k < 2N).
+   * @return +1 or -1.
+   */
+  std::int8_t phase(std::size_t k) const;
+
+  /**
+   * @brief Check if all phases are +1 (fast path for standard encodings).
+   * @return true if no entry has a negative phase.
+   */
+  bool all_phases_positive() const { return all_positive_; }
 
   /**
    * @brief Access the full Majorana-to-Pauli table.
    * @return const reference to the vector of SparsePauliWords.
    */
   const std::vector<SparsePauliWord>& table() const { return table_; }
+
+  /**
+   * @brief Access the phases vector.
+   * @return const reference to the vector of sign factors.
+   */
+  const std::vector<std::int8_t>& phases() const { return phases_; }
 
   /**
    * @brief Human-readable name of the encoding.
@@ -133,8 +157,14 @@ class MajoranaMapping {
   static MajoranaMapping parity(std::size_t num_modes);
 
  private:
-  /// Majorana-to-Pauli table: table_[k] = φ(γ_k).
+  /// Majorana-to-Pauli table: table_[k] = unsigned Pauli string for gamma_k.
   std::vector<SparsePauliWord> table_;
+
+  /// Per-entry sign factors: gamma_k = phases_[k] * table_[k].
+  std::vector<std::int8_t> phases_;
+
+  /// True if all phases are +1 (enables fast-path in engine).
+  bool all_positive_;
 
   /// Human-readable encoding name.
   std::string name_;

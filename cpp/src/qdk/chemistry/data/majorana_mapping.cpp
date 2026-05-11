@@ -142,8 +142,11 @@ constexpr std::uint8_t OP_Z = 3;
 // ── MajoranaMapping implementation ───────────────────────────────────
 
 MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
-                                 std::string name)
+                                 std::string name,
+                                 std::vector<std::int8_t> phases)
     : table_(std::move(table)),
+      phases_(std::move(phases)),
+      all_positive_(true),
       name_(std::move(name)),
       num_qubits_(compute_num_qubits(table_)) {
   if (table_.empty()) {
@@ -155,6 +158,23 @@ MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
         "MajoranaMapping table must have an even number of entries "
         "(2 per fermionic mode), got " +
         std::to_string(table_.size()));
+  }
+  // Default phases to all +1 if not provided
+  if (phases_.empty()) {
+    phases_.assign(table_.size(), 1);
+  } else if (phases_.size() != table_.size()) {
+    throw std::invalid_argument(
+        "phases size (" + std::to_string(phases_.size()) +
+        ") must match table size (" + std::to_string(table_.size()) + ")");
+  }
+  // Validate phase values and compute all_positive flag
+  for (std::size_t k = 0; k < phases_.size(); ++k) {
+    if (phases_[k] != 1 && phases_[k] != -1) {
+      throw std::invalid_argument(
+          "phases[" + std::to_string(k) + "] = " +
+          std::to_string(phases_[k]) + "; must be +1 or -1");
+    }
+    if (phases_[k] != 1) all_positive_ = false;
   }
   validate();
 }
@@ -168,28 +188,35 @@ const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
   return table_[k];
 }
 
+std::int8_t MajoranaMapping::phase(std::size_t k) const {
+  if (k >= phases_.size()) {
+    throw std::out_of_range(
+        "Majorana index " + std::to_string(k) +
+        " out of range [0, " + std::to_string(phases_.size()) + ")");
+  }
+  return phases_[k];
+}
+
 void MajoranaMapping::validate() const {
   const std::size_t n = table_.size();
   constexpr double tol = 1e-12;
 
   for (std::size_t i = 0; i < n; ++i) {
     for (std::size_t j = i; j < n; ++j) {
-      // Compute φ(γ_i)·φ(γ_j) + φ(γ_j)·φ(γ_i) and check = 2δ_{ij}·I
+      // gamma_k = phases_[k] * table_[k], so:
+      // gamma_i * gamma_j = phases_[i]*phases_[j] * table_[i]*table_[j]
       auto [phase_ij, word_ij] = multiply_words(table_[i], table_[j]);
       auto [phase_ji, word_ji] = multiply_words(table_[j], table_[i]);
 
-      // The anticommutator should be a scalar (identity word = empty)
-      // For i == j: result should be 2·I (phase = 2, word = empty)
-      // For i != j: result should be 0 (both terms cancel)
+      // Include the sign factors
+      double sign_ij = static_cast<double>(phases_[i]) * phases_[j];
 
       if (i == j) {
-        // γ_i² = I, so φ(γ_i)·φ(γ_i) should give phase·I with phase
-        // being ±1 (since Pauli strings square to ±I). The sum should be 2.
-        // Since word_ij == word_ji and phase_ij == phase_ji (same product),
-        // we need phase_ij to be 1 and word_ij to be identity.
+        // gamma_i^2 = phases_[i]^2 * P_i^2 = 1 * P_i^2
+        // P_i^2 must be I with phase +1
         if (!word_ij.empty()) {
           std::ostringstream msg;
-          msg << "Clifford algebra validation failed: γ_" << i
+          msg << "Clifford algebra validation failed: gamma_" << i
               << " squared is not proportional to identity";
           throw std::invalid_argument(msg.str());
         }

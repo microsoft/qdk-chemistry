@@ -16,7 +16,10 @@ import pytest
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
 )
-from .test_helpers import create_nontrivial_test_hamiltonian, create_test_basis_set
+from .test_helpers import (
+    create_nontrivial_test_hamiltonian,
+    create_test_basis_set,
+)
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
@@ -132,6 +135,87 @@ def test_openfermion_bk_tree_encoding():
     ref_qh = qubit_operator_to_qubit_hamiltonian(ref_qop, encoding="bravyi-kitaev-tree")
 
     _assert_pauli_ops_equal(qh, ref_qh)
+
+
+# -------------------------------------------------------------------------------------
+# Symmetry-conserving Bravyi-Kitaev (SCBK)
+# -------------------------------------------------------------------------------------
+
+
+def _make_scbk_mapping(hamiltonian: Hamiltonian) -> MajoranaMapping:
+    """Build a MajoranaMapping with name ``"symmetry-conserving-bravyi-kitaev"``.
+
+    SCBK uses name-dispatch, not the Majorana table. Use a JW table as placeholder.
+    """
+    n_spin = _num_spin_orbitals(hamiltonian)
+    jw = MajoranaMapping.jordan_wigner(num_modes=n_spin)
+    return MajoranaMapping(table=list(jw.table), name="symmetry-conserving-bravyi-kitaev")
+
+
+def test_openfermion_scbk_produces_qubit_hamiltonian():
+    """SCBK encoding produces a valid QubitHamiltonian with reduced qubit count."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    mapping = _make_scbk_mapping(hamiltonian)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+
+    qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping, symmetries)
+
+    assert qh is not None
+    assert len(qh.pauli_strings) > 0
+    # SCBK reduces qubit count by 2 relative to the number of spin-orbitals
+    n_spin = _num_spin_orbitals(hamiltonian)
+    assert qh.num_qubits == n_spin - 2
+
+
+def test_openfermion_scbk_sets_interleaved_order():
+    """SCBK encoding sets fermion_mode_order to INTERLEAVED."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    mapping = _make_scbk_mapping(hamiltonian)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+
+    qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping, symmetries)
+
+    assert qh.fermion_mode_order == FermionModeOrder.INTERLEAVED
+
+
+def test_openfermion_scbk_matches_direct_openfermion():
+    """SCBK encoding matches direct use of openfermion.transforms.symmetry_conserving_bravyi_kitaev."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    mapping = _make_scbk_mapping(hamiltonian)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+
+    qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping, symmetries)
+
+    # Build reference directly via OpenFermion
+    fop = hamiltonian_to_fermion_operator(hamiltonian)
+    h1_alpha, _ = hamiltonian.get_one_body_integrals()
+    n_spinorbitals = 2 * h1_alpha.shape[0]
+    n_active_electrons = symmetries.n_particles
+
+    ref_qop = of.transforms.symmetry_conserving_bravyi_kitaev(fop, n_spinorbitals, n_active_electrons)
+    ref_qop.compress()
+
+    # Remove core energy (same as plugin does)
+    core_energy = hamiltonian.get_core_energy()
+    if abs(core_energy) > 1e-15:
+        ref_qop -= core_energy * of.QubitOperator(())
+        ref_qop.compress()
+
+    ref_qh = qubit_operator_to_qubit_hamiltonian(
+        ref_qop, encoding="symmetry-conserving-bravyi-kitaev", fermion_mode_order=FermionModeOrder.INTERLEAVED
+    )
+
+    _assert_pauli_ops_equal(qh, ref_qh)
+
+
+def test_openfermion_scbk_requires_symmetries():
+    """SCBK encoding raises ValueError when symmetries is not provided."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    mapping = _make_scbk_mapping(hamiltonian)
+
+    mapper = create("qubit_mapper", "openfermion")
+    with pytest.raises(ValueError, match="symmetry-conserving Bravyi-Kitaev"):
+        mapper.run(hamiltonian, mapping)
 
 
 # -------------------------------------------------------------------------------------

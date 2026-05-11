@@ -250,11 +250,14 @@ MajoranaMapResult majorana_map_impl(
 
   PackedAccumulator<NW> acc;
 
-  // Convert all Majorana table entries to packed form
+  // Convert all Majorana table entries to packed form + cache phases
   std::vector<PackedPauliWord<NW>> packed_mapping(2 * n_modes);
+  std::vector<std::int8_t> maj_phases(2 * n_modes);
   for (std::size_t k = 0; k < 2 * n_modes; ++k) {
     packed_mapping[k] = sparse_to_packed<NW>(mapping(k));
+    maj_phases[k] = mapping.phase(k);
   }
+  const bool has_neg_phases = !mapping.all_phases_positive();
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
@@ -262,13 +265,21 @@ MajoranaMapResult majorana_map_impl(
   };
 
   // Helper: accumulate one-body E_pq for a mode pair, using packed types
+  // E_pq = (1/4) * sum_{a,b} c[a][b] * phase(2p+a) * phase(2q+b) * P(2p+a) * P(2q+b)
   auto accumulate_epq = [&](std::size_t mode_p, std::size_t mode_q,
                             double h_pq) {
     for (int a = 0; a < 2; ++a) {
+      std::size_t idx_pa = 2 * mode_p + a;
       for (int b = 0; b < 2; ++b) {
+        std::size_t idx_qb = 2 * mode_q + b;
         auto [ph, word] = multiply_packed(
-            packed_mapping[2 * mode_p + a], packed_mapping[2 * mode_q + b]);
-        acc.accumulate(word, apply_phase(ph, h_pq * kQuarter * kC[a][b]));
+            packed_mapping[idx_pa], packed_mapping[idx_qb]);
+        double sign = has_neg_phases
+                          ? static_cast<double>(maj_phases[idx_pa]) *
+                                maj_phases[idx_qb]
+                          : 1.0;
+        acc.accumulate(word,
+                       apply_phase(ph, sign * h_pq * kQuarter * kC[a][b]));
       }
     }
   };
@@ -320,8 +331,11 @@ MajoranaMapResult majorana_map_impl(
   // ─── Two-body terms ───────────────────────────────────────────────
 
   // Precompute Majorana pair products in packed form (same-spin only).
+  // Each entry stores the Pauli multiply phase index AND the combined
+  // Majorana sign factor (phases[i] * phases[j]).
   struct PackedPairProduct {
-    int phase;  // phase index (0..3): 0=+1, 1=+i, 2=-1, 3=-i
+    int phase;      // Pauli multiply phase index (0..3)
+    std::int8_t sign;  // maj_phases[i] * maj_phases[j] (±1)
     PackedPauliWord<NW> word;
   };
   const std::size_t maj_per_spin = 2 * n_spatial;
@@ -330,14 +344,23 @@ MajoranaMapResult majorana_map_impl(
 
   for (std::size_t i = 0; i < maj_per_spin; ++i) {
     for (std::size_t j = 0; j < maj_per_spin; ++j) {
+      // alpha block: Majorana indices i, j
       auto [ph_a, w_a] = multiply_packed(
           packed_mapping[i], packed_mapping[j]);
-      ppair_alpha[i * maj_per_spin + j] = {ph_a, std::move(w_a)};
+      std::int8_t sign_a = has_neg_phases
+                               ? maj_phases[i] * maj_phases[j]
+                               : static_cast<std::int8_t>(1);
+      ppair_alpha[i * maj_per_spin + j] = {ph_a, sign_a, std::move(w_a)};
 
+      // beta block: Majorana indices i+2*n_spatial, j+2*n_spatial
       auto [ph_b, w_b] = multiply_packed(
           packed_mapping[i + maj_per_spin],
           packed_mapping[j + maj_per_spin]);
-      ppair_beta[i * maj_per_spin + j] = {ph_b, std::move(w_b)};
+      std::int8_t sign_b =
+          has_neg_phases
+              ? maj_phases[i + maj_per_spin] * maj_phases[j + maj_per_spin]
+              : static_cast<std::int8_t>(1);
+      ppair_beta[i * maj_per_spin + j] = {ph_b, sign_b, std::move(w_b)};
     }
   }
 
@@ -362,10 +385,12 @@ MajoranaMapResult majorana_map_impl(
         auto& sse = ss_e[p * n_spatial + q];
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
-            const auto& [phase_a, word_a] = alpha_pair(2*p+a, 2*q+b);
-            sse.terms.emplace_back(apply_phase(phase_a, kQuarter * kC[a][b]), word_a);
-            const auto& [phase_b, word_b] = beta_pair(2*p+a, 2*q+b);
-            sse.terms.emplace_back(apply_phase(phase_b, kQuarter * kC[a][b]), word_b);
+            const auto& [phase_a, sign_a, word_a] = alpha_pair(2*p+a, 2*q+b);
+            sse.terms.emplace_back(
+                apply_phase(phase_a, static_cast<double>(sign_a) * kQuarter * kC[a][b]), word_a);
+            const auto& [phase_b, sign_b, word_b] = beta_pair(2*p+a, 2*q+b);
+            sse.terms.emplace_back(
+                apply_phase(phase_b, static_cast<double>(sign_b) * kQuarter * kC[a][b]), word_b);
           }
         }
       }
@@ -468,15 +493,16 @@ MajoranaMapResult majorana_map_impl(
       double half_eri = 0.5 * eri;
       for (int a = 0; a < 2; ++a) {
         for (int b = 0; b < 2; ++b) {
-          const auto& [ph1, w1] =
+          const auto& [ph1, s1, w1] =
               cache_pq[(2*bp+a) * maj_per_spin + (2*bq+b)];
           for (int c = 0; c < 2; ++c) {
             for (int d = 0; d < 2; ++d) {
-              const auto& [ph2, w2] =
+              const auto& [ph2, s2, w2] =
                   cache_rs[(2*br+c) * maj_per_spin + (2*bs+d)];
+              double sign = static_cast<double>(s1) * s2;
               std::complex<double> scale =
                   apply_phase((ph1 + ph2) & 3,
-                              half_eri * kSixteenth * kC[a][b] * kC[c][d]);
+                              sign * half_eri * kSixteenth * kC[a][b] * kC[c][d]);
               acc.accumulate_product(w1, w2, scale);
             }
           }

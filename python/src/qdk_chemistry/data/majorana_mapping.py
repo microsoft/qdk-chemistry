@@ -72,6 +72,7 @@ class MajoranaMapping(DataClass):
         self,
         table: list[str] | tuple[str, ...],
         name: str = "",
+        phases: list[int] | tuple[int, ...] | None = None,
         *,
         _core: _CoreMajoranaMapping | None = None,
     ) -> None:
@@ -80,24 +81,23 @@ class MajoranaMapping(DataClass):
         Args:
             table (list[str] | tuple[str, ...]): 2N Pauli strings in little-endian format (qubit 0 = rightmost char).
             name (str): Optional human-readable label for the encoding. Default ``""``.
+            phases (list[int] | None): Optional 2N sign factors (+1 or -1) per Majorana operator. Default all +1.
 
         Raises:
             ValueError: If the table is invalid (wrong size, bad characters, or Clifford algebra violation).
 
         """
         if _core is not None:
-            # Fast path: accept a pre-validated C++ core object directly
-            # (used by factory classmethods to skip re-parsing and re-validation)
             self._core = _core
         else:
-            # Build C++ core object (validates Clifford algebra)
-            self._core = _CoreMajoranaMapping(list(table), name)
+            self._core = _CoreMajoranaMapping(list(table), name, list(phases) if phases else [])
 
         # Cache immutable properties from the core
         self._table = self._core.table
         self._name = self._core.name
         self._num_modes = self._core.num_modes
         self._num_qubits = self._core.num_qubits
+        self._phases = self._core.phases
 
         # Mark immutable
         super().__init__()
@@ -121,6 +121,11 @@ class MajoranaMapping(DataClass):
     def name(self) -> str:
         """Human-readable name of the encoding (may be empty for custom mappings)."""
         return self._name
+
+    @property
+    def phases(self) -> tuple[int, ...]:
+        """Tuple of per-entry sign factors (+1 or -1). All +1 for standard encodings."""
+        return self._phases
 
     @property
     def core(self) -> _CoreMajoranaMapping:
@@ -225,6 +230,9 @@ class MajoranaMapping(DataClass):
             "table": list(self._table),
             "name": self._name,
         }
+        # Only include phases if any are non-default (-1)
+        if any(p != 1 for p in self._phases):
+            data["phases"] = list(self._phases)
         return self._add_json_version(data)
 
     @classmethod
@@ -242,6 +250,7 @@ class MajoranaMapping(DataClass):
         return cls(
             table=json_data["table"],
             name=json_data.get("name", ""),
+            phases=json_data.get("phases"),
         )
 
     def to_hdf5(self, group: h5py.Group) -> None:
