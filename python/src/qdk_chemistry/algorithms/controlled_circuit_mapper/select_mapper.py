@@ -21,7 +21,7 @@ class SelectMapper(Algorithm):
     r"""Abstract base class for SELECT oracle mappers.
 
     Subclasses implement a specific strategy for constructing the SELECT circuit
-    from a :class:`Select` data object.
+    from a :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.Select` data object.
     """
 
     def type_name(self) -> str:
@@ -53,8 +53,8 @@ class SelectMapperFactory(AlgorithmFactory):
 class MultiControlSelectMapper(SelectMapper):
     r"""Multi-controlled SELECT oracle mapper for LCU block encodings.
 
-    Converts a :class:`Select` data object into a Q# callable that implements
-    the SELECT oracle:
+    Converts a :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.Select` data object
+    into a Q# callable that implements the SELECT oracle:
 
     .. math::
 

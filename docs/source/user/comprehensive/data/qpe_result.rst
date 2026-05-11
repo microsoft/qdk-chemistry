@@ -87,7 +87,7 @@ The alias resolution algorithm works as follows:
 3. Include negative reflections: :math:`-E_k` for symmetry
 4. If a reference energy is provided, select the candidate closest to the reference as ``resolved_energy``
 
-The branch shift range can be customized via the ``branch_shifts`` parameter in :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction`.
+The branch shift range can be customized via the ``branch_shifts`` parameter in :meth:`~qdk_chemistry.data.QpeResult.from_time_evolution_result`.
 
 .. tip::
 
@@ -98,7 +98,7 @@ Construction
 ------------
 
 :class:`~qdk_chemistry.data.QpeResult` objects are typically created by the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm.
-They can also be constructed manually from a measured phase fraction using the :meth:`~qdk_chemistry.data.QpeResult.from_phase_fraction` class method:
+They can also be constructed manually from a measured phase fraction using the :meth:`~qdk_chemistry.data.QpeResult.from_time_evolution_result` class method:
 
 .. tab:: Python API
 

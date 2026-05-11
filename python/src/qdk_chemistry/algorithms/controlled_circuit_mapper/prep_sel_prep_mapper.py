@@ -24,7 +24,7 @@ class PrepSelPrepSettings(Settings):
     Attributes:
         prepare_mapper: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``. Any
-            :class:`~qdk_chemistry.algorithms.state_preparation.StatePreparation`
+            :class:`~qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation`
             that implements ``prepare_from_statevector`` can be used.
         select_mapper: Algorithm reference for the SELECT oracle mapper.
             Defaults to ``MultiControlSelectMapper``.
@@ -53,7 +53,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
        the ``prepare_mapper`` setting.  Any
-       :class:`~qdk_chemistry.algorithms.state_preparation.StatePreparation`
+       :class:`~qdk_chemistry.algorithms.state_preparation.state_preparation.StatePreparation`
        that implements ``prepare_from_statevector`` can be plugged in.
     2. **SELECT** — multi-controlled unitary application on the system register,
        resolved via the ``select_mapper`` setting.
