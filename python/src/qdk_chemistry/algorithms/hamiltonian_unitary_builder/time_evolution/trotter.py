@@ -142,8 +142,7 @@ class Trotter(TimeEvolutionBuilder):
             error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
-            power_strategy: Strategy for U^power: ``"rescale"`` scales
-                time, ``"repeat"`` repeats the circuit. Defaults to ``"repeat"``.
+            power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
 
         """
         super().__init__()
@@ -282,10 +281,8 @@ class Trotter(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=atol):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        coeffs = list(qubit_hamiltonian.get_real_coefficients(tolerance=atol))
-        # If there are no coefficients (e.g., empty Hamiltonian or all filtered by atol),
-        # there is nothing to decompose; return the empty list of terms.
-        if not coeffs:
+        # If all coefficients are below the tolerance, there is nothing to decompose.
+        if not any(abs(complex(c).real) > atol for c in qubit_hamiltonian.coefficients):
             Logger.warn("No coefficients above the tolerance; returning empty term list.")
             return terms
 
