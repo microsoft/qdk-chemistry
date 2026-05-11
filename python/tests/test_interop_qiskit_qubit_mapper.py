@@ -14,11 +14,17 @@ from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
 )
-from .test_helpers import create_test_hamiltonian
+from .test_helpers import create_test_basis_set, create_test_hamiltonian
 
 if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
     from qdk_chemistry.algorithms import QubitMapper, available, create
-    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
+    from qdk_chemistry.data import (
+        CanonicalFourCenterHamiltonianContainer,
+        Hamiltonian,
+        MajoranaMapping,
+        Orbitals,
+        QubitHamiltonian,
+    )
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_NATURE, reason="Qiskit Nature not available")
 
@@ -58,3 +64,76 @@ def test_qiskit_qubit_mappers(encoding) -> None:
         rtol=float_comparison_relative_tolerance,
         atol=float_comparison_absolute_tolerance,
     )
+
+
+def test_qiskit_unrestricted_jw_matches_qdk():
+    """Qiskit plugin produces same UHF JW result as QDK engine."""
+    n = 2
+    rng = np.random.default_rng(77)
+    coeffs_a = np.eye(n)
+    coeffs_b = np.eye(n) + rng.standard_normal((n, n)) * 0.1
+    basis = create_test_basis_set(n, "uhf-qiskit-test")
+    orbitals = Orbitals(coeffs_a, coeffs_b, None, None, None, basis)
+
+    raw_a = rng.standard_normal((n, n)) * 0.3
+    h1_a = (raw_a + raw_a.T) / 2 + np.diag([1.0, -0.5])
+    raw_b = rng.standard_normal((n, n)) * 0.3
+    h1_b = (raw_b + raw_b.T) / 2 + np.diag([0.8, -0.3])
+
+    def sym_eri(n, rng):
+        h2 = np.zeros((n, n, n, n))
+        seen = set()
+        for p in range(n):
+            for q in range(n):
+                for r in range(n):
+                    for s in range(n):
+                        perms = frozenset(
+                            {
+                                (p, q, r, s),
+                                (q, p, r, s),
+                                (p, q, s, r),
+                                (q, p, s, r),
+                                (r, s, p, q),
+                                (s, r, p, q),
+                                (r, s, q, p),
+                                (s, r, q, p),
+                            }
+                        )
+                        c = min(perms)
+                        if c in seen:
+                            continue
+                        seen.add(c)
+                        v = rng.standard_normal() * 0.2
+                        for a, b, c2, d in perms:
+                            h2[a, b, c2, d] = v
+        return h2
+
+    eri_aa = sym_eri(n, rng)
+    eri_ab = sym_eri(n, rng)
+    eri_bb = sym_eri(n, rng)
+
+    hamiltonian = Hamiltonian(
+        CanonicalFourCenterHamiltonianContainer(
+            h1_a,
+            h1_b,
+            eri_aa.ravel(),
+            eri_ab.ravel(),
+            eri_bb.ravel(),
+            orbitals,
+            0.0,
+            np.eye(0),
+            np.eye(0),
+        )
+    )
+    assert not hamiltonian.get_orbitals().is_restricted()
+
+    mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+    qh_qdk = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    qh_qis = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
+
+    # Coefficient-exact comparison
+    d_qdk = dict(zip(qh_qdk.pauli_strings, qh_qdk.coefficients, strict=False))
+    d_qis = dict(zip(qh_qis.pauli_strings, qh_qis.coefficients, strict=False))
+    all_keys = set(d_qdk) | set(d_qis)
+    max_diff = max(abs(d_qdk.get(k, 0) - d_qis.get(k, 0)) for k in all_keys)
+    assert max_diff < 1e-10, f"UHF JW max coefficient diff: {max_diff}"

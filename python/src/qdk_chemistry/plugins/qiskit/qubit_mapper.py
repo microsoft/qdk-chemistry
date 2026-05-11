@@ -99,12 +99,24 @@ class QiskitQubitMapper(QubitMapper):
                 f"Use the QDK variant for custom mappings."
             )
 
-        (h1_a, _) = hamiltonian.get_one_body_integrals()
-        (h2_aa, _, _) = hamiltonian.get_two_body_integrals()
+        h1_a, h1_b = hamiltonian.get_one_body_integrals()
+        h2_aa, h2_ab, h2_bb = hamiltonian.get_two_body_integrals()
         num_orbs = len(hamiltonian.get_orbitals().get_active_space_indices()[0])
-        electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
-            h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
-        )
+        is_restricted = hamiltonian.get_orbitals().is_restricted()
+
+        if is_restricted:
+            electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
+                h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
+            )
+        else:
+            electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
+                h1_a=h1_a,
+                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h1_b=h1_b,
+                h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h2_ba=h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+            )
+
         fermionic_op = electronic_hamiltonian.second_q_op()
         qubit_mapper = _SUPPORTED_ENCODINGS[encoding_name]()
         qubit_op = qubit_mapper.map(fermionic_op)

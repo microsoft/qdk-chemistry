@@ -16,7 +16,7 @@ import pytest
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
 )
-from .test_helpers import create_nontrivial_test_hamiltonian
+from .test_helpers import create_nontrivial_test_hamiltonian, create_test_basis_set
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 
@@ -24,7 +24,13 @@ if OPENFERMION_AVAILABLE:
     import openfermion as of
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
-    from qdk_chemistry.data import MajoranaMapping, Symmetries
+    from qdk_chemistry.data import (
+        CanonicalFourCenterHamiltonianContainer,
+        Hamiltonian,
+        MajoranaMapping,
+        Orbitals,
+        Symmetries,
+    )
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
@@ -39,7 +45,7 @@ if OPENFERMION_AVAILABLE:
     }
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
+    from qdk_chemistry.data import QubitHamiltonian
 
 pytestmark = pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
 
@@ -279,3 +285,78 @@ def test_openfermion_standard_sets_blocked_order(encoding):
         mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name=encoding)
     qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
     assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
+
+
+@pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not available")
+def test_openfermion_unrestricted_jw_matches_qdk():
+    """OpenFermion plugin produces same UHF JW result as QDK engine."""
+    n = 2
+    rng = np.random.default_rng(77)
+    coeffs_a = np.eye(n)
+    coeffs_b = np.eye(n) + rng.standard_normal((n, n)) * 0.1
+    basis = create_test_basis_set(n, "uhf-of-test")
+    orbitals = Orbitals(coeffs_a, coeffs_b, None, None, None, basis)
+
+    raw_a = rng.standard_normal((n, n)) * 0.3
+    h1_a = (raw_a + raw_a.T) / 2 + np.diag([1.0, -0.5])
+    raw_b = rng.standard_normal((n, n)) * 0.3
+    h1_b = (raw_b + raw_b.T) / 2 + np.diag([0.8, -0.3])
+
+    def sym_eri(n, rng):
+        h2 = np.zeros((n, n, n, n))
+        seen = set()
+        for p in range(n):
+            for q in range(n):
+                for r in range(n):
+                    for s in range(n):
+                        perms = frozenset(
+                            {
+                                (p, q, r, s),
+                                (q, p, r, s),
+                                (p, q, s, r),
+                                (q, p, s, r),
+                                (r, s, p, q),
+                                (s, r, p, q),
+                                (r, s, q, p),
+                                (s, r, q, p),
+                            }
+                        )
+                        c = min(perms)
+                        if c in seen:
+                            continue
+                        seen.add(c)
+                        v = rng.standard_normal() * 0.2
+                        for a, b, c2, d in perms:
+                            h2[a, b, c2, d] = v
+        return h2
+
+    eri_aa = sym_eri(n, rng)
+    eri_ab = sym_eri(n, rng)
+    eri_bb = sym_eri(n, rng)
+
+    hamiltonian = Hamiltonian(
+        CanonicalFourCenterHamiltonianContainer(
+            h1_a,
+            h1_b,
+            eri_aa.ravel(),
+            eri_ab.ravel(),
+            eri_bb.ravel(),
+            orbitals,
+            0.0,
+            np.eye(0),
+            np.eye(0),
+        )
+    )
+    assert not hamiltonian.get_orbitals().is_restricted()
+
+    mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+    qh_qdk = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    qh_of = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
+
+    # OpenFermion folds core_energy into identity; QDK doesn't.
+    # Core energy is 0.0 here, so no adjustment needed.
+    d_qdk = dict(zip(qh_qdk.pauli_strings, qh_qdk.coefficients, strict=False))
+    d_of = dict(zip(qh_of.pauli_strings, qh_of.coefficients, strict=False))
+    all_keys = set(d_qdk) | set(d_of)
+    max_diff = max(abs(d_qdk.get(k, 0) - d_of.get(k, 0)) for k in all_keys)
+    assert max_diff < 1e-10, f"UHF JW max coefficient diff: {max_diff}"
