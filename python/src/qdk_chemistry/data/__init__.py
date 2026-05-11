@@ -118,6 +118,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian import TimeDependentQubitHamiltonian
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -182,6 +183,7 @@ __all__ = [
     "Structure",
     "Symmetries",
     "TermPartition",
+    "TimeDependentQubitHamiltonian",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

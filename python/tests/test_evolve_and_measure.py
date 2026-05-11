@@ -14,7 +14,7 @@ import pytest
 
 import qdk_chemistry.algorithms.time_evolution.measure_simulation.base as measure_base
 from qdk_chemistry.algorithms.time_evolution.measure_simulation import EvolveAndMeasure
-from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, QubitHamiltonian, TimeDependentQubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -93,6 +93,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     steps = 100
     hamiltonians = [hamiltonian_p, hamiltonian_m] * (steps // 2)
     time_steps = [float(t + 1) for t in range(steps)]
+    td_hamiltonian = TimeDependentQubitHamiltonian(hamiltonians, time_steps)
     observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
     algo = EvolveAndMeasure()
@@ -107,12 +108,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     algo.settings().set("shots", 1024)
 
     state_prep = _identity_state_prep(num_qubits=2)
-    measurements = algo.run(
-        hamiltonians,
-        times=time_steps,
-        observables=[observable],
-        state_prep=state_prep,
-    )
+    measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep)
 
     for measurement in measurements:
         assert measurement[0].energy_expectation_value == pytest.approx(1.0, abs=0.2)
@@ -126,6 +122,7 @@ def test_evolve_and_measure_with_device_backend() -> None:
     """Run EvolveAndMeasure with a device_backend_name string."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])
     hamiltonian = QubitHamiltonian(["ZZ"], np.array([1.0]), term_partition=partition)
+    td_hamiltonian = TimeDependentQubitHamiltonian([hamiltonian], [1.0])
     observable = QubitHamiltonian(["ZZ"], np.array([1.0]))
 
     algo = EvolveAndMeasure()
@@ -140,12 +137,7 @@ def test_evolve_and_measure_with_device_backend() -> None:
     algo.settings().set("shots", 1024)
 
     state_prep = _identity_state_prep(num_qubits=2)
-    measurements = algo.run(
-        [hamiltonian],
-        times=[1.0],
-        observables=[observable],
-        state_prep=state_prep,
-    )
+    measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep)
 
     for measurement in measurements:
         # With device noise the expectation value should still be close to 1.0
@@ -155,6 +147,56 @@ def test_evolve_and_measure_with_device_backend() -> None:
 # ---------------------------------------------------------------------------
 # Error-path tests for _run_impl input validation
 # ---------------------------------------------------------------------------
+
+
+class TestTimeDependentQubitHamiltonianValidation:
+    """Tests for TimeDependentQubitHamiltonian construction validation."""
+
+    def _make_hamiltonian(self, num_qubits: int = 2) -> QubitHamiltonian:
+        labels = ["Z" + "I" * (num_qubits - 1)]
+        return QubitHamiltonian(labels, np.array([1.0]))
+
+    def test_empty_hamiltonians_raises(self):
+        """Empty hamiltonians list should raise ValueError."""
+        with pytest.raises(ValueError, match="hamiltonians must not be empty"):
+            TimeDependentQubitHamiltonian([], [1.0])
+
+    def test_empty_times_raises(self):
+        """Empty times list should raise ValueError."""
+        with pytest.raises(ValueError, match="times must not be empty"):
+            TimeDependentQubitHamiltonian([self._make_hamiltonian()], [])
+
+    def test_length_mismatch_raises(self):
+        """Mismatched lengths should raise ValueError."""
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="same length"):
+            TimeDependentQubitHamiltonian([h, h], [1.0])
+
+    def test_non_monotonic_times_raises(self):
+        """Non-monotonically-increasing times should raise ValueError."""
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="strictly monotonically increasing"):
+            TimeDependentQubitHamiltonian([h, h], [2.0, 1.0])
+
+    def test_duplicate_times_raises(self):
+        """Duplicate times should raise ValueError (strict monotonicity)."""
+        h = self._make_hamiltonian()
+        with pytest.raises(ValueError, match="strictly monotonically increasing"):
+            TimeDependentQubitHamiltonian([h, h], [1.0, 1.0])
+
+    def test_mismatched_num_qubits_raises(self):
+        """Hamiltonians with different num_qubits should raise ValueError."""
+        h2 = self._make_hamiltonian(num_qubits=2)
+        h3 = self._make_hamiltonian(num_qubits=3)
+        with pytest.raises(ValueError, match="same number of qubits"):
+            TimeDependentQubitHamiltonian([h2, h3], [1.0, 2.0])
+
+    def test_valid_construction(self):
+        """Valid inputs should construct without error."""
+        h = self._make_hamiltonian()
+        td = TimeDependentQubitHamiltonian([h, h], [1.0, 2.0])
+        assert len(td) == 2
+        assert td.num_qubits == 2
 
 
 class TestEvolveAndMeasureValidation:
@@ -167,59 +209,14 @@ class TestEvolveAndMeasureValidation:
     def _dummy_state_prep(self) -> Circuit:
         return _identity_state_prep(num_qubits=2)
 
-    def test_empty_qubit_hamiltonians_raises(self):
-        """Empty qubit_hamiltonians list should raise ValueError."""
-        algo = EvolveAndMeasure()
-        with pytest.raises(ValueError, match="qubit_hamiltonians must not be empty"):
-            algo.run([], times=[1.0], observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
-
-    def test_empty_times_raises(self):
-        """Empty times list should raise ValueError."""
-        algo = EvolveAndMeasure()
-        with pytest.raises(ValueError, match="times must not be empty"):
-            algo.run(
-                [self._make_hamiltonian()],
-                times=[],
-                observables=[self._make_hamiltonian()],
-                state_prep=self._dummy_state_prep(),
-            )
-
-    def test_length_mismatch_raises(self):
-        """Mismatched lengths of qubit_hamiltonians and times should raise ValueError."""
-        algo = EvolveAndMeasure()
-        h = self._make_hamiltonian()
-        with pytest.raises(ValueError, match="same length"):
-            algo.run([h, h], times=[1.0], observables=[h], state_prep=self._dummy_state_prep())
-
-    def test_non_monotonic_times_raises(self):
-        """Non-monotonically-increasing times should raise ValueError."""
-        algo = EvolveAndMeasure()
-        h = self._make_hamiltonian()
-        with pytest.raises(ValueError, match="strictly monotonically increasing"):
-            algo.run([h, h], times=[2.0, 1.0], observables=[h], state_prep=self._dummy_state_prep())
-
-    def test_duplicate_times_raises(self):
-        """Duplicate times should raise ValueError (strict monotonicity)."""
-        algo = EvolveAndMeasure()
-        h = self._make_hamiltonian()
-        with pytest.raises(ValueError, match="strictly monotonically increasing"):
-            algo.run([h, h], times=[1.0, 1.0], observables=[h], state_prep=self._dummy_state_prep())
-
-    def test_mismatched_hamiltonian_num_qubits_raises(self):
-        """Hamiltonians with different num_qubits should raise ValueError."""
-        algo = EvolveAndMeasure()
-        h2 = self._make_hamiltonian(num_qubits=2)
-        h3 = self._make_hamiltonian(num_qubits=3)
-        with pytest.raises(ValueError, match="same number of qubits"):
-            algo.run([h2, h3], times=[1.0, 2.0], observables=[h2], state_prep=self._dummy_state_prep())
-
     def test_mismatched_observable_num_qubits_raises(self):
         """Observables with different num_qubits from Hamiltonians should raise ValueError."""
         algo = EvolveAndMeasure()
         h2 = self._make_hamiltonian(num_qubits=2)
         obs3 = self._make_hamiltonian(num_qubits=3)
+        td = TimeDependentQubitHamiltonian([h2], [1.0])
         with pytest.raises(ValueError, match="same number of qubits"):
-            algo.run([h2], times=[1.0], observables=[obs3], state_prep=self._dummy_state_prep())
+            algo.run(td, observables=[obs3], state_prep=self._dummy_state_prep())
 
     def test_get_circuit_before_run_raises(self):
         """get_circuit() before run() should raise ValueError."""

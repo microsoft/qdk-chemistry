@@ -16,6 +16,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
+    TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -77,8 +78,7 @@ class MeasureSimulation(Algorithm):
     @abstractmethod
     def _run_impl(
         self,
-        qubit_hamiltonians: list[QubitHamiltonian],
-        times: list[float],
+        hamiltonian: TimeDependentQubitHamiltonian,
         observables: list[QubitHamiltonian],
         state_prep: Circuit,
         *,
@@ -91,8 +91,7 @@ class MeasureSimulation(Algorithm):
         ``AlgorithmRef``.
 
         Args:
-            qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: List of times to evolve under the Hamiltonians.
+            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Circuit that prepares the initial state before time evolution.
             noise: Optional noise profile.

@@ -5,14 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import itertools
-
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
     MeasurementData,
     QuantumErrorProfile,
     QubitHamiltonian,
+    TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
 from qdk_chemistry.utils import Logger
@@ -42,8 +41,7 @@ class EvolveAndMeasure(MeasureSimulation):
 
     def _run_impl(
         self,
-        qubit_hamiltonians: list[QubitHamiltonian],
-        times: list[float],
+        hamiltonian: TimeDependentQubitHamiltonian,
         observables: list[QubitHamiltonian],
         state_prep: Circuit,
         *,
@@ -56,8 +54,7 @@ class EvolveAndMeasure(MeasureSimulation):
         ``AlgorithmRef``.
 
         Args:
-            qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: Strictly monotonically increasing list of times to evolve under the Hamiltonians.
+            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Circuit that prepares the initial state before time evolution.
             noise: Optional noise profile.
@@ -65,32 +62,12 @@ class EvolveAndMeasure(MeasureSimulation):
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
 
-        Raises:
-            ValueError: If ``qubit_hamiltonians`` is empty.
-
         """
-        if not qubit_hamiltonians:
-            raise ValueError("qubit_hamiltonians must not be empty.")
-        if not times:
-            raise ValueError("times must not be empty.")
-        if len(qubit_hamiltonians) != len(times):
-            raise ValueError("qubit_hamiltonians and times must have the same length.")
-        if not all(a < b for a, b in itertools.pairwise(times)):
-            raise ValueError("times must be strictly monotonically increasing.")
-
-        # Ensure all Hamiltonians and observables have the same number of qubits.
-        reference_num_qubits = qubit_hamiltonians[0].num_qubits
-        for hamiltonian in qubit_hamiltonians[1:]:
-            if hamiltonian.num_qubits != reference_num_qubits:
-                raise ValueError("All Hamiltonians and observables must have the same number of qubits.")
         for observable in observables:
-            if observable.num_qubits != reference_num_qubits:
-                raise ValueError("All Hamiltonians and observables must have the same number of qubits.")
-        self._evolution_circuit = self._build_evolution_circuit(
-            qubit_hamiltonians=qubit_hamiltonians,
-            times=times,
-            state_prep=state_prep,
-        )
+            if observable.num_qubits != hamiltonian.num_qubits:
+                raise ValueError("All observables must have the same number of qubits as the Hamiltonian.")
+
+        self._evolution_circuit = self._build_evolution_circuit(hamiltonian, state_prep)
 
         measurements = []
         for observable in observables:
@@ -105,36 +82,34 @@ class EvolveAndMeasure(MeasureSimulation):
 
     def _build_evolution_circuit(
         self,
-        qubit_hamiltonians: list[QubitHamiltonian],
-        times: list[float],
+        hamiltonian: TimeDependentQubitHamiltonian,
         state_prep: Circuit,
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
-        The evolution builder and circuit mapper are resolved from
-        the algorithm's settings via ``AlgorithmRef``.
-
         Args:
-            qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: Strictly monotonically increasing list of times to evolve under the Hamiltonians.
+            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
             state_prep: Circuit that prepares the initial state before time evolution.
 
         Returns:
             The combined evolution circuit.
 
         """
-        evolution = self._create_time_evolution(qubit_hamiltonians[0], times[0])
+        hamiltonians = hamiltonian.hamiltonians
+        times = hamiltonian.times
 
-        for i in range(1, len(qubit_hamiltonians)):
+        evolution = self._create_time_evolution(hamiltonians[0], times[0])
+
+        for i in range(1, len(hamiltonians)):
             delta_t = times[i] - times[i - 1]
             evolution = UnitaryRepresentation(
                 evolution.get_container().combine(
-                    self._create_time_evolution(qubit_hamiltonians[i], delta_t).get_container(),
+                    self._create_time_evolution(hamiltonians[i], delta_t).get_container(),
                 )
             )
 
         circuit = self._map_time_evolution_to_circuit(evolution)
-        return self._prepend_state_prep_circuit(state_prep, circuit, qubit_hamiltonians[0].num_qubits)
+        return self._prepend_state_prep_circuit(state_prep, circuit, hamiltonian.num_qubits)
 
     def get_circuit(self) -> Circuit:
         """Get the evolution circuit generated during algorithm execution.
