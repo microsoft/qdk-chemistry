@@ -33,7 +33,7 @@ class BlockEncodingContainer(UnitaryContainer):
 
     @property
     @abstractmethod
-    def reflect(self) -> bool:
+    def quantum_walk(self) -> bool:
         """Whether to wrap with a quantum walk operator."""
 
 
@@ -204,7 +204,7 @@ class LCUContainer(BlockEncodingContainer):
         prepare: Prepare,
         select: Select,
         power: int = 1,
-        reflect: bool = False,
+        quantum_walk: bool = False,
     ) -> None:
         r"""Initialize an LCUContainer.
 
@@ -212,7 +212,7 @@ class LCUContainer(BlockEncodingContainer):
             power: Number of times to apply the walk operator (for W^power in QPE).
             prepare: The PREPARE oracle data class instance.
             select: The SELECT oracle data class instance.
-            reflect: When True, the circuit mapper wraps the block encoding with a
+            quantum_walk: When True, the circuit mapper wraps the block encoding with a
                 quantum walk operator (use with QPE). When False, the plain block
                 encoding is used (use with Hadamard test).
 
@@ -220,7 +220,7 @@ class LCUContainer(BlockEncodingContainer):
         self._power = power
         self.prepare = prepare
         self.select = select
-        self._reflect = reflect
+        self._quantum_walk = quantum_walk
 
         super().__init__()
 
@@ -235,14 +235,14 @@ class LCUContainer(BlockEncodingContainer):
         return self._power
 
     @property
-    def reflect(self) -> bool:
+    def quantum_walk(self) -> bool:
         """Whether to wrap with a quantum walk operator.
 
         Returns:
-            bool: True if reflection is enabled.
+            bool: True if quantum walk is enabled.
 
         """
-        return self._reflect
+        return self._quantum_walk
 
     @property
     def num_qubits(self) -> int:
@@ -269,7 +269,7 @@ class LCUContainer(BlockEncodingContainer):
 
         Returns:
             dict[str, Any]: Dictionary representation including container type, power,
-                prepare, select, and reflect fields.
+                prepare, select, and quantum_walk fields.
 
         """
         data: dict[str, Any] = {
@@ -277,7 +277,7 @@ class LCUContainer(BlockEncodingContainer):
             "power": self.power,
             "prepare": asdict(self.prepare),
             "select": asdict(self.select),
-            "reflect": self.reflect,
+            "quantum_walk": self.quantum_walk,
         }
 
         return self._add_json_version(data)
@@ -292,7 +292,7 @@ class LCUContainer(BlockEncodingContainer):
         self._add_hdf5_version(group)
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
-        group.attrs["reflect"] = self.reflect
+        group.attrs["quantum_walk"] = self.quantum_walk
         self.prepare.to_hdf5(group.create_group("prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
@@ -337,7 +337,7 @@ class LCUContainer(BlockEncodingContainer):
             power=json_data.get("power", 1),
             prepare=prepare,
             select=select,
-            reflect=bool(json_data.get("reflect", False)),
+            quantum_walk=bool(json_data.get("quantum_walk", json_data.get("reflect", False))),
         )
 
     @classmethod
@@ -353,20 +353,20 @@ class LCUContainer(BlockEncodingContainer):
         """
         prepare = Prepare.from_hdf5(group["prepare"])
         select = Select.from_hdf5(group["select"])
-        reflect = bool(group.attrs.get("reflect", False))
+        quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
         power = int(group.attrs["power"])
         return cls(
             power=power,
             prepare=prepare,
             select=select,
-            reflect=reflect,
+            quantum_walk=quantum_walk,
         )
 
     def get_summary(self) -> str:
         """Get a human-readable summary of the LCU container.
 
         Returns:
-            str: Multi-line summary describing power, prepare, select, and reflect settings.
+            str: Multi-line summary describing power, prepare, select, and quantum_walk settings.
 
         """
         return (
@@ -375,5 +375,5 @@ class LCUContainer(BlockEncodingContainer):
             f"  Prepare: {self.prepare.num_prepare_qubits} qubits, statevector shape {self.prepare.statevector.shape}\n"
             f"  Select: {self.select.num_prepare_qubits} control qubits, {self.select.num_target_qubits} target qubits,"
             f" {len(self.select.controlled_operations)} controlled operations\n"
-            f"  Reflect: {'Yes' if self.reflect else 'No'}"
+            f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
         )

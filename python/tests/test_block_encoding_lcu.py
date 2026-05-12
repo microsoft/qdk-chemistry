@@ -58,9 +58,9 @@ class TestLCUBuilder:
 
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder is accessible via the registry."""
-        builder = registry.create("hamiltonian_unitary_builder", "block_encoding")
+        builder = registry.create("hamiltonian_unitary_builder", "lcu")
         assert isinstance(builder, LCUBuilder)
-        assert builder.name() == "block_encoding"
+        assert builder.name() == "lcu"
 
     def test_prepare_statevector_encodes_normalized_coefficients(self):
         """Verify PREPARE statevector is sqrt(|alpha_j|/lambda) for each term.
@@ -131,18 +131,18 @@ class TestLCUBuilder:
         assert np.array_equal(container.select.phases, expected_phases)
 
     def test_quantum_walk_flag(self):
-        """Verify quantum_walk setting produces container with reflect=True."""
+        """Verify quantum_walk setting produces container with quantum_walk=True."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.25, 0.5]),
         )
         builder = LCUBuilder(quantum_walk=True)
         container = builder.run(hamiltonian).get_container()
-        assert container.reflect is True
+        assert container.quantum_walk is True
 
         builder_no_walk = LCUBuilder()
         container_no_walk = builder_no_walk.run(hamiltonian).get_container()
-        assert container_no_walk.reflect is False
+        assert container_no_walk.quantum_walk is False
 
 
 class TestLCUContainer:
