@@ -135,11 +135,7 @@ python3 --version
 pip3 install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-if [ "${MAC_BUILD}" == "ON" ]; then
-    pip3 install -r .pipelines/requirements-macos.txt
-else
-    pip3 install -r .pipelines/requirements-linux.txt
-fi
+pip3 install -r .pipelines/requirements.txt
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
