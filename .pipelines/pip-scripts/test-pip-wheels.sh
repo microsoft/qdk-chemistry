@@ -39,27 +39,27 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         build-essential \
         curl \
         git \
-        libboost-all-dev \
         libbz2-dev \
         libffi-dev \
         liblzma-dev \
         libncursesw5-dev \
-        libopenblas-dev \
         libreadline-dev \
         libsqlite3-dev \
         libssl-dev \
         libxml2-dev \
         libxmlsec1-dev \
         make \
-        python3 \
-        python3-dev \
-        python3-pip \
-        python3-venv \
         tk-dev \
         unzip \
         wget \
         xz-utils \
         zlib1g-dev
+        # libboost-all-dev \
+        # libopenblas-dev \
+        # python3 \
+        # python3-dev \
+        # python3-pip \
+        # python3-venv \
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
