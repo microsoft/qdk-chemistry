@@ -9,6 +9,13 @@ Version 2.0.0
 
 Work in progress
 
+Breaking changes
+-----------------
+
+- ``QdkEnergyEstimator`` no longer auto-groups terms by qubit-wise commutativity.
+  Pre-group with ``create("term_grouper", "qubit_wise_commuting")`` to restore
+  the previous behavior.
+
 Version 1.1.0
 =============
 
