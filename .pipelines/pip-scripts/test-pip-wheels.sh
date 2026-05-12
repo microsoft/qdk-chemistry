@@ -100,7 +100,7 @@ cd "$PYTHON_DIR"
 
 # Install built wheel with test dependencies
 WHEEL=(repaired_wheelhouse/qdk_chemistry*.whl)
-if [ ${#WHEEL[@]} -ne 1 ]; then
+if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
     echo "ERROR: Expected exactly 1 wheel, found ${#WHEEL[@]}: ${WHEEL[*]}"
     exit 1
 fi
