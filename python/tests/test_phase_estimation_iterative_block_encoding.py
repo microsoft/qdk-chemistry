@@ -22,17 +22,20 @@ class TestIQPEWithLCU:
     """Integration tests for IQPE using LCU unitary builder."""
 
     def test_iterative_qpe_with_lcu_two_qubit(self):
-        """Verify IQPE with LCU recovers the expected energy for a 2-qubit Hamiltonian.
+        """Verify IQPE with LCU quantum walk recovers the expected energy for a 2-qubit Hamiltonian.
 
-        Uses H = (pi/4)*ZZ which has eigenvalue pi/4 on |00>.
-        With evolution_time=1 (block encoding), phase_fraction = (pi/4)/(2*pi) = 1/8,
+        Uses H = (pi/4)*ZI + (pi/4)*IZ, a 2-term diagonal Hamiltonian.
+        Eigenstate |00> has eigenvalue (pi/4) + (pi/4) = pi/2.
+        lambda = pi/2, cos(2*pi*phi) = (pi/2)/(pi/2) = 1, phi = 0,
         exactly representable with 4 bits.
         """
         coeff = np.pi / 4.0
-        hamiltonian = QubitHamiltonian(pauli_strings=["ZZ"], coefficients=np.array([coeff]))
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["ZI", "IZ"],
+            coefficients=np.array([coeff, coeff]),
+        )
 
-        # State |00> is an eigenstate of ZZ with eigenvalue +1,
-        # so it's an eigenstate of H with eigenvalue pi/4.
+        # |00> is eigenstate with eigenvalue (pi/4) + (pi/4) = pi/2
         state_vector = [1.0, 0.0, 0.0, 0.0]
         state_prep_params = {
             "rowMap": [1, 0],
@@ -47,7 +50,7 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        # Configure IQPE with LCU (evolution_time=1.0 implicitly)
+        # Configure IQPE with LCU
         iqpe = IterativePhaseEstimation(
             num_bits=4,
             shots_per_bit=3,
@@ -62,7 +65,7 @@ class TestIQPEWithLCU:
         )
         iqpe.settings().set(
             "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu"),
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(
@@ -70,7 +73,7 @@ class TestIQPEWithLCU:
             state_preparation=state_prep,
         )
 
-        expected_energy = coeff  # pi/4
+        expected_energy = np.pi / 2.0  # pi/4 + pi/4
         assert np.isclose(
             result.raw_energy,
             expected_energy,
@@ -197,4 +200,166 @@ class TestIQPEWithLCU:
             result.raw_energy,
             reference_energy,
             atol=0.02,
+        )
+
+    def test_iterative_qpe_with_lcu_off_diagonal(self):
+        """Verify IQPE with LCU quantum walk handles off-diagonal Pauli terms.
+
+        Uses H = (pi/4)*XX + (pi/4)*ZZ, a Hamiltonian with both off-diagonal (XX)
+        and diagonal (ZZ) terms.
+        Eigenstate (|00> + |11>)/sqrt(2) has eigenvalue pi/2.
+        lambda = pi/2, cos(2*pi*phi) = 1, phi = 0.
+        """
+        coeff = np.pi / 4.0
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([coeff, coeff]),
+        )
+
+        # (|00> + |11>)/sqrt(2) is eigenstate with eigenvalue pi/2
+        s = 1.0 / np.sqrt(2.0)
+        state_vector = [s, 0.0, 0.0, s]
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": state_vector,
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+        iqpe.settings().set(
+            "circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        )
+        iqpe.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        )
+
+        result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
+
+        expected_energy = np.pi / 2.0
+        assert np.isclose(
+            result.raw_energy,
+            expected_energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=qpe_energy_tolerance,
+        )
+
+    def test_iterative_qpe_with_lcu_negative_coefficient(self):
+        """Verify IQPE with LCU quantum walk handles negative Hamiltonian coefficients.
+
+        Uses H = -(pi/4)*XX + (pi/4)*ZZ, mixing negative coefficients with
+        off-diagonal terms.
+        Eigenstate (|01> + |10>)/sqrt(2) has eigenvalue -pi/2.
+        lambda = pi/2, cos(2*pi*phi) = -1, phi = 0.5.
+        Tests sign encoding in the PREPARE oracle.
+        """
+        coeff = np.pi / 4.0
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([-coeff, coeff]),
+        )
+
+        # (|01> + |10>)/sqrt(2) is eigenstate with eigenvalue -pi/2
+        s = 1.0 / np.sqrt(2.0)
+        state_vector = [0.0, s, s, 0.0]
+        state_prep_params = {
+            "rowMap": [1, 0],
+            "stateVector": state_vector,
+            "expansionOps": [],
+            "numQubits": 2,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+        iqpe.settings().set(
+            "circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        )
+        iqpe.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        )
+
+        result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
+
+        expected_energy = -np.pi / 2.0
+        assert np.isclose(
+            result.raw_energy,
+            expected_energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=qpe_energy_tolerance,
+        )
+
+    def test_iterative_qpe_with_lcu_three_qubit(self):
+        """Verify IQPE with LCU quantum walk on a 3-qubit, 3-term Hamiltonian.
+
+        Uses H = (pi/4)*ZII + (pi/4)*IZI + (pi/4)*IIZ (sum of single-qubit Z
+        operators). With 3 terms, ceil(log2(3)) = 2 ancilla qubits are needed.
+        Eigenstate |111> has eigenvalue -(pi/4)*3 = -3*pi/4.
+        lambda = 3*pi/4, cos(2*pi*phi) = -1, phi = 0.5.
+        """
+        coeff = np.pi / 4.0
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["ZII", "IZI", "IIZ"],
+            coefficients=np.array([coeff, coeff, coeff]),
+        )
+
+        # |111> is eigenstate: each Z gives -1, so E = 3 * (-pi/4) = -3*pi/4
+        state_vector = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+        state_prep_params = {
+            "rowMap": [2, 1, 0],
+            "stateVector": state_vector,
+            "expansionOps": [],
+            "numQubits": 3,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+        )
+        iqpe.settings().set(
+            "circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        )
+        iqpe.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        )
+
+        result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
+
+        expected_energy = -3.0 * np.pi / 4.0
+        assert np.isclose(
+            result.raw_energy,
+            expected_energy,
+            rtol=float_comparison_relative_tolerance,
+            atol=qpe_energy_tolerance,
         )
