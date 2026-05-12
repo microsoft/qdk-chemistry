@@ -10,6 +10,8 @@ import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
+from .reference_tolerances import float_comparison_absolute_tolerance
+
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
     from qiskit.circuit import Parameter
@@ -137,3 +139,128 @@ def test_remove_z_basis_on_zero_state_preserves_after_x():
 
     assert "s" in result.count_ops()
     assert "rz" not in result.count_ops()
+
+
+def test_merge_z_basis_rotations_rz_gates():
+    """Test MergeZBasisRotations correctly handles rz gates (not just s/z/sdg)."""
+    qc = QuantumCircuit(1)
+    qc.rz(np.pi / 4, 0)
+    qc.rz(np.pi / 4, 0)
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    # Two rz(π/4) should merge into one rz(π/2)
+    ops = result.count_ops()
+    assert ops.get("rz", 0) == 1
+    angle = result.data[0].operation.params[0]
+    assert abs(angle - np.pi / 2) < float_comparison_absolute_tolerance
+
+
+def test_merge_z_basis_rotations_net_zero():
+    """Test MergeZBasisRotations removes gates when net rotation is zero."""
+    qc = QuantumCircuit(1)
+    qc.s(0)  # +π/2
+    qc.sdg(0)  # -π/2  → net = 0
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    assert result.size() == 0
+
+
+def test_merge_z_basis_rotations_parameterized_boundary():
+    """Test MergeZBasisRotations flushes accumulator at parameterized Rz boundary."""
+    theta = Parameter("θ")
+    qc = QuantumCircuit(1)
+    qc.s(0)  # π/2 accumulated
+    qc.rz(theta, 0)  # boundary: flush π/2 as rz, keep parameterized gate
+    qc.z(0)  # new accumulation: π
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    ops = result.count_ops()
+    # Should have: rz(π/2), rz(θ), rz(π) — three separate rz gates
+    assert ops.get("rz", 0) == 3
+    assert "s" not in ops
+    assert "z" not in ops
+
+
+def test_merge_z_basis_rotations_multi_qubit():
+    """Test MergeZBasisRotations handles multiple qubits independently."""
+    qc = QuantumCircuit(2)
+    qc.s(0)
+    qc.z(1)
+    qc.sdg(0)
+    qc.s(1)
+    qc.cx(0, 1)  # boundary for both qubits
+    qc.rz(np.pi / 4, 0)
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    ops = result.count_ops()
+    assert "s" not in ops
+    assert "sdg" not in ops
+    assert "z" not in ops
+    # q0: s + sdg = 0 → removed; then rz(π/4) after cx
+    # q1: z + s = 3π/2 → single rz before cx
+    assert ops.get("rz", 0) == 2
+    assert ops.get("cx", 0) == 1
+
+
+def test_merge_z_basis_rotations_single_gate_unchanged():
+    """Test MergeZBasisRotations leaves a single rz gate unchanged."""
+    qc = QuantumCircuit(1)
+    qc.rz(np.pi / 3, 0)
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    assert result.count_ops().get("rz", 0) == 1
+    assert abs(result.data[0].operation.params[0] - np.pi / 3) < float_comparison_absolute_tolerance
+
+
+def test_merge_z_basis_rotations_id_removal():
+    """Test MergeZBasisRotations removes identity gates."""
+    qc = QuantumCircuit(1)
+    qc.id(0)
+    qc.id(0)
+    qc.h(0)
+
+    result = _run_pass(MergeZBasisRotations(), qc)
+
+    assert "id" not in result.count_ops()
+    assert result.count_ops().get("h", 0) == 1
+
+
+def test_substitute_clifford_rz_settings_update():
+    """Test SubstituteCliffordRzSettings.update ensures 'id' in gate set."""
+    scr = SubstituteCliffordRz(equivalent_gate_set=["z"])
+    scr.settings().update({"equivalent_gate_set": ["s", "sdg"]})
+    gate_set = scr.settings().get("equivalent_gate_set")
+    assert "id" in gate_set
+
+
+def test_remove_z_basis_on_zero_state_diagonal_gate_preserves_zero():
+    """Test RemoveZBasisOnZeroState treats diagonal gates as preserving |0⟩."""
+    qc = QuantumCircuit(1)
+    qc.rz(np.pi / 3, 0)  # diagonal + |0⟩ → removed, qubit stays |0⟩
+    qc.s(0)  # still |0⟩ → removed
+
+    result = _run_pass(RemoveZBasisOnZeroState(), qc)
+
+    assert result.size() == 0
+
+
+def test_remove_z_basis_on_zero_state_multi_qubit():
+    """Test RemoveZBasisOnZeroState handles multiple qubits independently."""
+    qc = QuantumCircuit(2)
+    qc.s(0)  # q0 |0⟩ → removed
+    qc.h(0)  # q0 leaves |0⟩
+    qc.z(1)  # q1 still |0⟩ → removed
+    qc.rz(0.5, 0)  # q0 no longer |0⟩ → kept
+
+    result = _run_pass(RemoveZBasisOnZeroState(), qc)
+
+    ops = result.count_ops()
+    assert "s" not in ops
+    assert "z" not in ops
+    assert ops.get("h", 0) == 1
+    assert ops.get("rz", 0) == 1
