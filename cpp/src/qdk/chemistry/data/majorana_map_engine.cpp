@@ -113,12 +113,10 @@ std::pair<int, PackedPauliWord<NW>> multiply_packed(
     result.x[i] = x1 ^ x2;
     result.z[i] = z1 ^ z2;
     std::uint64_t nx1 = ~x1, nz1 = ~z1, nx2 = ~x2, nz2 = ~z2;
-    std::uint64_t cyc = (x1 & nz1 & x2 & z2) |
-                        (x1 & z1 & nx2 & z2) |
-                        (nx1 & z1 & x2 & nz2);
-    std::uint64_t anti = (x1 & z1 & x2 & nz2) |
-                         (nx1 & z1 & x2 & z2) |
-                         (x1 & nz1 & nx2 & z2);
+    std::uint64_t cyc =
+        (x1 & nz1 & x2 & z2) | (x1 & z1 & nx2 & z2) | (nx1 & z1 & x2 & nz2);
+    std::uint64_t anti =
+        (x1 & z1 & x2 & nz2) | (nx1 & z1 & x2 & z2) | (x1 & nz1 & nx2 & z2);
     phase_exp += __builtin_popcountll(cyc);
     phase_exp -= __builtin_popcountll(anti);
   }
@@ -148,8 +146,7 @@ inline std::complex<double> apply_phase(int phase_idx,
 template <std::size_t NW>
 class PackedAccumulator {
  public:
-  void accumulate(const PackedPauliWord<NW>& word,
-                  std::complex<double> coeff) {
+  void accumulate(const PackedPauliWord<NW>& word, std::complex<double> coeff) {
     // Single hash-map probe: operator[] default-constructs (0,0) on miss.
     terms_[word] += coeff;
   }
@@ -161,9 +158,10 @@ class PackedAccumulator {
     terms_[word] += apply_phase(phase_idx, scale);
   }
 
-  /// Extract terms above threshold as (coefficient, little-endian string) pairs.
-  std::vector<std::pair<std::complex<double>, std::string>> get_terms_as_strings(
-      double threshold, std::size_t num_qubits) const {
+  /// Extract terms above threshold as (coefficient, little-endian string)
+  /// pairs.
+  std::vector<std::pair<std::complex<double>, std::string>>
+  get_terms_as_strings(double threshold, std::size_t num_qubits) const {
     std::vector<std::pair<std::complex<double>, std::string>> result;
     result.reserve(terms_.size());
     for (const auto& [pw, coeff] : terms_) {
@@ -241,10 +239,10 @@ namespace {
 /// words per Pauli bitmask). NW is selected at runtime by the dispatcher.
 template <std::size_t NW>
 MajoranaMapResult majorana_map_impl(
-    const MajoranaMapping& mapping, double core_energy,
-    const double* h1_alpha, const double* h1_beta, const double* eri_aaaa,
-    const double* eri_aabb, const double* eri_bbbb, std::size_t n_spatial,
-    bool is_restricted, double threshold, double integral_threshold) {
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool is_restricted,
+    double threshold, double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
   const std::size_t num_qubits = mapping.num_qubits();
 
@@ -265,19 +263,19 @@ MajoranaMapResult majorana_map_impl(
   };
 
   // Helper: accumulate one-body E_pq for a mode pair, using packed types
-  // E_pq = (1/4) * sum_{a,b} c[a][b] * phase(2p+a) * phase(2q+b) * P(2p+a) * P(2q+b)
+  // E_pq = (1/4) * sum_{a,b} c[a][b] * phase(2p+a) * phase(2q+b) * P(2p+a) *
+  // P(2q+b)
   auto accumulate_epq = [&](std::size_t mode_p, std::size_t mode_q,
                             double h_pq) {
     for (int a = 0; a < 2; ++a) {
       std::size_t idx_pa = 2 * mode_p + a;
       for (int b = 0; b < 2; ++b) {
         std::size_t idx_qb = 2 * mode_q + b;
-        auto [ph, word] = multiply_packed(
-            packed_mapping[idx_pa], packed_mapping[idx_qb]);
-        double sign = has_neg_phases
-                          ? static_cast<double>(maj_phases[idx_pa]) *
-                                maj_phases[idx_qb]
-                          : 1.0;
+        auto [ph, word] =
+            multiply_packed(packed_mapping[idx_pa], packed_mapping[idx_qb]);
+        double sign = has_neg_phases ? static_cast<double>(maj_phases[idx_pa]) *
+                                           maj_phases[idx_qb]
+                                     : 1.0;
         acc.accumulate(word,
                        apply_phase(ph, sign * h_pq * kQuarter * kC[a][b]));
       }
@@ -291,7 +289,7 @@ MajoranaMapResult majorana_map_impl(
   }
 
   auto idx4 = [n_spatial](std::size_t p, std::size_t q, std::size_t r,
-                           std::size_t s) -> std::size_t {
+                          std::size_t s) -> std::size_t {
     return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
   };
 
@@ -334,7 +332,7 @@ MajoranaMapResult majorana_map_impl(
   // Each entry stores the Pauli multiply phase index AND the combined
   // Majorana sign factor (phases[i] * phases[j]).
   struct PackedPairProduct {
-    int phase;      // Pauli multiply phase index (0..3)
+    int phase;         // Pauli multiply phase index (0..3)
     std::int8_t sign;  // maj_phases[i] * maj_phases[j] (±1)
     PackedPauliWord<NW> word;
   };
@@ -345,31 +343,27 @@ MajoranaMapResult majorana_map_impl(
   for (std::size_t i = 0; i < maj_per_spin; ++i) {
     for (std::size_t j = 0; j < maj_per_spin; ++j) {
       // alpha block: Majorana indices i, j
-      auto [ph_a, w_a] = multiply_packed(
-          packed_mapping[i], packed_mapping[j]);
-      std::int8_t sign_a = has_neg_phases
-                               ? maj_phases[i] * maj_phases[j]
-                               : static_cast<std::int8_t>(1);
+      auto [ph_a, w_a] = multiply_packed(packed_mapping[i], packed_mapping[j]);
+      std::int8_t sign_a = has_neg_phases ? maj_phases[i] * maj_phases[j]
+                                          : static_cast<std::int8_t>(1);
       ppair_alpha[i * maj_per_spin + j] = {ph_a, sign_a, std::move(w_a)};
 
       // beta block: Majorana indices i+2*n_spatial, j+2*n_spatial
-      auto [ph_b, w_b] = multiply_packed(
-          packed_mapping[i + maj_per_spin],
-          packed_mapping[j + maj_per_spin]);
-      std::int8_t sign_b =
-          has_neg_phases
-              ? maj_phases[i + maj_per_spin] * maj_phases[j + maj_per_spin]
-              : static_cast<std::int8_t>(1);
+      auto [ph_b, w_b] = multiply_packed(packed_mapping[i + maj_per_spin],
+                                         packed_mapping[j + maj_per_spin]);
+      std::int8_t sign_b = has_neg_phases ? maj_phases[i + maj_per_spin] *
+                                                maj_phases[j + maj_per_spin]
+                                          : static_cast<std::int8_t>(1);
       ppair_beta[i * maj_per_spin + j] = {ph_b, sign_b, std::move(w_b)};
     }
   }
 
-  auto alpha_pair = [&](std::size_t i, std::size_t j)
-      -> const PackedPairProduct& {
+  auto alpha_pair = [&](std::size_t i,
+                        std::size_t j) -> const PackedPairProduct& {
     return ppair_alpha[i * maj_per_spin + j];
   };
-  auto beta_pair = [&](std::size_t i, std::size_t j)
-      -> const PackedPairProduct& {
+  auto beta_pair = [&](std::size_t i,
+                       std::size_t j) -> const PackedPairProduct& {
     return ppair_beta[i * maj_per_spin + j];
   };
 
@@ -385,12 +379,18 @@ MajoranaMapResult majorana_map_impl(
         auto& sse = ss_e[p * n_spatial + q];
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
-            const auto& [phase_a, sign_a, word_a] = alpha_pair(2*p+a, 2*q+b);
+            const auto& [phase_a, sign_a, word_a] =
+                alpha_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(
-                apply_phase(phase_a, static_cast<double>(sign_a) * kQuarter * kC[a][b]), word_a);
-            const auto& [phase_b, sign_b, word_b] = beta_pair(2*p+a, 2*q+b);
+                apply_phase(phase_a,
+                            static_cast<double>(sign_a) * kQuarter * kC[a][b]),
+                word_a);
+            const auto& [phase_b, sign_b, word_b] =
+                beta_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(
-                apply_phase(phase_b, static_cast<double>(sign_b) * kQuarter * kC[a][b]), word_b);
+                apply_phase(phase_b,
+                            static_cast<double>(sign_b) * kQuarter * kC[a][b]),
+                word_b);
           }
         }
       }
@@ -411,7 +411,8 @@ MajoranaMapResult majorana_map_impl(
           if (p != q) sym_map[q * n_spatial + p] = idx;
 
           std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                             PackedPauliWordHash<NW>> merged;
+                             PackedPauliWordHash<NW>>
+              merged;
           for (const auto& [c, w] : ss_e[p * n_spatial + q].terms) {
             merged[w] += c;
           }
@@ -477,38 +478,37 @@ MajoranaMapResult majorana_map_impl(
   } else {
     // Unrestricted: explicit spin-channel ERIs using packed types
 
-    auto accumulate_two_body_product = [&](std::size_t mode_p,
-                                           std::size_t mode_q,
-                                           std::size_t mode_r,
-                                           std::size_t mode_s, double eri) {
-      bool pq_is_alpha = mode_p < n_spatial;
-      bool rs_is_alpha = mode_r < n_spatial;
-      auto& cache_pq = pq_is_alpha ? ppair_alpha : ppair_beta;
-      auto& cache_rs = rs_is_alpha ? ppair_alpha : ppair_beta;
-      std::size_t bp = pq_is_alpha ? mode_p : (mode_p - n_spatial);
-      std::size_t bq = pq_is_alpha ? mode_q : (mode_q - n_spatial);
-      std::size_t br = rs_is_alpha ? mode_r : (mode_r - n_spatial);
-      std::size_t bs = rs_is_alpha ? mode_s : (mode_s - n_spatial);
+    auto accumulate_two_body_product =
+        [&](std::size_t mode_p, std::size_t mode_q, std::size_t mode_r,
+            std::size_t mode_s, double eri) {
+          bool pq_is_alpha = mode_p < n_spatial;
+          bool rs_is_alpha = mode_r < n_spatial;
+          auto& cache_pq = pq_is_alpha ? ppair_alpha : ppair_beta;
+          auto& cache_rs = rs_is_alpha ? ppair_alpha : ppair_beta;
+          std::size_t bp = pq_is_alpha ? mode_p : (mode_p - n_spatial);
+          std::size_t bq = pq_is_alpha ? mode_q : (mode_q - n_spatial);
+          std::size_t br = rs_is_alpha ? mode_r : (mode_r - n_spatial);
+          std::size_t bs = rs_is_alpha ? mode_s : (mode_s - n_spatial);
 
-      double half_eri = 0.5 * eri;
-      for (int a = 0; a < 2; ++a) {
-        for (int b = 0; b < 2; ++b) {
-          const auto& [ph1, s1, w1] =
-              cache_pq[(2*bp+a) * maj_per_spin + (2*bq+b)];
-          for (int c = 0; c < 2; ++c) {
-            for (int d = 0; d < 2; ++d) {
-              const auto& [ph2, s2, w2] =
-                  cache_rs[(2*br+c) * maj_per_spin + (2*bs+d)];
-              double sign = static_cast<double>(s1) * s2;
-              std::complex<double> scale =
-                  apply_phase((ph1 + ph2) & 3,
-                              sign * half_eri * kSixteenth * kC[a][b] * kC[c][d]);
-              acc.accumulate_product(w1, w2, scale);
+          double half_eri = 0.5 * eri;
+          for (int a = 0; a < 2; ++a) {
+            for (int b = 0; b < 2; ++b) {
+              const auto& [ph1, s1, w1] =
+                  cache_pq[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
+              for (int c = 0; c < 2; ++c) {
+                for (int d = 0; d < 2; ++d) {
+                  const auto& [ph2, s2, w2] =
+                      cache_rs[(2 * br + c) * maj_per_spin + (2 * bs + d)];
+                  double sign = static_cast<double>(s1) * s2;
+                  std::complex<double> scale = apply_phase(
+                      (ph1 + ph2) & 3,
+                      sign * half_eri * kSixteenth * kC[a][b] * kC[c][d]);
+                  acc.accumulate_product(w1, w2, scale);
+                }
+              }
             }
           }
-        }
-      }
-    };
+        };
 
     // aaaa channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
@@ -591,10 +591,10 @@ MajoranaMapResult majorana_map_impl(
 }  // anonymous namespace
 
 MajoranaMapResult majorana_map_hamiltonian(
-    const MajoranaMapping& mapping, double core_energy,
-    const double* h1_alpha, const double* h1_beta, const double* eri_aaaa,
-    const double* eri_aabb, const double* eri_bbbb, std::size_t n_spatial,
-    bool is_restricted, double threshold, double integral_threshold) {
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool is_restricted,
+    double threshold, double integral_threshold) {
   const std::size_t num_qubits = mapping.num_qubits();
   const std::size_t num_words = (num_qubits + 63) / 64;
 
@@ -606,27 +606,22 @@ MajoranaMapResult majorana_map_hamiltonian(
     case 1:
       return majorana_map_impl<1>(mapping, core_energy, h1_alpha, h1_beta,
                                   eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
-                                  is_restricted, threshold,
-                                  integral_threshold);
+                                  is_restricted, threshold, integral_threshold);
     case 2:
       return majorana_map_impl<2>(mapping, core_energy, h1_alpha, h1_beta,
                                   eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
-                                  is_restricted, threshold,
-                                  integral_threshold);
+                                  is_restricted, threshold, integral_threshold);
     case 3:
       return majorana_map_impl<3>(mapping, core_energy, h1_alpha, h1_beta,
                                   eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
-                                  is_restricted, threshold,
-                                  integral_threshold);
+                                  is_restricted, threshold, integral_threshold);
     case 4:
       return majorana_map_impl<4>(mapping, core_energy, h1_alpha, h1_beta,
                                   eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
-                                  is_restricted, threshold,
-                                  integral_threshold);
+                                  is_restricted, threshold, integral_threshold);
     default:
       throw std::invalid_argument(
-          "majorana_map_hamiltonian: num_qubits=" +
-          std::to_string(num_qubits) +
+          "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
           " requires " + std::to_string(num_words) +
           " uint64 words, but max supported is 4 (256 qubits). "
           "Contact the developers to extend the template dispatch.");

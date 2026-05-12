@@ -3,8 +3,8 @@
 // license information.
 
 #pragma once
-#include <cstdint>
 #include <complex>
+#include <cstdint>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <string>
@@ -55,19 +55,13 @@ struct MajoranaMapResult {
  * @param is_restricted Whether h1_alpha == h1_beta (spin-free case).
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
- * @return MajoranaMapResult with Pauli strings (little-endian) and coefficients.
+ * @return MajoranaMapResult with Pauli strings (little-endian) and
+ * coefficients.
  */
 MajoranaMapResult majorana_map_hamiltonian(
-    const MajoranaMapping& mapping,
-    double core_energy,
-    const double* h1_alpha,
-    const double* h1_beta,
-    const double* eri_aaaa,
-    const double* eri_aabb,
-    const double* eri_bbbb,
-    std::size_t n_spatial,
-    bool is_restricted,
-    double threshold,
-    double integral_threshold);
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool is_restricted,
+    double threshold, double integral_threshold);
 
 }  // namespace qdk::chemistry::data

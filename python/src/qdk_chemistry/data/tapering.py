@@ -38,6 +38,11 @@ class TaperingSpecification:
 
     __slots__ = ("_eigenvalues", "_qubit_indices", "_source_encoding", "_source_num_qubits")
 
+    _qubit_indices: tuple[int, ...]
+    _eigenvalues: tuple[int, ...]
+    _source_num_qubits: int
+    _source_encoding: str
+
     def __init__(
         self,
         qubit_indices: tuple[int, ...] | list[int],

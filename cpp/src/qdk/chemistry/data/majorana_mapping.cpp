@@ -150,8 +150,7 @@ MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
       name_(std::move(name)),
       num_qubits_(compute_num_qubits(table_)) {
   if (table_.empty()) {
-    throw std::invalid_argument(
-        "MajoranaMapping table must not be empty");
+    throw std::invalid_argument("MajoranaMapping table must not be empty");
   }
   if (table_.size() % 2 != 0) {
     throw std::invalid_argument(
@@ -170,9 +169,9 @@ MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
   // Validate phase values and compute all_positive flag
   for (std::size_t k = 0; k < phases_.size(); ++k) {
     if (phases_[k] != 1 && phases_[k] != -1) {
-      throw std::invalid_argument(
-          "phases[" + std::to_string(k) + "] = " +
-          std::to_string(phases_[k]) + "; must be +1 or -1");
+      throw std::invalid_argument("phases[" + std::to_string(k) +
+                                  "] = " + std::to_string(phases_[k]) +
+                                  "; must be +1 or -1");
     }
     if (phases_[k] != 1) all_positive_ = false;
   }
@@ -181,18 +180,18 @@ MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
 
 const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
   if (k >= table_.size()) {
-    throw std::out_of_range(
-        "Majorana index " + std::to_string(k) +
-        " out of range [0, " + std::to_string(table_.size()) + ")");
+    throw std::out_of_range("Majorana index " + std::to_string(k) +
+                            " out of range [0, " +
+                            std::to_string(table_.size()) + ")");
   }
   return table_[k];
 }
 
 std::int8_t MajoranaMapping::phase(std::size_t k) const {
   if (k >= phases_.size()) {
-    throw std::out_of_range(
-        "Majorana index " + std::to_string(k) +
-        " out of range [0, " + std::to_string(phases_.size()) + ")");
+    throw std::out_of_range("Majorana index " + std::to_string(k) +
+                            " out of range [0, " +
+                            std::to_string(phases_.size()) + ")");
   }
   return phases_[k];
 }
@@ -237,8 +236,8 @@ void MajoranaMapping::validate() const {
           auto sum = phase_ij + phase_ji;
           if (std::abs(sum) > tol) {
             std::ostringstream msg;
-            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_"
-                << j << "} != 0 (anticommutator phase sum = " << sum << ")";
+            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_" << j
+                << "} != 0 (anticommutator phase sum = " << sum << ")";
             throw std::invalid_argument(msg.str());
           }
         } else {
@@ -249,8 +248,7 @@ void MajoranaMapping::validate() const {
           // (possibly with different phase). If words differ, that's an error.
           if (std::abs(phase_ij) > tol || std::abs(phase_ji) > tol) {
             std::ostringstream msg;
-            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_"
-                << j
+            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_" << j
                 << "} produces non-cancelling terms with different Pauli words";
             throw std::invalid_argument(msg.str());
           }
@@ -279,8 +277,7 @@ std::size_t MajoranaMapping::compute_num_qubits(
 
 MajoranaMapping MajoranaMapping::jordan_wigner(std::size_t num_modes) {
   if (num_modes == 0) {
-    throw std::invalid_argument(
-        "jordan_wigner requires num_modes > 0");
+    throw std::invalid_argument("jordan_wigner requires num_modes > 0");
   }
 
   std::vector<SparsePauliWord> table;
@@ -311,8 +308,7 @@ MajoranaMapping MajoranaMapping::jordan_wigner(std::size_t num_modes) {
 
 MajoranaMapping MajoranaMapping::bravyi_kitaev(std::size_t num_modes) {
   if (num_modes == 0) {
-    throw std::invalid_argument(
-        "bravyi_kitaev requires num_modes > 0");
+    throw std::invalid_argument("bravyi_kitaev requires num_modes > 0");
   }
 
   // BK index sets are defined on a binary tree of size 2^ceil(log2(n))
@@ -324,15 +320,13 @@ MajoranaMapping MajoranaMapping::bravyi_kitaev(std::size_t num_modes) {
   for (std::size_t j = 0; j < num_modes; ++j) {
     auto parity = bk_parity_set(static_cast<std::uint64_t>(j), tree_size);
     auto update = bk_update_set(static_cast<std::uint64_t>(j), tree_size);
-    auto remainder =
-        bk_remainder_set(static_cast<std::uint64_t>(j), tree_size);
+    auto remainder = bk_remainder_set(static_cast<std::uint64_t>(j), tree_size);
 
     // Filter out indices ≥ num_modes (virtual tree nodes beyond actual qubits)
     auto filter = [num_modes](std::vector<std::uint64_t>& v) {
-      v.erase(std::remove_if(v.begin(), v.end(),
-                              [num_modes](std::uint64_t idx) {
-                                return idx >= num_modes;
-                              }),
+      v.erase(std::remove_if(
+                  v.begin(), v.end(),
+                  [num_modes](std::uint64_t idx) { return idx >= num_modes; }),
               v.end());
     };
     filter(parity);

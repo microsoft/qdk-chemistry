@@ -104,5 +104,3 @@ class TestTaperQubits:
         qh = QubitHamiltonian(pauli_strings=["XI"], coefficients=np.array([1.0]))
         with pytest.raises(ValueError, match="eliminated"):
             taper_qubits(qh, qubit_indices=[1], eigenvalues=[1])
-
-

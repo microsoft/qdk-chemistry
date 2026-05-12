@@ -183,8 +183,6 @@ class QdkQubitMapper(QubitMapper):
                 fermion_mode_order=qh.fermion_mode_order,
                 tapering=mapping.tapering,
             )
-            Logger.debug(
-                f"Tapered {mapping.tapering.num_tapered} qubits → {qh.num_qubits} qubits"
-            )
+            Logger.debug(f"Tapered {mapping.tapering.num_tapered} qubits → {qh.num_qubits} qubits")
 
         return qh

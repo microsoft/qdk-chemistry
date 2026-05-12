@@ -36,16 +36,14 @@ std::uint8_t char_to_op(char c) {
     case 'z':
       return 3;
     default:
-      throw std::invalid_argument(
-          std::string("Invalid Pauli character '") + c +
-          "' — expected I, X, Y, or Z");
+      throw std::invalid_argument(std::string("Invalid Pauli character '") + c +
+                                  "' — expected I, X, Y, or Z");
   }
 }
 
 /// Convert a dense little-endian Pauli string (qubit 0 = rightmost char)
 /// to a SparsePauliWord (sorted by qubit index, identities omitted).
-qdk::chemistry::data::SparsePauliWord dense_le_to_sparse(
-    const std::string& s) {
+qdk::chemistry::data::SparsePauliWord dense_le_to_sparse(const std::string& s) {
   qdk::chemistry::data::SparsePauliWord word;
   // Little-endian: qubit 0 is the rightmost character (index len-1).
   std::size_t len = s.size();
@@ -63,8 +61,7 @@ qdk::chemistry::data::SparsePauliWord dense_le_to_sparse(
 
 /// Convert a SparsePauliWord to a dense little-endian string.
 std::string sparse_to_dense_le(
-    const qdk::chemistry::data::SparsePauliWord& word,
-    std::size_t num_qubits) {
+    const qdk::chemistry::data::SparsePauliWord& word, std::size_t num_qubits) {
   // Build big-endian first (qubit 0 at index 0), then reverse
   std::string result(num_qubits, 'I');
   for (const auto& [qubit, op_type] : word) {
@@ -114,7 +111,8 @@ Example:
     4
 )");
 
-  // Constructor from list of dense little-endian Pauli strings + optional phases
+  // Constructor from list of dense little-endian Pauli strings + optional
+  // phases
   mapping.def(
       py::init([](py::list table_list, const std::string& name,
                   std::vector<std::int8_t> phases) {
@@ -144,8 +142,8 @@ Example:
           Py_ssize_t str_len;
           const char* str_data = PyUnicode_AsUTF8AndSize(item, &str_len);
           if (!str_data) {
-            throw py::value_error(
-                "Failed to decode string at index " + std::to_string(i));
+            throw py::value_error("Failed to decode string at index " +
+                                  std::to_string(i));
           }
 
           if (expected_len < 0) {
@@ -155,8 +153,7 @@ Example:
                 "All Pauli strings must have the same length. Entry 0 has "
                 "length " +
                 std::to_string(expected_len) + " but entry " +
-                std::to_string(i) + " has length " +
-                std::to_string(str_len));
+                std::to_string(i) + " has length " + std::to_string(str_len));
           }
 
           std::string s(str_data, static_cast<std::size_t>(str_len));
@@ -190,17 +187,16 @@ Raises:
 )");
 
   // Constructor from list of SparsePauliWord (for advanced use)
-  mapping.def(
-      py::init([](const std::vector<SparsePauliWord>& table,
-                  const std::string& name) {
-        try {
-          return MajoranaMapping(table, name);
-        } catch (const std::invalid_argument& e) {
-          throw py::value_error(e.what());
-        }
-      }),
-      py::arg("table"), py::arg("name") = "",
-      R"(
+  mapping.def(py::init([](const std::vector<SparsePauliWord>& table,
+                          const std::string& name) {
+                try {
+                  return MajoranaMapping(table, name);
+                } catch (const std::invalid_argument& e) {
+                  throw py::value_error(e.what());
+                }
+              }),
+              py::arg("table"), py::arg("name") = "",
+              R"(
 Construct a MajoranaMapping from a list of sparse Pauli words.
 
 Each sparse word is a list of (qubit_index, op_type) tuples. This is the
@@ -216,8 +212,7 @@ Raises:
 
   // Properties
   mapping.def_property_readonly(
-      "num_modes",
-      [](const MajoranaMapping& self) { return self.num_modes(); },
+      "num_modes", [](const MajoranaMapping& self) { return self.num_modes(); },
       "Number of fermionic modes (spin-orbitals).");
 
   mapping.def_property_readonly(
@@ -244,8 +239,7 @@ Raises:
 
   // sparse_table property: return as list of SparsePauliWord
   mapping.def_property_readonly(
-      "sparse_table",
-      [](const MajoranaMapping& self) { return self.table(); },
+      "sparse_table", [](const MajoranaMapping& self) { return self.table(); },
       "List of sparse Pauli words [(qubit_idx, op_type), ...].");
 
   // phases property
@@ -379,8 +373,7 @@ Returns:
       [](const MajoranaMapping& mapping, double core_energy,
          py::array_t<double, py::array::c_style | py::array::forcecast>
              h1_alpha,
-         py::array_t<double, py::array::c_style | py::array::forcecast>
-             h1_beta,
+         py::array_t<double, py::array::c_style | py::array::forcecast> h1_beta,
          py::array_t<double, py::array::c_style | py::array::forcecast>
              eri_aaaa,
          py::array_t<double, py::array::c_style | py::array::forcecast>
