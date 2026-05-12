@@ -130,7 +130,7 @@ extends:
               Python3.14:
                 pythonVersion: '3.14'
                 buildMarch: ${{ target.march }}
-            maxParallel: 3
+            maxParallel: 5
           templateContext:
             outputs:
             - output: pipelineArtifact
