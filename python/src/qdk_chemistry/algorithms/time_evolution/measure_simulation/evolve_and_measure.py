@@ -95,8 +95,7 @@ class EvolveAndMeasure(MeasureSimulation):
             The combined evolution circuit.
 
         """
-        hamiltonians = hamiltonian.hamiltonians
-        times = hamiltonian.times
+        hamiltonians, times = hamiltonian.to_snapshots()
 
         evolution = self._create_time_evolution(hamiltonians[0], times[0])
 

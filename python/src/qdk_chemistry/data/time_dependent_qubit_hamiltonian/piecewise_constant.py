@@ -1,12 +1,4 @@
-"""Time-dependent Hamiltonian for evolve-and-measure simulations.
-
-A :class:`TimeDependentQubitHamiltonian` bundles a sequence of
-:class:`~qdk_chemistry.data.QubitHamiltonian` snapshots with their
-corresponding time coordinates.  Validation (length consistency,
-strict monotonicity, qubit-count uniformity) is performed at
-construction time.
-
-"""
+"""Piecewise-constant time-dependent qubit Hamiltonian."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -18,14 +10,20 @@ from __future__ import annotations
 import itertools
 from typing import TYPE_CHECKING
 
+from .base import TimeDependentQubitHamiltonian
+
 if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
-__all__ = ["TimeDependentQubitHamiltonian"]
+__all__: list[str] = []
 
 
-class TimeDependentQubitHamiltonian:
+class PiecewiseConstantQubitHamiltonian(TimeDependentQubitHamiltonian):
     """An immutable sequence of Hamiltonians at monotonically increasing times.
+
+    Each time interval is associated with a fixed
+    :class:`~qdk_chemistry.data.QubitHamiltonian`.  This is the simplest
+    concrete implementation of :class:`TimeDependentQubitHamiltonian`.
 
     Args:
         hamiltonians: Non-empty list of qubit Hamiltonians, one per time step.
@@ -37,7 +35,7 @@ class TimeDependentQubitHamiltonian:
     """
 
     def __init__(self, hamiltonians: list[QubitHamiltonian], times: list[float]) -> None:
-        """Initialize a time-dependent qubit Hamiltonian.
+        """Initialize a piecewise-constant time-dependent qubit Hamiltonian.
 
         Args:
             hamiltonians: Non-empty list of qubit Hamiltonians, one per time step.
@@ -61,6 +59,33 @@ class TimeDependentQubitHamiltonian:
         self._hamiltonians = list(hamiltonians)
         self._times = list(times)
 
+    def evaluate(self, t: float) -> QubitHamiltonian:
+        """Return the Hamiltonian snapshot at time *t*.
+
+        For a piecewise-constant schedule, *t* must exactly match one of
+        the stored time coordinates.
+
+        Args:
+            t: The time at which to evaluate the Hamiltonian.
+
+        Returns:
+            The qubit Hamiltonian at the given time.
+
+        Raises:
+            ValueError: If *t* does not match any stored time coordinate.
+
+        """
+        try:
+            idx = self._times.index(t)
+        except ValueError:
+            raise ValueError(f"Time {t} not found in schedule {self._times}.") from None
+        return self._hamiltonians[idx]
+
+    @property
+    def schedule(self) -> list[float]:
+        """Ordered time points at which evolution steps are taken."""
+        return list(self._times)
+
     @property
     def hamiltonians(self) -> list[QubitHamiltonian]:
         """The Hamiltonian snapshots."""
@@ -75,11 +100,3 @@ class TimeDependentQubitHamiltonian:
     def num_qubits(self) -> int:
         """Number of qubits (uniform across all snapshots)."""
         return self._hamiltonians[0].num_qubits
-
-    def __len__(self) -> int:
-        """Return the number of time steps."""
-        return len(self._hamiltonians)
-
-    def __repr__(self) -> str:
-        """Return a string representation."""
-        return f"TimeDependentQubitHamiltonian(steps={len(self)}, num_qubits={self.num_qubits})"
