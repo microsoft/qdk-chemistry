@@ -1,4 +1,4 @@
-"""QDK/Chemistry PREPARE-SELECT controlled circuit mapper."""
+"""QDK/Chemistry PREPARE-SELECT-PREPARE controlled circuit mapper."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -65,10 +65,6 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
 
-    The quantum walk variant is used with **QPE** to extract eigenvalues,
-    while the plain block encoding is used with a **Hadamard test** for
-    expectation values.
-
     """
 
     def __init__(self):
@@ -125,7 +121,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         if len(controlled_unitary.control_indices) != 1:
             raise ValueError("PrepSelPrepMapper currently only supports a single control qubit.")
 
-        power: int = unitary_container.power
+        power = unitary_container.power
         prepare = unitary_container.prepare
         select = unitary_container.select
 
@@ -156,18 +152,18 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         if unitary_container.quantum_walk:
             qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepSelPrep.MakeQuantumWalkCircuit,
+                program=QSHARP_UTILS.PrepSelPrep.MakeControlledQuantumWalkCircuit,
                 parameter=psp_parameters,
             )
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeQuantumWalkOp(
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledQuantumWalkOp(
                 prepare_op, select_op, num_system, num_ancilla, power
             )
         else:
             qsharp_factory = QsharpFactoryData(
-                program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,
+                program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,
                 parameter=psp_parameters,
             )
-            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
+            qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepOp(
                 prepare_op, select_op, num_system, num_ancilla, power
             )
 

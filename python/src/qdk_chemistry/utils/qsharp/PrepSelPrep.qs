@@ -21,12 +21,20 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ///     \mathrm{REFLECT} = 2|0\rangle\langle 0| - I
     /// $$
     operation Reflect(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {
-        within {
-            ApplyToEachCA(X, ancillaRegister);
-        } apply {
-            Controlled Z(ancillaRegister[1...], ancillaRegister[0]);
+        let n = Length(ancillaRegister);
+        if n == 0 {
+            // No ancilla — reflection is a global phase (no-op).
+        } elif n == 1 {
+            Z(ancillaRegister[0]);
+            R(PauliI, 2.0 * PI(), ancillaRegister[0]);
+        } else {
+            within {
+                ApplyToEachCA(X, ancillaRegister);
+            } apply {
+                Controlled Z(ancillaRegister[1...], ancillaRegister[0]);
+            }
+            R(PauliI, 2.0 * PI(), ancillaRegister[0]);
         }
-        R(PauliI, 2.0 * PI(), ancillaRegister[0]);
     }
 
     /// # Summary
@@ -91,7 +99,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ///
     /// The caller passes system + ancilla qubits together since the ancilla
     /// becomes entangled with the control qubit during the controlled operation.
-    operation MakePrepSelPrepOp(
+    function MakeControlledPrepSelPrepOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -110,7 +118,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ///
     /// System and ancilla qubits are passed together; the caller is responsible
     /// for allocation since the walk operator leaves ancilla entangled.
-    operation MakeQuantumWalkOp(
+    function MakeControlledQuantumWalkOp(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -127,7 +135,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// Circuit entry point for prep-sel-prep (allocates qubits).
-    operation MakePrepSelPrepCircuit(
+    operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -136,12 +144,12 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakePrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakeControlledPrepSelPrepOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 
     /// Circuit entry point for quantum walk (allocates qubits).
-    operation MakeQuantumWalkCircuit(
+    operation MakeControlledQuantumWalkCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
@@ -150,7 +158,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     ) : Unit {
         use control = Qubit();
         use systems = Qubit[numSystemQubits + numAncillaQubits];
-        let op = MakeQuantumWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
+        let op = MakeControlledQuantumWalkOp(prepareOp, selectOp, numSystemQubits, numAncillaQubits, power);
         op(control, systems);
     }
 }
