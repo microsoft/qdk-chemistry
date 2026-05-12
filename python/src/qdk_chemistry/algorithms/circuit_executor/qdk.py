@@ -47,7 +47,10 @@ def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, i
         has_loss = False
         chars = []
         for x in reversed(one_run):
-            c = _map.get(str(x), "0")
+            label = str(x)
+            if label not in _map:
+                raise ValueError(f"Unexpected measurement result '{label}'; expected one of {set(_map)}")
+            c = _map[label]
             if c == "L":
                 has_loss = True
             chars.append(c)
