@@ -8,9 +8,7 @@
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
-    BlockEncodingContainer,
-)
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
@@ -71,9 +69,6 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
     while the plain block encoding is used with a **Hadamard test** for
     expectation values.
 
-    Notes:
-        * Currently supports only single-control-qubit scenarios.
-
     """
 
     def __init__(self):
@@ -118,10 +113,6 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         Returns:
             Circuit: A quantum circuit implementing the controlled block encoding.
-
-        Raises:
-            ValueError: If the unitary container is not a BlockEncodingContainer.
-            ValueError: If multiple control qubits are provided.
 
         """
         unitary_container = controlled_unitary.unitary.get_container()
