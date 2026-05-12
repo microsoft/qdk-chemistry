@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.controlled_circuit_mapper import MultiControlledSelectMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import MultiControlledSelectMapper, SelectMapperFactory
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -38,6 +38,11 @@ class TestMultiControlledSelectMapper:
         """Verify multi-control select mapper is accessible via the registry."""
         mapper = registry.create("select_mapper", "multi_controlled_select")
         assert isinstance(mapper, MultiControlledSelectMapper)
+
+    def test_factory_default_algorithm_name(self):
+        """Verify SelectMapperFactory default is multi_controlled_select."""
+        factory = SelectMapperFactory()
+        assert factory.default_algorithm_name() == "multi_controlled_select"
 
     def test_select_circuit_has_factory(self):
         """Test that the SELECT circuit has both qsharp_op and qsharp_factory."""
