@@ -8,14 +8,9 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.state_preparation.dense_pure_state import (
-    DensePureStatePreparation,
-)
-from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
-    SparseIsometryGF2XStatePreparation,
-)
+from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
+from qdk_chemistry.algorithms.state_preparation.sparse_isometry import SparseIsometryGF2XStatePreparation
 from qdk_chemistry.algorithms.state_preparation.state_preparation import (
-    StatePreparation,
     StatePreparationFactory,
     StatePreparationSettings,
 )
