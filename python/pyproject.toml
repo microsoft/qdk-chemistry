@@ -96,13 +96,16 @@ networkx-extras = [
   "networkx>=3.0"
 ]
 test = [
-  "pytest",
+  "ipykernel>=6.0",
+  "openfermion>=1.0.0; python_version < '3.14'",
+  "pennylane",
+  "pylatexenc==2.10; python_version < '3.14'",
   "pyscf>=2.9.0,<2.12.1",
+  "pytest",
   "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
   "qiskit-aer; python_version < '3.14'",
   "qiskit-nature; python_version < '3.14'",
-  "pylatexenc==2.10; python_version < '3.14'",
-  "openfermion>=1.0.0; python_version < '3.14'",
+  "rdkit"
 ]
 
 

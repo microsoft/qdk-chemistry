@@ -1,6 +1,5 @@
 #!/bin/bash
-set -e
-set -x
+set -ex
 
 MARCH=${1:-x86-64-v3}
 PYTHON_VERSION=${2:-3.11}
@@ -28,27 +27,39 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
-        python3 python3-pip python3-dev \
-        libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-        libffi-dev liblzma-dev \
-        libeigen3-dev \
-        nlohmann-json3-dev \
-        libboost-all-dev \
-        libgtest-dev \
-        libgmock-dev \
-        libfmt-dev \
-        ninja-build \
-        gcc g++ \
-        make \
-        git \
-        wget \
-        curl \
-        unzip \
-        patchelf \
         build-essential \
+        curl \
+        gcc g++ \
+        git \
+        libboost-all-dev \
+        libbz2-dev \
+        libeigen3-dev \
+        libffi-dev \
+        libfmt-dev \
+        libgmock-dev \
+        libgtest-dev \
+        liblzma-dev \
+        libncursesw5-dev \
         libpugixml-dev \
-        python3-pybind11 pybind11-dev
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        make \
+        ninja-build \
+        nlohmann-json3-dev \
+        patchelf \
+        pybind11-dev \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-pybind11 \
+        tk-dev \
+        unzip \
+        wget \
+        xz-utils \
+        zlib1g-dev
 
     # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
     echo "Downloading and installing CMake ${CMAKE_VERSION}..."
@@ -78,14 +89,15 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \
-        ninja \
-        eigen \
-        wget \
-        curl \
-        cmake \
-        gcc \
         boost \
-        pybind11
+        cmake \
+        curl \
+        eigen \
+        gcc \
+        ncurses \
+        ninja \
+        pybind11 \
+        wget
     export CMAKE_PREFIX_PATH="/opt/homebrew"
     export PYENV_ROOT="$PWD/.pyenv"
 fi

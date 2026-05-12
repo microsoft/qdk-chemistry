@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
 PYENV_VERSION=${3:-2.6.15}
@@ -36,22 +36,39 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
-        python3 python3-pip python3-venv python3-dev \
-        libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-        libffi-dev liblzma-dev \
-        libopenblas-dev \
-        libboost-all-dev \
-        wget \
+        build-essential \
         curl \
-        unzip
+        git \
+        libboost-all-dev \
+        libbz2-dev \
+        libffi-dev \
+        liblzma-dev \
+        libncursesw5-dev \
+        libopenblas-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        make \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+        tk-dev \
+        unzip \
+        wget \
+        xz-utils \
+        zlib1g-dev
+
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \
-        wget \
         curl \
-        unzip
+        ncurses \
+        unzip \
+        wget
 fi
 
 # Install pyenv to use non-system python3 versions
