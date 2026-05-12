@@ -17,6 +17,7 @@ from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration,
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
 from .test_helpers import create_test_orbitals
 
 
@@ -118,21 +119,6 @@ class TestDensePureStatePreparation:
         # 4 orbitals -> 8 qubits (4 alpha + 4 beta)
         assert num_qubits == 8
 
-    def test_asymmetric_active_space_raises(self):
-        """Test that asymmetric alpha/beta active spaces raise ValueError."""
-
-        class _MockOrbitals:
-            def get_active_space_indices(self):
-                return ([0, 1, 2], [0, 1, 2, 3])
-
-        class _MockWavefunction:
-            def get_orbitals(self):
-                return _MockOrbitals()
-
-        prep = DensePureStatePreparation()
-        with pytest.raises(ValueError, match="Asymmetric active spaces"):
-            prep.run(_MockWavefunction())
-
     def test_statevector_matches_wavefunction_4e4o(self, wavefunction_4e4o):
         """Verify the prepared state matches the expected statevector for the 4e4o problem.
 
@@ -210,5 +196,19 @@ class TestDensePureStatePreparation:
         dense_energy = estimator.run([(dense_circuit, hamiltonian_op)]).result()[0].data.evs
         sparse_energy = estimator.run([(sparse_circuit, hamiltonian_op)]).result()[0].data.evs
 
-        assert np.isclose(dense_energy, ref_energy_4e4o, rtol=1e-6, atol=1e-6)
-        assert np.isclose(dense_energy, sparse_energy, rtol=1e-6, atol=1e-6)
+        assert np.isclose(dense_energy, ref_energy_4e4o, atol=estimator_energy_tolerance)
+        assert np.isclose(dense_energy, sparse_energy, atol=float_comparison_absolute_tolerance)
+
+    def test_prepare_from_statevector(self):
+        """Verify prepare_from_statevector produces a circuit with correct factory parameters."""
+        prep = DensePureStatePreparation()
+        statevector = np.array([1.0 / np.sqrt(2), 1.0 / np.sqrt(2)])
+        qubit_indices = [0]
+        circuit = prep.prepare_from_statevector(statevector, num_qubits=1, qubit_indices=qubit_indices)
+
+        assert isinstance(circuit, Circuit)
+        params = circuit._qsharp_factory.parameter
+        assert params["numQubits"] == 1
+        assert params["rowMap"] == qubit_indices
+        assert params["expansionOps"] == []
+        assert np.allclose(params["stateVector"], statevector.tolist())

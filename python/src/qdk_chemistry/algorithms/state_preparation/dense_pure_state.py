@@ -53,6 +53,12 @@ class DensePureStatePreparation(StatePreparation):
 
         """
         alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
+        if alpha_indices != beta_indices:
+            raise ValueError(
+                f"Active space contains {len(alpha_indices)} alpha orbitals and "
+                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
+                "alpha and beta orbitals are not supported for state preparation."
+            )
         coeffs = wavefunction.get_coefficients()
         dets = wavefunction.get_active_determinants()
         num_orbitals = max(len(alpha_indices), len(beta_indices))

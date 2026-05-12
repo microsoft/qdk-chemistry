@@ -5,7 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import tempfile
+from pathlib import Path
+
+import h5py
 import numpy as np
+import pytest
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
@@ -144,6 +149,16 @@ class TestLCUBuilder:
         container_no_walk = builder_no_walk.run(hamiltonian).get_container()
         assert container_no_walk.quantum_walk is False
 
+    def test_rejects_zero_schatten_norm(self):
+        """Verify LCUBuilder raises ValueError when all coefficients are zero."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.0, 0.0]),
+        )
+        builder = LCUBuilder()
+        with pytest.raises(ValueError, match="Schatten norm is too small"):
+            builder.run(hamiltonian)
+
 
 class TestLCUContainer:
     """Tests for the LCUContainer data class."""
@@ -211,3 +226,53 @@ class TestLCUContainer:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    def test_hdf5_serialization_roundtrip(self):
+        """Test HDF5 serialization round-trip for LCUContainer."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ", "XZ"],
+            coefficients=np.array([0.25, -0.5, 0.3]),
+        )
+        builder = LCUBuilder()
+        container = builder.run(hamiltonian).get_container()
+
+        with tempfile.NamedTemporaryFile(suffix=".hdf5", delete=False) as tmp:
+            filename = tmp.name
+
+        try:
+            with h5py.File(filename, "w") as f:
+                container.to_hdf5(f)
+
+            with h5py.File(filename, "r") as f:
+                restored = LCUContainer.from_hdf5(f)
+
+            assert restored.type == container.type
+            assert restored.power == container.power
+            assert restored.quantum_walk == container.quantum_walk
+            assert restored.prepare.num_prepare_qubits == container.prepare.num_prepare_qubits
+            assert np.allclose(restored.prepare.statevector, container.prepare.statevector)
+            assert np.array_equal(restored.select.phases, container.select.phases)
+            assert len(restored.select.controlled_operations) == len(container.select.controlled_operations)
+            for r_op, c_op in zip(
+                restored.select.controlled_operations, container.select.controlled_operations, strict=False
+            ):
+                assert r_op.ctrl_state == c_op.ctrl_state
+                assert r_op.operation == c_op.operation
+        finally:
+            Path(filename).unlink()
+
+    def test_get_summary(self):
+        """Test that get_summary returns a descriptive string."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XX", "ZZ"],
+            coefficients=np.array([0.25, 0.5]),
+        )
+        builder = LCUBuilder()
+        container = builder.run(hamiltonian).get_container()
+
+        summary = container.get_summary()
+        assert "LCU Container" in summary
+        assert "Power" in summary
+        assert "Prepare" in summary
+        assert "Select" in summary
+        assert "Quantum Walk" in summary
