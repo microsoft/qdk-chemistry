@@ -95,6 +95,16 @@ openfermion-extras = [
 networkx-extras = [
   "networkx>=3.0"
 ]
+test = [
+  "pytest",
+  "pyscf>=2.9.0,<2.12.1",
+  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
+  "qiskit-aer; python_version < '3.14'",
+  "qiskit-nature; python_version < '3.14'",
+  "pylatexenc==2.10; python_version < '3.14'",
+  "openfermion>=1.0.0; python_version < '3.14'",
+]
+
 
 [project.urls]
 Documentation = "https://microsoft.github.io/qdk-chemistry"

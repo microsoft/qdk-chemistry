@@ -138,6 +138,12 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
+          - task: PipAuthenticate@1
+            displayName: Pip Authenticate
+            inputs:
+              artifactFeeds: AzureQuantum/quantum-apps-dependencies
+              onlyAddExtraIndex: false
+
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self

@@ -88,12 +88,6 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-- task: PipAuthenticate@1
-  displayName: Pip Authenticate
-  inputs:
-    artifactFeeds: AzureQuantum/quantum-apps-dependencies
-    onlyAddExtraIndex: false
-
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |
       echo "Running pip wheel build (Linux)..."

@@ -29,13 +29,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Reinstalling libc-bin..."
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
-    apt-get update
-    apt install -q libc-bin
+    apt-get update -q
+    apt install -y -q libc-bin
 
     # Update and install dependencies needed for testing
     echo "Installing apt dependencies..."
-    apt-get update
-    apt-get install -q -y \
+    apt-get update -q
+    apt-get install -y -q \
         python3 python3-pip python3-venv python3-dev \
         libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
         libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
@@ -82,28 +82,18 @@ rm -rf "$VENV_DIR"
 python3 -m venv "$VENV_DIR"
 . "$VENV_DIR/bin/activate"
 
-# Upgrade pip packages
-python3 -m pip install --upgrade pip
-python3 -m pip install "fonttools>=4.61.0" "urllib3>=2.6.0"
+pip3 install --upgrade pip
 
 # Install the wheel in the clean environment
 cd "$PYTHON_DIR"
 
-# Install testing/optional dependencies
-python3 -m pip install pytest "pyscf>=2.9.0,<2.12.1"
-
-# Install built wheel into fresh venv
-pip3 install repaired_wheelhouse/qdk_chemistry*.whl
-
-# Install qiskit-extras if supported (not available on Python 3.14+)
-# qiskit-aer and qiskit-nature do not yet have Python 3.14 wheels
-PYTHON_MINOR=$(python3 -c "import sys; print(sys.version_info.minor)")
-if [ "$PYTHON_MINOR" -lt 14 ]; then
-    echo "Installing qiskit-extras..."
-    python3 -m pip install qiskit-aer qiskit-nature "openfermion>=1.0.0" qiskit_qasm3_import "pylatexenc==2.10"
-else
-    echo "Skipping qiskit-extras and openfermion (not supported on Python 3.14+)"
+# Install built wheel with test dependencies
+WHEEL=(repaired_wheelhouse/qdk_chemistry*.whl)
+if [ ${#WHEEL[@]} -ne 1 ]; then
+    echo "ERROR: Expected exactly 1 wheel, found ${#WHEEL[@]}: ${WHEEL[*]}"
+    exit 1
 fi
+pip3 install "${WHEEL[0]}[test]"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
