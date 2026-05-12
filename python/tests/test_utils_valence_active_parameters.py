@@ -222,10 +222,12 @@ class TestTransitionMetalValenceParameters:
         wfn = make_minimal_wavefunction(["Ag", "H"], [[0.0, 0.0, 0.0], [0.0, 0.0, 1.617]], 24, 24)
 
         nele_on, norb_on = compute_valence_space_parameters(wfn, 0, include_double_d_shell=True)
-        assert (nele_on, norb_on) == (12, 15)  # Ag (11+14) + H (1+1)
+        # Ag with d' shell: (nele=11, norb=14); H: (nele=1, norb=1)
+        assert (nele_on, norb_on) == (12, 15)
 
         nele_off, norb_off = compute_valence_space_parameters(wfn, 0)
-        assert (nele_off, norb_off) == (12, 10)  # Ag default (11+9) + H (1+1)
+        # Ag default: (nele=11, norb=9); H: (nele=1, norb=1)
+        assert (nele_off, norb_off) == (12, 10)
 
     def test_toggle_respects_basis_cap(self):
         """The d' shell can't push num_active_orbitals above num_mo - num_core_mos."""

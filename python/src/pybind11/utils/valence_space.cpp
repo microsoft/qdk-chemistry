@@ -18,7 +18,7 @@ The structure is automatically extracted from the wavefunction.
 
 Args:
     wavefunction: The input wavefunction (the molecular structure is taken
-        from ``wavefunction.orbitals.basis_set``).
+        from ``wavefunction.orbitals.basis_set.structure``).
     charge: The total charge of the molecular system. Should match the charge
         used in the upstream SCF calculation.
     include_double_d_shell: When ``True``, add 5 correlating d' orbitals per
