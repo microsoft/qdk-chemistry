@@ -18,11 +18,11 @@ from .reference_tolerances import (
 )
 
 
-class TestQPEWithLCU:
-    """Integration tests for QPE using LCU unitary builder."""
+class TestIQPEWithLCU:
+    """Integration tests for IQPE using LCU unitary builder."""
 
     def test_iterative_qpe_with_lcu_two_qubit(self):
-        """Verify QPE with LCU recovers the expected energy for a 2-qubit Hamiltonian.
+        """Verify IQPE with LCU recovers the expected energy for a 2-qubit Hamiltonian.
 
         Uses H = (pi/4)*ZZ which has eigenvalue pi/4 on |00>.
         With evolution_time=1 (block encoding), phase_fraction = (pi/4)/(2*pi) = 1/8,
@@ -58,11 +58,11 @@ class TestQPEWithLCU:
         )
         iqpe.settings().set(
             "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select"),
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
         )
         iqpe.settings().set(
             "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "block_encoding"),
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu"),
         )
 
         result = iqpe.run(
@@ -178,11 +178,11 @@ class TestQPEWithLCU:
         )
         iqpe.settings().set(
             "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select"),
+            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
         )
         iqpe.settings().set(
             "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "block_encoding", quantum_walk=True),
+            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(

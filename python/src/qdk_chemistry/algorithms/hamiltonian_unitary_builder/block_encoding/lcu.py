@@ -98,7 +98,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """Construct the unitary representation using LCU block encoding.
 
         Computes normalized amplitudes, signs, and controlled operations from the
-        qubit Hamiltonian, then packages them into generalized Prepare/Select/Reflect
+        qubit Hamiltonian, then packages them into generalized Prepare/Select
         dataclasses stored in an LCUContainer.
 
         Args:
@@ -121,7 +121,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             power=power,
             prepare=prepare,
             select=select,
-            reflect=quantum_walk,
+            quantum_walk=quantum_walk,
         )
 
         return UnitaryRepresentation(container=container)
@@ -203,10 +203,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"block_encoding"``.
+            str: The name ``"lcu"``.
 
         """
-        return "block_encoding"
+        return "lcu"
 
     def type_name(self) -> str:
         """Return the algorithm type name.

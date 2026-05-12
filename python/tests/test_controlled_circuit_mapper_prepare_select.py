@@ -61,7 +61,7 @@ class TestPrepareSelectMapper:
     def test_name_and_type(self):
         """Test that name and type_name return correct values."""
         mapper = PrepSelPrepMapper()
-        assert mapper.name() == "prepare_select"
+        assert mapper.name() == "prepare_select_prepare"
         assert mapper.type_name() == "controlled_circuit_mapper"
 
     def test_basic_mapping_produces_circuit_with_factory(self):

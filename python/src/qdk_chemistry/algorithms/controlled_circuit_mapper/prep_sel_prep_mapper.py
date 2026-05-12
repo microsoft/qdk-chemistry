@@ -25,7 +25,7 @@ class PrepSelPrepSettings(Settings):
         state_prep: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
         select_mapper: Algorithm reference for the SELECT oracle mapper.
-            Defaults to ``MultiControlSelectMapper``.
+            Defaults to ``MultiControlledSelectMapper``.
 
     """
 
@@ -40,12 +40,12 @@ class PrepSelPrepSettings(Settings):
         self._set_default(
             "select_mapper",
             "algorithm_ref",
-            AlgorithmRef("select_mapper", "multi_control_select"),
+            AlgorithmRef("select_mapper", "multi_controlled_select"),
         )
 
 
 class PrepSelPrepMapper(ControlledCircuitMapper):
-    r"""Controlled circuit mapper using the PREPARE-SELECT pattern.
+    r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
     Composes a controlled block encoding from two independent sub-algorithms:
 
@@ -60,7 +60,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         B[H] = \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
 
-    When the container has ``reflect=True``, the block encoding is wrapped with
+    When the container has ``quantum_walk=True``, the block encoding is wrapped with
     a quantum walk operator:
 
     .. math::
@@ -85,10 +85,10 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"prepare_select"``.
+            str: The name ``"prepare_select_prepare"``.
 
         """
-        return "prepare_select"
+        return "prepare_select_prepare"
 
     def type_name(self) -> str:
         """Return the algorithm type name.
@@ -109,7 +109,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         2. **SELECT** — delegates to the nested ``select_mapper`` algorithm
            to build a Q# callable that applies controlled unitaries.
         3. **Compose** — stitches controlled PREPARE-SELECT-PREPARE into either a plain block
-           encoding or a quantum walk step (when ``reflect=True``), via the
+           encoding or a quantum walk step (when ``quantum_walk=True``), via the
            Q# ``PrepSelPrep`` / ``QuantumWalkStep`` operations.
 
         Args:
@@ -163,7 +163,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
             "power": power,
         }
 
-        if unitary_container.reflect:
+        if unitary_container.quantum_walk:
             qsharp_factory = QsharpFactoryData(
                 program=QSHARP_UTILS.PrepSelPrep.MakeQuantumWalkCircuit,
                 parameter=psp_parameters,

@@ -14,7 +14,7 @@ from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import Select
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["MultiControlSelectMapper", "SelectMapper", "SelectMapperFactory"]
+__all__: list[str] = ["MultiControlledSelectMapper", "SelectMapper", "SelectMapperFactory"]
 
 
 class SelectMapper(Algorithm):
@@ -46,11 +46,11 @@ class SelectMapperFactory(AlgorithmFactory):
         return "select_mapper"
 
     def default_algorithm_name(self) -> str:
-        """Return multi_control_select as the default algorithm name."""
-        return "multi_control_select"
+        """Return multi_controlled_select as the default algorithm name."""
+        return "multi_controlled_select"
 
 
-class MultiControlSelectMapper(SelectMapper):
+class MultiControlledSelectMapper(SelectMapper):
     r"""Multi-controlled SELECT oracle mapper for LCU block encodings.
 
     Converts a :class:`~qdk_chemistry.data.unitary_representation.containers.block_encoding.Select` data object
@@ -66,17 +66,17 @@ class MultiControlSelectMapper(SelectMapper):
     """
 
     def __init__(self):
-        """Initialize the MultiControlSelectMapper."""
+        """Initialize the MultiControlledSelectMapper."""
         super().__init__()
 
     def name(self) -> str:
         """Return the algorithm name.
 
         Returns:
-            str: The name ``"multi_control_select"``.
+            str: The name ``"multi_controlled_select"``.
 
         """
-        return "multi_control_select"
+        return "multi_controlled_select"
 
     def _run_impl(self, select: Select) -> Circuit:
         """Create a SELECT circuit from a Select data object.
