@@ -1,6 +1,6 @@
 """Time-dependent Hamiltonian for evolve-and-measure simulations.
 
-A :class:`TimeDependentHamiltonian` bundles a sequence of
+A :class:`TimeDependentQubitHamiltonian` bundles a sequence of
 :class:`~qdk_chemistry.data.QubitHamiltonian` snapshots with their
 corresponding time coordinates.  Validation (length consistency,
 strict monotonicity, qubit-count uniformity) is performed at
