@@ -208,12 +208,11 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
 
-          # ARM builds require that we transfer ownership of the wheel directory
+          # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user
-          - ${{ if eq(target.arch, 'aarch64') }}:
-            - script: |
-                sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-              displayName: Fix wheel directory ownership
+          - script: |
+              sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+            displayName: Fix wheel directory ownership
 
 
           - task: TwineAuthenticate@1

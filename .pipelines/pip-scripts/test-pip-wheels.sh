@@ -54,12 +54,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         wget \
         xz-utils \
         zlib1g-dev
-        # libboost-all-dev \
-        # libopenblas-dev \
-        # python3 \
-        # python3-dev \
-        # python3-pip \
-        # python3-venv \
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
