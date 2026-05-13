@@ -126,7 +126,7 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                Python${{ replace(py, '.', '_') }}:
+                Python${{ replace(py, '.', '') }}:
                   pythonVersion: ${{ py }}
             maxParallel: 5
           templateContext:
