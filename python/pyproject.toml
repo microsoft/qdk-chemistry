@@ -97,6 +97,8 @@ networkx-extras = [
 ]
 test = [
   "ipykernel>=6.0",
+  "nbclient",
+  "nbformat",
   "openfermion>=1.0.0; python_version < '3.14'",
   "pennylane",
   "pylatexenc==2.10; python_version < '3.14'",
