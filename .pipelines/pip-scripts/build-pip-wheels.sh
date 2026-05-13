@@ -10,7 +10,7 @@ CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
 BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
-PYENV_VERSION=${10:-2.6.15}
+PYENV_VERSION=${10:-2.6.31}
 MAC_BUILD=${11:-OFF}
 
 export CFLAGS="-fPIC -Os"
@@ -118,7 +118,7 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # pyenv is used in place of a venv to prevent any collisions with the system Python
 # when building with a non-system Python version.
 echo "Installing pyenv ${PYENV_VERSION}..."
-export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+PYENV_CHECKSUM=7435b8c1481043e48c838ba40d5c8bc724c23d4c94e531adc283a7c121757ad4
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip

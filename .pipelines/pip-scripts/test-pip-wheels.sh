@@ -2,7 +2,7 @@
 set -ex
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
-PYENV_VERSION=${3:-2.6.15}
+PYENV_VERSION=${3:-2.6.31}
 export MAC_BUILD
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -68,7 +68,7 @@ fi
 # Install pyenv to use non-system python3 versions
 if [ ! -d "$PYENV_ROOT" ]; then
     echo "Installing pyenv ${PYENV_VERSION}..."
-    export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+    PYENV_CHECKSUM=7435b8c1481043e48c838ba40d5c8bc724c23d4c94e531adc283a7c121757ad4
     wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
     echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
     unzip -q pyenv.zip

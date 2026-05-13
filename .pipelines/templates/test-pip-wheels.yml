@@ -16,7 +16,7 @@ parameters:
   default: OFF
 - name: pyenvVersion
   type: string
-  default: 2.6.15
+  default: 2.6.31
 
 steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
