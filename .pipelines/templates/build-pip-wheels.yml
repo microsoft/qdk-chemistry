@@ -4,7 +4,7 @@ parameters:
   default: armv8-a
 - name: buildType
   type: string
-  default: Debug
+  default: Release
 - name: buildTesting
   type: string
   default: ON
