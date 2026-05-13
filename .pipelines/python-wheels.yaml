@@ -129,10 +129,10 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                Python${{ replace(py, '.', '') }}:
+                Py${{ py }}:
                   pythonVersion: ${{ py }}
             maxParallel: 5
-          displayName: Build ${{ target.march }} ${{ target.os }} wheels py$(pythonVersion)
+          displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
