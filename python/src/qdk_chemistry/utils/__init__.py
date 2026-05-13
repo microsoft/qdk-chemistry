@@ -8,7 +8,7 @@
 from qdk_chemistry._core.utils import Logger, compute_valence_space_parameters, rotate_orbitals
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
 
-from . import model_hamiltonians
+from . import model_hamiltonians, spin_operators
 
 __all__ = [
     "CaseInsensitiveStrEnum",
@@ -16,4 +16,5 @@ __all__ = [
     "compute_valence_space_parameters",
     "model_hamiltonians",
     "rotate_orbitals",
+    "spin_operators",
 ]

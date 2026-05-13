@@ -687,20 +687,26 @@ std::unique_ptr<PauliOperatorExpression> SumPauliOperatorExpression::clone()
 
 std::unique_ptr<SumPauliOperatorExpression>
 SumPauliOperatorExpression::distribute() const {
-  // Short-circuit: if already distributed, just clone
-  if (this->is_distributed()) {
-    return std::make_unique<SumPauliOperatorExpression>(*this);
-  }
-
   auto result = std::make_unique<SumPauliOperatorExpression>();
   result->reserve_capacity(terms_.size() * 2);
 
-  for (const auto& term : terms_) {
-    auto distributed_term = term->distribute();
-    for (const auto& dist_term : distributed_term->get_terms()) {
-      result->add_term(dist_term->clone());
+  // Recursively flatten nested sums and distribute product terms.
+  std::function<void(const SumPauliOperatorExpression*)> flatten;
+  flatten = [&result, &flatten](const SumPauliOperatorExpression* sum) {
+    for (const auto& term : sum->get_terms()) {
+      if (const auto* nested_sum = term->as_sum_expression()) {
+        // Flatten nested sums recursively
+        flatten(nested_sum);
+      } else {
+        auto distributed_term = term->distribute();
+        for (const auto& dist_term : distributed_term->get_terms()) {
+          result->add_term(dist_term->clone());
+        }
+      }
     }
-  }
+  };
+
+  flatten(this);
   return result;
 }
 

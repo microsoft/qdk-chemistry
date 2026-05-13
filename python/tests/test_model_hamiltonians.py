@@ -123,18 +123,20 @@ class TestModelHamiltonians:
         j = 1.0
         h = 0.5
 
+        # Convention: S^α = σ^α/2 for spin-1/2, so two-body coefficients are J/4
+        # and one-body coefficients are h/2.
         expected = {}
-        # edges
+        # edges: J * S^z_i S^z_j → J/4 * Z_i Z_j
         for edge in [(0, 1), (1, 2), (2, 3)]:
             pauli = ["I"] * n
             pauli[n - 1 - edge[0]] = "Z"
             pauli[n - 1 - edge[1]] = "Z"
-            expected["".join(pauli)] = j
-        # sites
+            expected["".join(pauli)] = j / 4
+        # sites: h * S^x_i → h/2 * X_i
         for i in range(n):
             pauli = ["I"] * n
             pauli[n - 1 - i] = "X"
-            expected["".join(pauli)] = h
+            expected["".join(pauli)] = h / 2
 
         # scalar
         qh = create_ising_hamiltonian(lattice, j=j, h=h)
@@ -160,21 +162,23 @@ class TestModelHamiltonians:
         h_vec[2] = 0.9
         qh_modified = create_ising_hamiltonian(lattice, j=j_mat, h=h_vec)
         terms_mod = _get_terms_dict(qh_modified)
-        assert terms_mod["IIZZ"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["ZZII"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIIX"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IXII"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIZZ"] == pytest.approx(2.5 / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IZZI"] == pytest.approx(1.0 / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["ZZII"] == pytest.approx(1.0 / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIIX"] == pytest.approx(0.5 / 2, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IXII"] == pytest.approx(0.9 / 2, abs=float_comparison_absolute_tolerance)
 
-        # weighted edges
+        # weighted edges: edge weight 0.5 scales two-body terms
         lattice_w = LatticeGraph.chain(3, t=0.5)
         qh_w = create_ising_hamiltonian(lattice_w, j=2.0, h=1.0)
         terms_w = _get_terms_dict(qh_w)
-        assert terms_w["IZZ"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["ZZI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["IIX"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["IXI"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
-        assert terms_w["XII"] == pytest.approx(1.0, abs=float_comparison_absolute_tolerance)
+        # 2.0 * 0.5 / 4 = 0.25
+        assert terms_w["IZZ"] == pytest.approx(0.25, abs=float_comparison_absolute_tolerance)
+        assert terms_w["ZZI"] == pytest.approx(0.25, abs=float_comparison_absolute_tolerance)
+        # fields are not edge-weighted: 1.0 / 2 = 0.5
+        assert terms_w["IIX"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
+        assert terms_w["IXI"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
+        assert terms_w["XII"] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)
 
     def test_heisenberg_chain(self):
         n = 4
@@ -187,6 +191,8 @@ class TestModelHamiltonians:
         hy = -2.0
         hz = -3.0
 
+        # Convention: S^α = σ^α/2 for spin-1/2, so two-body coefficients are J/4
+        # and one-body coefficients are h/2.
         expected = {}
         # edges
         for edge in edges:
@@ -194,13 +200,13 @@ class TestModelHamiltonians:
                 ps = ["I"] * n
                 ps[n - 1 - edge[0]] = pauli_char
                 ps[n - 1 - edge[1]] = pauli_char
-                expected["".join(ps)] = j_val
+                expected["".join(ps)] = j_val / 4
         # sites
         for i in range(n):
             for pauli_char, h_val in [("X", hx), ("Y", hy), ("Z", hz)]:
                 ps = ["I"] * n
                 ps[n - 1 - i] = pauli_char
-                expected["".join(ps)] = h_val
+                expected["".join(ps)] = h_val / 2
 
         # scalar
         qh = create_heisenberg_hamiltonian(lattice, jx=jx, jy=jy, jz=jz, hx=hx, hy=hy, hz=hz)
@@ -235,16 +241,16 @@ class TestModelHamiltonians:
             lattice, jx=jx_mat, jy=jy_mat, jz=jz_mat, hx=hx_vec, hy=hy_vec, hz=hz_vec
         )
         terms_mod = _get_terms_dict(qh_modified)
-        assert terms_mod["IIXX"] == pytest.approx(2.5, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIYY"] == pytest.approx(jy, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIZZ"] == pytest.approx(jz, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IXXI"] == pytest.approx(jx, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IYYI"] == pytest.approx(jy, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IZZI"] == pytest.approx(0.3, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IIIX"] == pytest.approx(hx, abs=float_comparison_absolute_tolerance)
-        assert terms_mod["IXII"] == pytest.approx(0.9, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIXX"] == pytest.approx(2.5 / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIYY"] == pytest.approx(jy / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIZZ"] == pytest.approx(jz / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IXXI"] == pytest.approx(jx / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IYYI"] == pytest.approx(jy / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IZZI"] == pytest.approx(0.3 / 4, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IIIX"] == pytest.approx(hx / 2, abs=float_comparison_absolute_tolerance)
+        assert terms_mod["IXII"] == pytest.approx(0.9 / 2, abs=float_comparison_absolute_tolerance)
 
-        # weighted edges
+        # weighted edges: edge weight 2.0 scales two-body terms
         lattice_w = LatticeGraph.chain(3, t=2.0)
         qh_w = create_heisenberg_hamiltonian(lattice_w, jx=1.0, jy=1.0, jz=1.0)
         terms_w = _get_terms_dict(qh_w)
@@ -253,4 +259,5 @@ class TestModelHamiltonians:
                 ps = ["I"] * 3
                 ps[3 - 1 - edge[0]] = pauli_char
                 ps[3 - 1 - edge[1]] = pauli_char
-                assert terms_w["".join(ps)] == pytest.approx(2.0, abs=float_comparison_absolute_tolerance)
+                # 1.0 * 2.0 / 4 = 0.5
+                assert terms_w["".join(ps)] == pytest.approx(0.5, abs=float_comparison_absolute_tolerance)

@@ -20,10 +20,11 @@ Fermionic models
    * **Pariser-Parr-Pople (PPP)** — extends Hubbard with long-range intersite Coulomb interactions
 
 Spin models
-   Operate on spin-½ degrees of freedom and produce :class:`~qdk_chemistry.data.QubitHamiltonian` objects expressed as sums of Pauli operators.
+   Operate on spin-S degrees of freedom and produce :class:`~qdk_chemistry.data.QubitHamiltonian` objects expressed as sums of Pauli operators.
+   Support arbitrary spin quantum numbers and mixed-spin lattices.
 
-   * **Heisenberg** — anisotropic spin-spin coupling with external magnetic fields
-   * **Ising** — special case of Heisenberg with ZZ coupling and transverse X field
+   * **Heisenberg** — anisotropic spin-spin coupling with biquadratic terms and external magnetic fields
+   * **Ising** — special case of Heisenberg with :math:`S^z S^z` coupling and transverse :math:`S^x` field
 
 All model Hamiltonian builders take a :doc:`LatticeGraph <data/lattice_graph>` as their first argument, which defines the site connectivity and hopping structure.
 For a brief description of the available model Hamiltonian builders, see the table below.
@@ -52,11 +53,11 @@ For a more detailed description of each model Hamiltonian and their parameters, 
    * - ``create_heisenberg_hamiltonian``
      - Spin
      - QubitHamiltonian
-     - Anisotropic spin coupling + external fields
+     - Anisotropic spin-S coupling + biquadratic + fields
    * - ``create_ising_hamiltonian``
      - Spin
      - QubitHamiltonian
-     - ZZ coupling + transverse X field
+     - :math:`S^z S^z` coupling + transverse :math:`S^x` field
 
 Fermionic models
 ----------------
@@ -216,60 +217,202 @@ The ``pairwise_potential`` function accepts a user-defined callable ``func(i, j,
 Spin models
 -----------
 
+The spin model builders construct Hamiltonians for quantum spin systems on a lattice.
+They use physical spin operators :math:`\hat{S}^\alpha` with eigenvalues
+:math:`-S, -S+1, \ldots, S`, and produce :class:`~qdk_chemistry.data.QubitHamiltonian`
+objects expressed as sums of Pauli operators.
+
+Spin models support **arbitrary spin quantum numbers** (S = 1/2, 1, 3/2, 2, ...),
+including **mixed-spin lattices** where different sites carry different spin values.
+Each site is encoded into :math:`\lceil \log_2(2S+1) \rceil` qubits.
+
+.. note::
+
+   The spin model builders use physical spin operators :math:`\hat{S}^\alpha`
+   (not Pauli matrices :math:`\hat{\sigma}^\alpha`).
+   For spin-1/2, :math:`\hat{S}^\alpha = \hat{\sigma}^\alpha / 2`, so coupling
+   constants differ by a factor of 4 (two-body) or 2 (one-body) compared to the
+   Pauli-matrix convention.
+
 .. _model-heisenberg:
 
 Heisenberg model
 ~~~~~~~~~~~~~~~~
 
-The anisotropic Heisenberg model describes spin-½ particles interacting on a lattice with external magnetic fields:
+The anisotropic Heisenberg model describes spin-S particles interacting on a lattice
+with optional biquadratic coupling and external magnetic fields:
 
 .. math::
 
    \hat{H}_\text{Heisenberg} = \sum_{\langle i,j \rangle} w_{ij}\,\bigl(
-           J_x^{ij}\,\hat{\sigma}_i^x \hat{\sigma}_j^x
-         + J_y^{ij}\,\hat{\sigma}_i^y \hat{\sigma}_j^y
-         + J_z^{ij}\,\hat{\sigma}_i^z \hat{\sigma}_j^z
+           J_x^{ij}\,\hat{S}_i^x \hat{S}_j^x
+         + J_y^{ij}\,\hat{S}_i^y \hat{S}_j^y
+         + J_z^{ij}\,\hat{S}_i^z \hat{S}_j^z
        \bigr)
+     + \sum_{\langle i,j \rangle} w_{ij}\,J_\text{bq}^{ij}\,
+       (\hat{\mathbf{S}}_i \cdot \hat{\mathbf{S}}_j)^2
      + \sum_i \bigl(
-           h_x^{i}\,\hat{\sigma}_i^x
-         + h_y^{i}\,\hat{\sigma}_i^y
-         + h_z^{i}\,\hat{\sigma}_i^z
+           h_x^{i}\,\hat{S}_i^x
+         + h_y^{i}\,\hat{S}_i^y
+         + h_z^{i}\,\hat{S}_i^z
        \bigr)
 
-where :math:`J_x, J_y, J_z` are the spin-spin coupling constants, :math:`h_x, h_y, h_z` are external magnetic field components, and :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
-Each qubit corresponds to a lattice site.
+where :math:`J_x, J_y, J_z` are the bilinear spin-spin coupling constants,
+:math:`J_\text{bq}` is the biquadratic coupling constant,
+:math:`h_x, h_y, h_z` are external magnetic field components,
+and :math:`w_{ij}` is the edge weight from the lattice adjacency matrix.
 
-.. tab:: Python API
-
-   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
-      :language: python
-      :start-after: # start-cell-create-heisenberg
-      :end-before: # end-cell-create-heisenberg
+The ``spins`` parameter controls the spin quantum number per site (default 0.5).
+Pass a scalar for uniform spin or a list for mixed-spin lattices.
 
 Special cases of the Heisenberg model include:
 
 - **Isotropic (XXX)**: :math:`J_x = J_y = J_z`
 - **XXZ**: :math:`J_x = J_y \ne J_z`
 - **XY**: :math:`J_z = 0`
+- **Bilinear-biquadratic (BLBQ)**: :math:`J_x = J_y = J_z,\; J_\text{bq} \ne 0` (requires S > 1/2 for non-trivial effects)
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      from qdk_chemistry.data import LatticeGraph
+      from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
+
+      lattice = LatticeGraph.chain(4)
+
+      # Spin-1/2 (default) — isotropic Heisenberg
+      qh_half = create_heisenberg_hamiltonian(lattice, jx=1.0, jy=1.0, jz=1.0)
+
+      # Spin-3/2 — no penalty needed (dim 4 = 2^2)
+      qh_3half = create_heisenberg_hamiltonian(
+          lattice, jx=1.0, jy=1.0, jz=1.0, spins=1.5
+      )
+
+      # Spin-1 — requires penalty (dim 3 ≠ 2^k)
+      qh_one = create_heisenberg_hamiltonian(
+          lattice, jx=1.0, jy=1.0, jz=1.0, spins=1.0, penalty_strength=10.0
+      )
+
+      # Bilinear-biquadratic spin-1 model
+      qh_blbq = create_heisenberg_hamiltonian(
+          lattice, jx=1.0, jy=1.0, jz=1.0,
+          j_biquadratic=0.5, spins=1.0, penalty_strength=10.0
+      )
+
+      # Mixed-spin lattice
+      qh_mixed = create_heisenberg_hamiltonian(
+          lattice, jx=1.0, jy=1.0, jz=1.0,
+          spins=[0.5, 1.5, 0.5, 1.5]
+      )
 
 .. _model-ising:
 
 Ising model
 ~~~~~~~~~~~
 
-The transverse-field Ising model is a special case of the Heisenberg model with ZZ coupling and a transverse X field:
+The transverse-field Ising model is a special case of the Heisenberg model with
+:math:`\hat{S}^z \hat{S}^z` coupling and a transverse :math:`\hat{S}^x` field:
 
 .. math::
 
-   \hat{H}_\text{Ising} = \sum_{\langle i,j \rangle} w_{ij}\,J^{ij}\,\hat{\sigma}_i^z \hat{\sigma}_j^z
-     + \sum_i h^{i}\,\hat{\sigma}_i^x
+   \hat{H}_\text{Ising} = \sum_{\langle i,j \rangle} w_{ij}\,J^{ij}\,\hat{S}_i^z \hat{S}_j^z
+     + \sum_i h^{i}\,\hat{S}_i^x
+
+The ``spins`` and ``penalty_strength`` parameters work identically to the Heisenberg builder.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
-      :language: python
-      :start-after: # start-cell-create-ising
-      :end-before: # end-cell-create-ising
+   .. code-block:: python
+
+      from qdk_chemistry.data import LatticeGraph
+      from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
+
+      lattice = LatticeGraph.chain(4)
+
+      # Spin-1/2 Ising (default)
+      qh = create_ising_hamiltonian(lattice, j=1.0, h=0.5)
+
+      # Spin-3/2 Ising
+      qh_3half = create_ising_hamiltonian(lattice, j=1.0, h=0.5, spins=1.5)
+
+.. _qubit-encoding:
+
+Qubit encoding for higher spins
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each lattice site with spin quantum number :math:`S` is encoded into
+:math:`n = \lceil \log_2(2S+1) \rceil` qubits, giving :math:`2^n` computational
+basis states per site.  When :math:`2S+1` is a power of 2 (e.g. S = 1/2, 3/2, 7/2),
+all computational basis states are physical and no special treatment is needed.
+
+When :math:`2S+1` is **not** a power of 2 (e.g. S = 1, 2, 5/2), the encoding
+introduces :math:`2^n - (2S+1)` unphysical states per site.  The standard approach
+is to add a **penalty Hamiltonian** that raises the energy of these states:
+
+.. math::
+
+   \hat{H}_\text{total} = \hat{H}_\text{model}
+     + \lambda \sum_i \hat{P}_{\text{unphys},i}
+
+where :math:`\hat{P}_{\text{unphys},i}` projects onto the unphysical subspace of
+site :math:`i` and :math:`\lambda` is a large positive constant (the
+``penalty_strength`` parameter).  A sufficiently large :math:`\lambda` ensures that
+unphysical states lie well above the physical spectrum.
+
+.. list-table:: Qubit encoding summary
+   :header-rows: 1
+   :widths: 10 15 15 15 20
+
+   * - Spin S
+     - States (2S+1)
+     - Qubits
+     - 2\ :sup:`n`
+     - Penalty needed?
+   * - 1/2
+     - 2
+     - 1
+     - 2
+     - No
+   * - 1
+     - 3
+     - 2
+     - 4
+     - **Yes** (1 unphysical)
+   * - 3/2
+     - 4
+     - 2
+     - 4
+     - No
+   * - 2
+     - 5
+     - 3
+     - 8
+     - **Yes** (3 unphysical)
+   * - 5/2
+     - 6
+     - 3
+     - 8
+     - **Yes** (2 unphysical)
+   * - 7/2
+     - 8
+     - 3
+     - 8
+     - No
+
+The builders raise a ``ValueError`` if any site requires a penalty and
+``penalty_strength`` is not set, preventing accidental use of unphysical states.
+
+The :class:`~qdk_chemistry.utils.spin_operators.SpinEncoding` helper tracks the
+qubit-to-site mapping for mixed-spin lattices:
+
+.. code-block:: python
+
+   from qdk_chemistry.utils.spin_operators import SpinEncoding
+
+   enc = SpinEncoding([0.5, 1.5, 1.0, 0.5])
+   print(enc.total_qubits)    # 6 (1 + 2 + 2 + 1)
+   print(enc.site_qubits(1))  # range(1, 3) — site 1 uses qubits 1 and 2
 
 Parameter flexibility
 ---------------------
