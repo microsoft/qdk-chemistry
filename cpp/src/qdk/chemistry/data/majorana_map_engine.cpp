@@ -596,13 +596,18 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* eri_bbbb, std::size_t n_spatial, bool is_restricted,
     double threshold, double integral_threshold) {
   const std::size_t num_qubits = mapping.num_qubits();
+  if (num_qubits == 0) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: mapping has zero qubits; the encoding "
+        "must produce at least one qubit. This usually indicates an "
+        "uninitialized or malformed MajoranaMapping.");
+  }
   const std::size_t num_words = (num_qubits + 63) / 64;
 
   // Dispatch to the appropriate template instantiation.
   // Each instantiation uses std::array<uint64_t, NW> (stack-allocated,
   // no heap overhead per Pauli word).
   switch (num_words) {
-    case 0:
     case 1:
       return majorana_map_impl<1>(mapping, core_energy, h1_alpha, h1_beta,
                                   eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
