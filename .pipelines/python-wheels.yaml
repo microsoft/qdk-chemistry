@@ -41,6 +41,16 @@ parameters:
     arch: aarch64
     march: armv8-a
     imageName: ACES_VM_SharedPool_Tahoe
+  displayName: Target platforms
+- name: pythonVersions
+  type: object
+  default:
+  - '3.10'
+  - '3.11'
+  - '3.12'
+  - '3.13'
+  - '3.14'
+  displayName: Python versions
 - name: publishInternalFeed
   type: boolean
   default: false
@@ -115,21 +125,9 @@ extends:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
             matrix:
-              Python3.10:
-                pythonVersion: '3.10'
-                buildMarch: ${{ target.march }}
-              Python3.11:
-                pythonVersion: '3.11'
-                buildMarch: ${{ target.march }}
-              Python3.12:
-                pythonVersion: '3.12'
-                buildMarch: ${{ target.march }}
-              Python3.13:
-                pythonVersion: '3.13'
-                buildMarch: ${{ target.march }}
-              Python3.14:
-                pythonVersion: '3.14'
-                buildMarch: ${{ target.march }}
+              ${{ each py in parameters.pythonVersions }}:
+                Python${{ replace(py, '.', '_') }}:
+                  pythonVersion: ${{ py }}
             maxParallel: 5
           templateContext:
             outputs:
@@ -148,7 +146,7 @@ extends:
           - ${{ if eq(target.arch, 'x86_64') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
-                march: $(buildMarch)
+                march: ${{ target.march }}
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -170,7 +168,7 @@ extends:
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
-                march: $(buildMarch)
+                march: ${{ target.march }}
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
@@ -192,7 +190,7 @@ extends:
           - ${{ if eq(target.os, 'macOS') }}:
             - template: .pipelines/templates/build-pip-wheels.yml@self
               parameters:
-                march: $(buildMarch)
+                march: ${{ target.march }}
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
