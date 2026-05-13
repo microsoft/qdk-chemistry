@@ -322,23 +322,9 @@ jobs:
         # Remove CMake files to build Python package without picking the installed library
         rm -r ${{ github.workspace }}/install/lib/cmake/qdk
 
-        # debug python
-        which python
-        python --version
-        which pip
-        pip --version
-
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
-
-        # # Note: qiskit-extras is not supported on Python 3.14
-        # if [ "${{ matrix.skip-qiskit-extras }}" == "true" ]; then
-        #   echo "Skipping qiskit-extras installation (not supported on Python ${{ matrix.python-version }})"
-        #   python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[plugins,dev,docs,coverage]
-        # else
-        #   python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
-        # fi
 
         # Show installed packages for debugging
         echo "------------------ Installed Python packages ------------------"
@@ -348,16 +334,8 @@ jobs:
         # Test import
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
-        # # Install optional dependencies for tests
-        # python -m pip install --prefix=${{ github.workspace }}/install pennylane gast ipykernel
-
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
-
-    # - name: Install Python dependencies
-    #   run: |
-    #     python -m pip install --upgrade pip
-    #     python -m pip install --prefix=${{ github.workspace }}/install coverage pytest pytest-cov
 
     - name: Run Python tests
       env:
@@ -543,6 +521,7 @@ jobs:
       working-directory: docs
       run: |
         set +e
+        pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[docs]
         make clean all
         MAKE_EXIT_CODE=$?
         set -e
