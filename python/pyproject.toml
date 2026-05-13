@@ -81,7 +81,7 @@ jupyter = [
   "qdk-chemistry[plugins]",
 ]
 networkx-extras = [
-  "networkx>=3.0; python_full_version != '3.14.1'",
+  "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
 ]
 openfermion-extras = [
   "openfermion>=1.0.0; python_version < '3.14'"
