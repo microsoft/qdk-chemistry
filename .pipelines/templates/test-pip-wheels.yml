@@ -33,7 +33,6 @@ steps:
                                                           ${{ parameters.macBuild }} \
                                                           ${{ parameters.pyenvVersion }}
     displayName: Test wheel (Docker)
-    retryCountOnTaskFailure: 4
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
@@ -43,4 +42,3 @@ steps:
                                                         ${{ parameters.macBuild }} \
                                                         ${{ parameters.pyenvVersion }}
     displayName: Test wheel (native)
-    retryCountOnTaskFailure: 4

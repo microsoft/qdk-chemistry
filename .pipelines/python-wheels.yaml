@@ -43,7 +43,13 @@ parameters:
     imageName: ACES_VM_SharedPool_Tahoe
   displayName: Target platforms
 - name: pythonVersions
-  type: object
+  type: stringList
+  values:
+  - '3.10'
+  - '3.11'
+  - '3.12'
+  - '3.13'
+  - '3.14'
   default:
   - '3.10'
   - '3.11'
@@ -120,15 +126,15 @@ extends:
               os: ${{ target.os }}
 
           timeoutInMinutes: 480
-          displayName: Build ${{ target.march }} ${{ target.os }} wheels
-          variables:
-            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
                 Python${{ replace(py, '.', '') }}:
                   pythonVersion: ${{ py }}
             maxParallel: 5
+          displayName: Build ${{ target.march }} ${{ target.os }} wheels py$(pythonVersion)
+          variables:
+            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
             outputs:
             - output: pipelineArtifact
