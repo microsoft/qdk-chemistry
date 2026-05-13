@@ -21,7 +21,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
     apt-get update -q
-    apt install -y -q libc-bin
+    apt-get install -y -q libc-bin
 
     # Update and install dependencies
     echo "Installing apt dependencies..."

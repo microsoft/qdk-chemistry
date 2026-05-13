@@ -81,7 +81,7 @@ jupyter = [
   "qdk-chemistry[plugins]",
 ]
 networkx-extras = [
-  "networkx>=3.0"
+  "networkx>=3.0; python_full_version != '3.14.1'",
 ]
 openfermion-extras = [
   "openfermion>=1.0.0; python_version < '3.14'"
@@ -101,7 +101,7 @@ test = [
   "ipykernel>=6.0",
   "nbclient",
   "nbformat",
-  "networkx>=3.0",
+  "networkx>=3.0; python_full_version != '3.14.1'",
   "openfermion>=1.0.0; python_version < '3.14'",
   "pandas>=2.0.0",
   "pennylane",

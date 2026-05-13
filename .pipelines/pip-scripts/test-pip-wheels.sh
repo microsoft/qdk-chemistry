@@ -30,7 +30,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
     apt-get update -q
-    apt install -y -q libc-bin
+    apt-get install -y -q libc-bin
 
     # Update and install dependencies needed for testing
     echo "Installing apt dependencies..."
