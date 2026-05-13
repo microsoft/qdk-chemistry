@@ -137,6 +137,11 @@ pip3 install --upgrade pip
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
 pip3 install -r .pipelines/requirements.txt
 
+# Print installed packages for debugging
+echo "------------------ Installed Python packages ------------------"
+pip3 freeze
+echo "---------------------------------------------------------------"
+
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
 

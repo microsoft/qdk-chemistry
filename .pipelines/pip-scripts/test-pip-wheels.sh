@@ -106,6 +106,11 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
 fi
 pip3 install "${WHEEL[0]}[test]"
 
+# Print installed packages for debugging
+echo "------------------ Installed Python packages ------------------"
+pip3 freeze
+echo "---------------------------------------------------------------"
+
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
 

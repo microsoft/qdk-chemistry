@@ -325,14 +325,14 @@ jobs:
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.python-version }}" = "3.13" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+          pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
+          pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
         fi
 
-        # Show installed packages for debugging
+        # Print installed packages for debugging
         echo "------------------ Installed Python packages ------------------"
-        python -m pip freeze
+        pip freeze
         echo "---------------------------------------------------------------"
 
         # Test import
