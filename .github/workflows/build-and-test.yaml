@@ -322,6 +322,12 @@ jobs:
         # Remove CMake files to build Python package without picking the installed library
         rm -r ${{ github.workspace }}/install/lib/cmake/qdk
 
+        # debug python
+        which python
+        python --version
+        which pip
+        pip --version
+
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
@@ -334,8 +340,11 @@ jobs:
         #   python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[all]
         # fi
 
+        # Show installed packages for debugging
+        python -m pip freeze
+
         # Test import
-        python3 -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
+        python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
 
         # # Install optional dependencies for tests
         # python -m pip install --prefix=${{ github.workspace }}/install pennylane gast ipykernel
