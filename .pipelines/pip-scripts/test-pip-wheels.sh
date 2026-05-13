@@ -93,7 +93,7 @@ rm -rf "$VENV_DIR"
 python3 -m venv "$VENV_DIR"
 . "$VENV_DIR/bin/activate"
 
-pip3 install --upgrade pip
+python3 -m pip install --upgrade pip
 
 # Install the wheel in the clean environment
 cd "$PYTHON_DIR"
@@ -104,11 +104,11 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
     echo "ERROR: Expected exactly 1 wheel, found ${#WHEEL[@]}: ${WHEEL[*]}"
     exit 1
 fi
-pip3 install "${WHEEL[0]}[test]"
+python3 -m pip install "${WHEEL[0]}[test]"
 
 # Print installed packages for debugging
 echo "------------------ Installed Python packages ------------------"
-pip3 freeze
+python3 -m pip freeze
 echo "---------------------------------------------------------------"
 
 # Disable telemetry during testing

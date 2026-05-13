@@ -96,25 +96,12 @@ qiskit-extras = [
   "pylatexenc==2.10; python_version < '3.14'"
 ]
 test = [
-  "coverage",
-  "gcovr",
-  "ipykernel>=6.0",
+  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
   "nbclient",
   "nbformat",
-  "networkx>=3.0; python_full_version != '3.14.1'",
-  "openfermion>=1.0.0; python_version < '3.14'",
-  "pandas>=2.0.0",
   "pennylane",
-  "pylatexenc==2.10; python_version < '3.14'",
-  "pyscf>=2.9.0,<2.12.1",
-  "pytest",
-  "pytest-cov",
-  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
-  "qiskit-aer; python_version < '3.14'",
-  "qiskit-nature; python_version < '3.14'",
   "rdkit"
 ]
-
 
 [project.urls]
 Documentation = "https://microsoft.github.io/qdk-chemistry"

@@ -132,14 +132,14 @@ export PATH="$PYENV_ROOT/shims:$PATH"
 python3 --version
 
 # Update pip and install build tools
-pip3 install --upgrade pip
+python3 -m pip install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-pip3 install -r .pipelines/requirements.txt
+python3 -m pip install -r .pipelines/requirements.txt
 
 # Print installed packages for debugging
 echo "------------------ Installed Python packages ------------------"
-pip3 freeze
+python3 -m pip freeze
 echo "---------------------------------------------------------------"
 
 # Prepare README for PyPI
