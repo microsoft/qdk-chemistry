@@ -26,7 +26,6 @@ namespace QDKChemistry.Utils.PrepSelPrep {
             // No ancilla — reflection is a global phase (no-op).
         } elif n == 1 {
             Z(ancillaRegister[0]);
-            R(PauliI, 2.0 * PI(), ancillaRegister[0]);
         } else {
             within {
                 ApplyToEachCA(X, ancillaRegister);
@@ -55,23 +54,40 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         targetRegister : Qubit[],
         ancillaRegister : Qubit[],
     ) : Unit is Adj + Ctl {
-        let numAncillaQubits = Length(ancillaRegister);
-        if (numAncillaQubits == 0) {
-            selectOp([], targetRegister);
-        } else {
-            within {
-                prepareOp(ancillaRegister);
-            } apply {
-                selectOp(ancillaRegister, targetRegister);
+        body ... {
+            let numAncillaQubits = Length(ancillaRegister);
+            if (numAncillaQubits == 0) {
+                selectOp([], targetRegister);
+            } else {
+                within {
+                    prepareOp(ancillaRegister);
+                } apply {
+                    selectOp(ancillaRegister, targetRegister);
+                }
             }
         }
+        adjoint auto;
+        controlled (ctls, ...) {
+            // Per Babbush et al. (arXiv:1805.03662): only SELECT is controlled;
+            // PREPARE and PREPARE† run unconditionally.
+            let numAncillaQubits = Length(ancillaRegister);
+            if (numAncillaQubits == 0) {
+                Controlled selectOp(ctls, ([], targetRegister));
+            } else {
+                prepareOp(ancillaRegister);
+                Controlled selectOp(ctls, (ancillaRegister, targetRegister));
+                Adjoint prepareOp(ancillaRegister);
+            }
+        }
+        controlled adjoint auto;
     }
 
     /// # Summary
     /// Quantum walk step: W = REFLECT · B[H].
     ///
-    /// When controlled, only the block encoding is controlled; REFLECT runs
-    /// unconditionally (it is a no-op on |0⟩ when control is |0⟩).
+    /// When controlled, both SELECT (inside B[H]) and REFLECT are controlled,
+    /// while PREPARE/PREPARE† run unconditionally (via within/apply semantics).
+    /// This follows Babbush et al. (arXiv:1805.03662): c-W = c-R · (PREP† · c-SEL · PREP).
     ///
     /// $$
     ///     W = (2|0\rangle\langle 0| - I) \cdot \mathrm{PREPARE}^\dagger \cdot \mathrm{SELECT} \cdot \mathrm{PREPARE}
@@ -89,7 +105,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         adjoint auto;
         controlled (ctls, ...) {
             Controlled PrepSelPrep(ctls, (prepareOp, selectOp, targetRegister, ancillaRegister));
-            Reflect(ancillaRegister);
+            Controlled Reflect(ctls, (ancillaRegister));
         }
         controlled adjoint auto;
     }
