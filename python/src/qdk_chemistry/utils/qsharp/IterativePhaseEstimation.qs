@@ -31,7 +31,12 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         use qs = Qubit[Length(params.systems) + 1 + params.numAncillaQubits];
         let control = qs[params.control];
         let systems = Subarray(params.systems, qs);
-        let allTargets = qs[1..Length(params.systems) + params.numAncillaQubits];
+        let ancillas = if params.numAncillaQubits == 0 {
+            []
+        } else {
+            qs[1 + Length(params.systems)..Length(qs) - 1]
+        };
+        let allTargets = systems + ancillas;
 
         params.statePrep(systems);
 

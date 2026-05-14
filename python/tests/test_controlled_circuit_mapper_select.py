@@ -7,6 +7,7 @@
 
 import numpy as np
 import pytest
+from qdk import qsharp
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.controlled_circuit_mapper import MultiControlledSelectMapper, SelectMapperFactory
@@ -142,3 +143,61 @@ class TestMultiControlledSelectMapper:
         assert np.allclose(
             actual, expected, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
         )
+
+    def test_select_single_term_negative_sign(self):
+        r"""Verify SELECT for H = -1.0*Z applies the -1 global phase.
+
+        With one term, ceil(log2(1)) = 0, so the select register is empty.
+        The sign correction must still produce -Z, not +Z.
+
+        Uses ``qsharp.eval`` + ``qsharp.dump_machine()`` to inspect the quantum
+        state including global phase, which Qiskit Operator extraction drops.
+
+        - SELECT(-Z)|0> should give -Z|0> = -|0>  (amplitude -1)
+        - SELECT(-Z)|1> should give -Z|1> = +|1>  (amplitude +1)
+        """
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["Z"],
+            coefficients=np.array([-1.0]),
+        )
+        builder = LCUBuilder()
+        container = builder.run(hamiltonian).get_container()
+
+        mapper = MultiControlledSelectMapper()
+        circuit = mapper.run(container.select)
+
+        # Build Q# expression from the mapper's factory parameters
+        factory = circuit._qsharp_factory
+        params = factory.parameter["params"]
+        num_select = factory.parameter["numSelectQubits"]
+        num_target = factory.parameter["numTargetQubits"]
+
+        def _pauli_to_qs(p):
+            return "Pauli" + str(p).split(".")[1]
+
+        pauli_terms_str = (
+            "[" + ", ".join("[" + ", ".join(_pauli_to_qs(p) for p in term) + "]" for term in params.pauliTerms) + "]"
+        )
+        params_expr = (
+            f"new QDKChemistry.Utils.Select.PauliSelectParams {{"
+            f" pauliTerms = {pauli_terms_str},"
+            f" signs = {list(params.signs)},"
+            f" controlStates = {list(params.controlStates)} }}"
+        )
+        select_call = f"QDKChemistry.Utils.Select.PauliSelect({params_expr}, selectReg, targets);"
+
+        qsharp.eval(f"use selectReg = Qubit[{num_select}];")
+        qsharp.eval(f"use targets = Qubit[{num_target}];")
+
+        # Apply SELECT(-Z) to |0>: expect -Z|0> = -|0>
+        qsharp.eval(select_call)
+        state = qsharp.dump_machine()
+        assert state.check_eq([-1.0, 0.0]), f"SELECT(-Z)|0> should be -|0>, got {state.as_dense_state()}"
+
+        # Reset, prepare |1>, apply SELECT(-Z): expect -Z|1> = +|1>
+        qsharp.eval("ResetAll(targets);")
+        qsharp.eval(f"X(targets[0]); {select_call}")
+        state = qsharp.dump_machine()
+        assert state.check_eq([0.0, 1.0]), f"SELECT(-Z)|1> should be +|1>, got {state.as_dense_state()}"
+
+        qsharp.eval("ResetAll(targets);")

@@ -93,15 +93,20 @@ class MultiControlledSelectMapper(SelectMapper):
             Circuit: A Circuit wrapping the Q# SELECT callable and factory.
 
         """
+        # Convert Little-Endian Pauli string labels to Big-Endian Q# Pauli arrays.
         pauli_terms: list[list[qsharp.Pauli]] = []
+        control_states: list[int] = []
         for op in select.controlled_operations:
             base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
-            for i, pauli_char in enumerate(op.operation):
+            for i, pauli_char in enumerate(reversed(op.operation)):
                 if pauli_char != "I":
                     base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
             pauli_terms.append(base_paulis)
+            control_states.append(op.ctrl_state)
         phases = [int(s) for s in select.phases]
-        select_params = QSHARP_UTILS.Select.PauliSelectParams(pauliTerms=pauli_terms, signs=phases)
+        select_params = QSHARP_UTILS.Select.PauliSelectParams(
+            pauliTerms=pauli_terms, signs=phases, controlStates=control_states
+        )
         qsharp_op = QSHARP_UTILS.Select.MakeSelectOp(select_params)
         factory_params = {
             "params": select_params,

@@ -120,7 +120,7 @@ class DensePureStatePreparation(StatePreparation):
         Returns:
             Circuit: A Circuit wrapping the Q# PREPARE callable and factory.
 
-        TODO: Refactor Wavefunction to adpot PREPARE oracle for block encoding
+        TODO: Refactor Wavefunction to adopt PREPARE oracle for block encoding
 
         """
         amplitudes = statevector.tolist()

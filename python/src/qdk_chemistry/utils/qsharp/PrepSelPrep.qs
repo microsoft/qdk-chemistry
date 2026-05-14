@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-/// Generic PREPARE-SELECT block encoding operations.
+/// Generic PREPARE-SELECT-PREPARE block encoding operations.
 ///
 /// These operations compose arbitrary PREPARE and SELECT callables into
 /// block encodings and quantum walk steps.  They are agnostic to the
@@ -125,7 +125,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         (control, allQubits) => {
             let systems = allQubits[0..numSystemQubits - 1];
             let ancilla = allQubits[numSystemQubits...];
-            Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+            for _ in 0..power - 1 {
+                Controlled PrepSelPrep([control], (prepareOp, selectOp, systems, ancilla));
+            }
         }
     }
 
