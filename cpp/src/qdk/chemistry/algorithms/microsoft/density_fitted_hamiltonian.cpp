@@ -309,22 +309,12 @@ DensityFittedHamiltonianConstructor::_run_impl(
     // Unrestricted case
 
     // Determine whether the alpha inactive space is contiguous
-    bool alpha_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_alpha.size() - 1; ++i) {
-      if (inactive_indices_alpha[i + 1] - inactive_indices_alpha[i] != 1) {
-        alpha_inactive_is_contiguous = false;
-        break;
-      }
-    }
-
-    // Determine whether the beta inactive space is contiguous
-    bool beta_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_beta.size() - 1; ++i) {
-      if (inactive_indices_beta[i + 1] - inactive_indices_beta[i] != 1) {
-        beta_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    bool alpha_inactive_is_contiguous =
+        detail::validate_active_contiguous_indices(
+            inactive_indices_alpha, "Alpha", num_molecular_orbitals);
+    bool beta_inactive_is_contiguous =
+        detail::validate_active_contiguous_indices(
+            inactive_indices_beta, "Beta", num_molecular_orbitals);
 
     // Compute separate alpha and beta inactive density matrices
     Eigen::MatrixXd D_inactive_alpha =
