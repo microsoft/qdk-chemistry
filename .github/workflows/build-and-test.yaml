@@ -218,7 +218,7 @@ jobs:
 
     - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
       id: cache-cpp-deps
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
@@ -464,7 +464,7 @@ jobs:
 
     - name: Comment PR with coverage
       if: github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v2
+      uses: marocchino/sticky-pull-request-comment@v3
       with:
         path: pr-comment.md
         header: coverage-report
