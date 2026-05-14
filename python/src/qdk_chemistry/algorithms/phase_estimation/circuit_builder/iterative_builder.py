@@ -85,6 +85,8 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
 
         """
         num_bits = self.settings().get("num_bits")
+        if num_bits <= 0:
+            raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
         phase_correction = self.settings().get("phase_correction")
         num_iteration = self.settings().get("num_iteration")
 
@@ -103,10 +105,7 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
             )
             circuits.append(circuit)
 
-        Logger.warn(
-            f"Builder iteration circuit with dummy phase_correction={phase_correction}. "
-            f"This is non-adaptive and intended for resource estimation only."
-        )
+        Logger.info(f"Built {len(circuits)} iteration circuit(s) with phase_correction={phase_correction}.")
         return circuits
 
     def _create_iteration_circuit(

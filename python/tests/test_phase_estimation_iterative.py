@@ -655,9 +655,9 @@ class TestIterativeQpeCircuitBuilder:
         two_qubit_phase_problem: PhaseEstimationProblem,
     ) -> None:
         """Test that the builder generates the correct number of iteration circuits."""
-        iqpe = IterativeQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
+        iqpe_circuit_builder = IterativeQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
 
-        circuits = iqpe.run(
+        circuits = iqpe_circuit_builder.run(
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
             state_preparation=two_qubit_phase_problem.state_prep,
         )

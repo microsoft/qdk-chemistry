@@ -126,5 +126,5 @@ class QpeCircuitBuilderFactory(AlgorithmFactory):
         return "qpe_circuit_builder"
 
     def default_algorithm_name(self) -> str:
-        """Return the iterative as default algorithm name."""
+        """Return iterative as default algorithm name."""
         return "iterative"
