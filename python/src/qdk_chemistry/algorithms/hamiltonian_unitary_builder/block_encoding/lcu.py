@@ -110,6 +110,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
+
+        if not qubit_hamiltonian.is_hermitian():
+            raise ValueError("LCU block encoding requires a Hermitian Hamiltonian.")
+
         coefficients = qubit_hamiltonian.coefficients
         num_terms = len(coefficients)
         num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
@@ -132,7 +136,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
     ) -> Prepare:
         """Compute the PREPARE statevector from Hamiltonian coefficients.
 
-        Normalizes the absolute Hamiltonian coefficients by the Schatten norm and
+        Normalizes the absolute Hamiltonian coefficients by the Schatten 1-norm and
         takes the element-wise square root to produce the state-preparation amplitudes.
 
         Args:
@@ -145,7 +149,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             Prepare: The PREPARE oracle dataclass containing the statevector and qubit layout.
 
         """
-        coefficients = qubit_hamiltonian.coefficients
+        coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
         schatten_norm = qubit_hamiltonian.schatten_norm
         if schatten_norm < min_schatten_norm:
             raise ValueError("Schatten norm is too small, cannot build LCU block encoding.")
@@ -164,7 +168,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         """Compute SELECT controlled operations and phases from Hamiltonian terms.
 
         Builds a list of controlled Pauli-string operations (one per Hamiltonian term)
-        and an array of sign phases extracted from the coefficients.
+        and an array of sign phases extracted from the real coefficients.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian whose Pauli strings and coefficients
@@ -176,8 +180,9 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
                 and qubit layout.
 
         """
-        coefficients = qubit_hamiltonian.coefficients
-        pauli_strings = qubit_hamiltonian.pauli_strings
+        real_coeffs = qubit_hamiltonian.get_real_coefficients()
+        pauli_strings = [label for label, _ in real_coeffs]
+        coefficients = np.array([coeff for _, coeff in real_coeffs])
         num_terms = len(coefficients)
         num_system_qubits = qubit_hamiltonian.num_qubits
         phases = np.where(coefficients >= 0, 1, -1)

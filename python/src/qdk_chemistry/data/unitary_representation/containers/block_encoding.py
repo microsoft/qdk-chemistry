@@ -275,8 +275,8 @@ class LCUContainer(BlockEncodingContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
-            "prepare": asdict(self.prepare),
-            "select": asdict(self.select),
+            "prepare": asdict(self.prepare) | {"statevector": self.prepare.statevector.tolist()},
+            "select": asdict(self.select) | {"phases": self.select.phases.tolist()},
             "quantum_walk": self.quantum_walk,
         }
 

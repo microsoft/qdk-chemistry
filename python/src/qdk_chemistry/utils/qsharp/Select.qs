@@ -11,11 +11,13 @@ namespace QDKChemistry.Utils.Select {
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyPauli;
     import Std.Core.Length;
+    import Std.Math.PI;
 
     /// Parameters for the Pauli-based SELECT oracle.
     struct PauliSelectParams {
         pauliTerms : Pauli[][],
         signs : Int[],
+        controlStates : Int[],
     }
 
     /// Pauli SELECT oracle: applies Pauli string P_j controlled on ancilla state |j⟩,
@@ -28,18 +30,26 @@ namespace QDKChemistry.Utils.Select {
         let numUnitary = Length(params.pauliTerms);
         for i in 0..numUnitary - 1 {
             let U = params.pauliTerms[i];
-            ApplyControlledOnInt(i, ApplyPauli(U, _), selectRegister, targets);
-            if params.signs[i] < 0 and Length(selectRegister) > 0 {
-                // Apply -1 phase when selectRegister is in state |i⟩.
-                // Flip bits so |i⟩ → |1…1⟩, apply multi-controlled Z, then unflip.
-                within {
-                    for k in 0..Length(selectRegister) - 1 {
-                        if (i >>> k) &&& 1 == 0 {
-                            X(selectRegister[k]);
+            let ctrlState = params.controlStates[i];
+            ApplyControlledOnInt(ctrlState, ApplyPauli(U, _), selectRegister, targets);
+            if params.signs[i] < 0 {
+                if Length(selectRegister) > 0 {
+                    // Apply -1 phase when selectRegister is in state |ctrlState⟩.
+                    // Flip bits so |ctrlState⟩ → |1…1⟩, apply multi-controlled Z, then unflip.
+                    within {
+                        for k in 0..Length(selectRegister) - 1 {
+                            if (ctrlState >>> k) &&& 1 == 0 {
+                                X(selectRegister[k]);
+                            }
                         }
+                    } apply {
+                        Controlled Z(selectRegister[1...], selectRegister[0]);
                     }
-                } apply {
-                    Controlled Z(selectRegister[1...], selectRegister[0]);
+                } else {
+                    // No select qubits (single-term Hamiltonian). Apply -1 as a global
+                    // phase so the sign is still visible under outer control (e.g. QPE).
+                    // R(PauliI, θ, q) applies exp(-iθ/2)·I; with θ = 2π this gives -I.
+                    R(PauliI, 2.0 * PI(), targets[0]);
                 }
             }
         }
