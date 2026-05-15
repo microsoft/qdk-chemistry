@@ -503,7 +503,7 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "canonical_four_center") {
     return CanonicalFourCenterHamiltonianContainer::from_json(j);
   }
-  if (container_type == "three_center") {
+  if (container_type == "three_center" || container_type == "cholesky") {
     return ThreeCenterHamiltonianContainer::from_json(j);
   }
   if (container_type == "sparse") {

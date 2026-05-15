@@ -571,6 +571,9 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
     std::optional<Eigen::MatrixXd> ao_three_center_vectors;
     if (j.contains("ao_three_center_vectors")) {
       ao_three_center_vectors = load_matrix(j["ao_three_center_vectors"]);
+    } else if (j.contains("ao_cholesky_vectors")) {
+      // Legacy key migration
+      ao_three_center_vectors = load_matrix(j["ao_cholesky_vectors"]);
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
