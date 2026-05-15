@@ -509,4 +509,41 @@ struct bitset_less_comparator {
   }
 };
 
+/**
+ *  @brief Hash functor for std::bitset<N>
+ *
+ *  Provides a hash function for bitsets so they can be used as keys in
+ *  unordered containers (std::unordered_map, std::unordered_set).
+ *  Uses the same word-level reinterpretation as bitset_less for
+ *  consistency and performance.
+ *
+ *  @tparam N Width of the bitsets to hash
+ */
+template <size_t N>
+struct bitset_hash {
+  /**
+   *  @brief Compute the hash of a bitset
+   *
+   *  @param[in] bs Bitset to hash
+   *  @returns Hash value for the bitset
+   */
+  size_t operator()(const std::bitset<N>& bs) const {
+    if constexpr (N <= 64) {
+      return std::hash<unsigned long long>{}(fast_to_ullong(bs));
+    } else if constexpr (N % 64 == 0) {
+      // FNV-1a inspired hash over 64-bit words
+      size_t h = 14695981039346656037ULL;
+      auto words = reinterpret_cast<const uint64_t*>(&bs);
+      constexpr auto nwords = N / 64;
+      for (size_t i = 0; i < nwords; ++i) {
+        h ^= words[i];
+        h *= 1099511628211ULL;
+      }
+      return h;
+    } else {
+      return std::hash<std::string>{}(bs.to_string());
+    }
+  }
+};
+
 }  // namespace macis

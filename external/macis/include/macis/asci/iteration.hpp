@@ -10,9 +10,11 @@
 #pragma once
 #include <blas.hh>
 #include <macis/asci/determinant_search.hpp>
+#include <macis/bitset_operations.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <numeric>
+#include <unordered_map>
 
 namespace macis {
 
@@ -129,24 +131,29 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // much larger space, causing Davidson to stall.
   std::vector<double> X_local;
   if (asci_settings.warm_start_davidson && !old_wfn.empty()) {
-    // new wfn is already sorted by wfn_comp.  Iterate unsorted old dets
-    // and binary-search each into the new wfn.  This avoids sorting the
-    // old wfn (O(D log D) on large bitsets) and the associated permutation
-    // temporaries.
-    X_local.resize(wfn.size(), 0.0);
-    size_t n_matched = 0;
-    const size_t old_size = old_wfn.size();
-    for (size_t i = 0; i < old_size; ++i) {
-      auto it =
-          std::lower_bound(wfn.begin(), wfn.end(), old_wfn[i], wfn_comp{});
-      if (it != wfn.end() && *it == old_wfn[i]) {
-        size_t new_idx = static_cast<size_t>(std::distance(wfn.begin(), it));
-        X_local[new_idx] = old_X[i];
-        ++n_matched;
-      }
+    // Build a hash map from old determinants to their CI coefficients,
+    // then look up each new determinant in O(1) amortized time.
+    // This replaces the previous binary-search approach (O(D_old log D_new))
+    // with O(D_old + D_new) expected time.
+    using wfn_hash = bitset_hash<N>;
+    std::unordered_map<wfn_t<N>, double, wfn_hash> old_coeff_map;
+    old_coeff_map.reserve(old_wfn.size());
+    for (size_t i = 0; i < old_wfn.size(); ++i) {
+      old_coeff_map.emplace(old_wfn[i], old_X[i]);
     }
     old_wfn.clear();
     old_X.clear();
+
+    X_local.resize(wfn.size(), 0.0);
+    size_t n_matched = 0;
+
+    for (size_t i = 0; i < wfn.size(); ++i) {
+      auto it = old_coeff_map.find(wfn[i]);
+      if (it != old_coeff_map.end()) {
+        X_local[i] = it->second;
+        ++n_matched;
+      }
+    }
 
     // Use the projected vector norm as the warm-start quality metric.
     // ||P·ψ_old||₂ measures how much of the old eigenvector's weight lives
@@ -169,6 +176,15 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     }
   }
 
+  // FIXME(MPI): Two issues when MACIS_ENABLE_MPI is active:
+  // 1. If h_cache is non-null, selected_ci_diag throws (incremental mode
+  //    unsupported in MPI).  Callers (asci_grow, asci_refine) always pass
+  //    &h_cache — need to pass nullptr under MPI or gate incremental mode.
+  // 2. X_local is full-size (wfn.size()), but parallel_selected_ci_diag
+  //    truncates it to local_row_extent via resize().  Only rank 0 gets the
+  //    correct warm-start slice; other ranks receive rank 0's coefficients.
+  //    Fix: extract the local portion [rank*local_count..(rank+1)*local_count)
+  //    before calling, or have selected_ci_diag handle the scatter internally.
   double E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
       mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, X_local,
