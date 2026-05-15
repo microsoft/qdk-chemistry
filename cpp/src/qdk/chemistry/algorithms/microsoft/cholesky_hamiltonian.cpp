@@ -618,7 +618,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd H_active(nactive, nactive);
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
-      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_three_center_vectors")) {
         return std::make_shared<data::Hamiltonian>(
             std::make_unique<data::ThreeCenterHamiltonianContainer>(
                 H_active, L_mo, orbitals,
@@ -637,7 +637,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       H_active_beta = Cb_active.transpose() * H_full * Cb_active;
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
-      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_three_center_vectors")) {
         return std::make_shared<data::Hamiltonian>(
             std::make_unique<data::ThreeCenterHamiltonianContainer>(
                 H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
@@ -707,7 +707,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_three_center_vectors")) {
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active, L_mo, orbitals,
@@ -820,7 +820,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       }
     }
 
-    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_three_center_vectors")) {
       return std::make_shared<data::Hamiltonian>(
           std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,

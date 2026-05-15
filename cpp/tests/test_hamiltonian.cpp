@@ -1325,7 +1325,7 @@ auto run_restricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_three_center_vectors", true);
   }
 
   auto rhf_hamiltonian = ham_factory->run(rhf_orbitals);
@@ -1359,7 +1359,7 @@ auto run_unrestricted_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_three_center_vectors", true);
   }
 
   auto uhf_hamiltonian = ham_factory->run(uhf_orbitals);
@@ -1403,7 +1403,7 @@ auto run_restricted_active_o2 = [](const std::string& factory_name = "qdk") {
 
   auto ham_factory = HamiltonianConstructorFactory::create(factory_name);
   if (factory_name == "qdk_cholesky") {
-    ham_factory->settings().set("store_ao_cholesky_vectors", true);
+    ham_factory->settings().set("store_ao_three_center_vectors", true);
   }
 
   auto orbitals = wfn_active->get_orbitals();

@@ -282,7 +282,7 @@ Args:
     orbitals (Orbitals): Molecular orbital data
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+    ao_three_center_vectors (numpy.ndarray or None, optional): AO three-center vectors
         for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
@@ -298,7 +298,7 @@ Examples:
       py::arg("one_body_integrals"), py::arg("three_center_integrals"),
       py::arg("orbitals"), py::arg("core_energy"),
       py::arg("inactive_fock_matrix"),
-      py::arg("ao_cholesky_vectors") = py::none(),
+      py::arg("ao_three_center_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Unrestricted constructor
@@ -322,7 +322,7 @@ Args:
     core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
     inactive_fock_matrix_alpha (numpy.ndarray): Alpha inactive Fock matrix [norb x norb]
     inactive_fock_matrix_beta (numpy.ndarray): Beta inactive Fock matrix [norb x norb]
-    ao_cholesky_vectors (numpy.ndarray or None, optional): AO Cholesky vectors
+    ao_three_center_vectors (numpy.ndarray or None, optional): AO three-center vectors
         for potential reuse. Defaults to None.
     type (HamiltonianType, optional): Type of Hamiltonian (Hermitian by default)
 
@@ -345,7 +345,7 @@ Examples:
       py::arg("three_center_integrals_bb"), py::arg("orbitals"),
       py::arg("core_energy"), py::arg("inactive_fock_matrix_alpha"),
       py::arg("inactive_fock_matrix_beta"),
-      py::arg("ao_cholesky_vectors") = py::none(),
+      py::arg("ao_three_center_vectors") = py::none(),
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Three-center integral access
@@ -365,11 +365,11 @@ Raises:
 )",
       py::return_value_policy::reference_internal);
 
-  // AO Cholesky vectors access
+  // AO three-center vectors access
   three_center_container.def(
-      "get_ao_cholesky_vectors",
+      "get_ao_three_center_vectors",
       [](const ThreeCenterHamiltonianContainer& self) -> py::object {
-        const auto& opt = self.get_ao_cholesky_vectors();
+        const auto& opt = self.get_ao_three_center_vectors();
         if (!opt) return py::none();
         const Eigen::MatrixXd& mat = *opt;
         // Return a zero-copy view. We tie lifetime to self via
@@ -387,10 +387,10 @@ Raises:
             py::cast(self));  // prevent GC of self while array is alive
       },
       R"(
-Get the optional AO Cholesky vectors (zero-copy view).
+Get the optional AO three-center vectors (zero-copy view).
 
 Returns:
-    numpy.ndarray or None: AO Cholesky vectors matrix [nao^2 x nchol],
+    numpy.ndarray or None: AO three-center vectors matrix [nao^2 x nchol],
     or None if not stored. The returned array shares memory with the
     internal storage and should not be modified.
 )");

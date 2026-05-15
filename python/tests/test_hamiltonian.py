@@ -870,18 +870,18 @@ class TestThreeCenterSpecific:
         assert np.allclose(tc_aa, three_center_aa)
         assert np.allclose(tc_bb, three_center_bb)
 
-    def test_ao_cholesky_vectors_absent_by_default(self):
-        """Test that AO Cholesky vectors are None when not provided."""
+    def test_ao_three_center_vectors_absent_by_default(self):
+        """Test that AO three-center vectors are None when not provided."""
         one_body = np.eye(2)
         rng = np.random.default_rng(20)
         three_center = rng.random((4, 10))
         orbitals = create_test_orbitals(2)
 
         container = ThreeCenterHamiltonianContainer(one_body, three_center, orbitals, 1.0, np.array([]))
-        assert container.get_ao_cholesky_vectors() is None
+        assert container.get_ao_three_center_vectors() is None
 
-    def test_ao_cholesky_vectors_present(self):
-        """Test construction with AO Cholesky vectors and retrieval."""
+    def test_ao_three_center_vectors_present(self):
+        """Test construction with AO three-center vectors and retrieval."""
         one_body = np.eye(2)
         rng = np.random.default_rng(21)
         three_center = rng.random((4, 10))
@@ -889,14 +889,14 @@ class TestThreeCenterSpecific:
         orbitals = create_test_orbitals(2)
 
         container = ThreeCenterHamiltonianContainer(
-            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_three_center_vectors=ao_vecs
         )
-        result = container.get_ao_cholesky_vectors()
+        result = container.get_ao_three_center_vectors()
         assert result is not None
         np.testing.assert_array_almost_equal(result, ao_vecs)
 
-    def test_ao_cholesky_vectors_roundtrip_json(self):
-        """Test that AO Cholesky vectors survive JSON round-trip."""
+    def test_ao_three_center_vectors_roundtrip_json(self):
+        """Test that AO three-center vectors survive JSON round-trip."""
         one_body = np.eye(2)
         rng = np.random.default_rng(22)
         three_center = rng.random((4, 10))
@@ -904,7 +904,7 @@ class TestThreeCenterSpecific:
         orbitals = create_test_orbitals(2)
 
         container = ThreeCenterHamiltonianContainer(
-            one_body, three_center, orbitals, 1.0, np.array([]), ao_cholesky_vectors=ao_vecs
+            one_body, three_center, orbitals, 1.0, np.array([]), ao_three_center_vectors=ao_vecs
         )
         h = Hamiltonian(container)
 
@@ -912,9 +912,9 @@ class TestThreeCenterSpecific:
         assert h_roundtrip.get_container_type() == "three_center"
 
         roundtrip_data = json.loads(h_roundtrip.to_json())
-        assert "ao_cholesky_vectors" in roundtrip_data["container"]
+        assert "ao_three_center_vectors" in roundtrip_data["container"]
         assert np.allclose(
-            np.array(roundtrip_data["container"]["ao_cholesky_vectors"]),
+            np.array(roundtrip_data["container"]["ao_three_center_vectors"]),
             ao_vecs,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,

@@ -28,12 +28,12 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _three_center_integrals(
           make_restricted_three_center_integrals(three_center_integrals)),
-      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
+      _ao_three_center_vectors(std::move(ao_three_center_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -54,14 +54,14 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta,
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
       _three_center_integrals(
           std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
           std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)),
-      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
+      _ao_three_center_vectors(std::move(ao_three_center_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -80,14 +80,14 @@ std::unique_ptr<HamiltonianContainer> ThreeCenterHamiltonianContainer::clone()
   if (is_restricted()) {
     return std::make_unique<ThreeCenterHamiltonianContainer>(
         *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
-        _core_energy, *_inactive_fock_matrix.first, _ao_cholesky_vectors,
+        _core_energy, *_inactive_fock_matrix.first, _ao_three_center_vectors,
         _type);
   }
   return std::make_unique<ThreeCenterHamiltonianContainer>(
       *_one_body_integrals.first, *_one_body_integrals.second,
       *_three_center_integrals.first, *_three_center_integrals.second,
       _orbitals, _core_energy, *_inactive_fock_matrix.first,
-      *_inactive_fock_matrix.second, _ao_cholesky_vectors, _type);
+      *_inactive_fock_matrix.second, _ao_three_center_vectors, _type);
 }
 
 std::string ThreeCenterHamiltonianContainer::get_container_type() const {
@@ -169,9 +169,9 @@ ThreeCenterHamiltonianContainer::get_three_center_integrals() const {
 }
 
 const std::optional<Eigen::MatrixXd>&
-ThreeCenterHamiltonianContainer::get_ao_cholesky_vectors() const {
+ThreeCenterHamiltonianContainer::get_ao_three_center_vectors() const {
   QDK_LOG_TRACE_ENTERING();
-  return _ao_cholesky_vectors;
+  return _ao_three_center_vectors;
 }
 
 double ThreeCenterHamiltonianContainer::get_two_body_element(
@@ -417,16 +417,16 @@ nlohmann::json ThreeCenterHamiltonianContainer::to_json() const {
     j["has_orbitals"] = false;
   }
 
-  if (_ao_cholesky_vectors) {
-    std::vector<std::vector<double>> ao_cholesky_vectors_vec;
-    for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
+  if (_ao_three_center_vectors) {
+    std::vector<std::vector<double>> ao_three_center_vectors_vec;
+    for (int i = 0; i < _ao_three_center_vectors->rows(); ++i) {
       std::vector<double> row;
-      for (int j_idx = 0; j_idx < _ao_cholesky_vectors->cols(); ++j_idx) {
-        row.push_back((*_ao_cholesky_vectors)(i, j_idx));
+      for (int j_idx = 0; j_idx < _ao_three_center_vectors->cols(); ++j_idx) {
+        row.push_back((*_ao_three_center_vectors)(i, j_idx));
       }
-      ao_cholesky_vectors_vec.push_back(row);
+      ao_three_center_vectors_vec.push_back(row);
     }
-    j["ao_cholesky_vectors"] = ao_cholesky_vectors_vec;
+    j["ao_three_center_vectors"] = ao_three_center_vectors_vec;
   }
   return j;
 }
@@ -568,9 +568,9 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
       }
     }
 
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
-    if (j.contains("ao_cholesky_vectors")) {
-      ao_cholesky_vectors = load_matrix(j["ao_cholesky_vectors"]);
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors;
+    if (j.contains("ao_three_center_vectors")) {
+      ao_three_center_vectors = load_matrix(j["ao_three_center_vectors"]);
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
@@ -579,13 +579,13 @@ ThreeCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
       // so alpha and beta point to the same data
       return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
+          inactive_fock_alpha, std::move(ao_three_center_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
           orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
-          std::move(ao_cholesky_vectors), type);
+          std::move(ao_three_center_vectors), type);
     }
 
   } catch (const std::exception& e) {
@@ -669,8 +669,8 @@ void ThreeCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
       _orbitals->to_hdf5(orbitals_group);
     }
 
-    if (_ao_cholesky_vectors) {
-      save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
+    if (_ao_three_center_vectors) {
+      save_matrix_to_group(group, "ao_three_center_vectors", *_ao_three_center_vectors);
     }
 
   } catch (const H5::Exception& e) {
@@ -781,10 +781,10 @@ ThreeCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
     }
 
     // Load AO Cholesky vectors
-    std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
-    if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
-      ao_cholesky_vectors =
-          load_matrix_from_group(group, "ao_cholesky_vectors");
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors;
+    if (dataset_exists_in_group(group, "ao_three_center_vectors")) {
+      ao_three_center_vectors =
+          load_matrix_from_group(group, "ao_three_center_vectors");
     }
 
     // Create and return appropriate Hamiltonian using the correct constructor
@@ -792,13 +792,13 @@ ThreeCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
       // Use restricted constructor - it will create shared pointers internally
       return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
+          inactive_fock_alpha, std::move(ao_three_center_vectors), type);
     } else {
       // Use unrestricted constructor with separate alpha and beta data
       return std::make_unique<ThreeCenterHamiltonianContainer>(
           one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
           orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
-          std::move(ao_cholesky_vectors), type);
+          std::move(ao_three_center_vectors), type);
     }
 
   } catch (const H5::Exception& e) {

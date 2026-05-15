@@ -26,7 +26,7 @@ namespace qdk::chemistry::data {
  * contains:
  * - Three-center two-electron integrals (electron-electron repulsion) in MO
  * representation.
- * - Optionally, AO Cholesky vectors for potential reuse in further
+ * - Optionally, AO three-center vectors for potential reuse in further
  * transformations.
  *
  */
@@ -44,7 +44,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * energy)
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
-   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * @param ao_three_center_vectors Optional AO three-center vectors for potential reuse
    * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
@@ -55,7 +55,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
       const Eigen::MatrixXd& three_center_integrals,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix,
-      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
+      std::optional<Eigen::MatrixXd> ao_three_center_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -79,7 +79,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * the selected active space
    * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
    * selected active space
-   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
+   * @param ao_three_center_vectors Optional AO three-center vectors for potential reuse
    * (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
@@ -93,7 +93,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
-      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
+      std::optional<Eigen::MatrixXd> ao_three_center_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -136,12 +136,12 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   get_three_center_integrals() const;
 
   /**
-   * @brief Get the optional AO Cholesky vectors
-   * @return Const reference to the optional AO Cholesky vectors matrix
-   * [nao^2 x nchol]. Contains std::nullopt if AO Cholesky vectors were not
+   * @brief Get the optional AO three-center vectors
+   * @return Const reference to the optional AO three-center vectors matrix
+   * [nao^2 x nchol]. Contains std::nullopt if AO three-center vectors were not
    * provided at construction.
    */
-  const std::optional<Eigen::MatrixXd>& get_ao_cholesky_vectors() const;
+  const std::optional<Eigen::MatrixXd>& get_ao_three_center_vectors() const;
 
   /**
    * @brief Get specific four-center two-electron integral element
@@ -236,8 +236,8 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
 
-  /** Optional AO Cholesky vectors for potential reuse */
-  const std::optional<Eigen::MatrixXd> _ao_cholesky_vectors;
+  /** Optional AO three-center vectors for potential reuse */
+  const std::optional<Eigen::MatrixXd> _ao_three_center_vectors;
 
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
