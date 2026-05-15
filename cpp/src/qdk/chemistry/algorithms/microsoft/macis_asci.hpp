@@ -162,8 +162,6 @@ class MacisAsciSettings : public MacisSettings {
     set_default<double>(
         "grow_ci_residual_tolerance", macis_defaults.grow_ci_residual_tolerance,
         "CI residual tolerance during grow phase (0 = use refine tolerance)");
-    // I still don't understand this option very well, can you document is
-    // better and explain it to me in the chat?
     set_default<double>(
         "taper_grow_factor", macis_defaults.taper_grow_factor,
         "Growth factor for final expansion near ntdets_max (0 = disabled)");

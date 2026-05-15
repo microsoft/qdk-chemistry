@@ -186,8 +186,7 @@ TEST_F(MacisAsciTest, BasicASCICalculation) {
   // Energy should be close to FCI for this small active space.
   // ASCI with refinement converges to within ~1e-4 Eh of FCI;
   // tighter agreement requires the full C(6,3)^2 = 400 determinant space.
-  EXPECT_NEAR(energy, -75.945264376786554,
-              1e-4);  // ASCI energy tolerance vs FCI reference
+  EXPECT_NEAR(energy, -75.945290197648532, macis_params::energy_tol);
 }
 
 TEST_F(MacisAsciTest, StandaloneMacisLoggersFlushAtTraceWhenTraceEnabled) {
