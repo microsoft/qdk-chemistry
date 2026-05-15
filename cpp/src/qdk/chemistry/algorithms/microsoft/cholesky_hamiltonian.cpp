@@ -377,13 +377,14 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                  num_aos2, L_rows.data(), total_n_cols, 1.0,
                  eri_col_batch.data(), num_aos2);
     }
-    // === Step 4: Form vectors (sequentially within batch) ===
-    // Process each batch entry, forming vectors and doing in-batch
-    // Gram-Schmidt against vectors formed earlier in this batch.
-    // TODO: Explore block Gram-Schmidt to replace per-column orthogonalization.
+    // === Step 4: Form vectors with block Gram-Schmidt ===
+    // Within each batch entry, form new Cholesky vectors sequentially
+    // (in-batch GS has dependencies). After each batch entry, do one GEMM
+    // to orthogonalize all remaining ERI columns against the new vectors.
     for (size_t b = 0; b < n_batch; ++b) {
       const auto& be = batch[b];
       double* eri_col = eri_col_batch.data() + be.col_offset * num_aos2;
+      const size_t new_cols_start = current_col;
 
       for (size_t local_i = 0; local_i < be.n1; ++local_i) {
         const size_t j_max = (be.s1 == be.s2) ? (local_i + 1) : be.n2;
@@ -405,7 +406,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           const double* L_col = L_data.data() + current_col * num_aos2;
 
           // In-batch Gram-Schmidt: update remaining ERI columns in this
-          // shell pair (same as before)
+          // shell pair (sequential dependency — cannot be blocked)
           for (size_t col = local_index + 1; col < be.n1 * be.n2; ++col) {
             const size_t global_col_idx =
                 (be.bf1_st + col / be.n2) * num_aos + (be.bf2_st + col % be.n2);
@@ -414,20 +415,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                        eri_col + col * num_aos2, 1);
           }
 
-          // ALSO update ERI columns of LATER batch entries
-          // (cross-batch Gram-Schmidt)
-          for (size_t b2 = b + 1; b2 < n_batch; ++b2) {
-            const auto& be2 = batch[b2];
-            double* eri_col2 = eri_col_batch.data() + be2.col_offset * num_aos2;
-            for (size_t col2 = 0; col2 < be2.n1 * be2.n2; ++col2) {
-              const size_t g_idx = (be2.bf1_st + col2 / be2.n2) * num_aos +
-                                   (be2.bf2_st + col2 % be2.n2);
-              const double sf = -L_col[g_idx];
-              blas::axpy(num_aos2, sf, L_col, 1, eri_col2 + col2 * num_aos2, 1);
-            }
-          }
-
-          // Update diagonal elements
+          // Update diagonal elements (per-vector for threshold correctness)
           std::vector<size_t> shell_pairs_to_remove;
           for (const auto sp_index : active_shell_pairs) {
             const auto [s1, s2] = sp_index_to_shells[sp_index];
@@ -455,6 +443,38 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           }
           current_col += 1;
         }
+      }
+
+      // Block cross-batch Gram-Schmidt: orthogonalize all remaining ERI
+      // columns against the new vectors formed in this batch entry via
+      // one GEMM instead of per-vector axpy loops.
+      // Block cross-batch Gram-Schmidt: orthogonalize all remaining ERI
+      // columns against the new vectors formed in this batch entry via
+      // one GEMM instead of per-vector axpy loops.
+      const size_t n_new = current_col - new_cols_start;
+      if (n_new > 0 && b + 1 < n_batch) {
+        const size_t remaining_start = batch[b + 1].col_offset;
+        const size_t remaining_cols = total_n_cols - remaining_start;
+        double* eri_remaining =
+            eri_col_batch.data() + remaining_start * num_aos2;
+        const double* L_block =
+            L_data.data() + new_cols_start * num_aos2;
+
+        // Gather R: R[col, k] = L_block[k * num_aos2 + all_lookup[col]]
+        // where all_lookup maps batch column → global AO index.
+        std::vector<double> R(remaining_cols * n_new);
+        for (size_t k = 0; k < n_new; ++k) {
+          const double* L_k = L_block + k * num_aos2;
+          for (size_t col = 0; col < remaining_cols; ++col) {
+            R[col + k * remaining_cols] =
+                L_k[all_lookup[remaining_start + col]];
+          }
+        }
+
+        // eri_remaining -= L_block * R^T
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   num_aos2, remaining_cols, n_new, -1.0, L_block, num_aos2,
+                   R.data(), remaining_cols, 1.0, eri_remaining, num_aos2);
       }
     }  // for each batch entry
   }
