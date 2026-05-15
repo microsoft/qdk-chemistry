@@ -193,10 +193,9 @@ struct ASCISettings {
   /// @brief Hamiltonian build algorithm for diagonal blocks.
   /// "" or "sorted_double_loop" = default alpha-sorted double loop;
   /// "residue_arrays" = Algorithm 5 from Tubman et al. (arXiv:1807.00821);
-  /// "dynamic_bit_masking" = Algorithm 6 from Tubman et al.;
-  /// "dynamic_bit_masking_8" = same with 8 masks (C(8,4)=70 combos, fewer
-  ///   passes but more false positives).
-  std::string h_build_algo;
+  /// "dynamic_bit_masking" = Algorithm 6 from Tubman et al.
+  /// Number of masks is configurable via dynamic_bit_masking_num_masks.
+  std::string hamiltonian_build_algorithm;
 };
 
 /**

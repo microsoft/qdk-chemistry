@@ -14,6 +14,7 @@
 #include <macis/types.hpp>
 #include <macis/wfn/raw_bitset.hpp>
 #include <numeric>
+#include <span>
 #include <vector>
 
 #ifdef _OPENMP
@@ -49,24 +50,24 @@ struct SpinCache {
   size_t n_beta_elec = 0;
   size_t ndets = 0;
 
-  void build(const WfnType* dets, size_t n) {
-    ndets = n;
-    alpha.resize(n);
-    beta.resize(n);
+  void build(std::span<const WfnType> dets) {
+    ndets = dets.size();
+    alpha.resize(ndets);
+    beta.resize(ndets);
 
     auto a0 = wfn_traits::alpha_string(dets[0]);
     auto b0 = wfn_traits::beta_string(dets[0]);
     n_alpha_elec = a0.count();
     n_beta_elec = b0.count();
 
-    occ_alpha_flat.resize(n * n_alpha_elec);
-    occ_beta_flat.resize(n * n_beta_elec);
+    occ_alpha_flat.resize(ndets * n_alpha_elec);
+    occ_beta_flat.resize(ndets * n_beta_elec);
 
 #pragma omp parallel
     {
       std::vector<uint32_t> tmp;
 #pragma omp for schedule(static)
-      for (size_t i = 0; i < n; ++i) {
+      for (size_t i = 0; i < ndets; ++i) {
         alpha[i] = wfn_traits::alpha_string(dets[i]);
         beta[i] = wfn_traits::beta_string(dets[i]);
         spin_wfn_traits::state_to_occ(alpha[i], tmp);

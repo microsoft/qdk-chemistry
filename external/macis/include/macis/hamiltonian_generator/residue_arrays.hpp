@@ -149,7 +149,7 @@ class ResidueArrayHamiltonianGenerator
 
     const size_t ndets = std::distance(dets_begin, dets_end);
     detail::SpinCache<WfnType> cache;
-    cache.build(&*dets_begin, ndets);
+    cache.build({&*dets_begin, ndets});
 
     const size_t n_elec = dets_begin->count();
     const size_t residues_per_det = n_elec * (n_elec - 1) / 2;

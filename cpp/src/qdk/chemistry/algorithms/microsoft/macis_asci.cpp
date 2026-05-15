@@ -66,7 +66,7 @@ struct asci_helper {
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
     macis::ASCISettings asci_settings = get_asci_settings_(settings_);
 
-    QDK_LOGGER().info(
+    QDK_LOGGER().debug(
         "MACIS ASCI helper prepared: norb={}, nalpha={}, nbeta={}, "
         "ntdets_max={}, "
         "ntdets_min={}, max_refine_iter={}, grow_factor={}, rv_prune_tol={}",
@@ -81,10 +81,10 @@ struct asci_helper {
         const_cast<double*>(V_aaaa.data()), num_molecular_orbitals,
         num_molecular_orbitals, num_molecular_orbitals, num_molecular_orbitals);
 
-    // Select Hamiltonian generator based on h_build_algo
-    QDK_LOGGER().info("Constructing MACIS Hamiltonian generator.");
+    // Select Hamiltonian generator based on hamiltonian_build_algorithm
+    QDK_LOGGER().debug("Constructing MACIS Hamiltonian generator.");
     std::unique_ptr<macis::HamiltonianGenerator<wfn_type>> ham_gen_ptr;
-    const auto& algo = asci_settings.h_build_algo;
+    const auto& algo = asci_settings.hamiltonian_build_algorithm;
     if (algo == "residue_arrays") {
       // Guard: residue arrays require O(n_e^2) residues per det and become
       // infeasible for large active spaces.  Fall back to SDL with a warning.
@@ -99,16 +99,16 @@ struct asci_helper {
         ham_gen_ptr = std::make_unique<ra_gen_t>(T_span, V_span);
       }
     } else if (algo == "dynamic_bit_masking") {
-      ham_gen_ptr = std::make_unique<dbm_gen_t>(T_span, V_span);
-    } else if (algo == "dynamic_bit_masking_8") {
       auto p = std::make_unique<dbm_gen_t>(T_span, V_span);
-      p->set_num_masks(8);
+      const auto num_masks =
+          settings_.get<size_t>("dynamic_bit_masking_num_masks");
+      if (num_masks > 0) p->set_num_masks(num_masks);
       ham_gen_ptr = std::move(p);
     } else {
       ham_gen_ptr = std::make_unique<sdl_gen_t>(T_span, V_span);
     }
     auto& ham_gen = *ham_gen_ptr;
-    QDK_LOGGER().info("MACIS Hamiltonian generator constructed.");
+    QDK_LOGGER().debug("MACIS Hamiltonian generator constructed.");
 
     std::vector<double> C_casci;
     std::vector<wfn_type> dets;
@@ -120,17 +120,29 @@ struct asci_helper {
         qdk::chemistry::utils::microsoft::binomial_coefficient(
             num_molecular_orbitals, nbeta);
 
-    QDK_LOGGER().info("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
+    QDK_LOGGER().debug("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
 
     if (asci_settings.ntdets_max > fci_dimension) {
-      QDK_LOGGER().info(
+      QDK_LOGGER().debug(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
-      // IS SDL the best idea for FCI?
-      E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
-          mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-          nbeta, const_cast<double*>(T_a.data()),
-          const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      // Dispatch FCI with the same generator type as the ASCI path
+      if (algo == "residue_arrays" && (nalpha + nbeta) <= 60) {
+        E_casci = macis::CASRDMFunctor<ra_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      } else if (algo == "dynamic_bit_masking") {
+        E_casci = macis::CASRDMFunctor<dbm_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      } else {
+        E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
+            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+            nbeta, const_cast<double*>(T_a.data()),
+            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
+      }
       // Generate determinant basis for RDM calculation
       dets = macis::generate_hilbert_space<typename sdl_gen_t::full_det_t>(
           num_molecular_orbitals, nalpha, nbeta);
@@ -142,23 +154,23 @@ struct asci_helper {
       C_casci = {1.0};
 
       // Growth phase
-      QDK_LOGGER().info("Starting MACIS ASCI growth phase.");
+      QDK_LOGGER().debug("Starting MACIS ASCI growth phase.");
       std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
           std::move(C_casci), ham_gen,
           num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
-      QDK_LOGGER().info(
+      QDK_LOGGER().debug(
           "Completed MACIS ASCI growth phase with {} determinants.",
           dets.size());
 
       // Refinement phase
       if (asci_settings.max_refine_iter) {
-        QDK_LOGGER().info("Starting MACIS ASCI refinement phase.");
+        QDK_LOGGER().debug("Starting MACIS ASCI refinement phase.");
         std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
             asci_settings, mcscf_settings, E_casci, std::move(dets),
             std::move(C_casci), ham_gen,
             num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
-        QDK_LOGGER().info(
+        QDK_LOGGER().debug(
             "Completed MACIS ASCI refinement phase with {} determinants.",
             dets.size());
       }

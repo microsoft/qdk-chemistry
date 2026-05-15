@@ -88,10 +88,12 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
                     double);
   SET_MACIS_SETTING(settings_, asci_settings, taper_grow_factor, double);
 
-  // h_build_algo is stored as a string; it may not be present in all
-  // Settings objects, so silently fall back to the default (empty string).
+  // hamiltonian_build_algorithm is stored as a string; it may not be present
+  // in all Settings objects, so silently fall back to the default (empty
+  // string).
   try {
-    asci_settings.h_build_algo = settings_.get<std::string>("h_build_algo");
+    asci_settings.hamiltonian_build_algorithm =
+        settings_.get<std::string>("hamiltonian_build_algorithm");
   } catch (const qdk::chemistry::data::SettingNotFound&) {
     // not present in settings — leave empty (default sorted_double_loop)
   }

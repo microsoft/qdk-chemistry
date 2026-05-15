@@ -60,6 +60,9 @@ class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
                 "quartets during Cholesky decomposition",
                 qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
     set_default("store_ao_cholesky_vectors", false);
+    set_default("cholesky_gemm_batch_cols", static_cast<size_t>(20),
+                "Target number of GEMM columns per batched orthogonalization "
+                "call during Cholesky decomposition");
   }
   ~CholeskyHamiltonianSettings() override = default;
 };

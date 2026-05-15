@@ -90,7 +90,7 @@ class DynamicBitMaskHamiltonianGenerator
     const WfnType* dets = &*dets_begin;
 
     detail::SpinCache<WfnType> cache;
-    cache.build(dets, ndets);
+    cache.build({dets, ndets});
 
     auto variable_orbs = compute_discriminating_orbitals(dets_begin, ndets);
     std::vector<std::vector<uint32_t>> mask_bits;

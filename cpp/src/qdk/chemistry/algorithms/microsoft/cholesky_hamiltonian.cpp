@@ -65,7 +65,7 @@ namespace detail {
  */
 std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     qdk::chemistry::scf::BasisSet& basis_set, double threshold,
-    double eri_threshold) {
+    double eri_threshold, size_t target_gemm_cols) {
   QDK_LOG_TRACE_ENTERING();
   QDK_LOGGER().info("Cholesky decomposition threshold: {}", threshold);
   QDK_LOGGER().info("ERI screening threshold: {}", eri_threshold);
@@ -94,10 +94,14 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
 
   // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
   // This enables reusing ERI column buffers across iterations.
-  size_t max_shell_size = 0;
-  for (size_t s = 0; s < num_shells; ++s) {
-    max_shell_size = std::max(max_shell_size, obs[s].size());
-  }
+  const size_t max_shell_size =
+      num_shells == 0
+          ? 0
+          : std::max_element(obs.begin(), obs.end(),
+                             [](const auto& a, const auto& b) {
+                               return a.size() < b.size();
+                             })
+                ->size();
   const size_t max_n_cols = max_shell_size * max_shell_size;
 
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
@@ -222,9 +226,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // Target number of GEMM columns per batched orthogonalization call.
   // Amortizes memory-bandwidth cost of reading L_data by combining multiple
   // shell pairs into one GEMM. Auto-adapts to basis set: small shells (s,p)
-  // batch many; large shells (d,f) batch few. Value of 20 saturates bandwidth
-  // on typical hardware.
-  constexpr size_t TARGET_GEMM_COLS = 20;
+  // batch many; large shells (d,f) batch few.
+  const size_t TARGET_GEMM_COLS = target_gemm_cols;
 
   QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
   double D_max = 0.0;
@@ -283,9 +286,8 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       const auto& sp = sp_list[b];
       const size_t n1 = obs[sp.s1].size();
       const size_t n2 = obs[sp.s2].size();
-      batch[b] = {
-          sp.sp_index,  sp.s1,           sp.s2,          n1, n2, n1 * n2,
-          total_n_cols, shell2bf[sp.s1], shell2bf[sp.s2]};
+      batch[b] = {sp.sp_index, sp.s1, sp.s2, n1, n2, n1 * n2,
+                  total_n_cols, shell2bf[sp.s1], shell2bf[sp.s2]};
       total_n_cols += n1 * n2;
     }
 
@@ -378,6 +380,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     // === Step 4: Form vectors (sequentially within batch) ===
     // Process each batch entry, forming vectors and doing in-batch
     // Gram-Schmidt against vectors formed earlier in this batch.
+    // TODO: Explore block Gram-Schmidt to replace per-column orthogonalization.
     for (size_t b = 0; b < n_batch; ++b) {
       const auto& be = batch[b];
       double* eri_col = eri_col_batch.data() + be.col_offset * num_aos2;
@@ -456,7 +459,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     }  // for each batch entry
   }
 
-  QDK_LOGGER().info("Cholesky rank: {}", current_col);
+  QDK_LOGGER().debug("Cholesky rank: {}", current_col);
 
   if (current_col == max_rank) {
     QDK_LOGGER().warn(
@@ -784,8 +787,10 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   double eri_tol = _settings->get<double>("eri_threshold");
 
   // get cholesky vectors
+  size_t gemm_batch_cols =
+      _settings->get<size_t>("cholesky_gemm_batch_cols");
   auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
-      *internal_basis_set, cholesky_tol, eri_tol);
+      *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(
