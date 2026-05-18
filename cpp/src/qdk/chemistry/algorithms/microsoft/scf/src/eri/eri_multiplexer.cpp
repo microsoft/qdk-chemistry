@@ -61,7 +61,6 @@ void ERIMultiplexer::build_JK(const double* P, double* J, double* K,
                               double alpha, double beta, double omega) {
   QDK_LOG_TRACE_ENTERING();
 
-  // jk_impl_->build_JK(P, J, K, alpha, beta, omega);
   if (j_impl_ == k_impl_) {
     j_impl_->build_JK(P, J, K, alpha, beta, omega);
   } else {
