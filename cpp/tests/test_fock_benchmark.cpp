@@ -343,6 +343,74 @@ std::shared_ptr<Molecule> make_p450_model() {
   return mol;
 }
 
+/// Protonated nitrogen-rich porphyrin-like macrocycle C15H14N7(+1).
+/// Planar, singlet, 152 electrons, 76 occupied MOs.
+/// Provides a P450-sized system without metal d-orbitals or open-shell issues.
+std::shared_ptr<Molecule> make_porphyrin_model() {
+  auto mol = std::make_shared<Molecule>();
+  const double bohr_to_ang = 0.52917721092;
+  // C15H14N7: 15 carbons, 7 nitrogens, 14 hydrogens = 36 atoms
+  mol->atomic_nums = {
+    6, 6, 6, 6, 6, 6,       // C1-C6
+    7, 7, 7, 7,              // N7-N10
+    6,                        // C11
+    6, 6, 6, 6, 6, 6, 6, 6,  // C12-C19
+    7, 7, 7,                  // N20-N22
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1  // H23-H36
+  };
+  // Geometry in Angstrom (all z=0, planar)
+  std::vector<std::array<double, 3>> coords_ang = {
+    {-1.87749114,  1.72995118, 0.0},
+    { 0.55298794, -2.49233636, 0.0},
+    {-1.44240842,  3.83490380, 0.0},
+    { 2.59164903, -3.17361167, 0.0},
+    {-2.85053995,  3.71860327, 0.0},
+    { 1.78367879, -4.33272881, 0.0},
+    {-3.10205413,  2.34160934, 0.0},
+    { 0.46668746, -3.85845403, 0.0},
+    {-1.75265183,  0.33608322, 0.0},
+    {-0.58959022, -1.68414207, 0.0},
+    {-0.55520632, -0.31941790, 0.0},
+    { 3.70172364, -5.71288198, 0.0},
+    {-3.08037304,  6.07039014, 0.0},
+    {-1.67915524,  6.20326625, 0.0},
+    { 4.52056987, -4.56807508, 0.0},
+    { 3.98373604, -3.28506175, 0.0},
+    {-0.83943378,  5.09454174, 0.0},
+    {-3.69852891,  4.82220250, 0.0},
+    { 2.31191334, -5.62033823, 0.0},
+    { 0.58002784,  0.33437541, 0.0},
+    {-0.86259333,  2.56230020, 0.0},
+    { 1.78253082, -2.03297683, 0.0},
+    { 0.50897917,  1.36954842, 0.0},
+    { 1.43978081, -0.24652159, 0.0},
+    {-1.49025925, -2.14352941, 0.0},
+    {-2.60226661, -0.21204512, 0.0},
+    {-4.01401211,  1.90486802, 0.0},
+    {-0.36900502, -4.42768098, 0.0},
+    {-1.24613979,  7.19823447, 0.0},
+    { 5.59842868, -4.69352500, 0.0},
+    { 4.16454367, -6.69431724, 0.0},
+    {-3.69650783,  6.96359793, 0.0},
+    { 4.61473138, -2.40280157, 0.0},
+    { 0.24042477,  5.19686258, 0.0},
+    { 1.68514580, -6.50614389, 0.0},
+    {-4.77932212,  4.72525102, 0.0},
+  };
+  mol->coords.reserve(coords_ang.size());
+  for (const auto& c : coords_ang) {
+    mol->coords.push_back({c[0] / bohr_to_ang, c[1] / bohr_to_ang, c[2] / bohr_to_ang});
+  }
+
+  mol->n_atoms = mol->atomic_nums.size();
+  mol->atomic_charges = mol->atomic_nums;
+  mol->total_nuclear_charge =
+      std::accumulate(mol->atomic_nums.begin(), mol->atomic_nums.end(), 0ul);
+  mol->n_electrons = mol->total_nuclear_charge - 1;  // +1 charge
+  mol->multiplicity = 1;  // singlet
+  return mol;
+}
+
 /// Get the set of test systems for benchmarking.
 /// Systems are ordered by increasing size. The largest ones (water20, water40,
 /// alkane chains, benzene in TZVP) push into the regime where TLS scratch
@@ -379,6 +447,11 @@ std::vector<TestSystem> get_benchmark_systems() {
   // P450 model compound (88 atoms, Fe/S/N/O/C/H) in cc-pVDZ (~600 AOs)
   // Production-relevant: iron-porphyrin with d-functions on metal center
   systems.push_back({"p450_ccpvdz", "cc-pvdz", true, make_p450_model()});
+
+  // Porphyrin model: C15H14N7(+1) in cc-pVTZ (~856 AOs, spherical)
+  // Planar N-rich macrocycle: P450-scale without d-orbitals or open-shell issues
+  systems.push_back(
+      {"porphyrin_ccpvtz", "cc-pvtz", true, make_porphyrin_model()});
 
   // --- Very large (600+ AOs) --- where you really feel the pain
   // Only run if QDK_FOCK_BENCH_XL=1 is set (these take minutes per thread count)
@@ -1010,6 +1083,12 @@ TEST(SCFBenchmark, FullSCF) {
     cfg.cartesian = !sys.pure;
     cfg.mpi = ParallelConfig{1, 0, 1, 0};
     cfg.verbose = 1;
+
+    // Tighter convergence for testing (env var override)
+    if (std::getenv("QDK_SCF_TIGHT")) {
+      cfg.scf_algorithm.density_threshold = 1e-8;
+      cfg.scf_algorithm.og_threshold = 1e-8;
+    }
 
     try {
       auto solver = SCF::make_hf_solver(sys.mol, cfg);

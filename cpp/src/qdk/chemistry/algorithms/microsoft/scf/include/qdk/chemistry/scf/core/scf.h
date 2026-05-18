@@ -188,8 +188,8 @@ struct SCFConfig {
   uint64_t incremental_fock_start_step =
       3;  ///< SCF iteration to start incremental Fock matrix updates
   uint64_t fock_reset_steps =
-      1073741824;  ///< Number of steps between full Fock matrix rebuilds
-                   ///< (default: 2^30 = effectively never)
+      20;  ///< Number of steps between full Fock matrix rebuilds
+           ///< (default: 20, consistent with Gaussian)
 
 #ifdef QDK_CHEMISTRY_ENABLE_DFTD3
   DispersionType disp = DispersionType::None;

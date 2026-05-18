@@ -114,6 +114,12 @@ class GDMLineFunctor {
             num_molecular_orbitals)),
         cached_C_(num_molecular_orbitals * (unrestricted ? 2 : 1),
                   num_molecular_orbitals),
+        cached_J_(RowMajorMatrix::Zero(
+            (unrestricted ? 2 : 1) * num_molecular_orbitals,
+            num_molecular_orbitals)),
+        cached_K_(RowMajorMatrix::Zero(
+            (unrestricted ? 2 : 1) * num_molecular_orbitals,
+            num_molecular_orbitals)),
         grad_tmp_(num_molecular_orbitals, num_molecular_orbitals) {}
 
   /**
@@ -154,6 +160,21 @@ class GDMLineFunctor {
    */
   const RowMajorMatrix& get_cached_P() const { return cached_P_; }
 
+  /**
+   * @brief Get cached Fock matrix from last eval() call
+   */
+  const RowMajorMatrix& get_cached_F() const { return cached_F_; }
+
+  /**
+   * @brief Get cached J(ΔP) from last eval() (for main-loop reuse)
+   */
+  const RowMajorMatrix& get_cached_J() const { return cached_J_; }
+
+  /**
+   * @brief Get cached K(ΔP) from last eval() (for main-loop reuse)
+   */
+  const RowMajorMatrix& get_cached_K() const { return cached_K_; }
+
  private:
   const double compare_kappa_tol_ = std::numeric_limits<double>::epsilon();
   // Const references to external data
@@ -174,6 +195,8 @@ class GDMLineFunctor {
   RowMajorMatrix cached_F_;  // Needed for gradient computation
   RowMajorMatrix cached_C_;  // For writing back to scf_impl
   RowMajorMatrix cached_P_;  // For writing back to scf_impl
+  RowMajorMatrix cached_J_;  // Cached J(ΔP) for main-loop reuse
+  RowMajorMatrix cached_K_;  // Cached K(ΔP) for main-loop reuse
   RowMajorMatrix grad_tmp_;  // Workspace for gradient gemm
 };
 
@@ -218,13 +241,20 @@ double GDMLineFunctor::eval(const Eigen::VectorXd& x) {
         P_ptr[r * nmo + c] = P_ptr[c * nmo + r];
   }
 
-  // Evaluate energy and Fock matrix using trial density matrix
-  auto [energy, F_trial] =
-      scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
-
-  // Cache all results for potential grad() call at same kappa
-  cached_energy_ = energy;
-  cached_F_ = F_trial;
+  // Evaluate energy and Fock using incremental trial: F_trial = F_ + J(ΔP).
+  // This is self-consistent with the gradient (both use the same F_ base)
+  // and produces J/K that are bit-identical to the main loop's next build_JK.
+  if (scf_impl_.incremental_trial_enabled()) {
+    auto [energy, F_trial] =
+        scf_impl_.evaluate_trial_incremental(cached_P_, cached_J_, cached_K_);
+    cached_energy_ = energy;
+    cached_F_ = F_trial;
+  } else {
+    auto [energy, F_trial] =
+        scf_impl_.evaluate_trial_density_energy_and_fock(cached_P_);
+    cached_energy_ = energy;
+    cached_F_ = F_trial;
+  }
   cached_kappa_ = x;
 
   return cached_energy_;
@@ -959,6 +989,21 @@ void GDM::iterate(SCFImpl& scf_impl) {
         searched_kappa.setZero();
         energy_at_searched_kappa = last_accepted_energy_;
         grad_at_searched_kappa = current_gradient_;
+      } else if (scf_impl.incremental_trial_enabled()) {
+        // Line search failed with incremental trial — likely accumulated
+        // Fock drift made the energy surface too noisy. Disable incremental
+        // trial, rebuild F_ from scratch, and accept zero rotation for this
+        // step. Subsequent steps will use full-P trial (accurate but slower).
+        QDK_LOGGER().warn(
+            "Line search failed with incremental trial (grad_norm={:.6e}). "
+            "Disabling incremental trial and rebuilding Fock.",
+            grad_norm);
+        scf_impl.disable_incremental_trial();
+        scf_impl.rebuild_fock();
+        last_accepted_energy_ = scf_impl.recompute_energy();
+        searched_kappa.setZero();
+        energy_at_searched_kappa = last_accepted_energy_;
+        grad_at_searched_kappa = current_gradient_;
       } else {
         QDK_LOGGER().error(
             "Line search failed and gradient norm {:.6e} exceeds threshold. "
@@ -976,6 +1021,14 @@ void GDM::iterate(SCFImpl& scf_impl) {
   if (searched_kappa.norm() > nonpositive_threshold_) {
     scf_impl.orbitals_matrix() = line_functor.get_cached_C();
     scf_impl.density_matrix() = line_functor.get_cached_P();
+    // Cache J(ΔP)/K(ΔP) from the incremental trial. The main loop will
+    // use these instead of calling build_JK — bit-identical since the ΔP
+    // (P_trial - P_current) is the same as (P_ - P_last) on the next step.
+    if (scf_impl.incremental_trial_enabled()) {
+      scf_impl.cache_trial_fock(line_functor.get_cached_F());
+      scf_impl.coulomb_matrix() = line_functor.get_cached_J();
+      scf_impl.exchange_matrix() = line_functor.get_cached_K();
+    }
   }
 
   delta_energy_ = energy_at_searched_kappa - last_accepted_energy_;

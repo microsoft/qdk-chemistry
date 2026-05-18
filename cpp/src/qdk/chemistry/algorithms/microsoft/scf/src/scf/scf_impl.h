@@ -179,6 +179,72 @@ class SCFImpl {
   RowMajorMatrix& density_matrix() { return P_; }
 
   /**
+   * @brief Cache a trial Fock matrix for post-convergence reuse.
+   * Stored separately from F_ to avoid corrupting the incremental accumulation.
+   */
+  void cache_trial_fock(const RowMajorMatrix& F_trial) {
+    cached_trial_fock_ = F_trial;
+    trial_fock_valid_ = true;
+  }
+
+  /**
+   * @brief Check if incremental trial Fock is enabled (may be auto-disabled
+   * on line search failure due to accumulated Fock drift).
+   */
+  bool incremental_trial_enabled() const {
+    return supports_trial_fock_reuse() && incremental_trial_enabled_;
+  }
+
+  /**
+   * @brief Disable incremental trial Fock for the remainder of the SCF.
+   * Called by GDM when the line search fails, indicating accumulated
+   * Fock drift has made the incremental energy surface too noisy.
+   */
+  void disable_incremental_trial() { incremental_trial_enabled_ = false; }
+
+  /**
+   * @brief Rebuild Fock matrix from current density (full-P, no incremental).
+   * Used at DIIS→GDM transition to eliminate accumulated incremental drift.
+   */
+  void rebuild_fock();
+
+  /**
+   * @brief Recompute SCF energy from current F_ and P_.
+   * Used after rebuild_fock() to get an energy consistent with the clean Fock.
+   */
+  double recompute_energy() { return total_energy_(); }
+
+  /**
+   * @brief Get mutable reference to Coulomb matrix for installing cached J(ΔP)
+   */
+  RowMajorMatrix& coulomb_matrix() { return J_; }
+
+  /**
+   * @brief Get mutable reference to exchange matrix for installing cached K(ΔP)
+   */
+  RowMajorMatrix& exchange_matrix() { return K_; }
+
+  /**
+   * @brief Check if trial Fock caching is supported (HF: yes, KS: no)
+   */
+  virtual bool supports_trial_fock_reuse() const { return true; }
+
+  /**
+   * @brief Evaluate trial energy and Fock using incremental density.
+   *
+   * Computes ΔP = P_trial - P_ and calls build_JK(ΔP). The trial Fock is
+   * F_trial = F_ + J/K contribution (same accumulation path as update_fock_).
+   *
+   * @param P_trial Trial density matrix
+   * @param J_out   Output: J(ΔP) — can be cached for main-loop reuse
+   * @param K_out   Output: K(ΔP) — can be cached for main-loop reuse
+   * @return {total_energy, F_trial}
+   */
+  std::pair<double, RowMajorMatrix> evaluate_trial_incremental(
+      const RowMajorMatrix& P_trial, RowMajorMatrix& J_out,
+      RowMajorMatrix& K_out) const;
+
+  /**
    * @brief Get mutable reference to molecular orbital coefficients for
    * modification
    * @return Mutable reference to coefficient matrix C
@@ -382,5 +448,9 @@ class SCFImpl {
 
   bool density_matrix_initialized_;  ///< Whether density matrix has been
                                      ///< initialized from input MO
+
+  bool trial_fock_valid_ = false;     ///< cached_trial_fock_ is valid
+  bool incremental_trial_enabled_ = true;  ///< Auto-disabled on line search failure
+  RowMajorMatrix cached_trial_fock_;  ///< Trial Fock for post-convergence reuse
 };
 }  // namespace qdk::chemistry::scf

@@ -398,6 +398,15 @@ void SCFImpl::reset_fock_() {
 #endif
 }
 
+void SCFImpl::rebuild_fock() {
+  QDK_LOG_TRACE_ENTERING();
+  QDK_LOGGER().info("Rebuilding Fock matrix from full density (eliminate drift)");
+  reset_fock_();
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
+  update_fock_();
+}
+
 double SCFImpl::total_energy_() {
   QDK_LOG_TRACE_ENTERING();
   auto& res = ctx_.result;
@@ -681,7 +690,7 @@ void SCFImpl::iterate_() {
         AutoTimer t_cv("SCF::convergence");
         res.converged = scf_algorithm_->check_convergence(*this);
       }
-      {
+      if (!res.converged) {
         AutoTimer t_al("SCF::algorithm");
         scf_algorithm_->iterate(*this);
       }
@@ -1195,6 +1204,42 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
       ctx_.cfg->mpi.world_rank, ctx_.result.nuclear_repulsion_energy,
       scf_one_electron_energy, scf_two_electron_energy);
   return {total_energy, F_matrix};
+}
+
+std::pair<double, RowMajorMatrix> SCFImpl::evaluate_trial_incremental(
+    const RowMajorMatrix& P_trial, RowMajorMatrix& J_out,
+    RowMajorMatrix& K_out) const {
+  QDK_LOG_TRACE_ENTERING();
+  AutoTimer timer("SCFImpl::evaluate_trial_incremental");
+
+  RowMajorMatrix P_diff = P_trial - P_;
+
+  J_out.setZero();
+  K_out.setZero();
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(P_diff.data(), J_out.data(), K_out.data(), alpha, beta, omega);
+
+  RowMajorMatrix F_trial = F_;
+  if (ctx_.cfg->mpi.world_rank == 0) {
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
+        ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+      F_trial +=
+          (J_out.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
+           J_out.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
+                       num_atomic_orbitals_))
+              .replicate(2, 1) -
+          K_out;
+    } else {
+      F_trial += J_out - 0.5 * K_out;
+    }
+  }
+
+  double scf_one_electron_energy = P_trial.cwiseProduct(H_).sum();
+  double scf_two_electron_energy =
+      0.5 * P_trial.cwiseProduct(F_trial - H_).sum();
+  double total_energy = ctx_.result.nuclear_repulsion_energy +
+                        scf_one_electron_energy + scf_two_electron_energy;
+  return {total_energy, F_trial};
 }
 
 }  // namespace qdk::chemistry::scf

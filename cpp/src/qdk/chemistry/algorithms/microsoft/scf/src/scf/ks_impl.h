@@ -133,6 +133,9 @@ class KSImpl : public SCFImpl {
    */
   void update_trial_fock_() override;
 
+  /// Disable trial Fock reuse: KS needs consistent XC_ state
+  bool supports_trial_fock_reuse() const override { return false; }
+
   /// Trial XC potential for CPSCF/TDDFT response calculations
   RowMajorMatrix tXC_;
 };
