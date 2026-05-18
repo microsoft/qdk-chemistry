@@ -253,6 +253,16 @@ class ERI {
   std::vector<std::vector<uint32_t>> touched_K_list_; ///< Per-thread K touched index list
   bool first_build_jk_ = true; ///< True until first build_JK completes (skip sparse zeroing)
 
+  // Screening diagnostic counters (atomic for thread safety)
+  std::atomic<size_t> diag_considered_{0};
+  std::atomic<size_t> diag_schwarz_{0};
+  std::atomic<size_t> diag_density_{0};
+  std::atomic<size_t> diag_computed_{0};
+  std::atomic<size_t> diag_engine_skip_{0};
+  std::atomic<size_t> diag_j_would_screen_{0};
+  std::atomic<size_t> diag_k_would_screen_{0};
+  std::atomic<size_t> diag_calls_{0};
+
   // Precomputed screening data
   std::vector<double> K_schwarz_rowmax_;  ///< max_Q K_schwarz_(s3,Q) per shell s3
 
@@ -446,6 +456,10 @@ class ERI {
     QDK_LOG_TRACE_ENTERING();
 
     AutoTimer t("ERI::build_JK");
+    // Reset per-call screening counters
+    diag_considered_ = 0; diag_schwarz_ = 0; diag_density_ = 0;
+    diag_computed_ = 0; diag_engine_skip_ = 0;
+    diag_j_would_screen_ = 0; diag_k_would_screen_ = 0;
     const size_t N = obs_.nbf();
     const size_t nsh = obs_.size();
     const size_t ndm = spin_density_factor_;
@@ -541,6 +555,11 @@ class ERI {
       double* J_thr = J ? J_tls_[tid].data() : nullptr;
       double* K_thr = K ? K_tls_[tid].data() : nullptr;
 
+      // Per-thread screening counters
+      size_t loc_considered = 0, loc_schwarz = 0, loc_density = 0;
+      size_t loc_computed = 0, loc_engine_skip = 0;
+      size_t loc_j_screen = 0, loc_k_screen = 0;
+
       // Dynamic scheduling over bra-pairs — each thread processes
       // contiguous bra-pair ranges, improving cache locality for bra-side
       // density rows and Schwarz data vs the old round-robin.
@@ -563,8 +582,10 @@ class ERI {
         for (size_t s3 = 0; s3 <= s1; ++s3) {
           // Coarse s3-row pre-screen: skip entire row when even the best
           // ket pair can't produce a significant integral bound
-          if (schwarz_pq * K_schwarz_rowmax_[s3] < eri_threshold_)
+          if (schwarz_pq * K_schwarz_rowmax_[s3] < eri_threshold_) {
+            ++loc_schwarz; ++loc_considered;
             continue;
+          }
 
           const auto bf3_st = shell_bf_offset_[s3];
           const auto n3 = shell_nbf_[s3];
@@ -578,6 +599,7 @@ class ERI {
           for (size_t sp34_idx = sp34_begin; sp34_idx < sp34_end; ++sp34_idx) {
             const size_t s4 = sp_csr_.neighbors[sp34_idx];
             if (s4 > s4_max) break;
+            ++loc_considered;
 
             const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
@@ -596,7 +618,12 @@ class ERI {
             } else {
               P_screen = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
             }
-            if (P_screen * schwarz_bound < eri_threshold_) continue;
+            // Track J-only and K-only screening
+            double Pj = std::max(P12_nrm, P34_nrm);
+            double Pk = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+            if (Pj * schwarz_bound < eri_threshold_) ++loc_j_screen;
+            if (Pk * schwarz_bound < eri_threshold_) ++loc_k_screen;
+            if (P_screen * schwarz_bound < eri_threshold_) { ++loc_density; continue; }
 
             const auto bf4_st = shell_bf_offset_[s4];
             const auto n4 = shell_nbf_[s4];
@@ -626,7 +653,8 @@ class ERI {
                 obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
 
             const auto buf_1234 = buf[0];
-            if (buf_1234 == nullptr) continue;
+            if (buf_1234 == nullptr) { ++loc_engine_skip; continue; }
+            ++loc_computed;
 
             // Stack-tile contraction: accumulate shell-block contributions
             // in small L1-hot tiles, then flush once to the N² TLS buffer.
@@ -829,7 +857,37 @@ class ERI {
 #endif
         k_sparse_total += my_k_sparse * ndm;
       }
+      // Accumulate screening counters into class atomics
+      diag_considered_ += loc_considered;
+      diag_schwarz_ += loc_schwarz;
+      diag_density_ += loc_density;
+      diag_computed_ += loc_computed;
+      diag_engine_skip_ += loc_engine_skip;
+      diag_j_would_screen_ += loc_j_screen;
+      diag_k_would_screen_ += loc_k_screen;
     }  // parallel region
+
+    ++diag_calls_;
+    if (std::getenv("QDK_FOCK_SCREEN_DIAG")) {
+      auto total = diag_considered_.load();
+      auto sw = diag_schwarz_.load();
+      auto ds = diag_density_.load();
+      auto comp = diag_computed_.load();
+      auto eskip = diag_engine_skip_.load();
+      auto jsc = diag_j_would_screen_.load();
+      auto ksc = diag_k_would_screen_.load();
+      auto screened = sw + ds;
+      QDK_LOGGER().info(
+          "SCREEN call={} nsh={} | total_quartets={} schwarz={:.1f}% "
+          "density={:.1f}% computed={} ({:.1f}%) engine_skip={} | "
+          "J_would_screen={:.1f}% K_would_screen={:.1f}%",
+          diag_calls_.load(), nsh, total,
+          total > 0 ? 100.0 * sw / total : 0.0,
+          total > 0 ? 100.0 * ds / total : 0.0,
+          comp, total > 0 ? 100.0 * comp / total : 0.0, eskip,
+          total > 0 ? 100.0 * jsc / total : 0.0,
+          total > 0 ? 100.0 * ksc / total : 0.0);
+    }
 
     // Fused tile-to-dense reduction: read contiguous tiles from tiled TLS,
     // sum across threads, write to dense N×N output. Source reads are
