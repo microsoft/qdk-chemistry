@@ -359,19 +359,57 @@ class ERI {
     // ---------------------------------------------------------------
     // Phase 3: Bra-pair-chunked dynamic scheduling
     // ---------------------------------------------------------------
-    // Build flat canonical bra-pair list
+    // Build flat canonical bra-pair list with estimated cost for load balancing
     struct BraPair {
       size_t s1, s2;
       size_t sp_idx;
+      size_t est_ket_pairs;  // estimated number of ket-pairs for this bra-pair
     };
     std::vector<BraPair> bra_pairs;
     bra_pairs.reserve(sp_csr_.neighbors.size());
     for (size_t s1 = 0; s1 < nsh; ++s1) {
+      // Estimate ket-pair count: sum of ket-pairs for all s3 <= s1
+      size_t est_kets = 0;
+      for (size_t s3 = 0; s3 <= s1; ++s3) {
+        est_kets += sp_csr_.row_size(s3);
+      }
       for (size_t idx = sp_csr_.offsets[s1]; idx < sp_csr_.offsets[s1 + 1]; ++idx) {
-        bra_pairs.push_back({s1, sp_csr_.neighbors[idx], idx});
+        bra_pairs.push_back({s1, sp_csr_.neighbors[idx], idx, est_kets});
       }
     }
     const size_t n_bra_pairs = bra_pairs.size();
+
+    // Cost-balanced reordering: sort by descending cost, then interleave
+    // across thread bins so each thread gets a mix of expensive and cheap
+    // bra-pairs. Final order is deterministic (pure function of basis).
+    {
+      // Sort by descending estimated cost
+      std::vector<size_t> order(n_bra_pairs);
+      std::iota(order.begin(), order.end(), 0);
+      std::stable_sort(order.begin(), order.end(),
+                       [&](size_t a, size_t b) {
+                         return bra_pairs[a].est_ket_pairs >
+                                bra_pairs[b].est_ket_pairs;
+                       });
+
+      // Interleave into thread bins: bp_ranked[0] -> thread 0,
+      // bp_ranked[1] -> thread 1, ..., bp_ranked[nthreads] -> thread 0, etc.
+      std::vector<std::vector<size_t>> bins(nthreads_);
+      for (size_t r = 0; r < n_bra_pairs; ++r) {
+        bins[r % nthreads_].push_back(order[r]);
+      }
+
+      // Rebuild bra_pairs in bin order (thread 0's bra-pairs first, then
+      // thread 1's, etc.) so schedule(static) assigns them correctly.
+      std::vector<BraPair> reordered;
+      reordered.reserve(n_bra_pairs);
+      for (int t = 0; t < nthreads_; ++t) {
+        for (size_t idx : bins[t]) {
+          reordered.push_back(bra_pairs[idx]);
+        }
+      }
+      bra_pairs = std::move(reordered);
+    }
 
     // Per-thread N²-sized accumulation (same total memory as old TLS)
     std::vector<std::vector<double>> J_local(nthreads_);
