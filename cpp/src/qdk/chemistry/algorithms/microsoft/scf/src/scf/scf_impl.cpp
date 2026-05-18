@@ -619,10 +619,19 @@ void SCFImpl::iterate_() {
     auto [alpha, beta, omega] = get_hyb_coeff_();
     eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
     update_fock_();
-    for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
-      scf_algorithm_->solve_fock_eigenproblem(F_, S_, X_, C_, eigenvalues_, P_,
-                                              nelec_, num_atomic_orbitals_,
-                                              num_molecular_orbitals_, i);
+
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+      const auto& [effective_fock, total_density] =
+          scf_algorithm_->try_get_rohf_convergence_matrices(*this);
+      scf_algorithm_->solve_fock_eigenproblem(
+          effective_fock, S_, X_, C_, eigenvalues_, P_, nelec_,
+          num_atomic_orbitals_, num_molecular_orbitals_, 0);
+    } else {
+      for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
+        scf_algorithm_->solve_fock_eigenproblem(
+            F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
+            num_molecular_orbitals_, i);
+      }
     }
     scf_algorithm_->update_density_matrix(
         P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,

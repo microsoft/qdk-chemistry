@@ -987,7 +987,7 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
                             num_atomic_orbitals, num_occupied_orbitals);
   calculate_pseudo_canonical_orbital_block(
       Uii, num_occupied_orbitals, pseudo_canonical_eigenvalues_, 0, C_occ_view,
-      num_molecular_orbitals, num_molecular_orbitals);
+      num_atomic_orbitals, num_molecular_orbitals);
 
   RowMajorMatrix Uaa = F_MO.block(num_occupied_orbitals, num_occupied_orbitals,
                                   num_virtual_orbitals, num_virtual_orbitals);
@@ -996,7 +996,7 @@ void GDM::generate_restricted_unrestricted_pseudo_canonical_orbital_(
               num_atomic_orbitals, num_virtual_orbitals);
   calculate_pseudo_canonical_orbital_block(
       Uaa, num_virtual_orbitals, pseudo_canonical_eigenvalues_,
-      num_occupied_orbitals, C_virt_view, num_molecular_orbitals,
+      num_occupied_orbitals, C_virt_view, num_atomic_orbitals,
       num_molecular_orbitals);
 
   // Transform the vectors in history_kappa, history_dgrad, and

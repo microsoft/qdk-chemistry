@@ -36,6 +36,11 @@ KSImpl::KSImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
                std::shared_ptr<BasisSet> raw_basis_set)
     : SCFImpl(mol, cfg, basis_set, raw_basis_set, true) {
   QDK_LOG_TRACE_ENTERING();
+  if (cfg.scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+    throw std::invalid_argument(
+        "ROKS (Restricted Open-Shell Kohn-Sham) is not supported. "
+        "Use ROHF (scf_type=\"restricted\") without DFT functionals.");
+  }
 #ifdef ENABLE_NVTX3
   NVTX3_FUNC_RANGE();
 #endif
