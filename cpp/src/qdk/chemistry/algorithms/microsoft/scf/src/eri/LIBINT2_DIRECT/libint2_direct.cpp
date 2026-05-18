@@ -67,13 +67,15 @@ RowMajorMatrix compute_shellblock_norm(const ::libint2::BasisSet& obs,
 
   for (size_t idm = 0; idm < ndm; ++idm) {
     Eigen::Map<const RowMajorMatrix> A_map(A + idm * nbf * LDA, nbf, LDA);
+    // Exploit density symmetry: compute lower triangle, mirror to upper
     for (size_t ish = 0; ish < nsh; ++ish)
-      for (size_t jsh = 0; jsh < nsh; ++jsh) {
+      for (size_t jsh = 0; jsh <= ish; ++jsh) {
         double block_norm = A_map
                                 .block(shell2bf[ish], shell2bf[jsh],
                                        obs[ish].size(), obs[jsh].size())
                                 .lpNorm<Eigen::Infinity>();
         shnrms(ish, jsh) = std::max(shnrms(ish, jsh), block_norm);
+        shnrms(jsh, ish) = shnrms(ish, jsh);
       }
   }
   return shnrms;
@@ -238,12 +240,25 @@ class ERI {
   size_t tls_mat_size_ = 0;               ///< Current allocation size per buffer
 
   // Per-thread touched shell-pair tracking for sparse reduction + zeroing.
-  // Each entry is an nsh×nsh bitmap (uint8_t). On reduction, only touched
-  // shell-pair blocks are summed — O(touched × shell_size²) instead of O(N²).
-  // On zeroing, only previously-touched blocks are cleared.
+  // Bitmap for O(1) dedup + compact list for O(touched) iteration.
+  // The list avoids scanning the full nsh² bitmap 3× per call (zeroing,
+  // cost model, sparse reduction).
   std::vector<std::vector<uint8_t>> touched_J_; ///< Per-thread J touched bitmap
   std::vector<std::vector<uint8_t>> touched_K_; ///< Per-thread K touched bitmap
+  std::vector<std::vector<uint32_t>> touched_J_list_; ///< Per-thread J touched index list
+  std::vector<std::vector<uint32_t>> touched_K_list_; ///< Per-thread K touched index list
   bool first_build_jk_ = true; ///< True until first build_JK completes (skip sparse zeroing)
+
+  // Precomputed screening data
+  std::vector<double> K_schwarz_rowmax_;  ///< max_Q K_schwarz_(s3,Q) per shell s3
+
+  // Precomputed cost-balanced bra-pair schedule (built once, reused across calls)
+  struct BraPair {
+    size_t s1, s2;
+    size_t sp_idx;
+  };
+  std::vector<BraPair> bra_pairs_;  ///< Cost-balanced ordered bra-pair list
+  size_t n_bra_pairs_ = 0;
 
  public:
   /**
@@ -332,6 +347,49 @@ class ERI {
       touched_J_[tid].assign(nsh * nsh, 0);
       touched_K_[tid].assign(nsh * nsh, 0);
     }
+    touched_J_list_.resize(nthreads_);
+    touched_K_list_.resize(nthreads_);
+    for (int i = 0; i < nthreads_; ++i) {
+      touched_J_list_[i].reserve(nsh * nsh / 4);  // typical touched fraction
+      touched_K_list_[i].reserve(nsh * nsh / 2);
+    }
+
+    // Precompute K_schwarz row maxima for coarse s3-row pre-screening
+    K_schwarz_rowmax_.resize(nsh);
+    for (size_t s3 = 0; s3 < nsh; ++s3) {
+      double mx = 0.0;
+      for (size_t s4 = 0; s4 < nsh; ++s4)
+        mx = std::max(mx, K_schwarz_(s3, s4));
+      K_schwarz_rowmax_[s3] = mx;
+    }
+
+    // Build cost-balanced bra-pair schedule (once, reused across calls).
+    // Pure function of basis and thread count — no density dependence.
+    {
+      struct BraPairCost { size_t s1, s2, sp_idx, est; };
+      std::vector<BraPairCost> raw;
+      raw.reserve(sp_csr_.neighbors.size());
+      for (size_t s1 = 0; s1 < nsh; ++s1) {
+        size_t est_kets = 0;
+        for (size_t s3 = 0; s3 <= s1; ++s3)
+          est_kets += sp_csr_.row_size(s3);
+        for (size_t idx = sp_csr_.offsets[s1]; idx < sp_csr_.offsets[s1 + 1]; ++idx)
+          raw.push_back({s1, sp_csr_.neighbors[idx], idx, est_kets});
+      }
+      n_bra_pairs_ = raw.size();
+
+      std::vector<size_t> order(n_bra_pairs_);
+      std::iota(order.begin(), order.end(), 0);
+      std::stable_sort(order.begin(), order.end(),
+                       [&](size_t a, size_t b) { return raw[a].est > raw[b].est; });
+      std::vector<std::vector<size_t>> bins(nthreads_);
+      for (size_t r = 0; r < n_bra_pairs_; ++r)
+        bins[r % nthreads_].push_back(order[r]);
+      bra_pairs_.reserve(n_bra_pairs_);
+      for (int t = 0; t < nthreads_; ++t)
+        for (size_t idx : bins[t])
+          bra_pairs_.push_back({raw[idx].s1, raw[idx].s2, raw[idx].sp_idx});
+    }
   }
 
   /**
@@ -395,62 +453,18 @@ class ERI {
     for (int i = 0; i < nthreads_; ++i)
       engines_[i].set_precision(engine_precision);
 
-    if (J) std::memset(J, 0, mat_size * sizeof(double));
-    if (K) std::memset(K, 0, mat_size * sizeof(double));
-
-    // ---------------------------------------------------------------
-    // Phase 3: Bra-pair-chunked dynamic scheduling
-    // ---------------------------------------------------------------
-    // Build flat canonical bra-pair list with estimated cost for load balancing
-    struct BraPair {
-      size_t s1, s2;
-      size_t sp_idx;
-      size_t est_ket_pairs;  // estimated number of ket-pairs for this bra-pair
-    };
-    std::vector<BraPair> bra_pairs;
-    bra_pairs.reserve(sp_csr_.neighbors.size());
-    for (size_t s1 = 0; s1 < nsh; ++s1) {
-      // Estimate ket-pair count: sum of ket-pairs for all s3 <= s1
-      size_t est_kets = 0;
-      for (size_t s3 = 0; s3 <= s1; ++s3) {
-        est_kets += sp_csr_.row_size(s3);
-      }
-      for (size_t idx = sp_csr_.offsets[s1]; idx < sp_csr_.offsets[s1 + 1]; ++idx) {
-        bra_pairs.push_back({s1, sp_csr_.neighbors[idx], idx, est_kets});
-      }
+    // Parallel zero of output (NUMA-friendly, avoid serial memset)
+    if (J) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (size_t i = 0; i < mat_size; ++i) J[i] = 0.0;
     }
-    const size_t n_bra_pairs = bra_pairs.size();
-
-    // Cost-balanced reordering: sort by descending cost, then interleave
-    // across thread bins so each thread gets a mix of expensive and cheap
-    // bra-pairs. Final order is deterministic (pure function of basis).
-    {
-      // Sort by descending estimated cost
-      std::vector<size_t> order(n_bra_pairs);
-      std::iota(order.begin(), order.end(), 0);
-      std::stable_sort(order.begin(), order.end(),
-                       [&](size_t a, size_t b) {
-                         return bra_pairs[a].est_ket_pairs >
-                                bra_pairs[b].est_ket_pairs;
-                       });
-
-      // Interleave into thread bins: bp_ranked[0] -> thread 0,
-      // bp_ranked[1] -> thread 1, ..., bp_ranked[nthreads] -> thread 0, etc.
-      std::vector<std::vector<size_t>> bins(nthreads_);
-      for (size_t r = 0; r < n_bra_pairs; ++r) {
-        bins[r % nthreads_].push_back(order[r]);
-      }
-
-      // Rebuild bra_pairs in bin order (thread 0's bra-pairs first, then
-      // thread 1's, etc.) so schedule(static) assigns them correctly.
-      std::vector<BraPair> reordered;
-      reordered.reserve(n_bra_pairs);
-      for (int t = 0; t < nthreads_; ++t) {
-        for (size_t idx : bins[t]) {
-          reordered.push_back(bra_pairs[idx]);
-        }
-      }
-      bra_pairs = std::move(reordered);
+    if (K) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (size_t i = 0; i < mat_size; ++i) K[i] = 0.0;
     }
 
     // Accumulators for per-thread sparse work cost (computed in parallel)
@@ -467,43 +481,42 @@ class ERI {
 #else
       const int tid = 0;
 #endif
-      // Sparse zeroing: only clear shell-pair blocks touched in the previous
-      // call, then clear the touched bitmap. Much cheaper than full N² memset
-      // when each thread only touches a subset of shell pairs.
-      // On the very first build_JK call, TLS buffers are already zeroed by the
-      // constructor, so we skip the scan entirely.
+      // Sparse zeroing: iterate touched-list from previous call (O(touched),
+      // not O(nsh²)). Always zero both J and K TLS when stale, regardless of
+      // which matrices are requested in this call — otherwise stale data from
+      // a previous J+K call contaminates a subsequent J-only or K-only call.
       auto& tj = touched_J_[tid];
       auto& tk = touched_K_[tid];
       if (!first_build_jk_) {
-        if (J) {
+        {
           double* jd = J_tls_[tid].data();
-          for (size_t sa = 0; sa < nsh; ++sa)
-            for (size_t sb = 0; sb < nsh; ++sb)
-              if (tj[sa * nsh + sb]) {
-                const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-                for (size_t idm = 0; idm < ndm; ++idm) {
-                  const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-                  for (size_t a = 0; a < na; ++a)
-                    std::memset(jd + off + a * N, 0, nb * sizeof(double));
-                }
-                tj[sa * nsh + sb] = 0;
-              }
+          for (uint32_t idx : touched_J_list_[tid]) {
+            const size_t sa = idx / nsh, sb = idx % nsh;
+            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+            for (size_t idm = 0; idm < ndm; ++idm) {
+              const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+              for (size_t a = 0; a < na; ++a)
+                std::memset(jd + off + a * N, 0, nb * sizeof(double));
+            }
+            tj[idx] = 0;
+          }
         }
-        if (K) {
+        {
           double* kd = K_tls_[tid].data();
-          for (size_t sa = 0; sa < nsh; ++sa)
-            for (size_t sb = 0; sb < nsh; ++sb)
-              if (tk[sa * nsh + sb]) {
-                const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-                for (size_t idm = 0; idm < ndm; ++idm) {
-                  const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-                  for (size_t a = 0; a < na; ++a)
-                    std::memset(kd + off + a * N, 0, nb * sizeof(double));
-                }
-                tk[sa * nsh + sb] = 0;
-              }
+          for (uint32_t idx : touched_K_list_[tid]) {
+            const size_t sa = idx / nsh, sb = idx % nsh;
+            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+            for (size_t idm = 0; idm < ndm; ++idm) {
+              const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+              for (size_t a = 0; a < na; ++a)
+                std::memset(kd + off + a * N, 0, nb * sizeof(double));
+            }
+            tk[idx] = 0;
+          }
         }
       }
+      touched_J_list_[tid].clear();
+      touched_K_list_[tid].clear();
 
 #ifdef _OPENMP
 #pragma omp barrier
@@ -520,8 +533,8 @@ class ERI {
 #ifdef _OPENMP
 #pragma omp for schedule(static)
 #endif
-      for (size_t bp_idx = 0; bp_idx < n_bra_pairs; ++bp_idx) {
-        const auto& bp = bra_pairs[bp_idx];
+      for (size_t bp_idx = 0; bp_idx < n_bra_pairs_; ++bp_idx) {
+        const auto& bp = bra_pairs_[bp_idx];
         const size_t s1 = bp.s1;
         const size_t s2 = bp.s2;
         const auto bf1_st = shell_bf_offset_[s1];
@@ -531,7 +544,14 @@ class ERI {
         const auto* sp12_data = &sp_csr_.data[bp.sp_idx];
         const auto P12_nrm = P_shnrm(s1, s2);
 
+        const auto schwarz_pq = K_schwarz_(s1, s2);
+
         for (size_t s3 = 0; s3 <= s1; ++s3) {
+          // Coarse s3-row pre-screen: skip entire row when even the best
+          // ket pair can't produce a significant integral bound
+          if (schwarz_pq * K_schwarz_rowmax_[s3] < eri_threshold_)
+            continue;
+
           const auto bf3_st = shell_bf_offset_[s3];
           const auto n3 = shell_nbf_[s3];
           const auto P13_nrm = P_shnrm(s1, s3);
@@ -567,13 +587,19 @@ class ERI {
             const auto bf4_st = shell_bf_offset_[s4];
             const auto n4 = shell_nbf_[s4];
 
-            // Mark touched shell pairs for sparse reduction/zeroing
+            // Mark touched shell pairs (bitmap for dedup, list for iteration)
             if (J_thr) {
-              tj[s1 * nsh + s2] = 1; tj[s3 * nsh + s4] = 1;
+              auto idx12 = static_cast<uint32_t>(s1 * nsh + s2);
+              auto idx34 = static_cast<uint32_t>(s3 * nsh + s4);
+              if (!tj[idx12]) { tj[idx12] = 1; touched_J_list_[tid].push_back(idx12); }
+              if (!tj[idx34]) { tj[idx34] = 1; touched_J_list_[tid].push_back(idx34); }
             }
             if (K_thr) {
-              tk[s1 * nsh + s3] = 1; tk[s1 * nsh + s4] = 1;
-              tk[s2 * nsh + s3] = 1; tk[s2 * nsh + s4] = 1;
+              uint32_t idxs[] = {
+                static_cast<uint32_t>(s1*nsh+s3), static_cast<uint32_t>(s1*nsh+s4),
+                static_cast<uint32_t>(s2*nsh+s3), static_cast<uint32_t>(s2*nsh+s4)};
+              for (auto idx : idxs)
+                if (!tk[idx]) { tk[idx] = 1; touched_K_list_[tid].push_back(idx); }
             }
 
             auto s12_deg = (s1 == s2) ? 1 : 2;
@@ -763,24 +789,20 @@ class ERI {
         }  // s3
       }  // bra-pair (omp for)
 
-      // Parallel cost model: each thread counts its own touched AO pairs.
-      // Runs inside the compute region to avoid serial overhead and cache
-      // eviction between the compute and reduction phases.
+      // Parallel cost model: iterate touched lists (O(touched) per thread)
       {
         size_t my_j_sparse = 0, my_k_sparse = 0;
         if (J) {
-          const auto& tj_local = touched_J_[tid];
-          for (size_t sa = 0; sa < nsh; ++sa)
-            for (size_t sb = 0; sb < nsh; ++sb)
-              if (tj_local[sa * nsh + sb])
-                my_j_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+          for (uint32_t idx : touched_J_list_[tid]) {
+            const size_t sa = idx / nsh, sb = idx % nsh;
+            my_j_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+          }
         }
         if (K) {
-          const auto& tk_local = touched_K_[tid];
-          for (size_t sa = 0; sa < nsh; ++sa)
-            for (size_t sb = 0; sb < nsh; ++sb)
-              if (tk_local[sa * nsh + sb])
-                my_k_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+          for (uint32_t idx : touched_K_list_[tid]) {
+            const size_t sa = idx / nsh, sb = idx % nsh;
+            my_k_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+          }
         }
 #ifdef _OPENMP
 #pragma omp atomic
