@@ -4,7 +4,7 @@ parameters:
   default: armv8-a
 - name: buildType
   type: string
-  default: Debug
+  default: Release
 - name: buildTesting
   type: string
   default: ON
@@ -16,7 +16,7 @@ parameters:
   default: $(Agent.BuildDirectory)
 - name: dockerImage
   type: string
-  default: ubuntu:22.04
+  default: ubuntu:24.04
 - name: imageTag
   type: string
   default: linux/amd64
@@ -37,7 +37,7 @@ parameters:
   default: 5.2.0
 - name: pyenvVersion
   type: string
-  default: 2.6.15
+  default: 2.6.31
 - name: macBuild
   type: string
   default: OFF
@@ -51,11 +51,6 @@ steps:
   path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
-
-- task: PipAuthenticate@1
-  displayName: Pip Authenticate
-  inputs:
-    artifactFeeds: ""
 
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |
@@ -99,6 +94,7 @@ steps:
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -e PIP_INDEX_URL \
         -e QDK_UARCH=${{ parameters.march }} \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
@@ -114,10 +110,11 @@ steps:
                                                       ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux)
-    retryCountOnTaskFailure: 4
+    retryCountOnTaskFailure: 2
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
+      set -x
       echo "Running pip wheel build (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
@@ -132,4 +129,3 @@ steps:
                                                       ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
-    retryCountOnTaskFailure: 4
