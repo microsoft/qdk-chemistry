@@ -16,7 +16,7 @@ parameters:
   default: OFF
 - name: pyenvVersion
   type: string
-  default: 2.6.15
+  default: 2.6.31
 
 steps:
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
@@ -24,6 +24,7 @@ steps:
       echo "Running wheel tests (Docker)..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
+        -e PIP_INDEX_URL \
         -e QSHARP_PYTHON_TELEMETRY=false \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
@@ -32,7 +33,6 @@ steps:
                                                           ${{ parameters.macBuild }} \
                                                           ${{ parameters.pyenvVersion }}
     displayName: Test wheel (Docker)
-    retryCountOnTaskFailure: 4
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
@@ -42,4 +42,3 @@ steps:
                                                         ${{ parameters.macBuild }} \
                                                         ${{ parameters.pyenvVersion }}
     displayName: Test wheel (native)
-    retryCountOnTaskFailure: 4

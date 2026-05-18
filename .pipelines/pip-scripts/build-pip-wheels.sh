@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -ex
 
 MARCH=${1:-x86-64-v3}
 PYTHON_VERSION=${2:-3.11}
@@ -10,7 +10,7 @@ CMAKE_VERSION=${6:-3.28.3}
 HDF5_VERSION=${7:-1.13.0}
 BLIS_VERSION=${8:-2.0}
 LIBFLAME_VERSION=${9:-5.2.0}
-PYENV_VERSION=${10:-2.6.15}
+PYENV_VERSION=${10:-2.6.31}
 MAC_BUILD=${11:-OFF}
 
 export CFLAGS="-fPIC -Os"
@@ -21,33 +21,45 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     rm /var/lib/dpkg/info/libc-bin.*
     apt-get clean
     apt-get update -q
-    apt install -q libc-bin
+    apt-get install -y -q libc-bin
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
     apt-get update -q
     apt-get install -y -q \
-        python3 python3-pip python3-dev \
-        libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev \
-        libncurses5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev \
-        libffi-dev liblzma-dev \
-        libeigen3-dev \
-        nlohmann-json3-dev \
-        libboost-all-dev \
-        libgtest-dev \
-        libgmock-dev \
-        libfmt-dev \
-        ninja-build \
-        gcc g++ \
-        make \
-        git \
-        wget \
-        curl \
-        unzip \
-        patchelf \
         build-essential \
+        curl \
+        gcc g++ \
+        git \
+        libboost-all-dev \
+        libbz2-dev \
+        libeigen3-dev \
+        libffi-dev \
+        libfmt-dev \
+        libgmock-dev \
+        libgtest-dev \
+        liblzma-dev \
+        libncursesw5-dev \
         libpugixml-dev \
-        python3-pybind11 pybind11-dev
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
+        make \
+        ninja-build \
+        nlohmann-json3-dev \
+        patchelf \
+        pybind11-dev \
+        python3 \
+        python3-dev \
+        python3-pip \
+        python3-pybind11 \
+        tk-dev \
+        unzip \
+        wget \
+        xz-utils \
+        zlib1g-dev
 
     # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
     echo "Downloading and installing CMake ${CMAKE_VERSION}..."
@@ -77,14 +89,15 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
     arch -arm64 brew upgrade
     arch -arm64 brew install \
-        ninja \
-        eigen \
-        wget \
-        curl \
-        cmake \
-        gcc \
         boost \
-        pybind11
+        cmake \
+        curl \
+        eigen \
+        gcc \
+        ncurses \
+        ninja \
+        pybind11 \
+        wget
     export CMAKE_PREFIX_PATH="/opt/homebrew"
     export PYENV_ROOT="$PWD/.pyenv"
 fi
@@ -105,7 +118,7 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 # pyenv is used in place of a venv to prevent any collisions with the system Python
 # when building with a non-system Python version.
 echo "Installing pyenv ${PYENV_VERSION}..."
-export PYENV_CHECKSUM=95187d6ad9bc8310662b5b805a88506e5cbbe038f88890e5aabe3021711bf3c8
+PYENV_CHECKSUM=7435b8c1481043e48c838ba40d5c8bc724c23d4c94e531adc283a7c121757ad4
 wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
 echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
 unzip -q pyenv.zip
@@ -121,14 +134,13 @@ python3 --version
 # Update pip and install build tools
 python3 -m pip install --upgrade pip
 
-PIP_STRING="fonttools>=4.61.0 urllib3>=2.6.0"
-
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-if [ "${MAC_BUILD}" == "OFF" ]; then
-    PIP_STRING+=" opentelemetry-api==1.23.0 opentelemetry-sdk==1.23.0 opentelemetry-exporter-otlp-proto-grpc==1.23.0"
-fi
+python3 -m pip install -r .pipelines/requirements.txt
 
-python3 -m pip install auditwheel build ${PIP_STRING}
+# Print installed packages for debugging
+echo "------------------ Installed Python packages ------------------"
+python3 -m pip freeze
+echo "---------------------------------------------------------------"
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
@@ -216,7 +228,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"
     echo "Repairing wheel for macOS..."
-    pip install delocate==0.13.0
     WHEEL_FILE=$(ls dist/qdk_chemistry-*.whl)
     delocate-wheel -w repaired_wheelhouse/ "$WHEEL_FILE"
     delocate-listdeps --all repaired_wheelhouse/qdk_chemistry*.whl
