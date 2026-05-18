@@ -471,13 +471,15 @@ TEST_P(GoldenFockTest, JOnlyAndKOnlyWork) {
   // Full J+K reference
   auto [J_full, K_full] = build_JK_standalone(*eri, P, nao, ndm);
 
-  // J-only (K = nullptr)
+  // J-only (K = nullptr) — tighter screening may skip quartets whose K
+  // contribution was keeping them alive in the J+K path, so allow threshold-
+  // level differences rather than exact match.
   {
     size_t mat_size = ndm * nao * nao;
     std::vector<double> J_only(mat_size, 0.0);
     eri->build_JK(P.data(), J_only.data(), nullptr, 1.0, 0.0, 0.0);
     double j_diff = inf_norm_diff(J_full, J_only);
-    EXPECT_LT(j_diff, 1e-15) << "J-only differs from J+K for " << sys.name;
+    EXPECT_LT(j_diff, 1e-8) << "J-only differs from J+K for " << sys.name;
   }
 
   // K-only (J = nullptr)
@@ -486,7 +488,7 @@ TEST_P(GoldenFockTest, JOnlyAndKOnlyWork) {
     std::vector<double> K_only(mat_size, 0.0);
     eri->build_JK(P.data(), nullptr, K_only.data(), 1.0, 0.0, 0.0);
     double k_diff = inf_norm_diff(K_full, K_only);
-    EXPECT_LT(k_diff, 1e-15) << "K-only differs from J+K for " << sys.name;
+    EXPECT_LT(k_diff, 1e-8) << "K-only differs from J+K for " << sys.name;
   }
 }
 

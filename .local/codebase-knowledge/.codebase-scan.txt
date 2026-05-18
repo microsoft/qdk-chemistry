@@ -1,0 +1,318 @@
+
+=== DIRECTORY TREE (max depth 3, source files only) ===
+.clang-format
+.devcontainer
+.devcontainer/Dockerfile
+.devcontainer/devcontainer.json
+.devcontainer/scripts
+.devcontainer/scripts/install_cpp_dependencies.sh
+.devcontainer/scripts/venv.sh
+.github
+.github/CODEOWNERS
+.github/ISSUE_TEMPLATE
+.github/ISSUE_TEMPLATE/bug_report.md
+.github/ISSUE_TEMPLATE/documentation-issue.md
+.github/ISSUE_TEMPLATE/feature_request.md
+.github/ISSUE_TEMPLATE/question-template.md
+.github/copilot-instructions.md
+.github/scripts
+.github/scripts/check_license_headers.py
+.github/scripts/check_pyi_stubs.py
+.github/scripts/check_version_alignment.py
+.github/skills
+.github/skills/acquire-codebase-knowledge
+.github/skills/acquire-codebase-knowledge/SKILL.md
+.github/skills/acquire-codebase-knowledge/assets
+.github/skills/acquire-codebase-knowledge/references
+.github/skills/acquire-codebase-knowledge/scripts
+.github/skills/add-algorithm
+.github/skills/add-algorithm/SKILL.md
+.github/skills/add-binding
+.github/skills/add-binding/SKILL.md
+.github/skills/cpp-build
+.github/skills/cpp-build/SKILL.md
+.github/skills/docs-build
+.github/skills/docs-build/SKILL.md
+.github/skills/domain-reference
+.github/skills/domain-reference/SKILL.md
+.github/skills/domain-reference/references
+.github/skills/lint
+.github/skills/lint/SKILL.md
+.github/skills/python-build
+.github/skills/python-build/SKILL.md
+.github/workflows
+.github/workflows/build-and-test.yaml
+.github/workflows/precommit.yaml
+.gitignore
+.local
+.local/codebase-knowledge
+.local/codebase-knowledge/.codebase-scan.txt
+.local/codebase-knowledge/ARCHITECTURE.md
+.local/codebase-knowledge/CONCERNS.md
+.local/codebase-knowledge/CONVENTIONS.md
+.local/codebase-knowledge/INTEGRATIONS.md
+.local/codebase-knowledge/STACK.md
+.local/codebase-knowledge/STRUCTURE.md
+.local/codebase-knowledge/TESTING.md
+.pipelines
+.pipelines/install-scripts
+.pipelines/install-scripts/install-blis.sh
+.pipelines/install-scripts/install-hdf5.sh
+.pipelines/install-scripts/install-libflame.sh
+.pipelines/pip-scripts
+.pipelines/pip-scripts/build-pip-wheels.sh
+.pipelines/pip-scripts/prepare-readme.sh
+.pipelines/pip-scripts/test-pip-wheels.sh
+.pipelines/pip-scripts/versioning.py
+.pipelines/python-wheels.yaml
+.pipelines/templates
+.pipelines/templates/build-pip-wheels.yml
+.pipelines/templates/test-pip-wheels.yml
+.pre-commit-config.yaml
+CHANGELOG.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+INSTALL.md
+LICENSE.txt
+README.md
+SECURITY.md
+SUPPORT.md
+VERSION
+cpp
+cpp/CMakeLists.txt
+cpp/cmake
+cpp/cmake/cuda.cmake
+cpp/cmake/modules
+cpp/cmake/modules/DependencyManager.cmake
+cpp/cmake/qdk-uarch.cmake
+cpp/cmake/qdkConfig.cmake.in
+cpp/cmake/third_party.cmake
+cpp/include
+cpp/include/qdk
+cpp/include/qdk/chemistry
+cpp/include/qdk/chemistry.hpp
+cpp/manifest
+cpp/manifest/qdk-chemistry
+cpp/manifest/qdk-chemistry/cgmanifest.json
+cpp/src
+cpp/src/qdk
+cpp/src/qdk/chemistry
+cpp/tests
+cpp/tests/CMakeLists.txt
+cpp/tests/qdk_test_main.cpp
+cpp/tests/test_active_space.cpp
+cpp/tests/test_ansatz.cpp
+cpp/tests/test_basis_set.cpp
+cpp/tests/test_configuration.cpp
+cpp/tests/test_coupled_cluster_calculator.cpp
+cpp/tests/test_element_data.cpp
+cpp/tests/test_hamiltonian.cpp
+cpp/tests/test_lattice_graph.cpp
+cpp/tests/test_localization.cpp
+cpp/tests/test_logger.cpp
+cpp/tests/test_logger_startup.cpp
+cpp/tests/test_macis.cpp
+cpp/tests/test_macis_dispatch.cpp
+cpp/tests/test_mc.cpp
+cpp/tests/test_mcscf.cpp
+cpp/tests/test_model_hamiltonians.cpp
+cpp/tests/test_model_orbitals.cpp
+cpp/tests/test_mp2.cpp
+cpp/tests/test_orbitals_comprehensive.cpp
+cpp/tests/test_orbitals_edge_cases.cpp
+cpp/tests/test_pauli_operator.cpp
+cpp/tests/test_rdms.cpp
+cpp/tests/test_scf.cpp
+cpp/tests/test_settings.cpp
+cpp/tests/test_stability.cpp
+cpp/tests/test_structure.cpp
+cpp/tests/test_structure_comprehensive.cpp
+cpp/tests/test_utils.cpp
+cpp/tests/test_wavefunction.cpp
+cpp/tests/test_wfn_cas.cpp
+cpp/tests/test_wfn_cc.cpp
+cpp/tests/test_wfn_sci.cpp
+cpp/tests/test_wfn_sd.cpp
+cpp/tests/testing_utilities.hpp
+cpp/tests/ut_common.hpp
+docs
+docs/Doxyfile
+docs/Makefile
+docs/README.md
+docs/examples
+docs/examples/cpp
+docs/examples/cpp/CMakeLists.txt
+docs/source
+docs/source/_static
+docs/source/_static/custom.css
+docs/source/_static/diagrams
+docs/source/_static/examples
+docs/source/api
+docs/source/api/_cpp_placeholders.rst
+docs/source/api/_py_placeholders.rst
+docs/source/api/cpp_api.rst
+docs/source/api/python_api.rst
+docs/source/changelog.rst
+docs/source/conf.py
+docs/source/glossary.rst
+docs/source/index.rst
+docs/source/references.bib
+docs/source/references.rst
+docs/source/release-notes
+docs/source/release-notes/index.rst
+docs/source/release-notes/v1.1.0.rst
+docs/source/user
+docs/source/user/comprehensive
+docs/source/user/features.rst
+docs/source/user/quickstart.rst
+examples
+examples/README.md
+examples/data
+examples/data/benzene_diradical.structure.xyz
+examples/data/cyclobutadiene.structure.xyz
+examples/data/stretched_n2.structure.xyz
+examples/data/water.structure.xyz
+examples/extended_hubbard.ipynb
+examples/factory_list.ipynb
+examples/interoperability
+examples/interoperability/openFermion
+examples/interoperability/openFermion/molecular_hamiltonian_jordan_wigner.py
+examples/interoperability/pennylane
+examples/interoperability/pennylane/qpe_no_trotter.py
+examples/interoperability/qiskit
+examples/interoperability/qiskit/iqpe_model_hamiltonian.py
+examples/interoperability/qiskit/iqpe_no_trotter.py
+examples/interoperability/qiskit/iqpe_trotter.py
+examples/interoperability/rdkit
+examples/interoperability/rdkit/sample_rdkit_geometry.py
+examples/language
+examples/language/cpp
+examples/language/cpp/CMakeLists.txt
+examples/language/cpp/simple_e2e.cpp
+examples/language/sample_sci_workflow.py
+examples/qpe_stretched_n2.ipynb
+examples/state_prep_energy.ipynb
+examples/utils
+examples/utils/qpe_utils.py
+examples/utils/viz_utils.py
+external
+external/macis
+external/macis/CMakeLists.txt
+external/macis/LICENSE.txt
+external/macis/NOTICE.txt
+
+=== STACK DETECTION (manifest files) ===
+No recognized manifest files found in project root.
+
+=== ENTRY POINTS ===
+No common entry points found. Check 'main' or 'scripts.start' in manifest files above.
+
+=== LINTING AND FORMATTING CONFIG ===
+No linting or formatting config files found in project root.
+
+=== ENVIRONMENT VARIABLE TEMPLATES ===
+No .env.example or .env.template found. Identify required environment variables by searching the code and config for environment variable reads.
+
+=== TODO / FIXME / HACK (production code only, test dirs excluded) ===
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:28: TODO_LIMIT = 60
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:291: """Search for TODO/FIXME/HACK comments."""
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:291: """Search for TODO/FIXME/HACK comments."""
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:291: """Search for TODO/FIXME/HACK comments."""
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:293: patterns = ["TODO", "FIXME", "HACK"]
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:293: patterns = ["TODO", "FIXME", "HACK"]
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:293: patterns = ["TODO", "FIXME", "HACK"]
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:320: return todos[:TODO_LIMIT]
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:617: # TODOs
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:620: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", todos, output_file)
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:620: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", todos, output_file)
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:620: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", todos, output_file)
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:622: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", ["None found."], output_file)
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:622: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", ["None found."], output_file)
+.github/skills/acquire-codebase-knowledge/scripts/scan.py:622: print_section("TODO / FIXME / HACK (production code only, test dirs excluded)", ["None found."], output_file)
+python/src/qdk_chemistry/plugins/pyscf/conversion.py:160: # TODO Handle Cartesian basis sets
+python/src/qdk_chemistry/plugins/pyscf/conversion.py:271: # TODO Handle Cartesian
+cpp/src/qdk/chemistry/algorithms/microsoft/utils.cpp:189: // TODO: Support Cartesian Atomic Orbitals
+
+=== GIT RECENT COMMITS (last 20) ===
+a679187a Generalize `TimeEvolutionUnitary` and related builders to `Unitary` (#448)
+fc440dc8 Nightly rebuilds of Ubuntu 24.04 image use for runner pools (#460)
+80abb29c Algorithm nesting update (#455)
+638835ac Bump dev version to 2.0.0 (#458)
+8708c512 Add dense solver path for MACIS CAS (#443)
+5fdc0f09 Bugfix: Add ECP Contributions (#447)
+9cfc37d4 Add tolerance configration to PySCF AVAS module (#442)
+d6606ab8 Add qubit loss support in QuantumErrorProfile and noise config support in qdk sparse state simulator (#434)
+b5517a83 Fix int32 overflow in two-body integral and RDM indexing (#439)
+0860dbfb Remove _to_fcidump_file method from Hamiltonian (#445)
+7692880a Store Cholesky MO integrals and save them in serialization (#440)
+e7b1b953 Fix bug in ScfSolver for ROHF stability check (#433)
+bea81d61 Support newer PyQIR versions (#436)
+5dac279c Version 1.1 (#422)
+9d2a41c5 Model Hamiltonian Docs (#411)
+62e915fc CI/CD hardening (#424)
+4ed2a4a5 Encapsulate `qsharp.estimate` into `Circuit` (#428)
+5bc3f371 Update energy estimator to include commuting grouping (#426)
+937ac375 Original CI/CD Build Order (#425)
+3af867e5 Fix: Entropy Threshold for normalized entropies (#423)
+
+=== HIGH-CHURN FILES (last 90 days, top 20) ===
+   8 docs/source/conf.py
+   8 python/pyproject.toml
+   6 python/tests/test_phase_estimation_iterative.py
+   6 cpp/src/qdk/chemistry/algorithms/microsoft/cholesky_hamiltonian.cpp
+   6 cpp/tests/test_hamiltonian.cpp
+   5 examples/qpe_stretched_n2.ipynb
+   5 python/src/qdk_chemistry/data/__init__.py
+   5 python/src/qdk_chemistry/__init__.py
+   5 .pipelines/python-wheels.yaml
+   5 examples/state_prep_energy.ipynb
+   4 examples/interoperability/qiskit/iqpe_trotter.py
+   4 python/src/qdk_chemistry/algorithms/phase_estimation/iterative_phase_estimation.py
+   4 python/tests/test_time_evolution_trotter.py
+   4 python/tests/test_trotter_error.py
+   4 python/src/qdk_chemistry/algorithms/energy_estimator/energy_estimator.py
+   4 python/tests/test_energy_estimator.py
+   4 python/CMakeLists.txt
+   4 cpp/src/qdk/chemistry/algorithms/microsoft/macis_base.hpp
+   4 cpp/include/qdk/chemistry/data/wavefunction.hpp
+   4 cpp/src/qdk/chemistry/data/wavefunction.cpp
+
+=== MONOREPO SIGNALS ===
+No monorepo signals detected.
+
+=== CODE METRICS ===
+Total files scanned: 1143
+Total lines of code: 186913
+
+Files by language:
+  Other: 665
+  Python: 228
+  C++: 194
+  C Header: 55
+  Ruby: 1
+
+Top 10 largest files:
+external/macis/tests/ref_data/h2o.ccpvdz.cisd.nzval.bin: 27482.9KB
+external/macis/tests/ref_data/h2o.ccpvdz.cisd.colind.bin: 13741.5KB
+external/macis/tests/ref_data/ch4.wfn.dat: 5664.1KB
+external/macis/tests/ref_data/h2o.ccpvdz.fci.dat: 772.9KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/resources/compressed/ano-r.tar.gz: 710.4KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/resources/compressed/ano-rcc.tar.gz: 582.0KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/resources/compressed/ano-r2.tar.gz: 468.2KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/resources/compressed/ano-rcc-vqzp.tar.gz: 442.0KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/int1e.json: 426.5KB
+cpp/src/qdk/chemistry/algorithms/microsoft/scf/resources/compressed/ano-rcc-vtzp.tar.gz: 415.4KB
+
+=== CI/CD PIPELINES ===
+CI/CD: GitHub Actions
+
+=== CONTAINERS & ORCHESTRATION ===
+No containerization configs detected.
+
+=== SECURITY & COMPLIANCE ===
+Security: SECURITY.md
+
+=== PERFORMANCE & TESTING ===
+No performance testing configs detected.
+
+=== SCAN COMPLETE ===

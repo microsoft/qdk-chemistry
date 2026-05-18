@@ -40,21 +40,42 @@ const auto max_engine_precision = std::numeric_limits<double>::epsilon() / 1e10;
  * @param LDA Leading dimension of matrix A
  * @return Matrix of shell block norms for screening
  */
+/**
+ * @brief Compute shell block norms of a density matrix for screening purposes
+ *
+ * Computes the infinity norm (maximum absolute value) for each shell block
+ * of matrix A. When multiple density matrices are present (UHF: ndm=2),
+ * takes the elementwise maximum across all densities so that screening
+ * is conservative for all spin channels.
+ *
+ * @param obs Libint2 orbital basis set
+ * @param A Matrix data in row-major format (ndm consecutive NAO x NAO blocks)
+ * @param LDA Leading dimension of each matrix block (= NAO)
+ * @param ndm Number of density matrices (1 for RHF, 2 for UHF)
+ * @return Matrix of shell block norms for screening
+ */
 RowMajorMatrix compute_shellblock_norm(const ::libint2::BasisSet& obs,
-                                       const double* A, size_t LDA) {
+                                       const double* A, size_t LDA,
+                                       size_t ndm = 1) {
   QDK_LOG_TRACE_ENTERING();
 
   auto shell2bf = obs.shell2bf();
   const size_t nsh = obs.size();
+  const size_t nbf = obs.nbf();
   RowMajorMatrix shnrms(nsh, nsh);
-  Eigen::Map<const RowMajorMatrix> A_map(A, obs.nbf(), LDA);
-  for (auto ish = 0; ish < nsh; ++ish)
-    for (auto jsh = 0; jsh < nsh; ++jsh) {
-      shnrms(ish, jsh) = A_map
-                             .block(shell2bf[ish], shell2bf[jsh],
-                                    obs[ish].size(), obs[jsh].size())
-                             .lpNorm<Eigen::Infinity>();
-    }
+  shnrms.setZero();
+
+  for (size_t idm = 0; idm < ndm; ++idm) {
+    Eigen::Map<const RowMajorMatrix> A_map(A + idm * nbf * LDA, nbf, LDA);
+    for (size_t ish = 0; ish < nsh; ++ish)
+      for (size_t jsh = 0; jsh < nsh; ++jsh) {
+        double block_norm = A_map
+                                .block(shell2bf[ish], shell2bf[jsh],
+                                       obs[ish].size(), obs[jsh].size())
+                                .lpNorm<Eigen::Infinity>();
+        shnrms(ish, jsh) = std::max(shnrms(ish, jsh), block_norm);
+      }
+  }
   return shnrms;
 }
 
@@ -297,8 +318,9 @@ class ERI {
 
     if (is_rsx) throw std::runtime_error("RSX + LIBINT2_DIRECT NYI");
 
-    // Compute shell block norm of P
-    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_atomic_orbitals);
+    // Compute shell block norm of P (max over all density matrices for UHF)
+    const auto P_shnrm =
+        compute_shellblock_norm(obs_, P, num_atomic_orbitals, num_density_matrices);
     const auto P_shmax = P_shnrm.maxCoeff();
 
     // Check for NaN/Inf values
@@ -409,15 +431,29 @@ class ERI {
               // Assign to threads
               if ((s1234++) % nthreads != thread_id) continue;
 
-              // Determine if we need to compute this integral via Schwarz
+              // Tighter density-aware Schwarz screening:
+              // J contributions depend on P(s1,s2) and P(s3,s4) (bra/ket density)
+              // K contributions depend on cross terms P(s1,s3), P(s1,s4), P(s2,s3), P(s2,s4)
+              const auto schwarz_bound = K_schwarz_(s1, s2) * K_schwarz_(s3, s4);
               const auto P14_nrm = P_shnrm(s1, s4);
               const auto P24_nrm = P_shnrm(s2, s4);
               const auto P34_nrm = P_shnrm(s3, s4);
-              const auto P1234_nrm =
-                  std::max({P14_nrm, P24_nrm, P34_nrm, P123_nrm});
 
-              if (P1234_nrm * K_schwarz_(s1, s2) * K_schwarz_(s3, s4) <
-                  eri_threshold_)
+              double P_screen;
+              if (J && K) {
+                // Need max over both J and K density contributions
+                const auto P_J = std::max(P12_nrm, P34_nrm);
+                const auto P_K = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+                P_screen = std::max(P_J, P_K);
+              } else if (J) {
+                // J-only: only bra/ket density pairs matter
+                P_screen = std::max(P12_nrm, P34_nrm);
+              } else {
+                // K-only: only cross-index density pairs matter
+                P_screen = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+              }
+
+              if (P_screen * schwarz_bound < eri_threshold_)
                 continue;
 
               const auto bf4_st = shell_bf_offset_[s4];
