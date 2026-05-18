@@ -49,7 +49,7 @@ jobs:
         echo "Branch is up to date, starting Build and Test workflow."
 
   coverage:
-    name: ${{ matrix.os-name }}-py${{ matrix.python-version }} Build, Test, and Coverage Analysis
+    name: ${{ matrix.os-name }} Build, Test, and Coverage Analysis
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
