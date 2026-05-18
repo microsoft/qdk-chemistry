@@ -325,59 +325,60 @@ class ERI {
     QDK_LOG_TRACE_ENTERING();
 
     AutoTimer t("ERI::build_JK");
-    const size_t num_atomic_orbitals = obs_.nbf();
+    const size_t N = obs_.nbf();
     const size_t nsh = obs_.size();
-    const size_t num_density_matrices = spin_density_factor_;
-    const size_t mat_size =
-        num_density_matrices * num_atomic_orbitals * num_atomic_orbitals;
+    const size_t ndm = spin_density_factor_;
+    const size_t mat_size = ndm * N * N;
     const bool is_rsx = std::abs(omega) > 1e-12;
 
     if (is_rsx) throw std::runtime_error("RSX + LIBINT2_DIRECT NYI");
 
     // Compute shell block norm of P (max over all density matrices for UHF)
     const auto P_shnrm =
-        compute_shellblock_norm(obs_, P, num_atomic_orbitals, num_density_matrices);
+        compute_shellblock_norm(obs_, P, N, ndm);
     const auto P_shmax = P_shnrm.maxCoeff();
 
-    // Check for NaN/Inf values
     if (!std::isfinite(P_shmax)) {
       throw std::runtime_error("Density matrix contains NaN/Inf values.");
     }
 
-    // Setup required precision for libint2 engine
     double engine_precision;
     if (P_shmax <= 0.0) {
-      // fallback for small density matrix
       engine_precision = std::numeric_limits<double>::epsilon();
     } else {
       engine_precision = std::numeric_limits<double>::epsilon() / P_shmax;
     }
     engine_precision = std::max(engine_precision, max_engine_precision);
 
-    // Update engine precision for this density (engines are persistent class members)
     for (int i = 0; i < nthreads_; ++i)
       engines_[i].set_precision(engine_precision);
 
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
 
-    // Thread-local accumulation buffers for reproducibility
-    std::vector<std::vector<double>> J_local(0);
-    std::vector<std::vector<double>> K_local(0);
+    // ---------------------------------------------------------------
+    // Phase 3: Bra-pair-chunked dynamic scheduling
+    // ---------------------------------------------------------------
+    // Build flat canonical bra-pair list
+    struct BraPair {
+      size_t s1, s2;
+      size_t sp_idx;
+    };
+    std::vector<BraPair> bra_pairs;
+    bra_pairs.reserve(sp_csr_.neighbors.size());
+    for (size_t s1 = 0; s1 < nsh; ++s1) {
+      for (size_t idx = sp_csr_.offsets[s1]; idx < sp_csr_.offsets[s1 + 1]; ++idx) {
+        bra_pairs.push_back({s1, sp_csr_.neighbors[idx], idx});
+      }
+    }
+    const size_t n_bra_pairs = bra_pairs.size();
 
-    if (use_thread_local_buffers_) {
-      J_local.resize(nthreads_);
-      K_local.resize(nthreads_);
-      if (J) {
-        for (int t = 0; t < nthreads_; ++t) {
-          J_local[t].resize(mat_size, 0.0);
-        }
-      }
-      if (K) {
-        for (int t = 0; t < nthreads_; ++t) {
-          K_local[t].resize(mat_size, 0.0);
-        }
-      }
+    // Per-thread N²-sized accumulation (same total memory as old TLS)
+    std::vector<std::vector<double>> J_local(nthreads_);
+    std::vector<std::vector<double>> K_local(nthreads_);
+    for (int t = 0; t < nthreads_; ++t) {
+      if (J) J_local[t].resize(mat_size, 0.0);
+      if (K) K_local[t].resize(mat_size, 0.0);
     }
 
 #ifdef _OPENMP
@@ -385,282 +386,174 @@ class ERI {
 #endif
     {
 #ifdef _OPENMP
-      const auto thread_id = omp_get_thread_num();
+      const int tid = omp_get_thread_num();
 #else
-      const auto thread_id = 0;
+      const int tid = 0;
 #endif
-      auto& engine = engines_[thread_id];
+      auto& engine = engines_[tid];
       const auto& buf = engine.results();
-      double* J_thread = nullptr;
-      double* K_thread = nullptr;
-      if (use_thread_local_buffers_) {
-        J_thread = J ? J_local[thread_id].data() : nullptr;
-        K_thread = K ? K_local[thread_id].data() : nullptr;
-      }
+      double* J_thr = J ? J_local[tid].data() : nullptr;
+      double* K_thr = K ? K_local[tid].data() : nullptr;
 
-      for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
+      // Dynamic scheduling over bra-pairs — each thread processes
+      // contiguous bra-pair ranges, improving cache locality for bra-side
+      // density rows and Schwarz data vs the old round-robin.
+#ifdef _OPENMP
+#pragma omp for schedule(static)
+#endif
+      for (size_t bp_idx = 0; bp_idx < n_bra_pairs; ++bp_idx) {
+        const auto& bp = bra_pairs[bp_idx];
+        const size_t s1 = bp.s1;
+        const size_t s2 = bp.s2;
         const auto bf1_st = shell_bf_offset_[s1];
+        const auto bf2_st = shell_bf_offset_[s2];
         const auto n1 = shell_nbf_[s1];
+        const auto n2 = shell_nbf_[s2];
+        const auto* sp12_data = &sp_csr_.data[bp.sp_idx];
+        const auto P12_nrm = P_shnrm(s1, s2);
 
-        const size_t sp12_begin = sp_csr_.offsets[s1];
-        const size_t sp12_end = sp_csr_.offsets[s1 + 1];
+        for (size_t s3 = 0; s3 <= s1; ++s3) {
+          const auto bf3_st = shell_bf_offset_[s3];
+          const auto n3 = shell_nbf_[s3];
+          const auto P13_nrm = P_shnrm(s1, s3);
+          const auto P23_nrm = P_shnrm(s2, s3);
 
-        // Only loop over significant shell pairs (CSR row for s1)
-        for (size_t sp12_idx = sp12_begin; sp12_idx < sp12_end; ++sp12_idx) {
-          const size_t s2 = sp_csr_.neighbors[sp12_idx];
-          const auto bf2_st = shell_bf_offset_[s2];
-          const auto n2 = shell_nbf_[s2];
-          const auto* sp12_data = &sp_csr_.data[sp12_idx];
+          const size_t sp34_begin = sp_csr_.offsets[s3];
+          const size_t sp34_end = sp_csr_.offsets[s3 + 1];
+          const size_t s4_max = (s1 == s3) ? s2 : s3;
 
-          const auto P12_nrm = P_shnrm(s1, s2);
+          for (size_t sp34_idx = sp34_begin; sp34_idx < sp34_end; ++sp34_idx) {
+            const size_t s4 = sp_csr_.neighbors[sp34_idx];
+            if (s4 > s4_max) break;
 
-          for (size_t s3 = 0; s3 <= s1; ++s3) {
-            const auto bf3_st = shell_bf_offset_[s3];
-            const auto n3 = shell_nbf_[s3];
+            const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
-            const auto P13_nrm = P_shnrm(s1, s3);
-            const auto P23_nrm = P_shnrm(s2, s3);
-            const auto P123_nrm = std::max({P12_nrm, P13_nrm, P23_nrm});
+            // Density-aware Schwarz screening
+            const auto schwarz_bound = K_schwarz_(s1, s2) * K_schwarz_(s3, s4);
+            const auto P14_nrm = P_shnrm(s1, s4);
+            const auto P24_nrm = P_shnrm(s2, s4);
+            const auto P34_nrm = P_shnrm(s3, s4);
 
-            const size_t sp34_begin = sp_csr_.offsets[s3];
-            const size_t sp34_end = sp_csr_.offsets[s3 + 1];
-            const size_t s4_max = (s1 == s3) ? s2 : s3;
+            double P_screen;
+            if (J && K) {
+              P_screen = std::max(std::max(P12_nrm, P34_nrm),
+                                  std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm}));
+            } else if (J) {
+              P_screen = std::max(P12_nrm, P34_nrm);
+            } else {
+              P_screen = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+            }
+            if (P_screen * schwarz_bound < eri_threshold_) continue;
 
-            // Only loop over significant shell pairs (CSR row for s3)
-            for (size_t sp34_idx = sp34_begin; sp34_idx < sp34_end; ++sp34_idx) {
-              const size_t s4 = sp_csr_.neighbors[sp34_idx];
-              if (s4 > s4_max) break;
+            const auto bf4_st = shell_bf_offset_[s4];
+            const auto n4 = shell_nbf_[s4];
 
-              const auto* sp34_data = &sp_csr_.data[sp34_idx];
+            auto s12_deg = (s1 == s2) ? 1 : 2;
+            auto s34_deg = (s3 == s4) ? 1 : 2;
+            auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
+            auto s1234_deg = s12_deg * s34_deg * s12_34_deg;
 
-              // Assign to threads
-              if ((s1234++) % nthreads_ != thread_id) continue;
+            engine.compute2<::libint2::Operator::coulomb,
+                            ::libint2::BraKet::xx_xx, 0>(
+                obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
 
-              // Tighter density-aware Schwarz screening:
-              // J contributions depend on P(s1,s2) and P(s3,s4) (bra/ket density)
-              // K contributions depend on cross terms P(s1,s3), P(s1,s4), P(s2,s3), P(s2,s4)
-              const auto schwarz_bound = K_schwarz_(s1, s2) * K_schwarz_(s3, s4);
-              const auto P14_nrm = P_shnrm(s1, s4);
-              const auto P24_nrm = P_shnrm(s2, s4);
-              const auto P34_nrm = P_shnrm(s3, s4);
+            const auto buf_1234 = buf[0];
+            if (buf_1234 == nullptr) continue;
 
-              double P_screen;
-              if (J && K) {
-                // Need max over both J and K density contributions
-                const auto P_J = std::max(P12_nrm, P34_nrm);
-                const auto P_K = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
-                P_screen = std::max(P_J, P_K);
-              } else if (J) {
-                // J-only: only bra/ket density pairs matter
-                P_screen = std::max(P12_nrm, P34_nrm);
-              } else {
-                // K-only: only cross-index density pairs matter
-                P_screen = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+            // Contract J
+            if (J_thr)
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                auto* J_cur = J_thr + idm * N * N;
+                const auto* P_cur = P + idm * N * N;
+                for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+                  const size_t bf1 = bf1_st + i;
+                  for (size_t j = 0; j < n2; ++j) {
+                    const size_t bf2 = bf2_st + j;
+                    double J_ij = 0.0;
+                    const double P_ij = P_cur[bf1 * N + bf2];
+                    for (size_t k = 0; k < n3; ++k) {
+                      const size_t bf3 = bf3_st + k;
+                      for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                        const size_t bf4 = bf4_st + l;
+                        const auto value = buf_1234[ijkl] * s1234_deg;
+                        J_ij += P_cur[bf3 * N + bf4] * value;
+                        J_cur[bf3 * N + bf4] += P_ij * value;
+                      }
+                    }
+                    J_cur[bf1 * N + bf2] += J_ij;
+                  }
+                }
               }
 
-              if (P_screen * schwarz_bound < eri_threshold_)
-                continue;
-
-              const auto bf4_st = shell_bf_offset_[s4];
-              const auto n4 = shell_nbf_[s4];
-
-              // Permutational Degeneracy
-              auto s12_deg = (s1 == s2) ? 1 : 2;
-              auto s34_deg = (s3 == s4) ? 1 : 2;
-              auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
-              auto s1234_deg = s12_deg * s34_deg * s12_34_deg;
-
-              // Compute the integral shell quartet
-              engine.compute2<::libint2::Operator::coulomb,
-                              ::libint2::BraKet::xx_xx, 0>(
-                  obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
-
-              // Coarse integral screening
-              const auto buf_1234 = buf[0];
-              if (buf_1234 == nullptr) continue;
-
-              // Contract shell quartet (J)
-              if (J)
-                for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* J_cur =
-                      use_thread_local_buffers_
-                          ? J_thread +
-                                idm * num_atomic_orbitals * num_atomic_orbitals
-                          : J + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  auto* P_cur =
-                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                    const size_t bf1 = bf1_st + i;
-                    for (size_t j = 0; j < n2; ++j) {
-                      const size_t bf2 = bf2_st + j;
-                      double J_ij = 0.0;
-                      const double P_ij =
-                          P_cur[bf1 * num_atomic_orbitals + bf2];
-                      for (size_t k = 0; k < n3; ++k) {
-                        const size_t bf3 = bf3_st + k;
-                        for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                          const size_t bf4 = bf4_st + l;
-
-                          const auto value = buf_1234[ijkl] * s1234_deg;
-
-                          // J contractions
-                          J_ij +=
-                              P_cur[bf3 * num_atomic_orbitals + bf4] * value;
-                          if (use_thread_local_buffers_) {
-                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
-                                P_ij * value;
-                          } else {
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                            J_cur[bf3 * num_atomic_orbitals + bf4] +=
-                                P_ij * value;
-                          }
-
-                        }  // l
-                      }  // k
-
-                      // Update J
-                      if (use_thread_local_buffers_) {
-                        J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
-                      } else {
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                        J_cur[bf1 * num_atomic_orbitals + bf2] += J_ij;
+            // Contract K
+            if (K_thr)
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                auto* K_cur = K_thr + idm * N * N;
+                const auto* P_cur = P + idm * N * N;
+                for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+                  const size_t bf1 = bf1_st + i;
+                  for (size_t j = 0; j < n2; ++j) {
+                    const size_t bf2 = bf2_st + j;
+                    for (size_t k = 0; k < n3; ++k) {
+                      const size_t bf3 = bf3_st + k;
+                      double K_ik = 0.0;
+                      double K_jk = 0.0;
+                      const double P_ik = 0.25 * P_cur[bf1 * N + bf3];
+                      const double P_jk = 0.25 * P_cur[bf2 * N + bf3];
+                      for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                        const size_t bf4 = bf4_st + l;
+                        const auto value = buf_1234[ijkl] * s1234_deg;
+                        K_ik += 0.25 * P_cur[bf2 * N + bf4] * value;
+                        K_jk += 0.25 * P_cur[bf1 * N + bf4] * value;
+                        K_cur[bf1 * N + bf4] += P_jk * value;
+                        K_cur[bf2 * N + bf4] += P_ik * value;
                       }
-                    }  // j
-                  }  // i
-                }  // idm
+                      K_cur[bf1 * N + bf3] += K_ik;
+                      K_cur[bf2 * N + bf3] += K_jk;
+                    }
+                  }
+                }
+              }
 
-              // Contract shell quartet (K)
-              if (K)
-                for (size_t idm = 0; idm < num_density_matrices; ++idm) {
-                  auto* K_cur =
-                      use_thread_local_buffers_
-                          ? K_thread +
-                                idm * num_atomic_orbitals * num_atomic_orbitals
-                          : K + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  auto* P_cur =
-                      P + idm * num_atomic_orbitals * num_atomic_orbitals;
-                  for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                    const size_t bf1 = bf1_st + i;
-                    for (size_t j = 0; j < n2; ++j) {
-                      const size_t bf2 = bf2_st + j;
-                      for (size_t k = 0; k < n3; ++k) {
-                        const size_t bf3 = bf3_st + k;
-                        double K_ik = 0.0;
-                        double K_jk = 0.0;
-                        const double P_ik =
-                            0.25 * P_cur[bf1 * num_atomic_orbitals + bf3];
-                        const double P_jk =
-                            0.25 * P_cur[bf2 * num_atomic_orbitals + bf3];
-                        for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                          const size_t bf4 = bf4_st + l;
+          }  // s4
+        }  // s3
+      }  // bra-pair (omp for)
+    }  // parallel region
 
-                          const auto value = buf_1234[ijkl] * s1234_deg;
-
-                          // K contractions
-                          K_ik += 0.25 *
-                                  P_cur[bf2 * num_atomic_orbitals + bf4] *
-                                  value;
-                          K_jk += 0.25 *
-                                  P_cur[bf1 * num_atomic_orbitals + bf4] *
-                                  value;
-                          if (use_thread_local_buffers_) {
-                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
-                                P_jk * value;
-                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
-                                P_ik * value;
-                          } else {
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                            K_cur[bf1 * num_atomic_orbitals + bf4] +=
-                                P_jk * value;
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                            K_cur[bf2 * num_atomic_orbitals + bf4] +=
-                                P_ik * value;
-                          }
-
-                        }  // l
-
-                        // Update K
-                        if (use_thread_local_buffers_) {
-                          K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
-                          K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
-                        } else {
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                          K_cur[bf1 * num_atomic_orbitals + bf3] += K_ik;
-#ifdef _OPENMP
-#pragma omp atomic update relaxed
-#endif
-                          K_cur[bf2 * num_atomic_orbitals + bf3] += K_jk;
-                        }
-                      }  // k
-                    }  // j
-                  }  // i
-                }  // idm
-
-            }  // s4
-          }  // s3
-        }  // s2
-      }  // s1
-
-    }  // End parallel region
-
-    // Deterministic reduction: combine thread-local buffers in order
-    if (use_thread_local_buffers_) {
-      if (J) {
-        for (int t = 0; t < nthreads_; ++t) {
-          for (size_t i = 0; i < mat_size; ++i) {
-            J[i] += J_local[t][i];
-          }
-        }
-      }
-      if (K) {
-        for (int t = 0; t < nthreads_; ++t) {
-          for (size_t i = 0; i < mat_size; ++i) {
-            K[i] += K_local[t][i];
-          }
-        }
-      }
+    // Deterministic reduction: thread 0, 1, 2, ... in order
+    if (J) {
+      for (int t = 0; t < nthreads_; ++t)
+        for (size_t i = 0; i < mat_size; ++i)
+          J[i] += J_local[t][i];
+    }
+    if (K) {
+      for (int t = 0; t < nthreads_; ++t)
+        for (size_t i = 0; i < mat_size; ++i)
+          K[i] += K_local[t][i];
     }
 
     // Symmetrize J
     if (J)
-      for (size_t idm = 0; idm < num_density_matrices; ++idm)
-        for (size_t i = 0; i < num_atomic_orbitals; ++i)
+      for (size_t idm = 0; idm < ndm; ++idm)
+        for (size_t i = 0; i < N; ++i)
           for (size_t j = 0; j <= i; ++j) {
-            auto J_ij = J[idm * num_atomic_orbitals * num_atomic_orbitals +
-                          i * num_atomic_orbitals + j];
-            auto J_ji = J[idm * num_atomic_orbitals * num_atomic_orbitals +
-                          j * num_atomic_orbitals + i];
-            J_ij = 0.25 * (J_ij + J_ji);
-            J[idm * num_atomic_orbitals * num_atomic_orbitals +
-              i * num_atomic_orbitals + j] = J_ij;
-            J[idm * num_atomic_orbitals * num_atomic_orbitals +
-              j * num_atomic_orbitals + i] = J_ij;
+            auto v = J[idm * N * N + i * N + j];
+            auto w = J[idm * N * N + j * N + i];
+            v = 0.25 * (v + w);
+            J[idm * N * N + i * N + j] = v;
+            J[idm * N * N + j * N + i] = v;
           }
 
-    // Symmetrize K + scale by alpha/beta
+    // Symmetrize K + scale
     if (K)
-      for (size_t idm = 0; idm < num_density_matrices; ++idm)
-        for (size_t i = 0; i < num_atomic_orbitals; ++i)
+      for (size_t idm = 0; idm < ndm; ++idm)
+        for (size_t i = 0; i < N; ++i)
           for (size_t j = 0; j <= i; ++j) {
-            auto K_ij = K[idm * num_atomic_orbitals * num_atomic_orbitals +
-                          i * num_atomic_orbitals + j];
-            auto K_ji = K[idm * num_atomic_orbitals * num_atomic_orbitals +
-                          j * num_atomic_orbitals + i];
-            K_ij = (alpha + beta) * 0.5 * (K_ij + K_ji);
-            K[idm * num_atomic_orbitals * num_atomic_orbitals +
-              i * num_atomic_orbitals + j] = K_ij;
-            K[idm * num_atomic_orbitals * num_atomic_orbitals +
-              j * num_atomic_orbitals + i] = K_ij;
+            auto v = K[idm * N * N + i * N + j];
+            auto w = K[idm * N * N + j * N + i];
+            v = (alpha + beta) * 0.5 * (v + w);
+            K[idm * N * N + i * N + j] = v;
+            K[idm * N * N + j * N + i] = v;
           }
   }
 
