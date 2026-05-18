@@ -1700,8 +1700,8 @@ TEST_F(BasisSetTest, FromElementMapInvalidECP) {
 TEST_F(BasisSetTest, FromIndexMapInvalidECP) {
   auto structure = testing::create_agh_structure();
   std::map<size_t, std::string> index_map;
-  index_map[0] = "cc-pvdz";
-  index_map[1] = "def2-svp";
+  index_map[0] = "def2-svp";
+  index_map[1] = "cc-pvdz";
   EXPECT_NO_THROW(BasisSet::from_index_map(index_map, structure));
 }
 
@@ -2011,6 +2011,28 @@ TEST_F(BasisSetTest, AuxiliaryBasisCopyConstructorAndAssignment) {
   assigned = original;
   EXPECT_TRUE(assigned.has_aux_basis());
   EXPECT_EQ(original.get_num_aux_shells(), assigned.get_num_aux_shells());
+}
+
+TEST_F(BasisSetTest, FromBasisNameAuxBasisMissingElement) {
+  // K+ ion (Z=19) — 6-31g covers K, but aug-cc-pvdz-rifit does not
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};
+  std::vector<Element> elements = {Element::K};
+  auto structure = std::make_shared<Structure>(coords, elements);
+
+  // Primary basis should work for K
+  EXPECT_NO_THROW(BasisSet::from_basis_name("6-31g", structure));
+
+  // Auxiliary basis lacking K should throw a runtime_error identifying the aux
+  EXPECT_THROW(
+      BasisSet::from_basis_name("6-31g", "aug-cc-pvdz-rifit", structure),
+      std::runtime_error);
+}
+
+TEST_F(BasisSetTest, FromBasisNameEmptyAuxBasisSkipped) {
+  // Empty aux_basis_name should mean "no aux" — not crash
+  auto structure = testing::create_water_structure();
+  auto basis = BasisSet::from_basis_name("aug-cc-pvdz", "", *structure);
+  EXPECT_FALSE(basis->has_aux_basis());
 }
 
 TEST_F(BasisSetTest, AuxiliaryBasisJSONSerialization) {

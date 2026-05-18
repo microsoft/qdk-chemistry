@@ -183,6 +183,12 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
   // get element specific data
   auto element_data = data["elements"][nuclear_charge_string];
 
+  if (element_data.is_null() || !element_data.contains("electron_shells")) {
+    throw std::invalid_argument("Basis set '" + basis_set_name +
+                                "' has no entry for element Z=" +
+                                nuclear_charge_string);
+  }
+
   // iterate over electron shells
   for (const auto& shell : element_data["electron_shells"]) {
     for (size_t i = 0; i < shell["coefficients"].size(); i++) {
@@ -1040,11 +1046,20 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
     }
 
     // Get auxiliary basis shells (only the orbital shells, ignore ECP)
-    auto [aux_shells, aux_ecp_shells, aux_ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charge, aux_name_lower,
-                                             atom_index);
-    for (const auto& sh : aux_shells) {
-      all_aux_shells.push_back(sh);
+    if (!aux_name_lower.empty()) {
+      try {
+        auto [aux_shells, aux_ecp_shells, aux_ecp_electrons] =
+            detail::get_basis_for_nuclear_charge(nuclear_charge, aux_name_lower,
+                                                 atom_index);
+        for (const auto& sh : aux_shells) {
+          all_aux_shells.push_back(sh);
+        }
+      } catch (const std::exception& e) {
+        throw std::runtime_error(
+            "Auxiliary basis '" + aux_basis_name + "' has no entry for element Z=" +
+            std::to_string(static_cast<int>(nuclear_charge)) +
+            ": " + e.what());
+      }
     }
   }
 
