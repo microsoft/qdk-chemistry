@@ -237,6 +237,13 @@ class ERI {
   std::vector<std::vector<double>> K_tls_; ///< Per-thread K accumulation
   size_t tls_mat_size_ = 0;               ///< Current allocation size per buffer
 
+  // Per-thread touched shell-pair tracking for sparse reduction + zeroing.
+  // Each entry is an nsh×nsh bitmap (uint8_t). On reduction, only touched
+  // shell-pair blocks are summed — O(touched × shell_size²) instead of O(N²).
+  // On zeroing, only previously-touched blocks are cleared.
+  std::vector<std::vector<uint8_t>> touched_J_; ///< Per-thread J touched bitmap
+  std::vector<std::vector<uint8_t>> touched_K_; ///< Per-thread K touched bitmap
+
  public:
   /**
    * @brief Construct Libint2 direct ERI engine
@@ -306,6 +313,8 @@ class ERI {
     tls_mat_size_ = spin_density_factor_ * nbf * nbf;
     J_tls_.resize(nthreads_);
     K_tls_.resize(nthreads_);
+    touched_J_.resize(nthreads_);
+    touched_K_.resize(nthreads_);
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -317,9 +326,10 @@ class ERI {
 #endif
       J_tls_[tid].resize(tls_mat_size_);
       K_tls_[tid].resize(tls_mat_size_);
-      // First-touch: write every page so the OS maps to this thread's node
       std::memset(J_tls_[tid].data(), 0, tls_mat_size_ * sizeof(double));
       std::memset(K_tls_[tid].data(), 0, tls_mat_size_ * sizeof(double));
+      touched_J_[tid].assign(nsh * nsh, 0);
+      touched_K_[tid].assign(nsh * nsh, 0);
     }
   }
 
@@ -452,9 +462,35 @@ class ERI {
 #else
       const int tid = 0;
 #endif
-      // Zero this thread's TLS buffers (NUMA-local, parallel)
-      if (J) std::memset(J_tls_[tid].data(), 0, mat_size * sizeof(double));
-      if (K) std::memset(K_tls_[tid].data(), 0, mat_size * sizeof(double));
+      // Sparse zeroing: only clear shell-pair blocks touched in the previous
+      // call, then clear the touched bitmap. Much cheaper than full N² memset
+      // when each thread only touches a subset of shell pairs.
+      auto& tj = touched_J_[tid];
+      auto& tk = touched_K_[tid];
+      if (J) {
+        double* jd = J_tls_[tid].data();
+        for (size_t sa = 0; sa < nsh; ++sa)
+          for (size_t sb = 0; sb < nsh; ++sb)
+            if (tj[sa * nsh + sb]) {
+              size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+              size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+              for (size_t a = 0; a < na; ++a)
+                std::memset(jd + off + a * N, 0, nb * sizeof(double));
+              tj[sa * nsh + sb] = 0;
+            }
+      }
+      if (K) {
+        double* kd = K_tls_[tid].data();
+        for (size_t sa = 0; sa < nsh; ++sa)
+          for (size_t sb = 0; sb < nsh; ++sb)
+            if (tk[sa * nsh + sb]) {
+              size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+              size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+              for (size_t a = 0; a < na; ++a)
+                std::memset(kd + off + a * N, 0, nb * sizeof(double));
+              tk[sa * nsh + sb] = 0;
+            }
+      }
 
 #ifdef _OPENMP
 #pragma omp barrier
@@ -517,6 +553,15 @@ class ERI {
 
             const auto bf4_st = shell_bf_offset_[s4];
             const auto n4 = shell_nbf_[s4];
+
+            // Mark touched shell pairs for sparse reduction/zeroing
+            if (J_thr) {
+              tj[s1 * nsh + s2] = 1; tj[s3 * nsh + s4] = 1;
+            }
+            if (K_thr) {
+              tk[s1 * nsh + s3] = 1; tk[s1 * nsh + s4] = 1;
+              tk[s2 * nsh + s3] = 1; tk[s2 * nsh + s4] = 1;
+            }
 
             auto s12_deg = (s1 == s2) ? 1 : 2;
             auto s34_deg = (s3 == s4) ? 1 : 2;
@@ -590,24 +635,42 @@ class ERI {
       }  // bra-pair (omp for)
     }  // parallel region
 
-    // Deterministic parallel reduction: for each matrix element, sum
-    // thread contributions in fixed order 0, 1, ..., nthreads_-1.
-    // Parallelized over matrix elements (each element's reduction order is fixed).
+    // Sparse deterministic reduction: only sum shell-pair blocks that were
+    // touched by each thread. O(nthreads × touched_pairs × shell²) instead
+    // of O(nthreads × N²). Parallelized over shell-pair blocks.
     if (J) {
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) collapse(2)
 #endif
-      for (size_t i = 0; i < mat_size; ++i)
-        for (int t = 0; t < nthreads_; ++t)
-          J[i] += J_tls_[t][i];
+      for (size_t sa = 0; sa < nsh; ++sa)
+        for (size_t sb = 0; sb < nsh; ++sb) {
+          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+          const size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+          for (int t = 0; t < nthreads_; ++t) {
+            if (!touched_J_[t][sa * nsh + sb]) continue;
+            const double* src = J_tls_[t].data();
+            for (size_t a = 0; a < na; ++a)
+              for (size_t b = 0; b < nb; ++b)
+                J[off + a * N + b] += src[off + a * N + b];
+          }
+        }
     }
     if (K) {
 #ifdef _OPENMP
-#pragma omp parallel for schedule(static)
+#pragma omp parallel for schedule(static) collapse(2)
 #endif
-      for (size_t i = 0; i < mat_size; ++i)
-        for (int t = 0; t < nthreads_; ++t)
-          K[i] += K_tls_[t][i];
+      for (size_t sa = 0; sa < nsh; ++sa)
+        for (size_t sb = 0; sb < nsh; ++sb) {
+          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+          const size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+          for (int t = 0; t < nthreads_; ++t) {
+            if (!touched_K_[t][sa * nsh + sb]) continue;
+            const double* src = K_tls_[t].data();
+            for (size_t a = 0; a < na; ++a)
+              for (size_t b = 0; b < nb; ++b)
+                K[off + a * N + b] += src[off + a * N + b];
+          }
+        }
     }
 
     // Symmetrize J (parallel)
