@@ -68,9 +68,22 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Add compiler flags
-set(CMAKE_CXX_FLAGS_DEBUG_INIT "-g -O0 -Wall -Wextra")
-set(CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
+# Set per-config compile flags.
+if(MSVC)  # clang-cl and cl
+    set(CMAKE_CXX_FLAGS_DEBUG          "/Zi /Od /W3 /RTC1")
+    set(CMAKE_CXX_FLAGS_RELEASE        "/O2 /W1 /DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "/Zi /O2 /W1 /DNDEBUG")
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    set(CMAKE_CXX_FLAGS_DEBUG          "-g -O0 -Wall -Wextra")
+    set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -DNDEBUG")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-g -O3 -DNDEBUG")
+else()
+    message(WARNING "Unknown compiler ${CMAKE_CXX_COMPILER_ID}, using default CMAKE_CXX_FLAGS")
+endif()
+set(CMAKE_C_FLAGS_DEBUG          "${CMAKE_CXX_FLAGS_DEBUG}")
+set(CMAKE_C_FLAGS_RELEASE        "${CMAKE_CXX_FLAGS_RELEASE}")
+set(CMAKE_C_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+
 
 # Options
 option(QDK_CHEMISTRY_ENABLE_COVERAGE    "Enable coverage build" OFF)
@@ -83,6 +96,12 @@ option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
 # Enable OpenMP by default, except on Apple platforms with AppleClang
+# On Windows with clang-cl, CMake resolves OpenMP to:
+#   OpenMP_CXX_FLAGS = -Xclang -fopenmp
+#   OpenMP_libomp_LIBRARY = .../VC/Tools/MSVC/.../lib/x64/libomp.lib
+# This uses LLVM's libomp runtime (not MSVC's vcomp*.dll). libomp.dll must
+# be present at runtime alongside the built binaries. It is found in:
+#   %VS_INSTALL_DIR%\VC\Tools\Llvm\x64\bin\libomp.dll
 cmake_dependent_option(QDK_ENABLE_OPENMP
     "Enable OpenMP support" ON
     "NOT (APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL \"AppleClang\")" OFF)
@@ -119,6 +138,7 @@ if(NOT macis_FOUND)
     set(MACIS_ENABLE_MPI    OFF CACHE BOOL "MACIS enable MPI" FORCE)
     set(MACIS_ENABLE_PYTHON OFF CACHE BOOL "MACIS Enable Python" FORCE)
     set(MACIS_ENABLE_EXAMPLES OFF CACHE BOOL "MACIS Build Examples" FORCE)
+    set(MACIS_ENABLE_TESTS  ON CACHE BOOL "MACIS Build Tests")
     set(MACIS_ENABLE_OPENMP ${QDK_ENABLE_OPENMP} CACHE BOOL "MACIS Enable OpenMP" FORCE)
     if(DEFINED QDK_UARCH_USED)
       set(MACIS_UARCH  ${QDK_UARCH_USED} CACHE STRING "MACIS Microarchitecture" FORCE)
@@ -191,8 +211,12 @@ set_target_properties(chemistry PROPERTIES OUTPUT_NAME "qdk_chemistry")
 if(QDK_CHEMISTRY_ENABLE_COVERAGE)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         message(STATUS "Enabling coverage build")
-        target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
-        target_link_libraries(chemistry PRIVATE --coverage)
+        if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang" AND NOT MSVC)
+            target_compile_options(chemistry PRIVATE --coverage -fprofile-arcs -ftest-coverage)
+            target_link_libraries(chemistry PRIVATE --coverage)
+        else()
+            message(WARNING "Coverage build is only supported with GCC or Clang compilers")
+        endif()
     else()
         message(FATAL_ERROR "Coverage build is only supported in CMAKE_BUILD_TYPE=Debug or RelWithDebInfo mode")
     endif()

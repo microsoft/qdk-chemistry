@@ -24,7 +24,7 @@ def get_qsharp_utils():
     try:
         return qdk.code.QDKChemistry.Utils
     except AttributeError:
-        code = "\n".join(f.read_text() for f in _QS_FILES)
+        code = "\n".join(f.read_text(encoding="utf-8") for f in _QS_FILES)
         qsharp.eval(code)
         return qdk.code.QDKChemistry.Utils
 

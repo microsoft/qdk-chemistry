@@ -228,7 +228,7 @@ class QuantumErrorProfile(DataClass):
         # Convert to serializable dict
         data = self.to_json()
 
-        with Path(yaml_file).open("w") as f:
+        with Path(yaml_file).open("w", encoding="utf-8") as f:
             yaml.dump(data, f)
 
     @classmethod
@@ -246,7 +246,7 @@ class QuantumErrorProfile(DataClass):
         if not Path(yaml_file).exists():
             raise FileNotFoundError(f"File {yaml_file} not found")
 
-        with Path(yaml_file).open("r") as f:
+        with Path(yaml_file).open("r", encoding="utf-8") as f:
             data = yaml.load(f)
 
         if not isinstance(data, dict):

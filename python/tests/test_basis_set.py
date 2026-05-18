@@ -343,7 +343,11 @@ def test_json_serialization():
     assert basis_in.get_num_shells() == 2
     assert basis_in.get_num_atomic_orbitals() == 4
 
-    # Test file-based serialization
+    # Test file-based serialization.
+    # NOTE: Use delete=False so the file handle is closed when the with-block exits, allowing C++ code to open it.
+    # On Windows the default (delete=True) keeps an exclusive lock on the file. We delete the file manually in `finally`
+    # via Path.unlink(). This pattern is used throughout the test suite.
+    # NOTE: Python 3.12+ supports `delete=False, delete_on_close=True` which would avoid the manual unlink() at the end.
     with tempfile.NamedTemporaryFile(suffix=".basis_set.json", mode="w", delete=False) as tmp:
         filename = tmp.name
 
@@ -357,7 +361,7 @@ def test_json_serialization():
         assert basis_file.get_num_shells() == 2
         assert basis_file.get_num_atomic_orbitals() == 4
     finally:
-        Path(filename).unlink()
+        Path(filename).unlink(missing_ok=True)
 
 
 def test_hdf5_serialization():
@@ -540,9 +544,10 @@ def test_basis_set_file_io_generic():
     basis = BasisSet("STO-3G", shells)
 
     # Test JSON file I/O
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using generic method
         basis.to_file(json_filename, "json")
 
@@ -554,11 +559,14 @@ def test_basis_set_file_io_generic():
         assert basis2.get_num_shells() == basis.get_num_shells()
         assert basis2.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis2.get_num_atoms() == basis.get_num_atoms()
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 file I/O
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using generic method
         basis.to_file(hdf5_filename, "hdf5")
 
@@ -570,6 +578,8 @@ def test_basis_set_file_io_generic():
         assert basis3.get_num_shells() == basis.get_num_shells()
         assert basis3.get_num_atomic_orbitals() == basis.get_num_atomic_orbitals()
         assert basis3.get_num_atoms() == basis.get_num_atoms()
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
     # Test unsupported file type
     with pytest.raises(RuntimeError, match="Unsupported file type"):
@@ -598,9 +608,10 @@ def test_basis_set_hdf5_specific():
     basis = BasisSet("6-31G", shells)
 
     # Test new to_hdf5_file method
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save using new method
         basis.to_hdf5_file(hdf5_filename)
 
@@ -633,6 +644,8 @@ def test_basis_set_hdf5_specific():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_json_specific():
@@ -654,9 +667,10 @@ def test_basis_set_json_specific():
     basis = BasisSet("cc-pVDZ", shells, AOType.Cartesian)
 
     # Test updated JSON file I/O methods
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save using to_json_file method
         basis.to_json_file(json_filename)
 
@@ -690,6 +704,8 @@ def test_basis_set_json_specific():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_file_io_validation():
@@ -755,9 +771,10 @@ def test_basis_set_file_io_round_trip():
     basis = BasisSet("complex-basis", shells, AOType.Spherical)
 
     # Test JSON round-trip
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.json") as tmp_json:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.json", delete=False) as tmp_json:
         json_filename = tmp_json.name
 
+    try:
         # Save and reload
         basis.to_json_file(json_filename)
         basis_json = BasisSet.from_json_file(json_filename)
@@ -789,11 +806,14 @@ def test_basis_set_file_io_round_trip():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(json_filename).unlink(missing_ok=True)
 
     # Test HDF5 round-trip
-    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5") as tmp_hdf5:
+    with tempfile.NamedTemporaryFile(suffix=".basis_set.h5", delete=False) as tmp_hdf5:
         hdf5_filename = tmp_hdf5.name
 
+    try:
         # Save and reload
         basis.to_hdf5_file(hdf5_filename)
         basis_hdf5 = BasisSet.from_hdf5_file(hdf5_filename)
@@ -823,6 +843,8 @@ def test_basis_set_file_io_round_trip():
                 rtol=float_comparison_relative_tolerance,
                 atol=float_comparison_absolute_tolerance,
             )
+    finally:
+        Path(hdf5_filename).unlink(missing_ok=True)
 
 
 def test_basis_set_consistency_between_methods():

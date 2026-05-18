@@ -132,8 +132,8 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
                    int n_ecp_electrons, BasisMode mode, bool pure, bool sort)
     : mol(mol),
       mode(mode),
-      pure(pure),
       shells(input_shells),
+      pure(pure),
       ecp_shells(input_ecp_shells),
       element_ecp_electrons(element_ecp_electrons),
       n_ecp_electrons(n_ecp_electrons) {
@@ -188,7 +188,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
 BasisSet::BasisSet(std::shared_ptr<Molecule> mol,
                    const std::vector<Shell>& input_shells, BasisMode mode,
                    bool pure, bool sort)
-    : mol(mol), mode(mode), pure(pure), shells(input_shells) {
+    : mol(mol), mode(mode), shells(input_shells), pure(pure) {
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
   if (mpi::get_world_size() > 1) {
     MPI_Barrier(MPI_COMM_WORLD);
@@ -245,7 +245,7 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
               "basis" / (normalized_path + ".json");
     name = normalized_path;
   } else {
-    name = bs_path.stem();
+    name = bs_path.stem().string();
   }
   if (!std::filesystem::exists(bs_path)) {
     auto compressed_path = QDKChemistryConfig::get_resources_dir() /
@@ -425,7 +425,7 @@ Shell Shell::from_json(const nlohmann::ordered_json& rec,
                        const std::shared_ptr<Molecule> mol) {
   QDK_LOG_TRACE_ENTERING();
 
-  Shell sh;
+  Shell sh{};
   sh.atom_index = rec["atom"].template get<uint64_t>();
   sh.angular_momentum = rec["am"].template get<uint64_t>();
 

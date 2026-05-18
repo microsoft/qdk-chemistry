@@ -41,8 +41,8 @@ CoupledClusterContainer::CoupledClusterContainer(
     const std::optional<VectorVariant>& t2_amplitudes_bbbb)
     : WavefunctionContainer(
           WavefunctionType::NotSelfDual),  // Always force NotSelfDual for CC
-      _wavefunction(wavefunction),
-      _orbitals(orbitals) {
+      _orbitals(orbitals),
+      _wavefunction(wavefunction) {
   QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
@@ -488,7 +488,8 @@ void CoupledClusterContainer::to_hdf5(H5::Group& group) const {
     bool is_complex = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
         "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-    is_complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex);
+    hbool_t hb_is_complex = static_cast<hbool_t>(is_complex);
+    is_complex_attr.write(H5::PredType::NATIVE_HBOOL, &hb_is_complex);
 
     //  store amplitudes
     if (_t1_amplitudes_aa) {

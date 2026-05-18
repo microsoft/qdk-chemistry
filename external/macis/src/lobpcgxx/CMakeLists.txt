@@ -16,14 +16,18 @@ endif()
 set( gpu_backend "none" CACHE STRING "GPU backend to use" FORCE)
 message( WARNING "Turning off GPU Backend for BLAS++/LAPACK++")
 set(build_tests OFF CACHE BOOL "Build BLAS++/LAPACK++ tests" FORCE)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+if(NOT MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+endif()
 
 find_package(lapackpp CONFIG QUIET)
 if(NOT lapackpp_FOUND )
-include( FetchContent )
+  include( FetchContent )
   FetchContent_Declare( blaspp
     GIT_REPOSITORY https://github.com/icl-utk-edu/blaspp.git
     GIT_TAG v2025.05.28
+    PATCH_COMMAND git apply ${CMAKE_CURRENT_SOURCE_DIR}/cmake/blaspp_cache_defs.patch
+    UPDATE_DISCONNECTED TRUE
   )
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
@@ -32,13 +36,23 @@ include( FetchContent )
 
   FetchContent_MakeAvailable( blaspp )
   FetchContent_MakeAvailable( lapackpp )
-  target_compile_definitions( lapackpp PUBLIC LAPACK_COMPLEX_CPP )
+
+  if(MSVC)
+    # lapackpp sources use std::complex directly but on Windows _MSC_VER causes
+    # config.h to skip #include <complex>. Force-include it.
+    target_compile_options( lapackpp PRIVATE /FIcomplex )
+
+    # Suppress all warnings from third-party blaspp/lapackpp (clang-cl)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+      target_compile_options( blaspp   PRIVATE -w )
+      target_compile_options( lapackpp PRIVATE -w )
+    endif()
+  endif()
 endif()
 
 add_library( lobpcgxx INTERFACE )
 target_link_libraries( lobpcgxx INTERFACE blaspp lapackpp )
 target_compile_features( lobpcgxx INTERFACE cxx_std_20 )
-target_compile_definitions( lobpcgxx INTERFACE LAPACK_COMPLEX_CPP )
 
 target_include_directories( lobpcgxx INTERFACE
   $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>

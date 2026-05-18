@@ -64,10 +64,11 @@ class VVHVLocalization : public IterativeOrbitalLocalizationScheme {
       std::shared_ptr<IterativeOrbitalLocalizationScheme> inner_localizer)
       : IterativeOrbitalLocalizationScheme(settings),
         basis_set_(basis_set),
-        overlap_ori_(ao_overlap),
         minimal_basis_name_(minimal_basis_name),
-        basis_ori_fp_(utils::microsoft::convert_basis_set_from_qdk(*basis_set)),
-        inner_localizer_(inner_localizer) {
+        inner_localizer_(inner_localizer),
+        overlap_ori_(ao_overlap),
+        basis_ori_fp_(
+            utils::microsoft::convert_basis_set_from_qdk(*basis_set)) {
     QDK_LOG_TRACE_ENTERING();
 
     // Initialize all data structures and pre-compute integrals
