@@ -196,6 +196,32 @@ std::int8_t MajoranaMapping::phase(std::size_t k) const {
   return phases_[k];
 }
 
+std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
+    std::size_t j, std::size_t k) const {
+  const std::size_t n = table_.size();
+  if (j >= n || k >= n) {
+    throw std::out_of_range(
+        "MajoranaMapping::bilinear index out of range: requested (" +
+        std::to_string(j) + ", " + std::to_string(k) + "), valid range [0, " +
+        std::to_string(n) + ")");
+  }
+  if (j == k) {
+    throw std::invalid_argument(
+        "MajoranaMapping::bilinear is undefined for j == k (got " +
+        std::to_string(j) +
+        "); the bilinear i*gamma_j*gamma_k requires distinct indices.");
+  }
+  // i * gamma_j * gamma_k
+  //   = i * (phases_[j] * table_[j]) * (phases_[k] * table_[k])
+  //   = i * phases_[j] * phases_[k] * (table_[j] * table_[k])
+  auto [pauli_phase, word] =
+      PauliTermAccumulator::multiply_uncached(table_[j], table_[k]);
+  std::complex<double> coeff = std::complex<double>(0.0, 1.0) * pauli_phase *
+                               static_cast<double>(phases_[j]) *
+                               static_cast<double>(phases_[k]);
+  return {coeff, std::move(word)};
+}
+
 void MajoranaMapping::validate() const {
   const std::size_t n = table_.size();
   constexpr double tol = 1e-12;

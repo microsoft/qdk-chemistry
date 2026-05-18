@@ -460,3 +460,260 @@ class TestSymmetryConservingBravyiKitaev:
         par = MajoranaMapping.parity(8)
         assert par.tapering is None
         assert par.num_qubits == 8
+
+
+# ─── Bilinear primitive ──────────────────────────────────────────────────
+
+
+def _dense_to_sparse(s: str) -> list[tuple[int, str]]:
+    """Convert a dense little-endian Pauli string to a sparse word list.
+
+    The dense representation is ``s[0]`` = highest-index qubit, ``s[-1]`` =
+    qubit 0. The sparse representation is a list of ``(qubit_index, gate)``
+    pairs sorted by ``qubit_index``, omitting identities.
+    """
+    n = len(s)
+    return [(n - 1 - i, c) for i, c in enumerate(s) if c != "I"]
+
+
+def _sparse_to_dense(word: list[tuple[int, str]], n_qubits: int) -> str:
+    """Inverse of ``_dense_to_sparse``."""
+    chars = ["I"] * n_qubits
+    for q, g in word:
+        chars[q] = g
+    return "".join(reversed(chars))
+
+
+# Single-qubit Pauli multiplication table: (a, b) -> (phase, c) where a*b = phase * c.
+_PAULI_MULT = {
+    ("I", "I"): (1 + 0j, "I"),
+    ("I", "X"): (1 + 0j, "X"),
+    ("I", "Y"): (1 + 0j, "Y"),
+    ("I", "Z"): (1 + 0j, "Z"),
+    ("X", "I"): (1 + 0j, "X"),
+    ("X", "X"): (1 + 0j, "I"),
+    ("X", "Y"): (1j, "Z"),
+    ("X", "Z"): (-1j, "Y"),
+    ("Y", "I"): (1 + 0j, "Y"),
+    ("Y", "X"): (-1j, "Z"),
+    ("Y", "Y"): (1 + 0j, "I"),
+    ("Y", "Z"): (1j, "X"),
+    ("Z", "I"): (1 + 0j, "Z"),
+    ("Z", "X"): (1j, "Y"),
+    ("Z", "Y"): (-1j, "X"),
+    ("Z", "Z"): (1 + 0j, "I"),
+}
+
+
+def _multiply_dense(a: str, b: str) -> tuple[complex, str]:
+    """Multiply two dense little-endian Pauli strings of equal length."""
+    assert len(a) == len(b)
+    phase: complex = 1 + 0j
+    chars: list[str] = []
+    for ca, cb in zip(a, b, strict=True):
+        p, c = _PAULI_MULT[(ca, cb)]
+        phase *= p
+        chars.append(c)
+    return phase, "".join(chars)
+
+
+_FACTORIES = [
+    ("jordan_wigner", lambda n: MajoranaMapping.jordan_wigner(num_modes=n)),
+    ("bravyi_kitaev", lambda n: MajoranaMapping.bravyi_kitaev(num_modes=n)),
+    ("parity", lambda n: MajoranaMapping.parity(num_modes=n)),
+]
+
+
+class TestBilinear:
+    """Tests for the unified bilinear primitive ``i·gamma_j·gamma_k``.
+
+    Bilinears are the most general primitive across fermion-to-qubit
+    encodings: Majorana-atomic encodings expose individual gamma_k as well, but
+    redundant encodings (e.g. Bravyi-Kitaev superfast) only admit
+    parity-even products. These tests verify the algebraic invariants that
+    every backend must satisfy.
+    """
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4, 6])
+    def test_matches_majorana_product(self, name: str, factory, n_modes: int) -> None:
+        """``bilinear(j, k)`` equals ``i · majorana(j) · majorana(k)`` exactly."""
+        del name
+        m = factory(n_modes)
+        n = 2 * n_modes
+        for j in range(n):
+            for k in range(n):
+                if j == k:
+                    continue
+                expected_phase, expected_word = _multiply_dense(m.majorana(j), m.majorana(k))
+                expected_coeff = 1j * expected_phase
+                bcoeff, bword = m.bilinear(j, k)
+                assert bword == expected_word, f"({j},{k}): word {bword} != {expected_word}"
+                assert abs(bcoeff - expected_coeff) < 1e-12, f"({j},{k}): coeff {bcoeff} != {expected_coeff}"
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_antisymmetry(self, name: str, factory, n_modes: int) -> None:
+        """``bilinear(k, j) == -bilinear(j, k)`` for all distinct j, k."""
+        del name
+        m = factory(n_modes)
+        n = 2 * n_modes
+        for j in range(n):
+            for k in range(j + 1, n):
+                cjk, wjk = m.bilinear(j, k)
+                ckj, wkj = m.bilinear(k, j)
+                assert wjk == wkj
+                assert abs(cjk + ckj) < 1e-12, f"({j},{k}): {cjk} + {ckj} != 0"
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_squares_to_identity(self, name: str, factory, n_modes: int) -> None:
+        """``(i·gamma_j·gamma_k)² == I`` for all distinct j, k."""
+        del name
+        m = factory(n_modes)
+        n = 2 * n_modes
+        identity = "I" * len(m.table[0])
+        for j in range(n):
+            for k in range(n):
+                if j == k:
+                    continue
+                coeff, word = m.bilinear(j, k)
+                phase, prod = _multiply_dense(word, word)
+                assert prod == identity, f"({j},{k}): word² = {prod}, not identity"
+                assert abs((coeff * coeff) * phase - 1.0) < 1e-12, (
+                    f"({j},{k}): bilinear² coeff = {coeff * coeff * phase}"
+                )
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [3, 4])
+    def test_commutation_relations(self, name: str, factory, n_modes: int) -> None:
+        """Disjoint pairs commute; pairs sharing exactly one index anticommute."""
+        del name
+        m = factory(n_modes)
+        n = 2 * n_modes
+        pairs = [(j, k) for j in range(n) for k in range(j + 1, n)]
+        for j1, k1 in pairs:
+            c1, w1 = m.bilinear(j1, k1)
+            for j2, k2 in pairs:
+                shared = len({j1, k1} & {j2, k2})
+                if shared == 2:
+                    continue
+                c2, w2 = m.bilinear(j2, k2)
+                p_ab, w_ab = _multiply_dense(w1, w2)
+                p_ba, w_ba = _multiply_dense(w2, w1)
+                assert w_ab == w_ba
+                ab = c1 * c2 * p_ab
+                ba = c2 * c1 * p_ba
+                if shared == 0:
+                    assert abs(ab - ba) < 1e-12, f"disjoint ({j1},{k1})·({j2},{k2}) does not commute"
+                else:
+                    assert abs(ab + ba) < 1e-12, f"single-shared ({j1},{k1})·({j2},{k2}) does not anticommute"
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_hermitian_real_coefficient(self, name: str, factory, n_modes: int) -> None:
+        """Bilinears are Hermitian, so the coefficient is real for current encodings."""
+        del name
+        m = factory(n_modes)
+        n = 2 * n_modes
+        for j in range(n):
+            for k in range(n):
+                if j == k:
+                    continue
+                coeff, _ = m.bilinear(j, k)
+                assert abs(coeff.imag) < 1e-12, f"({j},{k}): coeff {coeff} is not real"
+                assert abs(abs(coeff.real) - 1.0) < 1e-12, f"({j},{k}): |coeff| = {abs(coeff.real)}, expected 1"
+
+    def test_jw_n2_known_values(self) -> None:
+        """JW(num_modes=2): gamma_0=X_0, gamma_1=Y_0, gamma_2=Z_0 X_1, gamma_3=Z_0 Y_1."""
+        m = MajoranaMapping.jordan_wigner(num_modes=2)
+        assert m.bilinear(0, 1) == (-1 + 0j, "IZ")
+        assert m.bilinear(1, 0) == (1 + 0j, "IZ")
+        assert m.bilinear(0, 2) == (1 + 0j, "XY")
+        assert m.bilinear(2, 3) == (-1 + 0j, "ZI")
+
+    def test_raises_on_equal_indices(self) -> None:
+        """``bilinear(j, j)`` is undefined and must raise ValueError."""
+        m = MajoranaMapping.jordan_wigner(num_modes=2)
+        with pytest.raises(ValueError, match="distinct"):
+            m.bilinear(0, 0)
+        with pytest.raises(ValueError, match="distinct"):
+            m.bilinear(3, 3)
+
+    def test_raises_on_out_of_range(self) -> None:
+        """Out-of-range indices raise IndexError."""
+        m = MajoranaMapping.jordan_wigner(num_modes=2)
+        with pytest.raises(IndexError):
+            m.bilinear(0, 4)
+        with pytest.raises(IndexError):
+            m.bilinear(99, 0)
+
+    def test_majorana_consistent_with_call(self) -> None:
+        """``majorana(k)`` and ``__call__(k)`` describe the same Pauli operator."""
+        m = MajoranaMapping.jordan_wigner(num_modes=3)
+        n_q = len(m.table[0])
+        for k in range(2 * m.num_modes):
+            sparse = m.core(k)
+            dense = m.majorana(k)
+            assert len(dense) == n_q
+            non_identity = sum(1 for c in dense if c != "I")
+            assert non_identity == len(sparse)
+
+    def test_majorana_out_of_range(self) -> None:
+        """``majorana(k)`` raises IndexError on out-of-range k."""
+        m = MajoranaMapping.jordan_wigner(num_modes=2)
+        with pytest.raises(IndexError):
+            m.majorana(4)
+        with pytest.raises(IndexError):
+            m.majorana(99)
+
+
+class TestEncodingMetadata:
+    """Tests for the new metadata properties on Majorana-atomic encodings."""
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_is_majorana_atomic(self, name: str, factory, n_modes: int) -> None:
+        """All current encodings are Majorana-atomic."""
+        del name
+        m = factory(n_modes)
+        assert m.is_majorana_atomic is True
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_stabilizers_empty(self, name: str, factory, n_modes: int) -> None:
+        """Majorana-atomic encodings have no codespace stabilizers."""
+        del name
+        m = factory(n_modes)
+        assert m.stabilizers == ()
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    @pytest.mark.parametrize("n_modes", [2, 4])
+    def test_parity_sector_unrestricted(self, name: str, factory, n_modes: int) -> None:
+        """Majorana-atomic encodings span both parity sectors (sector 0)."""
+        del name
+        m = factory(n_modes)
+        assert m.parity_sector == 0
+
+    def test_pauli_string_length_untapered(self) -> None:
+        """For untapered encodings, bilinear/majorana strings have length ``num_qubits``."""
+        m = MajoranaMapping.jordan_wigner(num_modes=4)
+        assert len(m.table[0]) == m.num_qubits == 4
+        assert len(m.majorana(0)) == 4
+        _, w = m.bilinear(0, 1)
+        assert len(w) == 4
+
+    def test_pauli_string_length_with_tapering(self) -> None:
+        """For tapered SCBK, bilinear/majorana operate in the pre-taper basis."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert len(scbk.table[0]) == 8
+        assert scbk.num_qubits == 6
+        for j in range(2 * scbk.num_modes):
+            assert len(scbk.majorana(j)) == 8
+            for k in range(2 * scbk.num_modes):
+                if j == k:
+                    continue
+                _, w = scbk.bilinear(j, k)
+                assert len(w) == 8
