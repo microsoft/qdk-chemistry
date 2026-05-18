@@ -2,7 +2,7 @@ Phase estimation
 ================
 
 The :class:`~qdk_chemistry.algorithms.PhaseEstimation` algorithm in QDK/Chemistry extracts eigenvalues from a quantum state by measuring the phase accumulated under repeated application of a unitary operator.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.QubitHamiltonian` (from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`), a unitary builder (e.g., :doc:`TimeEvolutionBuilder <time_evolution_builder>`), a :doc:`ControlledEvolutionCircuitMapper <circuit_mapper>`, and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.QubitHamiltonian` (from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`), a unitary builder (e.g., :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`), a :doc:`ControlledCircuitMapper <circuit_mapper>`, and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
 
 Overview
 --------
@@ -36,7 +36,7 @@ The most common path starts from a molecular system:
 1. Prepare a reference :class:`~qdk_chemistry.data.Wavefunction` from a :doc:`multi-configuration calculation <mc_calculator>`
 2. Generate a state-preparation :class:`~qdk_chemistry.data.Circuit` using :doc:`StatePreparation <state_preparation>`
 3. Map the molecular :class:`~qdk_chemistry.data.Hamiltonian` to qubit operators using :doc:`QubitMapper <qubit_mapper>`
-4. Choose a method for constructing the target unitary (currently, QDK/Chemistry provides :doc:`time-evolution builders <time_evolution_builder>` for Hamiltonian simulation)
+4. Choose a method for constructing the target unitary (currently, QDK/Chemistry provides :doc:`time-evolution builders <hamiltonian_unitary_builder>` for Hamiltonian simulation)
 5. Run phase estimation to obtain the energy eigenvalue
 
 Alternatively, phase estimation can be used with :doc:`model Hamiltonians <../model_hamiltonians>` (e.g., Hubbard, Heisenberg, or Ising spin models) or with a user-supplied :class:`~qdk_chemistry.data.Circuit` and :class:`~qdk_chemistry.data.QubitHamiltonian` directly — the full molecular-structure pipeline is not required.
@@ -66,11 +66,11 @@ QubitHamiltonian
 
 Unitary builder
    An algorithm that constructs the unitary operator :math:`U` whose eigenphase is to be measured.
-   For chemistry applications this is typically a :doc:`TimeEvolutionBuilder <time_evolution_builder>` that approximates :math:`U(t) = e^{-iHt}`.
-   The builder produces a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` which is then converted to a controlled circuit.
+   For chemistry applications this is typically a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` that approximates :math:`U(t) = e^{-iHt}` or :math:`U = \frac{H}{\|H\|}`.
+   The builder produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` which is then converted to a controlled circuit.
 
-ControlledEvolutionCircuitMapper
-   Converts a :class:`~qdk_chemistry.data.TimeEvolutionUnitary` into a *controlled* version and synthesises it as an executable :class:`~qdk_chemistry.data.Circuit`.
+ControlledCircuitMapper
+   Converts a :class:`~qdk_chemistry.data.UnitaryRepresentation` into a *controlled* version and synthesises it as an executable :class:`~qdk_chemistry.data.Circuit`.
    The default implementation (``"pauli_sequence"``) constructs controlled Pauli rotations from a :class:`~qdk_chemistry.data.PauliProductFormulaContainer`.
    See :doc:`circuit_mapper` for details.
 
@@ -240,7 +240,7 @@ Related classes
 - :class:`~qdk_chemistry.data.QpeResult`: Output data class containing phase, energy, and alias information
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit from :doc:`StatePreparation <state_preparation>`
-- :class:`~qdk_chemistry.data.TimeEvolutionUnitary`: Output of :doc:`TimeEvolutionBuilder <time_evolution_builder>`
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from :doc:`CircuitExecutor <circuit_executor>`
 - :class:`~qdk_chemistry.data.QuantumErrorProfile`: Noise model for noisy simulation
 
@@ -248,9 +248,9 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/phase_estimation.py>`_ script.
-- :doc:`TimeEvolutionBuilder <time_evolution_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition
+- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition or block-encoding methods
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
-- :doc:`ControlledEvolutionCircuitMapper <circuit_mapper>`: Controlled-unitary circuit synthesis
+- :doc:`ControlledCircuitMapper <circuit_mapper>`: Controlled-unitary circuit synthesis
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - :doc:`QpeResult <../data/qpe_result>`: Phase estimation result data class

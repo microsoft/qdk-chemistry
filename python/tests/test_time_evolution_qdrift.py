@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.time_evolution.builder.qdrift import QDrift, QDriftSettings
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift, QDriftSettings
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -52,16 +52,16 @@ class TestQDriftBasics:
     def test_type_name(self):
         """Test the type_name method of QDrift."""
         builder = QDrift()
-        assert builder.type_name() == "time_evolution_builder"
+        assert builder.type_name() == "hamiltonian_unitary_builder"
 
     def test_can_create_via_registry(self):
         """Test that QDrift can be created via the algorithm registry."""
-        builder = create("time_evolution_builder", "qdrift")
+        builder = create("hamiltonian_unitary_builder", "qdrift")
         assert isinstance(builder, QDrift)
 
     def test_can_create_with_settings(self):
         """Test that QDrift can be created with custom settings."""
-        builder = create("time_evolution_builder", "qdrift", num_samples=200, seed=42)
+        builder = create("hamiltonian_unitary_builder", "qdrift", num_samples=200, seed=42)
         assert builder.settings().get("num_samples") == 200
         assert builder.settings().get("seed") == 42
 
@@ -69,13 +69,13 @@ class TestQDriftBasics:
 class TestQDriftConstruction:
     """Tests for QDrift time evolution construction."""
 
-    def test_returns_time_evolution_unitary(self):
-        """Test that run returns a TimeEvolutionUnitary."""
+    def test_returns_unitary_representation(self):
+        """Test that run returns a UnitaryRepresentation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = QDrift(num_samples=10, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
         assert isinstance(container, PauliProductFormulaContainer)
 
@@ -83,8 +83,8 @@ class TestQDriftConstruction:
         """Test that the container has at most num_samples terms (fewer after merging)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
-        builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = QDrift(num_samples=num_samples, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         # Duplicate-term merging may reduce the count below num_samples
@@ -95,8 +95,8 @@ class TestQDriftConstruction:
         """Disabling merge_duplicate_terms gives exactly num_samples terms."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
         num_samples = 50
-        builder = QDrift(num_samples=num_samples, seed=42, merge_duplicate_terms=False)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = QDrift(num_samples=num_samples, seed=42, merge_duplicate_terms=False, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         assert len(unitary.get_container().step_terms) == num_samples
 
@@ -104,11 +104,11 @@ class TestQDriftConstruction:
         """Test that results are reproducible when using a seed."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Y", "Z"], coefficients=[1.0, 0.5, 0.25])
 
-        builder1 = QDrift(num_samples=20, seed=12345)
-        builder2 = QDrift(num_samples=20, seed=12345)
+        builder1 = QDrift(num_samples=20, seed=12345, time=0.1)
+        builder2 = QDrift(num_samples=20, seed=12345, time=0.1)
 
-        unitary1 = builder1.run(hamiltonian, time=0.1)
-        unitary2 = builder2.run(hamiltonian, time=0.1)
+        unitary1 = builder1.run(hamiltonian)
+        unitary2 = builder2.run(hamiltonian)
 
         terms1 = unitary1.get_container().step_terms
         terms2 = unitary2.get_container().step_terms
@@ -125,11 +125,11 @@ class TestQDriftConstruction:
             coefficients=[1.0, 0.5, 0.25, 0.1, 0.05],
         )
 
-        builder1 = QDrift(num_samples=30, seed=42)
-        builder2 = QDrift(num_samples=30, seed=123)
+        builder1 = QDrift(num_samples=30, seed=42, time=0.1)
+        builder2 = QDrift(num_samples=30, seed=123, time=0.1)
 
-        unitary1 = builder1.run(hamiltonian, time=0.1)
-        unitary2 = builder2.run(hamiltonian, time=0.1)
+        unitary1 = builder1.run(hamiltonian)
+        unitary2 = builder2.run(hamiltonian)
 
         terms1 = [(t.pauli_term, t.angle) for t in unitary1.get_container().step_terms]
         terms2 = [(t.pauli_term, t.angle) for t in unitary2.get_container().step_terms]
@@ -151,8 +151,8 @@ class TestQDriftSampling:
 
         num_samples = 10000
         time = 1.0
-        builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder = QDrift(num_samples=num_samples, seed=42, time=time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
 
@@ -180,8 +180,8 @@ class TestQDriftSampling:
         time = 0.5
         num_samples = 10
 
-        builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder = QDrift(num_samples=num_samples, seed=42, time=time)
+        unitary = builder.run(hamiltonian)
 
         # λ = |0.6| + |0.4| = 1.0
         # Sum of |merged_angle| across all terms should equal λ * t = 0.5,
@@ -201,8 +201,8 @@ class TestQDriftEdgeCases:
     def test_tiny_coefficients_still_sampled(self):
         """Test that even very small coefficients are included (no filtering)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1e-10])
-        builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = QDrift(num_samples=10, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         # Single term: all 10 identical samples merge into one rotation
@@ -214,8 +214,8 @@ class TestQDriftEdgeCases:
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
         num_samples = 20
         time = 0.1
-        builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder = QDrift(num_samples=num_samples, seed=42, time=time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
         # All 20 identical samples merge into a single X rotation
@@ -236,10 +236,9 @@ class TestQDriftEdgeCases:
             pauli_strings=["X"],
             coefficients=[1.0 + 0.5j],
         )
-        builder = QDrift(num_samples=10, seed=42)
-
+        builder = QDrift(num_samples=10, seed=42, time=0.1)
         with pytest.raises(ValueError, match="Non-Hermitian"):
-            builder.run(hamiltonian, time=0.1)
+            builder.run(hamiltonian)
 
     def test_negative_coefficients(self):
         """Test that negative coefficients are handled correctly."""
@@ -249,8 +248,8 @@ class TestQDriftEdgeCases:
         )
         time = 0.1
         num_samples = 20
-        builder = QDrift(num_samples=num_samples, seed=42)
-        unitary = builder.run(hamiltonian, time=time)
+        builder = QDrift(num_samples=num_samples, seed=42, time=time)
+        unitary = builder.run(hamiltonian)
 
         terms = unitary.get_container().step_terms
 
@@ -277,8 +276,8 @@ class TestQDriftEdgeCases:
             pauli_strings=["XI", "IZ", "XX", "ZZ"],
             coefficients=[1.0, 0.5, 0.3, 0.2],
         )
-        builder = QDrift(num_samples=50, seed=42)
-        unitary = builder.run(hamiltonian, time=0.1)
+        builder = QDrift(num_samples=50, seed=42, time=0.1)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
         assert container.num_qubits == 2
@@ -291,8 +290,8 @@ class TestQDriftEdgeCases:
             pauli_strings=["XXII", "IIZZ", "IYIY"],
             coefficients=[0.3, 0.3, 0.4],
         )
-        builder = QDrift(num_samples=10, seed=42)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = QDrift(num_samples=10, seed=42, time=1.0)
+        unitary = builder.run(hamiltonian)
 
         assert unitary.get_container().num_qubits == 4
 

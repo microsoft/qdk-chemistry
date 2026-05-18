@@ -9,9 +9,9 @@ import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.builder.trotter import Trotter
-from qdk_chemistry.data import QubitHamiltonian, TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
@@ -66,10 +66,10 @@ class TestTrotter:
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        builder = Trotter(num_divisions=1)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=1, time=0.2)
+        unitary = builder.run(hamiltonian)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
@@ -84,8 +84,8 @@ class TestTrotter:
             coefficients=[2.0, 1.0],
         )
 
-        builder = Trotter(num_divisions=4)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=4, time=0.2)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
 
@@ -103,6 +103,24 @@ class TestTrotter:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+    def test_single_step_no_merge_without_partition(self):
+        """Test that without term_partition, duplicate terms are not merged."""
+        pauli_strings = ["XII", "IXI", "XII"]
+        coefficients = [1.0, 1.0, 1.0]
+
+        hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
+        builder = Trotter(num_divisions=1, time=1.0)
+        unitary = builder.run(hamiltonian)
+
+        assert isinstance(unitary, UnitaryRepresentation)
+        container = unitary.get_container()
+
+        assert isinstance(container, PauliProductFormulaContainer)
+        assert container.num_qubits == 3
+        assert container.step_reps == 1
+        # Without a partition, each Pauli term is its own group — no merging.
+        assert len(container.step_terms) == 3
 
     def test_basic_decomposition(self):
         """Test basic decomposition of a qubit Hamiltonian."""
@@ -142,22 +160,22 @@ class TestTrotter:
 
     def test_not_implemented_order(self):
         """Test that unsupported Trotter orders raise NotImplementedError."""
-        builder = Trotter(order=3)
+        builder = Trotter(order=3, time=1.0)
         hamiltonian = QubitHamiltonian(pauli_strings=["X"], coefficients=[1.0])
 
         with pytest.raises(
             NotImplementedError, match="Trotter orders must be positive and even for orders greater than 1"
         ):
-            builder.run(hamiltonian, time=1.0)
+            builder.run(hamiltonian)
 
     def test_trotter_x_z_example(self):
         """Correctness check for first-order Trotter decomposition."""
         # Hamiltonian H = X + Z
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
 
-        builder = Trotter(num_divisions=1)
         t = 0.1
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(num_divisions=1, time=t)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
         # Build Trotter unitary matrix
@@ -186,10 +204,10 @@ class TestTrotter:
     def test_single_step_construction_second_order(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        builder = Trotter(num_divisions=1, order=2)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=1, order=2, time=0.2)
+        unitary = builder.run(hamiltonian)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
@@ -204,8 +222,8 @@ class TestTrotter:
             coefficients=[2.0, 3.0],
         )
 
-        builder = Trotter(num_divisions=4, order=2)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=4, order=2, time=0.2)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
 
@@ -261,9 +279,9 @@ class TestTrotter:
         # Hamiltonian H = X + Z
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
 
-        builder = Trotter(num_divisions=1, order=2)
         t = 0.1
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(num_divisions=1, order=2, time=t)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
         # Build Trotter unitary matrix
@@ -294,10 +312,10 @@ class TestTrotter:
     def test_single_step_construction_higher_order(self):
         """Test construction of time evolution unitary with a single Trotter step."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
-        builder = Trotter(num_divisions=1, order=4)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=1, order=4, time=0.2)
+        unitary = builder.run(hamiltonian)
 
-        assert isinstance(unitary, TimeEvolutionUnitary)
+        assert isinstance(unitary, UnitaryRepresentation)
         container = unitary.get_container()
 
         assert isinstance(container, PauliProductFormulaContainer)
@@ -312,8 +330,8 @@ class TestTrotter:
             coefficients=[1.0, 1.0],
         )
 
-        builder = Trotter(num_divisions=4, order=4)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=4, order=4, time=0.2)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
 
@@ -399,8 +417,8 @@ class TestTrotter:
             coefficients=[1.0, 1.0],
         )
 
-        builder = Trotter(num_divisions=4, order=6)
-        unitary = builder.run(hamiltonian, time=0.2)
+        builder = Trotter(num_divisions=4, order=6, time=0.2)
+        unitary = builder.run(hamiltonian)
 
         container = unitary.get_container()
 
@@ -483,8 +501,11 @@ class TestTrotter:
 
         terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
 
-        assert len(terms) == 1
-        assert terms[0].pauli_term == {0: "Z"}
+        # All terms should be Z only (X filtered out).
+        # After Suzuki recursion and schedule reduction, the total rotation
+        # angle across all Z terms must equal coeff * time = 1.0.
+        assert all(t.pauli_term == {0: "Z"} for t in terms)
+        assert abs(sum(t.angle for t in terms) - 1.0) < 1e-12
 
     def test_trotter_x_z_example_higher_order(self):
         """Correctness check for fourth-order Trotter decomposition."""
@@ -494,9 +515,9 @@ class TestTrotter:
             pauli_strings=["X", "Z"], coefficients=[hamiltonian_coefficient, hamiltonian_coefficient]
         )
 
-        builder = Trotter(num_divisions=1, order=4)
         t = 0.1
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(num_divisions=1, order=4, time=t)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
         # Build Trotter unitary matrix
@@ -529,8 +550,8 @@ class TestTrotterAccuracyAware:
         # H = X + Z, X and Z anticommute -> commutator bound = 2
         # N = ceil(2 * t^2 / (2 * eps)) = ceil(t^2 / eps)
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # N = ceil(2 * 1 / (2 * 0.01)) = 100
         assert container.step_reps == 100
@@ -538,8 +559,8 @@ class TestTrotterAccuracyAware:
     def test_target_accuracy_naive_bound(self):
         """Test that target_accuracy with naive bound computes correct step count."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, error_bound="naive")
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, error_bound="naive", time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # one_norm = 2, N = ceil(2 * 4 / 0.01) = 800
         assert container.step_reps == 800
@@ -549,26 +570,26 @@ class TestTrotterAccuracyAware:
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         eps = 0.01
         time = 1.0
-        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator")
-        builder_naive = Trotter(target_accuracy=eps, error_bound="naive")
-        n_comm = builder_comm.run(hamiltonian, time=time).get_container().step_reps
-        n_naive = builder_naive.run(hamiltonian, time=time).get_container().step_reps
+        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", time=time)
+        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", time=time)
+        n_comm = builder_comm.run(hamiltonian).get_container().step_reps
+        n_naive = builder_naive.run(hamiltonian).get_container().step_reps
         assert n_comm <= n_naive
 
     def test_commuting_hamiltonian_needs_one_step(self):
         """Test that a fully commuting Hamiltonian needs only 1 Trotter step."""
         # XI and IX commute -> commutator bound = 0 -> N = 1
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 1
 
     def test_manual_steps_as_lower_bound(self):
         """Test that manual num_divisions acts as a lower bound."""
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_divisions=10, target_accuracy=0.01)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(num_divisions=10, target_accuracy=0.01, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # Commutator bound gives 1, but manual gives 10 -> max(1, 10) = 10
         assert container.step_reps == 10
@@ -576,17 +597,17 @@ class TestTrotterAccuracyAware:
     def test_no_target_accuracy_backward_compatible(self):
         """Test that the builder is backward compatible when target_accuracy is disabled (0.0)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_divisions=3)
-        unitary = builder.run(hamiltonian, time=0.5)
+        builder = Trotter(num_divisions=3, time=0.5)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 3
 
     def test_angle_scaling_with_auto_steps(self):
         """Test that angles are correctly scaled when steps are auto-computed."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[2.0, 1.0])
-        builder = Trotter(target_accuracy=0.01)
         t = 1.0
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(target_accuracy=0.01, time=t)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         n = container.step_reps
         dt = t / n
@@ -608,8 +629,8 @@ class TestTrotterAccuracyAware:
     def test_zero_target_accuracy_means_disabled(self):
         """Test that target_accuracy=0.0 (default) disables auto step computation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.0, num_divisions=3)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.0, num_divisions=3, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # target_accuracy=0.0 means disabled, so num_divisions=3 is used directly
         assert container.step_reps == 3
@@ -626,16 +647,16 @@ class TestTrotterAccuracyAware:
         # H = X + Z, X and Z anticommute -> commutator bound = 6
         # For t = 1 and eps = 0.01, N = ceil(sqrt(6 / 12) / sqrt(eps)) = 8.
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, order=2)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, order=2, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 8
 
     def test_target_accuracy_naive_bound_second_order(self):
         """Test that target_accuracy with naive bound computes correct step count."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, error_bound="naive", order=2)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, error_bound="naive", order=2, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # one_norm = 2, naive second-order bound for eps=0.01 and t=1.0 gives N = 57
         assert container.step_reps == 57
@@ -645,26 +666,26 @@ class TestTrotterAccuracyAware:
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         eps = 0.01
         time = 1.0
-        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=2)
-        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=2)
-        n_comm = builder_comm.run(hamiltonian, time=time).get_container().step_reps
-        n_naive = builder_naive.run(hamiltonian, time=time).get_container().step_reps
+        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=2, time=time)
+        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=2, time=time)
+        n_comm = builder_comm.run(hamiltonian).get_container().step_reps
+        n_naive = builder_naive.run(hamiltonian).get_container().step_reps
         assert n_comm <= n_naive
 
     def test_commuting_hamiltonian_needs_one_step_second_order(self):
         """Test that a fully commuting Hamiltonian needs only 1 Trotter step."""
         # XI and IX commute -> commutator bound = 0 -> N = 1
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, order=2)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, order=2, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 1
 
     def test_manual_steps_as_lower_bound_second_order(self):
         """Test that manual num_divisions acts as a lower bound."""
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_divisions=10, target_accuracy=0.01, order=2)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(num_divisions=10, target_accuracy=0.01, order=2, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # Commutator bound gives 1, but manual gives 10 -> max(1, 10) = 10
         assert container.step_reps == 10
@@ -672,17 +693,17 @@ class TestTrotterAccuracyAware:
     def test_no_target_accuracy_backward_compatible_second_order(self):
         """Test that the builder is backward compatible when target_accuracy is disabled (0.0)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(num_divisions=3, order=2)
-        unitary = builder.run(hamiltonian, time=0.5)
+        builder = Trotter(num_divisions=3, order=2, time=0.5)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 3
 
     def test_angle_scaling_with_auto_steps_second_order(self):
         """Test that angles are correctly scaled when steps are auto-computed."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[3.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, order=2)
         t = 1.0
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(target_accuracy=0.01, order=2, time=t)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         n = container.step_reps
         dt = t / n
@@ -712,8 +733,8 @@ class TestTrotterAccuracyAware:
     def test_zero_target_accuracy_means_disabled_second_order(self):
         """Test that target_accuracy=0.0 (default) disables auto step computation."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.0, num_divisions=3, order=2)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.0, num_divisions=3, order=2, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         # target_accuracy=0.0 means disabled, so num_divisions=3 is used directly
         assert container.step_reps == 3
@@ -722,8 +743,8 @@ class TestTrotterAccuracyAware:
     def test_target_accuracy_commutator_bound_higher_order(self):
         """Test that target_accuracy with commutator bound computes correct step count."""
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, order=6)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, order=6, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 7
 
@@ -732,18 +753,18 @@ class TestTrotterAccuracyAware:
         hamiltonian = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         eps = 0.01
         time = 1.0
-        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=4)
-        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=4)
-        n_comm = builder_comm.run(hamiltonian, time=time).get_container().step_reps
-        n_naive = builder_naive.run(hamiltonian, time=time).get_container().step_reps
+        builder_comm = Trotter(target_accuracy=eps, error_bound="commutator", order=4, time=time)
+        builder_naive = Trotter(target_accuracy=eps, error_bound="naive", order=4, time=time)
+        n_comm = builder_comm.run(hamiltonian).get_container().step_reps
+        n_naive = builder_naive.run(hamiltonian).get_container().step_reps
         assert n_comm <= n_naive
 
     def test_commuting_hamiltonian_needs_one_step_higher_order(self):
         """Test that a fully commuting Hamiltonian needs only 1 Trotter step."""
         # XI and IX commute -> commutator bound = 0 -> N = 1
         hamiltonian = QubitHamiltonian(pauli_strings=["XI", "IX"], coefficients=[1.0, 1.0])
-        builder = Trotter(target_accuracy=0.01, order=6)
-        unitary = builder.run(hamiltonian, time=1.0)
+        builder = Trotter(target_accuracy=0.01, order=6, time=1.0)
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
         assert container.step_reps == 1
 
@@ -754,10 +775,10 @@ class TestTrotterAccuracyAware:
             coefficients=[1.0, 1.0],
         )
 
-        builder = Trotter(target_accuracy=0.01, order=4)
-
         t = 1.0
-        unitary = builder.run(hamiltonian, time=t)
+        builder = Trotter(target_accuracy=0.01, order=4, time=t)
+
+        unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
         n = container.step_reps
@@ -834,3 +855,23 @@ class TestTrotterAccuracyAware:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+
+class TestNoPartitionFallback:
+    """Tests for Trotter behavior when no term_partition is present."""
+
+    def test_no_partition_treats_each_term_individually(self):
+        """Test that without term_partition, each Pauli term is its own group."""
+        pauli_strings = ["ZZII", "XIII", "IZZI", "IXII", "IIZZ", "IIXI", "ZIIZ", "IIIX"]
+        coefficients = [1.0] * 8
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=pauli_strings,
+            coefficients=coefficients,
+        )
+        t = 1.0
+        builder = Trotter(num_divisions=1, order=1, time=t)
+        terms = builder.run(hamiltonian).get_container().step_terms
+
+        for idx, term in enumerate(terms):
+            assert term.pauli_term == builder._pauli_label_to_map(pauli_strings[idx])
+            assert term.angle == coefficients[idx] * t
