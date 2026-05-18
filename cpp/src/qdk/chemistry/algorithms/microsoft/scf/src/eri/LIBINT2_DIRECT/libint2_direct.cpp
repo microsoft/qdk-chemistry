@@ -442,8 +442,7 @@ class ERI {
       bra_pairs = std::move(reordered);
     }
 
-    // Zero persistent TLS buffers in parallel (each thread zeros its own,
-    // maintaining NUMA locality from the first-touch allocation)
+    // Single parallel region: zero TLS buffers + compute + bra-pair loop
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -453,19 +452,14 @@ class ERI {
 #else
       const int tid = 0;
 #endif
+      // Zero this thread's TLS buffers (NUMA-local, parallel)
       if (J) std::memset(J_tls_[tid].data(), 0, mat_size * sizeof(double));
       if (K) std::memset(K_tls_[tid].data(), 0, mat_size * sizeof(double));
-    }
 
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp barrier
 #endif
-    {
-#ifdef _OPENMP
-      const int tid = omp_get_thread_num();
-#else
-      const int tid = 0;
-#endif
+
       auto& engine = engines_[tid];
       const auto& buf = engine.results();
       double* J_thr = J ? J_tls_[tid].data() : nullptr;
