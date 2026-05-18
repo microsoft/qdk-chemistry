@@ -120,7 +120,7 @@ extends:
               hostArchitecture: Arm64
           ${{ else }}:
             pool:
-              name: $(CPU_POOL_X86)
+              name: aqe-1es-HB120-pool
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
