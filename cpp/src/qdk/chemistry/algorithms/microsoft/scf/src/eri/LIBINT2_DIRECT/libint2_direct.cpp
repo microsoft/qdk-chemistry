@@ -878,11 +878,8 @@ class ERI {
               if (!tj[idx12]) { tj[idx12] = 1; touched_J_list_[tid].push_back(idx12); }
               if (!tj[idx34]) { tj[idx34] = 1; touched_J_list_[tid].push_back(idx34); }
             }
-            // Per-quartet K significance: skip K contraction if cross-pair
-            // density norms are all below threshold (pre-LinK style)
-            const bool k_significant =
-                K_thr && (Pk * schwarz_bound >= eff_threshold);
-            if (k_significant) {
+            // Mark touched shell pairs (bitmap for dedup, list for iteration)
+            if (K_thr) {
               uint32_t idxs[] = {
                 static_cast<uint32_t>(s1*nsh+s3), static_cast<uint32_t>(s1*nsh+s4),
                 static_cast<uint32_t>(s2*nsh+s3), static_cast<uint32_t>(s2*nsh+s4)};
@@ -915,8 +912,7 @@ class ERI {
                                     n3 * n4 >= TILE_THRESHOLD);
 
             // Merged J+K contraction (single pass over integral buffer)
-            // When K is not significant for this quartet, use J-only path
-            if (J_thr && k_significant) {
+            if (J_thr && K_thr) {
               for (size_t idm = 0; idm < ndm; ++idm) {
                 auto* J_cur = J_thr + idm * tile_total_size_;
                 auto* K_cur = K_thr + idm * tile_total_size_;
