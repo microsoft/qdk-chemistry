@@ -558,21 +558,32 @@ class ERI {
       }  // bra-pair (omp for)
     }  // parallel region
 
-    // Deterministic reduction: thread 0, 1, 2, ... in order
+    // Deterministic parallel reduction: for each matrix element, sum
+    // thread contributions in fixed order 0, 1, ..., nthreads_-1.
+    // Parallelized over matrix elements (each element's reduction order is fixed).
     if (J) {
-      for (int t = 0; t < nthreads_; ++t)
-        for (size_t i = 0; i < mat_size; ++i)
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (size_t i = 0; i < mat_size; ++i)
+        for (int t = 0; t < nthreads_; ++t)
           J[i] += J_local[t][i];
     }
     if (K) {
-      for (int t = 0; t < nthreads_; ++t)
-        for (size_t i = 0; i < mat_size; ++i)
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (size_t i = 0; i < mat_size; ++i)
+        for (int t = 0; t < nthreads_; ++t)
           K[i] += K_local[t][i];
     }
 
-    // Symmetrize J
+    // Symmetrize J (parallel)
     if (J)
-      for (size_t idm = 0; idm < ndm; ++idm)
+      for (size_t idm = 0; idm < ndm; ++idm) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
         for (size_t i = 0; i < N; ++i)
           for (size_t j = 0; j <= i; ++j) {
             auto v = J[idm * N * N + i * N + j];
@@ -581,10 +592,14 @@ class ERI {
             J[idm * N * N + i * N + j] = v;
             J[idm * N * N + j * N + i] = v;
           }
+      }
 
-    // Symmetrize K + scale
+    // Symmetrize K + scale (parallel)
     if (K)
-      for (size_t idm = 0; idm < ndm; ++idm)
+      for (size_t idm = 0; idm < ndm; ++idm) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
         for (size_t i = 0; i < N; ++i)
           for (size_t j = 0; j <= i; ++j) {
             auto v = K[idm * N * N + i * N + j];
@@ -593,6 +608,7 @@ class ERI {
             K[idm * N * N + i * N + j] = v;
             K[idm * N * N + j * N + i] = v;
           }
+      }
   }
 
   /**
