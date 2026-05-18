@@ -477,6 +477,11 @@ class ERI {
       throw std::runtime_error("Density matrix contains NaN/Inf values.");
     }
 
+    // Use the configured screening threshold directly. The caller
+    // (scf_impl.cpp) may adjust eri_threshold_ via set_screening_threshold()
+    // for adaptive precision as SCF converges.
+    const double eff_threshold = eri_threshold_;
+
     double engine_precision;
     if (P_shmax <= 0.0) {
       engine_precision = std::numeric_limits<double>::epsilon();
@@ -582,7 +587,7 @@ class ERI {
         for (size_t s3 = 0; s3 <= s1; ++s3) {
           // Coarse s3-row pre-screen: skip entire row when even the best
           // ket pair can't produce a significant integral bound
-          if (schwarz_pq * K_schwarz_rowmax_[s3] < eri_threshold_) {
+          if (schwarz_pq * K_schwarz_rowmax_[s3] < eff_threshold) {
             ++loc_schwarz; ++loc_considered;
             continue;
           }
@@ -621,9 +626,9 @@ class ERI {
             // Track J-only and K-only screening
             double Pj = std::max(P12_nrm, P34_nrm);
             double Pk = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
-            if (Pj * schwarz_bound < eri_threshold_) ++loc_j_screen;
-            if (Pk * schwarz_bound < eri_threshold_) ++loc_k_screen;
-            if (P_screen * schwarz_bound < eri_threshold_) { ++loc_density; continue; }
+            if (Pj * schwarz_bound < eff_threshold) ++loc_j_screen;
+            if (Pk * schwarz_bound < eff_threshold) ++loc_k_screen;
+            if (P_screen * schwarz_bound < eff_threshold) { ++loc_density; continue; }
 
             const auto bf4_st = shell_bf_offset_[s4];
             const auto n4 = shell_nbf_[s4];
@@ -878,10 +883,11 @@ class ERI {
       auto ksc = diag_k_would_screen_.load();
       auto screened = sw + ds;
       QDK_LOGGER().info(
-          "SCREEN call={} nsh={} | total_quartets={} schwarz={:.1f}% "
-          "density={:.1f}% computed={} ({:.1f}%) engine_skip={} | "
+          "SCREEN call={} nsh={} eff_thresh={:.1e} P_shmax={:.1e} | "
+          "total_quartets={} schwarz={:.1f}% density={:.1f}% "
+          "computed={} ({:.1f}%) engine_skip={} | "
           "J_would_screen={:.1f}% K_would_screen={:.1f}%",
-          diag_calls_.load(), nsh, total,
+          diag_calls_.load(), nsh, eff_threshold, P_shmax, total,
           total > 0 ? 100.0 * sw / total : 0.0,
           total > 0 ? 100.0 * ds / total : 0.0,
           comp, total > 0 ? 100.0 * comp / total : 0.0, eskip,
