@@ -34,7 +34,7 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for active space Hamiltonian with three center integrals
-   * (ij|Q)
+   * (ij|P), such that (ij|kl) \approx \sum_P (ij|P)(P|kl)
    *
    * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
    * @param three_center_integrals Three-center two-electron integrals in MO
