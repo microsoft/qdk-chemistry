@@ -100,6 +100,23 @@ struct ShellPairCSR {
 
   /// Number of significant pairs for shell s
   size_t row_size(size_t s) const { return offsets[s + 1] - offsets[s]; }
+
+  /// Check if shell pair (s, t) exists (binary search since neighbors are sorted)
+  bool contains(size_t s, size_t t) const {
+    auto begin = neighbors.begin() + offsets[s];
+    auto end = neighbors.begin() + offsets[s + 1];
+    return std::binary_search(begin, end, t);
+  }
+
+  /// Get ShellPair data for (s, t), or nullptr if not found
+  const ::libint2::ShellPair* get_data(size_t s, size_t t) const {
+    auto begin = neighbors.begin() + offsets[s];
+    auto end = neighbors.begin() + offsets[s + 1];
+    auto it = std::lower_bound(begin, end, t);
+    if (it != end && *it == t)
+      return &data[it - neighbors.begin()];
+    return nullptr;
+  }
 };
 
 /**
@@ -639,6 +656,13 @@ class ERI {
       size_t loc_computed = 0, loc_engine_skip = 0;
       size_t loc_j_screen = 0, loc_k_screen = 0;
 
+      // Pre-LinK: thread-local epoch-based dedup for ML_PQ construction
+      // ml_epoch_ marks which (s3*nsh+s4) pairs were already added this bra pair
+      std::vector<uint32_t> ml_epoch(nsh * nsh, 0);
+      uint32_t ml_epoch_counter = 0;
+      std::vector<std::pair<size_t, size_t>> ml_pairs;  // (s3, s4) candidates
+      ml_pairs.reserve(256);
+
       // Dynamic scheduling over bra-pairs — each thread processes
       // contiguous bra-pair ranges, improving cache locality for bra-side
       // density rows and Schwarz data vs the old round-robin.
@@ -657,6 +681,146 @@ class ERI {
         const auto P12_nrm = P_shnrm(s1, s2);
 
         const auto schwarz_pq = K_schwarz_(s1, s2);
+
+        // ============================================================
+        // Pre-LinK K-only path: build ML_PQ from sig_kets + sig_bras
+        // with double-sorted early-exit, then iterate only ML_PQ.
+        // ============================================================
+        if (K_thr && !J_thr) {
+          ++ml_epoch_counter;
+          ml_pairs.clear();
+
+          // Build ML_PQ from sig_kets[s1]: for each R in sig_kets[s1],
+          // walk sig_bras[R] with early-exit to find significant (R,S) pairs
+          for (size_t ri = 0; ri < sig_kets_[s1].size(); ++ri) {
+            const size_t R = sig_kets_[s1][ri];
+            bool any_sig = false;
+            for (size_t si = 0; si < sig_bras_[R].size(); ++si) {
+              const size_t S = sig_bras_[R][si];
+              // Canonical ordering: (R,S) with R >= S
+              size_t s3 = (R >= S) ? R : S;
+              size_t s4 = (R >= S) ? S : R;
+              // Canonical constraint: (s3,s4) <= (s1,s2)
+              if (s3 > s1) continue;
+              if (s3 == s1 && s4 > s2) continue;
+              // Screen: D_max(s1,R) * K_schwarz(s1,s2) * K_schwarz(R,S) >= threshold
+              double screen_val = P_shnrm(s1, R) * schwarz_pq *
+                                  sig_bras_schwarz_[R][si];
+              if (screen_val < eff_threshold) break;  // early exit: sig_bras sorted desc by K_schwarz(R,S)
+              any_sig = true;
+              // Dedup via epoch marker
+              uint32_t pair_key = static_cast<uint32_t>(s3 * nsh + s4);
+              if (ml_epoch[pair_key] != ml_epoch_counter) {
+                ml_epoch[pair_key] = ml_epoch_counter;
+                ml_pairs.push_back({s3, s4});
+              }
+            }
+            // DISABLED: // DISABLED: if (!any_sig) break;  // early exit on R
+          }
+
+          // Also walk sig_kets[s2] to capture pairs significant through Q
+          for (size_t ri = 0; ri < sig_kets_[s2].size(); ++ri) {
+            const size_t R = sig_kets_[s2][ri];
+            bool any_sig = false;
+            for (size_t si = 0; si < sig_bras_[R].size(); ++si) {
+              const size_t S = sig_bras_[R][si];
+              size_t s3 = (R >= S) ? R : S;
+              size_t s4 = (R >= S) ? S : R;
+              if (s3 > s1) continue;
+              if (s3 == s1 && s4 > s2) continue;
+              double screen_val = P_shnrm(s2, R) * schwarz_pq *
+                                  sig_bras_schwarz_[R][si];
+              if (screen_val < eff_threshold) break;
+              any_sig = true;
+              uint32_t pair_key = static_cast<uint32_t>(s3 * nsh + s4);
+              if (ml_epoch[pair_key] != ml_epoch_counter) {
+                ml_epoch[pair_key] = ml_epoch_counter;
+                ml_pairs.push_back({s3, s4});
+              }
+            }
+            // DISABLED: if (!any_sig) break;
+          }
+
+          // Iterate ML_PQ and compute/contract K
+          for (const auto& [s3, s4] : ml_pairs) {
+            ++loc_considered;
+
+            // Check shell pair significance (overlap prescreen)
+            if (!sp_csr_.contains(s3, s4)) continue;
+
+            const auto bf3_st = shell_bf_offset_[s3];
+            const auto bf4_st = shell_bf_offset_[s4];
+            const auto n3 = shell_nbf_[s3];
+            const auto n4 = shell_nbf_[s4];
+
+            // Exact K screening with all 4 cross-pair norms
+            const auto P13_nrm = P_shnrm(s1, s3);
+            const auto P14_nrm = P_shnrm(s1, s4);
+            const auto P23_nrm = P_shnrm(s2, s3);
+            const auto P24_nrm = P_shnrm(s2, s4);
+            double Pk = std::max({P13_nrm, P14_nrm, P23_nrm, P24_nrm});
+            const auto schwarz_bound = K_schwarz_(s1, s2) * K_schwarz_(s3, s4);
+            if (Pk * schwarz_bound < eff_threshold) {
+              ++loc_density;
+              continue;
+            }
+
+            // Get shell pair data for s3,s4
+            const auto* sp34_data = sp_csr_.get_data(s3, s4);
+            if (!sp34_data) continue;
+
+            // Mark touched K shell pairs
+            {
+              uint32_t idxs[] = {
+                static_cast<uint32_t>(s1*nsh+s3), static_cast<uint32_t>(s1*nsh+s4),
+                static_cast<uint32_t>(s2*nsh+s3), static_cast<uint32_t>(s2*nsh+s4)};
+              for (auto idx : idxs)
+                if (!tk[idx]) { tk[idx] = 1; touched_K_list_[tid].push_back(idx); }
+            }
+
+            auto s12_deg = (s1 == s2) ? 1 : 2;
+            auto s34_deg = (s3 == s4) ? 1 : 2;
+            auto s12_34_deg = (s1 == s3) ? (s2 == s4 ? 1 : 2) : 2;
+            auto s1234_deg = s12_deg * s34_deg * s12_34_deg;
+
+            engine.compute2<::libint2::Operator::coulomb,
+                            ::libint2::BraKet::xx_xx, 0>(
+                obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+
+            const auto buf_1234 = buf[0];
+            if (buf_1234 == nullptr) { ++loc_engine_skip; continue; }
+            ++loc_computed;
+
+            // K-only contraction (tiled TLS)
+            for (size_t idm = 0; idm < ndm; ++idm) {
+              auto* K_cur = K_thr + idm * tile_total_size_;
+              const auto* P_cur = P + idm * N * N;
+              const size_t kt_13 = tile_offset_[s1 * nsh_ + s3];
+              const size_t kt_14 = tile_offset_[s1 * nsh_ + s4];
+              const size_t kt_23 = tile_offset_[s2 * nsh_ + s3];
+              const size_t kt_24 = tile_offset_[s2 * nsh_ + s4];
+              for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+                for (size_t j = 0; j < n2; ++j) {
+                  for (size_t k = 0; k < n3; ++k) {
+                    double K_ik = 0.0, K_jk = 0.0;
+                    const double P_ik = 0.25 * P_cur[(bf1_st + i) * N + (bf3_st + k)];
+                    const double P_jk = 0.25 * P_cur[(bf2_st + j) * N + (bf3_st + k)];
+                    for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                      const auto value = buf_1234[ijkl] * s1234_deg;
+                      K_ik += 0.25 * P_cur[(bf2_st + j) * N + (bf4_st + l)] * value;
+                      K_jk += 0.25 * P_cur[(bf1_st + i) * N + (bf4_st + l)] * value;
+                      K_cur[kt_14 + i * n4 + l] += P_jk * value;
+                      K_cur[kt_24 + j * n4 + l] += P_ik * value;
+                    }
+                    K_cur[kt_13 + i * n3 + k] += K_ik;
+                    K_cur[kt_23 + j * n3 + k] += K_jk;
+                  }
+                }
+              }
+            }
+          }  // end ML_PQ iteration
+          continue;  // skip the standard s3/s4 loop below
+        }  // end K-only pre-LinK path
 
         for (size_t s3 = 0; s3 <= s1; ++s3) {
           // Coarse s3-row pre-screen: skip entire row when even the best
