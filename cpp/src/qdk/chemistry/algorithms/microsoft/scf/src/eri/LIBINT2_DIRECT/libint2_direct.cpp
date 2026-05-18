@@ -590,81 +590,29 @@ class ERI {
 
             // Stack-tile contraction: accumulate shell-block contributions
             // in small L1-hot tiles, then flush once to the N² TLS buffer.
-            // This reduces N-strided cache misses from O(n1*n2*n3*n4) to
-            // O(tile_size) per shell quartet — critical for large N where
-            // the TLS buffer doesn't fit in L2.
-            // Skip tiling for small quartets (s-shells) where the setup
-            // overhead exceeds the cache benefit.
+            // When both J and K are requested (the common case), a single
+            // pass over the integral buffer serves both — halving reads and
+            // eliminating redundant value = buf[ijkl] * deg computation.
             constexpr size_t MAX_BF = 15;  // supports up to Cartesian g-shells
             constexpr size_t TILE_THRESHOLD = 4;  // min n3*n4 to justify tiling
             const bool use_tiles = (n1 <= MAX_BF && n2 <= MAX_BF &&
                                     n3 <= MAX_BF && n4 <= MAX_BF &&
                                     n3 * n4 >= TILE_THRESHOLD);
 
-            // Contract J
-            if (J_thr)
+            // Merged J+K contraction (single pass over integral buffer)
+            if (J_thr && K_thr) {
               for (size_t idm = 0; idm < ndm; ++idm) {
                 auto* J_cur = J_thr + idm * N * N;
-                const auto* P_cur = P + idm * N * N;
-                if (use_tiles) {
-                  // Pre-load P(s3,s4) tile
-                  double P_34[MAX_BF * MAX_BF];
-                  for (size_t k = 0; k < n3; ++k)
-                    for (size_t l = 0; l < n4; ++l)
-                      P_34[k * n4 + l] = P_cur[(bf3_st + k) * N + (bf4_st + l)];
-
-                  // J(s3,s4) accumulator tile
-                  double J_34[MAX_BF * MAX_BF];
-                  std::memset(J_34, 0, n3 * n4 * sizeof(double));
-
-                  for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                    for (size_t j = 0; j < n2; ++j) {
-                      double J_ij = 0.0;
-                      const double P_ij = P_cur[(bf1_st + i) * N + (bf2_st + j)];
-                      for (size_t k = 0; k < n3; ++k)
-                        for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                          const auto value = buf_1234[ijkl] * s1234_deg;
-                          J_ij += P_34[k * n4 + l] * value;
-                          J_34[k * n4 + l] += P_ij * value;
-                        }
-                      J_cur[(bf1_st + i) * N + (bf2_st + j)] += J_ij;
-                    }
-                  }
-                  // Flush J(s3,s4) tile
-                  for (size_t k = 0; k < n3; ++k)
-                    for (size_t l = 0; l < n4; ++l)
-                      J_cur[(bf3_st + k) * N + (bf4_st + l)] += J_34[k * n4 + l];
-                } else {
-                  // Direct contraction fallback for oversized shells
-                  for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                    const size_t bf1 = bf1_st + i;
-                    for (size_t j = 0; j < n2; ++j) {
-                      const size_t bf2 = bf2_st + j;
-                      double J_ij = 0.0;
-                      const double P_ij = P_cur[bf1 * N + bf2];
-                      for (size_t k = 0; k < n3; ++k) {
-                        const size_t bf3 = bf3_st + k;
-                        for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                          const auto value = buf_1234[ijkl] * s1234_deg;
-                          J_ij += P_cur[bf3 * N + (bf4_st + l)] * value;
-                          J_cur[bf3 * N + (bf4_st + l)] += P_ij * value;
-                        }
-                      }
-                      J_cur[bf1 * N + bf2] += J_ij;
-                    }
-                  }
-                }
-              }
-
-            // Contract K
-            if (K_thr)
-              for (size_t idm = 0; idm < ndm; ++idm) {
                 auto* K_cur = K_thr + idm * N * N;
                 const auto* P_cur = P + idm * N * N;
                 if (use_tiles) {
-                  // Pre-load density tiles (with 0.25 pre-multiplied)
+                  // Pre-load density tiles
+                  double P_34[MAX_BF * MAX_BF];
                   double P_13[MAX_BF * MAX_BF], P_23[MAX_BF * MAX_BF];
                   double P_14[MAX_BF * MAX_BF], P_24[MAX_BF * MAX_BF];
+                  for (size_t k = 0; k < n3; ++k)
+                    for (size_t l = 0; l < n4; ++l)
+                      P_34[k * n4 + l] = P_cur[(bf3_st + k) * N + (bf4_st + l)];
                   for (size_t i = 0; i < n1; ++i)
                     for (size_t k = 0; k < n3; ++k)
                       P_13[i * n3 + k] = 0.25 * P_cur[(bf1_st + i) * N + (bf3_st + k)];
@@ -678,9 +626,11 @@ class ERI {
                     for (size_t l = 0; l < n4; ++l)
                       P_24[j * n4 + l] = 0.25 * P_cur[(bf2_st + j) * N + (bf4_st + l)];
 
-                  // K accumulator tiles
+                  // Accumulator tiles
+                  double J_34[MAX_BF * MAX_BF];
                   double K_13[MAX_BF * MAX_BF], K_23[MAX_BF * MAX_BF];
                   double K_14[MAX_BF * MAX_BF], K_24[MAX_BF * MAX_BF];
+                  std::memset(J_34, 0, n3 * n4 * sizeof(double));
                   std::memset(K_13, 0, n1 * n3 * sizeof(double));
                   std::memset(K_23, 0, n2 * n3 * sizeof(double));
                   std::memset(K_14, 0, n1 * n4 * sizeof(double));
@@ -688,12 +638,16 @@ class ERI {
 
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     for (size_t j = 0; j < n2; ++j) {
+                      double J_ij = 0.0;
+                      const double P_ij = P_cur[(bf1_st + i) * N + (bf2_st + j)];
                       for (size_t k = 0; k < n3; ++k) {
                         double K_ik = 0.0, K_jk = 0.0;
                         const double P_ik = P_13[i * n3 + k];
                         const double P_jk = P_23[j * n3 + k];
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const auto value = buf_1234[ijkl] * s1234_deg;
+                          J_ij += P_34[k * n4 + l] * value;
+                          J_34[k * n4 + l] += P_ij * value;
                           K_ik += P_24[j * n4 + l] * value;
                           K_jk += P_14[i * n4 + l] * value;
                           K_14[i * n4 + l] += P_jk * value;
@@ -702,9 +656,13 @@ class ERI {
                         K_13[i * n3 + k] += K_ik;
                         K_23[j * n3 + k] += K_jk;
                       }
+                      J_cur[(bf1_st + i) * N + (bf2_st + j)] += J_ij;
                     }
                   }
-                  // Flush K tiles
+                  // Flush all tiles
+                  for (size_t k = 0; k < n3; ++k)
+                    for (size_t l = 0; l < n4; ++l)
+                      J_cur[(bf3_st + k) * N + (bf4_st + l)] += J_34[k * n4 + l];
                   for (size_t i = 0; i < n1; ++i)
                     for (size_t k = 0; k < n3; ++k)
                       K_cur[(bf1_st + i) * N + (bf3_st + k)] += K_13[i * n3 + k];
@@ -718,11 +676,13 @@ class ERI {
                     for (size_t l = 0; l < n4; ++l)
                       K_cur[(bf2_st + j) * N + (bf4_st + l)] += K_24[j * n4 + l];
                 } else {
-                  // Direct contraction fallback for oversized shells
+                  // Direct fallback: merged J+K without tiles
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
                     const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
                       const size_t bf2 = bf2_st + j;
+                      double J_ij = 0.0;
+                      const double P_ij = P_cur[bf1 * N + bf2];
                       for (size_t k = 0; k < n3; ++k) {
                         const size_t bf3 = bf3_st + k;
                         double K_ik = 0.0, K_jk = 0.0;
@@ -731,6 +691,8 @@ class ERI {
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const size_t bf4 = bf4_st + l;
                           const auto value = buf_1234[ijkl] * s1234_deg;
+                          J_ij += P_cur[bf3 * N + bf4] * value;
+                          J_cur[bf3 * N + bf4] += P_ij * value;
                           K_ik += 0.25 * P_cur[bf2 * N + bf4] * value;
                           K_jk += 0.25 * P_cur[bf1 * N + bf4] * value;
                           K_cur[bf1 * N + bf4] += P_jk * value;
@@ -739,10 +701,63 @@ class ERI {
                         K_cur[bf1 * N + bf3] += K_ik;
                         K_cur[bf2 * N + bf3] += K_jk;
                       }
+                      J_cur[bf1 * N + bf2] += J_ij;
                     }
                   }
                 }
               }
+            } else if (J_thr) {
+              // J-only contraction
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                auto* J_cur = J_thr + idm * N * N;
+                const auto* P_cur = P + idm * N * N;
+                for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+                  const size_t bf1 = bf1_st + i;
+                  for (size_t j = 0; j < n2; ++j) {
+                    const size_t bf2 = bf2_st + j;
+                    double J_ij = 0.0;
+                    const double P_ij = P_cur[bf1 * N + bf2];
+                    for (size_t k = 0; k < n3; ++k) {
+                      const size_t bf3 = bf3_st + k;
+                      for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                        const auto value = buf_1234[ijkl] * s1234_deg;
+                        J_ij += P_cur[bf3 * N + (bf4_st + l)] * value;
+                        J_cur[bf3 * N + (bf4_st + l)] += P_ij * value;
+                      }
+                    }
+                    J_cur[bf1 * N + bf2] += J_ij;
+                  }
+                }
+              }
+            } else if (K_thr) {
+              // K-only contraction
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                auto* K_cur = K_thr + idm * N * N;
+                const auto* P_cur = P + idm * N * N;
+                for (size_t i = 0, ijkl = 0; i < n1; ++i) {
+                  const size_t bf1 = bf1_st + i;
+                  for (size_t j = 0; j < n2; ++j) {
+                    const size_t bf2 = bf2_st + j;
+                    for (size_t k = 0; k < n3; ++k) {
+                      const size_t bf3 = bf3_st + k;
+                      double K_ik = 0.0, K_jk = 0.0;
+                      const double P_ik = 0.25 * P_cur[bf1 * N + bf3];
+                      const double P_jk = 0.25 * P_cur[bf2 * N + bf3];
+                      for (size_t l = 0; l < n4; ++l, ++ijkl) {
+                        const size_t bf4 = bf4_st + l;
+                        const auto value = buf_1234[ijkl] * s1234_deg;
+                        K_ik += 0.25 * P_cur[bf2 * N + bf4] * value;
+                        K_jk += 0.25 * P_cur[bf1 * N + bf4] * value;
+                        K_cur[bf1 * N + bf4] += P_jk * value;
+                        K_cur[bf2 * N + bf4] += P_ik * value;
+                      }
+                      K_cur[bf1 * N + bf3] += K_ik;
+                      K_cur[bf2 * N + bf3] += K_jk;
+                    }
+                  }
+                }
+              }
+            }
 
           }  // s4
         }  // s3
