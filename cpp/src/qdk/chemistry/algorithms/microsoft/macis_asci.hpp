@@ -167,11 +167,11 @@ class MacisAsciSettings : public MacisSettings {
         "Growth factor for final expansion near ntdets_max (0 = disabled)");
 
     // Hamiltonian build algorithm selection
-    set_default<std::string>(
-        "hamiltonian_build_algorithm", macis_defaults.hamiltonian_build_algorithm,
-        "Algorithm for diagonal Hamiltonian construction: "
-        "'' or 'sorted_double_loop' (default), "
-        "'residue_arrays', 'dynamic_bit_masking'");
+    set_default<std::string>("hamiltonian_build_algorithm",
+                             macis_defaults.hamiltonian_build_algorithm,
+                             "Algorithm for diagonal Hamiltonian construction: "
+                             "'' or 'sorted_double_loop' (default), "
+                             "'residue_arrays', 'dynamic_bit_masking'");
     set_default<size_t>("dynamic_bit_masking_num_masks", 0,
                         "Number of bit masks for dynamic_bit_masking generator "
                         "(0 = use generator default)");

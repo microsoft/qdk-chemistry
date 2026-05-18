@@ -95,13 +95,12 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
   // This enables reusing ERI column buffers across iterations.
   const size_t max_shell_size =
-      num_shells == 0
-          ? 0
-          : std::max_element(obs.begin(), obs.end(),
-                             [](const auto& a, const auto& b) {
-                               return a.size() < b.size();
-                             })
-                ->size();
+      num_shells == 0 ? 0
+                      : std::max_element(obs.begin(), obs.end(),
+                                         [](const auto& a, const auto& b) {
+                                           return a.size() < b.size();
+                                         })
+                            ->size();
   const size_t max_n_cols = max_shell_size * max_shell_size;
 
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
@@ -286,8 +285,9 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       const auto& sp = sp_list[b];
       const size_t n1 = obs[sp.s1].size();
       const size_t n2 = obs[sp.s2].size();
-      batch[b] = {sp.sp_index, sp.s1, sp.s2, n1, n2, n1 * n2,
-                  total_n_cols, shell2bf[sp.s1], shell2bf[sp.s2]};
+      batch[b] = {
+          sp.sp_index,  sp.s1,           sp.s2,          n1, n2, n1 * n2,
+          total_n_cols, shell2bf[sp.s1], shell2bf[sp.s2]};
       total_n_cols += n1 * n2;
     }
 
@@ -457,8 +457,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         const size_t remaining_cols = total_n_cols - remaining_start;
         double* eri_remaining =
             eri_col_batch.data() + remaining_start * num_aos2;
-        const double* L_block =
-            L_data.data() + new_cols_start * num_aos2;
+        const double* L_block = L_data.data() + new_cols_start * num_aos2;
 
         // Gather R: R[col, k] = L_block[k * num_aos2 + all_lookup[col]]
         // where all_lookup maps batch column → global AO index.
@@ -807,8 +806,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   double eri_tol = _settings->get<double>("eri_threshold");
 
   // get cholesky vectors
-  size_t gemm_batch_cols =
-      _settings->get<size_t>("cholesky_gemm_batch_cols");
+  size_t gemm_batch_cols = _settings->get<size_t>("cholesky_gemm_batch_cols");
   auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
       *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols);
 
