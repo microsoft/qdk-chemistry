@@ -84,7 +84,9 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `plugins` | Third-party quantum chemistry backends | PySCF |
 | `qiskit-extras` | Qiskit ecosystem packages | qiskit, qiskit-aer, qiskit-nature |
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
+| `networkx-extras` | NetworkX ecosystem packages | networkx |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
+| `test` | Testing tools and optional dependencies | pytest, ipykernel, networkx, openfermion, pennylane, pyscf, qiskit, rdkit |
 | `all` | **All of the above** | All optional dependencies |
 
 Install one or more extras with:
