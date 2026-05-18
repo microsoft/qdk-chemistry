@@ -32,6 +32,7 @@ from qdk_chemistry.data import (
     LayeredPartition,
     QubitHamiltonian,
     TermPartition,
+    TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -156,11 +157,17 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
 
-    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+    def _run_impl(
+        self,
+        qubit_hamiltonian: QubitHamiltonian | TimeDependentQubitHamiltonian,
+    ) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
+        Delegates to :meth:`_trotter`, which handles both time-independent
+        and time-dependent Hamiltonians.
+
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            qubit_hamiltonian: A time-independent or time-dependent qubit Hamiltonian.
 
         Returns:
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
@@ -168,12 +175,16 @@ class Trotter(TimeEvolutionBuilder):
         """
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
-        if order in {1, 2} or (order > 2 and order % 2 == 0):
-            return self._trotter(qubit_hamiltonian, effective_time, power_repetitions)
-        raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
+        if not (order in {1, 2} or (order > 2 and order % 2 == 0)):
+            raise NotImplementedError("Trotter orders must be positive and even for orders greater than 1")
+
+        return self._trotter(qubit_hamiltonian, effective_time, power_repetitions)
 
     def _trotter(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float, power_repetitions: int = 1
+        self,
+        qubit_hamiltonian: QubitHamiltonian | TimeDependentQubitHamiltonian,
+        time: float,
+        power_repetitions: int = 1,
     ) -> UnitaryRepresentation:
         r"""Construct the unitary representation using the Trotter decomposition.
 
@@ -190,8 +201,14 @@ class Trotter(TimeEvolutionBuilder):
         as: :math:`S_{2k}(t) = S_{2k-2}(u_k t)^2 S_{2k-2}((1-4u_k) t) S_{2k-2}(u_k t)^2`,
         where :math:`u_k = 1/(4-4^{1/(2k-1)})` (See Suzuki (1992)).
 
+        For a time-independent :class:`~qdk_chemistry.data.QubitHamiltonian`,
+        a single Trotter step is decomposed and repeated via ``step_reps``.
+        For a :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`, the
+        Hamiltonian is evaluated at each division's midpoint and per-step terms
+        are concatenated.
+
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            qubit_hamiltonian: The (possibly time-dependent) qubit Hamiltonian.
             time: The total evolution time.
             power_repetitions: Number of times the full Trotter product is repeated
                 (used by the "repeat" power strategy). Defaults to 1.
@@ -201,21 +218,41 @@ class Trotter(TimeEvolutionBuilder):
 
         """
         weight_threshold = self._settings.get("weight_threshold")
+        is_time_dependent = isinstance(qubit_hamiltonian, TimeDependentQubitHamiltonian)
 
-        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
+        if is_time_dependent:
+            # Sample H(t) at midpoints across the interval and take the
+            # maximum required divisions so the step size is fine enough
+            # for the worst-case norm.
+            h_initial = qubit_hamiltonian.evaluate(0.0)
+            initial_divisions = self._resolve_num_divisions(h_initial, time)
+            dt_sample = time / initial_divisions
+            num_divisions = initial_divisions
+            for i in range(initial_divisions):
+                h_snapshot = qubit_hamiltonian.evaluate((i + 0.5) * dt_sample)
+                num_divisions = max(num_divisions, self._resolve_num_divisions(h_snapshot, time))
+        else:
+            num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
 
-        delta = time / num_divisions
+        dt = time / num_divisions
 
-        terms = self._decompose_trotter_step(qubit_hamiltonian, time=delta, atol=weight_threshold)
-
-        num_qubits = qubit_hamiltonian.num_qubits
+        if is_time_dependent:
+            all_terms: list[ExponentiatedPauliTerm] = []
+            for i in range(num_divisions):
+                # Evaluate the Hamiltonian at the midpoint of the interval for better accuracy.
+                h_snapshot = qubit_hamiltonian.evaluate((i + 0.5) * dt)
+                all_terms.extend(self._decompose_trotter_step(h_snapshot, time=dt, atol=weight_threshold))
+            step_terms = all_terms
+            step_reps = power_repetitions
+        else:
+            step_terms = self._decompose_trotter_step(qubit_hamiltonian, time=dt, atol=weight_threshold)
+            step_reps = num_divisions * power_repetitions
 
         container = PauliProductFormulaContainer(
-            step_terms=terms,
-            step_reps=num_divisions * power_repetitions,
-            num_qubits=num_qubits,
+            step_terms=step_terms,
+            step_reps=step_reps,
+            num_qubits=qubit_hamiltonian.num_qubits,
         )
-
         return UnitaryRepresentation(container=container)
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:

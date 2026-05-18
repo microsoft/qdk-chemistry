@@ -12,7 +12,6 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     TimeDependentQubitHamiltonian,
-    UnitaryRepresentation,
 )
 from qdk_chemistry.utils import Logger
 
@@ -27,6 +26,12 @@ class EvolveAndMeasureSettings(MeasureSimulationSettings):
     def __init__(self):
         """Initialize the settings for EvolveAndMeasure."""
         super().__init__()
+        self._set_default(
+            "total_time",
+            "float",
+            1.0,
+            "Total evolution time.",
+        )
 
 
 class EvolveAndMeasure(MeasureSimulation):
@@ -87,26 +92,19 @@ class EvolveAndMeasure(MeasureSimulation):
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
+        The total evolution time is read from settings and passed to the
+        time evolution builder, which handles time-stepping internally.
+
         Args:
-            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
+            hamiltonian: Time-dependent Hamiltonian.
             state_prep: Circuit that prepares the initial state before time evolution.
 
         Returns:
             The combined evolution circuit.
 
         """
-        hamiltonians, times = hamiltonian.to_snapshots()
-
-        evolution = self._create_time_evolution(hamiltonians[0], times[0])
-
-        for i in range(1, len(hamiltonians)):
-            delta_t = times[i] - times[i - 1]
-            evolution = UnitaryRepresentation(
-                evolution.get_container().combine(
-                    self._create_time_evolution(hamiltonians[i], delta_t).get_container(),
-                )
-            )
-
+        total_time: float = self._settings.get("total_time")
+        evolution = self._create_time_evolution(hamiltonian, total_time)
         circuit = self._map_time_evolution_to_circuit(evolution)
         return self._prepend_state_prep_circuit(state_prep, circuit, hamiltonian.num_qubits)
 

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from qdk_chemistry.data.base import DataClass
-from qdk_chemistry.data.term_partition import TermPartition
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 
 if TYPE_CHECKING:
@@ -30,6 +30,23 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = []
+
+
+def _merge_term_partitions(p0: TermPartition, p1: TermPartition, offset: int) -> TermPartition | None:
+    """Merge two partitions by concatenating groups and offsetting *p1* indices.
+
+    Returns ``None`` if the two partitions have different concrete types.
+
+    """
+    if isinstance(p0, FlatPartition) and isinstance(p1, FlatPartition):
+        shifted = tuple(tuple(i + offset for i in group) for group in p1.groups)
+        return FlatPartition(strategy=p0.strategy, groups=p0.groups + shifted)
+
+    if isinstance(p0, LayeredPartition) and isinstance(p1, LayeredPartition):
+        shifted = tuple(tuple(tuple(i + offset for i in layer) for layer in group) for group in p1.groups)
+        return LayeredPartition(strategy=p0.strategy, groups=p0.groups + shifted)
+
+    return None
 
 
 class QubitHamiltonian(DataClass):
@@ -48,6 +65,10 @@ class QubitHamiltonian(DataClass):
             partitions, into parallelisable layers within each group).  Set by
             geometry-aware constructors and by ``term_grouper`` algorithms; reset
             to ``None`` by transformations that change the term ordering.
+
+    Supports arithmetic: ``H1 + H2`` concatenates terms and merges
+    partitions; ``scalar * H`` scales coefficients and preserves the
+    partition.
 
     """
 
@@ -199,6 +220,82 @@ class QubitHamiltonian(DataClass):
 
         """
         return all(abs(complex(c).imag) <= tolerance for c in self.coefficients)
+
+    def __add__(self, other: QubitHamiltonian) -> QubitHamiltonian:
+        """Return the sum of two qubit Hamiltonians.
+
+        Pauli strings and coefficients are concatenated.  The ``encoding``
+        and ``fermion_mode_order`` metadata must match between operands
+        (or both be ``None``); a mismatch raises ``ValueError``.  If both
+        operands carry a :attr:`term_partition` of the same concrete type,
+        the partitions are merged (with the right-hand operand's indices
+        offset).  Otherwise the result has no partition.
+
+        Args:
+            other: The qubit Hamiltonian to add.
+
+        Returns:
+            A new ``QubitHamiltonian`` with concatenated terms.
+
+        Raises:
+            TypeError: If *other* is not a ``QubitHamiltonian``.
+            ValueError: If the two Hamiltonians have different qubit counts, encodings, or fermion mode orders.
+
+        """
+        if not isinstance(other, QubitHamiltonian):
+            return NotImplemented
+        if self.num_qubits != other.num_qubits:
+            raise ValueError(f"Cannot add Hamiltonians with {self.num_qubits} and {other.num_qubits} qubits.")
+        if self.encoding != other.encoding:
+            raise ValueError(
+                f"Cannot add Hamiltonians with different encodings: {self.encoding!r} vs {other.encoding!r}."
+            )
+        if self.fermion_mode_order != other.fermion_mode_order:
+            raise ValueError(
+                f"Cannot add Hamiltonians with different fermion_mode_order: "
+                f"{self.fermion_mode_order!r} vs {other.fermion_mode_order!r}."
+            )
+
+        pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
+        coefficients = np.concatenate([self.coefficients, other.coefficients])
+
+        partition = None
+        if self.term_partition is not None and other.term_partition is not None:
+            partition = _merge_term_partitions(self.term_partition, other.term_partition, len(self.pauli_strings))
+
+        return QubitHamiltonian(
+            pauli_strings,
+            coefficients,
+            encoding=self.encoding,
+            fermion_mode_order=self.fermion_mode_order,
+            term_partition=partition,
+        )
+
+    def __mul__(self, scalar: complex) -> QubitHamiltonian:
+        """Return the Hamiltonian with all coefficients scaled by *scalar*.
+
+        The :attr:`term_partition` is preserved since term indices are unchanged.
+
+        Args:
+            scalar: The scalar multiplier.
+
+        Returns:
+            A new ``QubitHamiltonian`` with scaled coefficients.
+
+        """
+        if not isinstance(scalar, int | float | complex | np.number):
+            return NotImplemented
+        return QubitHamiltonian(
+            list(self.pauli_strings),
+            self.coefficients * scalar,
+            encoding=self.encoding,
+            fermion_mode_order=self.fermion_mode_order,
+            term_partition=self.term_partition,
+        )
+
+    def __rmul__(self, scalar: complex) -> QubitHamiltonian:
+        """Support ``scalar * hamiltonian``."""
+        return self.__mul__(scalar)
 
     def get_real_coefficients(
         self, tolerance: float = 1e-12, sort_by_magnitude: bool = False

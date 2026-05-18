@@ -1,4 +1,4 @@
-"""Time-dependent qubit Hamiltonian abstract base class."""
+"""Time-dependent qubit Hamiltonian wrapper class."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -7,26 +7,39 @@
 
 from __future__ import annotations
 
-from abc import abstractmethod
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 
+    from .containers.base import TimeDependentQubitHamiltonianContainer
+
 __all__: list[str] = []
 
 
 class TimeDependentQubitHamiltonian:
-    """Abstract base for time-dependent qubit Hamiltonians.
+    """Wrapper for time-dependent qubit Hamiltonians.
 
-    Subclasses must implement :meth:`evaluate` and :attr:`schedule` to
-    define how the Hamiltonian varies with time.  The base class provides
-    :meth:`to_snapshots` for algorithms that need materialized lists and
-    default implementations of ``__len__`` and ``__repr__``.
+    Delegates storage and evaluation to a
+    :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base.TimeDependentQubitHamiltonianContainer`.
+
+    Args:
+        container: The container that stores and evaluates the time-dependent Hamiltonian.
 
     """
 
-    @abstractmethod
+    def __init__(self, container: TimeDependentQubitHamiltonianContainer) -> None:
+        self._container = container
+
+    def get_container(self) -> TimeDependentQubitHamiltonianContainer:
+        """Return the underlying container.
+
+        Returns:
+            The time-dependent qubit Hamiltonian container.
+
+        """
+        return self._container
+
     def evaluate(self, t: float) -> QubitHamiltonian:
         """Return the qubit Hamiltonian at time *t*.
 
@@ -37,30 +50,13 @@ class TimeDependentQubitHamiltonian:
             The qubit Hamiltonian at the given time.
 
         """
+        return self._container.evaluate(t)
 
     @property
-    @abstractmethod
-    def schedule(self) -> list[float]:
-        """Ordered time points at which evolution steps are taken."""
-
-    @property
-    @abstractmethod
     def num_qubits(self) -> int:
         """Number of qubits (uniform across all times)."""
-
-    def to_snapshots(self) -> tuple[list[QubitHamiltonian], list[float]]:
-        """Materialize the schedule into explicit ``(hamiltonians, times)`` lists.
-
-        Returns:
-            A tuple of ``(hamiltonians, times)`` evaluated at each scheduled time point.
-
-        """
-        return [self.evaluate(t) for t in self.schedule], list(self.schedule)
-
-    def __len__(self) -> int:
-        """Return the number of time steps."""
-        return len(self.schedule)
+        return self._container.num_qubits
 
     def __repr__(self) -> str:
         """Return a string representation."""
-        return f"{type(self).__name__}(steps={len(self)}, num_qubits={self.num_qubits})"
+        return f"{type(self).__name__}(num_qubits={self.num_qubits})"
