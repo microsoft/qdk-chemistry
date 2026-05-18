@@ -8,6 +8,7 @@
 
 #include "scf/ks_impl.h"
 #include "scf/scf_impl.h"
+#include "util/timer.h"
 
 namespace qdk::chemistry::scf {
 std::unique_ptr<SCF> SCF::make_hf_solver(std::shared_ptr<Molecule> mol,
@@ -142,4 +143,7 @@ int SCF::get_num_density_matrices() const {
   QDK_LOG_TRACE_ENTERING();
   return impl_->get_num_density_matrices();
 }
+
+void SCF::print_timer_summary() { Timer::print_summary(); }
+
 }  // namespace qdk::chemistry::scf

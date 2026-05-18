@@ -577,20 +577,33 @@ void SCFImpl::iterate_() {
     P_last = P_;
 
     auto [alpha, beta, omega] = get_hyb_coeff_();
-    eri_->build_JK(P_diff.data(), J_.data(), K_.data(), alpha, beta, omega);
+    {
+      AutoTimer t_jk("SCF::build_JK");
+      eri_->build_JK(P_diff.data(), J_.data(), K_.data(), alpha, beta, omega);
+    }
 
-    update_fock_();
+    {
+      AutoTimer t_uf("SCF::update_fock");
+      update_fock_();
+    }
 
-    res.scf_total_energy = total_energy_();
+    {
+      AutoTimer t_en("SCF::total_energy");
+      res.scf_total_energy = total_energy_();
+    }
 
     if (cfg->mpi.world_rank == 0) {
       if (std::isnan(res.scf_total_energy) or std::isinf(res.scf_total_energy))
         throw std::runtime_error("NaN or INF Encountered in SCF Energy");
 
-      // Check convergence
-      res.converged = scf_algorithm_->check_convergence(*this);
-      // Perform SCF Algorithm iteration only if not converged
-      scf_algorithm_->iterate(*this);
+      {
+        AutoTimer t_cv("SCF::convergence");
+        res.converged = scf_algorithm_->check_convergence(*this);
+      }
+      {
+        AutoTimer t_al("SCF::algorithm");
+        scf_algorithm_->iterate(*this);
+      }
 
       res.scf_iterations = step + 1;
     }

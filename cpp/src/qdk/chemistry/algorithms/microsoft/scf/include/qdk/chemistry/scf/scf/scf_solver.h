@@ -219,6 +219,14 @@ class SCF {
       std::shared_ptr<BasisSet> basis_set,
       std::shared_ptr<BasisSet> raw_basis_set);
 
+  /**
+   * @brief Print performance timing summary to stdout
+   *
+   * Outputs accumulated timer statistics from all SCF operations.
+   * Useful for benchmarking and profiling.
+   */
+  static void print_timer_summary();
+
  private:
   /**
    * @brief Private constructor

@@ -967,3 +967,72 @@ TEST(FockBenchmark, ThresholdSweep) {
     }
   }
 }
+
+// ===========================================================================
+// BENCHMARK: Full SCF convergence
+// Runs SCF to convergence on each benchmark system using DIIS_GDM.
+// Measures total wall time, iteration count, and prints per-phase breakdown.
+// Set environment variable QDK_SCF_BENCH=1 to enable.
+// ===========================================================================
+TEST(SCFBenchmark, FullSCF) {
+  if (!std::getenv("QDK_SCF_BENCH")) {
+    GTEST_SKIP() << "Set QDK_SCF_BENCH=1 to run SCF benchmarks";
+  }
+
+  std::cout << "\n=== SCF Benchmark (DIIS_GDM, Libint2Direct) ===" << std::endl;
+  std::cout << "system,basis,nao,iterations,total_ms,energy" << std::endl;
+
+  auto systems = get_benchmark_systems();
+
+  for (const auto& sys : systems) {
+    // Build basis to get NAO for reporting
+    auto basis = make_basis(sys.mol, sys.basis_name, sys.pure);
+    const size_t nao = basis->num_atomic_orbitals;
+
+    // Optional NAO limit for quick profiling runs
+    const char* max_nao_env = std::getenv("QDK_SCF_BENCH_MAX_NAO");
+    if (max_nao_env && nao > static_cast<size_t>(std::atoi(max_nao_env))) {
+      std::cout << sys.name << "," << sys.basis_name << "," << nao
+                << ",SKIPPED,0.0,0.0" << std::endl;
+      continue;
+    }
+
+    // Configure SCF with DIIS_GDM (production default)
+    SCFConfig cfg;
+    cfg.scf_orbital_type = SCFOrbitalType::Restricted;
+    cfg.eri.method = ERIMethod::Libint2Direct;
+    cfg.eri.eri_threshold = 1e-9;
+    cfg.eri.shell_pair_threshold = 1e-12;
+    cfg.eri.use_atomics = false;
+    cfg.scf_algorithm.method = SCFAlgorithmName::DIIS_GDM;
+    cfg.scf_algorithm.max_iteration = 200;
+    cfg.basis = sys.basis_name;
+    cfg.cartesian = !sys.pure;
+    cfg.mpi = ParallelConfig{1, 0, 1, 0};
+    cfg.verbose = 1;
+
+    try {
+      auto solver = SCF::make_hf_solver(sys.mol, cfg);
+
+      auto start = std::chrono::high_resolution_clock::now();
+      const auto& ctx = solver->run();
+      auto end = std::chrono::high_resolution_clock::now();
+
+      double total_ms =
+          std::chrono::duration<double, std::milli>(end - start).count();
+
+      std::cout << sys.name << "," << sys.basis_name << "," << nao << ","
+                << ctx.result.scf_iterations << ","
+                << std::fixed << std::setprecision(1) << total_ms << ","
+                << std::fixed << std::setprecision(12)
+                << ctx.result.scf_total_energy << std::endl;
+    } catch (const std::exception& e) {
+      std::cout << sys.name << "," << sys.basis_name << "," << nao
+                << ",FAILED,0.0,0.0  # " << e.what() << std::endl;
+    }
+  }
+
+  // Print cumulative per-phase timing breakdown
+  std::cout << "\n";
+  SCF::print_timer_summary();
+}

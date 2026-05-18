@@ -154,9 +154,9 @@ void SCFAlgorithm::solve_fock_eigenproblem(
       num_atomic_orbitals, num_molecular_orbitals);
   RowMajorMatrix tmp1 = X.transpose() * F_dm;
   RowMajorMatrix tmp2 = tmp1 * X;
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals,
-               tmp2.data(), num_molecular_orbitals,
-               eigenvalues.data() + idx_spin * num_molecular_orbitals);
+  lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals,
+                tmp2.data(), num_molecular_orbitals,
+                eigenvalues.data() + idx_spin * num_molecular_orbitals);
   tmp2.transposeInPlace();  // Row major
   C_dm.noalias() = X * tmp2;
 #endif
