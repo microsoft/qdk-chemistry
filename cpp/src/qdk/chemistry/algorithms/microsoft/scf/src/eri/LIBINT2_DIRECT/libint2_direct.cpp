@@ -220,6 +220,10 @@ class ERI {
   ShellPairCSR sp_csr_;            ///< CSR shell-pair list + data (by value)
   RowMajorMatrix K_schwarz_;       ///< Schwarz screening matrix for integral bounds
 
+  // Persistent per-thread Libint2 engine pool (constructed once, reused across calls)
+  std::vector<::libint2::Engine> engines_; ///< One engine per thread
+  int nthreads_;                           ///< Number of threads engines_ is sized for
+
   // Per-shell POD arrays for fast inner-loop access (avoid obs_[s].size() calls)
   std::vector<size_t> shell_nbf_;       ///< shell_nbf_[s] = number of basis functions in shell s
   std::vector<size_t> shell_bf_offset_; ///< shell_bf_offset_[s] = first basis function index
@@ -274,6 +278,18 @@ class ERI {
     K_schwarz_ = RowMajorMatrix(obs_.size(), obs_.size());
     auto mpi = mpi_default_input();
     schwarz_integral(&basis_set, mpi, K_schwarz_.data(), true);
+
+    // Construct persistent per-thread engine pool
+#ifdef _OPENMP
+    nthreads_ = omp_get_max_threads();
+#else
+    nthreads_ = 1;
+#endif
+    engines_.resize(nthreads_);
+    engines_[0] = ::libint2::Engine(::libint2::Operator::coulomb,
+                                    obs_.max_nprim(), obs_.max_l(), 0);
+    engines_[0].set(::libint2::ScreeningMethod::Original);
+    for (int i = 1; i < nthreads_; ++i) engines_[i] = engines_[0];
   }
 
   /**
@@ -338,18 +354,9 @@ class ERI {
     }
     engine_precision = std::max(engine_precision, max_engine_precision);
 
-    // Setup the engine
-#ifdef _OPENMP
-    const int nthreads = omp_get_max_threads();
-#else
-    const int nthreads = 1;
-#endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    // Update engine precision for this density (engines are persistent class members)
+    for (int i = 0; i < nthreads_; ++i)
+      engines_[i].set_precision(engine_precision);
 
     if (J) std::memset(J, 0, mat_size * sizeof(double));
     if (K) std::memset(K, 0, mat_size * sizeof(double));
@@ -359,15 +366,15 @@ class ERI {
     std::vector<std::vector<double>> K_local(0);
 
     if (use_thread_local_buffers_) {
-      J_local.resize(nthreads);
-      K_local.resize(nthreads);
+      J_local.resize(nthreads_);
+      K_local.resize(nthreads_);
       if (J) {
-        for (int t = 0; t < nthreads; ++t) {
+        for (int t = 0; t < nthreads_; ++t) {
           J_local[t].resize(mat_size, 0.0);
         }
       }
       if (K) {
-        for (int t = 0; t < nthreads; ++t) {
+        for (int t = 0; t < nthreads_; ++t) {
           K_local[t].resize(mat_size, 0.0);
         }
       }
@@ -382,10 +389,8 @@ class ERI {
 #else
       const auto thread_id = 0;
 #endif
-      auto& engine = engines_coulomb[thread_id];
+      auto& engine = engines_[thread_id];
       const auto& buf = engine.results();
-
-      // Get pointers to thread-local buffers
       double* J_thread = nullptr;
       double* K_thread = nullptr;
       if (use_thread_local_buffers_) {
@@ -429,7 +434,7 @@ class ERI {
               const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
               // Assign to threads
-              if ((s1234++) % nthreads != thread_id) continue;
+              if ((s1234++) % nthreads_ != thread_id) continue;
 
               // Tighter density-aware Schwarz screening:
               // J contributions depend on P(s1,s2) and P(s3,s4) (bra/ket density)
@@ -611,14 +616,14 @@ class ERI {
     // Deterministic reduction: combine thread-local buffers in order
     if (use_thread_local_buffers_) {
       if (J) {
-        for (int t = 0; t < nthreads; ++t) {
+        for (int t = 0; t < nthreads_; ++t) {
           for (size_t i = 0; i < mat_size; ++i) {
             J[i] += J_local[t][i];
           }
         }
       }
       if (K) {
-        for (int t = 0; t < nthreads; ++t) {
+        for (int t = 0; t < nthreads_; ++t) {
           for (size_t i = 0; i < mat_size; ++i) {
             K[i] += K_local[t][i];
           }
@@ -726,24 +731,15 @@ class ERI {
     // Setup required precision for libint2 engine
     const auto engine_precision = std::numeric_limits<double>::epsilon();
 
-    // Setup the engine
-#ifdef _OPENMP
-    const int nthreads = omp_get_max_threads();
-#else
-    const int nthreads = 1;
-#endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    // Update engine precision for quarter transformation
+    for (int i = 0; i < nthreads_; ++i)
+      engines_[i].set_precision(engine_precision);
 
     // Thread-local accumulation buffers for reproducibility
     std::vector<std::vector<double>> out_local(0);
     if (use_thread_local_buffers_) {
-      out_local.resize(nthreads);
-      for (int t = 0; t < nthreads; ++t) {
+      out_local.resize(nthreads_);
+      for (int t = 0; t < nthreads_; ++t) {
         out_local[t].resize(out_size, 0.0);
       }
     }
@@ -757,7 +753,7 @@ class ERI {
 #else
       const auto thread_id = 0;
 #endif
-      auto& engine = engines_coulomb[thread_id];
+      auto& engine = engines_[thread_id];
       const auto& buf = engine.results();
 
       // Get pointer to thread-local buffer
@@ -799,9 +795,7 @@ class ERI {
               const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
               // Assign to threads
-              if ((s1234++) % nthreads != thread_id) continue;
-
-              // Use Schwarz screening only
+              if ((s1234++) % nthreads_ != thread_id) continue;
               if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < eri_threshold_)
                 continue;
 
@@ -908,7 +902,7 @@ class ERI {
 
     // Deterministic reduction: combine thread-local buffers in order
     if (use_thread_local_buffers_) {
-      for (int t = 0; t < nthreads; ++t) {
+      for (int t = 0; t < nthreads_; ++t) {
         for (size_t i = 0; i < out_size; ++i) {
           out[i] += out_local[t][i];
         }
