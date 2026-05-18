@@ -282,6 +282,8 @@ class ERI {
 
   // Precomputed screening data
   std::vector<double> K_schwarz_rowmax_;  ///< max_Q K_schwarz_(s3,Q) per shell s3
+  // Distance-dependent Schwarz: shell-pair Gaussian product centers
+  std::vector<std::array<double, 3>> pair_center_;  ///< pair_center_[s1*nsh+s2]
 
   // Pre-LinK data structures (Kussmann & Ochsenfeld, JCP 138, 134114, 2013)
   // sig_bras_[P] = shells Q sorted descending by K_schwarz_(P,Q) — built once
@@ -414,6 +416,25 @@ class ERI {
       for (size_t s4 = 0; s4 < nsh; ++s4)
         mx = std::max(mx, K_schwarz_(s3, s4));
       K_schwarz_rowmax_[s3] = mx;
+    }
+
+    // Distance-dependent Schwarz: precompute shell-pair Gaussian product centers
+    pair_center_.resize(nsh * nsh);
+    for (size_t s1 = 0; s1 < nsh; ++s1) {
+      const auto& sh1 = obs_[s1];
+      double min_exp1 = sh1.alpha[0];
+      for (const auto& a : sh1.alpha) min_exp1 = std::min(min_exp1, a);
+      for (size_t s2 = 0; s2 <= s1; ++s2) {
+        const auto& sh2 = obs_[s2];
+        double min_exp2 = sh2.alpha[0];
+        for (const auto& a : sh2.alpha) min_exp2 = std::min(min_exp2, a);
+        double zeta = min_exp1 + min_exp2;
+        std::array<double, 3> P;
+        for (int d = 0; d < 3; ++d)
+          P[d] = (min_exp1 * sh1.O[d] + min_exp2 * sh2.O[d]) / zeta;
+        pair_center_[s1 * nsh + s2] = P;
+        pair_center_[s2 * nsh + s1] = P;
+      }
     }
 
     // Pre-LinK: build Schwarz-sorted bra lists (density-independent, built once)
@@ -846,8 +867,24 @@ class ERI {
 
             const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
-            // Density-aware Schwarz screening
+            // Distance-dependent Schwarz bound:
+            // |(PQ|1/r|RS)| ≤ Q_PQ * Q_RS / sqrt(1 + R²_PQ)
+            // Rigorous for large R (Coulomb decay), degenerates to
+            // standard Schwarz at R=0.
             const auto schwarz_bound = K_schwarz_(s1, s2) * K_schwarz_(s3, s4);
+            {
+              const auto& Pc = pair_center_[s1 * nsh_ + s2];
+              const auto& Qc = pair_center_[s3 * nsh_ + s4];
+              double R2 = 0.0;
+              for (int d = 0; d < 3; ++d) {
+                double dx = Pc[d] - Qc[d];
+                R2 += dx * dx;
+              }
+              if (schwarz_bound < eff_threshold * std::sqrt(1.0 + R2)) {
+                ++loc_schwarz;
+                continue;
+              }
+            }
             const auto P14_nrm = P_shnrm(s1, s4);
             const auto P24_nrm = P_shnrm(s2, s4);
             const auto P34_nrm = P_shnrm(s3, s4);
