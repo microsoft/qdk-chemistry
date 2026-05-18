@@ -1034,21 +1034,21 @@ class BasisSet : public DataClass,
   /// Shells organized by atom index - each atom has a vector of shells
   std::vector<std::vector<Shell>> _shells_per_atom;
 
+  /// Effective Core Potential (ECP) name (basis set name)
+  std::string _ecp_name;
+
   /// ECP shells organized by atom index - each atom has a vector of ECP shells
   std::vector<std::vector<Shell>> _ecp_shells_per_atom;
 
-  /// Auxiliary shells organized by atom index - each atom has a vector of
-  /// auxiliary shells
-  std::vector<std::vector<Shell>> _aux_shells_per_atom;
+  /// Number of ECP electrons replaced for each atom
+  std::vector<size_t> _ecp_electrons;
 
   /// Auxiliary basis set name
   std::string _aux_name;
 
-  /// Effective Core Potential (ECP) name (basis set name)
-  std::string _ecp_name;
-
-  /// Number of ECP electrons replaced for each atom
-  std::vector<size_t> _ecp_electrons;
+  /// Auxiliary shells organized by atom index - each atom has a vector of
+  /// auxiliary shells
+  std::vector<std::vector<Shell>> _aux_shells_per_atom;
 
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
