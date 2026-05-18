@@ -551,6 +551,18 @@ void SCFImpl::iterate_() {
   RowMajorMatrix P_last = RowMajorMatrix::Zero(
       num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
 
+  // Variable Fock tolerance: start loose, tighten as SCF converges.
+  // This reduces integral count in early iterations where the density
+  // is far from converged and tight screening is unnecessary.
+  const double base_threshold = cfg->eri.eri_threshold;
+  double current_threshold = base_threshold;
+  // Maximum relaxation: allow threshold up to 100× base in early iterations
+  const double max_threshold = base_threshold * 100.0;
+  // Multiplier for dynamic threshold: threshold = max(base, density_rms * factor)
+  // Factor of 1e-5 means threshold tracks ~5 orders below density change
+  const double threshold_factor = 1e-5;
+  bool needs_fock_reset = false;
+
   for (auto step = 0; step < cfg->scf_algorithm.max_iteration; ++step) {
 #ifdef ENABLE_NVTX3
     nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "SCF::iterate_step"};
@@ -564,9 +576,34 @@ void SCFImpl::iterate_() {
            "MPI_Bcast(P_)");
 #endif
 
-    if (step < cfg->incremental_fock_start_step ||
+    // Compute dynamic ERI threshold based on convergence state
+    if (step >= 2 && cfg->mpi.world_rank == 0) {
+      double density_rms =
+          (P_ - P_last).norm() / num_atomic_orbitals_;
+      double dynamic_thresh =
+          std::max(base_threshold, density_rms * threshold_factor);
+      // Clamp to maximum allowed relaxation
+      dynamic_thresh = std::min(dynamic_thresh, max_threshold);
+      // Quantize to powers of 10 (avoid threshold jitter)
+      dynamic_thresh = std::pow(10.0, std::floor(std::log10(dynamic_thresh)));
+      // Only allow monotonic tightening (never increase threshold)
+      dynamic_thresh = std::min(dynamic_thresh, current_threshold);
+      if (dynamic_thresh < current_threshold) {
+        // Threshold tightened — must reset incremental Fock to avoid
+        // accumulated errors from integrals skipped at the looser level
+        needs_fock_reset = true;
+        QDK_LOGGER().info(
+            "Variable threshold: {:.0e} -> {:.0e} (density_rms={:.2e})",
+            current_threshold, dynamic_thresh, density_rms);
+        current_threshold = dynamic_thresh;
+        eri_->set_screening_threshold(current_threshold);
+      }
+    }
+
+    if (needs_fock_reset || step < cfg->incremental_fock_start_step ||
         step % cfg->fock_reset_steps == 0) {
       P_diff = P_;
+      needs_fock_reset = false;
       if (cfg->mpi.world_rank == 0) {
         QDK_LOGGER().info("Reset incremental Fock matrix");
         reset_fock_();
@@ -661,9 +698,15 @@ void SCFImpl::iterate_() {
     }
   }
   if (!res.converged) {
+    // Restore base threshold before throwing
+    eri_->set_screening_threshold(base_threshold);
     throw std::runtime_error(
         fmt::format("SCF failed to converge after {} steps",
                     cfg->scf_algorithm.max_iteration));
+  }
+  // Restore base threshold for post-convergence operations (gradients, etc.)
+  if (current_threshold != base_threshold) {
+    eri_->set_screening_threshold(base_threshold);
   }
   // update eigenvalues for GDM as GDM never updates eigenvalues_
   if (ctx_.cfg->scf_algorithm.method == SCFAlgorithmName::GDM ||

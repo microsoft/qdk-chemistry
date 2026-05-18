@@ -410,6 +410,9 @@ class ERI {
     }
   }
 
+  /// Update the integral screening threshold for subsequent build_JK calls.
+  void set_eri_threshold(double threshold) { eri_threshold_ = threshold; }
+
   /**
    * @brief Build Coulomb (J) and exchange (K) matrices using direct integral
    * evaluation
@@ -1247,5 +1250,10 @@ void LIBINT2_DIRECT::quarter_trans_impl(size_t nt, const double* C,
   if (!eri_impl_) throw std::runtime_error("LIBINT2_DIRECT NOT INITIALIZED");
   eri_impl_->quarter_trans(nt, C, out);
 };
+
+void LIBINT2_DIRECT::set_screening_threshold(double threshold) {
+  ERI::set_screening_threshold(threshold);
+  if (eri_impl_) eri_impl_->set_eri_threshold(threshold);
+}
 
 }  // namespace qdk::chemistry::scf

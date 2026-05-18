@@ -56,6 +56,19 @@ class ERI {
   virtual ~ERI() = default;
 
   /**
+   * @brief Set the integral screening threshold for subsequent build_JK calls
+   *
+   * Allows dynamic adjustment of the screening threshold during SCF iterations.
+   * A looser threshold skips more integrals (faster but less accurate);
+   * a tighter threshold computes more integrals (slower but more accurate).
+   *
+   * @param threshold New screening threshold (must be positive)
+   */
+  virtual void set_screening_threshold(double threshold) {
+    tolerance_ = threshold;
+  }
+
+  /**
    * @brief Build Coulomb (J) and exchange (K) matrices
    *
    * Computes J[μν] = Σ_λσ P[λσ](μν|λσ) and K[μν] = Σ_λσ P[λσ](μλ|νσ)

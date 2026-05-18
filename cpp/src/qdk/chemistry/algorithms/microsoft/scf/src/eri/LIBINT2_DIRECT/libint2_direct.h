@@ -66,6 +66,12 @@ class LIBINT2_DIRECT : public ERI {
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) override;
 
+  /**
+   * @brief Set screening threshold for this engine and its implementation
+   * @see ERI::set_screening_threshold for API details
+   */
+  void set_screening_threshold(double threshold) override;
+
  private:
   /**
    * @brief Build Coulomb (J) and exchange (K) matrices via direct integral
