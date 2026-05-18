@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -12,7 +14,9 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     TimeDependentQubitHamiltonian,
+    UnitaryRepresentation,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils import Logger
 
 from .base import MeasureSimulation, MeasureSimulationSettings
@@ -31,6 +35,12 @@ class EvolveAndMeasureSettings(MeasureSimulationSettings):
             "float",
             1.0,
             "Total evolution time.",
+        )
+        self._set_default(
+            "dt",
+            "float",
+            0.0,
+            "Time step for time-dependent evolution. Each step is passed to the builder",
         )
 
 
@@ -54,12 +64,8 @@ class EvolveAndMeasure(MeasureSimulation):
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
         """Run evolve-and-measure simulation.
 
-        The evolution builder, circuit mapper, circuit executor, and energy
-        estimator are resolved from the algorithm's settings via
-        ``AlgorithmRef``.
-
         Args:
-            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
+            hamiltonian: Time-dependent Hamiltonian.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Circuit that prepares the initial state before time evolution.
             noise: Optional noise profile.
@@ -92,21 +98,70 @@ class EvolveAndMeasure(MeasureSimulation):
     ) -> Circuit:
         """Construct the combined evolution circuit.
 
-        The total evolution time is read from settings and passed to the
-        time evolution builder, which handles time-stepping internally.
+        The interval ``[0, total_time]`` is divided into steps of size
+        ``dt``.  At each step the Hamiltonian is evaluated at the midpoint
+        and the builder is called with ``dt`` as the evolution time.  The
+        resulting per-step unitaries are combined via
+        :meth:`PauliProductFormulaContainer.combine`, which merges
+        adjacent identical Pauli terms at step boundaries.
 
         Args:
             hamiltonian: Time-dependent Hamiltonian.
-            state_prep: Circuit that prepares the initial state before time evolution.
+            state_prep: Circuit that prepares the initial state.
 
         Returns:
-            The combined evolution circuit.
+            The combined state-prep + evolution circuit.
 
         """
         total_time: float = self._settings.get("total_time")
-        evolution = self._create_time_evolution(hamiltonian, total_time)
+        evolution = self._build_time_dependent_evolution(hamiltonian, total_time)
         circuit = self._map_time_evolution_to_circuit(evolution)
         return self._prepend_state_prep_circuit(state_prep, circuit, hamiltonian.num_qubits)
+
+    def _build_time_dependent_evolution(
+        self,
+        hamiltonian: TimeDependentQubitHamiltonian,
+        total_time: float,
+    ) -> UnitaryRepresentation:
+        """Build the combined unitary for a time-dependent Hamiltonian.
+
+        The interval ``[0, total_time]`` is divided into steps of size
+        ``dt`` (from settings).  At each step the Hamiltonian is evaluated
+        at the midpoint and the Trotter builder is called with ``dt`` as
+        the evolution time.  Per-step containers are combined via
+        :meth:`PauliProductFormulaContainer.combine`, which merges
+        adjacent identical Pauli terms at step boundaries.
+
+        Args:
+            hamiltonian: The time-dependent qubit Hamiltonian.
+            total_time: Total evolution time.
+
+        Returns:
+            Combined ``UnitaryRepresentation`` for the full evolution.
+
+        """
+        dt: float = self._settings.get("dt")
+        if dt <= 0.0:
+            dt = total_time
+        if dt > total_time:
+            raise ValueError(f"dt ({dt}) must not exceed total_time ({total_time}).")
+        num_steps = max(1, round(total_time / dt))
+        dt = total_time / num_steps
+
+        combined_container: PauliProductFormulaContainer | None = None
+        for i in range(num_steps):
+            t_mid = (i + 0.5) * dt
+            h_snapshot = hamiltonian.evaluate(t_mid)
+            step_evolution = self._create_time_evolution(h_snapshot, dt)
+            step_container = step_evolution.get_container()
+            if not isinstance(step_container, PauliProductFormulaContainer):
+                raise TypeError(f"Expected PauliProductFormulaContainer, got {type(step_container).__name__}.")
+            if combined_container is None:
+                combined_container = step_container
+            else:
+                combined_container = combined_container.combine(step_container)
+
+        return UnitaryRepresentation(container=combined_container)
 
     def get_circuit(self) -> Circuit:
         """Get the evolution circuit generated during algorithm execution.

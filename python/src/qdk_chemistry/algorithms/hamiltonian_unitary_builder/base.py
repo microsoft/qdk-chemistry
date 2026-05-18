@@ -8,7 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.data import QubitHamiltonian, Settings, TimeDependentQubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import QubitHamiltonian, Settings, UnitaryRepresentation
 
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
@@ -27,17 +27,14 @@ class HamiltonianUnitaryBuilder(Algorithm):
         super().__init__()
 
     @abstractmethod
-    def _run_impl(
-        self,
-        qubit_hamiltonian: QubitHamiltonian | TimeDependentQubitHamiltonian,
-    ) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation for the given Hamiltonian.
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation for the given QubitHamiltonian.
 
         Args:
-            qubit_hamiltonian: A time-independent or time-dependent qubit Hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
+            UnitaryRepresentation: A UnitaryRepresentation for the given QubitHamiltonian.
 
         """
 
@@ -125,17 +122,14 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(
-        self,
-        qubit_hamiltonian: QubitHamiltonian | TimeDependentQubitHamiltonian,
-    ) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary.
+    def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitHamiltonian.
 
         Args:
-            qubit_hamiltonian: A time-independent or time-dependent qubit Hamiltonian.
+            qubit_hamiltonian: The qubit Hamiltonian.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitHamiltonian.
 
         """
 

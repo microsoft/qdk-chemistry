@@ -124,6 +124,7 @@ def test_evolve_and_measure_eigenvalue_remains_constant() -> None:
     )
     algo.settings().set("shots", 1024)
     algo.settings().set("total_time", 100.0)
+    algo.settings().set("dt", 1.0)
 
     state_prep = _identity_state_prep(num_qubits=2)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep)
@@ -204,6 +205,7 @@ def _run_smooth_drive_test(
     total_time: float,
     num_divisions: int,
     *,
+    dt: float = 0.1,
     expected_zz: float = 1.0,
     atol: float = 0.2,
 ) -> None:
@@ -225,6 +227,7 @@ def _run_smooth_drive_test(
     )
     algo.settings().set("shots", 1024)
     algo.settings().set("total_time", total_time)
+    algo.settings().set("dt", dt)
 
     state_prep = _identity_state_prep(num_qubits=2)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep)
