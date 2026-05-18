@@ -464,51 +464,11 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 
   const size_t num_atoms = structure->get_num_atoms();
-
-  // Organize shells by atom index
-  for (const auto& shell : shells) {
-    size_t atom_index = shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-
-    _shells_per_atom[atom_index].push_back(shell);
-  }
-
-  // Organize auxiliary shells by atom index
-  for (const auto& aux_shell : aux_shells) {
-    if (aux_shell.has_radial_powers()) {
-      throw std::invalid_argument(
-          "Auxiliary shells contain a shell with radial powers; did you pass "
-          "ECP shells by mistake? ECP basis must be constructed with both ECP "
-          "shells and ECP electrons.");
-    }
-    size_t atom_index = aux_shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Auxiliary shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _aux_shells_per_atom.size()) {
-      _aux_shells_per_atom.resize(atom_index + 1);
-    }
-
-    _aux_shells_per_atom[atom_index].push_back(aux_shell);
-  }
+  _organize_shells(shells, num_atoms, "Shell");
+  _organize_aux_shells(aux_shells, num_atoms);
 
   // Initialize ECP electrons vector with zeros for each atom
-  _ecp_electrons.resize(structure->get_num_atoms(), 0);
+  _ecp_electrons.resize(num_atoms, 0);
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -556,42 +516,8 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 
   const size_t num_atoms = structure->get_num_atoms();
-
-  // Organize shells by atom index
-  for (const auto& shell : shells) {
-    size_t atom_index = shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-
-    _shells_per_atom[atom_index].push_back(shell);
-  }
-
-  // Organize ECP shells by atom index
-  for (const auto& ecp_shell : ecp_shells) {
-    size_t atom_index = ecp_shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("ECP shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-
-    // Ensure we have enough space for this atom
-    if (atom_index >= _ecp_shells_per_atom.size()) {
-      _ecp_shells_per_atom.resize(atom_index + 1);
-    }
-
-    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
-  }
+  _organize_shells(shells, num_atoms, "Shell");
+  _organize_ecp_shells(ecp_shells, num_atoms);
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -727,57 +653,9 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   }
 
   const size_t num_atoms = structure->get_num_atoms();
-
-  // Organize shells by atom index
-  for (const auto& shell : shells) {
-    size_t atom_index = shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-    if (atom_index >= _shells_per_atom.size()) {
-      _shells_per_atom.resize(atom_index + 1);
-    }
-    _shells_per_atom[atom_index].push_back(shell);
-  }
-
-  // Organize ECP shells by atom index
-  for (const auto& ecp_shell : ecp_shells) {
-    size_t atom_index = ecp_shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("ECP shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-    if (atom_index >= _ecp_shells_per_atom.size()) {
-      _ecp_shells_per_atom.resize(atom_index + 1);
-    }
-    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
-  }
-
-  // Organize auxiliary shells by atom index
-  for (const auto& aux_shell : aux_shells) {
-    if (aux_shell.has_radial_powers()) {
-      throw std::invalid_argument(
-          "Auxiliary shells contains a shell with radial powers; did you pass "
-          "ECP shells by mistake? ECP basis must be constructed with both ECP "
-          "shells and ECP electrons.");
-    }
-    size_t atom_index = aux_shell.atom_index;
-    if (atom_index >= num_atoms) {
-      throw std::invalid_argument("Auxiliary shell atom_index (" +
-                                  std::to_string(atom_index) +
-                                  ") is out of range for structure with " +
-                                  std::to_string(num_atoms) + " atoms");
-    }
-    if (atom_index >= _aux_shells_per_atom.size()) {
-      _aux_shells_per_atom.resize(atom_index + 1);
-    }
-    _aux_shells_per_atom[atom_index].push_back(aux_shell);
-  }
+  _organize_shells(shells, num_atoms, "Shell");
+  _organize_ecp_shells(ecp_shells, num_atoms);
+  _organize_aux_shells(aux_shells, num_atoms);
 
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
@@ -1732,6 +1610,64 @@ bool BasisSet::_is_consistent_with_structure() const {
   }
 
   return true;
+}
+
+void BasisSet::_organize_shells(const std::vector<Shell>& shells,
+                                size_t num_atoms,
+                                const std::string& label) {
+  for (const auto& shell : shells) {
+    size_t atom_index = shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument(label + " atom_index (" +
+                                  std::to_string(atom_index) +
+                                  ") is out of range for structure with " +
+                                  std::to_string(num_atoms) + " atoms");
+    }
+    if (atom_index >= _shells_per_atom.size()) {
+      _shells_per_atom.resize(atom_index + 1);
+    }
+    _shells_per_atom[atom_index].push_back(shell);
+  }
+}
+
+void BasisSet::_organize_ecp_shells(const std::vector<Shell>& ecp_shells,
+                                    size_t num_atoms) {
+  for (const auto& ecp_shell : ecp_shells) {
+    size_t atom_index = ecp_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument("ECP shell atom_index (" +
+                                  std::to_string(atom_index) +
+                                  ") is out of range for structure with " +
+                                  std::to_string(num_atoms) + " atoms");
+    }
+    if (atom_index >= _ecp_shells_per_atom.size()) {
+      _ecp_shells_per_atom.resize(atom_index + 1);
+    }
+    _ecp_shells_per_atom[atom_index].push_back(ecp_shell);
+  }
+}
+
+void BasisSet::_organize_aux_shells(const std::vector<Shell>& aux_shells,
+                                    size_t num_atoms) {
+  for (const auto& aux_shell : aux_shells) {
+    if (aux_shell.has_radial_powers()) {
+      throw std::invalid_argument(
+          "Auxiliary shell has radial powers; did you pass ECP shells by "
+          "mistake? ECP basis must be constructed with both ECP shells and "
+          "ECP electrons.");
+    }
+    size_t atom_index = aux_shell.atom_index;
+    if (atom_index >= num_atoms) {
+      throw std::invalid_argument("Auxiliary shell atom_index (" +
+                                  std::to_string(atom_index) +
+                                  ") is out of range for structure with " +
+                                  std::to_string(num_atoms) + " atoms");
+    }
+    if (atom_index >= _aux_shells_per_atom.size()) {
+      _aux_shells_per_atom.resize(atom_index + 1);
+    }
+    _aux_shells_per_atom[atom_index].push_back(aux_shell);
+  }
 }
 
 bool BasisSet::_is_valid() const {

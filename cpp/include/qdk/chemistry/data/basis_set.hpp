@@ -1075,6 +1075,28 @@ class BasisSet : public DataClass,
   bool _is_valid() const;
 
   /**
+   * @brief Organize shells into per-atom storage, validating atom indices.
+   * @param shells The shells to organize
+   * @param num_atoms Number of atoms in the structure
+   * @param label Label for error messages (e.g., "Shell", "ECP shell")
+   */
+  void _organize_shells(const std::vector<Shell>& shells, size_t num_atoms,
+                        const std::string& label);
+
+  /**
+   * @brief Organize ECP shells into per-atom storage, validating atom indices.
+   */
+  void _organize_ecp_shells(const std::vector<Shell>& ecp_shells,
+                            size_t num_atoms);
+
+  /**
+   * @brief Organize auxiliary shells into per-atom storage, validating atom
+   *        indices and rejecting shells with radial powers.
+   */
+  void _organize_aux_shells(const std::vector<Shell>& aux_shells,
+                            size_t num_atoms);
+
+  /**
    * @brief Validate consistency with the associated molecular structure
    * @return True if basis set is consistent with its structure
    */
