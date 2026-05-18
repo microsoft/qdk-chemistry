@@ -229,6 +229,14 @@ class ERI {
   std::vector<size_t> shell_bf_offset_; ///< shell_bf_offset_[s] = first basis function index
   size_t max_shellblock_bf_;            ///< max over all s of shell_nbf_[s]
 
+  // Persistent per-thread TLS accumulation buffers.
+  // Allocated once with first-touch in a parallel region so each thread's
+  // buffer lands on its own NUMA node. Reused across build_JK calls to
+  // avoid repeated heap allocation of nthreads × N² doubles.
+  std::vector<std::vector<double>> J_tls_; ///< Per-thread J accumulation
+  std::vector<std::vector<double>> K_tls_; ///< Per-thread K accumulation
+  size_t tls_mat_size_ = 0;               ///< Current allocation size per buffer
+
  public:
   /**
    * @brief Construct Libint2 direct ERI engine
@@ -290,6 +298,29 @@ class ERI {
                                     obs_.max_nprim(), obs_.max_l(), 0);
     engines_[0].set(::libint2::ScreeningMethod::Original);
     for (int i = 1; i < nthreads_; ++i) engines_[i] = engines_[0];
+
+    // Pre-allocate per-thread TLS buffers with first-touch NUMA placement.
+    // Each thread allocates and touches its own buffer inside a parallel
+    // region so the OS maps the pages to the thread's NUMA node.
+    const size_t nbf = obs_.nbf();
+    tls_mat_size_ = spin_density_factor_ * nbf * nbf;
+    J_tls_.resize(nthreads_);
+    K_tls_.resize(nthreads_);
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+#ifdef _OPENMP
+      const int tid = omp_get_thread_num();
+#else
+      const int tid = 0;
+#endif
+      J_tls_[tid].resize(tls_mat_size_);
+      K_tls_[tid].resize(tls_mat_size_);
+      // First-touch: write every page so the OS maps to this thread's node
+      std::memset(J_tls_[tid].data(), 0, tls_mat_size_ * sizeof(double));
+      std::memset(K_tls_[tid].data(), 0, tls_mat_size_ * sizeof(double));
+    }
   }
 
   /**
@@ -411,12 +442,19 @@ class ERI {
       bra_pairs = std::move(reordered);
     }
 
-    // Per-thread N²-sized accumulation (same total memory as old TLS)
-    std::vector<std::vector<double>> J_local(nthreads_);
-    std::vector<std::vector<double>> K_local(nthreads_);
-    for (int t = 0; t < nthreads_; ++t) {
-      if (J) J_local[t].resize(mat_size, 0.0);
-      if (K) K_local[t].resize(mat_size, 0.0);
+    // Zero persistent TLS buffers in parallel (each thread zeros its own,
+    // maintaining NUMA locality from the first-touch allocation)
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+#ifdef _OPENMP
+      const int tid = omp_get_thread_num();
+#else
+      const int tid = 0;
+#endif
+      if (J) std::memset(J_tls_[tid].data(), 0, mat_size * sizeof(double));
+      if (K) std::memset(K_tls_[tid].data(), 0, mat_size * sizeof(double));
     }
 
 #ifdef _OPENMP
@@ -430,8 +468,8 @@ class ERI {
 #endif
       auto& engine = engines_[tid];
       const auto& buf = engine.results();
-      double* J_thr = J ? J_local[tid].data() : nullptr;
-      double* K_thr = K ? K_local[tid].data() : nullptr;
+      double* J_thr = J ? J_tls_[tid].data() : nullptr;
+      double* K_thr = K ? K_tls_[tid].data() : nullptr;
 
       // Dynamic scheduling over bra-pairs — each thread processes
       // contiguous bra-pair ranges, improving cache locality for bra-side
@@ -567,7 +605,7 @@ class ERI {
 #endif
       for (size_t i = 0; i < mat_size; ++i)
         for (int t = 0; t < nthreads_; ++t)
-          J[i] += J_local[t][i];
+          J[i] += J_tls_[t][i];
     }
     if (K) {
 #ifdef _OPENMP
@@ -575,7 +613,7 @@ class ERI {
 #endif
       for (size_t i = 0; i < mat_size; ++i)
         for (int t = 0; t < nthreads_; ++t)
-          K[i] += K_local[t][i];
+          K[i] += K_tls_[t][i];
     }
 
     // Symmetrize J (parallel)
