@@ -75,7 +75,7 @@ struct ERIConfig {
   uint32_t with_j = 1;           ///< Compute Coulomb (J) matrix (1=yes, 0=no)
   uint32_t with_k = 1;           ///< Compute exchange (K) matrix (1=yes, 0=no)
   uint32_t dm_cnt = 1;           ///< Number of density matrices to process
-  double eri_threshold = 1e-10;  ///< Integral screening threshold
+  double eri_threshold = 1e-9;  ///< Integral screening threshold
   double shell_pair_threshold =
       1e-12;  ///< Overlap-based shell pair pre-screening threshold
   bool use_atomics =

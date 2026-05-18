@@ -197,7 +197,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     ms_scf_config->eri.eri_threshold = eri_threshold;
   } else {
     // use the appropriate default according to convergence threshold
-    double eri_threshold_multiplier = 1.0e-5;
+    double eri_threshold_multiplier = 1.0e-4;
     ms_scf_config->eri.eri_threshold =
         convergence_threshold * eri_threshold_multiplier;
   }

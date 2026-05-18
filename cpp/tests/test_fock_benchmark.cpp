@@ -95,7 +95,7 @@ std::shared_ptr<BasisSet> make_basis(std::shared_ptr<Molecule> mol,
 std::shared_ptr<ERI> make_direct_eri(BasisSet& basis,
                                      SCFOrbitalType orbital_type,
                                      bool use_atomics = false,
-                                     double eri_threshold = 1e-10,
+                                     double eri_threshold = 1e-9,
                                      double sp_threshold = 1e-12) {
   SCFConfig cfg;
   cfg.scf_orbital_type = orbital_type;
@@ -907,5 +907,63 @@ TEST(FockBenchmark, MemoryBaseline) {
     std::cout << sys.name << "," << sys.basis_name << "," << nao << ","
               << nthreads << "," << std::fixed << std::setprecision(2)
               << scratch_mb << std::endl;
+  }
+}
+
+// ===========================================================================
+// BENCHMARK: ERI threshold sweep
+// For each benchmark system, measure accuracy and timing at different
+// screening thresholds relative to a tight (1e-14) reference.
+// ===========================================================================
+TEST(FockBenchmark, ThresholdSweep) {
+  if (!std::getenv("QDK_FOCK_BENCH")) {
+    GTEST_SKIP() << "Set QDK_FOCK_BENCH=1 to run timing benchmarks";
+  }
+  std::cout << "system,nao,threshold,build_jk_ms,j_max_err,k_max_err"
+            << std::endl;
+
+  auto systems = get_benchmark_systems();
+  const std::vector<double> thresholds = {1e-8, 1e-9, 1e-10, 1e-11, 1e-12};
+  constexpr double ref_threshold = 1e-14;
+
+  for (const auto& sys : systems) {
+    auto basis = make_basis(sys.mol, sys.basis_name, sys.pure);
+    const size_t nao = basis->num_atomic_orbitals;
+    const size_t ndm = 1;
+    auto P = make_random_density(nao);
+
+    // Tight-threshold reference
+    auto eri_ref = make_direct_eri(*basis, SCFOrbitalType::Restricted,
+                                   false, ref_threshold);
+    auto [J_ref, K_ref] = build_JK_standalone(*eri_ref, P, nao, ndm);
+
+    for (double thresh : thresholds) {
+      auto eri = make_direct_eri(*basis, SCFOrbitalType::Restricted,
+                                 false, thresh);
+      // Warmup
+      auto [J_w, K_w] = build_JK_standalone(*eri, P, nao, ndm);
+
+      // Timed runs
+      const int n_runs = 3;
+      double total_ms = 0.0;
+      std::vector<double> J_last, K_last;
+      for (int r = 0; r < n_runs; ++r) {
+        auto start = std::chrono::high_resolution_clock::now();
+        auto [J, K] = build_JK_standalone(*eri, P, nao, ndm);
+        auto end = std::chrono::high_resolution_clock::now();
+        total_ms +=
+            std::chrono::duration<double, std::milli>(end - start).count();
+        if (r == n_runs - 1) { J_last = J; K_last = K; }
+      }
+      double avg_ms = total_ms / n_runs;
+      double j_err = inf_norm_diff(J_ref, J_last);
+      double k_err = inf_norm_diff(K_ref, K_last);
+
+      std::cout << sys.name << "," << nao << ","
+                << std::scientific << std::setprecision(0) << thresh << ","
+                << std::fixed << std::setprecision(2) << avg_ms << ","
+                << std::scientific << std::setprecision(2)
+                << j_err << "," << k_err << std::endl;
+    }
   }
 }
