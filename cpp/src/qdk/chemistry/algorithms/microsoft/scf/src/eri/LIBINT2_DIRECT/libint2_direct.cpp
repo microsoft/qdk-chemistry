@@ -282,6 +282,15 @@ class ERI {
 
   // Precomputed screening data
   std::vector<double> K_schwarz_rowmax_;  ///< max_Q K_schwarz_(s3,Q) per shell s3
+  // Distance-dependent bound precomputed data per shell pair (CSR indexed)
+  // For each shell pair in sp_csr_: K_max, gamma_min, nprim, center of most diffuse pair
+  struct PairBoundData {
+    double K_max;           ///< largest K among surviving primitive pairs
+    double gamma_min;       ///< smallest gamma (= 1/max(one_over_gamma))
+    double nprim;           ///< number of surviving primitive pairs
+    double P_diffuse[3];    ///< product center of the most diffuse primitive pair
+  };
+  std::vector<PairBoundData> pair_bound_;  ///< indexed same as sp_csr_.data
   // Distance-dependent Schwarz: shell-pair Gaussian product centers
   std::vector<std::array<double, 3>> pair_center_;  ///< pair_center_[s1*nsh+s2]
 
@@ -407,6 +416,26 @@ class ERI {
     for (int i = 0; i < nthreads_; ++i) {
       touched_J_list_[i].reserve(nsh * nsh / 4);
       touched_K_list_[i].reserve(nsh * nsh / 2);
+    }
+
+    // Precompute distance-dependent bound data for each shell pair in CSR
+    pair_bound_.resize(sp_csr_.data.size());
+    for (size_t idx = 0; idx < sp_csr_.data.size(); ++idx) {
+      const auto& sp = sp_csr_.data[idx];
+      PairBoundData bd{};
+      double max_oog = 0.0;
+      for (const auto& pp : sp.primpairs) {
+        if (std::abs(pp.K) > bd.K_max) bd.K_max = std::abs(pp.K);
+        if (pp.one_over_gamma > max_oog) {
+          max_oog = pp.one_over_gamma;
+          bd.P_diffuse[0] = pp.P[0];
+          bd.P_diffuse[1] = pp.P[1];
+          bd.P_diffuse[2] = pp.P[2];
+        }
+      }
+      bd.gamma_min = (max_oog > 0) ? 1.0 / max_oog : 1e10;
+      bd.nprim = static_cast<double>(sp.primpairs.size());
+      pair_bound_[idx] = bd;
     }
 
     // Precompute K_schwarz row maxima for coarse s3-row pre-screening
