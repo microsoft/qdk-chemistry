@@ -266,6 +266,14 @@ class ERI {
   // Precomputed screening data
   std::vector<double> K_schwarz_rowmax_;  ///< max_Q K_schwarz_(s3,Q) per shell s3
 
+  // Pre-LinK data structures (Kussmann & Ochsenfeld, JCP 138, 134114, 2013)
+  // sig_bras_[P] = shells Q sorted descending by K_schwarz_(P,Q) — built once
+  std::vector<std::vector<size_t>> sig_bras_;
+  std::vector<std::vector<double>> sig_bras_schwarz_;  ///< parallel Schwarz values
+  // sig_kets_[P] = shells R sorted descending by screening value — rebuilt per build_JK
+  std::vector<std::vector<size_t>> sig_kets_;
+  std::vector<std::vector<double>> sig_kets_screen_;  ///< parallel screening values
+
   // Precomputed cost-balanced bra-pair schedule (built once, reused across calls)
   struct BraPair {
     size_t s1, s2;
@@ -391,6 +399,26 @@ class ERI {
       K_schwarz_rowmax_[s3] = mx;
     }
 
+    // Pre-LinK: build Schwarz-sorted bra lists (density-independent, built once)
+    // sig_bras_[P] = shells Q sorted descending by K_schwarz_(P,Q)
+    sig_bras_.resize(nsh);
+    sig_bras_schwarz_.resize(nsh);
+    for (size_t P = 0; P < nsh; ++P) {
+      std::vector<std::pair<double, size_t>> pq_vals;
+      for (size_t Q = 0; Q < nsh; ++Q) {
+        double val = K_schwarz_(P, Q);
+        if (val >= 1e-15) pq_vals.push_back({val, Q});
+      }
+      std::sort(pq_vals.begin(), pq_vals.end(),
+                [](const auto& a, const auto& b) { return a.first > b.first; });
+      sig_bras_[P].reserve(pq_vals.size());
+      sig_bras_schwarz_[P].reserve(pq_vals.size());
+      for (const auto& [val, Q] : pq_vals) {
+        sig_bras_[P].push_back(Q);
+        sig_bras_schwarz_[P].push_back(val);
+      }
+    }
+
     // Build cost-balanced bra-pair schedule (once, reused across calls).
     // Pure function of basis and thread count — no density dependence.
     {
@@ -481,6 +509,52 @@ class ERI {
     // (scf_impl.cpp) may adjust eri_threshold_ via set_screening_threshold()
     // for adaptive precision as SCF converges.
     const double eff_threshold = eri_threshold_;
+
+    // Pre-LinK: build density-weighted significant ket lists
+    // sig_kets_[P] = shells R where ceiling[P]*ceiling[R]*D_max(P,R) >= threshold
+    // Sorted descending by screening value for early-exit
+    sig_kets_.resize(nsh);
+    sig_kets_screen_.resize(nsh);
+    if (K) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+      for (size_t P = 0; P < nsh; ++P) {
+        sig_kets_[P].clear();
+        sig_kets_screen_[P].clear();
+        std::vector<std::pair<double, size_t>> pr_vals;
+        for (size_t R = 0; R < nsh; ++R) {
+          double screen_val =
+              K_schwarz_rowmax_[P] * K_schwarz_rowmax_[R] * P_shnrm(P, R);
+          if (screen_val >= eff_threshold) {
+            pr_vals.push_back({screen_val, R});
+          }
+        }
+        std::sort(pr_vals.begin(), pr_vals.end(),
+                  [](const auto& a, const auto& b) { return a.first > b.first; });
+        sig_kets_[P].reserve(pr_vals.size());
+        sig_kets_screen_[P].reserve(pr_vals.size());
+        for (const auto& [val, R] : pr_vals) {
+          sig_kets_[P].push_back(R);
+          sig_kets_screen_[P].push_back(val);
+        }
+      }
+    }
+
+    // Pre-LinK diagnostic: report sig_kets statistics
+    if (K && std::getenv("QDK_FOCK_SCREEN_DIAG")) {
+      size_t total_kets = 0, max_kets = 0;
+      for (size_t P = 0; P < nsh; ++P) {
+        total_kets += sig_kets_[P].size();
+        max_kets = std::max(max_kets, sig_kets_[P].size());
+      }
+      double avg_kets = static_cast<double>(total_kets) / nsh;
+      QDK_LOGGER().info(
+          "preLinK: nsh={} sig_kets_avg={:.1f} sig_kets_max={} "
+          "sig_kets_total={} (of {} = {:.1f}%)",
+          nsh, avg_kets, max_kets, total_kets, nsh * nsh,
+          100.0 * total_kets / (nsh * nsh));
+    }
 
     double engine_precision;
     if (P_shmax <= 0.0) {
