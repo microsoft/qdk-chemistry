@@ -576,6 +576,50 @@ void SCFImpl::iterate_() {
     }
     P_last = P_;
 
+    // ΔP sparsity diagnostics (gated by environment variable)
+    if (cfg->mpi.world_rank == 0 && std::getenv("QDK_SCF_DELTA_P_DIAG")) {
+      const size_t nao = num_atomic_orbitals_;
+      const double thresh = cfg->eri.eri_threshold;
+      // Element-wise statistics
+      double max_dp = 0.0, sum_sq = 0.0;
+      size_t nnz = 0;
+      for (size_t i = 0; i < nao; ++i) {
+        for (size_t j = i; j < nao; ++j) {
+          double v = std::abs(P_diff(i, j));
+          max_dp = std::max(max_dp, v);
+          sum_sq += v * v * (i == j ? 1 : 2);
+          if (v > thresh) nnz += (i == j ? 1 : 2);
+        }
+      }
+      double rms_dp = std::sqrt(sum_sq / (nao * nao));
+      double elem_density = static_cast<double>(nnz) / (nao * nao);
+      // Shell-block statistics
+      const auto& shells = ctx_.basis_set->shells;
+      const size_t nsh = shells.size();
+      auto shell_nbf = [&](size_t s) -> size_t {
+        size_t l = shells[s].angular_momentum;
+        return ctx_.basis_set->pure ? (2 * l + 1) : ((l + 1) * (l + 2) / 2);
+      };
+      std::vector<size_t> sh2bf(nsh + 1, 0);
+      for (size_t s = 0; s < nsh; ++s) sh2bf[s + 1] = sh2bf[s] + shell_nbf(s);
+      size_t sig_pairs = 0, total_pairs = nsh * (nsh + 1) / 2;
+      for (size_t sa = 0; sa < nsh; ++sa) {
+        for (size_t sb = sa; sb < nsh; ++sb) {
+          double block_max = 0.0;
+          for (size_t i = sh2bf[sa]; i < sh2bf[sa + 1]; ++i)
+            for (size_t j = sh2bf[sb]; j < sh2bf[sb + 1]; ++j)
+              block_max = std::max(block_max, std::abs(P_diff(i, j)));
+          if (block_max > thresh) ++sig_pairs;
+        }
+      }
+      double shell_density = static_cast<double>(sig_pairs) / total_pairs;
+      QDK_LOGGER().info(
+          "dP_diag step={} max={:.2e} rms={:.2e} elem_nnz={:.1f}% "
+          "shell_sig={}/{} ({:.1f}%)",
+          step, max_dp, rms_dp, elem_density * 100.0, sig_pairs, total_pairs,
+          shell_density * 100.0);
+    }
+
     auto [alpha, beta, omega] = get_hyb_coeff_();
     {
       AutoTimer t_jk("SCF::build_JK");
