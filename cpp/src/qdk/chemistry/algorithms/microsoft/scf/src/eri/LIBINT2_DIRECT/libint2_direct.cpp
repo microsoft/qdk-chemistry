@@ -15,6 +15,7 @@
 #include <omp.h>
 #endif
 #include <blas.hh>
+#include <cassert>
 #include <stdexcept>
 #include <unordered_set>
 
@@ -57,30 +58,37 @@ RowMajorMatrix compute_shellblock_norm(const ::libint2::BasisSet& obs,
   return shnrms;
 }
 
-using shellpair_list_t = std::unordered_map<size_t, std::vector<size_t>>;
-using shellpair_data_t = std::vector<
-    std::vector<std::shared_ptr<::libint2::ShellPair>>>;  // in same order as
-                                                          // shellpair_list_t
+/**
+ * @brief CSR (Compressed Sparse Row) shell-pair list
+ *
+ * Cache-friendly replacement for the unordered_map + shared_ptr shell-pair
+ * data structures. Stores shell-pair neighbor indices in CSR format and
+ * ShellPair geometric data contiguously by value.
+ *
+ * For each shell s, the significant neighbors are stored at indices
+ * [offsets[s], offsets[s+1]) in the neighbors and data arrays. Neighbors
+ * within each row are sorted in ascending order, which is required for the
+ * `if (s4 > s4_max) break;` early-exit optimization.
+ */
+struct ShellPairCSR {
+  std::vector<size_t> offsets;           ///< size nsh+1; row boundaries
+  std::vector<size_t> neighbors;         ///< size = total significant pairs
+  std::vector<::libint2::ShellPair> data;///< same length as neighbors; by value
+
+  /// Number of significant pairs for shell s
+  size_t row_size(size_t s) const { return offsets[s + 1] - offsets[s]; }
+};
 
 /**
- * @brief Precompute significant shell pairs for integral screening
+ * @brief Precompute significant shell pairs in CSR format
  *
- * Determines which shell pairs have significant overlap and should be included
- * in integral evaluation. Uses overlap integral screening to eliminate
- * negligible shell pairs, reducing computational cost in subsequent ERI
- * evaluation. Also precomputes ShellPair objects containing geometric screening
- * data.
- *
- * @param obs Libint2 orbital basis set
- * @param threshold Overlap threshold for shell pair significance (default:
- * 1e-12)
- * @return Tuple containing shell pair list and precomputed ShellPair data
- *
- * @note Shell pairs on the same center are always considered significant
- * @note ShellPair objects contain logarithmic precision bounds for screening
+ * Replaces compute_shellpairs() with a cache-friendly CSR layout.
+ * ShellPair objects are stored by value (no shared_ptr indirection).
+ * Neighbors within each row are sorted ascending (required by the
+ * early-exit break in the ket-pair loop).
  */
-std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
-    const ::libint2::BasisSet& obs, double threshold) {
+ShellPairCSR compute_shellpairs_csr(const ::libint2::BasisSet& obs,
+                                    double threshold) {
   QDK_LOG_TRACE_ENTERING();
 
   const auto ln_max_engine_precision = std::log(max_engine_precision);
@@ -95,12 +103,8 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
                                   obs.max_l(), 0));
   for (auto& e : engines) e.set_precision(0.);
 
-  shellpair_list_t splist;
-
-  // Initialize with empty lists
-  for (size_t i = 0; i < nsh; ++i) {
-    splist.insert(std::make_pair(i, std::vector<size_t>()));
-  }
+  // Phase 1: Determine significant pairs per shell (thread-local lists)
+  std::vector<std::vector<size_t>> per_shell_neighbors(nsh);
 
 #ifdef _OPENMP
 #pragma omp parallel
@@ -128,25 +132,44 @@ std::tuple<shellpair_list_t, shellpair_data_t> compute_shellpairs(
           const auto norm = buf_map.norm();
           significant = (norm >= threshold);
         }
+        if (significant) per_shell_neighbors[s1].emplace_back(s2);
+      }
+    }
+  }
 
-        if (significant) splist[s1].emplace_back(s2);
-      }  // s2
-    }  // s1
-  }  // parallel
+  // Phase 2: Build CSR offsets
+  ShellPairCSR csr;
+  csr.offsets.resize(nsh + 1);
+  csr.offsets[0] = 0;
+  for (size_t s = 0; s < nsh; ++s) {
+    csr.offsets[s + 1] = csr.offsets[s] + per_shell_neighbors[s].size();
+  }
+  const size_t total_pairs = csr.offsets[nsh];
 
-  shellpair_data_t spdata(splist.size());
+  // Phase 3: Fill neighbors array (preserving ascending order per row)
+  csr.neighbors.resize(total_pairs);
+  for (size_t s = 0; s < nsh; ++s) {
+    assert(std::is_sorted(per_shell_neighbors[s].begin(),
+                          per_shell_neighbors[s].end()));
+    std::copy(per_shell_neighbors[s].begin(), per_shell_neighbors[s].end(),
+              csr.neighbors.begin() + csr.offsets[s]);
+  }
 
+  // Phase 4: Construct ShellPair data by value (parallel, indexed by position)
+  csr.data.resize(total_pairs);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic)
 #endif
-  for (size_t s1 = 0; s1 < nsh; ++s1)
-    for (size_t s2 : splist[s1]) {
-      spdata[s1].emplace_back(std::make_shared<::libint2::ShellPair>(
-          obs[s1], obs[s2], ln_max_engine_precision,
-          ::libint2::ScreeningMethod::Original));
+  for (size_t s1 = 0; s1 < nsh; ++s1) {
+    for (size_t idx = csr.offsets[s1]; idx < csr.offsets[s1 + 1]; ++idx) {
+      const size_t s2 = csr.neighbors[idx];
+      csr.data[idx] = ::libint2::ShellPair(obs[s1], obs[s2],
+                                           ln_max_engine_precision,
+                                           ::libint2::ScreeningMethod::Original);
     }
+  }
 
-  return std::make_tuple(splist, spdata);
+  return csr;
 }
 
 /**
@@ -173,9 +196,13 @@ class ERI {
   ::libint2::BasisSet obs_;        ///< Libint2 orbital basis set representation
   std::vector<size_t>
       shell2bf_;  ///< Mapping from shell index to first atomic orbital
-  shellpair_list_t splist_;   ///< Pre-computed shell pair list for screening
-  shellpair_data_t spdata_;   ///< Shell pair geometric data and bounds
-  RowMajorMatrix K_schwarz_;  ///< Schwarz screening matrix for integral bounds
+  ShellPairCSR sp_csr_;            ///< CSR shell-pair list + data (by value)
+  RowMajorMatrix K_schwarz_;       ///< Schwarz screening matrix for integral bounds
+
+  // Per-shell POD arrays for fast inner-loop access (avoid obs_[s].size() calls)
+  std::vector<size_t> shell_nbf_;       ///< shell_nbf_[s] = number of basis functions in shell s
+  std::vector<size_t> shell_bf_offset_; ///< shell_bf_offset_[s] = first basis function index
+  size_t max_shellblock_bf_;            ///< max over all s of shell_nbf_[s]
 
  public:
   /**
@@ -208,8 +235,19 @@ class ERI {
 
     shell2bf_ = obs_.shell2bf();
 
-    // Compute Shell Pairs
-    std::tie(splist_, spdata_) = compute_shellpairs(obs_, shell_pair_threshold);
+    // Build per-shell POD arrays
+    const size_t nsh = obs_.size();
+    shell_nbf_.resize(nsh);
+    shell_bf_offset_.resize(nsh);
+    max_shellblock_bf_ = 0;
+    for (size_t s = 0; s < nsh; ++s) {
+      shell_nbf_[s] = obs_[s].size();
+      shell_bf_offset_[s] = shell2bf_[s];
+      max_shellblock_bf_ = std::max(max_shellblock_bf_, shell_nbf_[s]);
+    }
+
+    // Compute Shell Pairs in CSR format
+    sp_csr_ = compute_shellpairs_csr(obs_, shell_pair_threshold);
 
     // Compute Schwarz Screening
     K_schwarz_ = RowMajorMatrix(obs_.size(), obs_.size());
@@ -334,37 +372,39 @@ class ERI {
       }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
-        const auto bf1_st = shell2bf_[s1];
-        const auto n1 = obs_[s1].size();
+        const auto bf1_st = shell_bf_offset_[s1];
+        const auto n1 = shell_nbf_[s1];
 
-        auto sp12_data_it = spdata_.at(s1).begin();
+        const size_t sp12_begin = sp_csr_.offsets[s1];
+        const size_t sp12_end = sp_csr_.offsets[s1 + 1];
 
-        // Only loop over significant shell pairs
-        for (size_t s2 : splist_[s1]) {
-          const auto bf2_st = shell2bf_[s2];
-          const auto n2 = obs_[s2].size();
-          const auto* sp12_data = sp12_data_it->get();
-          sp12_data_it++;
+        // Only loop over significant shell pairs (CSR row for s1)
+        for (size_t sp12_idx = sp12_begin; sp12_idx < sp12_end; ++sp12_idx) {
+          const size_t s2 = sp_csr_.neighbors[sp12_idx];
+          const auto bf2_st = shell_bf_offset_[s2];
+          const auto n2 = shell_nbf_[s2];
+          const auto* sp12_data = &sp_csr_.data[sp12_idx];
 
           const auto P12_nrm = P_shnrm(s1, s2);
 
           for (size_t s3 = 0; s3 <= s1; ++s3) {
-            const auto bf3_st = shell2bf_[s3];
-            const auto n3 = obs_[s3].size();
+            const auto bf3_st = shell_bf_offset_[s3];
+            const auto n3 = shell_nbf_[s3];
 
             const auto P13_nrm = P_shnrm(s1, s3);
             const auto P23_nrm = P_shnrm(s2, s3);
             const auto P123_nrm = std::max({P12_nrm, P13_nrm, P23_nrm});
 
-            auto sp34_data_it = spdata_.at(s3).begin();
+            const size_t sp34_begin = sp_csr_.offsets[s3];
+            const size_t sp34_end = sp_csr_.offsets[s3 + 1];
             const size_t s4_max = (s1 == s3) ? s2 : s3;
 
-            // Only loop over significant shell pairs
-            for (size_t s4 : splist_[s3]) {
+            // Only loop over significant shell pairs (CSR row for s3)
+            for (size_t sp34_idx = sp34_begin; sp34_idx < sp34_end; ++sp34_idx) {
+              const size_t s4 = sp_csr_.neighbors[sp34_idx];
               if (s4 > s4_max) break;
 
-              const auto* sp34_data = sp34_data_it->get();
-              sp34_data_it++;
+              const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
               // Assign to threads
               if ((s1234++) % nthreads != thread_id) continue;
@@ -380,8 +420,8 @@ class ERI {
                   eri_threshold_)
                 continue;
 
-              const auto bf4_st = shell2bf_[s4];
-              const auto n4 = obs_[s4].size();
+              const auto bf4_st = shell_bf_offset_[s4];
+              const auto n4 = shell_nbf_[s4];
 
               // Permutational Degeneracy
               auto s12_deg = (s1 == s2) ? 1 : 2;
@@ -691,34 +731,36 @@ class ERI {
       }
 
       for (size_t s1 = 0ul, s1234 = 0ul; s1 < nsh; ++s1) {
-        const auto bf1_st = shell2bf_[s1];
-        const auto n1 = obs_[s1].size();
+        const auto bf1_st = shell_bf_offset_[s1];
+        const auto n1 = shell_nbf_[s1];
 
-        auto sp12_data_it = spdata_.at(s1).begin();
+        const size_t sp12_begin = sp_csr_.offsets[s1];
+        const size_t sp12_end = sp_csr_.offsets[s1 + 1];
 
-        // Only loop over significant shell pairs
-        for (size_t s2 : splist_[s1]) {
-          const auto bf2_st = shell2bf_[s2];
-          const auto n2 = obs_[s2].size();
-          const auto* sp12_data = sp12_data_it->get();
-          sp12_data_it++;
+        // Only loop over significant shell pairs (CSR row for s1)
+        for (size_t sp12_idx = sp12_begin; sp12_idx < sp12_end; ++sp12_idx) {
+          const size_t s2 = sp_csr_.neighbors[sp12_idx];
+          const auto bf2_st = shell_bf_offset_[s2];
+          const auto n2 = shell_nbf_[s2];
+          const auto* sp12_data = &sp_csr_.data[sp12_idx];
 
           // Permutational Degeneracy
           auto s12_deg = (s1 == s2) ? 1 : 2;
 
           for (size_t s3 = 0; s3 <= s1; ++s3) {
-            const auto bf3_st = shell2bf_[s3];
-            const auto n3 = obs_[s3].size();
+            const auto bf3_st = shell_bf_offset_[s3];
+            const auto n3 = shell_nbf_[s3];
 
-            auto sp34_data_it = spdata_.at(s3).begin();
+            const size_t sp34_begin = sp_csr_.offsets[s3];
+            const size_t sp34_end = sp_csr_.offsets[s3 + 1];
             const size_t s4_max = (s1 == s3) ? s2 : s3;
 
-            // Only loop over significant shell pairs
-            for (size_t s4 : splist_[s3]) {
+            // Only loop over significant shell pairs (CSR row for s3)
+            for (size_t sp34_idx = sp34_begin; sp34_idx < sp34_end; ++sp34_idx) {
+              const size_t s4 = sp_csr_.neighbors[sp34_idx];
               if (s4 > s4_max) break;
 
-              const auto* sp34_data = sp34_data_it->get();
-              sp34_data_it++;
+              const auto* sp34_data = &sp_csr_.data[sp34_idx];
 
               // Assign to threads
               if ((s1234++) % nthreads != thread_id) continue;
@@ -727,8 +769,8 @@ class ERI {
               if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < eri_threshold_)
                 continue;
 
-              const auto bf4_st = shell2bf_[s4];
-              const auto n4 = obs_[s4].size();
+              const auto bf4_st = shell_bf_offset_[s4];
+              const auto n4 = shell_nbf_[s4];
 
               // Compute the integral shell quartet
               engine.compute2<::libint2::Operator::coulomb,
