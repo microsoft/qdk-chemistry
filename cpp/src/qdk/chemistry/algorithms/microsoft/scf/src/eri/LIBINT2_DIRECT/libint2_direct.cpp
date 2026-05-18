@@ -230,13 +230,17 @@ class ERI {
   std::vector<size_t> shell_nbf_;       ///< shell_nbf_[s] = number of basis functions in shell s
   std::vector<size_t> shell_bf_offset_; ///< shell_bf_offset_[s] = first basis function index
   size_t max_shellblock_bf_;            ///< max over all s of shell_nbf_[s]
+  size_t nsh_ = 0;                     ///< number of shells
 
-  // Persistent per-thread TLS accumulation buffers.
-  // Allocated once with first-touch in a parallel region so each thread's
-  // buffer lands on its own NUMA node. Reused across build_JK calls to
-  // avoid repeated heap allocation of nthreads × N² doubles.
-  std::vector<std::vector<double>> J_tls_; ///< Per-thread J accumulation
-  std::vector<std::vector<double>> K_tls_; ///< Per-thread K accumulation
+  // Persistent per-thread TLS accumulation buffers in TILED layout.
+  // Each shell-pair (sa,sb) owns a contiguous tile of nbf[sa]*nbf[sb]
+  // doubles. Tiles are packed sequentially, indexed by tile_offset_.
+  // This eliminates N-strided scattered writes — all contraction flushes
+  // and reduction reads are unit-stride within each tile.
+  std::vector<size_t> tile_offset_;  ///< tile_offset_[sa*nsh+sb] = element offset
+  size_t tile_total_size_ = 0;      ///< total doubles per density matrix
+  std::vector<std::vector<double>> J_tls_; ///< Per-thread J accumulation (tiled)
+  std::vector<std::vector<double>> K_tls_; ///< Per-thread K accumulation (tiled)
   size_t tls_mat_size_ = 0;               ///< Current allocation size per buffer
 
   // Per-thread touched shell-pair tracking for sparse reduction + zeroing.
@@ -322,11 +326,25 @@ class ERI {
     engines_[0].set(::libint2::ScreeningMethod::Original);
     for (int i = 1; i < nthreads_; ++i) engines_[i] = engines_[0];
 
-    // Pre-allocate per-thread TLS buffers with first-touch NUMA placement.
-    // Each thread allocates and touches its own buffer inside a parallel
-    // region so the OS maps the pages to the thread's NUMA node.
+    // Build tile layout with cache-line alignment.
+    // Each tile is padded to start at a 64-byte (8-double) boundary to
+    // prevent false sharing between adjacent tiles during parallel reduction.
+    constexpr size_t CACHE_LINE_DOUBLES = 8;  // 64 bytes / 8 bytes per double
     const size_t nbf = obs_.nbf();
-    tls_mat_size_ = spin_density_factor_ * nbf * nbf;
+    nsh_ = nsh;
+    tile_offset_.resize(nsh * nsh);
+    tile_total_size_ = 0;
+    for (size_t sa = 0; sa < nsh; ++sa)
+      for (size_t sb = 0; sb < nsh; ++sb) {
+        tile_offset_[sa * nsh + sb] = tile_total_size_;
+        size_t tile_size = shell_nbf_[sa] * shell_nbf_[sb];
+        // Round up to cache line boundary
+        tile_size = (tile_size + CACHE_LINE_DOUBLES - 1) & ~(CACHE_LINE_DOUBLES - 1);
+        tile_total_size_ += tile_size;
+      }
+    tls_mat_size_ = spin_density_factor_ * tile_total_size_;
+
+    // Pre-allocate per-thread TLS buffers with first-touch NUMA placement.
     J_tls_.resize(nthreads_);
     K_tls_.resize(nthreads_);
     touched_J_.resize(nthreads_);
@@ -350,7 +368,7 @@ class ERI {
     touched_J_list_.resize(nthreads_);
     touched_K_list_.resize(nthreads_);
     for (int i = 0; i < nthreads_; ++i) {
-      touched_J_list_[i].reserve(nsh * nsh / 4);  // typical touched fraction
+      touched_J_list_[i].reserve(nsh * nsh / 4);
       touched_K_list_[i].reserve(nsh * nsh / 2);
     }
 
@@ -481,10 +499,7 @@ class ERI {
 #else
       const int tid = 0;
 #endif
-      // Sparse zeroing: iterate touched-list from previous call (O(touched),
-      // not O(nsh²)). Always zero both J and K TLS when stale, regardless of
-      // which matrices are requested in this call — otherwise stale data from
-      // a previous J+K call contaminates a subsequent J-only or K-only call.
+      // Sparse zeroing: contiguous tile memset (O(touched), no N-stride)
       auto& tj = touched_J_[tid];
       auto& tk = touched_K_[tid];
       if (!first_build_jk_) {
@@ -492,12 +507,10 @@ class ERI {
           double* jd = J_tls_[tid].data();
           for (uint32_t idx : touched_J_list_[tid]) {
             const size_t sa = idx / nsh, sb = idx % nsh;
-            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-            for (size_t idm = 0; idm < ndm; ++idm) {
-              const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-              for (size_t a = 0; a < na; ++a)
-                std::memset(jd + off + a * N, 0, nb * sizeof(double));
-            }
+            const size_t tile_sz = shell_nbf_[sa] * shell_nbf_[sb];
+            for (size_t idm = 0; idm < ndm; ++idm)
+              std::memset(jd + idm * tile_total_size_ + tile_offset_[idx],
+                          0, tile_sz * sizeof(double));
             tj[idx] = 0;
           }
         }
@@ -505,12 +518,10 @@ class ERI {
           double* kd = K_tls_[tid].data();
           for (uint32_t idx : touched_K_list_[tid]) {
             const size_t sa = idx / nsh, sb = idx % nsh;
-            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-            for (size_t idm = 0; idm < ndm; ++idm) {
-              const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-              for (size_t a = 0; a < na; ++a)
-                std::memset(kd + off + a * N, 0, nb * sizeof(double));
-            }
+            const size_t tile_sz = shell_nbf_[sa] * shell_nbf_[sb];
+            for (size_t idm = 0; idm < ndm; ++idm)
+              std::memset(kd + idm * tile_total_size_ + tile_offset_[idx],
+                          0, tile_sz * sizeof(double));
             tk[idx] = 0;
           }
         }
@@ -628,11 +639,18 @@ class ERI {
             // Merged J+K contraction (single pass over integral buffer)
             if (J_thr && K_thr) {
               for (size_t idm = 0; idm < ndm; ++idm) {
-                auto* J_cur = J_thr + idm * N * N;
-                auto* K_cur = K_thr + idm * N * N;
+                auto* J_cur = J_thr + idm * tile_total_size_;
+                auto* K_cur = K_thr + idm * tile_total_size_;
                 const auto* P_cur = P + idm * N * N;
+                // Tiled TLS base pointers for this quartet's shell pairs
+                const size_t jt_12 = tile_offset_[s1 * nsh_ + s2];
+                const size_t jt_34 = tile_offset_[s3 * nsh_ + s4];
+                const size_t kt_13 = tile_offset_[s1 * nsh_ + s3];
+                const size_t kt_14 = tile_offset_[s1 * nsh_ + s4];
+                const size_t kt_23 = tile_offset_[s2 * nsh_ + s3];
+                const size_t kt_24 = tile_offset_[s2 * nsh_ + s4];
                 if (use_tiles) {
-                  // Pre-load density tiles
+                  // Pre-load density tiles (from dense P — not tiled)
                   double P_34[MAX_BF * MAX_BF];
                   double P_13[MAX_BF * MAX_BF], P_23[MAX_BF * MAX_BF];
                   double P_14[MAX_BF * MAX_BF], P_24[MAX_BF * MAX_BF];
@@ -682,103 +700,98 @@ class ERI {
                         K_13[i * n3 + k] += K_ik;
                         K_23[j * n3 + k] += K_jk;
                       }
-                      J_cur[(bf1_st + i) * N + (bf2_st + j)] += J_ij;
+                      // Flush J_ij to tiled TLS (contiguous)
+                      J_cur[jt_12 + i * n2 + j] += J_ij;
                     }
                   }
-                  // Flush all tiles
+                  // Flush stack tiles to tiled TLS (all contiguous writes)
                   for (size_t k = 0; k < n3; ++k)
                     for (size_t l = 0; l < n4; ++l)
-                      J_cur[(bf3_st + k) * N + (bf4_st + l)] += J_34[k * n4 + l];
+                      J_cur[jt_34 + k * n4 + l] += J_34[k * n4 + l];
                   for (size_t i = 0; i < n1; ++i)
                     for (size_t k = 0; k < n3; ++k)
-                      K_cur[(bf1_st + i) * N + (bf3_st + k)] += K_13[i * n3 + k];
+                      K_cur[kt_13 + i * n3 + k] += K_13[i * n3 + k];
                   for (size_t j = 0; j < n2; ++j)
                     for (size_t k = 0; k < n3; ++k)
-                      K_cur[(bf2_st + j) * N + (bf3_st + k)] += K_23[j * n3 + k];
+                      K_cur[kt_23 + j * n3 + k] += K_23[j * n3 + k];
                   for (size_t i = 0; i < n1; ++i)
                     for (size_t l = 0; l < n4; ++l)
-                      K_cur[(bf1_st + i) * N + (bf4_st + l)] += K_14[i * n4 + l];
+                      K_cur[kt_14 + i * n4 + l] += K_14[i * n4 + l];
                   for (size_t j = 0; j < n2; ++j)
                     for (size_t l = 0; l < n4; ++l)
-                      K_cur[(bf2_st + j) * N + (bf4_st + l)] += K_24[j * n4 + l];
+                      K_cur[kt_24 + j * n4 + l] += K_24[j * n4 + l];
                 } else {
-                  // Direct fallback: merged J+K without tiles
+                  // Direct fallback: merged J+K without stack tiles
                   for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                    const size_t bf1 = bf1_st + i;
                     for (size_t j = 0; j < n2; ++j) {
-                      const size_t bf2 = bf2_st + j;
                       double J_ij = 0.0;
-                      const double P_ij = P_cur[bf1 * N + bf2];
+                      const double P_ij = P_cur[(bf1_st + i) * N + (bf2_st + j)];
                       for (size_t k = 0; k < n3; ++k) {
-                        const size_t bf3 = bf3_st + k;
                         double K_ik = 0.0, K_jk = 0.0;
-                        const double P_ik = 0.25 * P_cur[bf1 * N + bf3];
-                        const double P_jk = 0.25 * P_cur[bf2 * N + bf3];
+                        const double P_ik = 0.25 * P_cur[(bf1_st + i) * N + (bf3_st + k)];
+                        const double P_jk = 0.25 * P_cur[(bf2_st + j) * N + (bf3_st + k)];
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                          const size_t bf4 = bf4_st + l;
                           const auto value = buf_1234[ijkl] * s1234_deg;
-                          J_ij += P_cur[bf3 * N + bf4] * value;
-                          J_cur[bf3 * N + bf4] += P_ij * value;
-                          K_ik += 0.25 * P_cur[bf2 * N + bf4] * value;
-                          K_jk += 0.25 * P_cur[bf1 * N + bf4] * value;
-                          K_cur[bf1 * N + bf4] += P_jk * value;
-                          K_cur[bf2 * N + bf4] += P_ik * value;
+                          J_ij += P_cur[(bf3_st + k) * N + (bf4_st + l)] * value;
+                          J_cur[jt_34 + k * n4 + l] += P_ij * value;
+                          K_ik += 0.25 * P_cur[(bf2_st + j) * N + (bf4_st + l)] * value;
+                          K_jk += 0.25 * P_cur[(bf1_st + i) * N + (bf4_st + l)] * value;
+                          K_cur[kt_14 + i * n4 + l] += P_jk * value;
+                          K_cur[kt_24 + j * n4 + l] += P_ik * value;
                         }
-                        K_cur[bf1 * N + bf3] += K_ik;
-                        K_cur[bf2 * N + bf3] += K_jk;
+                        K_cur[kt_13 + i * n3 + k] += K_ik;
+                        K_cur[kt_23 + j * n3 + k] += K_jk;
                       }
-                      J_cur[bf1 * N + bf2] += J_ij;
+                      J_cur[jt_12 + i * n2 + j] += J_ij;
                     }
                   }
                 }
               }
             } else if (J_thr) {
-              // J-only contraction
+              // J-only contraction (tiled TLS)
               for (size_t idm = 0; idm < ndm; ++idm) {
-                auto* J_cur = J_thr + idm * N * N;
+                auto* J_cur = J_thr + idm * tile_total_size_;
                 const auto* P_cur = P + idm * N * N;
+                const size_t jt_12 = tile_offset_[s1 * nsh_ + s2];
+                const size_t jt_34 = tile_offset_[s3 * nsh_ + s4];
                 for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                  const size_t bf1 = bf1_st + i;
                   for (size_t j = 0; j < n2; ++j) {
-                    const size_t bf2 = bf2_st + j;
                     double J_ij = 0.0;
-                    const double P_ij = P_cur[bf1 * N + bf2];
-                    for (size_t k = 0; k < n3; ++k) {
-                      const size_t bf3 = bf3_st + k;
+                    const double P_ij = P_cur[(bf1_st + i) * N + (bf2_st + j)];
+                    for (size_t k = 0; k < n3; ++k)
                       for (size_t l = 0; l < n4; ++l, ++ijkl) {
                         const auto value = buf_1234[ijkl] * s1234_deg;
-                        J_ij += P_cur[bf3 * N + (bf4_st + l)] * value;
-                        J_cur[bf3 * N + (bf4_st + l)] += P_ij * value;
+                        J_ij += P_cur[(bf3_st + k) * N + (bf4_st + l)] * value;
+                        J_cur[jt_34 + k * n4 + l] += P_ij * value;
                       }
-                    }
-                    J_cur[bf1 * N + bf2] += J_ij;
+                    J_cur[jt_12 + i * n2 + j] += J_ij;
                   }
                 }
               }
             } else if (K_thr) {
-              // K-only contraction
+              // K-only contraction (tiled TLS)
               for (size_t idm = 0; idm < ndm; ++idm) {
-                auto* K_cur = K_thr + idm * N * N;
+                auto* K_cur = K_thr + idm * tile_total_size_;
                 const auto* P_cur = P + idm * N * N;
+                const size_t kt_13 = tile_offset_[s1 * nsh_ + s3];
+                const size_t kt_14 = tile_offset_[s1 * nsh_ + s4];
+                const size_t kt_23 = tile_offset_[s2 * nsh_ + s3];
+                const size_t kt_24 = tile_offset_[s2 * nsh_ + s4];
                 for (size_t i = 0, ijkl = 0; i < n1; ++i) {
-                  const size_t bf1 = bf1_st + i;
                   for (size_t j = 0; j < n2; ++j) {
-                    const size_t bf2 = bf2_st + j;
                     for (size_t k = 0; k < n3; ++k) {
-                      const size_t bf3 = bf3_st + k;
                       double K_ik = 0.0, K_jk = 0.0;
-                      const double P_ik = 0.25 * P_cur[bf1 * N + bf3];
-                      const double P_jk = 0.25 * P_cur[bf2 * N + bf3];
+                      const double P_ik = 0.25 * P_cur[(bf1_st + i) * N + (bf3_st + k)];
+                      const double P_jk = 0.25 * P_cur[(bf2_st + j) * N + (bf3_st + k)];
                       for (size_t l = 0; l < n4; ++l, ++ijkl) {
-                        const size_t bf4 = bf4_st + l;
                         const auto value = buf_1234[ijkl] * s1234_deg;
-                        K_ik += 0.25 * P_cur[bf2 * N + bf4] * value;
-                        K_jk += 0.25 * P_cur[bf1 * N + bf4] * value;
-                        K_cur[bf1 * N + bf4] += P_jk * value;
-                        K_cur[bf2 * N + bf4] += P_ik * value;
+                        K_ik += 0.25 * P_cur[(bf2_st + j) * N + (bf4_st + l)] * value;
+                        K_jk += 0.25 * P_cur[(bf1_st + i) * N + (bf4_st + l)] * value;
+                        K_cur[kt_14 + i * n4 + l] += P_jk * value;
+                        K_cur[kt_24 + j * n4 + l] += P_ik * value;
                       }
-                      K_cur[bf1 * N + bf3] += K_ik;
-                      K_cur[bf2 * N + bf3] += K_jk;
+                      K_cur[kt_13 + i * n3 + k] += K_ik;
+                      K_cur[kt_23 + j * n3 + k] += K_jk;
                     }
                   }
                 }
@@ -815,96 +828,53 @@ class ERI {
       }
     }  // parallel region
 
-    // Hybrid deterministic reduction: choose dense or sparse based on the
-    // AO-element-weighted work cost computed inside the parallel region.
-    // Dense reduction uses a tight vectorized loop (unit-stride, AVX-friendly).
-    // Sparse reduction skips untouched shell-pair blocks using the bitmap.
-    //
-    // The sparse inner loop has non-unit-stride access (rows of a shell block
-    // are N apart in the row-major N² buffer), making it ~3-5x slower per
-    // element than vectorized dense. However, sparse reads less total data,
-    // which matters at high thread counts where memory bandwidth is limiting.
-    // The 50% threshold balances these: switch to dense only when sparse
-    // would process more than half the data that dense would process.
-    constexpr size_t dense_threshold_num = 1;
-    constexpr size_t dense_threshold_den = 2;
-    const size_t dense_work = static_cast<size_t>(nthreads_) * ndm * N * N;
-
+    // Fused tile-to-dense reduction: read contiguous tiles from tiled TLS,
+    // sum across threads, write to dense N×N output. Source reads are
+    // unit-stride (tile-contiguous); dest writes are N-strided but happen
+    // only once per tile element per thread.
     if (J) {
-      const bool use_dense_j =
-          j_sparse_total * dense_threshold_den >
-          dense_work * dense_threshold_num;
-      if (use_dense_j) {
-        // Dense reduction: parallel over rows, unit-stride vectorized add
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static)
-#endif
-        for (size_t row = 0; row < ndm * N; ++row) {
-          double* dst = J + row * N;
-          for (int t = 0; t < nthreads_; ++t) {
-            const double* src = J_tls_[t].data() + row * N;
-#pragma omp simd
-            for (size_t col = 0; col < N; ++col)
-              dst[col] += src[col];
-          }
-        }
-      } else {
-        // Sparse reduction: skip untouched shell-pair blocks
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) collapse(2)
 #endif
-        for (size_t sa = 0; sa < nsh; ++sa)
-          for (size_t sb = 0; sb < nsh; ++sb) {
-            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-            for (int t = 0; t < nthreads_; ++t) {
-              if (!touched_J_[t][sa * nsh + sb]) continue;
-              const double* src = J_tls_[t].data();
-              for (size_t idm = 0; idm < ndm; ++idm) {
-                const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-                for (size_t a = 0; a < na; ++a)
-                  for (size_t b = 0; b < nb; ++b)
-                    J[off + a * N + b] += src[off + a * N + b];
-              }
+      for (size_t sa = 0; sa < nsh; ++sa)
+        for (size_t sb = 0; sb < nsh; ++sb) {
+          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+          const size_t tile_off = tile_offset_[sa * nsh_ + sb];
+          const size_t bf_a = shell_bf_offset_[sa];
+          const size_t bf_b = shell_bf_offset_[sb];
+          for (int t = 0; t < nthreads_; ++t) {
+            if (!touched_J_[t][sa * nsh + sb]) continue;
+            for (size_t idm = 0; idm < ndm; ++idm) {
+              const double* src = J_tls_[t].data() + idm * tile_total_size_ + tile_off;
+              double* dst_base = J + idm * N * N;
+              for (size_t a = 0; a < na; ++a)
+                for (size_t b = 0; b < nb; ++b)
+                  dst_base[(bf_a + a) * N + (bf_b + b)] += src[a * nb + b];
             }
           }
-      }
+        }
     }
     if (K) {
-      const bool use_dense_k =
-          k_sparse_total * dense_threshold_den >
-          dense_work * dense_threshold_num;
-      if (use_dense_k) {
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static)
-#endif
-        for (size_t row = 0; row < ndm * N; ++row) {
-          double* dst = K + row * N;
-          for (int t = 0; t < nthreads_; ++t) {
-            const double* src = K_tls_[t].data() + row * N;
-#pragma omp simd
-            for (size_t col = 0; col < N; ++col)
-              dst[col] += src[col];
-          }
-        }
-      } else {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) collapse(2)
 #endif
-        for (size_t sa = 0; sa < nsh; ++sa)
-          for (size_t sb = 0; sb < nsh; ++sb) {
-            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-            for (int t = 0; t < nthreads_; ++t) {
-              if (!touched_K_[t][sa * nsh + sb]) continue;
-              const double* src = K_tls_[t].data();
-              for (size_t idm = 0; idm < ndm; ++idm) {
-                const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-                for (size_t a = 0; a < na; ++a)
-                  for (size_t b = 0; b < nb; ++b)
-                    K[off + a * N + b] += src[off + a * N + b];
-              }
+      for (size_t sa = 0; sa < nsh; ++sa)
+        for (size_t sb = 0; sb < nsh; ++sb) {
+          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+          const size_t tile_off = tile_offset_[sa * nsh_ + sb];
+          const size_t bf_a = shell_bf_offset_[sa];
+          const size_t bf_b = shell_bf_offset_[sb];
+          for (int t = 0; t < nthreads_; ++t) {
+            if (!touched_K_[t][sa * nsh + sb]) continue;
+            for (size_t idm = 0; idm < ndm; ++idm) {
+              const double* src = K_tls_[t].data() + idm * tile_total_size_ + tile_off;
+              double* dst_base = K + idm * N * N;
+              for (size_t a = 0; a < na; ++a)
+                for (size_t b = 0; b < nb; ++b)
+                  dst_base[(bf_a + a) * N + (bf_b + b)] += src[a * nb + b];
             }
           }
-      }
+        }
     }
 
     first_build_jk_ = false;
