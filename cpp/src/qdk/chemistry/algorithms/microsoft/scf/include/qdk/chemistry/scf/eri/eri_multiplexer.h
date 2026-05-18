@@ -82,6 +82,17 @@ class ERIMultiplexer : public ERI {
                 double beta, double omega) override;
 
   /**
+   * @brief Propagate screening threshold to all sub-implementations
+   * @see ERI::set_screening_threshold for API documentation
+   */
+  void set_screening_threshold(double threshold) override {
+    ERI::set_screening_threshold(threshold);
+    if (j_impl_) j_impl_->set_screening_threshold(threshold);
+    if (k_impl_ && k_impl_ != j_impl_)
+      k_impl_->set_screening_threshold(threshold);
+  }
+
+  /**
    * @brief Compute gradients of J and K energies
    *
    * Routes gradient computation to the configured gradient implementation.
