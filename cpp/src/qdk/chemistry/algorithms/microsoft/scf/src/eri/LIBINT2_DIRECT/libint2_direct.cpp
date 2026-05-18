@@ -243,6 +243,7 @@ class ERI {
   // On zeroing, only previously-touched blocks are cleared.
   std::vector<std::vector<uint8_t>> touched_J_; ///< Per-thread J touched bitmap
   std::vector<std::vector<uint8_t>> touched_K_; ///< Per-thread K touched bitmap
+  bool first_build_jk_ = true; ///< True until first build_JK completes (skip sparse zeroing)
 
  public:
   /**
@@ -452,7 +453,11 @@ class ERI {
       bra_pairs = std::move(reordered);
     }
 
-    // Single parallel region: zero TLS buffers + compute + bra-pair loop
+    // Accumulators for per-thread sparse work cost (computed in parallel)
+    size_t j_sparse_total = 0;
+    size_t k_sparse_total = 0;
+
+    // Single parallel region: zero TLS buffers + compute + cost model
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
@@ -465,31 +470,39 @@ class ERI {
       // Sparse zeroing: only clear shell-pair blocks touched in the previous
       // call, then clear the touched bitmap. Much cheaper than full N² memset
       // when each thread only touches a subset of shell pairs.
+      // On the very first build_JK call, TLS buffers are already zeroed by the
+      // constructor, so we skip the scan entirely.
       auto& tj = touched_J_[tid];
       auto& tk = touched_K_[tid];
-      if (J) {
-        double* jd = J_tls_[tid].data();
-        for (size_t sa = 0; sa < nsh; ++sa)
-          for (size_t sb = 0; sb < nsh; ++sb)
-            if (tj[sa * nsh + sb]) {
-              size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-              size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-              for (size_t a = 0; a < na; ++a)
-                std::memset(jd + off + a * N, 0, nb * sizeof(double));
-              tj[sa * nsh + sb] = 0;
-            }
-      }
-      if (K) {
-        double* kd = K_tls_[tid].data();
-        for (size_t sa = 0; sa < nsh; ++sa)
-          for (size_t sb = 0; sb < nsh; ++sb)
-            if (tk[sa * nsh + sb]) {
-              size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-              size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-              for (size_t a = 0; a < na; ++a)
-                std::memset(kd + off + a * N, 0, nb * sizeof(double));
-              tk[sa * nsh + sb] = 0;
-            }
+      if (!first_build_jk_) {
+        if (J) {
+          double* jd = J_tls_[tid].data();
+          for (size_t sa = 0; sa < nsh; ++sa)
+            for (size_t sb = 0; sb < nsh; ++sb)
+              if (tj[sa * nsh + sb]) {
+                const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+                for (size_t idm = 0; idm < ndm; ++idm) {
+                  const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+                  for (size_t a = 0; a < na; ++a)
+                    std::memset(jd + off + a * N, 0, nb * sizeof(double));
+                }
+                tj[sa * nsh + sb] = 0;
+              }
+        }
+        if (K) {
+          double* kd = K_tls_[tid].data();
+          for (size_t sa = 0; sa < nsh; ++sa)
+            for (size_t sb = 0; sb < nsh; ++sb)
+              if (tk[sa * nsh + sb]) {
+                const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+                for (size_t idm = 0; idm < ndm; ++idm) {
+                  const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+                  for (size_t a = 0; a < na; ++a)
+                    std::memset(kd + off + a * N, 0, nb * sizeof(double));
+                }
+                tk[sa * nsh + sb] = 0;
+              }
+        }
       }
 
 #ifdef _OPENMP
@@ -633,45 +646,130 @@ class ERI {
           }  // s4
         }  // s3
       }  // bra-pair (omp for)
+
+      // Parallel cost model: each thread counts its own touched AO pairs.
+      // Runs inside the compute region to avoid serial overhead and cache
+      // eviction between the compute and reduction phases.
+      {
+        size_t my_j_sparse = 0, my_k_sparse = 0;
+        if (J) {
+          const auto& tj_local = touched_J_[tid];
+          for (size_t sa = 0; sa < nsh; ++sa)
+            for (size_t sb = 0; sb < nsh; ++sb)
+              if (tj_local[sa * nsh + sb])
+                my_j_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+        }
+        if (K) {
+          const auto& tk_local = touched_K_[tid];
+          for (size_t sa = 0; sa < nsh; ++sa)
+            for (size_t sb = 0; sb < nsh; ++sb)
+              if (tk_local[sa * nsh + sb])
+                my_k_sparse += shell_nbf_[sa] * shell_nbf_[sb];
+        }
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        j_sparse_total += my_j_sparse * ndm;
+#ifdef _OPENMP
+#pragma omp atomic
+#endif
+        k_sparse_total += my_k_sparse * ndm;
+      }
     }  // parallel region
 
-    // Sparse deterministic reduction: only sum shell-pair blocks that were
-    // touched by each thread. O(nthreads × touched_pairs × shell²) instead
-    // of O(nthreads × N²). Parallelized over shell-pair blocks.
+    // Hybrid deterministic reduction: choose dense or sparse based on the
+    // AO-element-weighted work cost computed inside the parallel region.
+    // Dense reduction uses a tight vectorized loop (unit-stride, AVX-friendly).
+    // Sparse reduction skips untouched shell-pair blocks using the bitmap.
+    //
+    // The sparse inner loop has non-unit-stride access (rows of a shell block
+    // are N apart in the row-major N² buffer), making it ~3-5x slower per
+    // element than vectorized dense. However, sparse reads less total data,
+    // which matters at high thread counts where memory bandwidth is limiting.
+    // The 50% threshold balances these: switch to dense only when sparse
+    // would process more than half the data that dense would process.
+    constexpr size_t dense_threshold_num = 1;
+    constexpr size_t dense_threshold_den = 2;
+    const size_t dense_work = static_cast<size_t>(nthreads_) * ndm * N * N;
+
     if (J) {
+      const bool use_dense_j =
+          j_sparse_total * dense_threshold_den >
+          dense_work * dense_threshold_num;
+      if (use_dense_j) {
+        // Dense reduction: parallel over rows, unit-stride vectorized add
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (size_t row = 0; row < ndm * N; ++row) {
+          double* dst = J + row * N;
+          for (int t = 0; t < nthreads_; ++t) {
+            const double* src = J_tls_[t].data() + row * N;
+#pragma omp simd
+            for (size_t col = 0; col < N; ++col)
+              dst[col] += src[col];
+          }
+        }
+      } else {
+        // Sparse reduction: skip untouched shell-pair blocks
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) collapse(2)
 #endif
-      for (size_t sa = 0; sa < nsh; ++sa)
-        for (size_t sb = 0; sb < nsh; ++sb) {
-          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-          const size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-          for (int t = 0; t < nthreads_; ++t) {
-            if (!touched_J_[t][sa * nsh + sb]) continue;
-            const double* src = J_tls_[t].data();
-            for (size_t a = 0; a < na; ++a)
-              for (size_t b = 0; b < nb; ++b)
-                J[off + a * N + b] += src[off + a * N + b];
+        for (size_t sa = 0; sa < nsh; ++sa)
+          for (size_t sb = 0; sb < nsh; ++sb) {
+            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+            for (int t = 0; t < nthreads_; ++t) {
+              if (!touched_J_[t][sa * nsh + sb]) continue;
+              const double* src = J_tls_[t].data();
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+                for (size_t a = 0; a < na; ++a)
+                  for (size_t b = 0; b < nb; ++b)
+                    J[off + a * N + b] += src[off + a * N + b];
+              }
+            }
           }
-        }
+      }
     }
     if (K) {
+      const bool use_dense_k =
+          k_sparse_total * dense_threshold_den >
+          dense_work * dense_threshold_num;
+      if (use_dense_k) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (size_t row = 0; row < ndm * N; ++row) {
+          double* dst = K + row * N;
+          for (int t = 0; t < nthreads_; ++t) {
+            const double* src = K_tls_[t].data() + row * N;
+#pragma omp simd
+            for (size_t col = 0; col < N; ++col)
+              dst[col] += src[col];
+          }
+        }
+      } else {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) collapse(2)
 #endif
-      for (size_t sa = 0; sa < nsh; ++sa)
-        for (size_t sb = 0; sb < nsh; ++sb) {
-          const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
-          const size_t off = shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
-          for (int t = 0; t < nthreads_; ++t) {
-            if (!touched_K_[t][sa * nsh + sb]) continue;
-            const double* src = K_tls_[t].data();
-            for (size_t a = 0; a < na; ++a)
-              for (size_t b = 0; b < nb; ++b)
-                K[off + a * N + b] += src[off + a * N + b];
+        for (size_t sa = 0; sa < nsh; ++sa)
+          for (size_t sb = 0; sb < nsh; ++sb) {
+            const size_t na = shell_nbf_[sa], nb = shell_nbf_[sb];
+            for (int t = 0; t < nthreads_; ++t) {
+              if (!touched_K_[t][sa * nsh + sb]) continue;
+              const double* src = K_tls_[t].data();
+              for (size_t idm = 0; idm < ndm; ++idm) {
+                const size_t off = idm * N * N + shell_bf_offset_[sa] * N + shell_bf_offset_[sb];
+                for (size_t a = 0; a < na; ++a)
+                  for (size_t b = 0; b < nb; ++b)
+                    K[off + a * N + b] += src[off + a * N + b];
+              }
+            }
           }
-        }
+      }
     }
+
+    first_build_jk_ = false;
 
     // Symmetrize J (parallel)
     if (J)

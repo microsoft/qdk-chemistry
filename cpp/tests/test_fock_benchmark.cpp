@@ -638,6 +638,8 @@ INSTANTIATE_TEST_SUITE_P(
 // ===========================================================================
 // TEST: UHF (unrestricted) correctness
 // Verify build_JK works with ndm=2 (two spin density matrices).
+// Calls build_JK twice on the same ERI object to exercise sparse zeroing of
+// both spin blocks, and checks alpha and beta blocks independently.
 // ===========================================================================
 TEST(FockBuilderUHF, UnrestrictedMatchesTolerance) {
   auto mol = make_h2o();
@@ -653,7 +655,7 @@ TEST(FockBuilderUHF, UnrestrictedMatchesTolerance) {
   std::copy(P_alpha.begin(), P_alpha.end(), P.begin());
   std::copy(P_beta.begin(), P_beta.end(), P.begin() + nao * nao);
 
-  // Single-threaded reference
+  // Single-threaded reference — call twice on the same ERI to exercise zeroing
   std::vector<double> J_ref(ndm * nao * nao, 0.0);
   std::vector<double> K_ref(ndm * nao * nao, 0.0);
   {
@@ -663,35 +665,49 @@ TEST(FockBuilderUHF, UnrestrictedMatchesTolerance) {
 #endif
     auto eri =
         make_direct_eri(*basis, SCFOrbitalType::Unrestricted, false);
+    // First call warms up; second call exercises sparse zeroing
+    eri->build_JK(P.data(), J_ref.data(), K_ref.data(), 1.0, 0.0, 0.0);
+    std::fill(J_ref.begin(), J_ref.end(), 0.0);
+    std::fill(K_ref.begin(), K_ref.end(), 0.0);
     eri->build_JK(P.data(), J_ref.data(), K_ref.data(), 1.0, 0.0, 0.0);
 #ifdef _OPENMP
     omp_set_num_threads(orig);
 #endif
   }
 
-  // Multi-threaded
+  // Multi-threaded — also call twice
   std::vector<double> J_mt(ndm * nao * nao, 0.0);
   std::vector<double> K_mt(ndm * nao * nao, 0.0);
   {
     auto eri =
         make_direct_eri(*basis, SCFOrbitalType::Unrestricted, false);
     eri->build_JK(P.data(), J_mt.data(), K_mt.data(), 1.0, 0.0, 0.0);
+    std::fill(J_mt.begin(), J_mt.end(), 0.0);
+    std::fill(K_mt.begin(), K_mt.end(), 0.0);
+    eri->build_JK(P.data(), J_mt.data(), K_mt.data(), 1.0, 0.0, 0.0);
   }
 
+  // Compare full matrices
   double j_diff = inf_norm_diff(J_ref, J_mt);
   double k_diff = inf_norm_diff(K_ref, K_mt);
   EXPECT_LT(j_diff, 1e-13) << "UHF J mismatch";
   EXPECT_LT(k_diff, 1e-13) << "UHF K mismatch";
 
-  // Verify J and K are non-trivial (not all zeros)
-  double j_norm = *std::max_element(
-      J_ref.begin(), J_ref.end(),
-      [](double a, double b) { return std::abs(a) < std::abs(b); });
-  double k_norm = *std::max_element(
-      K_ref.begin(), K_ref.end(),
-      [](double a, double b) { return std::abs(a) < std::abs(b); });
-  EXPECT_GT(std::abs(j_norm), 1e-10) << "UHF J appears to be all zeros";
-  EXPECT_GT(std::abs(k_norm), 1e-10) << "UHF K appears to be all zeros";
+  // Verify each spin block independently is non-trivial
+  auto block_max_abs = [](const std::vector<double>& v, size_t offset, size_t n) {
+    double mx = 0.0;
+    for (size_t i = 0; i < n; ++i)
+      mx = std::max(mx, std::abs(v[offset + i]));
+    return mx;
+  };
+  EXPECT_GT(block_max_abs(J_ref, 0, nao * nao), 1e-10)
+      << "UHF J alpha block appears to be all zeros";
+  EXPECT_GT(block_max_abs(J_ref, nao * nao, nao * nao), 1e-10)
+      << "UHF J beta block appears to be all zeros";
+  EXPECT_GT(block_max_abs(K_ref, 0, nao * nao), 1e-10)
+      << "UHF K alpha block appears to be all zeros";
+  EXPECT_GT(block_max_abs(K_ref, nao * nao, nao * nao), 1e-10)
+      << "UHF K beta block appears to be all zeros";
 }
 
 // ===========================================================================
@@ -798,16 +814,29 @@ TEST(FockBenchmark, ThreadScaling) {
   std::cout << "system,basis,nao,nthreads,build_jk_ms,variant" << std::endl;
 
   auto systems = get_benchmark_systems();
-  std::vector<int> thread_counts = {1, 2, 4, 8};
 
 #ifdef _OPENMP
   int max_threads = omp_get_max_threads();
-  if (max_threads >= 16) thread_counts.push_back(16);
-  if (max_threads >= 32) thread_counts.push_back(32);
-  if (max_threads >= 64) thread_counts.push_back(64);
 #endif
 
   for (const auto& sys : systems) {
+    // Per-system minimum thread count: P450 starts at 32, others at 16
+    int min_threads = 16;
+    if (sys.name.find("p450") != std::string::npos) {
+      min_threads = 32;
+    }
+
+    std::vector<int> thread_counts;
+#ifdef _OPENMP
+    for (int nt : {16, 32, 64}) {
+      if (nt >= min_threads && nt <= max_threads)
+        thread_counts.push_back(nt);
+    }
+#else
+    thread_counts = {1};
+#endif
+    if (thread_counts.empty()) continue;
+
     auto basis = make_basis(sys.mol, sys.basis_name, sys.pure);
     const size_t nao = basis->num_atomic_orbitals;
     const size_t ndm = 1;
