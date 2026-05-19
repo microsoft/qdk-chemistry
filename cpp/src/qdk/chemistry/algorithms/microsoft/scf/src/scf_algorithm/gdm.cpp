@@ -1240,6 +1240,11 @@ void GDM::iterate(SCFImpl& scf_impl) {
   const auto& F = scf_impl.get_fock_matrix();
 
   const auto* cfg = ctx_.cfg;
+  if (cfg->mpi.world_size > 1) {
+    throw std::runtime_error(
+        "Temporary limitation: evaluate_trial_density_energy_and_fock is not "
+        "supported with MPI world_size > 1.");
+  }
   const int num_molecular_orbitals =
       static_cast<int>(ctx_.num_molecular_orbitals);
 
