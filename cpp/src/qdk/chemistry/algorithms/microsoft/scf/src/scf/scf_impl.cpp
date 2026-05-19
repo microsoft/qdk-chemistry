@@ -16,6 +16,7 @@
 #endif
 #include <qdk/chemistry/scf/util/env_helper.h>
 
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -618,10 +619,19 @@ void SCFImpl::iterate_() {
     auto [alpha, beta, omega] = get_hyb_coeff_();
     eri_->build_JK(P_.data(), J_.data(), K_.data(), alpha, beta, omega);
     update_fock_();
-    for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
-      scf_algorithm_->solve_fock_eigenproblem(F_, S_, X_, C_, eigenvalues_, P_,
-                                              nelec_, num_atomic_orbitals_,
-                                              num_molecular_orbitals_, i);
+
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
+      const auto& [effective_fock, total_density] =
+          scf_algorithm_->try_get_rohf_convergence_matrices(*this);
+      scf_algorithm_->solve_fock_eigenproblem(
+          effective_fock, S_, X_, C_, eigenvalues_, P_, nelec_,
+          num_atomic_orbitals_, num_molecular_orbitals_, 0);
+    } else {
+      for (int i = 0; i < num_orbital_spin_blocks_; ++i) {
+        scf_algorithm_->solve_fock_eigenproblem(
+            F_, S_, X_, C_, eigenvalues_, P_, nelec_, num_atomic_orbitals_,
+            num_molecular_orbitals_, i);
+      }
     }
     scf_algorithm_->update_density_matrix(
         P_, C_, ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted,
@@ -1035,8 +1045,15 @@ void SCFImpl::write_gradients_(const std::vector<double>& gradients,
 
 std::pair<double, RowMajorMatrix>
 SCFImpl::evaluate_trial_density_energy_and_fock(
-    const RowMajorMatrix& P_matrix, const std::source_location& loc) const {
+    const RowMajorMatrix& P_matrix, double* J_out, double* K_out,
+    const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
+
+  if (ctx_.cfg->mpi.world_size > 1) {
+    throw std::runtime_error(
+        "Temporary limitation: evaluate_trial_density_energy_and_fock is not "
+        "supported with MPI world_size > 1.");
+  }
 
   QDK_LOGGER().debug(
       "Computing energy and Fock matrix by trial density matrix (called from "
@@ -1056,12 +1073,22 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
       num_density_matrices_ * num_atomic_orbitals_, num_atomic_orbitals_);
   eri_->build_JK(P_matrix.data(), J_matrix.data(), K_matrix.data(), alpha, beta,
                  omega);
+
+  if (J_out != nullptr) {
+    std::memcpy(J_out, J_matrix.data(),
+                sizeof(double) * static_cast<size_t>(J_matrix.size()));
+  }
+  if (K_out != nullptr) {
+    std::memcpy(K_out, K_matrix.data(),
+                sizeof(double) * static_cast<size_t>(K_matrix.size()));
+  }
 #ifdef QDK_CHEMISTRY_ENABLE_PCM
   throw std::runtime_error("PCM is not supported in trial density evaluation.");
 #endif
 
   if (ctx_.cfg->mpi.world_rank == 0) {
-    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted) {
+    if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::Unrestricted ||
+        ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
       F_matrix +=
           (J_matrix.block(0, 0, num_atomic_orbitals_, num_atomic_orbitals_) +
            J_matrix.block(num_atomic_orbitals_, 0, num_atomic_orbitals_,
@@ -1095,6 +1122,13 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
       ctx_.cfg->mpi.world_rank, ctx_.result.nuclear_repulsion_energy,
       scf_one_electron_energy, scf_two_electron_energy);
   return {total_energy, F_matrix};
+}
+
+void SCFImpl::build_jk_matrices(const RowMajorMatrix& density_matrix,
+                                RowMajorMatrix& J, RowMajorMatrix& K) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [alpha, beta, omega] = get_hyb_coeff_();
+  eri_->build_JK(density_matrix.data(), J.data(), K.data(), alpha, beta, omega);
 }
 
 }  // namespace qdk::chemistry::scf
