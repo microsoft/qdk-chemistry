@@ -13,7 +13,7 @@ namespace qdk::chemistry::data {
 SlaterDeterminantContainer::SlaterDeterminantContainer(
     const Configuration& det, std::shared_ptr<Orbitals> orbitals,
     WavefunctionType type)
-    : WavefunctionContainer(type),
+    : DeterminantalWavefunctionContainer(type),
       _determinant(det),
       _orbitals(orbitals),
       _coefficient_vector(Eigen::VectorXd(Eigen::VectorXd::Ones(1))) {
@@ -534,30 +534,13 @@ bool SlaterDeterminantContainer::is_complex() const {
   return false;  // Slater determinants always use real coefficients (unity)
 }
 
-nlohmann::json SlaterDeterminantContainer::to_json() const {
+nlohmann::json SlaterDeterminantContainer::_to_json_impl() const {
   QDK_LOG_TRACE_ENTERING();
-
   nlohmann::json j;
-
-  // Store version first
-  j["version"] = SERIALIZATION_VERSION;
-
-  // Store container type
-  j["container_type"] = get_container_type();
-
-  // Store wavefunction type
-  j["wavefunction_type"] =
-      (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-
-  // Store orbitals
   j["orbitals"] = _orbitals->to_json();
-
-  // Store single determinant
   j["determinant"] = _determinant.to_json();
-
   // SD containers are always real with coefficient 1.0
   j["is_complex"] = false;
-
   return j;
 }
 
@@ -602,32 +585,10 @@ SlaterDeterminantContainer::from_json(const nlohmann::json& j) {
   }
 }
 
-void SlaterDeterminantContainer::to_hdf5(H5::Group& group) const {
+void SlaterDeterminantContainer::_to_hdf5_impl(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
 
   try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-
-    // Add version attribute
-    H5::Attribute version_attr = group.createAttribute(
-        "version", string_type, H5::DataSpace(H5S_SCALAR));
-    std::string version_str(SERIALIZATION_VERSION);
-    version_attr.write(string_type, version_str);
-    version_attr.close();
-
-    // Store container type
-    std::string container_type = get_container_type();
-    H5::Attribute type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    type_attr.write(string_type, container_type);
-
-    // Store wavefunction type
-    std::string wf_type =
-        (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
-    H5::Attribute wf_type_attr = group.createAttribute(
-        "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
-    wf_type_attr.write(string_type, wf_type);
-
     // Store orbitals
     H5::Group orbitals_group = group.createGroup("orbitals");
     _orbitals->to_hdf5(orbitals_group);
@@ -693,6 +654,13 @@ SlaterDeterminantContainer::from_hdf5(H5::Group& group) {
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
+}
+
+std::string SlaterDeterminantContainer::_get_summary_impl() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ostringstream oss;
+  oss << "  Determinant: " << _determinant.to_string() << "\n";
+  return oss.str();
 }
 
 }  // namespace qdk::chemistry::data

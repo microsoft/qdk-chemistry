@@ -1130,6 +1130,91 @@ WavefunctionType WavefunctionContainer::get_type() const {
   return _type;
 }
 
+std::string WavefunctionContainer::get_summary() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ostringstream oss;
+  oss << "  Container type: " << get_container_type() << "\n";
+  oss << "  Wavefunction type: "
+      << (_type == WavefunctionType::SelfDual ? "SelfDual" : "NotSelfDual")
+      << "\n";
+  oss << "  Complex: " << (is_complex() ? "yes" : "no") << "\n";
+
+  auto [n_alpha_total, n_beta_total] = get_total_num_electrons();
+  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
+  oss << "  Total electrons (α,β): (" << n_alpha_total << "," << n_beta_total
+      << ")\n";
+  oss << "  Active electrons (α,β): (" << n_alpha_active << "," << n_beta_active
+      << ")\n";
+
+  oss << "  1-RDM available: " << (has_one_rdm_spin_dependent() ? "yes" : "no")
+      << "\n";
+  oss << "  2-RDM available: " << (has_two_rdm_spin_dependent() ? "yes" : "no")
+      << "\n";
+
+  if (auto orbitals = get_orbitals()) {
+    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs, "
+        << (orbitals->is_restricted() ? "restricted" : "unrestricted") << "\n";
+  } else {
+    oss << "  Orbitals: none\n";
+  }
+
+  oss << _get_summary_impl();
+  return oss.str();
+}
+
+std::string DeterminantalWavefunctionContainer::_get_summary_impl() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ostringstream oss;
+  oss << "  Number of determinants: " << size() << "\n";
+  return oss.str();
+}
+
+nlohmann::json WavefunctionContainer::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j;
+  j["version"] = SERIALIZATION_VERSION;
+  j["container_type"] = get_container_type();
+  j["wavefunction_type"] =
+      (_type == WavefunctionType::SelfDual) ? "self_dual" : "not_self_dual";
+
+  // Serialize RDMs and entropies if available
+  _serialize_rdms_to_json(j);
+  _serialize_entropies_to_json(j);
+
+  // Merge container-specific fields
+  nlohmann::json impl = _to_json_impl();
+  for (auto it = impl.begin(); it != impl.end(); ++it) {
+    j[it.key()] = it.value();
+  }
+  return j;
+}
+
+nlohmann::json DeterminantalWavefunctionContainer::_to_json_impl() const {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j;
+
+  bool is_complex_v = detail::is_vector_variant_complex(get_coefficients());
+  j["is_complex"] = is_complex_v;
+  if (is_complex_v) {
+    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(get_coefficients());
+    nlohmann::json coeffs_array = nlohmann::json::array();
+    for (Eigen::Index i = 0; i < coeffs_complex.size(); ++i) {
+      coeffs_array.push_back(
+          {coeffs_complex(i).real(), coeffs_complex(i).imag()});
+    }
+    j["coefficients"] = coeffs_array;
+  } else {
+    const auto& coeffs_real = std::get<Eigen::VectorXd>(get_coefficients());
+    j["coefficients"] = std::vector<double>(
+        coeffs_real.data(), coeffs_real.data() + coeffs_real.size());
+  }
+
+  if (has_configuration_set()) {
+    j["configuration_set"] = get_configuration_set().to_json();
+  }
+  return j;
+}
+
 // Wavefunction implementations
 Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
     : _container(std::move(container)) {
@@ -1186,18 +1271,39 @@ Wavefunction::get_active_orbital_occupations() const {
 Wavefunction::ScalarVariant Wavefunction::get_coefficient(
     const Configuration& det) const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->get_coefficient(det);
+  const auto* det_container =
+      dynamic_cast<const DeterminantalWavefunctionContainer*>(_container.get());
+  if (!det_container) {
+    throw std::runtime_error(
+        "get_coefficient is only available on determinantal wavefunction "
+        "containers");
+  }
+  return det_container->get_coefficient(det);
 }
 
 const Wavefunction::VectorVariant& Wavefunction::get_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->get_coefficients();
+  const auto* det_container =
+      dynamic_cast<const DeterminantalWavefunctionContainer*>(_container.get());
+  if (!det_container) {
+    throw std::runtime_error(
+        "get_coefficients is only available on determinantal wavefunction "
+        "containers");
+  }
+  return det_container->get_coefficients();
 }
 
 const Wavefunction::DeterminantVector& Wavefunction::get_active_determinants()
     const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->get_active_determinants();
+  const auto* det_container =
+      dynamic_cast<const DeterminantalWavefunctionContainer*>(_container.get());
+  if (!det_container) {
+    throw std::runtime_error(
+        "get_active_determinants is only available on determinantal "
+        "wavefunction containers");
+  }
+  return det_container->get_active_determinants();
 }
 
 Wavefunction::DeterminantVector Wavefunction::get_total_determinants() const {
@@ -1290,7 +1396,13 @@ Configuration Wavefunction::get_total_determinant(
 
 size_t Wavefunction::size() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->size();
+  const auto* det_container =
+      dynamic_cast<const DeterminantalWavefunctionContainer*>(_container.get());
+  if (!det_container) {
+    throw std::runtime_error(
+        "size is only available on determinantal wavefunction containers");
+  }
+  return det_container->size();
 }
 
 std::pair<Wavefunction::DeterminantVector, Wavefunction::VectorVariant>
@@ -1712,57 +1824,6 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
         "wavefunction_type", string_type, H5::DataSpace(H5S_SCALAR));
     wf_type_attr.write(string_type, wf_type);
 
-    // Store restrictedness flag
-    bool is_restricted = get_orbitals()->is_restricted();
-    H5::Attribute restricted_attr = group.createAttribute(
-        "is_restricted", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-    hbool_t is_restricted_flag = is_restricted ? 1 : 0;
-    restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
-
-    // Store complexity flag for coefficients
-    // Check if coefficients exist before accessing
-    if (has_coefficients()) {
-      bool is_complex = detail::is_vector_variant_complex(get_coefficients());
-      H5::Attribute complex_attr = group.createAttribute(
-          "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
-      hbool_t is_complex_flag = is_complex ? 1 : 0;
-      complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-
-      // Store coefficients
-      if (is_complex) {
-        const auto& coeffs_complex =
-            std::get<Eigen::VectorXcd>(get_coefficients());
-        hsize_t coeff_dims = coeffs_complex.size();
-        H5::DataSpace coeff_space(1, &coeff_dims);
-
-        // Use HDF5's native complex number support - no data copying
-        // Create compound type for complex numbers (real, imag)
-        H5::CompType complex_type(sizeof(std::complex<double>));
-        complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
-        complex_type.insertMember("i", sizeof(double),
-                                  H5::PredType::NATIVE_DOUBLE);
-
-        H5::DataSet complex_dataset =
-            group.createDataSet("coefficients", complex_type, coeff_space);
-        // Write directly from Eigen's memory layout without copying
-        complex_dataset.write(coeffs_complex.data(), complex_type);
-      } else {
-        const auto& coeffs_real = std::get<Eigen::VectorXd>(get_coefficients());
-        hsize_t coeff_dims = coeffs_real.size();
-        H5::DataSpace coeff_space(1, &coeff_dims);
-        H5::DataSet coeff_dataset = group.createDataSet(
-            "coefficients", H5::PredType::NATIVE_DOUBLE, coeff_space);
-        // Write directly from Eigen's memory without copying
-        coeff_dataset.write(coeffs_real.data(), H5::PredType::NATIVE_DOUBLE);
-      }
-    }
-
-    if (has_configuration_set()) {
-      // Store configuration set (delegates to ConfigurationSet serialization)
-      H5::Group config_set_group = group.createGroup("configuration_set");
-      get_configuration_set().to_hdf5(config_set_group);
-    }
-
     // Serialize RDMs if available
     _serialize_rdms_to_hdf5(group);
 
@@ -1788,8 +1849,56 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
       mi_dataset.write(mi_row_major.data(), H5::PredType::NATIVE_DOUBLE);
     }
 
+    // Container-specific fields
+    _to_hdf5_impl(group);
+
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void DeterminantalWavefunctionContainer::_to_hdf5_impl(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+
+  // Store restrictedness flag
+  bool is_restricted = get_orbitals()->is_restricted();
+  H5::Attribute restricted_attr = group.createAttribute(
+      "is_restricted", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  hbool_t is_restricted_flag = is_restricted ? 1 : 0;
+  restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
+
+  // Store complexity flag for coefficients
+  bool is_complex = detail::is_vector_variant_complex(get_coefficients());
+  H5::Attribute complex_attr = group.createAttribute(
+      "is_complex", H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  hbool_t is_complex_flag = is_complex ? 1 : 0;
+  complex_attr.write(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
+
+  // Store coefficients
+  if (is_complex) {
+    const auto& coeffs_complex = std::get<Eigen::VectorXcd>(get_coefficients());
+    hsize_t coeff_dims = coeffs_complex.size();
+    H5::DataSpace coeff_space(1, &coeff_dims);
+
+    H5::CompType complex_type(sizeof(std::complex<double>));
+    complex_type.insertMember("r", 0, H5::PredType::NATIVE_DOUBLE);
+    complex_type.insertMember("i", sizeof(double), H5::PredType::NATIVE_DOUBLE);
+
+    H5::DataSet complex_dataset =
+        group.createDataSet("coefficients", complex_type, coeff_space);
+    complex_dataset.write(coeffs_complex.data(), complex_type);
+  } else {
+    const auto& coeffs_real = std::get<Eigen::VectorXd>(get_coefficients());
+    hsize_t coeff_dims = coeffs_real.size();
+    H5::DataSpace coeff_space(1, &coeff_dims);
+    H5::DataSet coeff_dataset = group.createDataSet(
+        "coefficients", H5::PredType::NATIVE_DOUBLE, coeff_space);
+    coeff_dataset.write(coeffs_real.data(), H5::PredType::NATIVE_DOUBLE);
+  }
+
+  if (has_configuration_set()) {
+    H5::Group config_set_group = group.createGroup("configuration_set");
+    get_configuration_set().to_hdf5(config_set_group);
   }
 }
 
@@ -2013,35 +2122,7 @@ std::string Wavefunction::get_summary() const {
   QDK_LOG_TRACE_ENTERING();
   std::ostringstream oss;
   oss << "Wavefunction Summary:\n";
-  oss << "  Container type: " << _container->get_container_type() << "\n";
-  oss << "  Number of determinants: " << size() << "\n";
-  oss << "  Wavefunction type: "
-      << (get_type() == WavefunctionType::SelfDual ? "SelfDual" : "NotSelfDual")
-      << "\n";
-  oss << "  Complex: " << (is_complex() ? "yes" : "no") << "\n";
-  oss << "  Norm: " << norm() << "\n";
-
-  auto [n_alpha_total, n_beta_total] = get_total_num_electrons();
-  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
-
-  oss << "  Total electrons (α,β): (" << n_alpha_total << "," << n_beta_total
-      << ")\n";
-  oss << "  Active electrons (α,β): (" << n_alpha_active << "," << n_beta_active
-      << ")\n";
-
-  // RDM availability
-  oss << "  1-RDM available: " << (has_one_rdm_spin_dependent() ? "yes" : "no")
-      << "\n";
-  oss << "  2-RDM available: " << (has_two_rdm_spin_dependent() ? "yes" : "no")
-      << "\n";
-
-  if (auto orbitals = get_orbitals()) {
-    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs, "
-        << (orbitals->is_restricted() ? "restricted" : "unrestricted");
-  } else {
-    oss << "  Orbitals: none";
-  }
-
+  oss << _container->get_summary();
   return oss.str();
 }
 }  // namespace qdk::chemistry::data

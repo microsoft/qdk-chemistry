@@ -352,24 +352,14 @@ void MP2Container::clear_caches() const {
   _coefficients_cache = nullptr;
 }
 
-nlohmann::json MP2Container::to_json() const {
+nlohmann::json MP2Container::_to_json_impl() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
-  j["type"] = "mp2";
-  j["version"] = SERIALIZATION_VERSION;
-
-  // Serialize orbitals
   j["orbitals"] = get_orbitals()->to_json();
-
-  // Serialize Hamiltonian
   j["hamiltonian"] = _hamiltonian->to_json();
-
-  // Serialize wavefunction
   j["wavefunction"] = _wavefunction->to_json();
-
   // Note: We don't serialize amplitudes in JSON - they are computed on
   // demand when Hamiltonian is available
-
   return j;
 }
 
@@ -393,24 +383,9 @@ std::unique_ptr<MP2Container> MP2Container::from_json(const nlohmann::json& j) {
   return std::make_unique<MP2Container>(hamiltonian, wavefunction);
 }
 
-void MP2Container::to_hdf5(H5::Group& group) const {
+void MP2Container::_to_hdf5_impl(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
-    H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
-
-    // version
-    H5::Attribute version_attr = group.createAttribute(
-        "version", string_type, H5::DataSpace(H5S_SCALAR));
-    std::string version_str = SERIALIZATION_VERSION;
-    version_attr.write(string_type, version_str);
-    version_attr.close();
-
-    // container type
-    std::string container_type = get_container_type();
-    H5::Attribute container_type_attr = group.createAttribute(
-        "container_type", string_type, H5::DataSpace(H5S_SCALAR));
-    container_type_attr.write(string_type, container_type);
-
     // complex flag
     bool is_complex_flag = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
@@ -1099,6 +1074,19 @@ MP2Container::get_active_two_rdm_spin_traced() const {
   _two_rdm_spin_traced =
       detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
   return *_two_rdm_spin_traced;
+}
+
+std::string MP2Container::_get_summary_impl() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ostringstream oss;
+  oss << "  Hamiltonian: " << (_hamiltonian ? "set" : "none") << "\n";
+  oss << "  Reference wavefunction: " << (_wavefunction ? "set" : "none")
+      << "\n";
+  oss << "  T1 amplitudes: " << (has_t1_amplitudes() ? "cached" : "on-demand")
+      << "\n";
+  oss << "  T2 amplitudes: " << (has_t2_amplitudes() ? "cached" : "on-demand")
+      << "\n";
+  return oss.str();
 }
 
 }  // namespace qdk::chemistry::data

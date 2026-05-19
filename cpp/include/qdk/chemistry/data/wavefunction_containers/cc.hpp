@@ -97,20 +97,32 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @return Shared pointer to wavefunction
    */
   std::shared_ptr<Wavefunction> get_wavefunction() const;
-  /**
-   * @brief Not implemented for CC wavefunctions
-   */
-  const VectorVariant& get_coefficients() const override;
 
   /**
-   * @brief Not implemented for CC wavefunctions
+   * @brief Get CI coefficients generated lazily from CC amplitudes
+   *
+   * Truncates the expansion at fourth order. Result is cached after first
+   * computation.
+   *
+   * @return Reference to vector of CI coefficients
    */
-  ScalarVariant get_coefficient(const Configuration& det) const override;
+  const VectorVariant& get_coefficients() const;
 
   /**
-   * @brief Not implemented for CC wavefunctions
+   * @brief Get coefficient for a specific determinant
+   *
+   * Triggers lazy CI expansion on first call.
+   *
+   * @param det Configuration to look up
+   * @return Coefficient value (zero if determinant not in expansion)
    */
-  const DeterminantVector& get_active_determinants() const override;
+  ScalarVariant get_coefficient(const Configuration& det) const;
+
+  /**
+   * @brief Get determinants generated lazily from CC amplitudes
+   * @return Reference to vector of determinant configurations
+   */
+  const DeterminantVector& get_active_determinants() const;
 
   /**
    * @brief Get T1 amplitudes
@@ -151,7 +163,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @throws std::runtime_error Always throws as this is not meaningful for CC
    * wavefunctions
    */
-  size_t size() const override;
+  size_t size() const;
 
   /**
    * @brief Not implemented for CC wavefunctions
@@ -218,12 +230,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
   void clear_caches() const override;
 
   /**
-   * @brief Convert container to JSON format
-   * @return JSON object containing container data
-   */
-  nlohmann::json to_json() const override;
-
-  /**
    * @brief Load container from JSON format
    * @param j JSON object containing container data
    * @return Unique pointer to CC container created from JSON data
@@ -231,13 +237,6 @@ class CoupledClusterContainer : public WavefunctionContainer {
    */
   static std::unique_ptr<CoupledClusterContainer> from_json(
       const nlohmann::json& j);
-
-  /**
-   * @brief Convert container to HDF5 group
-   * @param group HDF5 group to write container data to
-   * @throws std::runtime_error if HDF5 I/O error occurs
-   */
-  void to_hdf5(H5::Group& group) const override;
 
   /**
    * @brief Load container from HDF5 group
@@ -352,6 +351,11 @@ class CoupledClusterContainer : public WavefunctionContainer {
    * @throws std::runtime_error Always throws - requires adjoint wavefunction
    */
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
+
+ protected:
+  void _to_hdf5_impl(H5::Group& group) const override;
+  nlohmann::json _to_json_impl() const override;
+  std::string _get_summary_impl() const override;
 
  private:
   // Orbital information

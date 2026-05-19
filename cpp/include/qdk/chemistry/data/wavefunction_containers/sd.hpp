@@ -27,7 +27,7 @@ namespace qdk::chemistry::data {
  * with coefficient 1.0. It provides efficient storage and computation for
  * single-determinant wavefunctions such as Hartree-Fock reference states.
  */
-class SlaterDeterminantContainer : public WavefunctionContainer {
+class SlaterDeterminantContainer : public DeterminantalWavefunctionContainer {
  public:
   // Use real values for single determinants (coefficient is always 1.0)
   using MatrixVariant = ContainerTypes::MatrixVariant;
@@ -209,12 +209,6 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   void clear_caches() const override;
 
   /**
-   * @brief Convert container to JSON format
-   * @return JSON object containing container data
-   */
-  nlohmann::json to_json() const override;
-
-  /**
    * @brief Load container from JSON format
    * @param j JSON object containing container data
    * @return Unique pointer to SD container created from JSON data
@@ -222,13 +216,6 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
    */
   static std::unique_ptr<SlaterDeterminantContainer> from_json(
       const nlohmann::json& j);
-
-  /**
-   * @brief Convert container to HDF5 group
-   * @param group HDF5 group to write container data to
-   * @throws std::runtime_error if HDF5 I/O error occurs
-   */
-  void to_hdf5(H5::Group& group) const override;
 
   /**
    * @brief Load container from HDF5 group
@@ -250,6 +237,11 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
    * @return Always false for Slater determinants (coefficients are unity)
    */
   bool is_complex() const override;
+
+ protected:
+  void _to_hdf5_impl(H5::Group& group) const override;
+  nlohmann::json _to_json_impl() const override;
+  std::string _get_summary_impl() const override;
 
  private:
   // Single determinant - optimized storage for exactly one determinant
