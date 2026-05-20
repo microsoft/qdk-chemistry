@@ -404,16 +404,13 @@ class TestScfSolver:
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
 
 
-_REF_BOHR_TO_ANG = 0.52917721092
-
-
 def _create_h2o_dfj_structure():
     """Create H2O structure matching the DFJ reference calculation geometry."""
     coords = np.array(
         [
-            [0.00, 0.49 / _REF_BOHR_TO_ANG, -0.79 / _REF_BOHR_TO_ANG],
-            [0.00, 0.49 / _REF_BOHR_TO_ANG, 0.79 / _REF_BOHR_TO_ANG],
-            [0.00, -0.12 / _REF_BOHR_TO_ANG, 0.00],
+            [0.00, 0.49 * ANGSTROM_TO_BOHR, -0.79 * ANGSTROM_TO_BOHR],
+            [0.00, 0.49 * ANGSTROM_TO_BOHR, 0.79 * ANGSTROM_TO_BOHR],
+            [0.00, -0.12 * ANGSTROM_TO_BOHR, 0.00],
         ]
     )
     return Structure(["H", "H", "O"], coords)
@@ -424,7 +421,7 @@ def _create_o2_dfj_structure():
     coords = np.array(
         [
             [0.0, 0.0, 0.0],
-            [0.0, 0.0, 1.21 / _REF_BOHR_TO_ANG],
+            [0.0, 0.0, 1.21 * ANGSTROM_TO_BOHR],
         ]
     )
     return Structure(["O", "O"], coords)
