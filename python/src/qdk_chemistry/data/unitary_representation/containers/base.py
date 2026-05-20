@@ -99,7 +99,7 @@ class UnitaryContainer(DataClass):
 
     @abstractmethod
     def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
-        """Combine this container with another, merging adjacent terms where possible.
+        """Combine this container with another to represent sequential application.
 
         Args:
             other: The container to append after this one.

@@ -188,7 +188,7 @@ def _ordered_partitions(n: int, k: int) -> list[list[int]]:
 
 
 class MagnusPropagatorSettings(Settings):
-    """Settings for the time-averaged propagator."""
+    """Settings for the Magnus propagator."""
 
     def __init__(self):
         """Initialize settings with default Magnus expansion order."""
@@ -197,7 +197,7 @@ class MagnusPropagatorSettings(Settings):
 
 
 class MagnusPropagator(Propagator):
-    r"""Time-averaged propagator with recursive Magnus expansion.
+    r"""Magnus propagator with recursive expansion.
 
     Evaluates the effective Hamiltonian for an interval :math:`[t_1, t_2]`
     using the Magnus expansion truncated at the configured ``order``.
@@ -213,7 +213,7 @@ class MagnusPropagator(Propagator):
     """
 
     def __init__(self):
-        """Initialize the time-averaged propagator."""
+        """Initialize the Magnus propagator."""
         super().__init__()
         self._settings = MagnusPropagatorSettings()
 

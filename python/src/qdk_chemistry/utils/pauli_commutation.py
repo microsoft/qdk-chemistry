@@ -85,6 +85,7 @@ def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian
     if not terms:
         return _QubitHamiltonian(["I" * num_qubits], np.array([0.0]))
 
+    # PauliTermAccumulator returns qubit-0-first ordering; reverse to Qiskit/QubitHamiltonian convention (qubit-0-last).
     labels = [label[::-1] for _, label in terms]
     coeffs = np.array([complex(c) for c, _ in terms])
     return _QubitHamiltonian(labels, coeffs)

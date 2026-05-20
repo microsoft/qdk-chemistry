@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-import qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base as measure_base
+import qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation.base as hamiltonian_sim_base
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -41,7 +41,7 @@ def test_prepend_state_prep_circuit_composes_qsharp_operations(monkeypatch: pyte
     evolution_op = object()
 
     monkeypatch.setattr(
-        measure_base,
+        hamiltonian_sim_base,
         "QSHARP_UTILS",
         SimpleNamespace(
             CircuitComposition=SimpleNamespace(
@@ -206,6 +206,19 @@ class TestEulerIntegratorValidation:
         measurements = algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
         assert len(measurements) == 1
 
+    def test_propagator_setting_via_create_kwargs(self):
+        """Propagator AlgorithmRef should be configurable through create() kwargs."""
+        from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+        algo = registry.create(
+            "hamiltonian_simulation",
+            "euler_integrator",
+            propagator=AlgorithmRef("propagator", "magnus", order=2),
+        )
+        ref = algo.settings().get("propagator")
+        assert ref.algorithm_type == "propagator"
+        assert ref.algorithm_name == "magnus"
+
 
 # ---------------------------------------------------------------------------
 # Time-dependent Trotter tests with smooth driving functions
@@ -250,35 +263,34 @@ def _run_smooth_drive_test(
 
 
 def test_euler_integrator_sinusoidal_drive() -> None:
-    """Sinusoidal drive H(t) = sin(t)*X on single qubit, measure Z.
-
-    Exact ⟨Z⟩ = cos(2∫₀ᵀ sin(t)dt) = cos(2) ≈ -0.416.
-    """
-    _run_smooth_drive_test(drive=np.sin, total_time=np.pi / 2, num_divisions=1, dt=np.pi / 20, expected_z=-0.416)
+    """Sinusoidal drive H(t) = sin(t)*X on single qubit, measure Z."""
+    total_time = np.pi / 2
+    # Exact: ⟨Z⟩ = cos(2∫₀ᵀ sin(t)dt) = cos(2(1 - cos(T)))
+    expected_z = float(np.cos(2 * (1 - np.cos(total_time))))
+    _run_smooth_drive_test(drive=np.sin, total_time=total_time, num_divisions=1, dt=np.pi / 20, expected_z=expected_z)
 
 
 def test_euler_integrator_exponential_decay_drive() -> None:
-    """Exponential decay drive H(t) = exp(-t)*X on single qubit, measure Z.
-
-    Exact ⟨Z⟩ = cos(2(1-e⁻¹)) ≈ 0.302.
-    """
+    """Exponential decay drive H(t) = exp(-t)*X on single qubit, measure Z."""
 
     def exp_decay(t: float) -> float:
         return float(np.exp(-t))
 
-    _run_smooth_drive_test(drive=exp_decay, total_time=1.0, num_divisions=1, dt=0.1, expected_z=0.302)
+    # Exact: ⟨Z⟩ = cos(2∫₀¹ exp(-t)dt) = cos(2(1 - e⁻¹))
+    expected_z = float(np.cos(2 * (1 - np.exp(-1))))
+    _run_smooth_drive_test(drive=exp_decay, total_time=1.0, num_divisions=1, dt=0.1, expected_z=expected_z)
 
 
 def test_euler_integrator_linear_ramp_drive() -> None:
-    """Linear ramp drive H(t) = t*X on single qubit, measure Z.
-
-    Exact ⟨Z⟩ = cos(2·T²/2) = cos(1) ≈ 0.540 for T=1.
-    """
+    """Linear ramp drive H(t) = t*X on single qubit, measure Z."""
 
     def linear_ramp(t: float) -> float:
         return t
 
-    _run_smooth_drive_test(drive=linear_ramp, total_time=1.0, num_divisions=1, dt=0.1, expected_z=0.540)
+    total_time = 1.0
+    # Exact: ⟨Z⟩ = cos(2∫₀ᵀ t dt) = cos(T²)
+    expected_z = float(np.cos(total_time**2))
+    _run_smooth_drive_test(drive=linear_ramp, total_time=total_time, num_divisions=1, dt=0.1, expected_z=expected_z)
 
 
 def test_euler_integrator_non_commuting_observable() -> None:

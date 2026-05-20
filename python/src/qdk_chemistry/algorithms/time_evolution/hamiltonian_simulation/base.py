@@ -1,4 +1,4 @@
-"""QDK/Chemistry evolve-and-measure abstractions and utilities."""
+"""QDK/Chemistry Hamiltonian simulation abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -30,7 +30,7 @@ class HamiltonianSimulationSettings(Settings):
     """Settings for Hamiltonian simulation."""
 
     def __init__(self):
-        """Initialize defaults for evolve-and-measure simulation."""
+        """Initialize defaults for Hamiltonian simulation."""
         super().__init__()
         self._set_default(
             "evolution_builder",

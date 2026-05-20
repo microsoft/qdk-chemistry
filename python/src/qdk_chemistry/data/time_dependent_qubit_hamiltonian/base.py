@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from .containers.base import TimeDependentQubitHamiltonianContainer
 
-__all__: list[str] = []
+__all__: list[str] = ["TimeDependentQubitHamiltonian"]
 
 
 class TimeDependentQubitHamiltonian:
@@ -29,6 +29,7 @@ class TimeDependentQubitHamiltonian:
     """
 
     def __init__(self, container: TimeDependentQubitHamiltonianContainer) -> None:
+        """Initialize with the given container."""
         self._container = container
 
     def get_container(self) -> TimeDependentQubitHamiltonianContainer:
