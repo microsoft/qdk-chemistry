@@ -7,5 +7,15 @@
 
 from .base import ControlledCircuitMapperFactory
 from .pauli_sequence_mapper import PauliSequenceMapper
+from .prep_sel_prep_mapper import PrepSelPrepMapper, PrepSelPrepSettings
+from .select_mapper import MultiControlledSelectMapper, SelectMapper, SelectMapperFactory
 
-__all__ = ["ControlledCircuitMapperFactory", "PauliSequenceMapper"]
+__all__ = [
+    "ControlledCircuitMapperFactory",
+    "MultiControlledSelectMapper",
+    "PauliSequenceMapper",
+    "PrepSelPrepMapper",
+    "PrepSelPrepSettings",
+    "SelectMapper",
+    "SelectMapperFactory",
+]

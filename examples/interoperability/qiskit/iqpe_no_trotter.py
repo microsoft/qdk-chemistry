@@ -265,7 +265,7 @@ bits, phase_fraction = run_iterative_exact_qpe(
 ########################################################################################
 # 5. Process and display results
 ########################################################################################
-result = QpeResult.from_phase_fraction(
+result = QpeResult.from_time_evolution_result(
     method="iterative_exact",
     phase_fraction=phase_fraction,
     evolution_time=T_TIME,

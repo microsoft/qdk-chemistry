@@ -14,7 +14,12 @@ import numpy as np
 
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.phase import energy_alias_candidates, energy_from_phase, resolve_energy_aliases
+from qdk_chemistry.utils.phase import (
+    energy_alias_candidates,
+    energy_from_phase,
+    energy_from_phase_qubitization,
+    resolve_energy_aliases,
+)
 
 __all__: list[str] = []
 
@@ -31,13 +36,13 @@ class QpeResult(DataClass):
     def __init__(
         self,
         method: str,
-        evolution_time: float,
         phase_fraction: float,
         phase_angle: float,
         canonical_phase_fraction: float,
         canonical_phase_angle: float,
         raw_energy: float,
         branching: tuple[float, ...],
+        evolution_time: float | None,
         resolved_energy: float | None = None,
         bits_msb_first: tuple[int, ...] | None = None,
         bitstring_msb_first: str | None = None,
@@ -47,13 +52,13 @@ class QpeResult(DataClass):
 
         Args:
             method: Identifier for the algorithm or workflow that produced the result.
-            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
             phase_fraction:  Raw measured phase fraction in ``[0, 1)``.
             phase_angle: Raw measured phase angle in radians.
             canonical_phase_fraction:  Alias-resolved phase fraction consistent with the selected energy branch.
             canonical_phase_angle: Alias-resolved phase angle in radians.
             raw_energy: Energy computed directly from ``phase_fraction``.
             branching: Sorted tuple of all alias energy candidates considered.
+            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
             resolved_energy: Alias energy selected with the optional reference value, if available.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
@@ -62,13 +67,13 @@ class QpeResult(DataClass):
         """
         Logger.trace_entering()
         self.method = method
-        self.evolution_time = evolution_time
         self.phase_fraction = phase_fraction
         self.phase_angle = phase_angle
         self.canonical_phase_fraction = canonical_phase_fraction
         self.canonical_phase_angle = canonical_phase_angle
         self.raw_energy = raw_energy
         self.branching = branching
+        self.evolution_time = evolution_time
         self.resolved_energy = resolved_energy
         self.bits_msb_first = bits_msb_first
         self.bitstring_msb_first = bitstring_msb_first
@@ -77,7 +82,7 @@ class QpeResult(DataClass):
         super().__init__()
 
     @classmethod
-    def from_phase_fraction(
+    def from_time_evolution_result(
         cls,
         *,
         method: str,
@@ -160,6 +165,65 @@ class QpeResult(DataClass):
             metadata=metadata_copy,
         )
 
+    @classmethod
+    def from_block_encoding_result(
+        cls,
+        *,
+        method: str,
+        phase_fraction: float,
+        lambda_val: float,
+        bits_msb_first: Sequence[int] | None = None,
+        bitstring_msb_first: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> "QpeResult":
+        r"""Construct a :class:`QpeResult` from a block-encoding (qubitization) phase measurement.
+
+        For qubitization the walk operator has eigenvalues :math:`e^{\pm i \arccos(E/\lambda)}`,
+        so the energy is recovered as :math:`E = \lambda \cos(2\pi\varphi)`.
+
+        Args:
+            method: Phase estimation algorithm or workflow label.
+            phase_fraction: Measured phase fraction in ``[0, 1)``.
+            lambda_val: The 1-norm :math:`\lambda = \sum_j |\alpha_j|` of the Hamiltonian.
+            bits_msb_first: Optional measured bits ordered from MSB to LSB.
+            bitstring_msb_first: Optional string representation of the measured bits.
+            metadata: Optional dictionary copied into the result for caller-defined context.
+
+        Returns:
+            QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        """
+        Logger.trace_entering()
+        method_label = str(method.value) if hasattr(method, "value") else str(method)
+
+        normalized_phase = float(phase_fraction % 1.0)
+        phase_angle = float(normalized_phase * (2 * np.pi))
+        raw_energy = energy_from_phase_qubitization(normalized_phase, lambda_val=lambda_val)
+
+        normalized_bits: tuple[int, ...] | None = None
+        bitstring = bitstring_msb_first
+        if bits_msb_first is not None:
+            normalized_bits = tuple(int(bit) for bit in bits_msb_first)
+            if bitstring is None:
+                bitstring = "".join(str(bit) for bit in normalized_bits)
+
+        metadata_copy = dict(metadata) if metadata is not None else None
+
+        return cls(
+            method=method_label,
+            evolution_time=None,
+            phase_fraction=normalized_phase,
+            phase_angle=phase_angle,
+            canonical_phase_fraction=normalized_phase,
+            canonical_phase_angle=phase_angle,
+            raw_energy=raw_energy,
+            branching=(raw_energy,),
+            resolved_energy=None,
+            bits_msb_first=normalized_bits,
+            bitstring_msb_first=bitstring,
+            metadata=metadata_copy,
+        )
+
     # DataClass interface implementation
     def get_summary(self) -> str:
         """Get a human-readable summary of the QPE result.
@@ -170,10 +234,15 @@ class QpeResult(DataClass):
         """
         lines = [
             f"QPE Result ({self.method})",
-            f"  Evolution time: {self.evolution_time}",
-            f"  Phase fraction: {self.phase_fraction:.6f}",
-            f"  Raw energy: {self.raw_energy:.6f}",
         ]
+        if self.evolution_time is not None:
+            lines.append(f"  Evolution time: {self.evolution_time}")
+        lines.extend(
+            [
+                f"  Phase fraction: {self.phase_fraction:.6f}",
+                f"  Raw energy: {self.raw_energy:.6f}",
+            ]
+        )
         if self.resolved_energy is not None:
             lines.append(f"  Resolved energy: {self.resolved_energy:.6f}")
         if self.bitstring_msb_first is not None:
@@ -189,7 +258,6 @@ class QpeResult(DataClass):
         """
         data = {
             "method": self.method,
-            "evolution_time": self.evolution_time,
             "phase_fraction": self.phase_fraction,
             "phase_angle": self.phase_angle,
             "canonical_phase_fraction": self.canonical_phase_fraction,
@@ -198,6 +266,8 @@ class QpeResult(DataClass):
             "branching": list(self.branching),
         }
 
+        if self.evolution_time is not None:
+            data["evolution_time"] = self.evolution_time
         if self.resolved_energy is not None:
             data["resolved_energy"] = self.resolved_energy
         if self.bits_msb_first is not None:
@@ -218,7 +288,8 @@ class QpeResult(DataClass):
         """
         self._add_hdf5_version(group)
         group.attrs["method"] = self.method
-        group.attrs["evolution_time"] = self.evolution_time
+        if self.evolution_time is not None:
+            group.attrs["evolution_time"] = self.evolution_time
         group.attrs["phase_fraction"] = self.phase_fraction
         group.attrs["phase_angle"] = self.phase_angle
         group.attrs["canonical_phase_fraction"] = self.canonical_phase_fraction
@@ -255,7 +326,7 @@ class QpeResult(DataClass):
 
         return cls(
             method=json_data["method"],
-            evolution_time=json_data["evolution_time"],
+            evolution_time=json_data.get("evolution_time"),
             phase_fraction=json_data["phase_fraction"],
             phase_angle=json_data["phase_angle"],
             canonical_phase_fraction=json_data["canonical_phase_fraction"],
@@ -296,7 +367,7 @@ class QpeResult(DataClass):
 
         return cls(
             method=group.attrs["method"],
-            evolution_time=group.attrs["evolution_time"],
+            evolution_time=group.attrs.get("evolution_time"),
             phase_fraction=group.attrs["phase_fraction"],
             phase_angle=group.attrs["phase_angle"],
             canonical_phase_fraction=group.attrs["canonical_phase_fraction"],
