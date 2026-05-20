@@ -98,19 +98,23 @@ Eigen::MatrixXd transform_three_center_ao_to_mo(
         "ao_three_center_vectors dimensions do not match n_ao");
   }
 
+  // B_ao is (n_ao², rank) col-major. Mapped as (n_ao, n_ao*rank) col-major:
+  //   reshaped(nu, Q*n_ao + mu) = B_ao(mu*n_ao + nu, Q)
+  // First half-transform (one GEMM): contract nu index with C
+  //   T1(j, Q*n_ao + mu) = sum_nu C(nu,j) * B(mu,nu,Q)
+  Eigen::Map<const Eigen::MatrixXd> B_reshaped(
+      ao_three_center_vectors.data(), n_ao, n_ao * rank);
+  Eigen::MatrixXd T1 = mo_coeffs.transpose() * B_reshaped;  // (n_mo, n_ao*rank)
+
+  // Second half-transform: contract mu index with C
+  //   result(i,j,Q) = sum_mu C(mu,i) * T1(j, Q*n_ao + mu)
+  // For each Q, subblock = T1.middleCols(Q*n_ao, n_ao) is (n_mo x n_ao)
+  //   out_Q(i,j) = (C^T * subblock^T)(i,j)
   Eigen::MatrixXd mo_vectors(n_mo * n_mo, rank);
-
-  // iterate over each 3-center vector
-  for (size_t k = 0; k < rank; ++k) {
-    // Reshape the flat AO vector to a matrix (n_ao x n_ao)
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                   Eigen::RowMajor>>
-        V_ao(ao_three_center_vectors.col(k).data(), n_ao, n_ao);
-
-    // Transform from AO to MO basis: C^T * V_ao * C
-    // Write directly to output column
-    Eigen::Map<Eigen::MatrixXd> V_mo_map(mo_vectors.col(k).data(), n_mo, n_mo);
-    V_mo_map.noalias() = mo_coeffs.transpose() * V_ao * mo_coeffs;
+  for (size_t Q = 0; Q < rank; ++Q) {
+    auto subblock = T1.middleCols(Q * n_ao, n_ao);  // (n_mo x n_ao)
+    Eigen::Map<Eigen::MatrixXd> out_Q(mo_vectors.col(Q).data(), n_mo, n_mo);
+    out_Q.noalias() = mo_coeffs.transpose() * subblock.transpose();
   }
 
   return mo_vectors;
@@ -161,30 +165,29 @@ Eigen::MatrixXd build_K_from_three_center(
         "ao_three_center_vectors dimensions do not match density matrix");
   }
 
-  // Extract occupied orbital coefficients only
+  // Extract occupied orbital coefficients
   Eigen::MatrixXd C_occ(n_ao, n_occ);
   for (size_t idx = 0; idx < n_occ; ++idx) {
     C_occ.col(idx) = coeffs.col(occ_orb_ind[idx]);
   }
 
-  // Transform to occupied MO basis only: L^k_{\sigma,i_occ} = L^k_{\mu\sigma} *
-  // C_{\mu,i_occ}
-  Eigen::MatrixXd L_sigma_occ(n_ao * n_occ, rank);
-  for (size_t k = 0; k < rank; ++k) {
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                   Eigen::RowMajor>>
-        L_k(ao_three_center_vectors.col(k).data(), n_ao, n_ao);
-    Eigen::Map<Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao, n_occ);
-    L_k_occ.noalias() = L_k * C_occ;
+  // Half-transform: B_half(mu, i, Q) = sum_nu B(mu,nu,Q) * C_occ(nu,i)
+  // Store as (n_ao x n_occ*rank) so K = B_half_2d * B_half_2d^T in one GEMM.
+  // Each row mu gets the flattened (n_occ x rank) result for that mu.
+  Eigen::MatrixXd B_half_2d(n_ao, n_occ * rank);
+  for (size_t mu = 0; mu < n_ao; ++mu) {
+    // (n_occ x rank) = C_occ^T * B_ao[mu*n_ao..(mu+1)*n_ao, :]
+    Eigen::MatrixXd temp =
+        C_occ.transpose() *
+        ao_three_center_vectors.middleRows(mu * n_ao, n_ao);
+    // Flatten (n_occ x rank) col-major into row mu
+    B_half_2d.row(mu) =
+        Eigen::Map<Eigen::RowVectorXd>(temp.data(), n_occ * rank);
   }
 
-  // Build K_{\lambda\sigma} = \sum_k L^k_{\lambda,i} * L^k_{\sigma,i}
-  Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_ao, n_ao);
-  for (size_t k = 0; k < rank; ++k) {
-    Eigen::Map<const Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao,
-                                              n_occ);
-    K.noalias() += L_k_occ * L_k_occ.transpose();
-  }
+  // K[mu,nu] = sum_{i,Q} B_half(mu,i,Q) * B_half(nu,i,Q)
+  //          = B_half_2d * B_half_2d^T  (single GEMM / DSYRK)
+  Eigen::MatrixXd K = B_half_2d * B_half_2d.transpose();
 
   return K;
 }
