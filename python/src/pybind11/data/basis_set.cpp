@@ -178,8 +178,7 @@ Examples:
 Get number of atomic orbitals this shell contributes.
 
 Args:
-    atomic_orbital_type (AOType | None): Whether to use spherical (2l+1) or Cartesian functions.
-        Default is Spherical
+    atomic_orbital_type (AOType | None): Spherical (default) or Cartesian AOs.
 
 Returns:
     int: Number of atomic orbitals
@@ -247,7 +246,7 @@ Create a basis set from a name and shells.
 Args:
     name (str): Name of the basis set (e.g., "6-31G", "cc-pVDZ")
         shells (Iterable[Shell]): Iterable of Shell objects
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, structure [, atomic_orbital_type])
@@ -264,7 +263,7 @@ Args:
     name (str): Name of the basis set
         shells (Iterable[Shell]): Iterable of Shell objects
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, aux_shells, structure [, atomic_orbital_type])
@@ -285,7 +284,7 @@ Args:
     shells (Iterable[Shell]): Iterable of Shell objects
     aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects (e.g., for density fitting)
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, aux_name, aux_shells, structure
@@ -309,7 +308,7 @@ Args:
     aux_name (str): Name of the auxiliary basis set
     aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, ecp_shells, ecp_electrons, structure
@@ -334,7 +333,7 @@ Args:
     ecp_shells (Iterable[Shell]): Iterable of ECP Shell objects (with radial powers)
     ecp_electrons (list[int]): Number of ECP electrons per atom
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons, structure
@@ -360,7 +359,7 @@ Args:
     ecp_shells (Iterable[Shell]): Iterable of ECP Shell objects
     ecp_electrons (list[int]): Number of ECP electrons per atom
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // BasisSet(name, shells, ecp_name, ecp_shells, ecp_electrons,
@@ -391,7 +390,7 @@ Args:
     aux_name (str): Name of the auxiliary basis set
     aux_shells (Iterable[Shell]): Iterable of auxiliary Shell objects
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType): Spherical or Cartesian (default Spherical)
+    atomic_orbital_type (AOType): Spherical (default) or Cartesian AOs.
 )");
 
   // Basis type management
@@ -1169,8 +1168,7 @@ Loads a standard basis set (e.g., "sto-3g", "cc-pvdz") for all atoms in the stru
 Args:
     basis_name (str): Name of the basis set (e.g., "sto-3g", "cc-pvdz", "6-31g");
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance
@@ -1199,8 +1197,7 @@ Args:
     basis_name (str): Name of the basis set (e.g., "def2-svp")
     aux_basis_name (str): Name of the auxiliary basis set (e.g., "def2-universal-jfit")
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance with auxiliary basis
@@ -1224,8 +1221,7 @@ Args:
     element_to_basis_map (dict[str, str]): Dictionary mapping element symbols to basis set names.
         Example: {"H": "sto-3g", "O": "cc-pvdz"}
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance with custom name "custom_basis_set"
@@ -1254,8 +1250,7 @@ Args:
     element_to_basis_map (dict[str, str]): Dictionary mapping element symbols to basis set names
     element_to_aux_basis_map (dict[str, str]): Dictionary mapping element symbols to auxiliary basis set names
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance with auxiliary basis
@@ -1280,8 +1275,7 @@ Args:
     index_to_basis_map (dict[int, str]): Dictionary mapping atom indices to basis set names.
         Example: {0: "sto-3g", 1: "cc-pvdz", 2: "sto-3g"}
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance with custom name "custom_basis_set"
@@ -1310,8 +1304,7 @@ Args:
     index_to_basis_map (dict[int, str]): Dictionary mapping atom indices to basis set names
     index_to_aux_basis_map (dict[int, str]): Dictionary mapping atom indices to auxiliary basis set names
     structure (Structure): Molecular structure
-    atomic_orbital_type (AOType, optional): Whether to use spherical or Cartesian atomic orbitals.
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     BasisSet: New basis set instance with auxiliary basis
@@ -1400,8 +1393,7 @@ Get number of orbitals for given angular momentum.
 
 Args:
     l (int): Angular momentum quantum number
-    atomic_orbital_type (AOType, optional): Whether to use spherical (2l+1) or Cartesian functions
-        Default is Spherical
+    atomic_orbital_type (AOType, optional): Spherical (default) or Cartesian AOs.
 
 Returns:
     int: Number of orbital functions
