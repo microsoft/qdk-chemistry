@@ -8,8 +8,10 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 
 #include <libint2.hpp>  // for Shell class
+#include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <string>
 
 namespace qdk::chemistry::utils::microsoft {
 
@@ -162,7 +164,58 @@ size_t factorial(size_t n);
  * @param n The total number of items.
  * @param k The number of items to choose.
  * @return The binomial coefficient C(n, k), or 0 if k > n.
+ *
+ * @warning This function silently overflows when C(n, k) exceeds the range of
+ * size_t (e.g., C(66, 33) and larger). Use binomial_coefficient_checked() to
+ * detect overflow, or log_binomial_coefficient() to compute the natural
+ * logarithm of large values without overflow.
  */
 size_t binomial_coefficient(size_t n, size_t k);
+
+/**
+ * @brief Compute the binomial coefficient C(n, k) with overflow detection.
+ *
+ * Computes C(n, k) exactly using size_t arithmetic, but returns std::nullopt
+ * if the result would overflow size_t at any point during the computation.
+ *
+ * @param n The total number of items.
+ * @param k The number of items to choose.
+ * @return The binomial coefficient C(n, k) wrapped in std::optional, or
+ * std::nullopt if the result (or any intermediate product) would overflow
+ * size_t. Returns 0 if k > n, and 1 if k == 0 or k == n.
+ */
+std::optional<size_t> binomial_coefficient_checked(size_t n, size_t k);
+
+/**
+ * @brief Compute the natural logarithm of the binomial coefficient C(n, k).
+ *
+ * Computed as lgamma(n+1) - lgamma(k+1) - lgamma(n-k+1) so it does not
+ * overflow for any reasonable n. Useful for rigorously reporting very large
+ * combinatorial counts (e.g., FCI determinant counts for large active spaces)
+ * that exceed the representable range of size_t.
+ *
+ * @param n The total number of items.
+ * @param k The number of items to choose.
+ * @return ln(C(n, k)) as a double. Returns -infinity if k > n, and 0 if
+ * k == 0 or k == n (since ln(1) == 0).
+ */
+double log_binomial_coefficient(size_t n, size_t k);
+
+/**
+ * @brief Format a (possibly very large) combinatorial count for display.
+ *
+ * If the exact value fits in size_t (i.e., @p exact is engaged), the exact
+ * integer is returned as a decimal string. Otherwise, the value is rendered
+ * in scientific notation using @p ln_value (the natural logarithm of the
+ * count) with a prefix indicating the value is approximate (e.g.,
+ * "~1.234e+45 (exceeds 64-bit integer range)").
+ *
+ * @param exact The exact count, or std::nullopt if it overflows size_t.
+ * @param ln_value The natural logarithm of the count, used to format the
+ * scientific-notation fallback when @p exact is std::nullopt.
+ * @return Human-readable string representation of the count.
+ */
+std::string format_combinatorial_count(std::optional<size_t> exact,
+                                       double ln_value);
 
 }  // namespace qdk::chemistry::utils::microsoft

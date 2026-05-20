@@ -549,3 +549,115 @@ TEST_F(MathUtilsTest, BinomialCoefficientValues) {
   EXPECT_EQ(binomial_coefficient(50, 25), 126410606437752ULL);
   EXPECT_EQ(binomial_coefficient(60, 30), 118264581564861424ULL);
 }
+
+// ========== Tests for binomial_coefficient_checked function ==========
+
+TEST_F(MathUtilsTest, BinomialCoefficientCheckedEdgeCases) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient_checked;
+
+  EXPECT_EQ(binomial_coefficient_checked(0, 0), std::optional<size_t>(1));
+  EXPECT_EQ(binomial_coefficient_checked(5, 0), std::optional<size_t>(1));
+  EXPECT_EQ(binomial_coefficient_checked(10, 10), std::optional<size_t>(1));
+  EXPECT_EQ(binomial_coefficient_checked(5, 6), std::optional<size_t>(0));
+  EXPECT_EQ(binomial_coefficient_checked(100, 1), std::optional<size_t>(100));
+}
+
+TEST_F(MathUtilsTest, BinomialCoefficientCheckedMatchesUnchecked) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient;
+  using qdk::chemistry::utils::microsoft::binomial_coefficient_checked;
+
+  // For values that fit in size_t, the checked variant matches the unchecked
+  // one exactly.
+  EXPECT_EQ(binomial_coefficient_checked(40, 20),
+            std::optional<size_t>(binomial_coefficient(40, 20)));
+  EXPECT_EQ(binomial_coefficient_checked(60, 30),
+            std::optional<size_t>(binomial_coefficient(60, 30)));
+  EXPECT_EQ(binomial_coefficient_checked(62, 31),
+            std::optional<size_t>(binomial_coefficient(62, 31)));
+}
+
+TEST_F(MathUtilsTest, BinomialCoefficientCheckedDetectsOverflow) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient_checked;
+
+  // C(68, 34) ~ 2.8e19 exceeds the max value of uint64_t (~1.8e19).
+  EXPECT_EQ(binomial_coefficient_checked(68, 34), std::nullopt);
+  // C(176, 88) is astronomically larger than uint64_t can represent
+  // (this is the case reported in the issue for a 176-orbital active space).
+  EXPECT_EQ(binomial_coefficient_checked(176, 88), std::nullopt);
+  EXPECT_EQ(binomial_coefficient_checked(200, 100), std::nullopt);
+}
+
+// ========== Tests for log_binomial_coefficient function ==========
+
+TEST_F(MathUtilsTest, LogBinomialCoefficientMatchesExactForSmallValues) {
+  using qdk::chemistry::utils::microsoft::binomial_coefficient;
+  using qdk::chemistry::utils::microsoft::log_binomial_coefficient;
+
+  // For values that fit in size_t, exp(log_binomial_coefficient) must round
+  // back to the exact value.
+  const std::vector<std::pair<size_t, size_t>> cases = {
+      {10, 5}, {20, 10}, {30, 15}, {40, 20}, {50, 25}, {60, 30}};
+  for (const auto& [n, k] : cases) {
+    const double expected = static_cast<double>(binomial_coefficient(n, k));
+    const double approx = std::exp(log_binomial_coefficient(n, k));
+    // Relative tolerance of 1e-9 is appropriate for the lgamma-based estimate.
+    EXPECT_NEAR(approx, expected, expected * 1e-9)
+        << "C(" << n << ", " << k << ")";
+  }
+}
+
+TEST_F(MathUtilsTest, LogBinomialCoefficientEdgeCases) {
+  using qdk::chemistry::utils::microsoft::log_binomial_coefficient;
+
+  EXPECT_EQ(log_binomial_coefficient(5, 0), 0.0);
+  EXPECT_EQ(log_binomial_coefficient(5, 5), 0.0);
+  EXPECT_EQ(log_binomial_coefficient(10, 10), 0.0);
+  EXPECT_EQ(log_binomial_coefficient(3, 10),
+            -std::numeric_limits<double>::infinity());
+}
+
+TEST_F(MathUtilsTest, LogBinomialCoefficientHandlesHugeValues) {
+  using qdk::chemistry::utils::microsoft::log_binomial_coefficient;
+
+  // C(176, 88): the FCI alpha-string count for a 176-orbital, 88-electron
+  // active space (the case reported in the issue). lgamma keeps this finite.
+  const double log_val = log_binomial_coefficient(176, 88);
+  EXPECT_TRUE(std::isfinite(log_val));
+  // Reference value (computed independently): log10(C(176, 88)) ~ 51.7.
+  const double log10_val = log_val / std::log(10.0);
+  EXPECT_NEAR(log10_val, 51.7, 0.5);
+}
+
+// ========== Tests for format_combinatorial_count function ==========
+
+TEST_F(MathUtilsTest, FormatCombinatorialCountExactValue) {
+  using qdk::chemistry::utils::microsoft::format_combinatorial_count;
+  using qdk::chemistry::utils::microsoft::log_binomial_coefficient;
+
+  // When the exact value is provided, the log value is ignored.
+  EXPECT_EQ(format_combinatorial_count(std::optional<size_t>(0), 0.0), "0");
+  EXPECT_EQ(format_combinatorial_count(std::optional<size_t>(42),
+                                       log_binomial_coefficient(10, 5)),
+            "42");
+  EXPECT_EQ(format_combinatorial_count(
+                std::optional<size_t>(118264581564861424ULL), 0.0),
+            "118264581564861424");
+}
+
+TEST_F(MathUtilsTest, FormatCombinatorialCountScientificFallback) {
+  using qdk::chemistry::utils::microsoft::format_combinatorial_count;
+  using qdk::chemistry::utils::microsoft::log_binomial_coefficient;
+
+  // For the 176o/88e case, the formatted string must be in scientific
+  // notation, not a wrapped/overflowed 64-bit integer (which is what the
+  // issue reports: "16727579725233405952"). Anchor the test on a stable
+  // exponent prefix and the overflow disclaimer.
+  const double log_val = 2.0 * log_binomial_coefficient(176, 88);
+  const std::string formatted =
+      format_combinatorial_count(std::nullopt, log_val);
+  EXPECT_NE(formatted.find("e+"), std::string::npos)
+      << "Expected scientific notation, got: " << formatted;
+  EXPECT_NE(formatted.find("exceeds 64-bit integer range"), std::string::npos)
+      << "Expected overflow disclaimer, got: " << formatted;
+  EXPECT_EQ(formatted.front(), '~');
+}

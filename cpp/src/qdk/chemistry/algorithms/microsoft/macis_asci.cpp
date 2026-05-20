@@ -17,6 +17,10 @@
 // Local implementation details
 #include "utils.hpp"
 
+#include <limits>
+#include <optional>
+#include <string>
+
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
@@ -84,18 +88,53 @@ struct asci_helper {
                             num_molecular_orbitals, num_molecular_orbitals));
     QDK_LOGGER().debug("MACIS Hamiltonian generator constructed.");
 
-    size_t fci_dimension =
-        qdk::chemistry::utils::microsoft::binomial_coefficient(
-            num_molecular_orbitals, nalpha) *
-        qdk::chemistry::utils::microsoft::binomial_coefficient(
+    // Compute the FCI dimension as C(norb, nalpha) * C(norb, nbeta), with
+    // overflow detection. For large active spaces (e.g., 176 orbitals) the
+    // exact value vastly exceeds the range of size_t, so we fall back to a
+    // logarithmic estimate for display and treat the comparison against
+    // ntdets_max as if the FCI dimension were effectively infinite.
+    const auto fci_alpha =
+        qdk::chemistry::utils::microsoft::binomial_coefficient_checked(
+            num_molecular_orbitals, nalpha);
+    const auto fci_beta =
+        qdk::chemistry::utils::microsoft::binomial_coefficient_checked(
             num_molecular_orbitals, nbeta);
 
-    QDK_LOGGER().debug("MACIS ASCI FCI dimension estimate: {}", fci_dimension);
+    std::optional<size_t> fci_dimension;
+    if (fci_alpha.has_value() && fci_beta.has_value()) {
+      const size_t a = *fci_alpha;
+      const size_t b = *fci_beta;
+      if (a == 0 || b == 0) {
+        fci_dimension = size_t{0};
+      } else if (a <= std::numeric_limits<size_t>::max() / b) {
+        fci_dimension = a * b;
+      }
+    }
 
-    if (asci_settings.ntdets_max > fci_dimension) {
+    const double log_fci_dimension =
+        qdk::chemistry::utils::microsoft::log_binomial_coefficient(
+            num_molecular_orbitals, nalpha) +
+        qdk::chemistry::utils::microsoft::log_binomial_coefficient(
+            num_molecular_orbitals, nbeta);
+
+    const std::string fci_dimension_str =
+        qdk::chemistry::utils::microsoft::format_combinatorial_count(
+            fci_dimension, log_fci_dimension);
+
+    QDK_LOGGER().debug("MACIS ASCI FCI dimension estimate: {}",
+                       fci_dimension_str);
+
+    // If the FCI dimension overflows size_t it is necessarily greater than
+    // any int64_t-valued ntdets_max, so the requested determinant count
+    // cannot exceed it.
+    const bool ntdets_max_exceeds_fci =
+        fci_dimension.has_value() &&
+        static_cast<size_t>(asci_settings.ntdets_max) > *fci_dimension;
+
+    if (ntdets_max_exceeds_fci) {
       QDK_LOGGER().info(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
-          asci_settings.ntdets_max, fci_dimension);
+          asci_settings.ntdets_max, fci_dimension_str);
       E_casci = macis::CASRDMFunctor<generator_t>::rdms(
           mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
           nbeta, const_cast<double*>(T_a.data()),

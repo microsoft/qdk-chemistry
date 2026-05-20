@@ -13,7 +13,12 @@
 #endif
 
 #include <libint2.hpp>
+#include <cmath>
+#include <iomanip>
+#include <limits>
+#include <optional>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -466,6 +471,64 @@ size_t binomial_coefficient(size_t n, size_t k) {
     result = (result * (n - (k - i))) / i;
   }
   return result;
+}
+
+std::optional<size_t> binomial_coefficient_checked(size_t n, size_t k) {
+  if (k > n) return size_t{0};
+  if (k == 0 || k == n) return size_t{1};
+  // Exploit symmetry: C(n, k) == C(n, n - k). Smaller k keeps the loop short
+  // and intermediate products as small as possible.
+  if (k > n - k) {
+    k = n - k;
+  }
+  size_t result = 1;
+  constexpr size_t kMax = std::numeric_limits<size_t>::max();
+  for (size_t i = 1; i <= k; ++i) {
+    const size_t numerator = n - (k - i);
+    // Detect overflow before multiplying. result * numerator overflows iff
+    // result > kMax / numerator (numerator is >= 1 here since i <= k <= n).
+    if (numerator != 0 && result > kMax / numerator) {
+      return std::nullopt;
+    }
+    // The exact running result is always an integer because the product of
+    // i consecutive integers is divisible by i!, so this division is exact
+    // and matches the unchecked binomial_coefficient() implementation.
+    result = (result * numerator) / i;
+  }
+  return result;
+}
+
+double log_binomial_coefficient(size_t n, size_t k) {
+  if (k > n) return -std::numeric_limits<double>::infinity();
+  if (k == 0 || k == n) return 0.0;
+  // ln(C(n, k)) = lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1).
+  // Using lgamma avoids overflow for any n representable as a double.
+  const double n_d = static_cast<double>(n);
+  const double k_d = static_cast<double>(k);
+  return std::lgamma(n_d + 1.0) - std::lgamma(k_d + 1.0) -
+         std::lgamma(n_d - k_d + 1.0);
+}
+
+std::string format_combinatorial_count(std::optional<size_t> exact,
+                                       double ln_value) {
+  if (exact.has_value()) {
+    return std::to_string(*exact);
+  }
+  if (!std::isfinite(ln_value)) {
+    // ln(0) -> -inf, or otherwise undefined. Should not normally happen for
+    // a value too large for size_t, but guard against it for robustness.
+    return "unknown (non-finite log)";
+  }
+  // Convert from natural log to base-10 scientific notation.
+  constexpr double kLn10 = 2.302585092994045684;
+  const double log10_value = ln_value / kLn10;
+  const double exponent_d = std::floor(log10_value);
+  const double mantissa = std::pow(10.0, log10_value - exponent_d);
+  std::ostringstream oss;
+  oss << "~" << std::fixed << std::setprecision(3) << mantissa << "e+"
+      << static_cast<long long>(exponent_d)
+      << " (exceeds 64-bit integer range)";
+  return oss.str();
 }
 
 }  // namespace qdk::chemistry::utils::microsoft
