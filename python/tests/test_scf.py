@@ -457,6 +457,7 @@ class TestScfSolverDfj:
         basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
         energy, wfn = scf_solver.run(water, 0, 1, basis)
 
+        # Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-75.955848898587732)) < scf_energy_tolerance
 
     def test_water_rks_dfj_pbe_m06_2x(self):
@@ -469,6 +470,7 @@ class TestScfSolverDfj:
         basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
         energy, wfn = scf_solver.run(water, 0, 1, basis)
 
+        # Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-76.271464794036)) < scf_energy_tolerance
 
         # use the PBE orbitals as the initial guess for M06-2X
@@ -477,6 +479,7 @@ class TestScfSolverDfj:
         m06_solver.settings().set("eri_method", "incore")
         energy, m06_wfn = m06_solver.run(water, 0, 1, wfn.get_orbitals())
 
+        # Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
         assert abs(energy - (-76.320941901587)) < scf_energy_tolerance
 
     def test_o2_triplet_uhf_dfj(self):
@@ -489,6 +492,7 @@ class TestScfSolverDfj:
         basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", o2)
         energy, wfn = scf_solver.run(o2, 0, 3, basis)
 
+        # Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/o2.json
         assert abs(energy - (-149.489993170463)) < scf_energy_tolerance
 
     def test_bf_uks_dfj_pbe(self):
@@ -502,6 +506,7 @@ class TestScfSolverDfj:
         basis = BasisSet.from_basis_name("sto-3g", "def2-universal-jfit", bf)
         energy, wfn = scf_solver.run(bf, 0, 1, basis)
 
+        # Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/bf.json
         assert abs(energy - (-122.732943463018)) < scf_energy_tolerance
 
     def test_dfj_without_aux_basis_raises(self):
