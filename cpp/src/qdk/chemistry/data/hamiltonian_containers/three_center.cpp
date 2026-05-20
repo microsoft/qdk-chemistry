@@ -28,7 +28,8 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix,
-    std::optional<Eigen::MatrixXd> ao_three_center_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors,
+    HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
       _three_center_integrals(
@@ -54,7 +55,8 @@ ThreeCenterHamiltonianContainer::ThreeCenterHamiltonianContainer(
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta,
-    std::optional<Eigen::MatrixXd> ao_three_center_vectors, HamiltonianType type)
+    std::optional<Eigen::MatrixXd> ao_three_center_vectors,
+    HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
@@ -673,7 +675,8 @@ void ThreeCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
     }
 
     if (_ao_three_center_vectors) {
-      save_matrix_to_group(group, "ao_three_center_vectors", *_ao_three_center_vectors);
+      save_matrix_to_group(group, "ao_three_center_vectors",
+                           *_ao_three_center_vectors);
     }
 
   } catch (const H5::Exception& e) {

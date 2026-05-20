@@ -4,12 +4,11 @@
 
 #pragma once
 
-#include <optional>
-
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 
 #include <libint2.hpp>  // for Shell class
+#include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 
@@ -92,7 +91,8 @@ nlohmann::ordered_json convert_to_json_primary(
  * format that can be easily serialized and used in other applications.
  *
  * @param basis_set The qdk::chemistry::data::BasisSet object to convert.
- * @return The auxiliary basis JSON, or std::nullopt if no auxiliary basis exists.
+ * @return The auxiliary basis JSON, or std::nullopt if no auxiliary basis
+ * exists.
  */
 std::optional<nlohmann::ordered_json> convert_to_json_auxiliary(
     const qdk::chemistry::data::BasisSet& basis_set);

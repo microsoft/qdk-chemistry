@@ -1157,7 +1157,8 @@ TEST_F(ScfTest, WaterRhfDfj) {
       BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
-  // Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
+  // Reference:
+  // cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
   EXPECT_NEAR(energy, -75.955848898587732, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
@@ -1173,7 +1174,8 @@ TEST_F(ScfTest, WaterRksDfjPbe) {
       BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
-  // Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
+  // Reference:
+  // cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
   EXPECT_NEAR(energy, -76.271464794036, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
@@ -1189,7 +1191,8 @@ TEST_F(ScfTest, WaterRksDfjM062x) {
       BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", water);
   auto [energy, wfn] = scf_solver->run(water, 0, 1, basis);
 
-  // Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
+  // Reference:
+  // cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/h2o_gauxc.json
   EXPECT_NEAR(energy, -76.320941901587, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_TRUE(wfn->get_orbitals()->is_restricted());
@@ -1204,7 +1207,8 @@ TEST_F(ScfTest, OxygenTripletUhfDfj) {
   auto basis = BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", o2);
   auto [energy, wfn] = scf_solver->run(o2, 0, 3, basis);
 
-  // Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/o2.json
+  // Reference:
+  // cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/o2.json
   EXPECT_NEAR(energy, -149.489993170463, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_FALSE(wfn->get_orbitals()->is_restricted());
@@ -1220,7 +1224,8 @@ TEST_F(ScfTest, BfUksDfjPbe) {
   auto basis = BasisSet::from_basis_name("sto-3g", "def2-universal-jfit", bf);
   auto [energy, wfn] = scf_solver->run(bf, 0, 1, basis);
 
-  // Reference: cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/bf.json
+  // Reference:
+  // cpp/src/qdk/chemistry/algorithms/microsoft/scf/tests/data/bf.json
   EXPECT_NEAR(energy, -122.732943463018, testing::scf_energy_tolerance);
   // TODO: test this when Hamiltonian and orbital restrictness are consistent
   // EXPECT_FALSE(wfn->get_orbitals()->is_restricted());

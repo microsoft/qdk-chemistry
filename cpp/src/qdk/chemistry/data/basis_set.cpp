@@ -184,9 +184,9 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
   auto element_data = data["elements"][nuclear_charge_string];
 
   if (element_data.is_null() || !element_data.contains("electron_shells")) {
-    throw std::invalid_argument("Basis set '" + basis_set_name +
-                                "' has no entry for element Z=" +
-                                nuclear_charge_string);
+    throw std::invalid_argument(
+        "Basis set '" + basis_set_name +
+        "' has no entry for element Z=" + nuclear_charge_string);
   }
 
   // iterate over electron shells
@@ -934,9 +934,9 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
         }
       } catch (const std::exception& e) {
         throw std::runtime_error(
-            "Auxiliary basis '" + aux_basis_name + "' has no entry for element Z=" +
-            std::to_string(static_cast<int>(nuclear_charge)) +
-            ": " + e.what());
+            "Auxiliary basis '" + aux_basis_name +
+            "' has no entry for element Z=" +
+            std::to_string(static_cast<int>(nuclear_charge)) + ": " + e.what());
       }
     }
   }
@@ -1613,8 +1613,7 @@ bool BasisSet::_is_consistent_with_structure() const {
 }
 
 void BasisSet::_organize_shells(const std::vector<Shell>& shells,
-                                size_t num_atoms,
-                                const std::string& label) {
+                                size_t num_atoms, const std::string& label) {
   for (const auto& shell : shells) {
     size_t atom_index = shell.atom_index;
     if (atom_index >= num_atoms) {

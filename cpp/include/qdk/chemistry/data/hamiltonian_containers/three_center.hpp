@@ -44,8 +44,8 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * energy)
    * @param inactive_fock_matrix Inactive Fock matrix for the selected active
    * space
-   * @param ao_three_center_vectors Optional AO three-center vectors for potential reuse
-   * (default: std::nullopt)
+   * @param ao_three_center_vectors Optional AO three-center vectors for
+   * potential reuse (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
@@ -79,8 +79,8 @@ class ThreeCenterHamiltonianContainer : public HamiltonianContainer {
    * the selected active space
    * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
    * selected active space
-   * @param ao_three_center_vectors Optional AO three-center vectors for potential reuse
-   * (default: std::nullopt)
+   * @param ao_three_center_vectors Optional AO three-center vectors for
+   * potential reuse (default: std::nullopt)
    * @param type Type of Hamiltonian (Hermitian by default)
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
