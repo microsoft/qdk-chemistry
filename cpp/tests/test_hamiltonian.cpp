@@ -1891,7 +1891,44 @@ TEST_F(HamiltonianConstructorTest, DensityFittedUnrestrictedO2) {
   });
 }
 
-// Helper class to force unrestricted behavior for closed-shell systems
+TEST_F(HamiltonianConstructorTest, UnrestrictedOneSpinEmpty) {
+  // Hydrogen atom: 1 alpha electron, 0 beta electrons.
+  // Tests the edge case where one spin channel has no inactive orbitals.
+  std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d(0.0, 0.0, 0.0)};
+  std::vector<std::string> symbols = {"H"};
+  Structure h_structure(coordinates, symbols);
+
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  scf_factory->settings().set("eri_method", "incore");
+
+  auto h_structure_ptr = std::make_shared<Structure>(h_structure);
+  auto basis = BasisSet::from_basis_name("sto-3g", h_structure);
+
+  // Multiplicity 2 → 1 alpha, 0 beta
+  auto [uhf_energy, uhf_wavefunction] =
+      scf_factory->run(h_structure_ptr, 0, 2, basis);
+  auto uhf_orbitals = uhf_wavefunction->get_orbitals();
+
+  EXPECT_TRUE(uhf_orbitals->is_unrestricted());
+
+  // Build Hamiltonian — exercises the empty-beta-inactive path
+  auto ham_factory = HamiltonianConstructorFactory::create("qdk");
+  auto hamiltonian = ham_factory->run(uhf_orbitals);
+
+  EXPECT_TRUE(hamiltonian->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian->is_unrestricted());
+
+  // Also test with cholesky path
+  auto ham_cholesky = HamiltonianConstructorFactory::create("qdk_cholesky");
+  ham_cholesky->settings().set("store_ao_three_center_vectors", true);
+  auto hamiltonian_chol = ham_cholesky->run(uhf_orbitals);
+
+  EXPECT_TRUE(hamiltonian_chol->has_one_body_integrals());
+  EXPECT_TRUE(hamiltonian_chol->has_two_body_integrals());
+  EXPECT_TRUE(hamiltonian_chol->is_unrestricted());
+}
 class ForceUnrestrictedOrbitals : public Orbitals {
  public:
   ForceUnrestrictedOrbitals(
