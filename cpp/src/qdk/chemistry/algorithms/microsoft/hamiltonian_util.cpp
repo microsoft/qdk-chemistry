@@ -171,23 +171,24 @@ Eigen::MatrixXd build_K_from_three_center(
     C_occ.col(idx) = coeffs.col(occ_orb_ind[idx]);
   }
 
-  // Half-transform: B_half(mu, i, Q) = sum_nu B(mu,nu,Q) * C_occ(nu,i)
-  // Store as (n_ao x n_occ*rank) so K = B_half_2d * B_half_2d^T in one GEMM.
-  // Each row mu gets the flattened (n_occ x rank) result for that mu.
-  Eigen::MatrixXd B_half_2d(n_ao, n_occ * rank);
-  for (size_t mu = 0; mu < n_ao; ++mu) {
-    // (n_occ x rank) = C_occ^T * B_ao[mu*n_ao..(mu+1)*n_ao, :]
-    Eigen::MatrixXd temp =
-        C_occ.transpose() *
-        ao_three_center_vectors.middleRows(mu * n_ao, n_ao);
-    // Flatten (n_occ x rank) col-major into row mu
-    B_half_2d.row(mu) =
-        Eigen::Map<Eigen::RowVectorXd>(temp.data(), n_occ * rank);
-  }
+  // One GEMM for half-transform via reshape:
+  //   B_ao (n_ao², rank) col-major viewed as (n_ao, n_ao*rank) gives
+  //   B_reshaped(nu, Q*n_ao + mu) = B_ao(mu*n_ao + nu, Q).
+  //   half = C_occ^T * B_reshaped → (n_occ, n_ao*rank)
+  //   half(i, Q*n_ao + mu) = sum_nu C_occ(nu,i) * B(mu,nu,Q)
+  Eigen::Map<const Eigen::MatrixXd> B_reshaped(
+      ao_three_center_vectors.data(), n_ao, n_ao * rank);
+  Eigen::MatrixXd half = C_occ.transpose() * B_reshaped;  // (n_occ, n_ao*rank)
 
-  // K[mu,nu] = sum_{i,Q} B_half(mu,i,Q) * B_half(nu,i,Q)
-  //          = B_half_2d * B_half_2d^T  (single GEMM / DSYRK)
-  Eigen::MatrixXd K = B_half_2d * B_half_2d.transpose();
+  // Transpose + reshape to get mu as row index:
+  //   half^T col-major: element (Q*n_ao+mu, i) at flat pos i*(n_ao*rank)+Q*n_ao+mu
+  //   Reinterpreted as (n_ao, rank*n_occ): row=mu, col=i*rank+Q
+  //   So half_r(mu, i*rank+Q) = B_half(mu, i, Q)
+  Eigen::MatrixXd half_t = half.transpose();  // (n_ao*rank, n_occ)
+  Eigen::Map<Eigen::MatrixXd> half_r(half_t.data(), n_ao, rank * n_occ);
+
+  // One DSYRK: K[mu,nu] = sum_{i,Q} half_r(mu,col) * half_r(nu,col)
+  Eigen::MatrixXd K = half_r * half_r.transpose();
 
   return K;
 }
