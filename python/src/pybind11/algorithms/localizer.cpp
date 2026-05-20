@@ -9,6 +9,7 @@
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/mp2_natural_orbitals.hpp"
+#include "qdk/chemistry/algorithms/microsoft/localization/natural_orbitals.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/pipek_mezey.hpp"
 #include "qdk/chemistry/algorithms/microsoft/localization/vvhv.hpp"
 
@@ -246,6 +247,47 @@ See Also:
 Default constructor.
 
 Initializes an MP2 natural orbital transformer with default settings.
+
+)");
+
+  // Bind concrete microsoft::NaturalOrbitalLocalizer implementation
+  py::class_<microsoft::NaturalOrbitalLocalizer, Localizer, py::smart_holder>(
+      m, "QdkNaturalOrbitalLocalizer", R"(
+QDK natural orbital transformer.
+
+This class provides a concrete implementation that transforms molecular
+orbitals into natural orbitals by diagonalizing the spin-traced one-particle
+reduced density matrix (1-RDM). Natural orbitals are eigenfunctions of the
+1-RDM, and their eigenvalues are the occupation numbers.
+
+.. note::
+    Requires ``loc_indices_a == loc_indices_b`` (natural orbitals are a single set).
+    Requires a spin-traced 1-RDM and an active space in the wavefunction.
+    For unrestricted Slaterdeterminant, the 1-RDM is expressed in the
+    alpha MO basis and the output is always a restricted set of natural orbitals.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    # Create a natural orbital localizer
+    localizer = alg.QdkNaturalOrbitalLocalizer()
+
+    # Transform to natural orbitals
+    no_wfn = localizer.run(wavefunction, active_indices, active_indices)
+
+See Also:
+    :class:`OrbitalLocalizer`
+    :class:`QdkMP2NaturalOrbitalLocalizer`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a natural orbital transformer with default settings.
 
 )");
 

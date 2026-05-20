@@ -13,6 +13,7 @@ internal package paths.
 from qdk_chemistry._core._algorithms import (
     OrbitalLocalizer,  # noqa: F401 - re-export
     QdkMP2NaturalOrbitalLocalizer,  # noqa: F401 - re-export
+    QdkNaturalOrbitalLocalizer,  # noqa: F401 - re-export
     QdkPipekMezeyLocalizer,  # noqa: F401 - re-export
     QdkVVHVLocalizer,  # noqa: F401 - re-export
 )
