@@ -57,13 +57,13 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
     def h0(self) -> QubitHamiltonian:
         """The time-independent Hamiltonian."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
-        return container.h0
+        return container.base_hamiltonian
 
     @property
     def h1(self) -> QubitHamiltonian:
         """The time-dependent Hamiltonian (modulated by the drive)."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
-        return container.h1
+        return container.drive_hamiltonian
 
     @property
     def drive(self) -> Callable[[float], float]:

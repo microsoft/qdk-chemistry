@@ -15,9 +15,9 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 )
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import EvolutionCircuitMapper
+from .base import CircuitMapper
 
-__all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
+__all__: list[str] = ["NonControlledPauliSequenceMapper", "PauliSequenceMapperSettings"]
 
 
 class PauliSequenceMapperSettings(Settings):
@@ -28,12 +28,12 @@ class PauliSequenceMapperSettings(Settings):
         super().__init__()
 
 
-class PauliSequenceMapper(EvolutionCircuitMapper):
-    r"""Evolution circuit mapper using Pauli product formula term sequences.
+class NonControlledPauliSequenceMapper(CircuitMapper):
+    r"""Circuit mapper using Pauli product formula term sequences.
 
-    Given a time-evolution operator expressed as a Pauli product formula
-    :math:`U(t) \approx \left[ U_{\mathrm{step}}(t / r) \right]^{r}`, this mapper constructs
-    a :math:`U(t)` using the following pattern:
+    Given a unitary expressed as a Pauli product formula
+    :math:`U \approx \left[ \prod_j e^{-i\theta_j P_j} \right]^{r}`, this mapper constructs
+    a circuit for :math:`U` using the following pattern:
 
     1. Each Pauli operator :math:`P_j` is basis-rotated into the :math:`Z` basis.
     2. Qubits involved in :math:`P_j` are entangled into a sequence using CNOT gates.
@@ -42,7 +42,7 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
     4. The basis rotations and entangling operations are uncomputed.
 
     Notes:
-        * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
+        * Requires a ``PauliProductFormulaContainer`` for the unitary representation.
 
     """
 
@@ -56,27 +56,27 @@ class PauliSequenceMapper(EvolutionCircuitMapper):
         return "pauli_sequence"
 
     def type_name(self) -> str:
-        """Return evolution_circuit_mapper as the algorithm type name."""
-        return "evolution_circuit_mapper"
+        """Return circuit_mapper as the algorithm type name."""
+        return "circuit_mapper"
 
     def _run_impl(self, evolution: UnitaryRepresentation) -> Circuit:
-        r"""Construct a quantum circuit implementing the time evolution unitary.
+        r"""Construct a quantum circuit implementing the given unitary.
 
         Args:
-            evolution: The time evolution unitary containing the Hamiltonian and evolution parameters.
+            evolution: The unitary representation to map into a circuit.
 
         Returns:
-            Circuit: A quantum circuit implementing the time evolution unitary.
+            Circuit: A quantum circuit implementing the unitary.
 
         Raises:
-            ValueError: If the time evolution unitary container type is not supported.
+            ValueError: If the unitary container type is not supported.
 
         """
         unitary_container = evolution.get_container()
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
                 f"The {evolution.get_container_type()} container type is not supported. "
-                "PauliSequenceMapper only supports PauliProductFormula container for time evolution unitary."
+                "NonControlledPauliSequenceMapper only supports PauliProductFormula containers."
             )
 
         pauli_terms: list[list[qsharp.Pauli]] = []

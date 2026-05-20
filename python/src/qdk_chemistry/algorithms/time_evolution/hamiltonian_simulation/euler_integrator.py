@@ -1,4 +1,20 @@
-"""Hamiltonian evolution + observable measurement implementation."""
+r"""Euler integrator for time-dependent Hamiltonian simulation.
+
+This module implements an Euler integrator for solving the time-dependent
+Schrodinger equation i*dU/dt = H(t)*U on a quantum computer.
+
+The integrator divides [0, T] into uniform steps of size dt.  At each step
+a :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` evaluates
+the effective Hamiltonian for the interval, which is then Trotterized into a
+quantum circuit.  Per-step unitaries are combined via
+UnitaryContainer.combine, which merges adjacent identical Pauli
+terms at step boundaries.
+
+The default propagator (``magnus``) computes the Magnus-expanded
+Hamiltonian over each interval, giving second-order global accuracy for
+smooth drives.  Other propagators can be substituted via the
+``propagator`` setting.
+"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -7,6 +23,9 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+from qdk_chemistry.algorithms.propagator.base import Propagator
 from qdk_chemistry.data import (
     Circuit,
     EnergyExpectationResult,
@@ -16,42 +35,44 @@ from qdk_chemistry.data import (
     TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
-from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils import Logger
 
-from .base import MeasureSimulation, MeasureSimulationSettings
+from .base import HamiltonianSimulation, HamiltonianSimulationSettings
 
-__all__: list[str] = ["EvolveAndMeasure", "EvolveAndMeasureSettings"]
+if TYPE_CHECKING:
+    from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
+
+__all__: list[str] = ["EulerIntegrator", "EulerIntegratorSettings"]
 
 
-class EvolveAndMeasureSettings(MeasureSimulationSettings):
-    """Settings for the EvolveAndMeasure algorithm."""
+class EulerIntegratorSettings(HamiltonianSimulationSettings):
+    """Settings for the Euler integrator."""
 
     def __init__(self):
-        """Initialize the settings for EvolveAndMeasure."""
+        """Initialize the settings for EulerIntegrator."""
         super().__init__()
-        self._set_default(
-            "total_time",
-            "float",
-            1.0,
-            "Total evolution time.",
-        )
-        self._set_default(
-            "dt",
-            "float",
-            0.0,
-            "Time step for time-dependent evolution. Each step is passed to the builder",
-        )
 
 
-class EvolveAndMeasure(MeasureSimulation):
-    """Evolve under a Hamiltonian and measure a target observable."""
+class EulerIntegrator(HamiltonianSimulation):
+    r"""Euler integrator for time-dependent Hamiltonian simulation.
+
+    Solves :math:`i\partial_t U = H(t)\,U` by dividing :math:`[0, T]` into
+    steps of size ``dt``.  At each step a
+    :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` computes
+    the effective Hamiltonian for the interval, which is Trotterized into
+    a quantum circuit.
+
+    The default ``magnus`` propagator integrates the drive function
+    over each interval, giving :math:`O(\Delta t^2)` global accuracy for
+    smooth drives.
+
+    """
 
     def __init__(self):
-        """Initialize EvolveAndMeasure with the given settings."""
+        """Initialize EulerIntegrator."""
         Logger.trace_entering()
         super().__init__()
-        self._settings = EvolveAndMeasureSettings()
+        self._settings = EulerIntegratorSettings()
         self._evolution_circuit: Circuit | None = None
 
     def _run_impl(
@@ -59,15 +80,17 @@ class EvolveAndMeasure(MeasureSimulation):
         hamiltonian: TimeDependentQubitHamiltonian,
         observables: list[QubitHamiltonian],
         state_prep: Circuit,
+        shots: int = 1000,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
-        """Run evolve-and-measure simulation.
+        """Run the Euler-integrated Hamiltonian simulation.
 
         Args:
             hamiltonian: Time-dependent Hamiltonian.
             observables: List of observable Hamiltonians to measure after evolution.
             state_prep: Circuit that prepares the initial state before time evolution.
+            shots: Number of measurement shots per observable. Defaults to 1000.
             noise: Optional noise profile.
 
         Returns:
@@ -86,6 +109,7 @@ class EvolveAndMeasure(MeasureSimulation):
                 self._measure_observable(
                     circuit=self._evolution_circuit,
                     observable=observable,
+                    shots=shots,
                     noise=noise,
                 )
             )
@@ -99,10 +123,10 @@ class EvolveAndMeasure(MeasureSimulation):
         """Construct the combined evolution circuit.
 
         The interval ``[0, total_time]`` is divided into steps of size
-        ``dt``.  At each step the Hamiltonian is evaluated at the midpoint
-        and the builder is called with ``dt`` as the evolution time.  The
-        resulting per-step unitaries are combined via
-        :meth:`PauliProductFormulaContainer.combine`, which merges
+        ``dt``.  At each step the propagator evaluates the effective
+        Hamiltonian for the interval and the builder Trotterizes it.
+        The resulting per-step unitaries are combined via
+        :meth:`UnitaryContainer.combine`, which merges
         adjacent identical Pauli terms at step boundaries.
 
         Args:
@@ -123,14 +147,13 @@ class EvolveAndMeasure(MeasureSimulation):
         hamiltonian: TimeDependentQubitHamiltonian,
         total_time: float,
     ) -> UnitaryRepresentation:
-        """Build the combined unitary for a time-dependent Hamiltonian.
+        r"""Build the combined unitary via Euler steps.
 
-        The interval ``[0, total_time]`` is divided into steps of size
-        ``dt`` (from settings).  At each step the Hamiltonian is evaluated
-        at the midpoint and the Trotter builder is called with ``dt`` as
-        the evolution time.  Per-step containers are combined via
-        :meth:`PauliProductFormulaContainer.combine`, which merges
-        adjacent identical Pauli terms at step boundaries.
+        Divides :math:`[0, T]` into ``num_steps = T / dt`` intervals.
+        At each step the propagator computes the effective Hamiltonian
+        for the interval and the builder Trotterizes it.  Per-step
+        containers are combined via
+        ``UnitaryContainer.combine``.
 
         Args:
             hamiltonian: The time-dependent qubit Hamiltonian.
@@ -145,21 +168,24 @@ class EvolveAndMeasure(MeasureSimulation):
             dt = total_time
         if dt > total_time:
             raise ValueError(f"dt ({dt}) must not exceed total_time ({total_time}).")
-        num_steps = max(1, round(total_time / dt))
-        dt = total_time / num_steps
+        num_time_steps = total_time / dt
+        if num_time_steps != round(num_time_steps):
+            raise ValueError(f"total_time ({total_time}) must be a positive integer multiple of dt ({dt}).")
 
-        combined_container: PauliProductFormulaContainer | None = None
-        for i in range(num_steps):
-            t_mid = (i + 0.5) * dt
-            h_snapshot = hamiltonian.evaluate(t_mid)
+        combined_container: UnitaryContainer | None = None
+        propagator = self._create_nested("propagator")
+        if not isinstance(propagator, Propagator):
+            raise TypeError(f"propagator must be a Propagator, got {type(propagator).__name__}.")
+        for i in range(int(num_time_steps)):
+            t_start = i * dt
+            t_end = (i + 1) * dt
+            h_snapshot = propagator.run(hamiltonian, t_start, t_end)
             step_evolution = self._create_time_step_evolution(h_snapshot, dt)
-            step_container = step_evolution.get_container()
-            if not isinstance(step_container, PauliProductFormulaContainer):
-                raise TypeError(f"Expected PauliProductFormulaContainer, got {type(step_container).__name__}.")
+            time_step_container = step_evolution.get_container()
             if combined_container is None:
-                combined_container = step_container
+                combined_container = time_step_container
             else:
-                combined_container = combined_container.combine(step_container)
+                combined_container = combined_container.combine(time_step_container)
 
         return UnitaryRepresentation(container=combined_container)
 
@@ -178,5 +204,5 @@ class EvolveAndMeasure(MeasureSimulation):
         raise ValueError("No evolution circuit has been generated. Please run the algorithm first.")
 
     def name(self) -> str:
-        """Return ``evolve_and_measure`` as the algorithm name."""
-        return "evolve_and_measure"
+        """Return ``euler_integrator`` as the algorithm name."""
+        return "euler_integrator"

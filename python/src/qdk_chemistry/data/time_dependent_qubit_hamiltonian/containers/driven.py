@@ -27,27 +27,27 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
     drive function *f(t)*.
 
     Args:
-        h0: Time-independent qubit Hamiltonian.
-        h1: Time-dependent qubit Hamiltonian (modulated by *drive*).
-        drive: Scalar function f(t) that modulates *h1*.
+        base_hamiltonian: Time-independent qubit Hamiltonian.
+        drive_hamiltonian: Driven qubit Hamiltonian (modulated by *drive*).
+        drive: Scalar function f(t) that modulates *drive_hamiltonian*.
 
     Raises:
-        ValueError: If *h0* and *h1* have different qubit counts.
+        ValueError: If *base_hamiltonian* and *drive_hamiltonian* have different qubit counts.
 
     """
 
     def __init__(
         self,
-        h0: QubitHamiltonian,
-        h1: QubitHamiltonian,
+        base_hamiltonian: QubitHamiltonian,
+        drive_hamiltonian: QubitHamiltonian,
         drive: Callable[[float], float],
     ) -> None:
         """Initialize the driven container."""
-        if h0.num_qubits != h1.num_qubits:
-            raise ValueError("h0 and h1 must have the same number of qubits.")
+        if base_hamiltonian.num_qubits != drive_hamiltonian.num_qubits:
+            raise ValueError("base_hamiltonian and drive_hamiltonian must have the same number of qubits.")
 
-        self._h0 = h0
-        self._h1 = h1
+        self._base_hamiltonian = base_hamiltonian
+        self._drive_hamiltonian = drive_hamiltonian
         self._drive = drive
 
     def evaluate(self, t: float) -> QubitHamiltonian:
@@ -60,17 +60,17 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
             The qubit Hamiltonian at the given time.
 
         """
-        return self._h0 + self._drive(t) * self._h1
+        return self._base_hamiltonian + self._drive(t) * self._drive_hamiltonian
 
     @property
-    def h0(self) -> QubitHamiltonian:
+    def base_hamiltonian(self) -> QubitHamiltonian:
         """The time-independent Hamiltonian."""
-        return self._h0
+        return self._base_hamiltonian
 
     @property
-    def h1(self) -> QubitHamiltonian:
-        """The time-dependent Hamiltonian (modulated by the drive)."""
-        return self._h1
+    def drive_hamiltonian(self) -> QubitHamiltonian:
+        """The driven Hamiltonian (modulated by the drive)."""
+        return self._drive_hamiltonian
 
     @property
     def drive(self) -> Callable[[float], float]:
@@ -80,4 +80,4 @@ class DrivenContainer(TimeDependentQubitHamiltonianContainer):
     @property
     def num_qubits(self) -> int:
         """Number of qubits (uniform across all times)."""
-        return self._h0.num_qubits
+        return self._base_hamiltonian.num_qubits
