@@ -19,6 +19,8 @@ Key features of the :class:`~qdk_chemistry.data.BasisSet` class include:
 - Basis set metadata (name, parameters)
 - Integration with molecular structure information
 - On-demand expansion of shells to individual basis functions
+- Effective Core Potentials (ECP) with radial powers
+- Auxiliary basis sets for density fitting
 
 Usage
 -----
@@ -98,6 +100,22 @@ The library supports three methods for loading basis sets:
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
+The library also supports loading an auxiliary basis set alongside the primary basis set in a single call:
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-loading-with-aux
+      :end-before: // end-cell-loading-with-aux
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-loading-with-aux
+      :end-before: # end-cell-loading-with-aux
+
 Creating a basis set
 --------------------
 
@@ -162,6 +180,55 @@ The ``Shell`` structure contains information about a group of basis functions:
       :start-after: # start-cell-shells
       :end-before: # end-cell-shells
 
+Working with ECP shells
+-----------------------
+
+Effective Core Potentials (ECPs) replace inner-core electrons with a pseudopotential, reducing computational cost for heavy atoms.
+ECP shells are stored alongside primary shells but include an additional **radial powers** vector (:math:`r^n` terms).
+
+ECP data is specified at construction time via dedicated constructors that accept ``ecp_shells``, ``ecp_electrons``, and an optional ``ecp_name``.
+The ``ecp_electrons`` vector records how many core electrons each atom has replaced.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-ecp
+      :end-before: // end-cell-ecp
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-ecp
+      :end-before: # end-cell-ecp
+
+.. note::
+   If a basis set from the library includes an ECP, it will be loaded automatically.
+   Manual ECP construction is only needed for custom basis sets.
+
+Auxiliary basis sets
+--------------------
+
+Auxiliary basis sets are used in density-fitting (DF) and resolution-of-the-identity (RI) approximations to speed up two-electron integral evaluation.
+The auxiliary shells are stored inside the same :class:`~qdk_chemistry.data.BasisSet` object as supplementary data alongside the primary shells.
+
+Auxiliary basis data can be attached at construction time or loaded from the library using ``from_basis_name`` with an auxiliary name.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/basis_set.cpp
+      :language: cpp
+      :start-after: // start-cell-auxiliary
+      :end-before: // end-cell-auxiliary
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/basis_set.py
+      :language: python
+      :start-after: # start-cell-auxiliary
+      :end-before: # end-cell-auxiliary
+
 Serialization
 -------------
 
@@ -185,32 +252,42 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 .. code-block:: json
 
    {
+     "version": "0.1.0",
+     "name": "6-31G",
+     "atomic_orbital_type": "spherical",
+     "num_atomic_orbitals": 9,
+     "num_shells": 3,
+     "num_atoms": 2,
      "atoms": [
        {
          "atom_index": 0,
          "shells": [
            {
-             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
+             "orbital_type": "s",
              "exponents": [3.425250914, 0.6239137298, 0.168855404],
-             "orbital_type": "s"
-           },
+             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422]
+           }
+         ],
+         "ecp_shells": [
            {
-             "coefficients": [0.1559162750, 0.6076837186],
-             "exponents": [0.7868272350, 0.1881288540],
-             "orbital_type": "p"
+             "orbital_type": "s",
+             "exponents": [10.0, 5.0],
+             "coefficients": [50.0, 20.0],
+             "rpowers": [2, 2]
+           }
+         ],
+         "aux_shells": [
+           {
+             "orbital_type": "s",
+             "exponents": [5.0],
+             "coefficients": [2.0]
            }
          ]
-       },
-       {
-         "atom_index": 1,
-         "shells": ["..."]
        }
      ],
-     "basis_type": "spherical",
-     "name": "6-31G",
-     "num_atoms": 2,
-     "num_basis_functions": 9,
-     "num_shells": 3
+     "ecp_name": "my-ecp",
+     "ecp_electrons": [28, 0],
+     "aux_name": "my-aux-fit"
    }
 
 HDF5 format
@@ -220,15 +297,40 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
 
 .. code-block:: text
 
-   /
-   ├── shells/             # Group
-   │   ├── atom_indices    # Dataset: uint32, 1D Array of atom indices
-   │   ├── coefficients    # Dataset: float64, 1D Array of orbital coefficients
-   │   ├── exponents       # Dataset: float64, 1D Array of orbital exponents
-   │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
-   │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
-   └── metadata/           # Group
-       └── name            # Attribute: string value of the basis set name
+   /basis_set                                     (Group - top-level)
+   ├── @version = "0.1.0"                         (Attribute, variable-length string)
+   ├── @ecp_name = "lanl2dz"                      (Attribute, variable-length string, optional)
+   ├── @aux_name = "cc-pVDZ-RI"                   (Attribute, variable-length string, optional)
+   │
+   ├── metadata/                                  (Group)
+   │   ├── @name = "cc-pVDZ"                      (Attribute, variable-length string)
+   │   └── @atomic_orbital_type = "spherical"     (Attribute, variable-length string)
+   │
+   ├── shells/                                    (Group, present if num_shells > 0)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │
+   ├── ecp_shells/                                (Group, optional - present if ECP shells exist)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   ├── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │   └── rpowers                                (Dataset: int32, 1D, flattened across shells)
+   │
+   ├── ecp_electrons                              (Dataset: uint64, 1D per atom, optional)
+   │
+   ├── aux_shells/                                (Group, optional - present if auxiliary basis exists)
+   │   ├── atom_indices                           (Dataset: uint32, 1D, one per shell)
+   │   ├── orbital_types                          (Dataset: int32, 1D, one per shell)
+   │   ├── num_primitives                         (Dataset: uint32, 1D, one per shell)
+   │   ├── exponents                              (Dataset: float64, 1D, flattened across shells)
+   │   └── coefficients                           (Dataset: float64, 1D, flattened across shells)
+   │
+   └── structure/                                 (Group, optional - nested Structure object)
 
 .. tab:: C++ API
 
