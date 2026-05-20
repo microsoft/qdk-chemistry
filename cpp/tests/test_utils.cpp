@@ -623,7 +623,10 @@ TEST_F(MathUtilsTest, LogBinomialCoefficientHandlesHugeValues) {
   // active space (the case reported in the issue). lgamma keeps this finite.
   const double log_val = log_binomial_coefficient(176, 88);
   EXPECT_TRUE(std::isfinite(log_val));
-  // Reference value (computed independently): log10(C(176, 88)) ~ 51.7.
+  // Reference: log10(C(176, 88)) = lgamma(177)/ln(10) - 2*lgamma(89)/ln(10)
+  // ~= 51.76 (verified with Python: math.lgamma(177) - 2*math.lgamma(89), then
+  // divided by ln(10)). Use a wide tolerance since this test only needs to
+  // confirm the value is in the right ballpark, not bit-for-bit accuracy.
   const double log10_val = log_val / std::log(10.0);
   EXPECT_NEAR(log10_val, 51.7, 0.5);
 }

@@ -16,6 +16,7 @@
 #include <cmath>
 #include <iomanip>
 #include <limits>
+#include <numbers>
 #include <optional>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -520,13 +521,16 @@ std::string format_combinatorial_count(std::optional<size_t> exact,
     return "unknown (non-finite log)";
   }
   // Convert from natural log to base-10 scientific notation.
-  constexpr double kLn10 = 2.302585092994045684;
-  const double log10_value = ln_value / kLn10;
-  const double exponent_d = std::floor(log10_value);
-  const double mantissa = std::pow(10.0, log10_value - exponent_d);
+  const double log10_value = ln_value / std::numbers::ln10;
+  const long long exponent = static_cast<long long>(std::floor(log10_value));
+  const double mantissa =
+      std::pow(10.0, log10_value - static_cast<double>(exponent));
   std::ostringstream oss;
-  oss << "~" << std::fixed << std::setprecision(3) << mantissa << "e+"
-      << static_cast<long long>(exponent_d)
+  // Print sign explicitly so negative exponents render as "e-NN" rather than
+  // a malformed "e+-NN". (For combinatorial counts that overflow size_t the
+  // exponent is necessarily positive, but be robust for general callers.)
+  oss << "~" << std::fixed << std::setprecision(3) << mantissa << "e"
+      << std::showpos << exponent << std::noshowpos
       << " (exceeds 64-bit integer range)";
   return oss.str();
 }
