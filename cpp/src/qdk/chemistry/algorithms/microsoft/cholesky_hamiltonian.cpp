@@ -691,11 +691,10 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     Eigen::MatrixXd F_inactive(num_molecular_orbitals, num_molecular_orbitals);
     F_inactive = Ca.transpose() * F_inactive_ao * Ca;
 
-    // Compute the inactive energy
+    // Compute the inactive energy (diagonal of C^T H C only)
     double E_inactive = 0.0;
-    Eigen::MatrixXd H_mo = Ca.transpose() * H_full * Ca;
     for (auto i : inactive_indices) {
-      E_inactive += H_mo(i, i) + F_inactive(i, i);
+      E_inactive += Ca.col(i).dot(H_full * Ca.col(i)) + F_inactive(i, i);
     }
 
     // Extract active space Hamiltonian
@@ -793,16 +792,13 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     F_inactive_alpha = Ca.transpose() * F_inactive_alpha_ao * Ca;
     F_inactive_beta = Cb.transpose() * F_inactive_beta_ao * Cb;
 
-    // Compute inactive energy
-    Eigen::MatrixXd H_mo_alpha = Ca.transpose() * H_full * Ca;
-    Eigen::MatrixXd H_mo_beta = Cb.transpose() * H_full * Cb;
-
+    // Compute inactive energy (diagonal of C^T H C only)
     double E_inactive = 0.0;
     for (auto i : inactive_indices_alpha) {
-      E_inactive += H_mo_alpha(i, i) + F_inactive_alpha(i, i);
+      E_inactive += Ca.col(i).dot(H_full * Ca.col(i)) + F_inactive_alpha(i, i);
     }
     for (auto i : inactive_indices_beta) {
-      E_inactive += H_mo_beta(i, i) + F_inactive_beta(i, i);
+      E_inactive += Cb.col(i).dot(H_full * Cb.col(i)) + F_inactive_beta(i, i);
     }
     // Avoid double counting of two-electron interactions
     E_inactive *= 0.5;
