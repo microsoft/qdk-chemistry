@@ -126,6 +126,10 @@ def _import_plugins() -> None:
         import qdk_chemistry.plugins.openfermion as openfermion_plugin  # noqa: PLC0415
 
         openfermion_plugin.load()
+    with contextlib.suppress(ImportError):
+        import qdk_chemistry.plugins.networkx as networkx_plugin  # noqa: PLC0415
+
+        networkx_plugin.load()
 
 
 def _is_placeholder_stub(stub_file: Path) -> bool:
