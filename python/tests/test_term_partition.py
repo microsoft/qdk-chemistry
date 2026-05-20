@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-import importlib.util
-
 import numpy as np
 import pytest
 
@@ -20,6 +18,7 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
     TermPartition,
 )
+from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
@@ -181,13 +180,11 @@ class TestTermGrouperRegistry:
 # NetworkX-backed term groupers (requires networkx)
 # ---------------------------------------------------------------------------
 
-_has_networkx = importlib.util.find_spec("networkx") is not None
-
 
 class TestNxTermGroupers:
     """Tests for the NetworkX-backed term groupers."""
 
-    pytestmark = pytest.mark.skipif(not _has_networkx, reason="networkx not installed")
+    pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_NETWORKX, reason="networkx not installed")
 
     NX_STRATEGIES = ("nx_commuting", "nx_qubit_wise_commuting")
 
