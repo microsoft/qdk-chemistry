@@ -101,9 +101,9 @@ class MeasureSimulation(Algorithm):
 
         """
 
-    def _create_time_evolution(
+    def _create_time_step_evolution(
         self,
-        qubit_hamiltonian: QubitHamiltonian | TimeDependentQubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian,
         time: float,
     ) -> UnitaryRepresentation:
         """Create the time-evolution unitary for current settings."""

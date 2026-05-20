@@ -152,7 +152,7 @@ class EvolveAndMeasure(MeasureSimulation):
         for i in range(num_steps):
             t_mid = (i + 0.5) * dt
             h_snapshot = hamiltonian.evaluate(t_mid)
-            step_evolution = self._create_time_evolution(h_snapshot, dt)
+            step_evolution = self._create_time_step_evolution(h_snapshot, dt)
             step_container = step_evolution.get_container()
             if not isinstance(step_container, PauliProductFormulaContainer):
                 raise TypeError(f"Expected PauliProductFormulaContainer, got {type(step_container).__name__}.")

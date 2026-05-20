@@ -19,7 +19,7 @@ __all__: list[str] = ["TimeDependentQubitHamiltonianContainer"]
 class TimeDependentQubitHamiltonianContainer:
     """Abstract base for time-dependent qubit Hamiltonian storage.
 
-    Concrete containers define *how* a time-dependent Hamiltonian is stored
+    Concrete containers define how a time-dependent Hamiltonian is stored
     and evaluated.  :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`
     delegates to a container instance.
 

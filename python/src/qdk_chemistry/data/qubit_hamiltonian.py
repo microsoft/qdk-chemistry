@@ -32,12 +32,21 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = []
 
 
-def _merge_term_partitions(p0: TermPartition, p1: TermPartition, offset: int) -> TermPartition | None:
+def _merge_term_partitions(p0: TermPartition, p1: TermPartition) -> TermPartition:
     """Merge two partitions by concatenating groups and offsetting *p1* indices.
 
-    Returns ``None`` if the two partitions have different concrete types.
+    The offset is derived from *p0*: all *p1* indices are shifted by
+    ``len(p0.all_indices())``.  Both partitions must be the same concrete
+    type; a mismatch raises ``TypeError``.
+
+    Example: H0 has 3 terms with partition groups ``((0, 1), (2,))`` and
+    H1 has 2 terms with groups ``((0,), (1,))``.  After concatenation
+    H1's indices are shifted by 3 (len of H0), producing
+    ``((0, 1), (2,), (3,), (4,))``.
 
     """
+    offset = len(p0.all_indices())
+
     if isinstance(p0, FlatPartition) and isinstance(p1, FlatPartition):
         shifted = tuple(tuple(i + offset for i in group) for group in p1.groups)
         return FlatPartition(strategy=p0.strategy, groups=p0.groups + shifted)
@@ -46,7 +55,7 @@ def _merge_term_partitions(p0: TermPartition, p1: TermPartition, offset: int) ->
         shifted = tuple(tuple(tuple(i + offset for i in layer) for layer in group) for group in p1.groups)
         return LayeredPartition(strategy=p0.strategy, groups=p0.groups + shifted)
 
-    return None
+    raise TypeError(f"Cannot merge partitions of different types: {type(p0).__name__} and {type(p1).__name__}.")
 
 
 class QubitHamiltonian(DataClass):
@@ -243,7 +252,7 @@ class QubitHamiltonian(DataClass):
 
         """
         if not isinstance(other, QubitHamiltonian):
-            return NotImplemented
+            raise TypeError(f"Cannot add QubitHamiltonian with {type(other).__name__}.")
         if self.num_qubits != other.num_qubits:
             raise ValueError(f"Cannot add Hamiltonians with {self.num_qubits} and {other.num_qubits} qubits.")
         if self.encoding != other.encoding:
@@ -261,7 +270,7 @@ class QubitHamiltonian(DataClass):
 
         partition = None
         if self.term_partition is not None and other.term_partition is not None:
-            partition = _merge_term_partitions(self.term_partition, other.term_partition, len(self.pauli_strings))
+            partition = _merge_term_partitions(self.term_partition, other.term_partition)
 
         return QubitHamiltonian(
             pauli_strings,
@@ -271,7 +280,7 @@ class QubitHamiltonian(DataClass):
             term_partition=partition,
         )
 
-    def __mul__(self, scalar: complex) -> QubitHamiltonian:
+    def __mul__(self, scalar) -> QubitHamiltonian:
         """Return the Hamiltonian with all coefficients scaled by *scalar*.
 
         The :attr:`term_partition` is preserved since term indices are unchanged.
@@ -293,7 +302,7 @@ class QubitHamiltonian(DataClass):
             term_partition=self.term_partition,
         )
 
-    def __rmul__(self, scalar: complex) -> QubitHamiltonian:
+    def __rmul__(self, scalar: float) -> QubitHamiltonian:
         """Support ``scalar * hamiltonian``."""
         return self.__mul__(scalar)
 

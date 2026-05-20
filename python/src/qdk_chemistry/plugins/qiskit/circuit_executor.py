@@ -13,7 +13,6 @@ data classes and returns measurement bitstring results via CircuitExecutorData.
 from __future__ import annotations
 
 from qiskit import transpile
-from qiskit.providers.exceptions import QiskitBackendNotFoundError
 from qiskit.transpiler import PassManager
 from qiskit_aer import AerSimulator
 from qiskit_aer.noise import NoiseModel
@@ -137,17 +136,26 @@ class QiskitAerSimulator(CircuitExecutor):
                     "Install it with: pip install qiskit-ibm-runtime"
                 )
 
-            import qiskit_ibm_runtime.fake_provider  # noqa: PLC0415
+            import qiskit_ibm_runtime.fake_provider.backends as fake_backends  # noqa: PLC0415
 
-            provider = qiskit_ibm_runtime.fake_provider.FakeProviderForBackendV2()
-            try:
-                device_backend = provider.backend(device_backend_name)
-            except QiskitBackendNotFoundError:
-                available = sorted(b.name for b in provider.backends())
-                available_backends = ", ".join(available)
+            if not device_backend_name.startswith("fake_") or len(device_backend_name) <= len("fake_"):
                 raise ValueError(
-                    f"Unknown device backend '{device_backend_name}'. Available backends: {available_backends}"
-                ) from None
+                    f"device_backend_name must start with 'fake_' followed by a backend name"
+                    f" (got '{device_backend_name}')."
+                )
+
+            # Look up the V2 fake backend class directly by name to avoid
+            # instantiating FakeProviderForBackendV2 (which triggers
+            # deprecation warnings from the plugin discovery catalog).
+            parts = device_backend_name[len("fake_") :].split("_")
+            class_name = "Fake" + "".join(p.capitalize() for p in parts) + "V2"
+            backend_cls = getattr(fake_backends, class_name, None)
+            if backend_cls is None:
+                raise ValueError(
+                    f"Unknown device backend '{device_backend_name}' (tried class '{class_name}'). "
+                    "Use a valid qiskit-ibm-runtime fake backend name (e.g. 'fake_manila')."
+                )
+            device_backend = backend_cls()
 
             backend = AerSimulator.from_backend(device_backend)
             backend.set_options(
