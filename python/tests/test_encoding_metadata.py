@@ -181,8 +181,8 @@ def test_validate_encoding_compatibility_mismatch():
 
 def test_state_preparation_injects_jordan_wigner_encoding(wavefunction_4e4o):
     """Test that StatePreparation algorithms inject Jordan-Wigner encoding."""
-    # Test sparse_isometry_gf2x
-    prep_gf2x = create("state_prep", "sparse_isometry_gf2x")
+    # Test sparse_isometry
+    prep_gf2x = create("state_prep", "sparse_isometry")
     circuit_gf2x = prep_gf2x.run(wavefunction_4e4o)
     assert circuit_gf2x.encoding == "jordan-wigner"
 
@@ -250,7 +250,7 @@ def test_end_to_end_workflow_compatible_encodings(wavefunction_4e4o):
     qubit_ham = mapper.run(hamiltonian)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)
-    prep = create("state_prep", "sparse_isometry_gf2x")
+    prep = create("state_prep", "sparse_isometry")
     circuit = prep.run(wavefunction_4e4o)
 
     # Validation should pass
@@ -266,7 +266,7 @@ def test_end_to_end_workflow_incompatible_encodings(wavefunction_4e4o):
     qubit_ham = mapper.run(hamiltonian)
 
     # Create Circuit with state preparation (should be Jordan-Wigner)
-    prep = create("state_prep", "sparse_isometry_gf2x")
+    prep = create("state_prep", "sparse_isometry")
     circuit = prep.run(wavefunction_4e4o)
 
     # Validation should fail

@@ -199,7 +199,7 @@ print(f"ASCI energy: {E_asci:.10f} Hartree")
 _cas = create("multi_configuration_calculator", "macis_cas")
 _E_cas, _wfn_cas = _cas.run(_hamiltonian, 1, 1)
 
-_state_prep = create("state_prep", "sparse_isometry_gf2x")
+_state_prep = create("state_prep", "sparse_isometry")
 _circuit = _state_prep.run(_wfn_cas)
 
 circuit_executor = create("circuit_executor", "qdk_sparse_state_simulator")

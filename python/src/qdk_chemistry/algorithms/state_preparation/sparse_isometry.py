@@ -6,7 +6,7 @@ leverage the sparsity of quantum states to create optimized circuits that
 prepare only the non-zero amplitude components, significantly reducing circuit
 depth and gate count compared to dense state preparation methods.
 
-**SparseIsometryGF2XStatePrep**: Enhanced sparse isometry using GF2+X elimination.
+**SparseIsometryStatePrep**: Enhanced sparse isometry using GF2+X elimination.
 This method performs duplicate row removal, all-ones row removal, and diagonal
 matrix rank reduction besides standard GF2 Gaussian elimination. It tracks both
 CNOT and X operations for optimal circuit reconstruction and can be more
@@ -22,7 +22,7 @@ compared to traditional isometry methods.
 
 Algorithm Details:
 
-* SparseIsometryGF2X: Applies enhanced GF2+X elimination (preprocessing + GF2
+* SparseIsometry: Applies enhanced GF2+X elimination (preprocessing + GF2
   + postprocessing), performs dense state preparation on the reduced space,
   then applies recorded operations (CX and X) in reverse to expand back to
   the full space.
@@ -45,11 +45,11 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.binary_encoding import MatrixCompressionOp, MatrixCompressionType
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["SparseIsometryGF2XStatePreparationSettings"]
+__all__: list[str] = ["SparseIsometryStatePreparationSettings"]
 
 
-class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
-    """Settings for SparseIsometryGF2XStatePreparation."""
+class SparseIsometryStatePreparationSettings(StatePreparationSettings):
+    """Settings for SparseIsometryStatePreparation."""
 
     def __init__(self):
         """Initialize the StatePreparationSettings."""
@@ -59,7 +59,7 @@ class SparseIsometryGF2XStatePreparationSettings(StatePreparationSettings):
         )
 
 
-class SparseIsometryGF2XStatePreparation(StatePreparation):
+class SparseIsometryStatePreparation(StatePreparation):
     """State preparation using sparse isometry with enhanced GF2+X elimination.
 
     This class implements "GF2+X" state preparation for electronic structure problems using
@@ -90,10 +90,10 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
     """
 
     def __init__(self) -> None:
-        """Initialize the SparseIsometryGF2XStatePreparation."""
+        """Initialize the SparseIsometryStatePreparation."""
         Logger.trace_entering()
         super().__init__()
-        self._settings = SparseIsometryGF2XStatePreparationSettings()
+        self._settings = SparseIsometryStatePreparationSettings()
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Prepare a quantum circuit that encodes the given wavefunction using sparse isometry over GF(2^x).
@@ -492,7 +492,7 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
     def name(self) -> str:
         """Return the name of the state preparation method."""
         Logger.trace_entering()
-        return "sparse_isometry_gf2x"
+        return "sparse_isometry"
 
 
 @dataclass

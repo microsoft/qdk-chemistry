@@ -104,7 +104,7 @@ ham = create("hamiltonian_constructor").run(wfn.get_orbitals())
 _, wfn_cas = create("multi_configuration_calculator").run(ham, 1, 1)
 
 # StatePreparation produces a Circuit with a native Q# factory
-state_prep = create("state_prep", "sparse_isometry_gf2x")
+state_prep = create("state_prep", "sparse_isometry")
 circuit = state_prep.run(wfn_cas)
 
 # Inspect the Q# circuit (prune unused qubits for clarity)

@@ -23,7 +23,7 @@ import qsharp
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     GF2XEliminationResult,
-    SparseIsometryGF2XStatePreparation,
+    SparseIsometryStatePreparation,
     _eliminate_column,
     _find_pivot_row,
     _is_diagonal_matrix,
@@ -59,9 +59,9 @@ def test_regular_isometry_state_prep(wavefunction_4e4o):
     assert int(qubit_pattern.group(1)) == 2 * 4
 
 
-def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
+def test_sparse_isometry_basic(wavefunction_4e4o):
     """Test the sparse isometry GF(2^X) StatePreparation algorithm basic functionality."""
-    prep = create("state_prep", "sparse_isometry_gf2x")
+    prep = create("state_prep", "sparse_isometry")
     # Test circuit creation
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
@@ -79,9 +79,9 @@ def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_sparse_isometry_gf2x_qiskit_dense_prepare(wavefunction_4e4o):
+def test_sparse_isometry_qiskit_dense_prepare(wavefunction_4e4o):
     """Test the sparse isometry GF(2^X) StatePreparation algorithm basic functionality."""
-    prep = create("state_prep", "sparse_isometry_gf2x", dense_preparation_method="qiskit")
+    prep = create("state_prep", "sparse_isometry", dense_preparation_method="qiskit")
     # Test circuit creation
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
@@ -96,8 +96,8 @@ def test_sparse_isometry_gf2x_qiskit_dense_prepare(wavefunction_4e4o):
     assert f"{expected_theta:.6f}" in qasm  # expected angle
 
 
-def test_sparse_isometry_gf2x_single_reference_state():
-    """Test SparseIsometryGF2XStatePrep with single reference state after filtering."""
+def test_sparse_isometry_single_reference_state():
+    """Test SparseIsometryStatePrep with single reference state after filtering."""
     # Create a wavefunction with coefficients that will be filtered out
     test_orbitals = create_test_orbitals(2)
 
@@ -108,7 +108,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
     wavefunction = Wavefunction(container)
 
-    prep = create("state_prep", "sparse_isometry_gf2x")
+    prep = create("state_prep", "sparse_isometry")
 
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
@@ -136,7 +136,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
 
 def test_gf2x_bitstrings_to_binary_matrix():
     """Test functionality of _bitstrings_to_binary_matrix helper."""
-    testclass = SparseIsometryGF2XStatePreparation()
+    testclass = SparseIsometryStatePreparation()
     # Simple 3-qubit, 2-determinant example
     bitstrings = ["101", "010"]  # q[2]q[1]q[0] format (Little Endian)
     result = testclass._bitstrings_to_binary_matrix(bitstrings)
@@ -221,7 +221,7 @@ def test_gf2x_bitstrings_to_binary_matrix():
 
 def test_gf2x_bitstrings_to_binary_matrix_edge_cases():
     """Test edge cases and error conditions for bitstring-to-matrix conversion."""
-    testclass = SparseIsometryGF2XStatePreparation()
+    testclass = SparseIsometryStatePreparation()
 
     # Empty bitstrings list
     with pytest.raises(ValueError, match="Bitstrings list cannot be empty"):
@@ -258,7 +258,7 @@ def test_gf2x_bitstrings_to_binary_matrix_edge_cases():
 
 def test_gf2x_bitstrings_to_binary_matrix_qiskit_convention():
     """Test that the function correctly handles Qiskit Little Endian convention."""
-    testclass = SparseIsometryGF2XStatePreparation()
+    testclass = SparseIsometryStatePreparation()
 
     # Test specific example
     bitstrings = ["101", "010"]  # q[2]q[1]q[0] format
@@ -290,7 +290,7 @@ def test_gf2x_bitstrings_to_binary_matrix_qiskit_convention():
 
 def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
     """Test additional validation scenarios for bitstrings_to_binary_matrix."""
-    testclass = SparseIsometryGF2XStatePreparation()
+    testclass = SparseIsometryStatePreparation()
 
     # Test with large valid bitstring
     large_bitstring = ["0" * 50, "1" * 50]
@@ -302,7 +302,7 @@ def test_gf2x_bitstrings_to_binary_matrix_additional_validation():
 
 def test_prepare_single_reference_state_error_cases():
     """Test error handling for invalid inputs."""
-    test_cls = SparseIsometryGF2XStatePreparation()
+    test_cls = SparseIsometryStatePreparation()
     with pytest.raises(ValueError, match="Bitstring cannot be empty"):
         test_cls._prepare_single_reference_state("")
 

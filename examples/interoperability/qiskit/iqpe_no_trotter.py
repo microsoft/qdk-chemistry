@@ -228,7 +228,7 @@ E_sparse, sparse_wavefunction = pmc.run(
     active_hamiltonian, list(top_configurations.keys())
 )
 
-sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry_gf2x")
+sparse_state_prep = create("state_prep", algorithm_name="sparse_isometry")
 state_prep = sparse_state_prep.run(sparse_wavefunction).get_qiskit_circuit()
 state_prep = transpile(
     state_prep,

@@ -590,7 +590,7 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.sparse_isometry_binary_encoding import (  # noqa: PLC0415
         SparseIsometryBinaryEncodingStatePreparation,
     )
@@ -601,7 +601,7 @@ def _register_python_algorithms():
     )
 
     register(lambda: QdkEnergyEstimator())
-    register(lambda: SparseIsometryGF2XStatePreparation())
+    register(lambda: SparseIsometryStatePreparation())
     register(lambda: SparseIsometryBinaryEncodingStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())

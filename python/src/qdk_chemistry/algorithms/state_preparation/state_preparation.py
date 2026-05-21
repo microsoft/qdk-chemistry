@@ -76,5 +76,5 @@ class StatePreparationFactory(AlgorithmFactory):
         return "state_prep"
 
     def default_algorithm_name(self) -> str:
-        """Return the sparse_isometry_gf2x as default algorithm name."""
-        return "sparse_isometry_gf2x"
+        """Return the sparse_isometry as default algorithm name."""
+        return "sparse_isometry"

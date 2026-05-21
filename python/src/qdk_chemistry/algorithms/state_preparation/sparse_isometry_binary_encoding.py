@@ -28,8 +28,8 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .sparse_isometry import (
     GF2XEliminationResult,
-    SparseIsometryGF2XStatePreparation,
-    SparseIsometryGF2XStatePreparationSettings,
+    SparseIsometryStatePreparation,
+    SparseIsometryStatePreparationSettings,
     gf2x_with_tracking,
 )
 
@@ -38,7 +38,7 @@ __all__ = [
 ]
 
 
-class SparseIsometryBinaryEncodingSettings(SparseIsometryGF2XStatePreparationSettings):
+class SparseIsometryBinaryEncodingSettings(SparseIsometryStatePreparationSettings):
     """Settings for SparseIsometryBinaryEncodingStatePreparation."""
 
     def __init__(self):
@@ -58,7 +58,7 @@ class SparseIsometryBinaryEncodingSettings(SparseIsometryGF2XStatePreparationSet
         )
 
 
-class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryGF2XStatePreparation):
+class SparseIsometryBinaryEncodingStatePreparation(SparseIsometryStatePreparation):
     """State preparation using sparse isometry with binary encoding.
 
     This class extends sparse isometry with GF2+X elimination by replacing
