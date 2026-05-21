@@ -139,6 +139,8 @@ def test_euler_integrator_with_device_backend() -> None:
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qiskit_aer_simulator", device_backend_name="fake_manila"),
     )
+    algo.settings().set("total_time", 1.0)
+    algo.settings().set("dt", 1.0)
 
     state_prep = identity_state_prep(num_qubits=2)
     measurements = algo.run(td_hamiltonian, observables=[observable], state_prep=state_prep, shots=1024)
@@ -189,11 +191,11 @@ class TestEulerIntegratorValidation:
         algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
         algo.settings().set("total_time", 1.0)
         algo.settings().set("dt", 2.0)
-        with pytest.raises(ValueError, match="must not exceed"):
+        with pytest.raises(ValueError, match="must match not exceed"):
             algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
 
-    def test_dt_zero_defaults_to_single_step(self):
-        """Dt = 0 should default to total_time (single step) and run without error."""
+    def test_dt_zero_raises(self):
+        """Dt = 0 should raise ValueError."""
         h = self._make_hamiltonian(num_qubits=2)
         td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
         algo = EulerIntegrator()
@@ -203,8 +205,36 @@ class TestEulerIntegratorValidation:
         algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
         algo.settings().set("total_time", 1.0)
         algo.settings().set("dt", 0.0)
-        measurements = algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
-        assert len(measurements) == 1
+        with pytest.raises(ValueError, match="must be nonzero"):
+            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+
+    def test_dt_negative_raises(self):
+        """Dt with opposite sign to total_time should raise ValueError."""
+        h = self._make_hamiltonian(num_qubits=2)
+        td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
+        algo = EulerIntegrator()
+        algo.settings().set(
+            "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
+        )
+        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
+        algo.settings().set("total_time", 1.0)
+        algo.settings().set("dt", -0.5)
+        with pytest.raises(ValueError, match="must match the sign"):
+            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
+
+    def test_total_time_zero_raises(self):
+        """total_time = 0 should raise ValueError."""
+        h = self._make_hamiltonian(num_qubits=2)
+        td = DrivenQubitHamiltonian(h, h, drive=_constant_drive)
+        algo = EulerIntegrator()
+        algo.settings().set(
+            "evolution_builder", AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1)
+        )
+        algo.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator"))
+        algo.settings().set("total_time", 0.0)
+        algo.settings().set("dt", 0.1)
+        with pytest.raises(ValueError, match="total_time must be nonzero"):
+            algo.run(td, observables=[self._make_hamiltonian()], state_prep=self._dummy_state_prep())
 
     def test_propagator_setting_via_create_kwargs(self):
         """Propagator AlgorithmRef should be configurable through create() kwargs."""

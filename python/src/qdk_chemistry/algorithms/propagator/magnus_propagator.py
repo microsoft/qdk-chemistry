@@ -1,32 +1,14 @@
-r"""Time-averaged propagator with Magnus expansion.
+r"""Time-averaged propagator via first-order Magnus expansion.
 
-Computes the effective Hamiltonian for a time interval via the Magnus
-expansion truncated at a configurable order.
-
-**Order 1** (default) is the time-averaged Hamiltonian:
+Computes the effective Hamiltonian for a time interval as the time average:
 
 .. math::
 
-    \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
+    H_\text{eff} = \frac{1}{\delta t} \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
 
-Higher orders add commutator corrections computed recursively via
-
-.. math::
-
-    \dot\Omega_n
-    = \sum_{k=1}^{n-1} \frac{B_k}{k!}
-      \sum_{j_1+\cdots+j_k=n-1}
-      \mathrm{ad}_{\Omega_{j_1}} \cdots
-      \mathrm{ad}_{\Omega_{j_k}}(H(t))
-
-where :math:`B_k` are Bernoulli numbers.
-
-For the driven case :math:`H(t) = H_0 + f(t)\,H_1` every Magnus term
-reduces to a linear combination of nested commutators of :math:`H_0`
-and :math:`H_1` with scalar coefficients that are iterated integrals
-over the drive function.  The propagator returns
-:math:`\Omega / \delta t` so that the builder (which multiplies by
-``dt``) recovers the full exponent.
+For the driven case :math:`H(t) = H_0 + f(t)\,H_1` this reduces to
+:math:`H_\text{eff} = H_0 + \bar f\,H_1` where :math:`\bar f` is the
+time-averaged drive.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -61,18 +43,13 @@ class MagnusPropagatorSettings(Settings):
 
 
 class MagnusPropagator(Propagator):
-    r"""Magnus propagator with recursive expansion.
+    r"""First-order Magnus propagator (time averaging).
 
     Evaluates the effective Hamiltonian for an interval :math:`[t_1, t_2]`
-    using the Magnus expansion truncated at the configured ``order``.
+    as the time average :math:`H_\text{eff} = H_0 + \bar f\,H_1`.
 
     For :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
-    Hamiltonians all integrals reduce to scalar quadratures over the
-    drive function.  Higher orders are built recursively via nested
-    commutators of :math:`H_0` and :math:`H_1`.
-
-    For other container types only order 1 (midpoint evaluation) is
-    supported.
+    Hamiltonians the drive integral reduces to a scalar quadrature.
 
     """
 
@@ -140,10 +117,9 @@ class MagnusPropagator(Propagator):
         """
         dt = t_end - t_start
         h0, h1, drive = container.base_hamiltonian, container.drive_hamiltonian, container.drive
+        f_avg = integrate.quad(drive, t_start, t_end)[0] / dt
 
-        return (1.0 / dt) * integrate.quad(lambda _t: 1.0, t_start, t_end)[0] * h0 + (1.0 / dt) * integrate.quad(
-            drive, t_start, t_end
-        )[0] * h1
+        return h0 + f_avg * h1
 
     def name(self) -> str:
         """Return ``magnus`` as the algorithm name."""

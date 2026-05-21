@@ -17,7 +17,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import CircuitMapper
 
-__all__: list[str] = ["NonControlledPauliSequenceMapper", "PauliSequenceMapperSettings"]
+__all__: list[str] = ["PauliSequenceMapper", "PauliSequenceMapperSettings"]
 
 
 class PauliSequenceMapperSettings(Settings):
@@ -28,7 +28,7 @@ class PauliSequenceMapperSettings(Settings):
         super().__init__()
 
 
-class NonControlledPauliSequenceMapper(CircuitMapper):
+class PauliSequenceMapper(CircuitMapper):
     r"""Circuit mapper using Pauli product formula term sequences.
 
     Given a unitary expressed as a Pauli product formula
@@ -76,7 +76,7 @@ class NonControlledPauliSequenceMapper(CircuitMapper):
         if not isinstance(unitary_container, PauliProductFormulaContainer):
             raise ValueError(
                 f"The {evolution.get_container_type()} container type is not supported. "
-                "NonControlledPauliSequenceMapper only supports PauliProductFormula containers."
+                "PauliSequenceMapper only supports PauliProductFormula containers."
             )
 
         pauli_terms: list[list[qsharp.Pauli]] = []

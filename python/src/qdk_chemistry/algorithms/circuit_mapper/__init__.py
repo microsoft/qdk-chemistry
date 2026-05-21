@@ -6,10 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import CircuitMapperFactory
-from .non_controlled_pauli_sequence_mapper import NonControlledPauliSequenceMapper, PauliSequenceMapperSettings
+from .pauli_sequence_mapper import PauliSequenceMapper, PauliSequenceMapperSettings
 
 __all__ = [
     "CircuitMapperFactory",
-    "NonControlledPauliSequenceMapper",
+    "PauliSequenceMapper",
     "PauliSequenceMapperSettings",
 ]

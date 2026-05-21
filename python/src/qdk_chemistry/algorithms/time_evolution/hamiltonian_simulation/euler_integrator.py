@@ -3,7 +3,9 @@ r"""Euler integrator for time-dependent Hamiltonian simulation.
 This module implements an Euler integrator for solving the time-dependent
 Schrodinger equation i*dU/dt = H(t)*U on a quantum computer.
 
-The integrator divides [0, T] into uniform steps of size dt.  At each step
+The integrator divides [0, T] into ``floor(T / dt)`` steps of size dt.  If T
+is not an exact multiple of dt, a final cleanup step of size ``T mod dt`` is
+appended.  At each step
 a :class:`~qdk_chemistry.algorithms.propagator.base.Propagator` evaluates
 the effective Hamiltonian for the interval, which is then Trotterized into a
 quantum circuit.  Per-step unitaries are combined via
@@ -149,11 +151,10 @@ class EulerIntegrator(HamiltonianSimulation):
     ) -> UnitaryRepresentation:
         r"""Build the combined unitary via Euler steps.
 
-        Divides :math:`[0, T]` into ``num_steps = T / dt`` intervals.
-        At each step the propagator computes the effective Hamiltonian
-        for the interval and the builder Trotterizes it.  Per-step
-        containers are combined via
-        ``UnitaryContainer.combine``.
+        Divides :math:`[0, T]` into steps of size ``dt``.  The number of
+        full steps is ``floor(T / dt)``.  If ``T`` is not an exact multiple
+        of ``dt``, a final cleanup step of size ``T mod dt`` is appended.
+        Raises ``ValueError`` if ``dt > T``.
 
         Args:
             hamiltonian: The time-dependent qubit Hamiltonian.
@@ -164,23 +165,38 @@ class EulerIntegrator(HamiltonianSimulation):
 
         """
         dt: float = self._settings.get("dt")
-        if dt <= 0.0:
-            dt = total_time
-        if dt > total_time:
-            raise ValueError(f"dt ({dt}) must not exceed total_time ({total_time}).")
-        num_time_steps = total_time / dt
-        if num_time_steps != round(num_time_steps):
-            raise ValueError(f"total_time ({total_time}) must be a positive integer multiple of dt ({dt}).")
+        if total_time == 0.0:
+            raise ValueError("total_time must be nonzero.")
+        if dt == 0.0:
+            raise ValueError(f"dt ({dt}) must be nonzero.")
+        if dt / total_time > 1:
+            raise ValueError(f"dt ({dt}) must match not exceed total_time ({total_time}).")
+        if dt / total_time < 0:
+            raise ValueError(f"dt ({dt}) must match the sign of total_time ({total_time}).")
+
+        num_full_steps = int(total_time / dt)
+        residual = total_time - num_full_steps * dt
 
         combined_container: UnitaryContainer | None = None
         propagator = self._create_nested("propagator")
         if not isinstance(propagator, Propagator):
             raise TypeError(f"propagator must be a Propagator, got {type(propagator).__name__}.")
-        for i in range(int(num_time_steps)):
+        for i in range(num_full_steps):
             t_start = i * dt
             t_end = (i + 1) * dt
             h_snapshot = propagator.run(hamiltonian, t_start, t_end)
             step_evolution = self._create_time_step_evolution(h_snapshot, dt)
+            time_step_container = step_evolution.get_container()
+            if combined_container is None:
+                combined_container = time_step_container
+            else:
+                combined_container = combined_container.combine(time_step_container)
+
+        if residual > 0.0:
+            t_start = num_full_steps * dt
+            t_end = total_time
+            h_snapshot = propagator.run(hamiltonian, t_start, t_end)
+            step_evolution = self._create_time_step_evolution(h_snapshot, residual)
             time_step_container = step_evolution.get_container()
             if combined_container is None:
                 combined_container = time_step_container

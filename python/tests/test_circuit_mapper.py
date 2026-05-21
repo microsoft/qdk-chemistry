@@ -12,8 +12,8 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.circuit_mapper.non_controlled_pauli_sequence_mapper import (
-    NonControlledPauliSequenceMapper,
+from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
+    PauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -48,14 +48,14 @@ class TestPauliSequenceMapperNonControlled:
 
     def test_name_and_type_name(self):
         """Test mapper identity methods."""
-        mapper = NonControlledPauliSequenceMapper()
+        mapper = PauliSequenceMapper()
 
         assert mapper.name() == "pauli_sequence"
         assert mapper.type_name() == "circuit_mapper"
 
     def test_run_builds_regular_unitary_circuit(self, simple_unitary):
         """Test run() builds a regular (non-controlled) unitary circuit."""
-        mapper = NonControlledPauliSequenceMapper()
+        mapper = PauliSequenceMapper()
 
         circuit = mapper.run(simple_unitary)
 
@@ -69,7 +69,7 @@ class TestPauliSequenceMapperNonControlled:
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_unitary_circuit_matrix(self, simple_unitary):
         """Test that the constructed unitary circuit has the expected matrix."""
-        mapper = NonControlledPauliSequenceMapper()
+        mapper = PauliSequenceMapper()
         circuit = mapper.run(simple_unitary)
 
         container = simple_unitary.get_container()
