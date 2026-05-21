@@ -16,7 +16,7 @@ def identity_state_prep(num_qubits: int) -> Circuit:
     """Create an identity state-preparation circuit that leaves the initial state unchanged.
 
     Useful as a trivial state-prep when evolving from a computational
-    basis state (e.g. |0...0⟩) without any additional preparation.
+    basis state (e.g. ``|0...0>``) without any additional preparation.
 
     Args:
         num_qubits: Number of qubits in the circuit.
