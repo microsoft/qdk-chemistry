@@ -1,14 +1,25 @@
-r"""Time-averaged propagator via first-order Magnus expansion.
+r"""Time-averaged propagator with Magnus expansion.
 
-Computes the effective Hamiltonian for a time interval as the time average:
+Computes the effective Hamiltonian for a time interval via the Magnus
+expansion truncated at a configurable order.
+
+**Order 1** (default) is the time-averaged Hamiltonian:
 
 .. math::
 
-    H_\text{eff} = \frac{1}{\delta t} \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
+    \Omega_1 = \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'
 
-For the driven case :math:`H(t) = H_0 + f(t)\,H_1` this reduces to
-:math:`H_\text{eff} = H_0 + \bar f\,H_1` where :math:`\bar f` is the
-time-averaged drive.
+Higher orders add commutator corrections computed recursively via
+
+.. math::
+
+    \dot\Omega_n
+    = \sum_{k=1}^{n-1} \frac{B_k}{k!}
+      \sum_{j_1+\cdots+j_k=n-1}
+      \mathrm{ad}_{\Omega_{j_1}} \cdots
+      \mathrm{ad}_{\Omega_{j_k}}(H(t))
+
+where :math:`B_k` are Bernoulli numbers.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -43,10 +54,12 @@ class MagnusPropagatorSettings(Settings):
 
 
 class MagnusPropagator(Propagator):
-    r"""First-order Magnus propagator (time averaging).
+    r"""Magnus propagator for time-dependent Hamiltonian simulation.
 
     Evaluates the effective Hamiltonian for an interval :math:`[t_1, t_2]`
-    as the time average :math:`H_\text{eff} = H_0 + \bar f\,H_1`.
+    via the Magnus expansion.  Currently only **order 1** (time averaging)
+    is implemented: :math:`H_\text{eff} = H_0 + \bar f\,H_1`.  Orders
+    higher than 1 raise :class:`NotImplementedError`.
 
     For :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
     Hamiltonians the drive integral reduces to a scalar quadrature.
@@ -104,6 +117,13 @@ class MagnusPropagator(Propagator):
         t_end: float,
     ) -> QubitHamiltonian:
         r"""Order-1 Magnus expansion (time averaging) for driven Hamiltonians.
+
+        For the driven case :math:`H(t) = H_0 + f(t)\,H_1` every Magnus term
+        reduces to a linear combination of nested commutators of :math:`H_0`
+        and :math:`H_1` with scalar coefficients that are iterated integrals
+        over the drive function.  The propagator returns
+        :math:`\Omega / \delta t` so that the builder (which multiplies by
+        ``dt``) recovers the full exponent.
 
         Computes :math:`H_\text{eff} = \frac{1}{\delta t} \int_{t_1}^{t_2} H(t')\,\mathrm{d}t'`
         where :math:`H(t) = H_0 + f(t)\,H_1`.
