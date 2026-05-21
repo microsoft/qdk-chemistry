@@ -15,13 +15,13 @@ permissions:
 jobs:
   trigger-slow-tests:
     name: Trigger Slow Tests
-    if: >
-      github.event.issue.pull_request && (
-        contains(github.event.comment.body, '/qdkbot run slow tests') ||
-        contains(github.event.comment.body, '/qdkbot run slow-tests') ||
-        contains(github.event.comment.body, '/qdkbot run tests') ||
-        contains(github.event.comment.body, '/qdkbot tests')
-      )
+    # if: >
+    #   github.event.issue.pull_request && (
+    #     contains(github.event.comment.body, '/qdkbot run slow tests') ||
+    #     contains(github.event.comment.body, '/qdkbot run slow-tests') ||
+    #     contains(github.event.comment.body, '/qdkbot run tests') ||
+    #     contains(github.event.comment.body, '/qdkbot tests')
+    #   )
     runs-on: ubuntu-latest
     steps:
     - name: Get PR details
