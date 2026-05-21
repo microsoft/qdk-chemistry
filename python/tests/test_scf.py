@@ -304,6 +304,21 @@ class TestScfSolver:
         assert abs(energy - (-74.361530753176)) < scf_energy_tolerance
         assert orbitals.is_restricted()
 
+    def test_scf_solver_oxygen_atom_rohf_gdm(self):
+        """Test SCF solver on oxygen atom triplet with ROHF/cc-pvdz and GDM."""
+        oxygen = create_oxygen_structure()
+        scf_solver = algorithms.create("scf_solver")
+
+        scf_solver.settings().set("enable_gdm", True)
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+
+        energy, wavefunction = scf_solver.run(oxygen, 0, 3, "cc-pvdz")
+        orbitals = wavefunction.get_orbitals()
+
+        assert abs(energy - (-74.787513074624)) < scf_energy_tolerance
+        assert orbitals.is_restricted()
+
     def test_scf_solver_oh_roks_invalid(self):
         """Test restricted open-shell KS request on OH doublet raises error."""
         oh_structure = create_oh_structure()

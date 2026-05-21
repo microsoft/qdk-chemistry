@@ -105,7 +105,7 @@ std::shared_ptr<SCFAlgorithm> SCFAlgorithm::create(const SCFContext& ctx) {
   switch (cfg.scf_algorithm.method) {
     case SCFAlgorithmName::ASAHF:
       if (rohf_enabled) {
-        throw std::runtime_error("ROHF-enabled ASAHF is not supported!");
+        throw std::invalid_argument("ROHF-enabled ASAHF is not supported!");
       }
       return std::make_shared<AtomicSphericallyAveragedHartreeFock>(
           ctx, cfg.scf_algorithm.diis_subspace_size);
@@ -290,7 +290,7 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   const int num_atomic_orbitals = static_cast<int>(C.rows());
   const int num_molecular_orbitals = static_cast<int>(C.cols());
   if (num_atomic_orbitals != num_molecular_orbitals) {
-    throw std::runtime_error(
+    throw std::invalid_argument(
         "ROHF build requires number of atomic orbitals to equal number of "
         "molecular orbitals!");
   }

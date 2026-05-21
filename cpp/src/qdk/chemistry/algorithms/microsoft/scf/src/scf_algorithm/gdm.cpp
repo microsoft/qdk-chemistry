@@ -138,7 +138,9 @@ static void apply_restricted_open_shell_orbital_rotation(
   kappa_complete.block(virtual_start, 0, num_virtual_orbitals,
                        num_closed_orbitals) = -kappa_ia.transpose();
 
-  // 0.5 is for consistency with the gradient definition
+  // kappa_vector stores only unique (upper-triangular) rotation parameters.
+  // kappa_complete is the full antisymmetric matrix (K = -K^T), so each unique
+  // parameter appears twice. Scale by 0.5 to match the gradient convention.
   kappa_complete *= 0.5;
 
   RowMajorMatrix exp_kappa =
@@ -258,6 +260,14 @@ static void compute_restricted_open_shell_gradient(
       RowMajorMatrix::Zero(num_molecular_orbitals, num_molecular_orbitals);
 
   const int num_atomic_orbitals = scf_impl.get_num_atomic_orbitals();
+
+  if (J_ao.size() < 2 * num_atomic_orbitals * num_atomic_orbitals ||
+      K_ao.size() < 2 * num_atomic_orbitals * num_atomic_orbitals) {
+    throw std::invalid_argument(
+        "J_ao and K_ao must each contain alpha and beta blocks "
+        "(size >= 2 * num_atomic_orbitals^2).");
+  }
+
   const auto& H_ao_full = scf_impl.get_core_hamiltonian();
 
   const auto J_alpha_ao = Eigen::Map<const RowMajorMatrix>(
@@ -1240,6 +1250,8 @@ void GDM::iterate(SCFImpl& scf_impl) {
   const auto& F = scf_impl.get_fock_matrix();
 
   const auto* cfg = ctx_.cfg;
+  // TODO: This function is called within iterate_ which runs only on rank 0,
+  // but build_jk_matrices requires participation from all MPI ranks.
   if (cfg->mpi.world_size > 1) {
     throw std::runtime_error(
         "Temporary limitation: evaluate_trial_density_energy_and_fock is not "

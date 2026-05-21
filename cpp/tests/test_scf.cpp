@@ -243,6 +243,20 @@ TEST_F(ScfTest, OH_ROHF_GDM) {
   EXPECT_TRUE(wfn_doublet->get_orbitals()->is_restricted());
 }
 
+TEST_F(ScfTest, Oxygen_atom_ROHF_GDM) {
+  auto oxygen = testing::create_oxygen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  auto [E_triplet, wfn_triplet] = scf_solver->run(oxygen, 0, 3, "cc-pvdz");
+
+  EXPECT_NEAR(E_triplet, -74.787513074624, testing::scf_energy_tolerance);
+
+  // Check triplet orbitals are restricted (ROHF)
+  EXPECT_TRUE(wfn_triplet->get_orbitals()->is_restricted());
+}
+
 TEST_F(ScfTest, Oxygen_atom_invalid_energy_thresh_diis_switch_gdm) {
   auto oxygen = testing::create_oxygen_structure();
   auto scf_solver = ScfSolverFactory::create();
