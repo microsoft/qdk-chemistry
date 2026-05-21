@@ -2,7 +2,6 @@
 set -ex
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
-PYENV_VERSION=${3:-2.6.31}
 export MAC_BUILD
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,10 +14,8 @@ else
 fi
 
 if [ "$MAC_BUILD" == "OFF" ] && [ -d "/workspace" ]; then
-    export PYENV_ROOT="/workspace/.pyenv"
     VENV_DIR="/workspace/test_wheel_env"
 else
-    export PYENV_ROOT="$REPO_ROOT/.pyenv"
     VENV_DIR="$REPO_ROOT/.test_wheel_env"
 fi
 
@@ -65,26 +62,20 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         wget
 fi
 
-# Install pyenv to use non-system python3 versions
-if [ ! -d "$PYENV_ROOT" ]; then
-    echo "Installing pyenv ${PYENV_VERSION}..."
-    PYENV_CHECKSUM=7435b8c1481043e48c838ba40d5c8bc724c23d4c94e531adc283a7c121757ad4
-    wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
-    echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
-    unzip -q pyenv.zip
-    mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
-    rm pyenv.zip
-    "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
-    "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
-    export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
-    export PATH="$PYENV_ROOT/shims:$PATH"
-fi
+# On Linux, install Python ${PYTHON_VERSION} inside the container via uv (standalone Python
+# from python-build-standalone), to avoid relying on the container's system Python.
+# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in the
+# pipeline template, which puts it on PATH for this script.
+if [ "$MAC_BUILD" == "OFF" ]; then
+    echo "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    export PATH="$HOME/.local/bin:$PATH"
 
-# Install and activate the specific Python version
-"$PYENV_ROOT/bin/pyenv" install $PYTHON_VERSION --skip-existing
-"$PYENV_ROOT/bin/pyenv" global $PYTHON_VERSION
-export PATH="$PYENV_ROOT/versions/$PYTHON_VERSION/bin:$PATH"
-export PATH="$PYENV_ROOT/shims:$PATH"
+    echo "Installing Python ${PYTHON_VERSION} via uv..."
+    uv python install "${PYTHON_VERSION}"
+    PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")"
+    export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+fi
 
 python3 --version
 

@@ -35,9 +35,6 @@ parameters:
 - name: libflameVersion
   type: string
   default: 5.2.0
-- name: pyenvVersion
-  type: string
-  default: 2.6.31
 - name: macBuild
   type: string
   default: OFF
@@ -107,12 +104,15 @@ steps:
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
-                                                      ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux)
     retryCountOnTaskFailure: 2
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
+  - task: UsePythonVersion@0
+    displayName: Use Python ${{ parameters.pythonVersion }} (macOS)
+    inputs:
+      versionSpec: '${{ parameters.pythonVersion }}'
   - script: |
       set -x
       echo "Running pip wheel build (native)..."
@@ -126,6 +126,5 @@ steps:
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
-                                                      ${{ parameters.pyenvVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
