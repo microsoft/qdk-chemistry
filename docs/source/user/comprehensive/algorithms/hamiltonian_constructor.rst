@@ -182,6 +182,11 @@ Four-center integrals are reconstructed on the fly when consumers request them.
 - The input :doc:`Orbitals <../data/orbitals>` must reference a :doc:`BasisSet <../data/basis_set>` that carries an auxiliary basis. Auxiliary shells are attached when the basis set is constructed (e.g. via ``BasisSet::from_basis_name(basis_name, aux_basis_name, structure)``); ``run()`` throws ``std::runtime_error`` if ``has_aux_basis()`` is ``false``.
 - An active space must be defined on the orbitals. For unrestricted orbitals, the alpha and beta active spaces must contain the same number of orbitals.
 
+.. note::
+
+   This constructor uses density fitting for **both** the Coulomb (J) and exchange (K) contributions to the Fock matrix during the integral transformation.
+   Unlike hybrid DF-J / exact-K schemes, all two-electron interactions are approximated through the auxiliary basis, making the method uniformly RI-accelerated but reliant on a well-matched fitting basis for accuracy.
+
 .. rubric:: When to use
 
 - Large active space calculations where memory is a concern
