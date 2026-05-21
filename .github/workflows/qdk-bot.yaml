@@ -1,4 +1,4 @@
-name: Slow Tests (On Demand)
+name: QDK bot
 
 on:
   pull_request:
