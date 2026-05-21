@@ -12,11 +12,14 @@
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/solvers/davidson.hpp>
+#include <macis/solvers/incremental_h_build.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
+#include <optional>
 #include <sparsexx/io/write_dist_mm.hpp>
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/util/submatrix.hpp>
+#include <stdexcept>
 
 namespace macis {
 
@@ -156,110 +159,163 @@ double serial_selected_ci_diag(const SpMatType& H, size_t davidson_max_m,
  * @brief Main selected CI diagonalization routine with Hamiltonian
  * construction.
  *
- * This function constructs the selected CI Hamiltonian matrix from determinants
- * and performs diagonalization to find the ground state energy. It
- * automatically chooses between serial and parallel implementations based on
- * compilation flags.
+ * Builds the Hamiltonian and runs Davidson.  If a CachedHamiltonianState is
+ * provided, attempts an incremental build first and falls back to a full
+ * build when overlap is low.  Automatically chooses serial vs parallel
+ * Davidson based on compilation flags.
  *
- * @tparam index_t Type for matrix indices
- * @tparam WfnType Type of wavefunction/determinant
- * @tparam WfnIterator Iterator type for determinant container
- * @param[in] dets_begin Iterator to beginning of determinant list
- * @param[in] dets_end Iterator to end of determinant list
- * @param[in,out] ham_gen Hamiltonian generator for matrix elements
- * @param[in] h_el_tol Tolerance for Hamiltonian matrix elements
- * @param[in] davidson_max_m Maximum dimension of Davidson subspace
- * @param[in] davidson_res_tol Davidson convergence tolerance
- * @param[in,out] C_local Eigenvector coefficients (local portion for MPI)
- * @param[in] comm MPI communicator (MPI builds only)
- * @param[in] quiet Flag to suppress output (default: false)
- * @return Ground state energy
+ * @param cache  Optional pointer to incremental H_build cache.  nullptr
+ *               disables incremental mode.
+ * @param min_patch_overlap  Overlap threshold for patched build (ignored
+ *                           when cache is nullptr).
  */
 template <typename index_t, typename WfnType, typename WfnIterator>
 double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
                         HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
                         size_t davidson_max_m, double davidson_res_tol,
                         std::vector<double>& C_local,
-                        MACIS_MPI_CODE(MPI_Comm comm, )
-                            const bool quiet = false) {
+                        CachedHamiltonianState<WfnType, index_t>* cache,
+                        double min_patch_overlap
+                            MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
   auto logger = spdlog::get("ci_solver");
   if (!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
   }
+  // Ensure sub-loggers exist for downstream code
+  if (!spdlog::get("h_build")) spdlog::stdout_color_mt("h_build");
+  if (!spdlog::get("h_build_inc")) spdlog::stdout_color_mt("h_build_inc");
 
-  logger->info("[Selected CI Solver]:");
+  const size_t ndets = std::distance(dets_begin, dets_end);
+  const bool incremental = cache != nullptr;
+
+#ifdef MACIS_ENABLE_MPI
+  if (incremental) {
+    throw std::runtime_error(
+        "selected_ci_diag: incremental mode is not supported when "
+        "MACIS_ENABLE_MPI is enabled");
+  }
+#endif
+
+  logger->info("[Selected CI Solver{}]:", incremental ? " (incremental)" : "");
   logger->info("  {} = {:6}, {} = {:.5e}, {} = {:.5e}, {} = {:4}", "NDETS",
-               std::distance(dets_begin, dets_end), "MATEL_TOL", h_el_tol,
-               "RES_TOL", davidson_res_tol, "MAX_SUB", davidson_max_m);
+               ndets, "MATEL_TOL", h_el_tol, "RES_TOL", davidson_res_tol,
+               "MAX_SUB", davidson_max_m);
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
 
-  // Generate Hamiltonian
   MACIS_MPI_CODE(MPI_Barrier(comm);)
   auto H_st = clock_type::now();
 
-#ifdef MACIS_ENABLE_MPI
+  double E;
 
-  auto world_size = comm_size(comm);
-  auto world_rank = comm_rank(comm);
+  // ---- Incremental path: try patched operator first ----
+  if (incremental && cache->valid) {
+    std::vector<WfnType> new_dets(dets_begin, dets_end);
+    auto patched_op = build_patched_operator<index_t>(
+        *cache, new_dets, ham_gen, h_el_tol, min_patch_overlap);
+    auto H_en = clock_type::now();
+    logger->info("  PATCH_DUR = {:.5e} ms", duration_type(H_en - H_st).count());
 
-  auto H = make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end,
-                                              ham_gen, h_el_tol);
-#else
+    if (patched_op) {
+      // Set up guess
+      C_local.resize(ndets, 0.0);
+      auto max_c = *std::max_element(
+          C_local.begin(), C_local.end(),
+          [](auto a, auto b) { return std::abs(a) < std::abs(b); });
+      if (std::abs(max_c) > (1.0 / ndets)) {
+        logger->info("  * Will use passed vector as guess");
+      } else {
+        logger->info("  * Will generate diagonal guess");
+        const auto& D = patched_op->diagonal();
+        auto D_min = std::min_element(D.begin(), D.end());
+        auto min_idx = std::distance(D.begin(), D_min);
+        std::fill(C_local.begin(), C_local.end(), 0.0);
+        C_local[min_idx] = 1.0;
+      }
+
+      auto dav_st = clock_type::now();
+      auto [niter, eigval] = davidson(ndets, davidson_max_m, *patched_op,
+                                      patched_op->diagonal().data(),
+                                      davidson_res_tol, C_local.data());
+      auto dav_en = clock_type::now();
+
+      logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", "DAV_NITER",
+                   niter, "E0", eigval, "DAVIDSON_DUR",
+                   duration_type(dav_en - dav_st).count());
+      E = eigval;
+
+      return E;
+    }
+    // patched_op is nullopt — fall through to full build
+  }
+
+  // ---- Full build path ----
   auto H =
+#ifdef MACIS_ENABLE_MPI
+      make_dist_csr_hamiltonian<index_t>(comm, dets_begin, dets_end, ham_gen,
+                                         h_el_tol);
+#else
       make_csr_hamiltonian<index_t>(dets_begin, dets_end, ham_gen, h_el_tol);
-#endif /* MACIS_ENABLE_MPI */
+#endif
 
   auto H_en = clock_type::now();
   MACIS_MPI_CODE(MPI_Barrier(comm);)
 
-  // Get total NNZ
 #ifdef MACIS_ENABLE_MPI
   size_t local_nnz = H.nnz();
   size_t total_nnz = allreduce(local_nnz, MPI_SUM, comm);
-  size_t max_nnz = allreduce(local_nnz, MPI_MAX, comm);
-  size_t min_nnz = allreduce(local_nnz, MPI_MIN, comm);
-#else
-  size_t total_nnz = H.nnz();
-#endif /* MACIS_ENABLE_MPI */
-
-  logger->info("  {}   = {:6}, {}     = {:.5e} ms", "NNZ", total_nnz, "H_DUR",
-               duration_type(H_en - H_st).count());
-
-#ifdef MACIS_ENABLE_MPI
+  auto world_size = comm_size(comm);
   if (world_size > 1) {
+    size_t max_nnz = allreduce(local_nnz, MPI_MAX, comm);
+    size_t min_nnz = allreduce(local_nnz, MPI_MIN, comm);
     double local_hdur = duration_type(H_en - H_st).count();
     double max_hdur = allreduce(local_hdur, MPI_MAX, comm);
     double min_hdur = allreduce(local_hdur, MPI_MIN, comm);
-    double avg_hdur = allreduce(local_hdur, MPI_SUM, comm);
-    avg_hdur /= world_size;
+    double avg_hdur = allreduce(local_hdur, MPI_SUM, comm) / world_size;
     logger->info(
         "  H_DUR_MAX = {:.2e} ms, H_DUR_MIN = {:.2e} ms, H_DUR_AVG = {:.2e} ms",
         max_hdur, min_hdur, avg_hdur);
+    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}", max_nnz, min_nnz,
+                 total_nnz / double(world_size));
   }
-#endif /* MACIS_ENABLE_MPI */
+#else
+  size_t total_nnz = H.nnz();
+#endif
+
+  logger->info("  {}   = {:6}, {}     = {:.5e} ms", "NNZ", total_nnz, "H_DUR",
+               duration_type(H_en - H_st).count());
   logger->info("  {} = {:.2e} GiB", "HMEM_LOC",
                H.mem_footprint() / 1073741824.);
   logger->info("  {} = {:.2e}%", "H_SPARSE",
                total_nnz / double(H.n() * H.n()) * 100);
-#ifdef MACIS_ENABLE_MPI
-  if (world_size > 1) {
-    logger->info("  NNZ_MAX = {}, NNZ_MIN = {}, NNZ_AVG = {}", max_nnz, min_nnz,
-                 total_nnz / double(world_size));
-  }
-#endif /* MACIS_ENABLE_MPI */
 
-  // Solve EVP
 #ifdef MACIS_ENABLE_MPI
-  auto E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol,
-                                     C_local, comm);
+  E = parallel_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local,
+                                comm);
 #else
-  auto E =
-      serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
-#endif /* MACIS_ENABLE_MPI */
+  E = serial_selected_ci_diag(H, davidson_max_m, davidson_res_tol, C_local);
+#endif
+
+  // Cache for next iteration if incremental mode is active
+  if (incremental) {
+    cache->store(std::vector<WfnType>(dets_begin, dets_end), std::move(H));
+  }
 
   return E;
+}
+
+/// @brief Convenience overload without incremental cache.
+template <typename index_t, typename WfnType, typename WfnIterator>
+double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
+                        HamiltonianGenerator<WfnType>& ham_gen, double h_el_tol,
+                        size_t davidson_max_m, double davidson_res_tol,
+                        std::vector<double>& C_local
+                            MACIS_MPI_CODE(, MPI_Comm comm = MPI_COMM_WORLD)) {
+  return selected_ci_diag<index_t>(
+      dets_begin, dets_end, ham_gen, h_el_tol, davidson_max_m, davidson_res_tol,
+      C_local, static_cast<CachedHamiltonianState<WfnType, index_t>*>(nullptr),
+      0.3 MACIS_MPI_CODE(, comm));
 }
 
 }  // namespace macis
