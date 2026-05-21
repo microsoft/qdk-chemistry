@@ -162,121 +162,29 @@ class TestTimeAveragedPropagatorRegistry:
 
 
 class TestMagnusOrder2:
-    """Tests for second-order Magnus expansion in the propagator."""
+    """Tests that higher-order Magnus raises NotImplementedError."""
 
-    def test_constant_drive_order2_equals_order1(self):
-        """Constant drive: f(t)=c, so f(t1)-f(t2)=0, Ω₂=0."""
+    def test_order2_raises_not_implemented(self):
+        """Order 2 should raise NotImplementedError."""
         h0 = _make_hamiltonian(["ZI"], [1.0])
         h1 = _make_hamiltonian(["IX"], [1.0])
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 2.0)
 
-        prop1 = MagnusPropagator()
-        result1 = prop1.run(td, 0.0, 1.0)
+        prop = MagnusPropagator()
+        prop.settings().set("order", 2)
+        with pytest.raises(NotImplementedError, match="not yet implemented"):
+            prop.run(td, 0.0, 1.0)
 
-        prop2 = MagnusPropagator()
-        prop2.settings().set("order", 2)
-        result2 = prop2.run(td, 0.0, 1.0)
-
-        # Build coefficient dict for comparison (ignore near-zero terms)
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
-            return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
-
-        assert _to_dict(result2) == pytest.approx(_to_dict(result1), abs=1e-12)
-
-    def test_linear_drive_order2_nonzero_correction(self):
-        """Linear drive f(t)=t on [0,1]: s₂ = -1/6, Ω₂ ∝ [H₁, H₀]."""
+    def test_order3_raises_not_implemented(self):
+        """Order 3 should raise NotImplementedError."""
         h0 = _make_hamiltonian(["Z"], [1.0])
         h1 = _make_hamiltonian(["X"], [1.0])
         td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
 
         prop = MagnusPropagator()
-        prop.settings().set("order", 2)
-        result = prop.run(td, 0.0, 1.0)
-
-        # Order 1: Ω₁^(H)/dt = Z + 0.5*X
-        # Ω₂^(H) has coefficient -iY*T³/6 on the Y term
-        # Phase factor for n=2: (-i)^1 = -i
-        # H_eff correction = (-i) * (-iY/6) = -Y/6 (real)
-        assert "Y" in result.pauli_strings
-        y_idx = result.pauli_strings.index("Y")
-        np.testing.assert_allclose(result.coefficients[y_idx], -1.0 / 6.0, atol=1e-10)
-
-    def test_commuting_h0_h1_order2_equals_order1(self):
-        """When [H₁, H₀]=0, order 2 should equal order 1."""
-        h0 = _make_hamiltonian(["ZI"], [1.0])
-        h1 = _make_hamiltonian(["IZ"], [1.0])  # commutes with h0
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
-
-        prop1 = MagnusPropagator()
-        result1 = prop1.run(td, 0.0, 1.0)
-
-        prop2 = MagnusPropagator()
-        prop2.settings().set("order", 2)
-        result2 = prop2.run(td, 0.0, 1.0)
-
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
-            return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
-
-        assert _to_dict(result2) == pytest.approx(_to_dict(result1), abs=1e-12)
-
-    def test_order3_constant_drive_equals_order1(self):
-        """Constant drive: all higher-order corrections vanish."""
-        h0 = _make_hamiltonian(["Z"], [1.0])
-        h1 = _make_hamiltonian(["X"], [1.0])
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda _t: 2.0)
-
-        prop1 = MagnusPropagator()
-        result1 = prop1.run(td, 0.0, 1.0)
-
-        prop3 = MagnusPropagator()
-        prop3.settings().set("order", 3)
-        result3 = prop3.run(td, 0.0, 1.0)
-
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
-            return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
-
-        assert _to_dict(result3) == pytest.approx(_to_dict(result1), abs=1e-12)
-
-    def test_order3_linear_drive_has_correction(self):
-        """Order 3 with linear drive should differ from order 2."""
-        h0 = _make_hamiltonian(["Z"], [1.0])
-        h1 = _make_hamiltonian(["X"], [1.0])
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
-
-        prop2 = MagnusPropagator()
-        prop2.settings().set("order", 2)
-        result2 = prop2.run(td, 0.0, 1.0)
-
-        prop3 = MagnusPropagator()
-        prop3.settings().set("order", 3)
-        result3 = prop3.run(td, 0.0, 1.0)
-
-        # Order 3 should add terms beyond order 2 (since [H0,[H1,H0]] and [H1,[H1,H0]] are nonzero)
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
-            return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
-
-        d2 = _to_dict(result2)
-        d3 = _to_dict(result3)
-        # They should differ (order 3 correction is nonzero for non-commuting H0, H1 with linear drive)
-        assert d2 != pytest.approx(d3, abs=1e-8)
-
-    def test_commuting_h0_h1_high_order_equals_order1(self):
-        """When [H₁, H₀]=0, all higher orders equal order 1."""
-        h0 = _make_hamiltonian(["ZI"], [1.0])
-        h1 = _make_hamiltonian(["IZ"], [1.0])
-        td = DrivenQubitHamiltonian(h0, h1, drive=lambda t: t)
-
-        prop1 = MagnusPropagator()
-        result1 = prop1.run(td, 0.0, 1.0)
-
-        prop4 = MagnusPropagator()
-        prop4.settings().set("order", 4)
-        result4 = prop4.run(td, 0.0, 1.0)
-
-        def _to_dict(h: QubitHamiltonian) -> dict[str, complex]:
-            return {s: c for s, c in zip(h.pauli_strings, h.coefficients, strict=False) if abs(c) > 1e-12}
-
-        assert _to_dict(result4) == pytest.approx(_to_dict(result1), abs=1e-12)
+        prop.settings().set("order", 3)
+        with pytest.raises(NotImplementedError, match="not yet implemented"):
+            prop.run(td, 0.0, 1.0)
 
     def test_order_setting_via_registry(self):
         """Order should be configurable through the registry create kwargs."""
@@ -286,123 +194,4 @@ class TestMagnusOrder2:
         assert prop.settings().get("order") == 2
 
 
-# ---------------------------------------------------------------
-# Magnus convergence test against exact matrix exponentiation
-# ---------------------------------------------------------------
-
-# Pauli matrices
-_I = np.eye(2, dtype=complex)
-_X = np.array([[0, 1], [1, 0]], dtype=complex)
-_Y = np.array([[0, -1j], [1j, 0]], dtype=complex)
-_Z = np.array([[1, 0], [0, -1]], dtype=complex)
-_PAULI = {"I": _I, "X": _X, "Y": _Y, "Z": _Z}
-
-
-def _qh_to_matrix(h: QubitHamiltonian) -> np.ndarray:
-    """Convert a QubitHamiltonian to a dense matrix."""
-    n = h.num_qubits
-    dim = 2**n
-    mat = np.zeros((dim, dim), dtype=complex)
-    for label, coeff in zip(h.pauli_strings, h.coefficients, strict=True):
-        term = np.array([[1.0]], dtype=complex)
-        for char in reversed(label):
-            term = np.kron(_PAULI[char], term)
-        mat += complex(coeff) * term
-    return mat
-
-
-def _exact_propagator(
-    h0_mat: np.ndarray,
-    h1_mat: np.ndarray,
-    drive,
-    t_start: float,
-    t_end: float,
-    steps: int = 2000,
-) -> np.ndarray:
-    """Compute U = T exp(-i ∫ H(t) dt) via fine-grained product."""
-    from scipy.linalg import expm  # noqa: PLC0415
-
-    dt = (t_end - t_start) / steps
-    dim = h0_mat.shape[0]
-    u = np.eye(dim, dtype=complex)
-    for k in range(steps):
-        t_mid = t_start + (k + 0.5) * dt
-        h_t = h0_mat + drive(t_mid) * h1_mat
-        u = expm(-1j * h_t * dt) @ u
-    return u
-
-
-class TestMagnusConvergence:
-    """Verify that higher Magnus orders converge to the exact propagator."""
-
-    @staticmethod
-    def _propagator_error(h0, h1, drive, t_start, t_end, order):
-        """Frobenius-norm error between Magnus and exact propagator."""
-        from scipy.linalg import expm  # noqa: PLC0415
-
-        td = DrivenQubitHamiltonian(h0, h1, drive=drive)
-        dt = t_end - t_start
-
-        prop = MagnusPropagator()
-        prop.settings().set("order", order)
-        h_eff = prop.run(td, t_start, t_end)
-
-        h_eff_mat = _qh_to_matrix(h_eff)
-        u_magnus = expm(-1j * h_eff_mat * dt)
-
-        h0_mat = _qh_to_matrix(h0)
-        h1_mat = _qh_to_matrix(h1)
-        u_exact = _exact_propagator(h0_mat, h1_mat, drive, t_start, t_end)
-
-        return np.linalg.norm(u_magnus - u_exact, "fro")
-
-    def test_higher_orders_reduce_error_linear_drive(self):
-        """For H=Z+t*X on [0,0.3], error should decrease with Magnus order."""
-        h0 = _make_hamiltonian(["Z"], [1.0])
-        h1 = _make_hamiltonian(["X"], [1.0])
-        drive = lambda t: t  # noqa: E731
-
-        errors = []
-        for order in range(1, 5):
-            err = self._propagator_error(h0, h1, drive, 0.0, 0.3, order)
-            errors.append(err)
-
-        # Each order should improve (or at least not worsen significantly)
-        for i in range(1, len(errors)):
-            assert errors[i] < errors[i - 1] + 1e-10, (
-                f"Order {i + 1} error ({errors[i]:.2e}) not less than order {i} ({errors[i - 1]:.2e})"
-            )
-        # Order 4 should be very accurate for this small dt
-        assert errors[3] < 1e-4, f"Order 4 error {errors[3]:.2e} too large"
-
-    def test_higher_orders_reduce_error_sinusoidal_drive(self):
-        """For H=Z+sin(t)*X on [0,0.5], error should decrease with order."""
-        h0 = _make_hamiltonian(["Z"], [1.0])
-        h1 = _make_hamiltonian(["X"], [1.0])
-        drive = math.sin
-
-        errors = []
-        for order in range(1, 5):
-            err = self._propagator_error(h0, h1, drive, 0.0, 0.5, order)
-            errors.append(err)
-
-        for i in range(1, len(errors)):
-            assert errors[i] < errors[i - 1] + 1e-10, (
-                f"Order {i + 1} error ({errors[i]:.2e}) not less than order {i} ({errors[i - 1]:.2e})"
-            )
-        assert errors[3] < 1e-4, f"Order 4 error {errors[3]:.2e} too large"
-
-    def test_convergence_two_qubit(self):
-        """Two-qubit H=ZI+t*IX on [0,0.2]: orders 1-4 should converge."""
-        h0 = _make_hamiltonian(["ZI"], [1.0])
-        h1 = _make_hamiltonian(["IX"], [1.0])
-        drive = lambda t: t  # noqa: E731
-
-        errors = []
-        for order in range(1, 5):
-            err = self._propagator_error(h0, h1, drive, 0.0, 0.2, order)
-            errors.append(err)
-
-        for i in range(1, len(errors)):
-            assert errors[i] < errors[i - 1] + 1e-10
-        assert errors[3] < 1e-5
+# Higher-order Magnus convergence tests removed — order > 1 is not yet implemented.
