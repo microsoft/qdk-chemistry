@@ -113,5 +113,5 @@ class TestQiskitAerCircuitExecutor:
         """Test that an invalid device_backend_name raises ValueError with a helpful message."""
         executor = QiskitAerSimulator()
         executor.settings().set("device_backend_name", "not_a_real_backend")
-        with pytest.raises(ValueError, match="Unknown device backend 'not_a_real_backend'"):
+        with pytest.raises(ValueError, match="device_backend_name must start with 'fake_'"):
             executor.run(test_circuit_1, shots=10)
