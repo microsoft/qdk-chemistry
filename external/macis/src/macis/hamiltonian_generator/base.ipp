@@ -40,7 +40,7 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
   size_t no = norb_;
   size_t no2 = no * no;
   size_t no3 = no2 * no;
-  spdlog::info(
+  spdlog::debug(
       "Generating integral intermediates for Hamiltonian generator with {} "
       "orbitals...",
       no);
@@ -56,7 +56,7 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
         G_red_(k, i, j) = V(k, k, i, j) - V(k, j, i, k);
         V_red_(k, i, j) = V(k, k, i, j);
       }
-  spdlog::info("Finished generating integral intermediates.");
+  spdlog::debug("Finished generating integral intermediates.");
   // G2_red(i,j) = 0.5 * G(i,i,j,j)
   //             = 0.5 * (V(i,i,j,j) - V(i,j,j,i))
   // V2_red(i,j) = V(i,i,j,j)

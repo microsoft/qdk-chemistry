@@ -154,10 +154,15 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
             }
           }
         }
-        // FIXME(MPI): Two issues:
-        // 1. &h_cache is non-null → selected_ci_diag throws under MPI.
-        // 2. X_union is full-size but parallel_selected_ci_diag truncates
-        //    to local_row_extent — only rank 0 gets the correct warm-start.
+#ifdef MACIS_ENABLE_MPI
+        if (comm_size(comm) > 1) {
+          throw std::runtime_error(
+              "asci_refine: incremental Hamiltonian caching is not supported "
+              "in "
+              "MPI builds with world_size > 1. Union-stabilization cannot "
+              "proceed with h_cache under MPI.");
+        }
+#endif
         double E_union = selected_ci_diag<index_t>(
             union_wfn.begin(), union_wfn.end(), ham_gen,
             mcscf_settings.ci_matel_tol, mcscf_settings.ci_max_subspace,

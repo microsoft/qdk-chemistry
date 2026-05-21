@@ -52,6 +52,8 @@ struct SpinCache {
 
   void build(std::span<const WfnType> dets) {
     ndets = dets.size();
+    if (ndets == 0) return;
+
     alpha.resize(ndets);
     beta.resize(ndets);
 

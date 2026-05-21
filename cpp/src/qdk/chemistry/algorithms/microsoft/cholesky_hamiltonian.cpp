@@ -159,9 +159,6 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   std::vector<std::vector<size_t>> active_shell_pairs_local(nthreads);
 #endif
 
-  // Reusable ERI column buffer — single shared buffer, no per-thread copies.
-  std::vector<double> eri_col_max(num_aos2 * max_n_cols, 0.0);
-
   // Compute diagonal elements for all shell pairs
   QDK_LOGGER().debug("Computing diagonal elements");
 #ifdef _OPENMP

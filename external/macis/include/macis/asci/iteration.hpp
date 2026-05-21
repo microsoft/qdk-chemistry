@@ -176,15 +176,16 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     }
   }
 
-  // FIXME(MPI): Two issues when MACIS_ENABLE_MPI is active:
-  // 1. If h_cache is non-null, selected_ci_diag throws (incremental mode
-  //    unsupported in MPI).  Callers (asci_grow, asci_refine) always pass
-  //    &h_cache — need to pass nullptr under MPI or gate incremental mode.
-  // 2. X_local is full-size (wfn.size()), but parallel_selected_ci_diag
-  //    truncates it to local_row_extent via resize().  Only rank 0 gets the
-  //    correct warm-start slice; other ranks receive rank 0's coefficients.
-  //    Fix: extract the local portion [rank*local_count..(rank+1)*local_count)
-  //    before calling, or have selected_ci_diag handle the scatter internally.
+#ifdef MACIS_ENABLE_MPI
+  if (h_cache && comm_size(comm) > 1) {
+    throw std::runtime_error(
+        "asci_iter: incremental Hamiltonian caching (h_cache != nullptr) is "
+        "not "
+        "supported in MPI builds with world_size > 1. Pass nullptr for h_cache "
+        "when running under MPI.");
+  }
+#endif
+
   double E = selected_ci_diag<index_t>(
       wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
       mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol, X_local,
