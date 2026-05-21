@@ -621,8 +621,9 @@ void SCFImpl::iterate_() {
     update_fock_();
 
     if (ctx_.cfg->scf_orbital_type == SCFOrbitalType::RestrictedOpenShell) {
-      const auto& [effective_fock, total_density] =
+      const auto rohf_convergence_matrices =
           scf_algorithm_->try_get_rohf_convergence_matrices(*this);
+      const auto& effective_fock = std::get<0>(rohf_convergence_matrices);
       scf_algorithm_->solve_fock_eigenproblem(
           effective_fock, S_, X_, C_, eigenvalues_, P_, nelec_,
           num_atomic_orbitals_, num_molecular_orbitals_, 0);
@@ -1127,6 +1128,18 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
 void SCFImpl::build_jk_matrices(const RowMajorMatrix& density_matrix,
                                 RowMajorMatrix& J, RowMajorMatrix& K) const {
   QDK_LOG_TRACE_ENTERING();
+
+  const int expected_rows = num_density_matrices_ * num_atomic_orbitals_;
+  const int expected_cols = num_atomic_orbitals_;
+  VERIFY_INPUT(density_matrix.rows() == expected_rows &&
+                   density_matrix.cols() == expected_cols,
+               "density_matrix shape should be (num_density_matrices_ * "
+               "num_atomic_orbitals_, num_atomic_orbitals_)");
+  VERIFY_INPUT(J.rows() == expected_rows && J.cols() == expected_cols,
+               "J shape should match density_matrix shape");
+  VERIFY_INPUT(K.rows() == expected_rows && K.cols() == expected_cols,
+               "K shape should match density_matrix shape");
+
   auto [alpha, beta, omega] = get_hyb_coeff_();
   eri_->build_JK(density_matrix.data(), J.data(), K.data(), alpha, beta, omega);
 }

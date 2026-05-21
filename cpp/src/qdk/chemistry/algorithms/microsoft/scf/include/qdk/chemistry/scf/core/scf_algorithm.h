@@ -120,14 +120,13 @@ class SCFAlgorithm {
    *
    * For ROHF, some algorithms evaluate convergence using an effective Fock
    * matrix and total density matrix rather than the spin-blocked SCFImpl
-   * matrices. Derived algorithms can override this hook and provide
-   * references to those matrices.
+   * matrices. This helper returns references to those matrices.
    *
    * @param[in] scf_impl SCF implementation object
    * @return Pair of references to convergence Fock and density matrices
    * @throws std::logic_error If ROHF convergence matrices are unavailable
    */
-  virtual std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
+  std::pair<const RowMajorMatrix&, const RowMajorMatrix&>
   try_get_rohf_convergence_matrices(const SCFImpl& scf_impl);
 
   /**
