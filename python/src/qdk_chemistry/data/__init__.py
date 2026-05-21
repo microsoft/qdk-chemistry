@@ -118,6 +118,10 @@ from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven import DrivenContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQubitHamiltonian
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -143,6 +147,8 @@ __all__ = [
     "ControlledUnitary",
     "CoupledClusterContainer",
     "DataClass",
+    "DrivenContainer",
+    "DrivenQubitHamiltonian",
     "ElectronicStructureSettings",
     "Element",
     "EncodingMismatchError",
@@ -182,6 +188,8 @@ __all__ = [
     "Structure",
     "Symmetries",
     "TermPartition",
+    "TimeDependentQubitHamiltonian",
+    "TimeDependentQubitHamiltonianContainer",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

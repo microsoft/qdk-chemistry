@@ -92,7 +92,9 @@ plugins = [
 qiskit-extras = [
   "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
   "qiskit-aer; python_version < '3.14'",
+  "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
   "qiskit-nature; python_version < '3.14'",
+  "qiskit-qasm3-import; python_version < '3.14'",
   "pylatexenc==2.10; python_version < '3.14'"
 ]
 test = [
