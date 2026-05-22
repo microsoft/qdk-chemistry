@@ -176,8 +176,10 @@ if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
 else
     # Public ensureconda has no --envfile (it's an ms-ensureconda extension);
     # it just prints the discovered / installed conda binary path on stdout.
-    # We wire up the bash hook ourselves.
-    CONDA_EXE=$(python3 -m ensureconda)
+    # Force it to install conda-standalone (default would be micromamba, which
+    # uses a different CLI: `micromamba shell hook --shell bash` instead of
+    # `conda shell.bash hook`, plus mamba-specific `create`/`activate`).
+    CONDA_EXE=$(python3 -m ensureconda --no-mamba --no-micromamba --conda --conda-exe)
     deactivate
     export CONDA_EXE
     # shellcheck disable=SC1090
