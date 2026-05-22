@@ -46,6 +46,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         libxml2-dev \
         libxmlsec1-dev \
         make \
+        python3 \
+        python3-pip \
+        python3-venv \
         tk-dev \
         unzip \
         wget \
@@ -61,30 +64,60 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         python \
         unzip \
         wget
-    # Make sure Homebrew's python3 is preferred when bootstrapping ms-ensureconda.
+    # Make sure Homebrew's python3 is preferred when bootstrapping conda.
     export PATH="/opt/homebrew/bin:$PATH"
 fi
 
-# Install Python ${PYTHON_VERSION} via Anaconda's conda package manager (bootstrapped by
-# Microsoft's CFS-compliant ms-ensureconda tool) on both Linux (inside the test container)
-# and macOS. Anaconda is the officially approved Python distribution for Microsoft CI builds
-# (Azure Pipelines / OneBranch); see
-# https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
-# (section "Setting up Conda in CI builds").
+# =============================================================================
+# Bootstrap Anaconda's `conda` for Python ${PYTHON_VERSION}.
+# =============================================================================
 #
-# Prereq: the AzureQuantum/quantum-apps-dependencies Azure Artifacts feed must have
-# azure-feed://mseng/Anaconda@Published configured as an upstream so that the
-# ms-ensureconda pip package resolves. PIP_INDEX_URL is set by PipAuthenticate@1 at job
-# level; on Linux it's forwarded into the docker container via -e PIP_INDEX_URL.
-echo "Installing ms-ensureconda and bootstrapping conda..."
-# Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS is externally
-# managed). Same flow works in the Linux container, where the apt-installed python3 is
-# also externally managed on Ubuntu 24.04.
+# Anaconda is the officially approved Python distribution for Microsoft CI
+# builds (Azure Pipelines / OneBranch); see
+#   https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
+# (section "Setting up Conda in CI builds"). The MS-vetted bootstrapper is
+# `ms-ensureconda`.
+#
+# !!! HEADS UP: ms-ensureconda has incomplete platform coverage.            !!!
+# !!! As of writing it only ships `manylinux_2_7_x86_64` and `win_amd64`    !!!
+# !!! wheels — there are NO wheels for macOS (any arch) or Linux aarch64.   !!!
+# !!! See:                                                                  !!!
+# !!!   https://pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/pypi/simple/ms-ensureconda/
+# !!! On those platforms `pip install ms-ensureconda` aborts with           !!!
+# !!! "No matching distribution found".                                     !!!
+# !!!                                                                       !!!
+# !!! Until ms-ensureconda publishes broader wheel coverage we fall back to !!!
+# !!! the upstream public `ensureconda` package (pure-Python `py3-none-any`,!!!
+# !!! identical `python -m ensureconda --envfile` CLI). It is fetched from  !!!
+# !!! the same Azure Artifacts feed via its public PyPI upstream so it      !!!
+# !!! still flows through CFS.                                              !!!
+# !!!                                                                       !!!
+# !!! TODO: revert to ms-ensureconda on every platform once arm64 / macOS   !!!
+# !!! wheels are published. File via python@microsoft.com if needed.        !!!
+#
+# Prereq: the AzureQuantum/quantum-apps-dependencies feed must have
+# azure-feed://mseng/Anaconda@Published configured as an upstream so that
+# ms-ensureconda resolves on Linux x86_64. PIP_INDEX_URL is set by
+# PipAuthenticate@1 at job level; on Linux it's forwarded into the docker
+# container via -e PIP_INDEX_URL.
+case "$(uname -s):$(uname -m)" in
+    Linux:x86_64)
+        ENSURECONDA_PKG="ms-ensureconda"
+        ;;
+    *)
+        # macOS (arm64) and Linux aarch64 — see HEADS UP block above.
+        ENSURECONDA_PKG="ensureconda"
+        ;;
+esac
+
+echo "Installing ${ENSURECONDA_PKG} (on $(uname -s):$(uname -m)) and bootstrapping conda..."
+# Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS
+# and apt Python on Ubuntu 24.04 are both externally managed).
 python3 -m venv /tmp/bootstrap-venv
 # shellcheck disable=SC1091
 . /tmp/bootstrap-venv/bin/activate
 python3 -m pip install --upgrade pip
-python3 -m pip install ms-ensureconda
+python3 -m pip install "${ENSURECONDA_PKG}"
 python3 -m ensureconda --envfile /tmp/ensureconda.env
 deactivate
 
