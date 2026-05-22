@@ -118,12 +118,25 @@ python3 -m venv /tmp/bootstrap-venv
 . /tmp/bootstrap-venv/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install "${ENSURECONDA_PKG}"
-python3 -m ensureconda --envfile /tmp/ensureconda.env
-deactivate
 
-set -a; . /tmp/ensureconda.env; set +a
-# shellcheck disable=SC1090
-. "$CONDA_BASH_HOOK"
+if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
+    # ms-ensureconda's --envfile flag dumps CONDA_BASH_HOOK + friends to a
+    # dotenv file we then source to wire up conda for this shell.
+    python3 -m ensureconda --envfile /tmp/ensureconda.env
+    deactivate
+    set -a; . /tmp/ensureconda.env; set +a
+    # shellcheck disable=SC1090
+    . "$CONDA_BASH_HOOK"
+else
+    # Public ensureconda has no --envfile (it's an ms-ensureconda extension);
+    # it just prints the discovered / installed conda binary path on stdout.
+    # We wire up the bash hook ourselves.
+    CONDA_EXE=$(python3 -m ensureconda)
+    deactivate
+    export CONDA_EXE
+    # shellcheck disable=SC1090
+    eval "$("$CONDA_EXE" shell.bash hook)"
+fi
 
 echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSION}..."
 conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}"
