@@ -109,10 +109,6 @@ steps:
     retryCountOnTaskFailure: 2
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
-  - task: UsePythonVersion@0
-    displayName: Use Python ${{ parameters.pythonVersion }} (macOS)
-    inputs:
-      versionSpec: '${{ parameters.pythonVersion }}'
   - script: |
       set -x
       echo "Running pip wheel build (native)..."

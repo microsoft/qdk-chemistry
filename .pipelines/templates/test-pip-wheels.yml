@@ -31,10 +31,6 @@ steps:
     displayName: Test wheel (Docker)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
-  - task: UsePythonVersion@0
-    displayName: Use Python ${{ parameters.pythonVersion }} (macOS)
-    inputs:
-      versionSpec: '${{ parameters.pythonVersion }}'
   - script: |
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python

@@ -94,8 +94,11 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         ncurses \
         ninja \
         pybind11 \
+        python \
         wget
     export CMAKE_PREFIX_PATH="/opt/homebrew"
+    # Make sure Homebrew's python3 is preferred when bootstrapping ms-ensureconda.
+    export PATH="/opt/homebrew/bin:$PATH"
 fi
 
 echo "Downloading HDF5 $HDF5_VERSION..."
@@ -110,33 +113,36 @@ echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 echo "Installing HDF5..."
 bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
 
-# On Linux, install Python ${PYTHON_VERSION} inside the container via Anaconda's conda
-# package manager, bootstrapped by Microsoft's CFS-compliant ms-ensureconda tool.
-# Anaconda is the officially approved Python distribution for Microsoft CI builds
+# Install Python ${PYTHON_VERSION} via Anaconda's conda package manager (bootstrapped by
+# Microsoft's CFS-compliant ms-ensureconda tool) on both Linux (inside the build container)
+# and macOS. Anaconda is the officially approved Python distribution for Microsoft CI builds
 # (Azure Pipelines / OneBranch); see
 # https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
 # (section "Setting up Conda in CI builds").
 #
 # Prereq: the AzureQuantum/quantum-apps-dependencies Azure Artifacts feed must have
 # azure-feed://mseng/Anaconda@Published configured as an upstream so that the
-# ms-ensureconda pip package resolves inside this container. PIP_INDEX_URL is
-# forwarded into the container by the pipeline template after PipAuthenticate@1.
-#
-# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in
-# the pipeline template, which puts it on PATH for this script.
-if [ "$MAC_BUILD" == "OFF" ]; then
-    echo "Installing ms-ensureconda and bootstrapping conda..."
-    python3 -m pip install --upgrade pip
-    python3 -m pip install ms-ensureconda
-    python3 -m ensureconda --envfile /tmp/ensureconda.env
-    set -a; . /tmp/ensureconda.env; set +a
-    # shellcheck disable=SC1090
-    . "$CONDA_BASH_HOOK"
+# ms-ensureconda pip package resolves. PIP_INDEX_URL is set by PipAuthenticate@1 at job
+# level; on Linux it's forwarded into the docker container via -e PIP_INDEX_URL.
+echo "Installing ms-ensureconda and bootstrapping conda..."
+# Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS is externally
+# managed). Same flow works in the Linux container, where the apt-installed python3 is
+# also externally managed on Ubuntu 24.04.
+python3 -m venv /tmp/bootstrap-venv
+# shellcheck disable=SC1091
+. /tmp/bootstrap-venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install ms-ensureconda
+python3 -m ensureconda --envfile /tmp/ensureconda.env
+deactivate
 
-    echo "Creating conda environment with Python ${PYTHON_VERSION}..."
-    conda create --yes --quiet --name buildenv "python=${PYTHON_VERSION}"
-    conda activate buildenv
-fi
+set -a; . /tmp/ensureconda.env; set +a
+# shellcheck disable=SC1090
+. "$CONDA_BASH_HOOK"
+
+echo "Creating conda environment with Python ${PYTHON_VERSION}..."
+conda create --yes --quiet --name buildenv "python=${PYTHON_VERSION}"
+conda activate buildenv
 
 python3 --version
 
