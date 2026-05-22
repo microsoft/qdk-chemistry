@@ -125,7 +125,7 @@ Alternatively, click the green button in the bottom-left corner of VS Code and s
 
 After the initial build, restart VS Code and reopen in the container to ensure the Python virtual environment is properly loaded.
 
-### Step 4: Develop!
+### Step 4: Develop
 
 The dev container builds the C++ library and links it the python package in separate steps, as shown in `.devcontainer/scripts/post_create.sh`. After changing the source code, you need to rebuild and install accordingly.
 
