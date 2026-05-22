@@ -127,7 +127,7 @@ After the initial build, restart VS Code and reopen in the container to ensure t
 
 ### Step 4: Develop
 
-The dev container builds the C++ library and links it the python package in separate steps, as shown in `.devcontainer/scripts/post_create.sh`. After changing the source code, you need to rebuild and install accordingly.
+The dev container builds the C++ library and links it to the Python package in separate steps, as shown in `.devcontainer/scripts/post_create.sh`. After changing the source code, you need to rebuild and install accordingly.
 
 **NOTE:**
 
