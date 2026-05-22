@@ -62,7 +62,7 @@ COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
 # Delete build directory after installation
 ENV KEEP_BUILD_DIR=0
 RUN bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
-     rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
+    rm /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
@@ -89,3 +89,16 @@ USER $USERNAME
 
 # Setup bash prompt
 RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
+
+# Create the Python virtual environment and pre-install workspace-independent
+# Python dev dependencies.
+ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
+    PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
+RUN python -m venv "$VIRTUAL_ENV" \
+    && pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir \
+    "ipykernel>=7.2,<8" \
+    "pandas>=3.0,<4" \
+    "pre-commit>=4.6,<5" \
+    "rdkit>=2026.3.2,<2026.4" \
+    && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc

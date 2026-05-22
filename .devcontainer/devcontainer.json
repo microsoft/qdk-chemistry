@@ -60,11 +60,18 @@
         }
     },
     "features": {
-        "ghcr.io/devcontainers/features/git:1": {}
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/node:1": {
+            "version": "lts"
+        },
+        "ghcr.io/devcontainers/features/rust:1": {
+            "version": "stable",
+            "profile": "default"
+        }
     },
     "remoteEnv": {
         "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
     },
-    "postCreateCommand": "bash .devcontainer/scripts/venv.sh",
+    "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
 }
