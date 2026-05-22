@@ -414,7 +414,10 @@ class QdkEnergyEstimator(EnergyEstimator):
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(
-            measurement_circuits, circuit_executor, shots_list, noise_model
+            measurement_circuits,
+            circuit_executor,
+            shots_list,
+            noise_model,
         )
         return MeasurementData(
             bitstring_counts=counts,

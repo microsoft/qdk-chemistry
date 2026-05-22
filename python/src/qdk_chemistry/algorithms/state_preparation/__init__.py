@@ -8,6 +8,7 @@ quantum states from classical wavefunctions.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryStatePreparation,
 )
@@ -25,4 +26,5 @@ __all__ = [
     "SparseIsometryStatePreparation",
     "StatePreparationFactory",
     "StatePreparationSettings",
+    "identity_state_prep",
 ]

@@ -3,9 +3,11 @@
     "license": "MIT",
     "files": [
         "src/BinaryEncoding.qs",
+        "src/CircuitComposition.qs",
         "src/StatePreparation.qs",
         "src/IterativePhaseEstimation.qs",
         "src/ControlledPauliExp.qs",
-        "src/MeasurementBasis.qs"
+        "src/MeasurementBasis.qs",
+        "src/PauliExp.qs"
     ]
 }
