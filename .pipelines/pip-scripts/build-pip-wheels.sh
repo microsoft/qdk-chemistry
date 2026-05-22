@@ -103,6 +103,9 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 echo "Downloading HDF5 $HDF5_VERSION..."
+# Clean up any leftover state from a previous (possibly failed) attempt on
+# this self-hosted agent — the workspace persists across builds and retries.
+rm -rf hdf5 hdf5-${HDF5_VERSION} hdf5-${HDF5_VERSION}.tar.bz2
 export HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
 wget -q -nc --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
 echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
