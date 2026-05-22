@@ -184,6 +184,114 @@ Eigen::MatrixXd build_K_from_three_center(
   return K;
 }
 
+bool is_indices_contiguous(const std::vector<size_t>& indices) {
+  if (indices.size() <= 1) return true;
+  for (size_t i = 0; i < indices.size() - 1; ++i) {
+    if (indices[i + 1] - indices[i] != 1) {
+      return false;
+    }
+  }
+  return true;
+}
+
+Eigen::MatrixXd build_inactive_density(const Eigen::MatrixXd& C,
+                                       const std::vector<size_t>& indices,
+                                       size_t n_ao) {
+  Eigen::MatrixXd D = Eigen::MatrixXd::Zero(n_ao, n_ao);
+  if (indices.empty()) return D;
+
+  if (is_indices_contiguous(indices)) {
+    auto C_inactive =
+        C.block(0, indices.front(), n_ao, indices.size());
+    D = C_inactive * C_inactive.transpose();
+  } else {
+    for (size_t i : indices) {
+      D += C.col(i) * C.col(i).transpose();
+    }
+  }
+  return D;
+}
+
+InactiveFockResult compute_restricted_inactive(
+    const Eigen::MatrixXd& J_ao, const Eigen::MatrixXd& K_ao,
+    const Eigen::MatrixXd& H_full, const Eigen::MatrixXd& Ca,
+    const std::vector<size_t>& inactive_indices,
+    const std::vector<size_t>& active_indices) {
+  size_t num_mo = Ca.cols();
+  size_t nactive = active_indices.size();
+
+  // Inactive Fock in AO basis: F = H + 2J - K
+  Eigen::MatrixXd F_inactive_ao = H_full + 2 * J_ao - K_ao;
+
+  // Transform to MO basis
+  Eigen::MatrixXd F_inactive(num_mo, num_mo);
+  F_inactive = Ca.transpose() * F_inactive_ao * Ca;
+
+  // Inactive energy (diagonal of C^T H C only)
+  double E_inactive = 0.0;
+  for (auto i : inactive_indices) {
+    E_inactive += Ca.col(i).dot(H_full * Ca.col(i)) + F_inactive(i, i);
+  }
+
+  // Extract active-space one-body Hamiltonian
+  Eigen::MatrixXd H_active(nactive, nactive);
+  for (size_t i = 0; i < nactive; i++) {
+    for (size_t j = 0; j < nactive; j++) {
+      H_active(i, j) = F_inactive(active_indices[i], active_indices[j]);
+    }
+  }
+
+  return {std::move(F_inactive), std::move(H_active), E_inactive};
+}
+
+UnrestrictedInactiveFockResult compute_unrestricted_inactive(
+    const Eigen::MatrixXd& J_alpha_ao, const Eigen::MatrixXd& K_alpha_ao,
+    const Eigen::MatrixXd& J_beta_ao, const Eigen::MatrixXd& K_beta_ao,
+    const Eigen::MatrixXd& H_full, const Eigen::MatrixXd& Ca,
+    const Eigen::MatrixXd& Cb,
+    const std::vector<size_t>& inactive_indices_alpha,
+    const std::vector<size_t>& inactive_indices_beta,
+    const std::vector<size_t>& active_indices_alpha,
+    const std::vector<size_t>& active_indices_beta) {
+  size_t num_mo = Ca.cols();
+  size_t nactive = active_indices_alpha.size();
+
+  // Fock matrices in AO basis
+  Eigen::MatrixXd F_alpha_ao = H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;
+  Eigen::MatrixXd F_beta_ao = H_full + J_alpha_ao + J_beta_ao - K_beta_ao;
+
+  // Transform to MO basis
+  Eigen::MatrixXd F_inactive_alpha(num_mo, num_mo);
+  Eigen::MatrixXd F_inactive_beta(num_mo, num_mo);
+  F_inactive_alpha = Ca.transpose() * F_alpha_ao * Ca;
+  F_inactive_beta = Cb.transpose() * F_beta_ao * Cb;
+
+  // Inactive energy
+  double E_inactive = 0.0;
+  for (auto i : inactive_indices_alpha) {
+    E_inactive += Ca.col(i).dot(H_full * Ca.col(i)) + F_inactive_alpha(i, i);
+  }
+  for (auto i : inactive_indices_beta) {
+    E_inactive += Cb.col(i).dot(H_full * Cb.col(i)) + F_inactive_beta(i, i);
+  }
+  E_inactive *= 0.5;
+
+  // Extract active-space one-body Hamiltonians
+  Eigen::MatrixXd H_active_alpha(nactive, nactive);
+  Eigen::MatrixXd H_active_beta(nactive, nactive);
+  for (size_t i = 0; i < nactive; i++) {
+    for (size_t j = 0; j < nactive; j++) {
+      H_active_alpha(i, j) =
+          F_inactive_alpha(active_indices_alpha[i], active_indices_alpha[j]);
+      H_active_beta(i, j) =
+          F_inactive_beta(active_indices_beta[i], active_indices_beta[j]);
+    }
+  }
+
+  return {std::move(F_inactive_alpha), std::move(F_inactive_beta),
+          std::move(H_active_alpha), std::move(H_active_beta), E_inactive};
+}
+
 }  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms::microsoft

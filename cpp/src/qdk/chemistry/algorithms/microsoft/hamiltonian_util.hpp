@@ -68,6 +68,63 @@ Eigen::MatrixXd build_K_from_three_center(
     const Eigen::MatrixXd& ao_three_center_vectors,
     const Eigen::MatrixXd& coeffs, const std::vector<size_t>& occ_orb_ind);
 
+/**
+ * @brief Check whether a sorted index vector is contiguous.
+ */
+bool is_indices_contiguous(const std::vector<size_t>& indices);
+
+/**
+ * @brief Build inactive density matrix with contiguity optimization.
+ */
+Eigen::MatrixXd build_inactive_density(const Eigen::MatrixXd& C,
+                                       const std::vector<size_t>& indices,
+                                       size_t n_ao);
+
+/**
+ * @brief Results of inactive Fock construction for one spin channel.
+ */
+struct InactiveFockResult {
+  Eigen::MatrixXd F_inactive;  // Full MO-basis inactive Fock
+  Eigen::MatrixXd H_active;    // Active-space one-body Hamiltonian
+  double E_inactive;            // Inactive energy contribution
+};
+
+/**
+ * @brief Compute inactive Fock, active H, and inactive energy (restricted).
+ *
+ * Given J and K in AO basis, builds F_inactive = H + 2J - K, transforms to MO,
+ * computes inactive energy, and extracts active-space H.
+ */
+InactiveFockResult compute_restricted_inactive(
+    const Eigen::MatrixXd& J_ao, const Eigen::MatrixXd& K_ao,
+    const Eigen::MatrixXd& H_full, const Eigen::MatrixXd& Ca,
+    const std::vector<size_t>& inactive_indices,
+    const std::vector<size_t>& active_indices);
+
+/**
+ * @brief Compute inactive Fock, active H, and inactive energy (unrestricted).
+ *
+ * Given alpha/beta J and K in AO basis, builds both spin Fock matrices,
+ * computes inactive energy, and extracts active-space H for each spin.
+ */
+struct UnrestrictedInactiveFockResult {
+  Eigen::MatrixXd F_inactive_alpha;
+  Eigen::MatrixXd F_inactive_beta;
+  Eigen::MatrixXd H_active_alpha;
+  Eigen::MatrixXd H_active_beta;
+  double E_inactive;
+};
+
+UnrestrictedInactiveFockResult compute_unrestricted_inactive(
+    const Eigen::MatrixXd& J_alpha_ao, const Eigen::MatrixXd& K_alpha_ao,
+    const Eigen::MatrixXd& J_beta_ao, const Eigen::MatrixXd& K_beta_ao,
+    const Eigen::MatrixXd& H_full, const Eigen::MatrixXd& Ca,
+    const Eigen::MatrixXd& Cb,
+    const std::vector<size_t>& inactive_indices_alpha,
+    const std::vector<size_t>& inactive_indices_beta,
+    const std::vector<size_t>& active_indices_alpha,
+    const std::vector<size_t>& active_indices_beta);
+
 }  // namespace detail
 
 }  // namespace qdk::chemistry::algorithms::microsoft
