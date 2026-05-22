@@ -110,19 +110,32 @@ echo "HDF5 $HDF5_VERSION downloaded and extracted successfully"
 echo "Installing HDF5..."
 bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
 
-# On Linux, install Python ${PYTHON_VERSION} inside the container via uv (standalone Python
-# from python-build-standalone), to avoid relying on the container's system Python.
-# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in the
-# pipeline template, which puts it on PATH for this script.
+# On Linux, install Python ${PYTHON_VERSION} inside the container via Anaconda's conda
+# package manager, bootstrapped by Microsoft's CFS-compliant ms-ensureconda tool.
+# Anaconda is the officially approved Python distribution for Microsoft CI builds
+# (Azure Pipelines / OneBranch); see
+# https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
+# (section "Setting up Conda in CI builds").
+#
+# Prereq: the AzureQuantum/quantum-apps-dependencies Azure Artifacts feed must have
+# azure-feed://mseng/Anaconda@Published configured as an upstream so that the
+# ms-ensureconda pip package resolves inside this container. PIP_INDEX_URL is
+# forwarded into the container by the pipeline template after PipAuthenticate@1.
+#
+# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in
+# the pipeline template, which puts it on PATH for this script.
 if [ "$MAC_BUILD" == "OFF" ]; then
-    echo "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+    echo "Installing ms-ensureconda and bootstrapping conda..."
+    python3 -m pip install --upgrade pip
+    python3 -m pip install ms-ensureconda
+    python3 -m ensureconda --envfile /tmp/ensureconda.env
+    set -a; . /tmp/ensureconda.env; set +a
+    # shellcheck disable=SC1090
+    . "$CONDA_BASH_HOOK"
 
-    echo "Installing Python ${PYTHON_VERSION} via uv..."
-    uv python install "${PYTHON_VERSION}"
-    PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")"
-    export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+    echo "Creating conda environment with Python ${PYTHON_VERSION}..."
+    conda create --yes --quiet --name buildenv "python=${PYTHON_VERSION}"
+    conda activate buildenv
 fi
 
 python3 --version

@@ -62,27 +62,43 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         wget
 fi
 
-# On Linux, install Python ${PYTHON_VERSION} inside the container via uv (standalone Python
-# from python-build-standalone), to avoid relying on the container's system Python.
-# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in the
-# pipeline template, which puts it on PATH for this script.
+# On Linux, install Python ${PYTHON_VERSION} inside the container via Anaconda's conda
+# package manager, bootstrapped by Microsoft's CFS-compliant ms-ensureconda tool.
+# Anaconda is the officially approved Python distribution for Microsoft CI builds
+# (Azure Pipelines / OneBranch); see
+# https://eng.ms/docs/more/languages-at-microsoft/python/articles/anaconda/install
+# (section "Setting up Conda in CI builds").
+#
+# Prereq: the AzureQuantum/quantum-apps-dependencies Azure Artifacts feed must have
+# azure-feed://mseng/Anaconda@Published configured as an upstream so that the
+# ms-ensureconda pip package resolves inside this container. PIP_INDEX_URL is
+# forwarded into the container by the pipeline template after PipAuthenticate@1.
+#
+# On macOS, the requested Python is provided by the UsePythonVersion@0 ADO task in
+# the pipeline template, which puts it on PATH for this script.
 if [ "$MAC_BUILD" == "OFF" ]; then
-    echo "Installing uv..."
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    export PATH="$HOME/.local/bin:$PATH"
+    echo "Installing ms-ensureconda and bootstrapping conda..."
+    python3 -m pip install --upgrade pip
+    python3 -m pip install ms-ensureconda
+    python3 -m ensureconda --envfile /tmp/ensureconda.env
+    set -a; . /tmp/ensureconda.env; set +a
+    # shellcheck disable=SC1090
+    . "$CONDA_BASH_HOOK"
 
-    echo "Installing Python ${PYTHON_VERSION} via uv..."
-    uv python install "${PYTHON_VERSION}"
-    PYTHON_BIN="$(uv python find "${PYTHON_VERSION}")"
-    export PATH="$(dirname "$PYTHON_BIN"):$PATH"
+    echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSION}..."
+    conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}"
+    conda activate testenv
 fi
 
 python3 --version
 
-# Create a clean virtual environment for testing the wheel
-rm -rf "$VENV_DIR"
-python3 -m venv "$VENV_DIR"
-. "$VENV_DIR/bin/activate"
+# On macOS we still use a venv for isolation; on Linux the conda env above already
+# provides an isolated Python.
+if [ "$MAC_BUILD" == "ON" ]; then
+    rm -rf "$VENV_DIR"
+    python3 -m venv "$VENV_DIR"
+    . "$VENV_DIR/bin/activate"
+fi
 
 python3 -m pip install --upgrade pip
 
@@ -109,4 +125,6 @@ export QSHARP_PYTHON_TELEMETRY=false
 echo '=== Running pytest suite ==='
 python3 -m pytest -v ./tests
 
-deactivate
+if [ "$MAC_BUILD" == "ON" ]; then
+    deactivate
+fi
