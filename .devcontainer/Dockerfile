@@ -95,7 +95,7 @@ RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
 ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
     PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
 RUN python -m venv "$VIRTUAL_ENV" \
-    && pip install --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir \
     "ipykernel>=6.0" \
     "pandas>=2.0.0" \
