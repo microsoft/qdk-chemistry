@@ -12,7 +12,9 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.time_evolution.circuit_mapper.pauli_sequence_mapper import PauliSequenceMapper
+from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
+    PauliSequenceMapper,
+)
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -49,7 +51,7 @@ class TestPauliSequenceMapperNonControlled:
         mapper = PauliSequenceMapper()
 
         assert mapper.name() == "pauli_sequence"
-        assert mapper.type_name() == "evolution_circuit_mapper"
+        assert mapper.type_name() == "circuit_mapper"
 
     def test_run_builds_regular_unitary_circuit(self, simple_unitary):
         """Test run() builds a regular (non-controlled) unitary circuit."""

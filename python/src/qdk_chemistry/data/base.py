@@ -151,7 +151,7 @@ class DataClass(_CoreDataClass):
             if attr is not None:
                 return attr
         # Forward to parent class for other attributes
-        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+        return super().__getattr__(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
         """Prevent attribute modification after initialization.

@@ -229,16 +229,6 @@ class SubstituteCliffordRz(TransformationPass):
 
     """
 
-    # Map from mod-8 factor (angle = factor * π/4) to (gate_name, gate_class)
-    _FACTOR_TO_GATE: tuple[tuple[int, str, type], ...] = (
-        (0, "id", IGate),
-        (1, "t", TGate),
-        (2, "s", SGate),
-        (4, "z", ZGate),
-        (6, "sdg", SdgGate),
-        (7, "tdg", TdgGate),
-    )
-
     def __init__(
         self,
         equivalent_gate_set: list[str] | None = None,
@@ -260,6 +250,14 @@ class SubstituteCliffordRz(TransformationPass):
                 raise TypeError("equivalent_gate_set must be a list of gate names or None")
             self._settings.set("equivalent_gate_set", equivalent_gate_set)
         self._settings.set("tolerance", tolerance)
+        self._factor_to_gate: tuple[tuple[int, str, type], ...] = (
+            (0, "id", IGate),
+            (1, "t", TGate),
+            (2, "s", SGate),
+            (4, "z", ZGate),
+            (6, "sdg", SdgGate),
+            (7, "tdg", TdgGate),
+        )
         self._build_lookup()
 
     def _build_lookup(self):
@@ -268,7 +266,7 @@ class SubstituteCliffordRz(TransformationPass):
         tolerance = self._settings.get("tolerance")
         # Precompute (mod8_target, gate_instance) pairs for enabled gates
         self._lookup: list[tuple[float, object]] = []
-        for mod8_val, name, cls in self._FACTOR_TO_GATE:
+        for mod8_val, name, cls in self._factor_to_gate:
             if name in gate_set:
                 self._lookup.append((float(mod8_val), cls()))
         self._tolerance = tolerance

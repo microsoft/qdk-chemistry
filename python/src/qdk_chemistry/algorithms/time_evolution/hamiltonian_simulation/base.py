@@ -1,4 +1,4 @@
-"""QDK/Chemistry evolve-and-measure abstractions and utilities."""
+"""QDK/Chemistry Hamiltonian simulation abstractions and utilities."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -8,6 +8,7 @@
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -16,97 +17,127 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
     Settings,
+    TimeDependentQubitHamiltonian,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-__all__: list[str] = ["MeasureSimulation", "MeasureSimulationFactory", "MeasureSimulationSettings"]
+__all__: list[str] = ["HamiltonianSimulation", "HamiltonianSimulationFactory", "HamiltonianSimulationSettings"]
 
 
-class MeasureSimulationSettings(Settings):
-    """Settings for evolve-and-measure simulation."""
+class HamiltonianSimulationSettings(Settings):
+    """Settings for Hamiltonian simulation."""
 
     def __init__(self):
-        """Initialize defaults for evolve-and-measure simulation."""
+        """Initialize defaults for Hamiltonian simulation."""
         super().__init__()
         self._set_default(
             "evolution_builder",
             "algorithm_ref",
             AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
+            "Time evolution builder used to construct the unitary.",
         )
         self._set_default(
             "circuit_mapper",
             "algorithm_ref",
-            AlgorithmRef("evolution_circuit_mapper", "pauli_sequence"),
+            AlgorithmRef("circuit_mapper", "pauli_sequence"),
+            "Circuit mapper used to convert the unitary to a circuit.",
         )
         self._set_default(
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+            "Circuit executor used to run quantum circuits.",
         )
         self._set_default(
-            "energy_estimator",
+            "observable_estimator",
             "algorithm_ref",
             AlgorithmRef("energy_estimator", "qdk"),
+            "Estimator used to compute observable expectation values.",
+        )
+        self._set_default(
+            "total_time",
+            "float",
+            1.0,
+            "Total evolution time.",
+        )
+        self._set_default(
+            "dt",
+            "float",
+            0.0,
+            "Time step for time-dependent evolution. Each step is passed to the builder.",
+        )
+        self._set_default(
+            "propagator",
+            "algorithm_ref",
+            AlgorithmRef("propagator", "magnus"),
+            "Propagator used to evaluate the effective Hamiltonian over each dt interval.",
         )
 
 
-class MeasureSimulation(Algorithm):
+class HamiltonianSimulation(Algorithm):
     """Abstract base class for Hamiltonian evolution and observable measurement."""
 
     def __init__(self):
-        """Initialize the evolve-and-measure simulation settings."""
+        """Initialize the Hamiltonian simulation settings."""
         super().__init__()
-        self._settings = MeasureSimulationSettings()
+        self._settings = HamiltonianSimulationSettings()
 
     def type_name(self) -> str:
-        """Return the algorithm type name as measure_simulation."""
-        return "measure_simulation"
+        """Return the algorithm type name as hamiltonian_simulation."""
+        return "hamiltonian_simulation"
 
     @abstractmethod
     def _run_impl(
         self,
-        qubit_hamiltonians: list[QubitHamiltonian],
-        times: list[float],
+        hamiltonian: TimeDependentQubitHamiltonian,
         observables: list[QubitHamiltonian],
-        *,
-        state_prep: Circuit | None = None,
+        state_prep: Circuit,
         shots: int = 1000,
+        *,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> list[tuple[EnergyExpectationResult, MeasurementData]]:
-        """Run evolve-and-measure simulation.
+        r"""Run Hamiltonian simulation.
 
-        The evolution builder, circuit mapper, circuit executor, and energy
-        estimator are resolved from the algorithm's settings via
-        ``AlgorithmRef``.
+        This method implements a quantum ODE integrator for the
+        Schrödinger equation :math:`i\\partial_t U = H(t)\\,U`.  The
+        time-dependent Hamiltonian is discretized into steps, each
+        step is Trotterized into a quantum circuit, and the resulting
+        circuit is executed to measure observable expectation values.
+
+        The evolution builder, circuit mapper, circuit executor, and
+        observable estimator are resolved from the algorithm's settings
+        via ``AlgorithmRef``.
 
         Args:
-            qubit_hamiltonians: List of Hamiltonians used to build time evolution.
-            times: List of times to evolve under the Hamiltonians.
-            observables: List of observable Hamiltonians to measure after evolution.
-            state_prep: Optional circuit that prepares the initial state before time evolution.
-            shots: Number of shots to use for measurement.
+            hamiltonian: Time-dependent Hamiltonian specifying the evolution schedule.
+            observables: Observable Hamiltonians to measure after evolution; each returns its own expectation value.
+            state_prep: Circuit that prepares the initial state before time evolution.
+            shots: Number of measurement shots per observable. Defaults to 1000.
             noise: Optional noise profile.
-            device_backend_name: Optional device backend name.
-            pre_transpilation_passes: Optional list of passes to apply before transpilation.
-            post_transpilation_passes: Optional list of passes to apply after transpilation.
 
         Returns:
             A list of tuples containing ``EnergyExpectationResult`` and ``MeasurementData`` objects.
 
         """
 
-    def _create_time_evolution(
+    def _create_time_step_evolution(
         self,
         qubit_hamiltonian: QubitHamiltonian,
         time: float,
     ) -> UnitaryRepresentation:
-        """Create the time-evolution unitary for current settings."""
+        """Create the time-evolution unitary for current settings.
+
+        Raises:
+            TypeError: If the evolution builder is not a ``TimeEvolutionBuilder``.
+
+        """
         evolution_builder = self._create_nested("evolution_builder")
+        if not isinstance(evolution_builder, TimeEvolutionBuilder):
+            raise TypeError(
+                f"evolution_builder must be a TimeEvolutionBuilder, got {type(evolution_builder).__name__}."
+            )
         evolution_builder.settings().set("time", time)
         return evolution_builder.run(qubit_hamiltonian)
 
@@ -119,8 +150,8 @@ class MeasureSimulation(Algorithm):
         return circuit_mapper.run(evolution)
 
     def _prepend_state_prep_circuit(self, state_prep: Circuit, circuit: Circuit, num_qubits: int) -> Circuit:
-        state_prep_op = getattr(state_prep, "_qsharp_op", None)
-        circuit_op = getattr(circuit, "_qsharp_op", None)
+        state_prep_op = state_prep._qsharp_op  # noqa: SLF001
+        circuit_op = circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None or circuit_op is None:
             raise RuntimeError("State-preparation circuit composition requires Q# operations on both circuits.")
 
@@ -153,12 +184,9 @@ class MeasureSimulation(Algorithm):
         observable: QubitHamiltonian,
         shots: int = 1000,
         noise: QuantumErrorProfile | None = None,
-        device_backend_name: str | None = None,
-        pre_transpilation_passes: list[str] | None = None,
-        post_transpilation_passes: list[str] | None = None,
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Measure a qubit observable on the provided circuit state."""
-        energy_estimator = self._create_nested("energy_estimator")
+        energy_estimator = self._create_nested("observable_estimator")
         # Propagate this algorithm's circuit_executor setting to the energy estimator
         energy_estimator.settings().set("circuit_executor", self._settings.get("circuit_executor"))
         energy_result, measurement_data = energy_estimator.run(
@@ -166,24 +194,17 @@ class MeasureSimulation(Algorithm):
             observable,
             total_shots=shots,
             noise_model=noise,
-            device_backend_name=device_backend_name,
-            pre_transpilation_passes=pre_transpilation_passes,
-            post_transpilation_passes=post_transpilation_passes,
         )
         return energy_result, measurement_data
 
 
-class MeasureSimulationFactory(AlgorithmFactory):
-    """Factory class for creating evolve-and-measure algorithm instances."""
-
-    def __init__(self):
-        """Initialize the MeasureSimulationFactory."""
-        super().__init__()
+class HamiltonianSimulationFactory(AlgorithmFactory):
+    """Factory class for creating Hamiltonian simulation algorithm instances."""
 
     def algorithm_type_name(self) -> str:
-        """Return the algorithm type name as measure_simulation."""
-        return "measure_simulation"
+        """Return the algorithm type name as hamiltonian_simulation."""
+        return "hamiltonian_simulation"
 
     def default_algorithm_name(self) -> str:
-        """Return evolve_and_measure as the default algorithm name."""
-        return "evolve_and_measure"
+        """Return euler_integrator as the default algorithm name."""
+        return "euler_integrator"

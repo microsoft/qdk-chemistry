@@ -1,4 +1,4 @@
-"""Subpackage for local time-evolution algorithm extensions (circuit_mapper, measure_simulation)."""
+"""Subpackage for local time-evolution algorithm extensions (hamiltonian_simulation)."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.

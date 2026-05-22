@@ -34,10 +34,7 @@ _ham_constructor = create("hamiltonian_constructor")
 _hamiltonian = _ham_constructor.run(_orbitals)
 
 _qdk_mapper = create("qubit_mapper", "qdk")
-_n_spin_orbitals = 2 * _hamiltonian.get_one_body_integrals()[0].shape[0]
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping as _MM
-
-_qubit_hamiltonian = _qdk_mapper.run(_hamiltonian, _MM.jordan_wigner(_n_spin_orbitals))
+_qubit_hamiltonian = _qdk_mapper.run(_hamiltonian)
 
 # ===========================================================================
 # Model Hamiltonians — fermionic
@@ -111,7 +108,7 @@ qubit_hamiltonian = _qubit_hamiltonian  # alias for display
 
 ################################################################################
 # start-cell-trotter
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import (
+from qdk_chemistry.algorithms.time_evolution.builder.trotter import (
     Trotter,
 )
 
@@ -126,7 +123,7 @@ unitary = builder.run(qubit_hamiltonian, time=1.0)
 
 ################################################################################
 # start-cell-trotter-error
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
+from qdk_chemistry.algorithms.time_evolution.builder.trotter_error import (
     trotter_steps_commutator,
 )
 
@@ -251,17 +248,16 @@ if _HAS_OPENFERMION:
     ############################################################################
     # start-cell-openfermion
     from qdk_chemistry.data import Symmetries
-    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
-    n_spin_orbitals = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
-    mapper = create("qubit_mapper", "openfermion")
-    qh = mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals))
+    mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
+    qh = mapper.run(hamiltonian)
 
     # Symmetry-conserving Bravyi-Kitaev (reduces qubit count by 2)
     sym = Symmetries(n_alpha=1, n_beta=1)
     mapper = create(
         "qubit_mapper",
         "openfermion",
+        encoding="symmetry-conserving-bravyi-kitaev",
     )
     qh = mapper.run(hamiltonian, sym)
     # end-cell-openfermion
