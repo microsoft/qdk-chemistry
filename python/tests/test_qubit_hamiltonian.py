@@ -16,7 +16,7 @@ import scipy.sparse
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
-from qdk_chemistry.data.term_partition import FlatPartition
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -579,3 +579,89 @@ class TestFermionModeOrder:
         qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
         summary = qh.get_summary()
         assert "Fermion mode order" not in summary
+
+
+class TestQubitHamiltonianArithmetic:
+    """Tests for __add__, __mul__, __rmul__ and partition merging."""
+
+    def test_add_concatenates_terms(self):
+        """H1 + H2 should concatenate pauli_strings and coefficients."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]))
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]))
+        result = h1 + h2
+        assert result.pauli_strings == ["XI", "IZ"]
+        np.testing.assert_allclose(result.coefficients, [1.0, 2.0])
+
+    def test_add_merges_flat_partitions(self):
+        """__add__ should merge FlatPartitions with offset."""
+        h1 = QubitHamiltonian(
+            ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=FlatPartition(strategy="s", groups=((0, 1),))
+        )
+        h2 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        result = h1 + h2
+        assert result.term_partition is not None
+        assert isinstance(result.term_partition, FlatPartition)
+        assert result.term_partition.groups == ((0, 1), (2,))
+
+    def test_add_merges_layered_partitions(self):
+        """__add__ should merge LayeredPartitions with offset."""
+        h1 = QubitHamiltonian(
+            ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,), (1,)),))
+        )
+        h2 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        result = h1 + h2
+        assert isinstance(result.term_partition, LayeredPartition)
+        assert result.term_partition.groups == (((0,), (1,)), ((2,),))
+
+    def test_add_mismatched_partition_types_raises(self):
+        """__add__ with FlatPartition + LayeredPartition should raise TypeError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        h2 = QubitHamiltonian(["IZ"], np.array([1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        with pytest.raises(TypeError, match="Cannot merge partitions of different types"):
+            h1 + h2
+
+    def test_add_no_partition_when_either_missing(self):
+        """__add__ should produce None partition when only one operand has one."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        h2 = QubitHamiltonian(["IZ"], np.array([1.0]))
+        result = h1 + h2
+        assert result.term_partition is None
+
+    def test_add_preserves_encoding(self):
+        """__add__ should propagate matching encoding."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), encoding="jordan-wigner")
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]), encoding="jordan-wigner")
+        assert (h1 + h2).encoding == "jordan-wigner"
+
+    def test_add_mismatched_encoding_raises(self):
+        """__add__ with different encodings should raise ValueError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), encoding="jordan-wigner")
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]), encoding="bravyi-kitaev")
+        with pytest.raises(ValueError, match="different encodings"):
+            h1 + h2
+
+    def test_add_mismatched_qubits_raises(self):
+        """__add__ with different qubit counts should raise ValueError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]))
+        h2 = QubitHamiltonian(["IIZ"], np.array([2.0]))
+        with pytest.raises(ValueError, match="Cannot add"):
+            h1 + h2
+
+    def test_mul_scales_coefficients(self):
+        """Scalar * H should scale coefficients."""
+        h = QubitHamiltonian(["XI", "IZ"], np.array([1.0, 2.0]))
+        result = 3.0 * h
+        np.testing.assert_allclose(result.coefficients, [3.0, 6.0])
+
+    def test_mul_preserves_partition(self):
+        """Scalar * H should keep the partition unchanged."""
+        p = FlatPartition(strategy="s", groups=((0,), (1,)))
+        h = QubitHamiltonian(["XI", "IZ"], np.array([1.0, 2.0]), term_partition=p)
+        result = 2.0 * h
+        assert result.term_partition is not None
+        assert result.term_partition.groups == p.groups
+
+    def test_rmul_equals_mul(self):
+        """H * scalar and scalar * H should give the same result."""
+        h = QubitHamiltonian(["XI"], np.array([3.0]))
+        np.testing.assert_allclose((h * 2.0).coefficients, (2.0 * h).coefficients)
