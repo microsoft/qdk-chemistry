@@ -97,8 +97,8 @@ ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
 RUN python -m venv "$VIRTUAL_ENV" \
     && pip install --upgrade pip setuptools wheel \
     && pip install --no-cache-dir \
-    "ipykernel>=7.2,<8" \
-    "pandas>=3.0,<4" \
+    "ipykernel>=6.0" \
+    "pandas>=2.0.0" \
     "pre-commit>=4.6,<5" \
-    "rdkit>=2026.3.2,<2026.4" \
+    "rdkit" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
