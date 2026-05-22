@@ -187,7 +187,9 @@ else
 fi
 
 echo "Creating conda environment with Python ${PYTHON_VERSION}..."
-conda create --yes --quiet --name buildenv "python=${PYTHON_VERSION}"
+# Explicitly include `pip` — fresh conda envs created with conda-standalone do
+# not include pip by default, which would break `python3 -m pip ...` below.
+conda create --yes --quiet --name buildenv "python=${PYTHON_VERSION}" pip
 conda activate buildenv
 
 python3 --version

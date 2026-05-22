@@ -141,7 +141,9 @@ else
 fi
 
 echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSION}..."
-conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}"
+# Explicitly include `pip` — fresh conda envs created with conda-standalone do
+# not include pip by default, which would break `python3 -m pip ...` below.
+conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
 conda activate testenv
 
 python3 --version
