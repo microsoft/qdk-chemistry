@@ -9,6 +9,7 @@
 # start-cell-json
 import os
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 import numpy as np
 from qdk_chemistry.data import (
@@ -19,7 +20,7 @@ from qdk_chemistry.data import (
 )
 
 # Load structure from XYZ file (the file uses Angstrom, which is converted to Bohr internally)
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(EXAMPLES_DATA_DIR / "h2.structure.xyz")
 
 # For demonstration: create a structure with custom masses and charges
 # (requires explicit coordinates, here in Bohr)

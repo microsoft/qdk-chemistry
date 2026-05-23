@@ -8,12 +8,13 @@
 ################################################################################
 # start-cell-hamiltonian-creation
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, SpinChannel
 
 # Load a structure from XYZ file
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
+    EXAMPLES_DATA_DIR / "water.structure.xyz"
 )
 
 # Run initial SCF to get orbitals

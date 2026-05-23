@@ -24,11 +24,12 @@ qubit_mapper.settings().set("encoding", "jordan-wigner")
 ################################################################################
 # start-cell-run
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 from qdk_chemistry.data import Structure
 
 # Read a molecular structure from XYZ file
-structure = Structure.from_xyz_file(Path(".") / "../data/water.structure.xyz")
+structure = Structure.from_xyz_file(EXAMPLES_DATA_DIR / "water.structure.xyz")
 
 # Perform an SCF calculation to generate initial orbitals
 scf_solver = create("scf_solver")

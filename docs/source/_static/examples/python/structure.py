@@ -9,6 +9,7 @@
 # start-cell-create
 import numpy as np
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.data import Structure, Element
 
 # Specify a structure using coordinates (in Bohr), and either symbols or elements
@@ -34,12 +35,12 @@ structure_custom = Structure(
 # start-cell-from-file
 # Load a structure from an XYZ file (coordinates in Angstrom are converted to Bohr)
 structure_from_file = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
+    EXAMPLES_DATA_DIR / "h2.structure.xyz"
 )
 
 # Load a structure from a JSON file (coordinates are stored in Bohr)
 structure_from_json = Structure.from_json_file(
-    Path(__file__).parent / "../data/water.structure.json"
+    EXAMPLES_DATA_DIR / "water.structure.json"
 )
 # end-cell-from-file
 ################################################################################

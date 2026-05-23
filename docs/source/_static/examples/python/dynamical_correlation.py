@@ -24,11 +24,12 @@ mp2_calculator = create("dynamical_correlation_calculator")
 ################################################################################
 # start-cell-run
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 from qdk_chemistry.data import Ansatz, Structure
 
 # Load H2 structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(EXAMPLES_DATA_DIR / "h2.structure.xyz")
 
 # Run initial SCF to get reference wavefunction
 scf_solver = create("scf_solver")

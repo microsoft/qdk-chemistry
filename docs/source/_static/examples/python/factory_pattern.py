@@ -8,11 +8,12 @@
 ################################################################################
 # start-cell-scf-localizer
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
 # Load H2 molecule from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(EXAMPLES_DATA_DIR / "h2.structure.xyz")
 
 # Create a SCF solver using the default implementation
 scf_solver = create("scf_solver")

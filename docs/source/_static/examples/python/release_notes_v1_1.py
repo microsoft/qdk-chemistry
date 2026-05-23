@@ -12,6 +12,7 @@ is executed end-to-end by the ``test_docs_examples.py`` test harness.
 
 import importlib.util
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 import numpy as np
 from qdk_chemistry.algorithms import create
@@ -22,7 +23,7 @@ from qdk_chemistry.data import Structure
 # (used by cells below that need a fermionic or qubit Hamiltonian)
 # ---------------------------------------------------------------------------
 _h2_structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/h2.structure.xyz"
+    EXAMPLES_DATA_DIR / "h2.structure.xyz"
 )
 _scf = create("scf_solver")
 _E_scf, _wfn_scf = _scf.run(

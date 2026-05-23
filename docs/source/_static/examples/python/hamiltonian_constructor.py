@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.data import Structure
@@ -33,7 +34,7 @@ hamiltonian_constructor.settings().set("eri_method", "direct")
 ################################################################################
 # start-cell-construct
 # Load a structure from XYZ file
-structure = Structure.from_xyz_file(Path(__file__).parent / "../data/h2.structure.xyz")
+structure = Structure.from_xyz_file(EXAMPLES_DATA_DIR / "h2.structure.xyz")
 
 # Run a SCF to get orbitals
 scf_solver = create("scf_solver")

@@ -9,11 +9,12 @@
 # start-cell-loading
 import numpy as np
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell, Structure
 
 # Load a water molecule structure from XYZ file
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
+    EXAMPLES_DATA_DIR / "water.structure.xyz"
 )
 
 # Create basis sets from the library using basis set name

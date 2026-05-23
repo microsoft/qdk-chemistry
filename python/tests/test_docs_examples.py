@@ -150,6 +150,12 @@ class TestExampleScripts(unittest.TestCase):
 
     def _run_python_example(self, example_file: Path):
         """Helper method to run a Python example file."""
+        env = os.environ.copy()
+        # Point doc examples at the canonical examples/data/ in the repo root so
+        # tests work without fragile symlinks or file copies.
+        env["QDK_CHEMISTRY_EXAMPLES_DATA_DIR"] = str(
+            Path(__file__).resolve().parent.parent.parent / "examples" / "data"
+        )
         result = subprocess.run(
             [sys.executable, str(example_file)],
             check=False,
@@ -157,6 +163,7 @@ class TestExampleScripts(unittest.TestCase):
             text=True,
             timeout=360,
             cwd=example_file.parent,
+            env=env,
         )
 
         assert result.returncode == 0, (
@@ -168,8 +175,11 @@ class TestExampleScripts(unittest.TestCase):
 def _create_test_methods():
     """Create individual test methods for each example file."""
     if PYTHON_EXAMPLES_DIR.exists():
-        # Python examples
-        py_example_files = sorted(PYTHON_EXAMPLES_DIR.glob("*.py"))
+        # Python examples (skip helper modules that aren't standalone examples)
+        _HELPER_MODULES = {"examples_data.py"}
+        py_example_files = sorted(
+            f for f in PYTHON_EXAMPLES_DIR.glob("*.py") if f.name not in _HELPER_MODULES
+        )
 
         for example_file in py_example_files:
             # Create a test method name from the file name

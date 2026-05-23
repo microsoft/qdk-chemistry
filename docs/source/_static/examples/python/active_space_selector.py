@@ -27,11 +27,12 @@ active_space_selector.settings().set("num_active_orbitals", 4)
 ################################################################################
 # start-cell-run
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.data import Structure
 
 # Load a molecular structure (water molecule) from XYZ file
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
+    EXAMPLES_DATA_DIR / "water.structure.xyz"
 )
 charge = 0
 

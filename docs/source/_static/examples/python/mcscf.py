@@ -54,12 +54,13 @@ mcscf.settings().set("max_cycle_macro", 50)
 ################################################################################
 # start-cell-run
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import compute_valence_space_parameters
 
 # Load nitrogen molecule structure
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/n2_stretched.structure.xyz"
+    EXAMPLES_DATA_DIR / "n2_stretched.structure.xyz"
 )
 charge = 0
 

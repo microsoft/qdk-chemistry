@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-create
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 
@@ -31,7 +32,7 @@ print(f"Localizer settings: {localizer.settings().keys()}")
 # start-cell-localize
 # Load H2O molecule from XYZ file
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/water.structure.xyz"
+    EXAMPLES_DATA_DIR / "water.structure.xyz"
 )
 
 # Obtain orbitals from SCF

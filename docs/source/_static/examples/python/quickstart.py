@@ -8,6 +8,7 @@
 ################################################################################
 # start-cell-structure
 from pathlib import Path
+from examples_data import EXAMPLES_DATA_DIR
 
 import numpy as np
 from qdk_chemistry.algorithms import create
@@ -15,7 +16,7 @@ from qdk_chemistry.data import AlgorithmRef, Structure
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
-    Path(__file__).parent / "../data/para_benzyne.structure.xyz"
+    EXAMPLES_DATA_DIR / "para_benzyne.structure.xyz"
 )
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
