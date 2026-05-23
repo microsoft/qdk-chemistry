@@ -21,10 +21,11 @@ mc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
 # end-cell-configure
 ################################################################################
 
+from examples_data import EXAMPLES_DATA_DIR
+
 ################################################################################
 # start-cell-run
 from pathlib import Path
-from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure
 

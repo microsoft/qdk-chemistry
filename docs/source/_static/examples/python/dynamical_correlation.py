@@ -21,10 +21,11 @@ mp2_calculator = create("dynamical_correlation_calculator")
 # end-cell-configure
 ################################################################################
 
+from examples_data import EXAMPLES_DATA_DIR
+
 ################################################################################
 # start-cell-run
 from pathlib import Path
-from examples_data import EXAMPLES_DATA_DIR
 
 from qdk_chemistry.data import Ansatz, Structure
 

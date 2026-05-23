@@ -51,10 +51,11 @@ mcscf.settings().set("max_cycle_macro", 50)
 # end-cell-configure
 ################################################################################
 
+from examples_data import EXAMPLES_DATA_DIR
+
 ################################################################################
 # start-cell-run
 from pathlib import Path
-from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.data import Structure
 from qdk_chemistry.utils import compute_valence_space_parameters
 

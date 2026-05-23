@@ -5,11 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from examples_data import EXAMPLES_DATA_DIR
+
 ################################################################################
 # start-cell-create
 import numpy as np
 from pathlib import Path
-from examples_data import EXAMPLES_DATA_DIR
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, BasisSet
 

@@ -21,10 +21,11 @@ qubit_mapper.settings().set("encoding", "jordan-wigner")
 # end-cell-configure
 ################################################################################
 
+from examples_data import EXAMPLES_DATA_DIR
+
 ################################################################################
 # start-cell-run
 from pathlib import Path
-from examples_data import EXAMPLES_DATA_DIR
 
 from qdk_chemistry.data import Structure
 
