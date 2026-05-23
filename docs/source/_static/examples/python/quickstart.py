@@ -9,15 +9,14 @@ from examples_data import EXAMPLES_DATA_DIR
 
 ################################################################################
 # start-cell-structure
-from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import AlgorithmRef, Structure
 
-# Load para-benzyne structure from XYZ file
+# Load benzene diradical structure from XYZ file
 structure = Structure.from_xyz_file(
-    EXAMPLES_DATA_DIR / "para_benzyne.structure.xyz"
+    EXAMPLES_DATA_DIR / "benzene_diradical.structure.xyz"
 )
 
 print(f"Created structure with {structure.get_num_atoms()} atoms")
@@ -41,7 +40,7 @@ print("SCF Orbitals:\n", wfn_hf.get_orbitals().get_summary())
 
 ################################################################################
 # start-cell-active-space
-# Select active space (6 electrons in 6 orbitals for para-benzyne)
+# Select active space (6 electrons in 6 orbitals for benzene diradical)
 #   to choose most chemically relevant orbitals
 active_space_selector = create(
     "active_space_selector",
