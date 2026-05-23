@@ -38,9 +38,13 @@ python -m pip install 'qdk-chemistry[all]'
 python -m pip install pennylane rdkit
 ```
 
-## Standalone examples and data
+## Examples and data in this directory
+
+Some notebooks (for example `extended_hubbard.ipynb`) import helper modules from the sibling `utils/` directory.
+Download or clone the full `examples/` directory structure (including `utils/`) instead of downloading only the notebook file.
 
 - `data`: Data directory for examples
+- `utils`: Shared helper modules used by some notebooks and scripts in this directory
 - `factory_list.ipynb`: Jupyter notebook that lists available factory methods in QDK/Chemistry along with their descriptions and settings
 - `language/cpp`: C++ example programs using the QDK/Chemistry C++ API
 - `language/sample_sci_workflow.py`: Python script demonstrating a sample classical workflow for selected CI quantum chemistry calculations.
