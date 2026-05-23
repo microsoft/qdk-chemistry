@@ -143,7 +143,24 @@ fi
 echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSION}..."
 # Explicitly include `pip` — fresh conda envs created with conda-standalone do
 # not include pip by default, which would break `python3 -m pip ...` below.
-conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
+#
+# On Linux x86_64 (ms-ensureconda path) we are running under 1ES network
+# isolation (CFSClean): public conda channels (conda.anaconda.org,
+# repo.anaconda.com) are blocked. Force conda to install everything from the
+# Azure Artifacts feed's Conda channel (proxied through the
+# azure-feed://mseng/Anaconda@Published upstream). The feed requires
+# authentication — we inline the pipeline's System.AccessToken as the
+# password component of the URL (ADO masks $(System.AccessToken) in logs).
+if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
+    : "${SYSTEM_ACCESSTOKEN:?SYSTEM_ACCESSTOKEN must be set when bootstrapping conda from the Azure Artifacts feed}"
+    { set +x; } 2>/dev/null
+    CONDA_CHANNEL_URL="https://token:${SYSTEM_ACCESSTOKEN}@pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo/"
+    set -x
+    conda create --override-channels --channel "${CONDA_CHANNEL_URL}" \
+                 --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
+else
+    conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
+fi
 conda activate testenv
 
 python3 --version
