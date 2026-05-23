@@ -148,14 +148,21 @@ echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSI
 # isolation (CFSClean): public conda channels (conda.anaconda.org,
 # repo.anaconda.com) are blocked. Force conda to install everything from the
 # Azure Artifacts feed's Conda channel (proxied through the
-# azure-feed://mseng/Anaconda@Published upstream). The feed requires
-# authentication — we inline the pipeline's System.AccessToken as the
-# password component of the URL (ADO masks $(System.AccessToken) in logs).
+# azure-feed://mseng/Anaconda@Published upstream).
+#
+# Auth: the conda install shipped by ms-ensureconda has a pre-registered
+# azure_artifacts_conda_auth plugin that injects auth on every Azure
+# Artifacts HTTPS request by reading $ARTIFACTS_CONDA_TOKEN. We just need to
+# set that env var (to the pipeline's System.AccessToken). The plugin then
+# handles auth; the channel URL itself must NOT inline the token (the plugin
+# crashes with UnboundLocalError if the var is missing, even when basic-auth
+# creds are present in the URL).
 if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
     : "${SYSTEM_ACCESSTOKEN:?SYSTEM_ACCESSTOKEN must be set when bootstrapping conda from the Azure Artifacts feed}"
     { set +x; } 2>/dev/null
-    CONDA_CHANNEL_URL="https://token:${SYSTEM_ACCESSTOKEN}@pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo/"
+    export ARTIFACTS_CONDA_TOKEN="${SYSTEM_ACCESSTOKEN}"
     set -x
+    CONDA_CHANNEL_URL="https://pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo/"
     conda create --override-channels --channel "${CONDA_CHANNEL_URL}" \
                  --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
 else
