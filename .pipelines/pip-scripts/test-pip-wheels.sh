@@ -150,6 +150,12 @@ echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSI
 # Azure Artifacts feed's Conda channel (proxied through the
 # azure-feed://mseng/Anaconda@Published upstream).
 #
+# The feed exposes its upstream conda channels as named subpaths under
+# /Conda/repo/<channel>/ (the feed root /Conda/repo/ itself returns 404 — it
+# is not a channel). We use `main` (the Anaconda defaults channel that hosts
+# python+pip) and `conda-forge` as a fallback for any package that defaults
+# wouldn't carry.
+#
 # Auth: the conda install shipped by ms-ensureconda has a pre-registered
 # azure_artifacts_conda_auth plugin that injects auth on every Azure
 # Artifacts HTTPS request by reading $ARTIFACTS_CONDA_TOKEN. We just need to
@@ -162,8 +168,10 @@ if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
     { set +x; } 2>/dev/null
     export ARTIFACTS_CONDA_TOKEN="${SYSTEM_ACCESSTOKEN}"
     set -x
-    CONDA_CHANNEL_URL="https://pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo/"
-    conda create --override-channels --channel "${CONDA_CHANNEL_URL}" \
+    CONDA_FEED_ROOT="https://pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo"
+    conda create --override-channels \
+                 --channel "${CONDA_FEED_ROOT}/main" \
+                 --channel "${CONDA_FEED_ROOT}/conda-forge" \
                  --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
 else
     conda create --yes --quiet --name testenv "python=${PYTHON_VERSION}" pip
