@@ -680,7 +680,7 @@ bool Orbitals::is_restricted() const {
       if (!_energies.first->isApprox(*_energies.second)) {
         return false;
       } else {
-        QDK_LOG_WARNING(
+        QDK_LOGGER().warn(
             "Although there are two sets of coefficients, the coefficient "
             "matrices and energies are identical. This orbital will be treated "
             "as restricted! To obtain an unrestricted orbital, consider "
