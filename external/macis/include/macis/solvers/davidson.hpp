@@ -277,20 +277,15 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
   // Handle trivial case of 1x1 matrix by evaluating the operator on the
   // current trial vector (instead of using the preconditioner diagonal D[0]).
   if (N == 1) {
-    if (std::abs(X[0]) < min_abs_denominator) {
-      X[0] = 1.0;
-    }
+    X[0] = 1.0;
     double AX = 0.0;
     op.operator_action(1, 1., X, N, 0., &AX, N);
-    const double eigenvalue = AX / X[0];
     logger->warn(
         "N==1 detected: using direct operator action on the trial vector and "
-        "returning the 1D Rayleigh quotient AX/X as the eigenvalue.");
+        "returning AX as the eigenvalue.");
     logger->info(
-        "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00",
-        eigenvalue);
-    logger->info("Davidson Converged!");
-    return std::make_pair(size_t(0), eigenvalue);
+        "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00", AX);
+    return std::make_pair(size_t(0), AX);
   }
 
   std::vector<double> V(N * (max_m + 1)), AV(N * (max_m + 1)),
