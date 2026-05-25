@@ -927,3 +927,47 @@ TEST_F(StabilityCheckerTest, QDK_RHF_H2_Stretched_STO3G_External_Instability) {
   EXPECT_NEAR(smallest_internal_eigenvalue, 0.6291346026640, davidson_tol);
   EXPECT_NEAR(smallest_external_eigenvalue, -0.4313775656554, davidson_tol);
 }
+
+TEST_F(StabilityCheckerTest, QDK_UHF_H2_Stretched_STO3G_Internal_Only) {
+  // Test stability analysis on stretched H2 molecule with unrestricted UHF.
+  // Only internal stability is valid for UHF.
+  std::vector<Eigen::Vector3d> coords = {
+      {0.0, 0.0, 0.0},
+      {4.0, 0.0, 0.0},
+  };
+  std::vector<Element> elements = {Element::H, Element::H};
+  auto h2 = std::make_shared<Structure>(coords, elements);
+
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "unrestricted");
+  auto [energy, wavefunction] = scf_solver->run(h2, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -0.761082247527, testing::scf_energy_tolerance);
+  EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
+
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("method", "hf");
+
+  auto [is_stable, result] = stability_checker->run(wavefunction);
+
+  EXPECT_TRUE(result != nullptr);
+  EXPECT_TRUE(result->has_internal_result());
+  EXPECT_TRUE(result->has_external_result());
+  EXPECT_GT(result->internal_size(), 0);
+  EXPECT_GT(result->external_size(), 0);
+
+  EXPECT_TRUE(result->is_internal_stable());
+  EXPECT_FALSE(result->is_external_stable());
+  EXPECT_FALSE(is_stable);
+
+  const double smallest_internal_eigenvalue =
+      result->get_smallest_internal_eigenvalue();
+  const double smallest_external_eigenvalue =
+      result->get_smallest_external_eigenvalue();
+  const double davidson_tol =
+      stability_checker->settings().get<double>("davidson_tolerance") * 1e2;
+
+  EXPECT_NEAR(smallest_internal_eigenvalue, 0.6291346026640, davidson_tol);
+  EXPECT_NEAR(smallest_external_eigenvalue, -0.4313775656554, davidson_tol);
+}

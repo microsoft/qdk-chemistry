@@ -679,6 +679,12 @@ bool Orbitals::is_restricted() const {
     if (_energies.first && _energies.second) {
       if (!_energies.first->isApprox(*_energies.second)) {
         return false;
+      } else {
+        QDK_LOG_WARNING(
+            "Although there are two sets of coefficients, the coefficient "
+            "matrices and energies are identical. This orbital will be treated "
+            "as restricted! To obtain an unrestricted orbital, consider "
+            "running SCF with a spin-broken initial guess.");
       }
     }
   }
