@@ -154,10 +154,12 @@ bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} 
 case "$(uname -s):$(uname -m)" in
     Linux:x86_64)
         ENSURECONDA_PKG="ms-ensureconda==2026.2.1"
+        USE_MS_ENSURECONDA=1
         ;;
     *)
         # macOS (arm64) and Linux aarch64 — see HEADS UP block above.
-        ENSURECONDA_PKG="ensureconda==2025.1.0"
+        ENSURECONDA_PKG="ensureconda==1.6.0"
+        USE_MS_ENSURECONDA=0
         ;;
 esac
 
@@ -172,7 +174,7 @@ python3 -m venv /tmp/bootstrap-venv
 python3 -m pip install --upgrade pip
 python3 -m pip install "${ENSURECONDA_PKG}"
 
-if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
+if [ "$USE_MS_ENSURECONDA" = "1" ]; then
     # ms-ensureconda's --envfile flag dumps CONDA_BASH_HOOK + friends to a
     # dotenv file we then source to wire up conda for this shell.
     python3 -m ensureconda --envfile /tmp/ensureconda.env
@@ -220,7 +222,7 @@ echo "Creating conda environment with Python ${PYTHON_VERSION}..."
 # Remove any existing conda env with the same name first (idempotent on
 # self-hosted agents and on retries).
 conda env remove -y -n buildenv 2>/dev/null || true
-if [ "$ENSURECONDA_PKG" = "ms-ensureconda==2026.2.1" ]; then
+if [ "$USE_MS_ENSURECONDA" = "1" ]; then
     : "${SYSTEM_ACCESSTOKEN:?SYSTEM_ACCESSTOKEN must be set when bootstrapping conda from the Azure Artifacts feed}"
     { set +x; } 2>/dev/null
     export ARTIFACTS_CONDA_TOKEN="${SYSTEM_ACCESSTOKEN}"
