@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstring>
 #include <set>
+#include <stdexcept>
 #include <tuple>
 #include <unordered_set>
 
@@ -155,6 +156,16 @@ Eigen::MatrixXd build_K_from_three_center(
   if (ao_three_center_vectors.rows() != n_ao * n_ao) {
     throw std::invalid_argument(
         "ao_three_center_vectors dimensions do not match density matrix");
+  }
+
+  // Validate orbital indices
+  size_t n_mo = static_cast<size_t>(coeffs.cols());
+  for (size_t idx = 0; idx < n_occ; ++idx) {
+    if (occ_orb_ind[idx] >= n_mo) {
+      throw std::out_of_range(
+          "Occupied orbital index " + std::to_string(occ_orb_ind[idx]) +
+          " is out of range [0, " + std::to_string(n_mo) + ")");
+    }
   }
 
   // Extract occupied orbital coefficients
