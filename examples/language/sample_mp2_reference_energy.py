@@ -68,7 +68,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Drive the simplified SCF → CASCI → sparse-CI workflow."""
+    """Drive the simplified SCF → Active space selection → active space DFMP2 workflow."""
     args = parse_args(argv)
 
     ########################################################################################
