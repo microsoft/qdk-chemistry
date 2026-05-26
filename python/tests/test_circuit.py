@@ -12,7 +12,19 @@ from pathlib import Path
 
 import h5py
 import pytest
-import qsharp
+from qdk.openqasm import circuit as openqasm_circuit
+from qdk.openqasm import compile as openqasm_compile
+
+try:
+    import qdk
+
+    QirInputDataType = qdk._interpreter.QirInputData
+    NativeCircuitType = qdk._native.Circuit
+except ImportError:
+    import qsharp
+
+    QirInputDataType = qsharp._qsharp.QirInputData
+    NativeCircuitType = qsharp._native.Circuit
 
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -41,7 +53,7 @@ def simple_qasm() -> str:
 @pytest.fixture
 def simple_qir(simple_qasm) -> str:
     """The QIR representation of the simple QASM string."""
-    return str(qsharp.openqasm.compile(simple_qasm))
+    return str(openqasm_compile(simple_qasm))
 
 
 class TestCircuitConstruction:
@@ -59,13 +71,13 @@ class TestCircuitConstruction:
         c[0] = measure q[0];
         c[1] = measure q[1];
         """
-        qir = qsharp.openqasm.compile(qasm)
-        qsharp_circuit = qsharp.openqasm.circuit(qasm)
+        qir = openqasm_compile(qasm)
+        qsharp_circuit = openqasm_circuit(qasm)
         circuit = Circuit(qasm=qasm, qir=qir, qsharp=qsharp_circuit)
         assert circuit.qasm is not None
         assert "h q[0];" in circuit.qasm
-        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
-        assert isinstance(circuit.qsharp, qsharp._native.Circuit)
+        assert isinstance(circuit.qir, QirInputDataType)
+        assert isinstance(circuit.qsharp, NativeCircuitType)
 
     def test_circuit_construction_raises(self):
         """Test that Circuit construction without QASM raises RuntimeError."""
@@ -106,7 +118,7 @@ class TestGetQsharpCircuit:
         qdk_circuit_info = json.loads(qdk_circuit.json())
         assert len(qdk_circuit_info["qubits"]) == 3
         qir = circuit.get_qir()
-        assert isinstance(qir, qsharp._qsharp.QirInputData)
+        assert isinstance(qir, QirInputDataType)
 
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
@@ -119,9 +131,9 @@ class TestGetQsharpCircuit:
         assert circuit.qsharp is None
         qir = circuit.get_qir()
         qsc = circuit.get_qsharp_circuit()
-        assert isinstance(qir, qsharp._qsharp.QirInputData)
-        assert isinstance(circuit.qir, qsharp._qsharp.QirInputData)
-        assert isinstance(qsc, qsharp._native.Circuit)
+        assert isinstance(qir, QirInputDataType)
+        assert isinstance(circuit.qir, QirInputDataType)
+        assert isinstance(qsc, NativeCircuitType)
 
     def test_get_qsharp_circuit_prune_classical_qubits(self):
         """Test that get_qsharp_circuit can prune classical qubits when requested."""
@@ -450,7 +462,7 @@ class TestCircuitEstimate:
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
-        qir = qsharp.openqasm.compile("""
+        qir = openqasm_compile("""
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;

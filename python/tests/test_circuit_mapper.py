@@ -9,8 +9,16 @@ import json
 
 import numpy as np
 import pytest
-import qsharp
 import scipy
+
+try:
+    import qdk
+
+    NativeCircuitType = qdk._native.Circuit
+except ImportError:
+    import qsharp
+
+    NativeCircuitType = qsharp._native.Circuit
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import (
     PauliSequenceMapper,
@@ -60,7 +68,7 @@ class TestPauliSequenceMapperNonControlled:
         circuit = mapper.run(simple_unitary)
 
         assert isinstance(circuit, Circuit)
-        assert isinstance(circuit.get_qsharp_circuit(), qsharp._native.Circuit)
+        assert isinstance(circuit.get_qsharp_circuit(), NativeCircuitType)
 
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
         num_qubits = len(qsc_json["qubits"])

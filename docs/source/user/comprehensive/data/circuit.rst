@@ -34,7 +34,7 @@ A :class:`~qdk_chemistry.data.Circuit` wraps a quantum circuit that may be repre
    * - ``qir``
      - A :term:`QIR` (Quantum Intermediate Representation) object for cross-platform compilation.
    * - ``qsharp``
-     - A compiled ``qsharp._native.Circuit`` object for inspection and visualization.
+     - A compiled ``qdk._native.Circuit`` object for inspection and visualization.
    * - ``qsharp_op``
      - A Q# callable — a native Q# operation that can be composed with other Q# operations.
    * - ``qsharp_factory``
@@ -50,7 +50,7 @@ The full constructor signature is:
    Circuit(
        qasm: str | None = None,
        qir: QirInputData | str | None = None,
-       qsharp: qsharp._native.Circuit | None = None,
+       qsharp: qdk._native.Circuit | None = None,
        qsharp_op: Callable | None = None,
        qsharp_factory: QsharpFactoryData | None = None,
        encoding: str | None = None,
@@ -103,7 +103,7 @@ Each method returns the circuit in the requested format, converting from whateve
    * - Method
      - Description
    * - :meth:`~qdk_chemistry.data.Circuit.get_qsharp_circuit`
-     - Returns a ``qsharp._native.Circuit`` for inspection. Accepts ``prune_classical_qubits`` to remove unused qubits.
+     - Returns a ``qdk._native.Circuit`` for inspection. Accepts ``prune_classical_qubits`` to remove unused qubits.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qir`
      - Returns the :term:`QIR` representation. Compiles from Q# factory or converts from QASM if needed.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qasm`
@@ -141,7 +141,7 @@ Properties
      - QirInputData | str | None
      - :term:`QIR` representation, if available. Lazily compiled from the Q# factory on first access.
    * - ``qsharp``
-     - qsharp._native.Circuit | None
+     - qdk._native.Circuit | None
      - Compiled Q# circuit object, if available.
    * - ``encoding``
      - str | None
