@@ -1,11 +1,6 @@
-"""QDK/Chemistry controlled circuit mapper module."""
+"""QDK/Chemistry time-dependent qubit Hamiltonian data module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-
-from .base import ControlledCircuitMapperFactory
-from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
-
-__all__ = ["ControlledCircuitMapperFactory", "ControlledPauliSequenceMapper"]

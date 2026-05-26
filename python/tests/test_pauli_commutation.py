@@ -5,10 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.data import QubitHamiltonian
 from qdk_chemistry.utils.pauli_commutation import (
+    commutator,
     commutator_bound_first_order,
     do_pauli_labels_commute,
     do_pauli_labels_qw_commute,
@@ -245,3 +247,51 @@ class TestGetCommutationChecker:
         """Test that an invalid type raises ValueError."""
         with pytest.raises(ValueError, match="Unknown commutation_type"):
             get_commutation_checker("invalid")
+
+
+def _make_hamiltonian(labels: list[str], weights: list[float]) -> QubitHamiltonian:
+    return QubitHamiltonian(labels, np.array(weights))
+
+
+class TestCommutator:
+    """Tests for the Pauli commutator utility."""
+
+    def test_commuting_paulis_give_zero(self):
+        """[X⊗I, I⊗Z] should be zero (they commute)."""
+        h_a = _make_hamiltonian(["XI"], [1.0])
+        h_b = _make_hamiltonian(["IZ"], [1.0])
+        result = commutator(h_a, h_b)
+        np.testing.assert_allclose(result.coefficients, [0.0], atol=1e-14)
+
+    def test_single_qubit_xz_commutator(self):
+        """[X, Z] = -2iY."""
+        h_x = _make_hamiltonian(["X"], [1.0])
+        h_z = _make_hamiltonian(["Z"], [1.0])
+        result = commutator(h_x, h_z)
+        assert len(result.pauli_strings) == 1
+        assert result.pauli_strings[0] == "Y"
+        np.testing.assert_allclose(result.coefficients[0], -2.0j, atol=1e-14)
+
+    def test_single_qubit_xy_commutator(self):
+        """[X, Y] = 2iZ."""
+        h_x = _make_hamiltonian(["X"], [1.0])
+        h_y = _make_hamiltonian(["Y"], [1.0])
+        result = commutator(h_x, h_y)
+        assert result.pauli_strings[0] == "Z"
+        np.testing.assert_allclose(result.coefficients[0], 2.0j, atol=1e-14)
+
+    def test_commutator_with_coefficients(self):
+        """[2X, 3Z] = 2*3*[X,Z] = -12iY."""
+        h_a = _make_hamiltonian(["X"], [2.0])
+        h_b = _make_hamiltonian(["Z"], [3.0])
+        result = commutator(h_a, h_b)
+        np.testing.assert_allclose(result.coefficients[0], -12.0j, atol=1e-14)
+
+    def test_multi_term_commutator(self):
+        """Commutator of multi-term Hamiltonians."""
+        h_a = _make_hamiltonian(["XI", "IX"], [1.0, 1.0])
+        h_b = _make_hamiltonian(["ZI"], [1.0])
+        result = commutator(h_a, h_b)
+        # [XI, ZI] = [X,Z]⊗I = -2iYI; [IX, ZI] commutes → only -2i YI
+        idx = result.pauli_strings.index("YI")
+        np.testing.assert_allclose(result.coefficients[idx], -2.0j, atol=1e-14)
