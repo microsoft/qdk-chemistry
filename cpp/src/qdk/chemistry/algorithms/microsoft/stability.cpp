@@ -330,15 +330,8 @@ class StabilityOperator {
 };
 
 /**
- * @brief Construct an initial eigenvector for the Davidson solver using a
- * random Gaussian guess. Each element is drawn from N(0,1) with a fixed seed
- * for reproducibility, and the resulting vector is normalized to unit length.
- *
- * A random guess avoids confinement to a symmetric subspace that can occur
- * when alpha and beta orbitals are identical (e.g. an unrestricted calculation
- * that converged to a closed-shell solution). In such cases a deterministic
- * guess based on orbital energy differences would be symmetric between the
- * spin channels and would miss antisymmetric instability modes.
+ * @brief Initialize eigenvector with a random Gaussian guess (N(0,1), seed 42,
+ * normalized). Avoids trapping in symmetric subspaces when alpha == beta.
  *
  * @param eigenvector [in, out] Output vector that stores the initialized guess.
  */
