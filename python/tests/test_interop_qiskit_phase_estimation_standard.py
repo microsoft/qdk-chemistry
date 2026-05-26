@@ -276,3 +276,22 @@ def test_builder_run_returns_circuits(two_qubit_phase_problem: TraditionalProble
     result = circuit.estimate()
     assert result is not None
     assert hasattr(result, "logical_counts")
+
+
+def test_builder_raises_invalid_num_bits_error(two_qubit_phase_problem: TraditionalProblem) -> None:
+    """Validate that QiskitStandardQpeCircuitBuilder raises ValueError for invalid num_bits."""
+    builder = QiskitStandardQpeCircuitBuilder(num_bits=0)  # Invalid number of bits
+    builder.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
+    )
+
+    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
+        builder.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )

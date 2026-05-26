@@ -119,6 +119,8 @@ class QiskitStandardQpeCircuitBuilder(QpeCircuitBuilder):
         """
         Logger.trace_entering()
         num_bits = self._settings.get("num_bits")
+        if num_bits <= 0:
+            raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
         ancilla = QuantumRegister(num_bits, "ancilla")
         system = QuantumRegister(qubit_hamiltonian.num_qubits, "system")
         classical = ClassicalRegister(num_bits, "c")
