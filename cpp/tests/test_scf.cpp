@@ -8,6 +8,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/utils/orbital_rotation.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
@@ -525,6 +526,46 @@ TEST_F(ScfTest, InitialGuessRestart) {
 
   // Should get the same energy (within tight tolerance)
   EXPECT_NEAR(energy_first, energy_second, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, CustomElementMapBasisRotatedOrbitalInitialGuessRuns) {
+  using namespace qdk::chemistry::utils;
+
+  auto water = testing::create_water_structure();
+
+  std::map<std::string, std::string> element_basis_map = {{"O", "sto-3g"},
+                                                          {"H", "sto-3g"}};
+  auto custom_basis = BasisSet::from_element_map(element_basis_map, water);
+
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("convergence_threshold", 1e-2);
+  auto [energy_first, wfn_first] = scf_solver->run(water, 0, 1, custom_basis);
+
+  auto orbitals_first = wfn_first->get_orbitals();
+  EXPECT_EQ(orbitals_first->get_basis_set()->get_name(), BasisSet::custom_name);
+
+  auto [n_alpha, n_beta] = wfn_first->get_total_num_electrons();
+  const size_t n_mo = orbitals_first->get_num_molecular_orbitals();
+  const size_t n_virtual = n_mo - n_alpha;
+  const size_t rotation_size = n_alpha * n_virtual;
+  Eigen::VectorXd rotation_vector =
+      Eigen::VectorXd::Constant(rotation_size, 0.01);
+
+  auto rotated_orbitals =
+      rotate_orbitals(orbitals_first, rotation_vector, n_alpha, n_beta);
+  EXPECT_EQ(rotated_orbitals->get_basis_set()->get_name(),
+            BasisSet::custom_name);
+
+  auto scf_solver_restart = ScfSolverFactory::create();
+  scf_solver_restart->settings().set("method", "hf");
+  scf_solver_restart->settings().set("convergence_threshold", 1e-2);
+
+  std::pair<double, std::shared_ptr<Wavefunction>> restart_result;
+  EXPECT_NO_THROW({
+    restart_result = scf_solver_restart->run(water, 0, 1, rotated_orbitals);
+  });
+  EXPECT_NE(restart_result.second, nullptr);
 }
 
 TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
