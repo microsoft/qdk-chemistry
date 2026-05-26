@@ -664,31 +664,9 @@ bool Orbitals::is_restricted() const {
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error(
         "Cannot determine if orbitals are restricted: orbital coefficients "
-        "not "
-        "set");
+        "not set");
   }
-  // Compare coefficient pointers first for efficiency
-  if (_coefficients.first == _coefficients.second) {
-    return true;
-  }
-  // If pointers are different, check if the data is the same
-  if (!_coefficients.first->isApprox(*_coefficients.second)) {
-    return false;
-  } else {
-    // Also check energies if both are set
-    if (_energies.first && _energies.second) {
-      if (!_energies.first->isApprox(*_energies.second)) {
-        return false;
-      } else {
-        QDK_LOGGER().warn(
-            "Although there are two sets of coefficients, the coefficient "
-            "matrices and energies are identical. This orbital will be treated "
-            "as restricted! To obtain an unrestricted orbital, consider "
-            "running SCF with a spin-broken initial guess.");
-      }
-    }
-  }
-  return true;
+  return _coefficients.first == _coefficients.second;
 }
 
 bool Orbitals::has_active_space() const {

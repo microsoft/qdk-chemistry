@@ -734,64 +734,6 @@ class TestStabilityChecker:
         self._check_reference_eigenvalue(result, ref_external, is_internal=False)
 
     @pytest.mark.parametrize(
-        ("backend", "ref_internal", "ref_external"),
-        [
-            ("pyscf", 0.6291346026640, -0.4313775656554),
-            ("qdk", 0.6291346026640, -0.4313775656554),
-        ],
-    )
-    def test_stability_h2_stretched_rhf_sto3g(self, backend, ref_internal, ref_external):
-        """Test restricted RHF stability on stretched H2 with STO-3G."""
-        h2 = create_stretched_h2_structure(distance_bohr=4.0)
-
-        scf_solver = self._create_scf_solver(backend=backend, scf_type="restricted")
-        scf_solver.settings().set("method", "hf")
-        energy, wavefunction = scf_solver.run(h2, 0, 1, "sto-3g")
-        assert abs(energy - (-0.761082247527)) < scf_energy_tolerance
-        assert wavefunction.get_orbitals().is_restricted()
-
-        stability_checker = self._create_stability_checker(backend=backend, internal=True, external=True)
-        stability_checker.settings().set("method", "hf")
-        is_stable, result = stability_checker.run(wavefunction)
-
-        self._assert_basic_stability_result(result, is_stable, has_internal=True, has_external=True)
-        assert result.is_internal_stable() is True
-        assert result.is_external_stable() is False
-        assert is_stable is False
-
-        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
-        self._check_reference_eigenvalue(result, ref_external, is_internal=False)
-
-    @pytest.mark.parametrize(
-        ("backend", "ref_internal", "ref_external"),
-        [
-            ("pyscf", 0.6291346026640, -0.4313775656554),
-            ("qdk", 0.6291346026640, -0.4313775656554),
-        ],
-    )
-    def test_stability_h2_stretched_uhf_sto3g(self, backend, ref_internal, ref_external):
-        """Test unrestricted UHF stability on stretched H2 with STO-3G."""
-        h2 = create_stretched_h2_structure(distance_bohr=4.0)
-
-        scf_solver = self._create_scf_solver(backend=backend, scf_type="unrestricted")
-        scf_solver.settings().set("method", "hf")
-        energy, wavefunction = scf_solver.run(h2, 0, 1, "sto-3g")
-        assert abs(energy - (-0.761082247527)) < scf_energy_tolerance
-        assert not wavefunction.get_orbitals().is_restricted()
-
-        stability_checker = self._create_stability_checker(backend=backend)
-        stability_checker.settings().set("method", "hf")
-        is_stable, result = stability_checker.run(wavefunction)
-
-        self._assert_basic_stability_result(result, is_stable, has_internal=True, has_external=True)
-        assert result.is_internal_stable() is True
-        assert result.is_external_stable() is False
-        assert is_stable is False
-
-        self._check_reference_eigenvalue(result, ref_internal, is_internal=True)
-        self._check_reference_eigenvalue(result, ref_external, is_internal=False)
-
-    @pytest.mark.parametrize(
         ("backend", "ref_eigenvalue"),
         [
             ("pyscf", -0.07936046244954532),

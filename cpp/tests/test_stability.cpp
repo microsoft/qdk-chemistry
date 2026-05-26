@@ -928,7 +928,8 @@ TEST_F(StabilityCheckerTest, QDK_RHF_H2_Stretched_STO3G_External_Instability) {
   EXPECT_NEAR(smallest_external_eigenvalue, -0.4313775656554, davidson_tol);
 }
 
-TEST_F(StabilityCheckerTest, QDK_UHF_H2_Stretched_STO3G_Internal_Only) {
+TEST_F(StabilityCheckerTest,
+       QDK_UHF_H2_Stretched_STO3G_distinguished_restricted) {
   // Test stability analysis on stretched H2 molecule with unrestricted UHF.
   // Only internal stability is valid for UHF.
   std::vector<Eigen::Vector3d> coords = {
@@ -953,21 +954,17 @@ TEST_F(StabilityCheckerTest, QDK_UHF_H2_Stretched_STO3G_Internal_Only) {
 
   EXPECT_TRUE(result != nullptr);
   EXPECT_TRUE(result->has_internal_result());
-  EXPECT_TRUE(result->has_external_result());
+  EXPECT_FALSE(result->has_external_result());
   EXPECT_GT(result->internal_size(), 0);
-  EXPECT_GT(result->external_size(), 0);
+  EXPECT_EQ(result->external_size(), 0);
 
-  EXPECT_TRUE(result->is_internal_stable());
-  EXPECT_FALSE(result->is_external_stable());
+  EXPECT_FALSE(result->is_internal_stable());
   EXPECT_FALSE(is_stable);
 
   const double smallest_internal_eigenvalue =
       result->get_smallest_internal_eigenvalue();
-  const double smallest_external_eigenvalue =
-      result->get_smallest_external_eigenvalue();
   const double davidson_tol =
       stability_checker->settings().get<double>("davidson_tolerance") * 1e2;
 
-  EXPECT_NEAR(smallest_internal_eigenvalue, 0.6291346026640, davidson_tol);
-  EXPECT_NEAR(smallest_external_eigenvalue, -0.4313775656554, davidson_tol);
+  EXPECT_NEAR(smallest_internal_eigenvalue, -0.4313775656554, davidson_tol);
 }
