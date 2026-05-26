@@ -92,7 +92,9 @@ steps:
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
         -e PIP_INDEX_URL \
+        ${{ if eq(parameters.march, 'x86-64-v3') }}: \
         -e SYSTEM_ACCESSTOKEN \
+        ${{ endif }}\
         -e QDK_UARCH=${{ parameters.march }} \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
@@ -108,8 +110,9 @@ steps:
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux)
     retryCountOnTaskFailure: 2
-    env:
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    ${{ if eq(parameters.march, 'x86-64-v3') }}:
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
