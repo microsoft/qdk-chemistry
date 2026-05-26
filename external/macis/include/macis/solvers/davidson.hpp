@@ -280,9 +280,6 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
     X[0] = 1.0;
     double AX = 0.0;
     op.operator_action(1, 1., X, N, 0., &AX, N);
-    logger->warn(
-        "N==1 detected: using direct operator action on the trial vector and "
-        "returning AX as the eigenvalue.");
     logger->info(
         "iter =    0, LAM(0) = {:20.12e}, RNORM =   0.000000000000e+00", AX);
     return std::make_pair(size_t(0), AX);
