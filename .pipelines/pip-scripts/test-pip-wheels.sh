@@ -13,12 +13,6 @@ else
     PYTHON_DIR="$REPO_ROOT/python"
 fi
 
-if [ "$MAC_BUILD" == "OFF" ] && [ -d "/workspace" ]; then
-    VENV_DIR="/workspace/test_wheel_env"
-else
-    VENV_DIR="$REPO_ROOT/.test_wheel_env"
-fi
-
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
@@ -88,9 +82,11 @@ fi
 # !!!                                                                       !!!
 # !!! Until ms-ensureconda publishes broader wheel coverage we fall back to !!!
 # !!! the upstream public `ensureconda` package (pure-Python `py3-none-any`,!!!
-# !!! identical `python -m ensureconda --envfile` CLI). It is fetched from  !!!
-# !!! the same Azure Artifacts feed via its public PyPI upstream so it      !!!
-# !!! still flows through CFS.                                              !!!
+# !!! same module name). It is fetched from the same Azure Artifacts feed   !!!
+# !!! via its public PyPI upstream so it still flows through CFS.           !!!
+# !!!                                                                       !!!
+# !!! IMPORTANT: ms-ensureconda has --envfile (dumps CONDA_BASH_HOOK etc);  !!!
+# !!! public ensureconda does NOT. The bootstrap logic branches on package. !!!
 # !!!                                                                       !!!
 # !!! TODO: revert to ms-ensureconda on every platform once arm64 / macOS   !!!
 # !!! wheels are published. File via python@microsoft.com if needed.        !!!
@@ -102,24 +98,26 @@ fi
 # container via -e PIP_INDEX_URL.
 case "$(uname -s):$(uname -m)" in
     Linux:x86_64)
-        ENSURECONDA_PKG="ms-ensureconda"
+        ENSURECONDA_PKG="ms-ensureconda==2026.2.1"
         ;;
     *)
         # macOS (arm64) and Linux aarch64 — see HEADS UP block above.
-        ENSURECONDA_PKG="ensureconda"
+        ENSURECONDA_PKG="ensureconda==2025.1.0"
         ;;
 esac
 
 echo "Installing ${ENSURECONDA_PKG} (on $(uname -s):$(uname -m)) and bootstrapping conda..."
 # Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS
 # and apt Python on Ubuntu 24.04 are both externally managed).
+# Clean any stale venv first (idempotent on self-hosted agents / retries).
+rm -rf /tmp/bootstrap-venv
 python3 -m venv /tmp/bootstrap-venv
 # shellcheck disable=SC1091
 . /tmp/bootstrap-venv/bin/activate
 python3 -m pip install --upgrade pip
 python3 -m pip install "${ENSURECONDA_PKG}"
 
-if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
+if [ "$ENSURECONDA_PKG" = "ms-ensureconda==2026.2.1" ]; then
     # ms-ensureconda's --envfile flag dumps CONDA_BASH_HOOK + friends to a
     # dotenv file we then source to wire up conda for this shell.
     python3 -m ensureconda --envfile /tmp/ensureconda.env
@@ -163,7 +161,11 @@ echo "Creating fresh conda environment for wheel test with Python ${PYTHON_VERSI
 # handles auth; the channel URL itself must NOT inline the token (the plugin
 # crashes with UnboundLocalError if the var is missing, even when basic-auth
 # creds are present in the URL).
-if [ "$ENSURECONDA_PKG" = "ms-ensureconda" ]; then
+#
+# Remove any existing conda env with the same name first (idempotent on
+# self-hosted agents and on retries).
+conda env remove -y -n testenv 2>/dev/null || true
+if [ "$ENSURECONDA_PKG" = "ms-ensureconda==2026.2.1" ]; then
     : "${SYSTEM_ACCESSTOKEN:?SYSTEM_ACCESSTOKEN must be set when bootstrapping conda from the Azure Artifacts feed}"
     { set +x; } 2>/dev/null
     export ARTIFACTS_CONDA_TOKEN="${SYSTEM_ACCESSTOKEN}"
