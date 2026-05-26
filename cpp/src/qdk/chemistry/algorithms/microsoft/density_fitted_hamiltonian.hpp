@@ -42,7 +42,9 @@ class DensityFittedHamiltonianSettings : public qdk::chemistry::data::Settings {
  * O(N_aux * N^2) where N is the number of molecular orbitals and N_aux is
  * the size of the auxiliary basis.
  *
- * @note An auxiliary basis set must be provided when calling run().
+ * @note The Orbitals passed to run() must use a basis set that includes an
+ * auxiliary basis for density fitting (for example, has_aux_basis() should
+ * return true).
  *
  * @see ThreeCenterHamiltonianContainer
  * @see HamiltonianConstructor
