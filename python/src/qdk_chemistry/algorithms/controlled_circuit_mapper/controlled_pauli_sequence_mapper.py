@@ -14,10 +14,10 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
 
-__all__: list[str] = ["PauliSequenceMapper"]
+__all__: list[str] = ["ControlledPauliSequenceMapper"]
 
 
-class PauliSequenceMapper(ControlledCircuitMapper):
+class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     r"""Controlled evolution circuit mapper using Pauli product formula term sequences.
 
     Given a time-evolution operator expressed as a Pauli product formula

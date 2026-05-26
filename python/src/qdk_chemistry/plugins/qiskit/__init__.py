@@ -17,25 +17,39 @@ _loaded = False
 QDK_CHEMISTRY_HAS_QISKIT = False
 QDK_CHEMISTRY_HAS_QISKIT_NATURE = False
 QDK_CHEMISTRY_HAS_QISKIT_AER = False
+QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = False
 
 
 def load():
     """Load the Qiskit related plugins into QDK/Chemistry."""
     Logger.trace_entering()
     global _loaded  # noqa: PLW0603
-    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE, QDK_CHEMISTRY_HAS_QISKIT_AER  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
+
     if importlib.util.find_spec("qiskit") is not None:
         QDK_CHEMISTRY_HAS_QISKIT = True
-        qiskit_load()
     if importlib.util.find_spec("qiskit_nature") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_NATURE = True
-        qiskit_nature_load()
     if importlib.util.find_spec("qiskit_aer") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_AER = True
+    if (
+        importlib.util.find_spec("qiskit_ibm_runtime") is not None
+        and importlib.util.find_spec("qiskit_ibm_runtime.fake_provider") is not None
+    ):
+        QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = True
+
+    if QDK_CHEMISTRY_HAS_QISKIT:
+        qiskit_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
+        qiskit_nature_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_AER:
         qiskit_aer_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+        qiskit_ibm_runtime_load()
 
 
 def qiskit_load():
@@ -65,6 +79,15 @@ def qiskit_nature_load():
 
     register(lambda: QiskitQubitMapper())
     Logger.debug(f"Qiskit Nature plugin loaded: [{QiskitQubitMapper().type_name()}: {QiskitQubitMapper().name()}].")
+
+
+def qiskit_ibm_runtime_load():
+    """Load the Qiskit IBM Runtime fake provider into QDK/Chemistry."""
+    Logger.trace_entering()
+
+    import qiskit_ibm_runtime.fake_provider  # noqa: PLC0415
+
+    Logger.debug("Qiskit IBM Runtime fake provider loaded.")
 
 
 def qiskit_aer_load():

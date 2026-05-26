@@ -12,8 +12,8 @@ import pytest
 import qsharp
 import scipy
 
-from qdk_chemistry.algorithms.controlled_circuit_mapper.pauli_sequence_mapper import (
-    PauliSequenceMapper,
+from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
+    ControlledPauliSequenceMapper,
 )
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.controlled_unitary import (
@@ -62,12 +62,12 @@ class TestPauliSequenceMapper:
 
     def test_name(self):
         """Test that the name method returns the correct algorithm name."""
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
         assert mapper.name() == "pauli_sequence"
 
     def test_basic_mapping(self, controlled_unitary):
         """Test basic mapping of ControlledUnitary to Circuit."""
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -76,7 +76,7 @@ class TestPauliSequenceMapper:
 
     def test_default_target_indices(self, controlled_unitary):
         """Test that default target indices are used when none are provided."""
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
         qsc_json = json.loads(circuit.get_qsharp_circuit().json())
@@ -137,14 +137,14 @@ class TestPauliSequenceMapper:
             control_indices=[2],
         )
 
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
 
         with pytest.raises(ValueError, match="not supported"):
             mapper.run(invalid_controlled)
 
     def test_rotation_parameters(self, controlled_unitary):
         """Test that rotation parameters are correctly set in the mapped circuit."""
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
 
         circuit = mapper.run(controlled_unitary)
 
@@ -176,7 +176,7 @@ class TestPauliSequenceMapper:
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
     def test_controlled_u_circuit_matrix(self, controlled_unitary):
         """Test that the constructed controlled-U circuit has the expected matrix."""
-        mapper = PauliSequenceMapper()
+        mapper = ControlledPauliSequenceMapper()
         circuit = mapper.run(controlled_unitary)
 
         # Extract angles from the container
