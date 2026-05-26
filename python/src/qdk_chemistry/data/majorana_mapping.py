@@ -185,15 +185,44 @@ class MajoranaMapping(DataClass):
         """Post-mapping tapering specification, or None for untapered encodings."""
         return self._tapering
 
+    def without_tapering(self) -> MajoranaMapping:
+        """Return a copy of this mapping with tapering stripped.
+
+        The returned mapping has the same Majorana table and phases but
+        ``tapering=None`` and ``name`` set to :attr:`base_encoding`.
+        This is used by :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper`
+        to separate the base encoding from post-mapping tapering.
+
+        Returns:
+            A new :class:`MajoranaMapping` with no tapering.
+
+        """
+        return MajoranaMapping(table=[], _core=self._core)
+
     @property
     def base_encoding(self) -> str:
         """The base encoding name used for the Majorana-to-Pauli table.
 
-        For standard encodings this equals :attr:`name`. For tapering-based
+        For standard encodings this equals :attr:`name`.  For tapering-based
         encodings like symmetry-conserving Bravyi-Kitaev, this returns the
-        underlying encoding (e.g. ``"bravyi-kitaev"``) while :attr:`name`
-        returns the final encoding label
+        underlying encoding (e.g. ``"bravyi-kitaev-tree"``) while
+        :attr:`name` returns the final encoding label
         (e.g. ``"symmetry-conserving-bravyi-kitaev"``).
+
+        .. important::
+
+           **Plugin dispatch key.**  Name-dispatched
+           :class:`~qdk_chemistry.algorithms.QubitMapper` backends
+           (OpenFermion, Qiskit) use this property — not :attr:`name` — to
+           select the third-party transform function.  Those backends
+           ignore :attr:`table` entirely and rebuild the qubit operator
+           from scratch.  Consistency between this name and the table
+           contents is guaranteed for factory-produced mappings and
+           verified by cross-backend tests, but is **not** checked at
+           runtime.  See
+           :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper`
+           for the full dispatch contract.
+
         """
         return self._core.name
 
@@ -325,6 +354,26 @@ class MajoranaMapping(DataClass):
         return cls(table=[], _core=core)
 
     @classmethod
+    def bravyi_kitaev_tree(cls, num_modes: int) -> MajoranaMapping:
+        """Construct a balanced binary tree Bravyi-Kitaev encoding.
+
+        Implementation from arXiv:1701.07072 (Havlíček et al.). Unlike the
+        Fenwick-tree variant (:meth:`bravyi_kitaev`), the balanced tree has
+        guaranteed Z₂ symmetries at qubit positions ``(n/2-1)`` and ``(n-1)``
+        for any even ``n``, making it the required base encoding for
+        :meth:`symmetry_conserving_bravyi_kitaev` tapering.
+
+        Args:
+            num_modes (int): Number of fermionic modes (spin-orbitals).
+
+        Returns:
+            MajoranaMapping: Mapping with name ``"bravyi-kitaev-tree"``.
+
+        """
+        core = _CoreMajoranaMapping.bravyi_kitaev_tree(num_modes)
+        return cls(table=[], _core=core)
+
+    @classmethod
     def parity(
         cls,
         num_modes: int,
@@ -360,21 +409,22 @@ class MajoranaMapping(DataClass):
     ) -> MajoranaMapping:
         """Construct a symmetry-conserving Bravyi-Kitaev (SCBK) encoding.
 
-        Combines the standard Bravyi-Kitaev mapping with a
+        Combines the balanced binary tree BK mapping
+        (:meth:`bravyi_kitaev_tree`) with a
         :class:`~qdk_chemistry.data.TaperingSpecification` that removes the two Z₂
         symmetry qubits (total electron-number parity and alpha-spin parity),
         reducing the qubit count by 2.
 
         When passed to :meth:`~qdk_chemistry.algorithms.QubitMapper.run`, the
-        mapper applies the BK mapping first, then tapers the symmetry qubits
-        automatically.
+        mapper applies the BK-tree mapping first, then tapers the symmetry
+        qubits automatically.
 
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals). Must be even and >= 4.
             symmetries (Symmetries): Electron counts for the target symmetry sector.
 
         Returns:
-            MajoranaMapping: BK mapping with SCBK tapering, name ``"symmetry-conserving-bravyi-kitaev"``.
+            MajoranaMapping: BK-tree mapping with SCBK tapering, name ``"symmetry-conserving-bravyi-kitaev"``.
 
         Raises:
             ValueError: If num_modes < 4 or odd, or electron counts are invalid.
@@ -385,13 +435,13 @@ class MajoranaMapping(DataClass):
             >>> mapping.name
             'symmetry-conserving-bravyi-kitaev'
             >>> mapping.base_encoding
-            'bravyi-kitaev'
+            'bravyi-kitaev-tree'
             >>> mapping.tapering.num_tapered
             2
 
         """
         tapering = TaperingSpecification.symmetry_conserving_bravyi_kitaev(num_modes, symmetries)
-        core = _CoreMajoranaMapping.bravyi_kitaev(num_modes)
+        core = _CoreMajoranaMapping.bravyi_kitaev_tree(num_modes)
         return cls(
             table=[],
             name="symmetry-conserving-bravyi-kitaev",
@@ -493,9 +543,15 @@ class MajoranaMapping(DataClass):
         self._add_hdf5_version(group)
         group.attrs["name"] = self._name
         group.attrs["num_modes"] = self._num_modes
-        # Store table as array of strings
-
         group.create_dataset("table", data=np.array(list(self._table), dtype="S"))
+        if any(p != 1 for p in self._phases):
+            group.create_dataset("phases", data=np.array(self._phases, dtype=np.int8))
+        if self._tapering is not None:
+            tg = group.create_group("tapering")
+            tg.create_dataset("qubit_indices", data=np.array(self._tapering.qubit_indices, dtype=np.int64))
+            tg.create_dataset("eigenvalues", data=np.array(self._tapering.eigenvalues, dtype=np.int8))
+            tg.attrs["source_num_qubits"] = self._tapering.source_num_qubits
+            tg.attrs["source_encoding"] = self._tapering.source_encoding
 
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> MajoranaMapping:
@@ -513,7 +569,22 @@ class MajoranaMapping(DataClass):
         name = group.attrs.get("name", "")
         if isinstance(name, bytes):
             name = name.decode("utf-8")
-        return cls(table=table, name=name)
+        phases = None
+        if "phases" in group:
+            phases = [int(p) for p in group["phases"][()]]
+        tapering = None
+        if "tapering" in group:
+            tg = group["tapering"]
+            src_enc = tg.attrs.get("source_encoding", "")
+            if isinstance(src_enc, bytes):
+                src_enc = src_enc.decode("utf-8")
+            tapering = TaperingSpecification(
+                qubit_indices=tuple(int(x) for x in tg["qubit_indices"][()]),
+                eigenvalues=tuple(int(x) for x in tg["eigenvalues"][()]),
+                source_num_qubits=int(tg.attrs["source_num_qubits"]),
+                source_encoding=src_enc,
+            )
+        return cls(table=table, name=name, phases=phases, tapering=tapering)
 
     def __repr__(self) -> str:
         """Return a repr string."""

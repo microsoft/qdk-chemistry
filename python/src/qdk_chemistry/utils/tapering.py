@@ -156,28 +156,29 @@ def taper_to_scbk(
     reducing the qubit count by 2.  The eigenvalues are determined by the
     electron counts following the convention of arXiv:1701.08213.
 
-    The input must be a BK-encoded QubitHamiltonian with an even number of
-    qubits (= 2 * n_spatial).
+    The input must be a BK-encoded (Fenwick or BK-tree) QubitHamiltonian with
+    an even number of qubits (= 2 * n_spatial).
 
     Args:
-        qubit_hamiltonian (QubitHamiltonian): A Bravyi-Kitaev encoded qubit Hamiltonian.
+        qubit_hamiltonian (QubitHamiltonian): A Bravyi-Kitaev or BK-tree encoded qubit Hamiltonian.
         symmetries (Symmetries): Symmetry information providing ``n_alpha`` and ``n_beta`` electron counts.
 
     Returns:
         QubitHamiltonian: Tapered Hamiltonian with 2 fewer qubits and encoding ``"symmetry-conserving-bravyi-kitaev"``.
 
     Raises:
-        ValueError: If encoding is not ``"bravyi-kitaev"``, or qubit count is odd or < 4.
+        ValueError: If encoding is not ``"bravyi-kitaev"`` or ``"bravyi-kitaev-tree"``, or qubit count is odd or < 4.
 
     """
     from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder  # noqa: PLC0415
 
-    if qubit_hamiltonian.encoding != "bravyi-kitaev":
+    _BK_ENCODINGS = {"bravyi-kitaev", "bravyi-kitaev-tree"}
+    if qubit_hamiltonian.encoding not in _BK_ENCODINGS:
         raise ValueError(
             f"taper_to_scbk requires a Bravyi-Kitaev encoded QubitHamiltonian "
-            f"(encoding='bravyi-kitaev'), got encoding={qubit_hamiltonian.encoding!r}. "
-            f"Use MajoranaMapping.bravyi_kitaev() to produce a BK-encoded Hamiltonian first."
+            f"(encoding in {_BK_ENCODINGS}), got encoding={qubit_hamiltonian.encoding!r}. "
+            f"Use MajoranaMapping.bravyi_kitaev_tree() to produce a BK-encoded Hamiltonian first."
         )
 
     if (

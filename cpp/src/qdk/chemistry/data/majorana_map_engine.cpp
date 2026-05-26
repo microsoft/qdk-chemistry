@@ -563,7 +563,7 @@ MajoranaMapResult majorana_map_impl(
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_aabb[idx4(p, q, r, s)];
+            double eri = eri_aabb[idx4(r, s, p, q)];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_alpha(r), mode_alpha(s), eri);

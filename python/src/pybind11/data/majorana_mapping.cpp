@@ -484,6 +484,32 @@ Returns:
 )");
 
   mapping.def_static(
+      "bravyi_kitaev_tree",
+      [](std::size_t num_modes) {
+        try {
+          return MajoranaMapping::bravyi_kitaev_tree(num_modes);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("num_modes"),
+      R"(
+Construct a balanced binary tree Bravyi-Kitaev encoding.
+
+Implementation from arXiv:1701.07072 (Havlíček et al.). Unlike the
+Fenwick-tree BK (``bravyi_kitaev()``), the balanced tree variant has
+guaranteed Z₂ symmetries at qubit positions (n/2-1) and (n-1) for any
+even n, making it the required base encoding for symmetry-conserving
+BK (SCBK) tapering.
+
+Args:
+    num_modes: Number of fermionic modes (spin-orbitals).
+
+Returns:
+    MajoranaMapping with name "bravyi-kitaev-tree".
+)");
+
+  mapping.def_static(
       "parity",
       [](std::size_t num_modes) {
         try {

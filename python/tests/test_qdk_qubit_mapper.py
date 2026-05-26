@@ -536,6 +536,32 @@ class TestQdkQubitMapper:
         eigs_parity = np.sort(np.linalg.eigvalsh(_to_matrix(result_parity)))
         np.testing.assert_allclose(eigs_parity, eigs_jw, atol=1e-10)
 
+    def test_parity_number_operator_structure(self) -> None:
+        """Parity encoding gives n_j = (I - Z_{j-1}·Z_j)/2, matching standard convention."""
+        from qdk_chemistry.utils.pauli_matrix import pauli_to_sparse_matrix  # noqa: PLC0415
+
+        n = 6
+        mapping = MajoranaMapping.parity(n)
+        I_n = np.eye(2**n)
+
+        for j in range(n):
+            g0 = pauli_to_sparse_matrix([mapping.table[2 * j]], np.array([mapping.phases[2 * j]])).toarray()
+            g1 = pauli_to_sparse_matrix([mapping.table[2 * j + 1]], np.array([mapping.phases[2 * j + 1]])).toarray()
+            nj = (I_n + 1j * g0 @ g1) / 2
+
+            # Build expected Z structure: Z_0 for j=0, Z_{j-1}·Z_j for j≥1
+            z_op = np.eye(2**n, dtype=complex)
+            for idx in range(2**n):
+                if j == 0:
+                    if (idx >> 0) & 1:
+                        z_op[idx, idx] = -1.0
+                else:
+                    parity = ((idx >> (j - 1)) & 1) ^ ((idx >> j) & 1)
+                    if parity:
+                        z_op[idx, idx] = -1.0
+            expected_nj = (I_n - z_op) / 2
+            np.testing.assert_allclose(nj, expected_nj, atol=1e-12, err_msg=f"n_{j} structure mismatch")
+
 
 class TestUnrestrictedHamiltonians:
     """Tests for unrestricted (UHF) Hamiltonian mapping."""
@@ -686,6 +712,68 @@ class TestUnrestrictedHamiltonians:
         assert len(qh.pauli_strings) > 0
         for c in qh.coefficients:
             assert abs(c.imag) < 1e-12
+
+    def test_unrestricted_asymmetric_aabb(self) -> None:
+        """UHF with genuinely asymmetric AABB integrals (eri_aabb[p,q,r,s] ≠ eri_aabb[r,s,p,q])."""
+        n = 2
+        rng = np.random.default_rng(123)
+        coeffs_alpha = np.eye(n) + rng.standard_normal((n, n)) * 0.1
+        coeffs_beta = np.eye(n) + rng.standard_normal((n, n)) * 0.1
+        basis_set = create_test_basis_set(n, "test-asym-aabb")
+        orbitals = Orbitals(coeffs_alpha, coeffs_beta, None, None, None, basis_set)
+
+        h1_alpha = np.array([[1.0, 0.2], [0.2, 0.8]])
+        h1_beta = np.array([[0.9, 0.1], [0.1, 1.1]])
+
+        # AAAA and BBBB with 8-fold symmetry
+        def sym_eri(n, rng):
+            h2 = np.zeros((n, n, n, n))
+            for p in range(n):
+                for q in range(n):
+                    for r in range(n):
+                        for s in range(n):
+                            if h2[p, q, r, s] == 0:
+                                v = rng.standard_normal() * 0.2
+                                for a, b, c, d in {(p, q, r, s), (q, p, r, s), (p, q, s, r), (q, p, s, r),
+                                                    (r, s, p, q), (s, r, p, q), (r, s, q, p), (s, r, q, p)}:
+                                    h2[a, b, c, d] = v
+            return h2.ravel()
+
+        h2_aaaa = sym_eri(n, rng)
+        h2_bbbb = sym_eri(n, rng)
+
+        # AABB with only 4-fold symmetry: (pq|rs) = (qp|rs) = (pq|sr) = (qp|sr)
+        # but NOT (pq|rs) = (rs|pq) since alpha ≠ beta
+        h2_aabb_4d = np.zeros((n, n, n, n))
+        for p in range(n):
+            for q in range(n):
+                for r in range(n):
+                    for s in range(n):
+                        if h2_aabb_4d[p, q, r, s] == 0:
+                            v = rng.standard_normal() * 0.3
+                            for a, b, c, d in {(p, q, r, s), (q, p, r, s), (p, q, s, r), (q, p, s, r)}:
+                                h2_aabb_4d[a, b, c, d] = v
+        h2_aabb = h2_aabb_4d.ravel()
+
+        fock_a, fock_b = np.eye(0), np.eye(0)
+        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(
+            h1_alpha, h1_beta, h2_aaaa, h2_aabb, h2_bbbb, orbitals, 0.0, fock_a, fock_b,
+        ))
+
+        n_modes = 2 * n
+        mapper = create("qubit_mapper", "qdk")
+
+        # All encodings should produce the same eigenvalues
+        eigs = {}
+        for enc in ["jordan_wigner", "bravyi_kitaev", "parity"]:
+            mapping = getattr(MajoranaMapping, enc)(num_modes=n_modes)
+            qh = mapper.run(h, mapping)
+            eigs[enc] = np.sort(np.real(np.linalg.eigvalsh(qh.to_matrix())))
+            for c in qh.coefficients:
+                assert abs(c.imag) < 1e-12, f"Non-real coeff in {enc}: {c}"
+
+        np.testing.assert_allclose(eigs["jordan_wigner"], eigs["bravyi_kitaev"], atol=1e-10)
+        np.testing.assert_allclose(eigs["jordan_wigner"], eigs["parity"], atol=1e-10)
 
 
 class TestQdkQubitMapperRealHamiltonians:
@@ -1027,7 +1115,7 @@ class TestScbkOneStep:
         assert qh.tapering.num_tapered == 2
 
     def test_scbk_matches_two_step(self) -> None:
-        """One-step symmetry-conserving BK matches explicit BK + internal taper."""
+        """One-step symmetry-conserving BK matches explicit BK-tree + internal taper."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
         from qdk_chemistry.utils.tapering import taper_to_scbk  # noqa: PLC0415
 
@@ -1039,12 +1127,56 @@ class TestScbkOneStep:
         scbk_mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, sym)
         qh_one_step = create("qubit_mapper", "qdk").run(hamiltonian, scbk_mapping)
 
-        # Two-step
-        bk_mapping = MajoranaMapping.bravyi_kitaev(n)
-        qh_bk = create("qubit_mapper", "qdk").run(hamiltonian, bk_mapping)
+        # Two-step: use BK-tree (the base encoding for SCBK)
+        bk_tree_mapping = MajoranaMapping.bravyi_kitaev_tree(n)
+        qh_bk = create("qubit_mapper", "qdk").run(hamiltonian, bk_tree_mapping)
         qh_two_step = taper_to_scbk(qh_bk, sym)
 
         assert qh_one_step.equiv(qh_two_step)
+
+    def test_scbk_non_power_of_two(self) -> None:
+        """SCBK eigenvalues match exact sector eigenvalues for non-power-of-2 mode counts."""
+        from itertools import combinations  # noqa: PLC0415
+
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        hamiltonian = create_nontrivial_test_hamiltonian(3)
+        n_spatial = hamiltonian.get_one_body_integrals()[0].shape[0]
+        n = 2 * n_spatial
+        n_alpha, n_beta = 2, 1
+        sym = Symmetries(n_alpha, n_beta)
+
+        mapper = create("qubit_mapper", "qdk")
+
+        # SCBK Hamiltonian
+        scbk_mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n, sym)
+        qh_scbk = mapper.run(hamiltonian, scbk_mapping)
+        eigs_scbk = np.sort(np.real(np.linalg.eigvalsh(qh_scbk.to_matrix())))
+
+        # Exact: project JW Hamiltonian onto all matching-parity sectors
+        jw_mapping = MajoranaMapping.jordan_wigner(n)
+        H_jw = mapper.run(hamiltonian, jw_mapping).to_matrix()
+        all_eigs: list[float] = []
+        for na in range(n_spatial + 1):
+            for nb in range(n_spatial + 1):
+                if (-1) ** (na + nb) != (-1) ** (n_alpha + n_beta):
+                    continue
+                if (-1) ** na != (-1) ** n_alpha:
+                    continue
+                states = []
+                for ac in combinations(range(n_spatial), na):
+                    for bc in combinations(range(n_spatial), nb):
+                        s = sum(1 << o for o in ac) | sum(1 << (o + n_spatial) for o in bc)
+                        states.append(s)
+                if states:
+                    proj = np.zeros((2**n, len(states)))
+                    for i, s in enumerate(states):
+                        proj[s, i] = 1.0
+                    all_eigs.extend(np.linalg.eigvalsh(proj.T @ H_jw @ proj))
+        eigs_exact = np.sort(all_eigs)
+
+        assert len(eigs_scbk) == len(eigs_exact)
+        np.testing.assert_allclose(eigs_scbk, eigs_exact, atol=1e-10)
 
     def test_standard_mappings_no_tapering(self) -> None:
         """Standard mappings produce QubitHamiltonian with tapering=None."""
@@ -1055,3 +1187,63 @@ class TestScbkOneStep:
             mapping = factory(n)
             qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
             assert qh.tapering is None
+
+
+# ─── BK-tree factory ─────────────────────────────────────────────────────
+
+
+class TestBravyiKitaevTreeMapper:
+    """Tests for the BK-tree (balanced binary tree) Bravyi-Kitaev variant."""
+
+    def test_bk_tree_instantiation(self) -> None:
+        """BK-tree mapping can be created for various mode counts."""
+        for n in (4, 6, 8, 10, 12):
+            mapping = MajoranaMapping.bravyi_kitaev_tree(n)
+            assert mapping.name == "bravyi-kitaev-tree"
+            assert mapping.num_qubits == n
+
+    def test_bk_tree_clifford_algebra(self) -> None:
+        """BK-tree Majorana operators satisfy {γ_i, γ_j} = 2δ_{ij}."""
+        from qdk_chemistry.utils.pauli_matrix import pauli_to_sparse_matrix  # noqa: PLC0415
+
+        for n in (4, 6, 8):
+            mapping = MajoranaMapping.bravyi_kitaev_tree(n)
+            gammas = [
+                pauli_to_sparse_matrix([mapping.table[k]], np.array([mapping.phases[k]])).toarray()
+                for k in range(2 * n)
+            ]
+            for i in range(2 * n):
+                for j in range(i, 2 * n):
+                    anticomm = gammas[i] @ gammas[j] + gammas[j] @ gammas[i]
+                    expected = 2.0 * np.eye(2**n) if i == j else np.zeros((2**n, 2**n))
+                    np.testing.assert_allclose(anticomm, expected, atol=1e-12, err_msg=f"n={n}, i={i}, j={j}")
+
+    def test_bk_tree_eigenvalues_match_jw(self) -> None:
+        """BK-tree encoded Hamiltonian has same eigenvalues as JW."""
+        hamiltonian = create_nontrivial_test_hamiltonian(3)
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapper = create("qubit_mapper", "qdk")
+
+        qh_jw = mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(n))
+        qh_bkt = mapper.run(hamiltonian, MajoranaMapping.bravyi_kitaev_tree(n))
+
+        eigs_jw = np.sort(np.real(np.linalg.eigvalsh(qh_jw.to_matrix())))
+        eigs_bkt = np.sort(np.real(np.linalg.eigvalsh(qh_bkt.to_matrix())))
+        np.testing.assert_allclose(eigs_bkt, eigs_jw, atol=1e-10)
+
+    def test_bk_tree_z2_symmetries(self) -> None:
+        """BK-tree Z_{n-1} and Z_{n/2-1} commute with the Hamiltonian (Z₂ symmetries)."""
+        hamiltonian = create_nontrivial_test_hamiltonian(3)
+        n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapper = create("qubit_mapper", "qdk")
+
+        H = mapper.run(hamiltonian, MajoranaMapping.bravyi_kitaev_tree(n)).to_matrix()
+
+        # Build Z_{n-1} and Z_{n/2-1} operators
+        for q in (n // 2 - 1, n - 1):
+            Z_q = np.eye(2**n, dtype=complex)
+            for i in range(2**n):
+                if (i >> q) & 1:
+                    Z_q[i, i] = -1.0
+            commutator = H @ Z_q - Z_q @ H
+            np.testing.assert_allclose(commutator, 0.0, atol=1e-12, err_msg=f"[H, Z_{q}] ≠ 0")

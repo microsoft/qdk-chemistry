@@ -389,6 +389,95 @@ MajoranaMapping MajoranaMapping::bravyi_kitaev(std::size_t num_modes) {
   return MajoranaMapping(std::move(table), "bravyi-kitaev");
 }
 
+// ── Factory: Bravyi-Kitaev tree ──────────────────────────────────────
+
+MajoranaMapping MajoranaMapping::bravyi_kitaev_tree(std::size_t num_modes) {
+  if (num_modes == 0) {
+    throw std::invalid_argument("bravyi_kitaev_tree requires num_modes > 0");
+  }
+
+  // Build the balanced binary tree (Algorithm 1 from arXiv:1701.07072).
+  // parent[j] = parent index of node j (-1 for root).
+  // children[j] = list of child indices of node j.
+  std::vector<int64_t> parent(num_modes, -1);
+  std::vector<std::vector<std::size_t>> children(num_modes);
+
+  // Recursive tree builder: range [left, right), pivot = midpoint.
+  // Left half goes under pivot; right half goes under parent_idx.
+  auto build_tree = [&](auto& self, std::size_t left, std::size_t right,
+                        std::size_t parent_idx) -> void {
+    if (left >= right) return;
+    std::size_t pivot = (left + right) >> 1;
+    parent[pivot] = static_cast<int64_t>(parent_idx);
+    children[parent_idx].push_back(pivot);
+    self(self, left, pivot, pivot);              // left subtree under pivot
+    self(self, pivot + 1, right, parent_idx);    // right subtree under parent
+  };
+
+  // Root is node (num_modes - 1). Build tree on [0, num_modes - 1).
+  if (num_modes > 1) {
+    build_tree(build_tree, 0, num_modes - 1, num_modes - 1);
+  }
+
+  std::vector<SparsePauliWord> table;
+  table.reserve(2 * num_modes);
+
+  for (std::size_t j = 0; j < num_modes; ++j) {
+    // U(j) = ancestors of j (walk up parent chain, excluding j itself)
+    std::vector<std::uint64_t> update;
+    for (int64_t p = parent[j]; p >= 0; p = parent[static_cast<std::size_t>(p)]) {
+      update.push_back(static_cast<std::uint64_t>(p));
+    }
+
+    // F(j) = children of j
+    // C(j) = for each ancestor of j, children of that ancestor with index < j
+    std::vector<std::uint64_t> child_set;
+    for (auto c : children[j]) {
+      child_set.push_back(static_cast<std::uint64_t>(c));
+    }
+    std::vector<std::uint64_t> remainder;
+    for (int64_t p = parent[j]; p >= 0; p = parent[static_cast<std::size_t>(p)]) {
+      for (auto c : children[static_cast<std::size_t>(p)]) {
+        if (c < j) {
+          remainder.push_back(static_cast<std::uint64_t>(c));
+        }
+      }
+    }
+
+    // P(j) = C(j) ∪ F(j)
+    std::vector<std::uint64_t> parity_set = remainder;
+    parity_set.insert(parity_set.end(), child_set.begin(), child_set.end());
+
+    // γ_{2j} = X_j · Z_{P(j)} · X_{U(j)}
+    {
+      std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
+      entries.emplace_back(static_cast<std::uint64_t>(j), OP_X);
+      for (auto q : parity_set) {
+        entries.emplace_back(q, OP_Z);
+      }
+      for (auto q : update) {
+        entries.emplace_back(q, OP_X);
+      }
+      table.push_back(build_sorted_word(std::move(entries)));
+    }
+
+    // γ_{2j+1} = Y_j · Z_{C(j)} · X_{U(j)}
+    {
+      std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
+      entries.emplace_back(static_cast<std::uint64_t>(j), OP_Y);
+      for (auto q : remainder) {
+        entries.emplace_back(q, OP_Z);
+      }
+      for (auto q : update) {
+        entries.emplace_back(q, OP_X);
+      }
+      table.push_back(build_sorted_word(std::move(entries)));
+    }
+  }
+
+  return MajoranaMapping(std::move(table), "bravyi-kitaev-tree");
+}
+
 // ── Factory: Parity ──────────────────────────────────────────────────
 
 MajoranaMapping MajoranaMapping::parity(std::size_t num_modes) {
@@ -400,30 +489,24 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes) {
   table.reserve(2 * num_modes);
 
   for (std::size_t j = 0; j < num_modes; ++j) {
-    // γ_{2j}: X_j, X_{j+1} (if j < n-1), Z on {j-1, j-3, j-5, ...}
+    // γ_{2j} = Z_{j-1} (if j>0) · X_j · X_{j+1} · ... · X_{n-1}
     {
       std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
-      // Z on alternating qubits below j (step -2 from j-1)
-      for (int64_t k = static_cast<int64_t>(j) - 1; k >= 0; k -= 2) {
-        entries.emplace_back(static_cast<std::uint64_t>(k), OP_Z);
+      if (j > 0) {
+        entries.emplace_back(static_cast<std::uint64_t>(j - 1), OP_Z);
       }
-      entries.emplace_back(static_cast<std::uint64_t>(j), OP_X);
-      if (j < num_modes - 1) {
-        entries.emplace_back(static_cast<std::uint64_t>(j + 1), OP_X);
+      for (std::size_t k = j; k < num_modes; ++k) {
+        entries.emplace_back(static_cast<std::uint64_t>(k), OP_X);
       }
       table.push_back(build_sorted_word(std::move(entries)));
     }
 
-    // γ_{2j+1}: Y_j, X_{j+1} (if j < n-1), Z on {j-2, j-4, j-6, ...}
+    // γ_{2j+1} = Y_j · X_{j+1} · ... · X_{n-1}
     {
       std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
-      // Z on alternating qubits below j (step -2 from j-2)
-      for (int64_t k = static_cast<int64_t>(j) - 2; k >= 0; k -= 2) {
-        entries.emplace_back(static_cast<std::uint64_t>(k), OP_Z);
-      }
       entries.emplace_back(static_cast<std::uint64_t>(j), OP_Y);
-      if (j < num_modes - 1) {
-        entries.emplace_back(static_cast<std::uint64_t>(j + 1), OP_X);
+      for (std::size_t k = j + 1; k < num_modes; ++k) {
+        entries.emplace_back(static_cast<std::uint64_t>(k), OP_X);
       }
       table.push_back(build_sorted_word(std::move(entries)));
     }

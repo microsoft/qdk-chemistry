@@ -240,11 +240,11 @@ class QubitHamiltonian(DataClass):
     def __add__(self, other: QubitHamiltonian) -> QubitHamiltonian:
         """Return the sum of two qubit Hamiltonians.
 
-        Pauli strings and coefficients are concatenated.  The ``encoding``
-        and ``fermion_mode_order`` metadata must match between operands
-        (or both be ``None``); a mismatch raises ``ValueError``.  If both
-        operands carry a :attr:`term_partition` of the same concrete type,
-        the partitions are merged (with the right-hand operand's indices
+        Pauli strings and coefficients are concatenated.  The ``encoding``,
+        ``fermion_mode_order``, and ``tapering`` metadata must match between
+        operands (or both be ``None``); a mismatch raises ``ValueError``.
+        If both operands carry a :attr:`term_partition` of the same concrete
+        type, the partitions are merged (with the right-hand operand's indices
         offset).  Otherwise the result has no partition.
 
         Args:
@@ -255,7 +255,7 @@ class QubitHamiltonian(DataClass):
 
         Raises:
             TypeError: If *other* is not a ``QubitHamiltonian``.
-            ValueError: If the two Hamiltonians have different qubit counts, encodings, or fermion mode orders.
+            ValueError: If the two Hamiltonians have different qubit counts, encodings, fermion mode orders, or tapering.
 
         """
         if not isinstance(other, QubitHamiltonian):
@@ -271,6 +271,10 @@ class QubitHamiltonian(DataClass):
                 f"Cannot add Hamiltonians with different fermion_mode_order: "
                 f"{self.fermion_mode_order!r} vs {other.fermion_mode_order!r}."
             )
+        if self.tapering != other.tapering:
+            raise ValueError(
+                f"Cannot add Hamiltonians with different tapering: {self.tapering!r} vs {other.tapering!r}."
+            )
 
         pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
         coefficients = np.concatenate([self.coefficients, other.coefficients])
@@ -285,6 +289,7 @@ class QubitHamiltonian(DataClass):
             encoding=self.encoding,
             fermion_mode_order=self.fermion_mode_order,
             term_partition=partition,
+            tapering=self.tapering,
         )
 
     def __mul__(self, scalar) -> QubitHamiltonian:
@@ -307,6 +312,7 @@ class QubitHamiltonian(DataClass):
             encoding=self.encoding,
             fermion_mode_order=self.fermion_mode_order,
             term_partition=self.term_partition,
+            tapering=self.tapering,
         )
 
     def __rmul__(self, scalar: float) -> QubitHamiltonian:
@@ -397,6 +403,7 @@ class QubitHamiltonian(DataClass):
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
+            tapering=self.tapering,
         )
 
     # DataClass interface implementation

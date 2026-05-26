@@ -48,19 +48,36 @@ class QiskitQubitMapperSettings(QubitMapperSettings):
 class QiskitQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
 
-    The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
-    passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
-    corresponding Qiskit Nature mapper. Custom (unnamed) mappings are not
-    supported -- use the QDK variant instead.
+    This is a **name-dispatched** backend: it reads
+    ``mapping.base_encoding`` to select the corresponding Qiskit Nature
+    mapper class and **ignores** ``mapping.table`` entirely.  The qubit
+    operator is built from scratch using Qiskit Nature's own
+    fermion-to-qubit pipeline.
+
+    .. warning::
+
+       Because this backend dispatches on the encoding *name* rather than
+       the Pauli table, it relies on the assumption that the mapping's
+       ``base_encoding`` string is consistent with its table contents.
+       This invariant is guaranteed for factory-produced mappings
+       (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)
+       and is verified by cross-backend eigenvalue tests in the test
+       suite.  Manually constructed mappings with mismatched names will
+       produce silently incorrect results.
+
+    Tapering-based encodings (e.g. parity two-qubit reduction) are
+    supported — the base class
+    :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper.run` strips
+    tapering before calling ``_run_impl()`` and reapplies it afterward.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, separate alpha and beta one-body and two-body
     integrals are forwarded to Qiskit Nature's ``ElectronicEnergy``.
 
-    Supported ``mapping.name`` values:
-        - ``"jordan-wigner"``
-        - ``"bravyi-kitaev"``
-        - ``"parity"``
+    Supported base encodings:
+        - ``"jordan-wigner"`` → :class:`qiskit_nature.second_q.mappers.JordanWignerMapper`
+        - ``"bravyi-kitaev"`` → :class:`qiskit_nature.second_q.mappers.BravyiKitaevMapper`
+        - ``"parity"`` → :class:`qiskit_nature.second_q.mappers.ParityMapper`
 
     Examples:
         >>> from qdk_chemistry.algorithms import create
@@ -84,31 +101,37 @@ class QiskitQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitHamiltonian:
-        """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
+        """Build a qubit Hamiltonian via Qiskit Nature (name-dispatched).
 
-        Supports both restricted and unrestricted (UHF) Hamiltonians. For
-        unrestricted systems, separate alpha/beta integrals are passed to
-        Qiskit Nature's ``ElectronicEnergy.from_raw_integrals``.
+        Reads ``mapping.base_encoding`` to select a Qiskit Nature mapper
+        class.  ``mapping.table`` is **not used** — the qubit operator
+        is rebuilt entirely by Qiskit's own pipeline.
 
         Args:
             hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
-            mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
+            mapping: Encoding selector — only ``base_encoding`` is read.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
         Raises:
-            NotImplementedError: If ``mapping.name`` is not a supported Qiskit encoding.
+            NotImplementedError: If ``mapping.base_encoding`` is not a supported Qiskit encoding.
 
         """
         Logger.trace_entering()
-        encoding_name = mapping.name
+
+        # --- Name dispatch (see QubitMapper class docstring) ---
+        # This backend does NOT use mapping.table.  It reads the encoding
+        # name and selects the corresponding Qiskit Nature mapper class,
+        # which rebuilds the qubit operator from scratch.  Consistency
+        # between the name and the table is only guaranteed for
+        # factory-produced MajoranaMapping objects.
+        encoding_name = mapping.base_encoding
 
         if encoding_name not in _SUPPORTED_ENCODINGS:
             raise NotImplementedError(
-                f"Qiskit plugin does not support MajoranaMapping with name {encoding_name!r}. "
-                f"Supported names: {sorted(_SUPPORTED_ENCODINGS.keys())}. "
-                f"Use the QDK variant for custom mappings."
+                f"Qiskit plugin does not support base encoding {encoding_name!r}. "
+                f"Supported encodings: {sorted(_SUPPORTED_ENCODINGS.keys())}."
             )
 
         h1_a, h1_b = hamiltonian.get_one_body_integrals()

@@ -125,8 +125,8 @@ Serialization
    restored = MajoranaMapping.from_json(json_str)
 
    # HDF5 round-trip
-   mapping.to_hdf5("mapping.h5")
-   restored = MajoranaMapping.from_hdf5("mapping.h5")
+   mapping.to_hdf5_file("mapping.h5")
+   restored = MajoranaMapping.from_hdf5_file("mapping.h5")
 
 
 Related classes

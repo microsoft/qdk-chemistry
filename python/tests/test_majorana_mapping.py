@@ -135,9 +135,9 @@ class TestParity:
         assert par.table == ("XX", "XY", "XZ", "YI")
 
     def test_reference_n4(self) -> None:
-        """Parity n=4 matches CNOT-derived reference."""
+        """Parity n=4 matches standard-convention reference."""
         par = MajoranaMapping.parity(num_modes=4)
-        expected = ("IIXX", "IIXY", "IXXZ", "IXYI", "XXZI", "XYIZ", "XZIZ", "YIZI")
+        expected = ("XXXX", "XXXY", "XXXZ", "XXYI", "XXZI", "XYII", "XZII", "YIII")
         assert par.table == expected
 
 
@@ -300,6 +300,25 @@ class TestSerialization:
         assert loaded.table == custom.table
         assert loaded.name == "my-custom"
 
+    def test_hdf5_round_trip_with_tapering(self) -> None:
+        """HDF5 round-trip preserves phases and tapering for SCBK mappings."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                scbk.to_hdf5(hf)
+            with h5py.File(f.name, "r") as hf:
+                loaded = MajoranaMapping.from_hdf5(hf)
+        assert loaded.table == scbk.table
+        assert loaded.name == scbk.name
+        assert loaded.phases == scbk.phases
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
+        assert loaded.tapering.source_num_qubits == scbk.tapering.source_num_qubits
+        assert loaded.tapering.source_encoding == scbk.tapering.source_encoding
+
 
 # ─── Summary/Repr Tests ─────────────────────────────────────────────────
 
@@ -377,7 +396,7 @@ class TestSymmetryConservingBravyiKitaev:
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
         assert scbk.name == "symmetry-conserving-bravyi-kitaev"
-        assert scbk.base_encoding == "bravyi-kitaev"
+        assert scbk.base_encoding == "bravyi-kitaev-tree"
 
     def test_scbk_has_tapering(self) -> None:
         """SCBK mapping has a TaperingSpecification with 2 tapered qubits."""

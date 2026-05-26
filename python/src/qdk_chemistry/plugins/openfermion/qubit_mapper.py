@@ -52,20 +52,36 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
 class OpenFermionQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.
 
-    The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
-    passed to :meth:`run`. The plugin uses ``mapping.name`` to select the
-    corresponding OpenFermion transform. Custom (unnamed) mappings and
-    tapering-based encodings (symmetry-conserving Bravyi-Kitaev, parity
-    two-qubit reduction) are not supported — use the QDK mapper instead.
+    This is a **name-dispatched** backend: it reads
+    ``mapping.base_encoding`` to select the corresponding OpenFermion
+    transform function and **ignores** ``mapping.table`` entirely.  The
+    qubit operator is built from scratch using OpenFermion's own
+    fermion-to-qubit pipeline.
+
+    .. warning::
+
+       Because this backend dispatches on the encoding *name* rather than
+       the Pauli table, it relies on the assumption that the mapping's
+       ``base_encoding`` string is consistent with its table contents.
+       This invariant is guaranteed for factory-produced mappings
+       (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)
+       and is verified by cross-backend eigenvalue tests in the test
+       suite.  Manually constructed mappings with mismatched names will
+       produce silently incorrect results.
+
+    Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are
+    supported — the base class
+    :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper.run` strips
+    tapering before calling ``_run_impl()`` and reapplies it afterward.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, separate alpha/beta spin channels are handled
     via ``hamiltonian_to_interaction_operator``.
 
-    Supported ``mapping.name`` values:
-        - ``"jordan-wigner"``
-        - ``"bravyi-kitaev"``
-        - ``"bravyi-kitaev-tree"``
+    Supported base encodings:
+        - ``"jordan-wigner"`` → :func:`openfermion.transforms.jordan_wigner`
+        - ``"bravyi-kitaev"`` → :func:`openfermion.transforms.bravyi_kitaev`
+        - ``"bravyi-kitaev-tree"`` → :func:`openfermion.transforms.bravyi_kitaev_tree`
 
     Examples:
         >>> from qdk_chemistry.algorithms import create
@@ -87,31 +103,37 @@ class OpenFermionQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitHamiltonian:
-        """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
+        """Build a qubit Hamiltonian via OpenFermion (name-dispatched).
 
-        Supports both restricted and unrestricted (UHF) Hamiltonians.
+        Reads ``mapping.base_encoding`` to select an OpenFermion transform
+        function.  ``mapping.table`` is **not used** — the qubit operator
+        is rebuilt entirely by OpenFermion's own pipeline.
 
         Args:
             hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
-            mapping: The Majorana-to-Pauli encoding. Only built-in encodings are supported.
+            mapping: Encoding selector — only ``base_encoding`` is read.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
         Raises:
-            NotImplementedError: If ``mapping.name`` is not a supported OpenFermion encoding.
+            NotImplementedError: If ``mapping.base_encoding`` is not a supported OpenFermion encoding.
 
         """
         Logger.trace_entering()
-        encoding_name = mapping.name
+
+        # --- Name dispatch (see QubitMapper class docstring) ---
+        # This backend does NOT use mapping.table.  It reads the encoding
+        # name and selects the corresponding OpenFermion transform function,
+        # which rebuilds the qubit operator from scratch.  Consistency
+        # between the name and the table is only guaranteed for
+        # factory-produced MajoranaMapping objects.
+        encoding_name = mapping.base_encoding
 
         if encoding_name not in _STANDARD_TRANSFORMS:
             raise NotImplementedError(
-                f"OpenFermion plugin does not support MajoranaMapping with name {encoding_name!r}. "
-                f"Supported names: {sorted(_STANDARD_TRANSFORMS.keys())}. "
-                f"For tapering-based encodings, use the QDK mapper with "
-                f"MajoranaMapping.symmetry_conserving_bravyi_kitaev() or "
-                f"MajoranaMapping.parity(n, symmetries)."
+                f"OpenFermion plugin does not support base encoding {encoding_name!r}. "
+                f"Supported encodings: {sorted(_STANDARD_TRANSFORMS.keys())}."
             )
 
         qubit_op = self._map_standard(hamiltonian, encoding_name)

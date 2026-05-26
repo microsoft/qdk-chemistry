@@ -60,10 +60,13 @@ class QdkQubitMapperSettings(QubitMapperSettings):
 class QdkQubitMapper(QubitMapper):
     """QDK native qubit mapper using Majorana-level C++ engine.
 
-    This mapper transforms a fermionic Hamiltonian to a qubit Hamiltonian.
-    The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping`
-    passed to :meth:`run`. Any valid MajoranaMapping works -- built-in
-    (Jordan-Wigner, Bravyi-Kitaev, parity) or custom.
+    This is a **table-driven** backend: it reads the Pauli-string table
+    from the :class:`~qdk_chemistry.data.MajoranaMapping` and passes it
+    directly to the C++ ``majorana_map_hamiltonian`` engine.  Any valid
+    ``MajoranaMapping`` works — built-in (Jordan-Wigner, Bravyi-Kitaev,
+    parity, BK-tree, SCBK) or custom user-defined tables.  The mapping's
+    ``name`` and ``base_encoding`` are used only for metadata on the
+    output :class:`~qdk_chemistry.data.QubitHamiltonian`, not for dispatch.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, the engine handles all four spin-channel ERI
@@ -109,11 +112,15 @@ class QdkQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitHamiltonian:
-        """Transform a fermionic Hamiltonian to a qubit Hamiltonian.
+        """Transform a fermionic Hamiltonian to a qubit Hamiltonian (table-driven).
+
+        This backend reads ``mapping.core`` (the C++ MajoranaMapping) and
+        uses the Pauli-string table directly.  The ``base_encoding`` name
+        is used only for metadata on the output, not for dispatch.
 
         Args:
             hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.
-            mapping: The Majorana-to-Pauli encoding.
+            mapping: The Majorana-to-Pauli encoding (table is consumed directly by the C++ engine).
 
         Returns:
             QubitHamiltonian: The qubit Hamiltonian with Pauli strings and coefficients.
@@ -164,25 +171,9 @@ class QdkQubitMapper(QubitMapper):
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
 
-        qh = QubitHamiltonian(
+        return QubitHamiltonian(
             pauli_strings=list(pauli_strings),
             coefficients=np.array(coefficients, dtype=complex),
             encoding=mapping.base_encoding,
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
-
-        # Apply post-mapping tapering if specified (e.g. SCBK)
-        if mapping.tapering is not None:
-            from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
-
-            qh = taper_qubits(qh, mapping.tapering.qubit_indices, mapping.tapering.eigenvalues)
-            qh = QubitHamiltonian(
-                pauli_strings=qh.pauli_strings,
-                coefficients=qh.coefficients,
-                encoding=mapping.name,
-                fermion_mode_order=qh.fermion_mode_order,
-                tapering=mapping.tapering,
-            )
-            Logger.debug(f"Tapered {mapping.tapering.num_tapered} qubits → {qh.num_qubits} qubits")
-
-        return qh

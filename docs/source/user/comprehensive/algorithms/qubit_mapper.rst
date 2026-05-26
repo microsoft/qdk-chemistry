@@ -132,6 +132,47 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _backend-dispatch-contract:
+
+Backend dispatch contract
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Implementations fall into two categories that use the
+:class:`~qdk_chemistry.data.MajoranaMapping` argument differently:
+
+**Table-driven backends** (QDK native)
+   Read the Pauli-string table from the ``MajoranaMapping`` directly and
+   pass it to the C++ mapping engine.  Any valid table works, including
+   custom encodings that have no standard name.
+
+**Name-dispatched backends** (OpenFermion, Qiskit)
+   **Ignore the Pauli table entirely.**  They read
+   :attr:`~qdk_chemistry.data.MajoranaMapping.base_encoding` — a string
+   like ``"jordan-wigner"`` or ``"bravyi-kitaev-tree"`` — and use it to
+   look up the corresponding transform in their own library.  The qubit
+   operator is then built from scratch using the third-party library's own
+   fermion-to-qubit pipeline.
+
+This distinction has practical consequences:
+
+- **Custom mappings** (user-defined Pauli tables) work with the QDK
+  backend but **cannot** be used with name-dispatched backends, which
+  have no way to interpret an arbitrary table.
+
+- **Consistency is assumed, not verified.**  Factory-produced mappings
+  (e.g. ``MajoranaMapping.jordan_wigner()``) guarantee that the Pauli
+  table and the ``base_encoding`` name describe the same encoding.
+  Cross-backend eigenvalue tests in the test suite verify this for every
+  supported factory × backend combination.  However, if a
+  ``MajoranaMapping`` is manually constructed with a table that does not
+  match its name, a name-dispatched backend will silently use the wrong
+  transform.
+
+- **Tapering** is handled in the base class
+  :meth:`~qdk_chemistry.algorithms.QubitMapper.run`, so all backends
+  automatically support tapered encodings (SCBK, parity two-qubit
+  reduction).  Backends only ever see the untapered base encoding.
+
 .. _qdk-qubit-mapper:
 
 QDK
@@ -140,9 +181,11 @@ QDK
 .. rubric:: Factory name: ``"qdk"``
 
 Native QDK/Chemistry qubit mapping implementation built on the :doc:`PauliOperator <../data/pauli_operator>` expression layer.
-This implementation provides high-performance fermion-to-qubit transformations without external dependencies.
+This is a **table-driven** backend: it reads the Pauli-string table from the :class:`~qdk_chemistry.data.MajoranaMapping` and passes it directly to the C++ mapping engine.
+Any valid ``MajoranaMapping`` works — factory-produced or custom user-defined tables.
+The mapping's ``name`` and ``base_encoding`` are used only for metadata on the output, not for dispatch.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
@@ -184,18 +227,15 @@ Qiskit
 .. rubric:: Factory name: ``"qiskit"``
 
 Qubit mapping implementation integrated through the Qiskit plugin.
+This is a **name-dispatched** backend: it reads ``mapping.base_encoding`` to select a Qiskit Nature mapper class and **ignores the Pauli table** (see :ref:`backend-dispatch-contract`).
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
-
-The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping` passed to ``run()``.
+Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 .. rubric:: Settings
 
-This implementation has no configurable settings. The encoding strategy is
-determined entirely by the :class:`~qdk_chemistry.data.MajoranaMapping` provided
-to ``run()``.
+This implementation has no configurable settings.
 
 .. _openfermion-qubit-mapper:
 
@@ -205,10 +245,9 @@ OpenFermion
 .. rubric:: Factory name: ``"openfermion"``
 
 Qubit mapping implementation integrated through the OpenFermion plugin.
+This is a **name-dispatched** backend: it reads ``mapping.base_encoding`` to select an OpenFermion transform function and **ignores the Pauli table** (see :ref:`backend-dispatch-contract`).
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
-
-The encoding is determined by the :class:`~qdk_chemistry.data.MajoranaMapping` passed to ``run()``.
+Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 

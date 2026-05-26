@@ -665,3 +665,77 @@ class TestQubitHamiltonianArithmetic:
         """H * scalar and scalar * H should give the same result."""
         h = QubitHamiltonian(["XI"], np.array([3.0]))
         np.testing.assert_allclose((h * 2.0).coefficients, (2.0 * h).coefficients)
+
+
+class TestTaperingPropagation:
+    """Verify tapering metadata survives arithmetic and reordering."""
+
+    @pytest.fixture()
+    def tapering(self):
+        """Create a sample tapering specification."""
+        from qdk_chemistry.data.tapering import TaperingSpecification
+
+        return TaperingSpecification(
+            qubit_indices=(3, 1),
+            eigenvalues=(1, -1),
+            source_num_qubits=4,
+            source_encoding="bravyi-kitaev-tree",
+        )
+
+    @pytest.fixture()
+    def tapered_h(self, tapering):
+        """Create a QubitHamiltonian with tapering metadata."""
+        return QubitHamiltonian(
+            ["XI", "IZ"],
+            np.array([1.0, 0.5]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+
+    def test_add_preserves_tapering(self, tapered_h, tapering):
+        """H1 + H2 with matching tapering should preserve it."""
+        h2 = QubitHamiltonian(
+            ["XX"],
+            np.array([0.3]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+        result = tapered_h + h2
+        assert result.tapering == tapering
+
+    def test_add_mismatched_tapering_raises(self, tapered_h):
+        """H1 + H2 with different tapering should raise ValueError."""
+        from qdk_chemistry.data.tapering import TaperingSpecification
+
+        other_tapering = TaperingSpecification(
+            qubit_indices=(3, 1),
+            eigenvalues=(1, 1),
+            source_num_qubits=4,
+            source_encoding="bravyi-kitaev-tree",
+        )
+        h2 = QubitHamiltonian(
+            ["XX"],
+            np.array([0.3]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=other_tapering,
+        )
+        with pytest.raises(ValueError, match="tapering"):
+            tapered_h + h2
+
+    def test_mul_preserves_tapering(self, tapered_h, tapering):
+        """Scalar * H should preserve tapering metadata."""
+        result = 2.0 * tapered_h
+        assert result.tapering == tapering
+        result2 = tapered_h * 3.0
+        assert result2.tapering == tapering
+
+    def test_to_interleaved_preserves_tapering(self, tapering):
+        """to_interleaved should preserve tapering metadata."""
+        h = QubitHamiltonian(
+            ["XIZI", "IZIX"],
+            np.array([1.0, 0.5]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+        result = h.to_interleaved(n_spatial=2)
+        assert result.tapering == tapering

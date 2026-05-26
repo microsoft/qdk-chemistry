@@ -199,14 +199,14 @@ def test_scbk_one_step_sets_encoding():
 
 
 def test_scbk_name_dispatch_removed():
-    """Passing a symmetry-conserving-BK-named mapping to the OF plugin raises NotImplementedError."""
+    """Passing a mapping with an unsupported base encoding to the OF plugin raises NotImplementedError."""
     hamiltonian = create_nontrivial_test_hamiltonian()
     n_spin = _num_spin_orbitals(hamiltonian)
     jw = MajoranaMapping.jordan_wigner(n_spin)
     mapping = MajoranaMapping(table=list(jw.table), name="symmetry-conserving-bravyi-kitaev")
 
     mapper = create("qubit_mapper", "openfermion")
-    with pytest.raises(NotImplementedError, match="tapering-based"):
+    with pytest.raises(NotImplementedError, match="does not support base encoding"):
         mapper.run(hamiltonian, mapping)
 
 
@@ -458,3 +458,31 @@ def test_openfermion_unrestricted_jw_matches_qdk():
     all_keys = set(d_qdk) | set(d_of)
     max_diff = max(abs(d_qdk.get(k, 0) - d_of.get(k, 0)) for k in all_keys)
     assert max_diff < 1e-10, f"UHF JW max coefficient diff: {max_diff}"
+
+
+@pytest.mark.skipif(not OPENFERMION_AVAILABLE, reason="OpenFermion not installed")
+def test_scbk_cross_backend():
+    """SCBK through QDK and OpenFermion backends should produce matching eigenvalues."""
+    hamiltonian = create_nontrivial_test_hamiltonian()
+    n_spin = _num_spin_orbitals(hamiltonian)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
+    mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(n_spin, symmetries)
+
+    qh_qdk = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    qh_of = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
+
+    assert qh_qdk.encoding == "symmetry-conserving-bravyi-kitaev"
+    assert qh_of.encoding == "symmetry-conserving-bravyi-kitaev"
+    assert qh_qdk.tapering is not None
+    assert qh_of.tapering is not None
+    assert qh_qdk.num_qubits == n_spin - 2
+    assert qh_of.num_qubits == n_spin - 2
+
+    # Compare eigenvalues
+    from qdk_chemistry.utils.pauli_matrix import pauli_to_sparse_matrix  # noqa: PLC0415
+
+    mat_qdk = pauli_to_sparse_matrix(list(qh_qdk.pauli_strings), qh_qdk.coefficients).toarray()
+    mat_of = pauli_to_sparse_matrix(list(qh_of.pauli_strings), qh_of.coefficients).toarray()
+    eigs_qdk = sorted(np.linalg.eigvalsh(mat_qdk))
+    eigs_of = sorted(np.linalg.eigvalsh(mat_of))
+    np.testing.assert_allclose(eigs_qdk, eigs_of, atol=1e-10)

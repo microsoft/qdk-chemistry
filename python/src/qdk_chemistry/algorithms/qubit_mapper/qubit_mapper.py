@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Settings
+from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
     from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
@@ -35,7 +36,56 @@ class QubitMapperSettings(Settings):
 
 
 class QubitMapper(Algorithm):
-    """Abstract base class for mapping a Hamiltonian to a QubitHamiltonian."""
+    """Abstract base class for mapping a Hamiltonian to a QubitHamiltonian.
+
+    .. rubric:: Backend dispatch contract
+
+    There are two fundamentally different kinds of ``QubitMapper`` backend,
+    and they use the :class:`~qdk_chemistry.data.MajoranaMapping` argument
+    in different ways:
+
+    **Table-driven backends** (e.g. :class:`QdkQubitMapper`)
+        Read ``mapping.table`` — the actual 2N Pauli strings that define
+        the Majorana-to-qubit encoding — and use them directly in the
+        mapping engine.  Any valid table works, including custom encodings
+        that have no name.
+
+    **Name-dispatched backends** (e.g. ``OpenFermionQubitMapper``,
+    ``QiskitQubitMapper``)
+        **Ignore** ``mapping.table`` entirely.  Instead they read
+        ``mapping.base_encoding`` (a string like ``"jordan-wigner"`` or
+        ``"bravyi-kitaev-tree"``) and use it to look up the corresponding
+        transform function in their own library.  The backend then builds
+        a qubit operator from scratch using its own independent
+        fermion-to-qubit pipeline.
+
+        This means:
+
+        *  The ``MajoranaMapping`` serves only as an **encoding selector**
+           for name-dispatched backends — its Pauli table is not consulted.
+        *  Consistency between the table and the name is **not verified at
+           runtime**.  If a ``MajoranaMapping`` is constructed with a table
+           that does not match its ``base_encoding`` name (e.g. a BK table
+           labelled ``"jordan-wigner"``), a name-dispatched backend will
+           silently use the wrong transform.
+        *  Factory-produced mappings (``MajoranaMapping.jordan_wigner()``,
+           ``.bravyi_kitaev()``, etc.) are guaranteed to be consistent.
+           Cross-backend eigenvalue tests in the test suite verify this for
+           every supported factory x backend combination.
+        *  Custom or manually constructed mappings with non-standard names
+           cannot be used with name-dispatched backends.
+
+    .. rubric:: Tapering
+
+    Subclasses implement :meth:`_run_impl` for the base (untapered) mapping.
+    Tapering is handled automatically by :meth:`run`: if the
+    :class:`~qdk_chemistry.data.MajoranaMapping` carries a
+    :attr:`~qdk_chemistry.data.MajoranaMapping.tapering` specification,
+    ``run()`` strips it before calling ``_run_impl()`` and applies it to
+    the result afterward.  This means ``_run_impl()`` only ever sees a
+    base encoding and never needs to handle tapering itself.
+
+    """
 
     def __init__(self):
         """Initialize the QubitMapper."""
@@ -45,6 +95,51 @@ class QubitMapper(Algorithm):
         """Return ``qubit_mapper`` as the algorithm type name."""
         return "qubit_mapper"
 
+    def run(
+        self,
+        hamiltonian: Hamiltonian,
+        mapping: MajoranaMapping,
+    ) -> QubitHamiltonian:
+        """Map a fermionic Hamiltonian to a qubit Hamiltonian.
+
+        If *mapping* carries tapering metadata, the tapering is stripped
+        before delegating to :meth:`_run_impl` and reapplied afterward.
+        This lets every backend (QDK native, OpenFermion, Qiskit, …)
+        support tapered encodings without duplicating tapering logic.
+
+        Args:
+            hamiltonian: The fermionic Hamiltonian.
+            mapping: The Majorana-to-Pauli encoding (may include tapering).
+
+        Returns:
+            QubitHamiltonian with encoding and tapering metadata set.
+
+        """
+        self._settings.lock()
+
+        tapering = mapping.tapering
+        if tapering is not None:
+            base_mapping = mapping.without_tapering()
+            qh = self._run_impl(hamiltonian, base_mapping)
+        else:
+            qh = self._run_impl(hamiltonian, mapping)
+
+        if tapering is not None:
+            from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
+            from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
+
+            qh = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
+            qh = QubitHamiltonian(
+                pauli_strings=qh.pauli_strings,
+                coefficients=qh.coefficients,
+                encoding=mapping.name,
+                fermion_mode_order=qh.fermion_mode_order,
+                tapering=tapering,
+            )
+            Logger.debug(f"Tapered {tapering.num_tapered} qubits → {qh.num_qubits} qubits")
+
+        return qh
+
     @abstractmethod
     def _run_impl(
         self,
@@ -53,9 +148,25 @@ class QubitMapper(Algorithm):
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
 
+        Implementations receive a **base** (untapered) mapping only.
+        Tapering is handled by :meth:`run`.
+
+        .. important::
+
+           **Table-driven** backends (e.g. :class:`QdkQubitMapper`) should
+           read ``mapping.table`` and ``mapping.core`` to perform the
+           transformation.
+
+           **Name-dispatched** backends (e.g. ``OpenFermionQubitMapper``)
+           should read ``mapping.base_encoding`` to select a third-party
+           transform function.  These backends do **not** use
+           ``mapping.table`` — they rebuild the qubit operator from scratch
+           using the third-party library's own pipeline.  See the class
+           docstring for the full dispatch contract and its implications.
+
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            mapping: The Majorana-to-Pauli encoding to use.
+            mapping: The Majorana-to-Pauli encoding (always untapered).
 
         Returns:
            QubitHamiltonian: An instance of the QubitHamiltonian.
