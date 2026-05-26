@@ -85,16 +85,14 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.march, 'x86-64-v3')) }}:
   - script: |
-      echo "Running pip wheel build (Linux)..."
+      echo "Running pip wheel build (Linux x86-64-v3)..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
         -e PIP_INDEX_URL \
-        ${{ if eq(parameters.march, 'x86-64-v3') }}: \
         -e SYSTEM_ACCESSTOKEN \
-        ${{ endif }}\
         -e QDK_UARCH=${{ parameters.march }} \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
@@ -108,11 +106,33 @@ steps:
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
-    displayName: Build wheel (Linux)
+    displayName: Build wheel (Linux x86-64-v3)
     retryCountOnTaskFailure: 2
-    ${{ if eq(parameters.march, 'x86-64-v3') }}:
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.march, 'x86-64-v3')) }}:
+  - script: |
+      echo "Running pip wheel build (Linux ${{ parameters.march }})..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -e PIP_INDEX_URL \
+        -e QDK_UARCH=${{ parameters.march }} \
+        -w /workspace/qdk-chemistry \
+        ${{ parameters.dockerImage }} \
+      bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
+                                                      ${{ parameters.pythonVersion }} \
+                                                      ${{ parameters.buildType }} \
+                                                      ${{ parameters.buildTesting }} \
+                                                      ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
+                                                      ${{ parameters.hdf5Version }} \
+                                                      ${{ parameters.blisVersion }} \
+                                                      ${{ parameters.libflameVersion }} \
+                                                      ${{ parameters.macBuild }}
+    displayName: Build wheel (Linux ${{ parameters.march }})
+    retryCountOnTaskFailure: 2
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |

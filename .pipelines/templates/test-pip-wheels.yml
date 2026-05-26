@@ -16,25 +16,36 @@ parameters:
   default: OFF
 
 steps:
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
-      echo "Running wheel tests (Docker)..."
+      echo "Running wheel tests (Docker linux/amd64)..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -e PIP_INDEX_URL \
-        ${{ if eq(parameters.imageTag, 'linux/amd64') }}: \
         -e SYSTEM_ACCESSTOKEN \
-        ${{ endif }}\
         -e QSHARP_PYTHON_TELEMETRY=false \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
-    displayName: Test wheel (Docker)
-    ${{ if eq(parameters.imageTag, 'linux/amd64') }}:
-      env:
-        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    displayName: Test wheel (Docker linux/amd64)
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
+  - script: |
+      echo "Running wheel tests (Docker ${{ parameters.imageTag }})..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -e PIP_INDEX_URL \
+        -e QSHARP_PYTHON_TELEMETRY=false \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace \
+        -w /workspace/qdk-chemistry/python \
+        ${{ parameters.dockerImage }} \
+        bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+                                                          ${{ parameters.macBuild }}
+    displayName: Test wheel (Docker ${{ parameters.imageTag }})
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
