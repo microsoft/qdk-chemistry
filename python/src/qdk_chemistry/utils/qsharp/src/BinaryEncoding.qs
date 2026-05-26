@@ -12,7 +12,6 @@ namespace QDKChemistry.Utils.BinaryEncoding {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.Measurement.MResetX;
-    import Std.StatePreparation.PreparePureStateD;
     import QDKChemistry.Utils.StatePreparation.ApplyDensePreparation;
 
     /// A single gate produced by the matrix compression pipeline.
