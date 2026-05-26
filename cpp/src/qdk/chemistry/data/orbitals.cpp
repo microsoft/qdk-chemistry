@@ -1127,17 +1127,30 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       return ModelOrbitals::from_hdf5(group);
     }
 
+    // Read is_restricted flag from metadata
+    bool restricted = false;
+    try {
+      H5::Group metadata_group = group.openGroup("metadata");
+      H5::DataSet ds = metadata_group.openDataSet("is_restricted");
+      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
+    } catch (const H5::Exception&) {
+      throw std::runtime_error(
+          "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
+    }
+
     // Handle regular Orbitals case
     // Load coefficients (required)
     auto coeffs_alpha = load_matrix_from_group(group, "coefficients_alpha");
 
-    // Check if beta coefficients exist
+    // Only read beta coefficients if unrestricted
     std::optional<Eigen::MatrixXd> coeffs_beta_opt;
-    try {
-      auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
-      coeffs_beta_opt = coeffs_beta;
-    } catch (const std::exception&) {
-      // Beta coefficients don't exist - this is a restricted calculation
+    if (!restricted) {
+      try {
+        auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
+        coeffs_beta_opt = coeffs_beta;
+      } catch (const std::exception&) {
+        // Beta coefficients don't exist - this is a restricted calculation
+      }
     }
 
     // Load optional energies
@@ -1199,7 +1212,13 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     } catch (const std::exception&) { /* optional */
     }
 
-    if (coeffs_beta_opt) {
+    if (restricted || !coeffs_beta_opt) {
+      // Restricted case - use single-matrix constructor to share the pointer
+      return std::make_shared<Orbitals>(
+          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
+          std::make_tuple(std::move(active_indices_alpha),
+                          std::move(inactive_indices_alpha)));
+    } else {
       // Unrestricted case
       return std::make_shared<Orbitals>(
           coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
@@ -1208,12 +1227,6 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
                           std::move(active_indices_beta),
                           std::move(inactive_indices_alpha),
                           std::move(inactive_indices_beta)));
-    } else {
-      // Restricted case
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(inactive_indices_alpha)));
     }
 
   } catch (const H5::Exception& e) {
