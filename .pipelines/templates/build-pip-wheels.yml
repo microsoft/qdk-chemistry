@@ -85,9 +85,9 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.march, 'x86-64-v3')) }}:
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
-      echo "Running pip wheel build (Linux x86-64-v3)..."
+      echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
@@ -106,14 +106,16 @@ steps:
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
-    displayName: Build wheel (Linux x86-64-v3)
+    displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
     env:
+      # Required by the conda bootstrap on linux/amd64 to authenticate to
+      # the Azure Artifacts feed that proxies ms-ensureconda + conda channels.
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.march, 'x86-64-v3')) }}:
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
-      echo "Running pip wheel build (Linux ${{ parameters.march }})..."
+      echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
