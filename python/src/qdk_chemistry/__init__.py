@@ -28,7 +28,11 @@ import warnings
 
 from qdk import TargetProfile
 from qdk import init as qdk_init
-from qsharp._qsharp import get_config as get_qdk_profile_config
+
+try:
+    from qdk._interpreter import get_config as get_qdk_profile_config
+except ImportError:
+    from qsharp._qsharp import get_config as get_qdk_profile_config
 
 # Import some tools for convenience
 import qdk_chemistry.constants
