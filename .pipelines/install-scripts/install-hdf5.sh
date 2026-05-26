@@ -6,6 +6,7 @@ BUILD_TYPE=${2:-Release}
 HDF5_PARENT_DIR=${3:-/ext}
 CXX_FLAGS=${4:-"-fPIC -O3"}
 MAC_BUILD=${5:-OFF}
+HDF5_VERSION=${6:-1.13.0}
 
 echo "Installing HDF5 to ${INSTALL_PREFIX}..."
 
@@ -18,13 +19,18 @@ if [ -d "${INSTALL_PREFIX}/hdf5" ]; then
     exit 0
 fi
 
-# Check if HDF5 source exists
-if [ ! -d "hdf5" ]; then
-    echo "Error: HDF5 source not found in /ext/"
-    echo "Available directories in /ext/:"
-    ls -la .
-    exit 1
-fi
+# Download HDF5 source.
+# Clean up any leftover state from a previous (possibly failed) attempt on
+# this self-hosted agent — the workspace persists across builds and retries.
+echo "Downloading HDF5 ${HDF5_VERSION}..."
+rm -rf hdf5 hdf5-${HDF5_VERSION} hdf5-${HDF5_VERSION}.tar.bz2
+HDF5_CHECKSUM=1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec
+wget -q --no-check-certificate https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
+tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
+rm hdf5-${HDF5_VERSION}.tar.bz2
+mv hdf5-${HDF5_VERSION} hdf5
+echo "HDF5 ${HDF5_VERSION} downloaded and extracted successfully"
 
 # Build and install HDF5 from extracted source
 cd hdf5
