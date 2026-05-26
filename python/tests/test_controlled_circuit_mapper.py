@@ -12,13 +12,10 @@ import pytest
 import scipy
 
 try:
-    import qdk
-
-    NativeCircuitType = qdk._native.Circuit
+    from qdk._native import Circuit as QdkCircuitType
 except ImportError:
-    import qsharp
+    from qsharp._native import Circuit as QdkCircuitType
 
-    NativeCircuitType = qsharp._native.Circuit
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
@@ -80,7 +77,7 @@ class TestPauliSequenceMapper:
         circuit = mapper.run(controlled_unitary)
 
         assert isinstance(circuit, Circuit)
-        assert isinstance(circuit.get_qsharp_circuit(), NativeCircuitType)
+        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
 
     def test_default_target_indices(self, controlled_unitary):
         """Test that default target indices are used when none are provided."""

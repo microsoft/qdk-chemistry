@@ -16,15 +16,12 @@ from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 
 try:
-    import qdk
+    from qdk._interpreter import QirInputData
+    from qdk._native import Circuit as QdkCircuitType
 
-    QirInputDataType = qdk._interpreter.QirInputData
-    NativeCircuitType = qdk._native.Circuit
 except ImportError:
-    import qsharp
-
-    QirInputDataType = qsharp._qsharp.QirInputData
-    NativeCircuitType = qsharp._native.Circuit
+    from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._qsharp import QirInputData
 
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -76,8 +73,8 @@ class TestCircuitConstruction:
         circuit = Circuit(qasm=qasm, qir=qir, qsharp=qsharp_circuit)
         assert circuit.qasm is not None
         assert "h q[0];" in circuit.qasm
-        assert isinstance(circuit.qir, QirInputDataType)
-        assert isinstance(circuit.qsharp, NativeCircuitType)
+        assert isinstance(circuit.qir, QirInputData)
+        assert isinstance(circuit.qsharp, QdkCircuitType)
 
     def test_circuit_construction_raises(self):
         """Test that Circuit construction without QASM raises RuntimeError."""
@@ -118,7 +115,7 @@ class TestGetQsharpCircuit:
         qdk_circuit_info = json.loads(qdk_circuit.json())
         assert len(qdk_circuit_info["qubits"]) == 3
         qir = circuit.get_qir()
-        assert isinstance(qir, QirInputDataType)
+        assert isinstance(qir, QirInputData)
 
     def test_get_circuit_from_factory(self):
         """Test that get_qir and get_qsharp_circuit can generate and cache QIR and Q# circuit from Q# factory data."""
@@ -131,9 +128,9 @@ class TestGetQsharpCircuit:
         assert circuit.qsharp is None
         qir = circuit.get_qir()
         qsc = circuit.get_qsharp_circuit()
-        assert isinstance(qir, QirInputDataType)
-        assert isinstance(circuit.qir, QirInputDataType)
-        assert isinstance(qsc, NativeCircuitType)
+        assert isinstance(qir, QirInputData)
+        assert isinstance(circuit.qir, QirInputData)
+        assert isinstance(qsc, QdkCircuitType)
 
     def test_get_qsharp_circuit_prune_classical_qubits(self):
         """Test that get_qsharp_circuit can prune classical qubits when requested."""

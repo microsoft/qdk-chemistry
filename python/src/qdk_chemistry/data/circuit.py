@@ -13,12 +13,13 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from __future__ import annotations
-
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+import h5py
 from qdk import qsharp
+from qdk.estimator import EstimatorParams, EstimatorResult
 from qdk.openqasm import OutputSemantics
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
@@ -27,20 +28,13 @@ from qdk.openqasm import estimate as openqasm_estimate
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
+try:
+    from qdk._interpreter import QirInputData
+    from qdk._native import Circuit as QdkCircuitType
 
-    import h5py
-    from qdk.estimator import EstimatorParams as QdkEstimatorParamsType
-    from qdk.estimator import EstimatorResult as QdkEstimatorResultType
-
-    try:
-        from qdk._interpreter import QirInputData as QdkQirInputDataType
-        from qdk._native import Circuit as QdkCircuitType
-
-    except ImportError:
-        from qsharp._native import Circuit as QdkCircuitType
-        from qsharp._qsharp import QirInputData as QdkQirInputDataType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
+    from qsharp._qsharp import QirInputData
 
 
 __all__: list[str] = ["QsharpFactoryData"]
@@ -70,7 +64,7 @@ class Circuit(DataClass):
     def __init__(
         self,
         qasm: str | None = None,
-        qir: QdkQirInputDataType | str | None = None,
+        qir: QirInputData | str | None = None,
         qsharp: QdkCircuitType | None = None,
         qsharp_op: Callable[..., Any] | None = None,
         qsharp_factory: QsharpFactoryData | None = None,
@@ -150,7 +144,7 @@ class Circuit(DataClass):
         qir = self.get_qir()
         return qasm3.dumps(qir_ir_to_qiskit(str(qir)))
 
-    def get_qir(self) -> QdkQirInputDataType | str:
+    def get_qir(self) -> QirInputData | str:
         """Get QIR representation of the quantum circuit.
 
         Returns:
@@ -212,15 +206,15 @@ class Circuit(DataClass):
 
     def estimate(
         self,
-        params: dict[str, Any] | list[Any] | QdkEstimatorParamsType | None = None,
-    ) -> QdkEstimatorResultType:
+        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
+    ) -> EstimatorResult:
         """Estimate resources for the quantum circuit.
 
         Args:
             params: Resource estimation parameters. Accepts a dict, list, or ``qdk.estimator.EstimatorParams``.
 
         Returns:
-            QdkEstimatorResultType: The estimated resources.
+            The estimated resources.
 
         Raises:
             RuntimeError: If no suitable circuit representation is available for estimation.
@@ -324,7 +318,7 @@ class Circuit(DataClass):
             group.attrs["encoding"] = self.encoding
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> Circuit:
+    def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
         """Create a Circuit from a JSON dictionary.
 
         Args:
@@ -345,7 +339,7 @@ class Circuit(DataClass):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> Circuit:
+    def from_hdf5(cls, group: h5py.Group) -> "Circuit":
         """Load a Circuit from an HDF5 group.
 
         Args:

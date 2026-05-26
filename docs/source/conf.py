@@ -207,11 +207,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
-    (r"py:class", r"qdk\..*"),  # qdk internal types (version-dependent)
-    (
-        r"py:class",
-        r"Qdk(QirInputData|Circuit|EstimatorResult|EstimatorParams)Type",
-    ),  # qdk internal types (version-dependent)
+    (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
 ]
 
 # Configure output for to-dos
