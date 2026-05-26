@@ -125,6 +125,51 @@ class PauliProductFormulaContainer(UnitaryContainer):
             num_qubits=self._num_qubits,
         )
 
+    def combine(self, other_container: "PauliProductFormulaContainer", atol=1e-12) -> "PauliProductFormulaContainer":
+        """Combine two Trotter evolutions, merging adjacent identical Pauli terms.
+
+        The terms from ``self`` (repeated ``step_reps`` times) are followed by the
+        terms from ``other_container`` (also repeated according to its
+        ``step_reps``). When two consecutive terms act with the same Pauli operator
+        string (i.e., have identical ``pauli_term`` dictionaries), their rotation
+        angles are summed into a single ``ExponentiatedPauliTerm``. If the summed
+        angle has magnitude less than ``atol``, the resulting term is removed.
+
+        Args:
+            other_container: The second ``PauliProductFormulaContainer`` appended
+                after this container.
+            atol: Absolute tolerance used when deciding whether a merged term with
+                a small rotation angle should be dropped.
+
+        Returns:
+            A single ``PauliProductFormulaContainer`` representing the combined
+            evolution with adjacent identical terms fused.
+
+        """
+        if self.num_qubits != other_container.num_qubits:
+            raise ValueError(
+                f"Cannot combine PauliProductFormulaContainer instances with different "
+                f"num_qubits (self.num_qubits={self.num_qubits}, "
+                f"other_container.num_qubits={other_container.num_qubits})."
+            )
+
+        merged: list[ExponentiatedPauliTerm] = []
+        for step_terms, step_reps in (
+            (self.step_terms, self.step_reps),
+            (other_container.step_terms, other_container.step_reps),
+        ):
+            for _ in range(step_reps):
+                for term in step_terms:
+                    if merged and merged[-1].pauli_term == term.pauli_term:
+                        new_angle = merged[-1].angle + term.angle
+                        if abs(new_angle) > atol:
+                            merged[-1] = ExponentiatedPauliTerm(pauli_term=term.pauli_term, angle=new_angle)
+                        else:
+                            merged.pop()
+                    else:
+                        merged.append(term)
+        return PauliProductFormulaContainer(step_terms=merged, step_reps=1, num_qubits=self.num_qubits)
+
     def to_json(self) -> dict[str, Any]:
         """Convert the PauliProductFormulaContainer to a dictionary for JSON serialization.
 
