@@ -281,8 +281,8 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     auto inactive_indices = inactive_indices_alpha;
 
     // Compute inactive density
-    Eigen::MatrixXd D_inactive =
-        detail::build_inactive_density(Ca, inactive_indices, num_atomic_orbitals);
+    Eigen::MatrixXd D_inactive = detail::build_inactive_density(
+        Ca, inactive_indices, num_atomic_orbitals);
 
     // Compute J and K via ERI
     Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
@@ -297,8 +297,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             result.H_active, moeri_aaaa, orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive));
 
   } else {
@@ -330,8 +329,7 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
             result.H_active_alpha, result.H_active_beta, moeri_aaaa, moeri_aabb,
             moeri_bbbb, orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive_alpha, result.F_inactive_beta));
   }
 }

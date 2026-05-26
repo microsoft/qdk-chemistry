@@ -249,8 +249,8 @@ DensityFittedHamiltonianConstructor::_run_impl(
     auto inactive_indices = inactive_indices_alpha;
 
     // Compute inactive density and J/K from 3-center vectors
-    Eigen::MatrixXd D_inactive =
-        detail::build_inactive_density(Ca, inactive_indices, num_atomic_orbitals);
+    Eigen::MatrixXd D_inactive = detail::build_inactive_density(
+        Ca, inactive_indices, num_atomic_orbitals);
     Eigen::MatrixXd J_inactive_ao =
         detail::build_J_from_three_center(B_ao, D_inactive);
     Eigen::MatrixXd K_inactive_ao =
@@ -263,8 +263,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active, dfmoeri_aa, orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive));
 
   } else {
@@ -294,8 +293,7 @@ DensityFittedHamiltonianConstructor::_run_impl(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active_alpha, result.H_active_beta, dfmoeri_aa, dfmoeri_bb,
             orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive_alpha, result.F_inactive_beta));
   }
 }

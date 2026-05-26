@@ -27,7 +27,9 @@ DEFAULT_MAX_DETERMINANTS = 2000
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse CLI options in the same order as the workflow steps."""
-    parser = argparse.ArgumentParser(description="End-to-end DF-MP2 reference energy demo")
+    parser = argparse.ArgumentParser(
+        description="End-to-end DF-MP2 reference energy demo"
+    )
     parser.add_argument(
         "--xyz",
         type=Path,

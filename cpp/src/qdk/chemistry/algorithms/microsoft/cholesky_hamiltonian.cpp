@@ -657,8 +657,8 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     const auto& inactive_indices = inactive_indices_alpha;
 
     // Compute inactive density and J/K from Cholesky vectors
-    Eigen::MatrixXd D_inactive =
-        detail::build_inactive_density(Ca, inactive_indices, num_atomic_orbitals);
+    Eigen::MatrixXd D_inactive = detail::build_inactive_density(
+        Ca, inactive_indices, num_atomic_orbitals);
     Eigen::MatrixXd J_inactive_ao =
         detail::build_J_from_three_center(L_ao, D_inactive);
     Eigen::MatrixXd K_inactive_ao =
@@ -679,8 +679,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     return std::make_shared<data::Hamiltonian>(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active, L_mo, orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive));
   } else {
     // Unrestricted case
@@ -718,8 +717,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
         std::make_unique<data::ThreeCenterHamiltonianContainer>(
             result.H_active_alpha, result.H_active_beta, L_mo_alpha, L_mo_beta,
             orbitals,
-            result.E_inactive +
-                structure->calculate_nuclear_repulsion_energy(),
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive_alpha, result.F_inactive_beta));
   }
 }

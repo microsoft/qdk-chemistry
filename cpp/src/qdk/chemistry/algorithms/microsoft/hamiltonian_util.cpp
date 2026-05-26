@@ -188,7 +188,7 @@ Eigen::MatrixXd build_K_from_three_center(
   Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_ao, n_ao);
   for (size_t k = 0; k < rank; ++k) {
     Eigen::Map<const Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao,
-                                               n_occ);
+                                              n_occ);
     K.noalias() += L_k_occ * L_k_occ.transpose();
   }
 
@@ -212,8 +212,7 @@ Eigen::MatrixXd build_inactive_density(const Eigen::MatrixXd& C,
   if (indices.empty()) return D;
 
   if (is_indices_contiguous(indices)) {
-    auto C_inactive =
-        C.block(0, indices.front(), n_ao, indices.size());
+    auto C_inactive = C.block(0, indices.front(), n_ao, indices.size());
     D = C_inactive * C_inactive.transpose();
   } else {
     for (size_t i : indices) {

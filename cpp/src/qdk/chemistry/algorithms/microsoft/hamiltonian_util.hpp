@@ -86,7 +86,7 @@ Eigen::MatrixXd build_inactive_density(const Eigen::MatrixXd& C,
 struct InactiveFockResult {
   Eigen::MatrixXd F_inactive;  // Full MO-basis inactive Fock
   Eigen::MatrixXd H_active;    // Active-space one-body Hamiltonian
-  double E_inactive;            // Inactive energy contribution
+  double E_inactive;           // Inactive energy contribution
 };
 
 /**
