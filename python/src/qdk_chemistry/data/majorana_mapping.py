@@ -589,4 +589,5 @@ class MajoranaMapping(DataClass):
     def __repr__(self) -> str:
         """Return a repr string."""
         label = f"'{self._name}', " if self._name else ""
-        return f"MajoranaMapping({label}num_modes={self._num_modes}, num_qubits={self._num_qubits})"
+        tapered = f", tapered={self._tapering.num_tapered}" if self._tapering is not None else ""
+        return f"MajoranaMapping({label}num_modes={self._num_modes}, num_qubits={self._num_qubits}{tapered})"

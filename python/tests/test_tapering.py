@@ -10,8 +10,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import QubitHamiltonian
-from qdk_chemistry.utils.tapering import taper_qubits
+from qdk_chemistry.data import QubitHamiltonian, Symmetries
+from qdk_chemistry.data.tapering import TaperingSpecification
+from qdk_chemistry.utils.tapering import taper_qubits, taper_to_scbk
 
 # -------------------------------------------------------------------------------------
 # taper_qubits — core tests
@@ -99,8 +100,61 @@ class TestTaperQubits:
         with pytest.raises(ValueError, match="duplicate"):
             taper_qubits(qh, qubit_indices=[0, 0], eigenvalues=[1, -1])
 
-    def test_all_terms_eliminated_raises(self) -> None:
-        """ValueError when all terms are eliminated by tapering."""
+    def test_all_terms_eliminated_returns_zero(self) -> None:
+        """When all terms are eliminated, return a zero-coefficient identity operator."""
         qh = QubitHamiltonian(pauli_strings=["XI"], coefficients=np.array([1.0]))
-        with pytest.raises(ValueError, match="eliminated"):
-            taper_qubits(qh, qubit_indices=[1], eigenvalues=[1])
+        result = taper_qubits(qh, qubit_indices=[1], eigenvalues=[1])
+        assert result.num_qubits == 1
+        assert len(result.pauli_strings) == 1
+        assert result.pauli_strings[0] == "I"
+        assert np.isclose(result.coefficients[0], 0.0)
+
+    def test_full_cancellation_returns_zero(self) -> None:
+        """When terms cancel to zero after merging, return a zero-coefficient identity."""
+        # Z with +1 eigenvalue → +1.0·I, and I → -1.0·I → merge to 0
+        qh = QubitHamiltonian(pauli_strings=["ZI", "II"], coefficients=np.array([1.0, -1.0]))
+        result = taper_qubits(qh, qubit_indices=[1], eigenvalues=[1])
+        assert result.num_qubits == 1
+        assert len(result.pauli_strings) == 1
+        assert result.pauli_strings[0] == "I"
+        assert np.isclose(result.coefficients[0], 0.0)
+
+
+# -------------------------------------------------------------------------------------
+# taper_to_scbk — two-step SCBK tests
+# -------------------------------------------------------------------------------------
+
+
+class TestTaperToScbk:
+    """Tests for the taper_to_scbk two-step function."""
+
+    def test_output_has_tapering_attribute(self) -> None:
+        """taper_to_scbk sets tapering metadata on the output QubitHamiltonian."""
+        qh = QubitHamiltonian(
+            pauli_strings=["IIII", "ZIZI", "IZIZ", "ZZII"],
+            coefficients=np.array([1.0, 0.5, 0.3, 0.2]),
+            encoding="bravyi-kitaev-tree",
+        )
+        symmetries = Symmetries(n_alpha=1, n_beta=1)
+        result = taper_to_scbk(qh, symmetries)
+
+        assert result.tapering is not None
+        assert isinstance(result.tapering, TaperingSpecification)
+        assert result.tapering.qubit_indices == (1, 3)
+        assert result.tapering.source_num_qubits == 4
+        assert result.tapering.source_encoding == "bravyi-kitaev-tree"
+        assert result.encoding == "symmetry-conserving-bravyi-kitaev"
+
+    def test_output_tapering_eigenvalues(self) -> None:
+        """Tapering eigenvalues match the symmetry sector."""
+        qh = QubitHamiltonian(
+            pauli_strings=["IIII", "ZIII"],
+            coefficients=np.array([1.0, 0.5]),
+            encoding="bravyi-kitaev",
+        )
+        symmetries = Symmetries(n_alpha=1, n_beta=0)
+        result = taper_to_scbk(qh, symmetries)
+
+        # n_alpha=1 (odd) → ev_alpha=-1, n_total=1 (odd) → ev_total=-1
+        assert result.tapering is not None
+        assert result.tapering.eigenvalues == (-1, -1)

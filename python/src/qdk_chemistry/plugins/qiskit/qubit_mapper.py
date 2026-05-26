@@ -144,12 +144,16 @@ class QiskitQubitMapper(QubitMapper):
                 h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
             )
         else:
+            # h2_ab is eri_aabb in chemist notation: (aa|bb).
+            # Qiskit's h2_ba parameter expects (bb|aa) = eri_aabb transposed.
+            # By Coulomb symmetry (pq|rs)=(rs|pq), this is eri_aabb[r,s,p,q].
+            h2_ab_4d = h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
                 h1_a=h1_a,
                 h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
                 h1_b=h1_b,
                 h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
-                h2_ba=h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h2_ba=h2_ab_4d.transpose(2, 3, 0, 1),
             )
 
         fermionic_op = electronic_hamiltonian.second_q_op()

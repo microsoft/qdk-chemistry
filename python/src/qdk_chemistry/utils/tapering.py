@@ -61,7 +61,7 @@ def taper_qubits(
         eigenvalues (Sequence[int]): Corresponding Z eigenvalues (+1 or -1) for each qubit.
 
     Returns:
-        QubitHamiltonian: A new QubitHamiltonian with the specified qubits removed.
+        QubitHamiltonian: Tapered Hamiltonian with fewer qubits. Zero-coefficient identity if all terms cancel.
 
     Raises:
         ValueError: If lengths don't match, indices are out of range, contain duplicates, or eigenvalues are not ±1.
@@ -118,24 +118,36 @@ def taper_qubits(
         new_strings.append(new_str)
         new_coeffs.append(adjusted_coeff)
 
+    new_nq = nq - len(qubit_indices)
+
     if not new_strings:
-        raise ValueError("All Pauli terms were eliminated by tapering")
+        # All terms had X/Y on tapered qubits — return zero operator
+        identity_str = "I" * new_nq
+        return QubitHamiltonian(
+            pauli_strings=[identity_str],
+            coefficients=np.array([0.0]),
+            encoding=qubit_hamiltonian.encoding,
+            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+        )
 
     # Merge duplicate Pauli strings
     merged: dict[str, complex] = {}
     for s, c in zip(new_strings, new_coeffs, strict=True):
         merged[s] = merged.get(s, 0.0) + c
 
-    # Filter near-zero terms
+    # Filter near-zero terms (use 1e-12, consistent with mapper thresholds)
     final_strings = []
     final_coeffs = []
     for s, c in merged.items():
-        if abs(c) > np.finfo(np.float64).eps:
+        if abs(c) > 1e-12:
             final_strings.append(s)
             final_coeffs.append(c)
 
     if not final_strings:
-        raise ValueError("All Pauli terms cancelled after tapering")
+        # All terms cancelled after merging — return zero operator
+        identity_str = "I" * new_nq
+        final_strings = [identity_str]
+        final_coeffs = [0.0]
 
     return QubitHamiltonian(
         pauli_strings=final_strings,
@@ -172,12 +184,13 @@ def taper_to_scbk(
     """
     from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder  # noqa: PLC0415
+    from qdk_chemistry.data.tapering import TaperingSpecification  # noqa: PLC0415
 
-    _BK_ENCODINGS = {"bravyi-kitaev", "bravyi-kitaev-tree"}
-    if qubit_hamiltonian.encoding not in _BK_ENCODINGS:
+    bk_encodings = {"bravyi-kitaev", "bravyi-kitaev-tree"}
+    if qubit_hamiltonian.encoding not in bk_encodings:
         raise ValueError(
             f"taper_to_scbk requires a Bravyi-Kitaev encoded QubitHamiltonian "
-            f"(encoding in {_BK_ENCODINGS}), got encoding={qubit_hamiltonian.encoding!r}. "
+            f"(encoding in {bk_encodings}), got encoding={qubit_hamiltonian.encoding!r}. "
             f"Use MajoranaMapping.bravyi_kitaev_tree() to produce a BK-encoded Hamiltonian first."
         )
 
@@ -205,10 +218,19 @@ def taper_to_scbk(
     q_alpha = n // 2 - 1
 
     result = taper_qubits(qubit_hamiltonian, [q_alpha, q_total], [ev_alpha, ev_total])
+
+    tapering = TaperingSpecification(
+        qubit_indices=(q_alpha, q_total),
+        eigenvalues=(ev_alpha, ev_total),
+        source_num_qubits=n,
+        source_encoding=qubit_hamiltonian.encoding or "bravyi-kitaev-tree",
+    )
+
     return QubitHamiltonian(
         pauli_strings=result.pauli_strings,
         coefficients=result.coefficients,
         encoding="symmetry-conserving-bravyi-kitaev",
         fermion_mode_order=result.fermion_mode_order,
         term_partition=result.term_partition,
+        tapering=tapering,
     )
