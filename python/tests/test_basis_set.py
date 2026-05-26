@@ -1819,5 +1819,5 @@ class TestBasisSetConstructorDispatch:
     # --- Error cases: ECP shells at n==4 should raise ---
 
     def test_ecp_at_n4_raises(self, shells, ecp_shells, structure):
-        with pytest.raises(ValueError, match="Auxiliary shells contain a shell with radial powers"):
+        with pytest.raises(ValueError, match="Auxiliary shell has radial powers"):
             BasisSet("test", shells, ecp_shells, structure)
