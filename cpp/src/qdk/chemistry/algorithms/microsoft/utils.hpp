@@ -142,17 +142,18 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize = true);
 
 /**
- * @brief Convert a qdk::chemistry::data::BasisSet to the internal library
- * BasisSet
+ * @brief Convert auxiliary basis from a qdk::chemistry::data::BasisSet to the
+ * internal library BasisSet
  *
- * This function converts a qdk::chemistry::data::BasisSet object into a
- * BasisSet compatible with the internal library, ensuring proper integration
- * with internal algorithms.
+ * This function converts the auxiliary basis shells from a
+ * qdk::chemistry::data::BasisSet object into a BasisSet compatible with the
+ * internal library, ensuring proper integration with internal algorithms.
  *
  * @param qdk_basis_set The qdk::chemistry::data::BasisSet object to convert.
  * @param  normalize Whether to normalize the basis set after conversion.
  * Default is true.
- * @return A shared pointer to the auxiliary internal basis set.
+ * @return A shared pointer to the auxiliary internal basis set, or nullptr if
+ * the input basis set has no auxiliary basis.
  * @throws std::runtime_error If the basis set is not spherical(pure)
  */
 std::shared_ptr<qcs::BasisSet> convert_aux_basis_set_from_qdk(
