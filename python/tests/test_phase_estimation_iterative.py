@@ -595,6 +595,29 @@ def test_iterative_qpe_initialization() -> None:
     assert iqpe._settings.get("shots_per_bit") == shots_per_bit
 
 
+def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+    """Test that IQPE raises ValueError when num_bits is negative."""
+    iqpe = IterativePhaseEstimation(num_bits=-1, shots_per_bit=3)
+    iqpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+    )
+    iqpe.settings().set(
+        "circuit_mapper",
+        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+    )
+    iqpe.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
+    )
+
+    with pytest.raises(ValueError, match="Number of bits to estimate must be positive"):
+        iqpe.run(
+            state_preparation=two_qubit_phase_problem.state_prep,
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        )
+
+
 def test_raises_not_implemented_for_non_time_evolution_builder(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:

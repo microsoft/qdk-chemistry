@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from functools import cached_property
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -82,11 +81,6 @@ class QpeCircuitBuilder(Algorithm):
             A list of quantum circuits for phase estimation.
 
         """
-
-    @cached_property
-    def unitary_builder(self):
-        """The nested unitary builder algorithm instance."""
-        return self._create_nested("unitary_builder")
 
     def _create_controlled_circuit(
         self,
