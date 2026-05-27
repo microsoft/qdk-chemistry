@@ -121,9 +121,12 @@ estimator.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
 )
+term_grouper = create("term_grouper", "qubit_wise_commuting")
+grouped_hamiltonian = term_grouper.run(qubit_hamiltonian=qubit_hamiltonian)
+
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
-    qubit_hamiltonian=qubit_hamiltonian,
+    qubit_hamiltonian=grouped_hamiltonian,
     total_shots=500000,
 )
 

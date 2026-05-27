@@ -18,11 +18,13 @@ from qdk_chemistry.algorithms.energy_estimator.qdk import (
     _append_measurement_to_circuit,
     _compute_expval_and_variance_from_bitstrings,
     _determine_measurement_basis,
+    _is_identity_only,
     _parity,
     _paulis_to_nonid_masks,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitHamiltonian
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
     estimator_energy_tolerance,
@@ -96,11 +98,15 @@ def test_create_measurement_circuits_basic(wavefunction_4e4o):
     ]
 
     # Call function
-    circuits = QdkEnergyEstimator._create_measurement_circuits(circuit, observable)
+    circuits, hamiltonians, identity_offset = QdkEnergyEstimator._create_measurement_circuits(circuit, observable)
     qsc_json = [circ.get_qsharp_circuit().json() for circ in circuits]
     # There should be one measurement circuit per observable
     assert isinstance(circuits, list)
     assert len(circuits) == 3
+    assert len(hamiltonians) == 3
+    assert np.isclose(
+        identity_offset, 0.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+    )
     assert all(isinstance(circ, Circuit) for circ in circuits)
     assert all(qsc.count("measure") == 2 for qsc in qsc_json)
 
@@ -304,4 +310,125 @@ def test_estimator_run_4e4o(executor_name, wavefunction_4e4o, ref_energy_4e4o):
         ref_energy_4e4o,
         rtol=float_comparison_relative_tolerance,
         atol=estimator_energy_tolerance,
+    )
+
+
+@pytest.mark.parametrize(
+    ("pauli_strings", "expected"),
+    [
+        (["IIII"], True),
+        (["II", "II"], True),
+        (["I"], True),
+        (["IIZI"], False),
+        (["IIII", "IIIZ"], False),
+        (["ZZ", "XX"], False),
+    ],
+    ids=[
+        "single-identity",
+        "multiple-identity",
+        "single-qubit-identity",
+        "one-non-identity",
+        "mixed-group",
+        "non-identity",
+    ],
+)
+def test_is_identity_only(pauli_strings, expected):
+    """Test _is_identity_only correctly identifies full identity groups."""
+    assert _is_identity_only(pauli_strings) == expected
+
+
+def test_estimator_pure_identity_hamiltonian(capfd):
+    """Test energy estimator with a Hamiltonian containing only identity terms."""
+    prev_level = Logger.get_global_level()
+    Logger.set_global_level("debug")
+
+    qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
+    circuit = Circuit(qasm=qasm)
+    # Pure identity Hamiltonian: coefficient * I should give coefficient directly
+    observable = QubitHamiltonian(["IIII"], np.array([3.5]))
+    estimator = QdkEnergyEstimator()
+    estimator.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+    )
+    energy_result, measurement_data = estimator.run(circuit, observable, total_shots=100)
+
+    # Identity expectation value is always 1.0, so energy = coefficient * 1.0
+    assert np.isclose(
+        energy_result.energy_expectation_value,
+        3.5,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+    assert np.isclose(
+        energy_result.energy_variance,
+        0.0,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+    # No measurement circuits should have been run
+    assert len(measurement_data.bitstring_counts) == 0
+    assert len(measurement_data.shots_list) == 0
+
+    # Verify log messages
+    captured = capfd.readouterr()
+    Logger.set_global_level(prev_level)
+    assert "Dropping identity-only group from measurement circuits. Energy offset += 3.5000" in captured.out
+    assert "All Hamiltonian terms are identity; skipping circuit execution." in captured.out
+
+
+def test_estimator_mixed_identity_and_pauli_terms():
+    """Test energy estimator with a Hamiltonian containing both identity and non-identity terms."""
+    qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n'
+    circuit = Circuit(qasm=qasm)
+    # Mixed Hamiltonian: identity term (coeff=2.0) + ZZ term (coeff=1.0)
+    # For Bell state |00>+|11>, <ZZ> = 1.0, so total energy = 2.0 + 1.0 = 3.0
+    observable = QubitHamiltonian(["II", "ZZ"], np.array([2.0, 1.0]))
+    estimator = QdkEnergyEstimator()
+    estimator.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+    )
+    energy_result, measurement_data = estimator.run(circuit, observable, total_shots=50000)
+
+    # Identity contributes 2.0, ZZ on Bell state contributes ~1.0
+    assert np.isclose(
+        energy_result.energy_expectation_value,
+        3.0,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+
+    # Only one measurement circuit should have been run (for ZZ), identity was dropped
+    assert len(measurement_data.bitstring_counts) == 1
+    assert len(measurement_data.shots_list) == 1
+    assert measurement_data.shots_list[0] == 50000
+    # All 50000 shots went to ZZ
+    assert sum(measurement_data.bitstring_counts[0].values()) == 50000
+
+
+def test_estimator_multiple_identity_terms():
+    """Test energy estimator with multiple identity terms having different coefficients."""
+    qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
+    circuit = Circuit(qasm=qasm)
+    # Multiple identity terms: sum of coefficients should be the energy
+    observable = QubitHamiltonian(["IIII", "IIII", "IIII"], np.array([1.5, -0.5, 2.0]))
+    estimator = QdkEnergyEstimator()
+    estimator.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
+    )
+    energy_result, _ = estimator.run(circuit, observable, total_shots=100)
+
+    assert np.isclose(
+        energy_result.energy_expectation_value,
+        3.0,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+    assert np.isclose(
+        energy_result.energy_variance,
+        0.0,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
     )
