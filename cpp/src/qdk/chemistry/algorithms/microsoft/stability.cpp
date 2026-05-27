@@ -331,7 +331,7 @@ class StabilityOperator {
 
 /**
  * @brief Initialize eigenvector with a random Gaussian guess (N(0,1), seed 42,
- * normalized). Avoids trapping in symmetric subspaces.
+ * normalized) to avoid trapping in a subspace.
  *
  * @param eigenvector [in, out] Output vector that stores the initialized guess.
  */
