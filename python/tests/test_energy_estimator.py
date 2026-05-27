@@ -33,6 +33,15 @@ from .reference_tolerances import (
 )
 
 
+@pytest.fixture
+def debug_logger():
+    """Temporarily set logger to debug level, restoring on teardown."""
+    prev_level = Logger.get_global_level()
+    Logger.set_global_level("debug")
+    yield
+    Logger.set_global_level(prev_level)
+
+
 def test_parity():
     """Test parity calculation."""
     assert _parity(0b0000) == 0  # This is the integer 0 in binary notation
@@ -334,11 +343,9 @@ def test_is_identity_only(pauli_strings, expected):
     assert _is_identity_only(pauli_strings) == expected
 
 
+@pytest.mark.usefixtures("debug_logger")
 def test_estimator_pure_identity_hamiltonian(capfd):
     """Test energy estimator with a Hamiltonian containing only identity terms."""
-    prev_level = Logger.get_global_level()
-    Logger.set_global_level("debug")
-
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
     circuit = Circuit(qasm=qasm)
     # Pure identity Hamiltonian: coefficient * I should give coefficient directly
@@ -369,7 +376,6 @@ def test_estimator_pure_identity_hamiltonian(capfd):
 
     # Verify log messages
     captured = capfd.readouterr()
-    Logger.set_global_level(prev_level)
     assert "Dropping identity-only group from measurement circuits. Energy offset += 3.5000" in captured.out
     assert "All Hamiltonian terms are identity; skipping circuit execution." in captured.out
 
