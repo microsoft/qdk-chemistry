@@ -70,9 +70,9 @@ class OpenFermionQubitMapper(QubitMapper):
        produce silently incorrect results.
 
     Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are
-    supported — the base class
-    :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper.run` strips
-    tapering before calling ``_run_impl()`` and reapplies it afterward.
+    supported — each backend handles tapering in its own ``_run_impl()``
+    via the :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper._taper_result`
+    helper.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, separate alpha/beta spin channels are handled
@@ -109,6 +109,10 @@ class OpenFermionQubitMapper(QubitMapper):
         function.  ``mapping.table`` is **not used** — the qubit operator
         is rebuilt entirely by OpenFermion's own pipeline.
 
+        If *mapping* carries tapering metadata, the base encoding is
+        extracted first, mapped, and tapering is applied to the result
+        via :meth:`~QubitMapper._taper_result`.
+
         Args:
             hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
             mapping: Encoding selector — only ``base_encoding`` is read.
@@ -123,11 +127,6 @@ class OpenFermionQubitMapper(QubitMapper):
         Logger.trace_entering()
 
         # --- Name dispatch (see QubitMapper class docstring) ---
-        # This backend does NOT use mapping.table.  It reads the encoding
-        # name and selects the corresponding OpenFermion transform function,
-        # which rebuilds the qubit operator from scratch.  Consistency
-        # between the name and the table is only guaranteed for
-        # factory-produced MajoranaMapping objects.
         encoding_name = mapping.base_encoding
 
         if encoding_name not in _STANDARD_TRANSFORMS:
@@ -150,11 +149,12 @@ class OpenFermionQubitMapper(QubitMapper):
             qubit_op -= core_energy * of.QubitOperator(())
             qubit_op.compress()
 
-        return qubit_operator_to_qubit_hamiltonian(
+        qh = qubit_operator_to_qubit_hamiltonian(
             qubit_op,
             encoding=encoding_name,
             fermion_mode_order=fermion_mode_order,
         )
+        return self._taper_result(qh, mapping)
 
     def _map_standard(self, hamiltonian: Hamiltonian, encoding: str) -> of.QubitOperator:
         """Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).

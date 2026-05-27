@@ -66,9 +66,9 @@ class QiskitQubitMapper(QubitMapper):
        produce silently incorrect results.
 
     Tapering-based encodings (e.g. parity two-qubit reduction) are
-    supported — the base class
-    :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper.run` strips
-    tapering before calling ``_run_impl()`` and reapplies it afterward.
+    supported — each backend handles tapering in its own ``_run_impl()``
+    via the :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper._taper_result`
+    helper.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, separate alpha and beta one-body and two-body
@@ -107,6 +107,10 @@ class QiskitQubitMapper(QubitMapper):
         class.  ``mapping.table`` is **not used** — the qubit operator
         is rebuilt entirely by Qiskit's own pipeline.
 
+        If *mapping* carries tapering metadata, the base encoding is
+        extracted first, mapped, and tapering is applied to the result
+        via :meth:`~QubitMapper._taper_result`.
+
         Args:
             hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
             mapping: Encoding selector — only ``base_encoding`` is read.
@@ -121,11 +125,6 @@ class QiskitQubitMapper(QubitMapper):
         Logger.trace_entering()
 
         # --- Name dispatch (see QubitMapper class docstring) ---
-        # This backend does NOT use mapping.table.  It reads the encoding
-        # name and selects the corresponding Qiskit Nature mapper class,
-        # which rebuilds the qubit operator from scratch.  Consistency
-        # between the name and the table is only guaranteed for
-        # factory-produced MajoranaMapping objects.
         encoding_name = mapping.base_encoding
 
         if encoding_name not in _SUPPORTED_ENCODINGS:
@@ -159,12 +158,13 @@ class QiskitQubitMapper(QubitMapper):
         fermionic_op = electronic_hamiltonian.second_q_op()
         qubit_mapper = _SUPPORTED_ENCODINGS[encoding_name]()
         qubit_op = qubit_mapper.map(fermionic_op)
-        return QubitHamiltonian(
+        qh = QubitHamiltonian(
             pauli_strings=qubit_op.paulis.to_labels(),
             coefficients=qubit_op.coeffs,
             encoding=encoding_name,
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
+        return self._taper_result(qh, mapping)
 
     def name(self) -> str:
         """Return the algorithm name ``qiskit``."""

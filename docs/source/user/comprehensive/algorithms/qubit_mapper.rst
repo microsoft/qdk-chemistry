@@ -168,10 +168,11 @@ This distinction has practical consequences:
   match its name, a name-dispatched backend will silently use the wrong
   transform.
 
-- **Tapering** is handled in the base class
-  :meth:`~qdk_chemistry.algorithms.QubitMapper.run`, so all backends
-  automatically support tapered encodings (SCBK, parity two-qubit
-  reduction).  Backends only ever see the untapered base encoding.
+- **Tapering** is each backend's responsibility.  The base class provides
+  a ``_taper_result()`` helper that strips tapering from the mapping,
+  performs the base transform, and reapplies tapering to the output.  All
+  shipped backends use this helper, but third-party backends are free to
+  handle tapering however they choose.
 
 .. _qdk-qubit-mapper:
 

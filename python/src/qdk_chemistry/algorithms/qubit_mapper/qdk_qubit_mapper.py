@@ -118,6 +118,10 @@ class QdkQubitMapper(QubitMapper):
         uses the Pauli-string table directly.  The ``base_encoding`` name
         is used only for metadata on the output, not for dispatch.
 
+        If *mapping* carries tapering metadata, the base encoding is
+        extracted first, mapped, and tapering is applied to the result
+        via :meth:`~QubitMapper._taper_result`.
+
         Args:
             hamiltonian: The fermionic Hamiltonian with one-body and two-body integrals.
             mapping: The Majorana-to-Pauli encoding (table is consumed directly by the C++ engine).
@@ -128,6 +132,9 @@ class QdkQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
+        # Strip tapering — the C++ engine maps the base encoding only
+        base_mapping = mapping.without_tapering() if mapping.tapering else mapping
+
         threshold = float(self.settings().get("threshold"))
         integral_threshold = float(self.settings().get("integral_threshold"))
 
@@ -137,9 +144,9 @@ class QdkQubitMapper(QubitMapper):
         n_spin_orbitals = 2 * n_spatial
         is_restricted = hamiltonian.get_orbitals().is_restricted()
 
-        if mapping.num_modes != n_spin_orbitals:
+        if base_mapping.num_modes != n_spin_orbitals:
             raise ValueError(
-                f"MajoranaMapping has {mapping.num_modes} modes but the Hamiltonian has "
+                f"MajoranaMapping has {base_mapping.num_modes} modes but the Hamiltonian has "
                 f"{n_spin_orbitals} spin-orbitals (2 x {n_spatial} spatial orbitals). "
                 f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
             )
@@ -156,7 +163,7 @@ class QdkQubitMapper(QubitMapper):
 
         # Single C++ call: Majorana-loop engine builds all Pauli terms
         pauli_strings, coefficients = majorana_map_hamiltonian(
-            mapping.core,
+            base_mapping.core,
             0.0,  # core energy not included (QDK convention)
             h1_a_flat,
             h1_b_flat,
@@ -171,9 +178,10 @@ class QdkQubitMapper(QubitMapper):
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
 
-        return QubitHamiltonian(
+        qh = QubitHamiltonian(
             pauli_strings=list(pauli_strings),
             coefficients=np.array(coefficients, dtype=complex),
-            encoding=mapping.base_encoding,
+            encoding=base_mapping.base_encoding,
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
+        return self._taper_result(qh, mapping)

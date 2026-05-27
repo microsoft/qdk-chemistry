@@ -77,13 +77,12 @@ class QubitMapper(Algorithm):
 
     .. rubric:: Tapering
 
-    Subclasses implement :meth:`_run_impl` for the base (untapered) mapping.
-    Tapering is handled automatically by :meth:`run`: if the
-    :class:`~qdk_chemistry.data.MajoranaMapping` carries a
-    :attr:`~qdk_chemistry.data.MajoranaMapping.tapering` specification,
-    ``run()`` strips it before calling ``_run_impl()`` and applies it to
-    the result afterward.  This means ``_run_impl()`` only ever sees a
-    base encoding and never needs to handle tapering itself.
+    Each backend is responsible for handling tapering in its own
+    ``_run_impl()``.  The static helper :meth:`_taper_result` provides
+    the common taper-then-relabel logic so backends don't have to
+    reimplement it, but backends are free to handle tapering however they
+    choose.  All shipped backends (QDK, OpenFermion, Qiskit) use the
+    helper.
 
     """
 
@@ -102,10 +101,8 @@ class QubitMapper(Algorithm):
     ) -> QubitHamiltonian:
         """Map a fermionic Hamiltonian to a qubit Hamiltonian.
 
-        If *mapping* carries tapering metadata, the tapering is stripped
-        before delegating to :meth:`_run_impl` and reapplied afterward.
-        This lets every backend (QDK native, OpenFermion, Qiskit, …)
-        support tapered encodings without duplicating tapering logic.
+        Delegates entirely to :meth:`_run_impl`.  Each backend is
+        responsible for handling tapering (if ``mapping.tapering`` is set).
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
@@ -116,29 +113,42 @@ class QubitMapper(Algorithm):
 
         """
         self._settings.lock()
+        return self._run_impl(hamiltonian, mapping)
 
+    @staticmethod
+    def _taper_result(qh: QubitHamiltonian, mapping: MajoranaMapping) -> QubitHamiltonian:
+        """Apply post-mapping tapering if the mapping specifies it.
+
+        Convenience helper for backends.  If ``mapping.tapering`` is
+        ``None``, returns *qh* unchanged.  Otherwise, applies
+        :func:`~qdk_chemistry.utils.tapering.taper_qubits` and relabels
+        the result with the mapping's final encoding name.
+
+        Args:
+            qh: The untapered qubit Hamiltonian from the base mapping.
+            mapping: The original mapping (with tapering metadata).
+
+        Returns:
+            QubitHamiltonian: Tapered and relabelled, or *qh* unchanged.
+
+        """
         tapering = mapping.tapering
-        if tapering is not None:
-            base_mapping = mapping.without_tapering()
-            qh = self._run_impl(hamiltonian, base_mapping)
-        else:
-            qh = self._run_impl(hamiltonian, mapping)
+        if tapering is None:
+            return qh
 
-        if tapering is not None:
-            from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
-            from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
+        from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian as QH  # noqa: PLC0415
+        from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
 
-            qh = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
-            qh = QubitHamiltonian(
-                pauli_strings=qh.pauli_strings,
-                coefficients=qh.coefficients,
-                encoding=mapping.name,
-                fermion_mode_order=qh.fermion_mode_order,
-                tapering=tapering,
-            )
-            Logger.debug(f"Tapered {tapering.num_tapered} qubits → {qh.num_qubits} qubits")
-
-        return qh
+        tapered = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
+        result = QH(
+            pauli_strings=tapered.pauli_strings,
+            coefficients=tapered.coefficients,
+            encoding=mapping.name,
+            fermion_mode_order=tapered.fermion_mode_order,
+            tapering=tapering,
+        )
+        Logger.debug(f"Tapered {tapering.num_tapered} qubits → {result.num_qubits} qubits")
+        return result
 
     @abstractmethod
     def _run_impl(
@@ -148,8 +158,11 @@ class QubitMapper(Algorithm):
     ) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
 
-        Implementations receive a **base** (untapered) mapping only.
-        Tapering is handled by :meth:`run`.
+        Implementations receive the **full** mapping, which may include
+        tapering.  Each backend is responsible for handling tapering —
+        typically by stripping it via ``mapping.without_tapering()``,
+        performing the base mapping, and calling :meth:`_taper_result`
+        to apply tapering to the output.
 
         .. important::
 
@@ -166,7 +179,7 @@ class QubitMapper(Algorithm):
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
-            mapping: The Majorana-to-Pauli encoding (always untapered).
+            mapping: The Majorana-to-Pauli encoding (may include tapering).
 
         Returns:
            QubitHamiltonian: An instance of the QubitHamiltonian.
