@@ -1134,7 +1134,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       H5::DataSet ds = metadata_group.openDataSet("is_restricted");
       ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
     } catch (const H5::Exception&) {
-      throw std::runtime_error(
+      throw std::invalid_argument(
           "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
     }
 
@@ -1148,8 +1148,9 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       try {
         auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
         coeffs_beta_opt = coeffs_beta;
-      } catch (const std::exception&) {
-        // Beta coefficients don't exist - this is a restricted calculation
+      } catch (const H5::Exception&) {
+        throw std::invalid_argument(
+            "HDF5 file missing 'coefficients_beta' for unrestricted orbitals");
       }
     }
 
@@ -1314,11 +1315,12 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     // Load coefficients (required for regular Orbitals)
     if (!j.contains("coefficients") || !j["coefficients"].contains("alpha") ||
         !j["coefficients"].contains("beta")) {
-      throw std::runtime_error("JSON missing required coefficient data");
+      throw std::invalid_argument("JSON missing required coefficient data");
     }
 
     if (!j.contains("is_restricted")) {
-      throw std::runtime_error("JSON missing required 'is_restricted' field");
+      throw std::invalid_argument(
+          "JSON missing required 'is_restricted' field");
     }
     const auto is_restricted = j["is_restricted"].get<bool>();
     auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
