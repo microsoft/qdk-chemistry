@@ -10,7 +10,7 @@
 import json
 
 import qdk
-import qsharp
+from qdk import qsharp
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 

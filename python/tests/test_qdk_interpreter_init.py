@@ -8,7 +8,11 @@
 import sys
 
 from qdk import TargetProfile, init
-from qsharp._qsharp import get_config
+
+try:
+    from qdk._interpreter import get_config
+except ImportError:
+    from qsharp._qsharp import get_config
 
 
 def test_qdk_interpreter_init_with_target_profile():
