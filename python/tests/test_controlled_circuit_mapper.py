@@ -9,8 +9,13 @@ import json
 
 import numpy as np
 import pytest
-import qsharp
 import scipy
+
+try:
+    from qdk._native import Circuit as QdkCircuitType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
+
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
@@ -72,7 +77,7 @@ class TestPauliSequenceMapper:
         circuit = mapper.run(controlled_unitary)
 
         assert isinstance(circuit, Circuit)
-        assert isinstance(circuit.get_qsharp_circuit(), qsharp._native.Circuit)
+        assert isinstance(circuit.get_qsharp_circuit(), QdkCircuitType)
 
     def test_default_target_indices(self, controlled_unitary):
         """Test that default target indices are used when none are provided."""
