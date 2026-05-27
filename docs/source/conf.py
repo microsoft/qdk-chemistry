@@ -111,6 +111,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "qiskit_ibm_runtime",
     "openfermion",
     "cirq",
     "cirq_core",
@@ -206,6 +207,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
+    (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
 ]
 
 # Configure output for to-dos
