@@ -136,11 +136,11 @@ class QubitMapper(Algorithm):
         if tapering is None:
             return qh
 
-        from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian as QH  # noqa: PLC0415
+        from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
         from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
 
         tapered = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
-        result = QH(
+        result = QubitHamiltonian(
             pauli_strings=tapered.pauli_strings,
             coefficients=tapered.coefficients,
             encoding=mapping.name,
