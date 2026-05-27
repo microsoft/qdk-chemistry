@@ -23,18 +23,18 @@ namespace qdk::chemistry::algorithms {
 class ElectronicStructureSettings : public data::Settings {
  public:
   ElectronicStructureSettings() {
-    set_default("method", "hf",
-                "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "
-                "See the user manual for the complete list of available options.");
+    set_default(
+        "method", "hf",
+        "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "
+        "See the user manual for the complete list of available options.");
     set_default("convergence_threshold", 1e-7);
     set_default("max_iterations", 50, "Maximum number of SCF iterations",
                 qdk::chemistry::data::BoundConstraint<int64_t>{
                     1, std::numeric_limits<int64_t>::max()});
     set_default("scf_type", std::string("auto"),
                 "SCF orbital type: 'auto' selects based on spin multiplicity",
-                data::ListConstraint<std::string>{
-                    {std::vector<std::string>{"auto", "restricted",
-                                              "unrestricted"}}});
+                data::ListConstraint<std::string>{{std::vector<std::string>{
+                    "auto", "restricted", "unrestricted"}}});
   }
 };
 

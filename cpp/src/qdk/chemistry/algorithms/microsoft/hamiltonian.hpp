@@ -20,9 +20,8 @@ class HamiltonianSettings : public qdk::chemistry::data::Settings {
                     {std::vector<std::string>{"direct", "incore"}}});
     set_default("scf_type", std::string("auto"),
                 "SCF orbital type: 'auto' selects based on spin multiplicity",
-                data::ListConstraint<std::string>{
-                    {std::vector<std::string>{"auto", "restricted",
-                                              "unrestricted"}}});
+                data::ListConstraint<std::string>{{std::vector<std::string>{
+                    "auto", "restricted", "unrestricted"}}});
   }
   ~HamiltonianSettings() override = default;
 };

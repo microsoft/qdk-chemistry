@@ -55,9 +55,8 @@ class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
   CholeskyHamiltonianSettings() {
     set_default("scf_type", std::string("auto"),
                 "SCF orbital type: 'auto' selects based on spin multiplicity",
-                data::ListConstraint<std::string>{
-                    {std::vector<std::string>{"auto", "restricted",
-                                              "unrestricted"}}});
+                data::ListConstraint<std::string>{{std::vector<std::string>{
+                    "auto", "restricted", "unrestricted"}}});
     set_default("cholesky_tolerance", 1e-8);
     set_default("eri_threshold", 1e-12,
                 "ERI screening threshold for skipping negligible shell "
