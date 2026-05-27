@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-import qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
