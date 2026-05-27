@@ -228,14 +228,14 @@ class Orbitals : public DataClass,
   virtual std::vector<size_t> get_all_mo_indices() const;
 
   /**
-   * @brief Check if calculation is restricted (RHF/RKS)
-   * @return True if alpha and beta coefficients are identical
+   * @brief Check if calculation is restricted (RHF/RKS/ROHF/ROKS)
+   * @return True if alpha and beta coefficients share the same storage
    */
   virtual bool is_restricted() const;
 
   /**
    * @brief Check if calculation is unrestricted (UHF/UKS)
-   * @return True if alpha and beta coefficients are different
+   * @return True if alpha and beta coefficients use separate storage
    */
   virtual bool is_unrestricted() const;
 

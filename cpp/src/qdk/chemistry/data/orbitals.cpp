@@ -1317,7 +1317,10 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
       throw std::runtime_error("JSON missing required coefficient data");
     }
 
-    const auto is_restricted = j.value("is_restricted", false);
+    if (!j.contains("is_restricted")) {
+      throw std::runtime_error("JSON missing required 'is_restricted' field");
+    }
+    const auto is_restricted = j["is_restricted"].get<bool>();
     auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
 
     // Load optional energies
