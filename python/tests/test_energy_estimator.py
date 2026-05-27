@@ -250,16 +250,11 @@ def test_create_energy_estimator_qdk():
     assert isinstance(estimator, QdkEnergyEstimator)
 
 
-def test_estimator_fewer_shots():
+def test_estimator_fewer_shots(wavefunction_4e4o):
     """Test estimator raises error when total shots is less than number of observables."""
-    qasm = """
-    include "stdgates.inc";
-    qubit[2] q;
-    h q[0];
-    cx q[0], q[1];
-    """
-    circuit = Circuit(qasm=qasm)
-    observable = QubitHamiltonian(["ZZ", "XX", "YY"], np.array([2, 3, 4]))
+    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    circuit = state_prep.run(wavefunction_4e4o)
+    observable = QubitHamiltonian(["IIIIIIZZ", "IIIIIIXX", "IIIIIIYY"], np.array([2, 3, 4]))
     estimator = QdkEnergyEstimator()
     estimator.settings().set(
         "circuit_executor",
@@ -276,7 +271,9 @@ def test_estimator_fewer_shots():
         "qdk_sparse_state_simulator",
         pytest.param(
             "qiskit_aer_simulator",
-            marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT_AER, reason="Qiskit Aer not available"),
+            marks=pytest.mark.skipif(
+                not QDK_CHEMISTRY_HAS_QISKIT_AER or not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit Aer not available"
+            ),
         ),
     ],
     ids=["qdk-full-state", "qdk-sparse-state", "qiskit-aer"],
@@ -377,6 +374,7 @@ def test_estimator_pure_identity_hamiltonian(capfd):
     assert "All Hamiltonian terms are identity; skipping circuit execution." in captured.out
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_estimator_mixed_identity_and_pauli_terms():
     """Test energy estimator with a Hamiltonian containing both identity and non-identity terms."""
     qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n'
@@ -407,12 +405,12 @@ def test_estimator_mixed_identity_and_pauli_terms():
     assert sum(measurement_data.bitstring_counts[0].values()) == 50000
 
 
-def test_estimator_multiple_identity_terms():
+def test_estimator_multiple_identity_terms(wavefunction_4e4o):
     """Test energy estimator with multiple identity terms having different coefficients."""
-    qasm = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\n'
-    circuit = Circuit(qasm=qasm)
+    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    circuit = state_prep.run(wavefunction_4e4o)
     # Multiple identity terms: sum of coefficients should be the energy
-    observable = QubitHamiltonian(["IIII", "IIII", "IIII"], np.array([1.5, -0.5, 2.0]))
+    observable = QubitHamiltonian(["IIIIIIII", "IIIIIIII", "IIIIIIII"], np.array([1.5, -0.5, 2.0]))
     estimator = QdkEnergyEstimator()
     estimator.settings().set(
         "circuit_executor",
