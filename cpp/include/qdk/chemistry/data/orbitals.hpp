@@ -229,13 +229,13 @@ class Orbitals : public DataClass,
 
   /**
    * @brief Check if calculation is restricted (RHF/RKS/ROHF/ROKS)
-   * @return True if alpha and beta coefficients share the same storage
+   * @return True if orbitals are restricted
    */
   virtual bool is_restricted() const;
 
   /**
    * @brief Check if calculation is unrestricted (UHF/UKS)
-   * @return True if alpha and beta coefficients use separate storage
+   * @return True if orbitals are unrestricted
    */
   virtual bool is_unrestricted() const;
 

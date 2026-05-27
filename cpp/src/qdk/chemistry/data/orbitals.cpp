@@ -666,6 +666,21 @@ bool Orbitals::is_restricted() const {
         "Cannot determine if orbitals are restricted: orbital coefficients "
         "not set");
   }
+  // Verify energy pointers are consistent with coefficients
+  if (_energies.first && _energies.second) {
+    if (_coefficients.first == _coefficients.second &&
+        _energies.first != _energies.second) {
+      throw std::runtime_error(
+          "Inconsistent orbital state: coefficients are shared but energies "
+          "are not");
+    }
+    if (_coefficients.first != _coefficients.second &&
+        _energies.first == _energies.second) {
+      throw std::runtime_error(
+          "Inconsistent orbital state: coefficients are separate but energies "
+          "are shared");
+    }
+  }
   return _coefficients.first == _coefficients.second;
 }
 
@@ -1159,7 +1174,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     if (dataset_exists_in_group(group, "energies_alpha")) {
       energies_alpha = load_vector_from_group(group, "energies_alpha");
     }
-    if (dataset_exists_in_group(group, "energies_beta")) {
+    if (!restricted && dataset_exists_in_group(group, "energies_beta")) {
       energies_beta = load_vector_from_group(group, "energies_beta");
     }
 

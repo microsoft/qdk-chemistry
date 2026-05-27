@@ -331,7 +331,7 @@ class StabilityOperator {
 
 /**
  * @brief Initialize eigenvector with a random Gaussian guess (N(0,1), seed 42,
- * normalized). Avoids trapping in symmetric subspaces when alpha == beta.
+ * normalized). Avoids trapping in symmetric subspaces.
  *
  * @param eigenvector [in, out] Output vector that stores the initialized guess.
  */
@@ -340,7 +340,7 @@ void initialize_eigenvector(Eigen::VectorXd& eigenvector) {
   int eigensize = eigenvector.size();
 
   // Use a random Gaussian initial guess to avoid being trapped in a symmetric
-  // subspace (e.g. when alpha and beta orbitals are identical).
+  // subspace when the rotation space has limited degrees of freedom.
   std::mt19937 gen(42);
   std::normal_distribution<double> dist(0.0, 1.0);
   for (int i = 0; i < eigensize; ++i) {
