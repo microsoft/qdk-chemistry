@@ -123,9 +123,6 @@ This implementation produces a ``CanonicalFourCenterHamiltonianContainer`` with 
    * - ``eri_method``
      - string
      - Method for computing electron repulsion integrals ("direct" or "incore")
-   * - ``scf_type``
-     - string
-     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 QDK Cholesky
 ~~~~~~~~~~~~
@@ -148,9 +145,6 @@ Four-center integrals are lazily computed from the three-center integrals on dem
    * - Setting
      - Type
      - Description
-   * - ``scf_type``
-     - string
-     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
    * - ``cholesky_tolerance``
      - float
      - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
@@ -239,9 +233,6 @@ See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end examp
    * - Setting
      - Type
      - Description
-   * - ``scf_type``
-     - string
-     - Type of :term:`SCF` reference ("auto", "unrestricted" or "restricted"). Default: "auto" (automatically detected from orbitals)
 
 Related classes
 ---------------

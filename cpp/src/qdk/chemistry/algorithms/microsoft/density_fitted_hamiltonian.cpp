@@ -179,18 +179,8 @@ DensityFittedHamiltonianConstructor::_run_impl(
   auto h_metric =
       qcs::libint2_util::metric_df(internal_basis_set->mode, aux_basis_libint2);
 
-  // Determine SCF type from settings
-  std::string scf_type = _settings->get<std::string>("scf_type");
-
-  bool is_restricted_calc;
-  if (scf_type == "restricted") {
-    is_restricted_calc = true;
-  } else if (scf_type == "unrestricted") {
-    is_restricted_calc = false;
-  } else {  // "auto"
-    is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
-                         orbitals->is_restricted();
-  }
+  bool is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
+                            orbitals->is_restricted();
 
   detail_df::fold_metric_to_three_center(
       num_atomic_orbitals, num_auxiliary_orbitals, h_eri, h_metric);
