@@ -57,9 +57,6 @@ class EnergyEstimator(Algorithm):
     ) -> tuple[EnergyExpectationResult, MeasurementData]:
         """Estimate the expectation value and variance of the Hamiltonian.
 
-        The circuit executor used to run quantum circuits is configured via
-        the ``circuit_executor`` setting (an ``AlgorithmRef``).
-
         Args:
             circuit: Circuit.
             qubit_hamiltonian: ``QubitHamiltonian`` to estimate.
