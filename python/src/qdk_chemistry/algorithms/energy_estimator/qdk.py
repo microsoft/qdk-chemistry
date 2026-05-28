@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-import qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
@@ -414,7 +414,10 @@ class QdkEnergyEstimator(EnergyEstimator):
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(
-            measurement_circuits, circuit_executor, shots_list, noise_model
+            measurement_circuits,
+            circuit_executor,
+            shots_list,
+            noise_model,
         )
         return MeasurementData(
             bitstring_counts=counts,
