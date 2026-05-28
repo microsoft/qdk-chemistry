@@ -109,4 +109,4 @@ RUN python -m venv "$VIRTUAL_ENV" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
 
 # Make user-local C++ installations discoverable
-ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}
+ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local
