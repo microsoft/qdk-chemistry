@@ -401,6 +401,47 @@ class TestStringSettingsHaveGuidance:
         )
 
 
+def _string_settings_with_allowed_values() -> list[tuple[str, str, str, list[str]]]:
+    """Collect (algorithm_type, algorithm_name, setting_name, allowed_values) for all string settings with options."""
+    cases: list[tuple[str, str, str, list[str]]] = []
+    for atype, aname in _REGISTERED_PAIRS:
+        try:
+            info = registry.inspect_settings(atype, aname)
+        except (ImportError, RuntimeError):
+            continue
+        for sname, ptype, _default, _desc, limits in info:
+            if ptype == "str" and isinstance(limits, list) and len(limits) > 0:
+                cases.append((atype, aname, sname, limits))
+    return cases
+
+
+_STRING_SETTINGS_WITH_OPTIONS = _string_settings_with_allowed_values()
+
+
+@pytest.mark.parametrize(
+    ("algorithm_type", "algorithm_name", "setting_name", "allowed_values"),
+    _STRING_SETTINGS_WITH_OPTIONS,
+    ids=[f"{t}/{n}.{s}" for t, n, s, _ in _STRING_SETTINGS_WITH_OPTIONS],
+)
+class TestAllowedStringValuesAccepted:
+    """Every advertised string option must be accepted by the algorithm's settings without error."""
+
+    def test_each_allowed_value_can_be_set(
+        self, algorithm_type: str, algorithm_name: str, setting_name: str, allowed_values: list[str]
+    ):
+        try:
+            algo = registry.create(algorithm_type, algorithm_name)
+        except (ImportError, RuntimeError) as exc:
+            pytest.skip(f"cannot instantiate {algorithm_type}/{algorithm_name}: {exc}")
+
+        for value in allowed_values:
+            algo.settings().set(setting_name, value)
+            assert algo.settings().get(setting_name) == value, (
+                f"{algorithm_type}/{algorithm_name}: setting {setting_name!r} to {value!r} "
+                f"did not persist (got {algo.settings().get(setting_name)!r})"
+            )
+
+
 class TestRegistryRegisterUnregister:
     """Test the register and unregister functions in the registry module."""
 
