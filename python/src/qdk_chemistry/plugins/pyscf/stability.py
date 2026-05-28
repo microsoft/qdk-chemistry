@@ -210,7 +210,13 @@ class PyscfStabilitySettings(Settings):
         self._set_default("nroots", "int", 3)
         self._set_default("davidson_tolerance", "double", 1e-8)
         self._set_default("stability_tolerance", "double", -1e-4)
-        self._set_default("method", "string", "hf")
+        self._set_default(
+            "method",
+            "string",
+            "hf",
+            "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "
+            "See the user manual for the complete list of available options.",
+        )
         self._set_default(
             "xc_grid", "int", 3, "Density functional integration grid level (0=coarse, 9=very fine)", list(range(10))
         )
