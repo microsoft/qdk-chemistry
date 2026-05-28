@@ -15,6 +15,9 @@ ENV LANG=en_US.UTF-8 \
     LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH} \
     PATH=/usr/local/bin:${PATH}
 
+# Cap cmake build parallelism to prevent OOM (e.g., in dev-loop rebuilds)
+ENV CMAKE_BUILD_PARALLEL_LEVEL=4
+
 # Create a non-root user with sudo privileges
 ARG USERNAME=vscode
 ARG USER_UID=1000
@@ -31,6 +34,7 @@ RUN apt-get update && \
     gnupg \
     build-essential \
     cmake \
+    ccache \
     clang \
     pkg-config \
     python3 \
@@ -94,6 +98,7 @@ RUN echo 'export PS1="\[\033[1;34m\]\u@qdk-dev:\w$ \[\033[0m\]"' >> ~/.bashrc
 # Python dev dependencies.
 ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
     PATH=/home/$USERNAME/qdk_chemistry_venv/bin:$PATH
+
 RUN python -m venv "$VIRTUAL_ENV" \
     && pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir \
@@ -102,3 +107,6 @@ RUN python -m venv "$VIRTUAL_ENV" \
     "pre-commit>=4.6,<5" \
     "rdkit" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc
+
+# Make user-local C++ installations discoverable
+ENV CMAKE_PREFIX_PATH=/home/$USERNAME/.local${CMAKE_PREFIX_PATH:+:${CMAKE_PREFIX_PATH}}
