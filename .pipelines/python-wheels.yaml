@@ -69,6 +69,10 @@ parameters:
   type: string
   default: None
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
+- name: runSlowTests
+  type: boolean
+  default: true
+  displayName: Run slow tests
 
 variables:
 - group: QdkChemistry
@@ -169,6 +173,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -191,6 +196,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
@@ -211,6 +217,7 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user
