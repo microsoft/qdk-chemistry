@@ -199,7 +199,7 @@ Four-center integrals are reconstructed on the fly when consumers request them.
 
       // Create the density-fitted Hamiltonian constructor.
       auto constructor =
-          algorithms::HamiltonianConstructor::create("qdk_density_fitted_hamiltonian");
+          algorithms::HamiltonianConstructorFactory::create("qdk_density_fitted_hamiltonian");
 
       // Build the active-space, density-fitted Hamiltonian.
       auto hamiltonian = constructor->run(orbitals);
@@ -222,7 +222,7 @@ Four-center integrals are reconstructed on the fly when consumers request them.
       # Build the active-space, density-fitted Hamiltonian.
       hamiltonian = constructor.run(orbitals)
 
-See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end example combining a density-fitted SCF, active-space selection, and ``"qdk_density_fitted_hamiltonian"``.
+See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end example combining a four-center SCF, active-space selection, ``"qdk_density_fitted_hamiltonian"``, and density-fitted MP2.
 
 .. rubric:: Settings
 

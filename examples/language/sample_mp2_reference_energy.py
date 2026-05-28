@@ -3,7 +3,7 @@
 This script performs a 4 center SCF → DFMP2 sequence to showcase the difference between the
 SCF energy and the reference energy computed by the MP2 calculator.  In QDK/Chemistry, SCF
 is treated as an orbital generator, but MP2 will always recalculate the reference energy based
-on the orbital using the MP2 Hamiltonian anzatz. In this example, the SCF energy is computed
+on the orbital using the MP2 Hamiltonian ansatz. In this example, the SCF energy is computed
 using the full four-center integrals, whereas the MP2 calculation uses the density-fitted
 Hamiltonian, so the reference energy reported by the MP2 calculator will differ from this SCF energy.
 """
@@ -43,7 +43,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--aux_basis",
         default="cc-pvdz-rifit",
-        help="Auxiliary basis set applied to the SCF solver for density fitting (default: cc-pvdz-rifit).",
+        help="Auxiliary basis set applied to the MP2 (not SCF) solver for density fitting (default: cc-pvdz-rifit).",
     )
     parser.add_argument(
         "--charge", type=int, default=0, help="Total molecular charge (default: 0)."
