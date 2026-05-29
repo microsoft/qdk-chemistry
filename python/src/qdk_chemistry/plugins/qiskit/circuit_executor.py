@@ -52,6 +52,7 @@ class QiskitAerSimulatorSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("seed", "int", 42)
+        self._set_default("seed_transpiler", "int", 42)
         self._set_default("method", "string", "statevector")
         self._set_default("transpile_optimization_level", "int", 0)
         self._set_default("device_backend_name", "string", "", "Name of a fake device backend for noise modeling.")
@@ -167,6 +168,7 @@ class QiskitAerSimulator(CircuitExecutor):
                 meas_circuit,
                 backend=device_backend,
                 optimization_level=opt_level,
+                seed_transpiler=self._settings.get("seed_transpiler"),
             )
 
         else:
@@ -176,11 +178,13 @@ class QiskitAerSimulator(CircuitExecutor):
                 seed_simulator=self._settings.get("seed"),
                 noise_model=noise_model,
             )
+            seed_transpiler = self._settings.get("seed_transpiler")
             if noise_model:
                 transpiled_circuit = transpile(
                     meas_circuit,
                     basis_gates=noise_model.basis_gates,
                     optimization_level=opt_level,
+                    seed_transpiler=seed_transpiler,
                 )
             else:
                 # Use qiskit_aer NoiseModel() default basis gates if no noise model is provided
@@ -188,6 +192,7 @@ class QiskitAerSimulator(CircuitExecutor):
                     meas_circuit,
                     basis_gates=NoiseModel().basis_gates,
                     optimization_level=opt_level,
+                    seed_transpiler=seed_transpiler,
                 )
 
         if post_transpilation_passes:
