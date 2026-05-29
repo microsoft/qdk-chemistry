@@ -7,7 +7,7 @@
 
 import numpy as np
 import pytest
-import qsharp
+from qdk.estimator import EstimatorResult
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryBinaryEncodingStatePreparation
@@ -83,7 +83,7 @@ class TestSparseIsometryBinaryEncoding:
         assert circuit.encoding == "jordan-wigner"
 
         result = circuit.estimate()
-        assert isinstance(result, qsharp.estimator.EstimatorResult)
+        assert isinstance(result, EstimatorResult)
         lc = result["logicalCounts"]
         assert lc["numQubits"] == 10  # 10 system qubits; pool covers all ancilla
         assert lc["tCount"] == 7
