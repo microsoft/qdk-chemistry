@@ -55,7 +55,9 @@
                 "C_Cpp.codeAnalysis.clangTidy.runAutomatically": true,
                 "C_Cpp.formatting": "clangFormat",
                 "C_Cpp.clang_format_style": "file",
-                "C_Cpp.clang_format_fallbackStyle": "Google"
+                "C_Cpp.clang_format_fallbackStyle": "Google",
+                "C_Cpp.default.cppStandard": "c++20",
+                "cmake.buildType": "Debug"
             }
         }
     },
@@ -70,7 +72,8 @@
         }
     },
     "remoteEnv": {
-        "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3"
+        "CPATH": "${containerEnv:CPATH}:/usr/include/hdf5/serial:/usr/include/eigen3",
+        "CMAKE_BUILD_TYPE": "Debug"
     },
     "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
