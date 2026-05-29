@@ -89,6 +89,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import BasisSet, Structure
+
 # Run SCF with density-fitted Coulomb integrals (DF-J)
 # Build a small molecule for the example
 water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
