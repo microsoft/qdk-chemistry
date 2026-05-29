@@ -715,18 +715,9 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
       Cb_active_rm = Cb_active;
 
-  // Determine SCF type from settings
-  std::string scf_type = _settings->get<std::string>("scf_type");
-
-  bool is_restricted_calc;
-  if (scf_type == "restricted") {
-    is_restricted_calc = true;
-  } else if (scf_type == "unrestricted") {
-    is_restricted_calc = false;
-  } else {  // "auto"
-    is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
-                         orbitals->is_restricted();
-  }
+  // Determine restricted/unrestricted from orbitals (auto behavior)
+  bool is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
+                            orbitals->is_restricted();
 
   // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
   // construction, so we only set Restricted for all restricted cases
