@@ -199,12 +199,6 @@ class TestValidation:
         with pytest.raises(ValueError, match="same length"):
             MajoranaMapping(table=["IX", "IYZ", "XZ", "YZ"])
 
-    def test_clifford_violation(self) -> None:
-        """Table violating Clifford algebra raises ValueError."""
-        # gamma_0 = gamma_1 = IX → they commute (shouldn't)
-        with pytest.raises(ValueError, match="Clifford"):
-            MajoranaMapping(table=["IX", "IX", "XZ", "YZ"])
-
     def test_zero_modes(self) -> None:
         """Zero modes raises ValueError in factories."""
         with pytest.raises(ValueError, match="num_modes"):
@@ -301,7 +295,7 @@ class TestSerialization:
         assert loaded.name == "my-custom"
 
     def test_hdf5_round_trip_with_tapering(self) -> None:
-        """HDF5 round-trip preserves phases and tapering for SCBK mappings."""
+        """HDF5 round-trip preserves tapering for SCBK mappings."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
@@ -312,7 +306,6 @@ class TestSerialization:
                 loaded = MajoranaMapping.from_hdf5(hf)
         assert loaded.table == scbk.table
         assert loaded.name == scbk.name
-        assert loaded.phases == scbk.phases
         assert loaded.tapering is not None
         assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
         assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues

@@ -14,21 +14,14 @@ The :class:`~qdk_chemistry.data.MajoranaMapping` class encapsulates such an enco
 Bilinears as the unified primitive
 ----------------------------------
 
-Across every fermion-to-qubit encoding, the most general primitive that admits a Pauli-string image is the **bilinear** :math:`i\,\gamma_j\,\gamma_k`.
-This is not a stylistic choice: bilinears generate the parity-even subalgebra of the Majorana Clifford algebra in *every* encoding, so any parity-conserving operator (Hamiltonian terms, BdG anomalous terms, density-density couplings) decomposes into ordered bilinear products.
-Quartics and higher-degree even monomials are products of bilinears.
+Across fermion-to-qubit encodings, the most general primitive that admits a Pauli-string image is the **bilinear** :math:`i\,\gamma_j\,\gamma_k`.
+Bilinears generate the parity-even subalgebra of the Majorana Clifford algebra, so any parity-conserving operator decomposes into ordered bilinear products, and higher-degree even monomials are products of bilinears.
 
-By contrast, individual Majorana operators :math:`\gamma_k` only have a Pauli image in **Majorana-atomic** encodings.
-For *redundant* encodings — Bravyi-Kitaev superfast, Verstraete-Cirac, Derby-Klassen compact, Setia-Whitfield, and the broader Majorana loop stabilizer code family — :math:`m > n` qubits represent :math:`n` modes, and a single :math:`\gamma_k` anticommutes with the total parity stabilizer; it has no representation in the codespace at all.
-
+Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings.
 The :class:`~qdk_chemistry.data.MajoranaMapping` API therefore exposes:
 
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` — the unified primitive available on every encoding.
-- :py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` — the additional capability that Majorana-atomic encodings provide; gated by :py:attr:`~qdk_chemistry.data.MajoranaMapping.is_majorana_atomic`.
-
-The current factory methods (Jordan-Wigner, Bravyi-Kitaev, parity, SCBK) are all Majorana-atomic, so both APIs are available and produce consistent results: :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` is computed on demand from the stored Majorana table.
-
-A common point of confusion: BdG (Bogoliubov-de Gennes) Hamiltonians contain anomalous terms like :math:`a_i^\dagger a_j^\dagger`. Despite breaking :math:`U(1)` particle number, these are parity-even bilinears in :math:`\gamma`'s and are representable on **any** backend, redundant or not. The cases that *require* a Majorana-atomic backend are single-Majorana observables (e.g. MZM measurements), state preparation by acting with a single :math:`a_j^\dagger` on the vacuum, and Bogoliubov quasiparticle operators viewed as observables.
+- :py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` — the additional capability provided by Majorana-atomic encodings; gated by :py:attr:`~qdk_chemistry.data.MajoranaMapping.is_majorana_atomic`.
 
 Convention
 ~~~~~~~~~~
@@ -102,12 +95,6 @@ Alternatively, construct from mode pairs:
 
    mapping = MajoranaMapping.from_mode_pairs(...)
 
-Validation
-----------
-
-At construction, the :class:`~qdk_chemistry.data.MajoranaMapping` validates that the provided table satisfies the Clifford algebra anti-commutation relations required for a valid Majorana-atomic fermion-to-qubit mapping.
-Invalid tables raise an error immediately, preventing silent correctness issues downstream.
-
 Serialization
 -------------
 
@@ -140,5 +127,3 @@ Further reading
 
 - :doc:`QubitMapper <../algorithms/qubit_mapper>`: The algorithm that consumes a ``MajoranaMapping`` to perform fermion-to-qubit transformations
 - :doc:`Design principles <../design/index>`: Data class design principles in QDK/Chemistry
-- Chen, Xu, Boettcher, "Equivalence between fermion-to-qubit mappings in two spatial dimensions" — unified treatment of every fermion-to-qubit mapping as a homomorphism from the parity-even Majorana Clifford algebra into the Pauli group, modulo stabilizers.
-- Jiang, Kalev, Mruczkiewicz, Neven, "Optimal fermion-to-qubit mapping via ternary trees" and the related Majorana loop stabilizer code literature — redundant encodings as stabilizer codes.

@@ -20,6 +20,7 @@ import numpy as np
 from qdk_chemistry._core.data import majorana_map_hamiltonian
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
+from qdk_chemistry.data.majorana_mapping import _sparse_to_dense_le
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
@@ -142,7 +143,8 @@ class QdkQubitMapper(QubitMapper):
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
         n_spatial = h1_alpha.shape[0]
         n_spin_orbitals = 2 * n_spatial
-        is_restricted = hamiltonian.get_orbitals().is_restricted()
+        # Restricted orbitals imply spin-free integrals (h_alpha == h_beta).
+        is_spin_free = hamiltonian.get_orbitals().is_restricted()
 
         if base_mapping.num_modes != n_spin_orbitals:
             raise ValueError(
@@ -152,17 +154,17 @@ class QdkQubitMapper(QubitMapper):
             )
 
         # Use ravel() instead of flatten() to avoid copying contiguous arrays.
-        # For restricted Hamiltonians the containers share the same two-body
+        # For spin-free Hamiltonians the containers share the same two-body
         # vector across aaaa/aabb/bbbb, so pass the same array to avoid
         # materializing unused copies.
         h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
-        h1_b_flat = h1_a_flat if is_restricted else np.ascontiguousarray(h1_beta).ravel()
+        h1_b_flat = h1_a_flat if is_spin_free else np.ascontiguousarray(h1_beta).ravel()
         h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
-        h2_aabb_flat = h2_aaaa_flat if is_restricted else np.ascontiguousarray(h2_aabb).ravel()
-        h2_bbbb_flat = h2_aaaa_flat if is_restricted else np.ascontiguousarray(h2_bbbb).ravel()
+        h2_aabb_flat = h2_aaaa_flat if is_spin_free else np.ascontiguousarray(h2_aabb).ravel()
+        h2_bbbb_flat = h2_aaaa_flat if is_spin_free else np.ascontiguousarray(h2_bbbb).ravel()
 
-        # Single C++ call: Majorana-loop engine builds all Pauli terms
-        pauli_strings, coefficients = majorana_map_hamiltonian(
+        # Single C++ call: Majorana-loop engine builds all Pauli terms as sparse words
+        words, coefficients = majorana_map_hamiltonian(
             base_mapping.core,
             0.0,  # core energy not included (QDK convention)
             h1_a_flat,
@@ -171,15 +173,19 @@ class QdkQubitMapper(QubitMapper):
             h2_aabb_flat,
             h2_bbbb_flat,
             n_spatial,
-            is_restricted,
+            is_spin_free,
             threshold,
             integral_threshold,
         )
 
+        # Render sparse words into dense little-endian strings (Python owns string form)
+        n_qubits = base_mapping.num_qubits
+        pauli_strings = [_sparse_to_dense_le(word, n_qubits) for word in words]
+
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
 
         qh = QubitHamiltonian(
-            pauli_strings=list(pauli_strings),
+            pauli_strings=pauli_strings,
             coefficients=np.array(coefficients, dtype=complex),
             encoding=base_mapping.base_encoding,
             fermion_mode_order=FermionModeOrder.BLOCKED,

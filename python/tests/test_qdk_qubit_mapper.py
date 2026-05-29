@@ -545,8 +545,8 @@ class TestQdkQubitMapper:
         I_n = np.eye(2**n)
 
         for j in range(n):
-            g0 = pauli_to_sparse_matrix([mapping.table[2 * j]], np.array([mapping.phases[2 * j]])).toarray()
-            g1 = pauli_to_sparse_matrix([mapping.table[2 * j + 1]], np.array([mapping.phases[2 * j + 1]])).toarray()
+            g0 = pauli_to_sparse_matrix([mapping.table[2 * j]], np.array([1.0])).toarray()
+            g1 = pauli_to_sparse_matrix([mapping.table[2 * j + 1]], np.array([1.0])).toarray()
             nj = (I_n + 1j * g0 @ g1) / 2
 
             # Build expected Z structure: Z_0 for j=0, Z_{j-1}·Z_j for j≥1
@@ -1209,7 +1209,7 @@ class TestBravyiKitaevTreeMapper:
         for n in (4, 6, 8):
             mapping = MajoranaMapping.bravyi_kitaev_tree(n)
             gammas = [
-                pauli_to_sparse_matrix([mapping.table[k]], np.array([mapping.phases[k]])).toarray()
+                pauli_to_sparse_matrix([mapping.table[k]], np.array([1.0])).toarray()
                 for k in range(2 * n)
             ]
             for i in range(2 * n):

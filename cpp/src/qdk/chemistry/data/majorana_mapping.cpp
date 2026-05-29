@@ -8,7 +8,6 @@
 #include <cstdint>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -16,16 +15,6 @@
 namespace qdk::chemistry::data {
 
 namespace {
-
-// Re-use the Pauli algebra from pauli_operator.cpp (it's in the detail
-// namespace of this translation unit's sibling, but we can call the
-// PauliTermAccumulator static helper which is public).
-
-/// Multiply two SparsePauliWords via the public uncached static method.
-std::pair<std::complex<double>, SparsePauliWord> multiply_words(
-    const SparsePauliWord& a, const SparsePauliWord& b) {
-  return PauliTermAccumulator::multiply_uncached(a, b);
-}
 
 // ── BK index-set computation ──────────────────────────────────────────
 
@@ -142,11 +131,8 @@ constexpr std::uint8_t OP_Z = 3;
 // ── MajoranaMapping implementation ───────────────────────────────────
 
 MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
-                                 std::string name,
-                                 std::vector<std::int8_t> phases)
+                                 std::string name)
     : table_(std::move(table)),
-      phases_(std::move(phases)),
-      all_positive_(true),
       name_(std::move(name)),
       num_qubits_(compute_num_qubits(table_)) {
   if (table_.empty()) {
@@ -158,24 +144,6 @@ MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
         "(2 per fermionic mode), got " +
         std::to_string(table_.size()));
   }
-  // Default phases to all +1 if not provided
-  if (phases_.empty()) {
-    phases_.assign(table_.size(), 1);
-  } else if (phases_.size() != table_.size()) {
-    throw std::invalid_argument(
-        "phases size (" + std::to_string(phases_.size()) +
-        ") must match table size (" + std::to_string(table_.size()) + ")");
-  }
-  // Validate phase values and compute all_positive flag
-  for (std::size_t k = 0; k < phases_.size(); ++k) {
-    if (phases_[k] != 1 && phases_[k] != -1) {
-      throw std::invalid_argument("phases[" + std::to_string(k) +
-                                  "] = " + std::to_string(phases_[k]) +
-                                  "; must be +1 or -1");
-    }
-    if (phases_[k] != 1) all_positive_ = false;
-  }
-  validate();
 }
 
 const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
@@ -185,15 +153,6 @@ const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
                             std::to_string(table_.size()) + ")");
   }
   return table_[k];
-}
-
-std::int8_t MajoranaMapping::phase(std::size_t k) const {
-  if (k >= phases_.size()) {
-    throw std::out_of_range("Majorana index " + std::to_string(k) +
-                            " out of range [0, " +
-                            std::to_string(phases_.size()) + ")");
-  }
-  return phases_[k];
 }
 
 std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
@@ -211,77 +170,11 @@ std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
         std::to_string(j) +
         "); the bilinear i*gamma_j*gamma_k requires distinct indices.");
   }
-  // i * gamma_j * gamma_k
-  //   = i * (phases_[j] * table_[j]) * (phases_[k] * table_[k])
-  //   = i * phases_[j] * phases_[k] * (table_[j] * table_[k])
+  // i * gamma_j * gamma_k = i * (table_[j] * table_[k])
   auto [pauli_phase, word] =
       PauliTermAccumulator::multiply_uncached(table_[j], table_[k]);
-  std::complex<double> coeff = std::complex<double>(0.0, 1.0) * pauli_phase *
-                               static_cast<double>(phases_[j]) *
-                               static_cast<double>(phases_[k]);
+  std::complex<double> coeff = std::complex<double>(0.0, 1.0) * pauli_phase;
   return {coeff, std::move(word)};
-}
-
-void MajoranaMapping::validate() const {
-  const std::size_t n = table_.size();
-  constexpr double tol = 1e-12;
-
-  for (std::size_t i = 0; i < n; ++i) {
-    for (std::size_t j = i; j < n; ++j) {
-      // gamma_k = phases_[k] * table_[k], so:
-      // gamma_i * gamma_j = phases_[i]*phases_[j] * table_[i]*table_[j]
-      auto [phase_ij, word_ij] = multiply_words(table_[i], table_[j]);
-      auto [phase_ji, word_ji] = multiply_words(table_[j], table_[i]);
-
-      // Include the sign factors
-      double sign_ij = static_cast<double>(phases_[i]) * phases_[j];
-
-      if (i == j) {
-        // gamma_i^2 = phases_[i]^2 * P_i^2 = 1 * P_i^2
-        // P_i^2 must be I with phase +1
-        if (!word_ij.empty()) {
-          std::ostringstream msg;
-          msg << "Clifford algebra validation failed: gamma_" << i
-              << " squared is not proportional to identity";
-          throw std::invalid_argument(msg.str());
-        }
-        // phase_ij should be +1 (Pauli string squares to +I only for I, XX,
-        // YY, ZZ on a single qubit gives -I for Y but the overall product
-        // should be +I for a valid Majorana operator)
-        if (std::abs(phase_ij - std::complex<double>(1.0, 0.0)) > tol) {
-          std::ostringstream msg;
-          msg << "Clifford algebra validation failed: γ_" << i
-              << " squared gives phase " << phase_ij << " (expected +1)";
-          throw std::invalid_argument(msg.str());
-        }
-      } else {
-        // γ_i·γ_j + γ_j·γ_i = 0, so the two products must cancel.
-        // If words are different, both must have zero coefficient.
-        // If words are the same, phases must sum to zero.
-        if (word_ij == word_ji) {
-          auto sum = phase_ij + phase_ji;
-          if (std::abs(sum) > tol) {
-            std::ostringstream msg;
-            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_" << j
-                << "} != 0 (anticommutator phase sum = " << sum << ")";
-            throw std::invalid_argument(msg.str());
-          }
-        } else {
-          // Different resulting words — each must be separately zero,
-          // which means either the mapping is invalid or the words cancel
-          // in a sum expression. For valid Majorana mappings from Clifford
-          // algebra homomorphisms, the products always yield the same word
-          // (possibly with different phase). If words differ, that's an error.
-          if (std::abs(phase_ij) > tol || std::abs(phase_ji) > tol) {
-            std::ostringstream msg;
-            msg << "Clifford algebra validation failed: {γ_" << i << ", γ_" << j
-                << "} produces non-cancelling terms with different Pauli words";
-            throw std::invalid_argument(msg.str());
-          }
-        }
-      }
-    }
-  }
 }
 
 std::size_t MajoranaMapping::compute_num_qubits(
