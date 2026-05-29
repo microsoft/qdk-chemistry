@@ -152,3 +152,4 @@ steps:
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
+    retryCountOnTaskFailure: 2
