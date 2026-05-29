@@ -109,7 +109,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_feedback = 0.0
         bits: list[int] = []
 
-        if self.settings().get("num_bits") < 0:
+        if self.settings().get("num_bits") <= 0:
             raise ValueError(
                 f"Number of bits to estimate must be positive. Got {self.settings().get('num_bits')} instead."
             )
