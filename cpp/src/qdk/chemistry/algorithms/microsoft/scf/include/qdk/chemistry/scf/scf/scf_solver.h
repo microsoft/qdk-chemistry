@@ -166,7 +166,8 @@ class SCF {
   static std::unique_ptr<SCF> make_hf_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
       const RowMajorMatrix& density_matrix, std::shared_ptr<BasisSet> basis_set,
-      std::shared_ptr<BasisSet> raw_basis_set);
+      std::shared_ptr<BasisSet> raw_basis_set,
+      std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
   /**
    * @brief Create a Hartree-Fock solver with user-provided initial density
@@ -180,7 +181,8 @@ class SCF {
   static std::unique_ptr<SCF> make_hf_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
       std::shared_ptr<BasisSet> basis_set,
-      std::shared_ptr<BasisSet> raw_basis_set);
+      std::shared_ptr<BasisSet> raw_basis_set,
+      std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
   /**
    * @brief Create a Kohn-Sham DFT solver
@@ -203,7 +205,8 @@ class SCF {
   static std::unique_ptr<SCF> make_ks_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
       const RowMajorMatrix& density_matrix, std::shared_ptr<BasisSet> basis_set,
-      std::shared_ptr<BasisSet> raw_basis_set);
+      std::shared_ptr<BasisSet> raw_basis_set,
+      std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
   /**
    * @brief Create a Kohn-Sham DFT solver with user-provided initial density
@@ -217,7 +220,8 @@ class SCF {
   static std::unique_ptr<SCF> make_ks_solver(
       std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
       std::shared_ptr<BasisSet> basis_set,
-      std::shared_ptr<BasisSet> raw_basis_set);
+      std::shared_ptr<BasisSet> raw_basis_set,
+      std::shared_ptr<BasisSet> aux_basis_set = nullptr);
 
  private:
   /**

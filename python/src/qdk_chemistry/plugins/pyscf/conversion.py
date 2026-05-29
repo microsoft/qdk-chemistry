@@ -287,6 +287,9 @@ def pyscf_mol_to_qdk_basis(
 
     # Extract ECP shells if present
     ecp_shells = []
+    ecp_name = "none"
+    ecp_electrons = [0] * pyscf_mol.natm
+
     if hasattr(pyscf_mol, "_ecp") and pyscf_mol._ecp:  # noqa: SLF001
         for iatm in range(pyscf_mol.natm):
             atom_symbol = atom_symbols[iatm]
@@ -316,9 +319,6 @@ def pyscf_mol_to_qdk_basis(
 
     # Extract ECP name and electron counts if present
     if hasattr(pyscf_mol, "ecp") and pyscf_mol.ecp:
-        ecp_name = "none"
-        ecp_electrons = [0] * pyscf_mol.natm
-
         if isinstance(pyscf_mol.ecp, str):
             # Simple case: ECP specified as a uniform string name
             ecp_name = pyscf_mol.ecp
@@ -391,8 +391,10 @@ def pyscf_mol_to_qdk_basis(
         if any(n > 0 for n in ecp_electrons):
             return BasisSet(basis_name, shells, ecp_name, ecp_shells, ecp_electrons, structure, AOType.Spherical)
 
-    # Create BasisSet with name, shells, ecp_shells, structure, and basis type
-    return BasisSet(basis_name, shells, ecp_shells, structure, AOType.Spherical)
+    # Fallback: include ECP shells (with zero electrons) only if present
+    if ecp_shells:
+        return BasisSet(basis_name, shells, ecp_shells, ecp_electrons, structure, AOType.Spherical)
+    return BasisSet(basis_name, shells, structure, AOType.Spherical)
 
 
 def orbitals_to_scf(

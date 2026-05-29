@@ -4,6 +4,8 @@
 
 #include "cholesky_hamiltonian.hpp"
 
+#include "hamiltonian_util.hpp"
+
 // STL Headers
 #include <cstring>
 #include <filesystem>
@@ -33,7 +35,7 @@
 
 // QDK/Chemistry data::Hamiltonian headers
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"
@@ -43,7 +45,6 @@ namespace qdk::chemistry::algorithms::microsoft {
 namespace qcs = qdk::chemistry::scf;
 
 namespace detail {
-
 /**
  * @brief Compute Cholesky decomposition of the two-electron integral tensor
  *
@@ -426,176 +427,12 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   return {std::move(L_data), current_col};
 }
 
-Eigen::MatrixXd transform_cholesky_to_mo(
-    const Eigen::MatrixXd& ao_cholesky_vectors,
-    const Eigen::MatrixXd& mo_coeffs) {
-  QDK_LOG_TRACE_ENTERING();
-  size_t n_ao = mo_coeffs.rows();
-  size_t n_mo = mo_coeffs.cols();
-  size_t rank = ao_cholesky_vectors.cols();
-
-  // Validate dimensions
-  if (n_ao == 0 || n_mo == 0) {
-    throw std::invalid_argument("C matrix has zero dimensions");
-  }
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
-    throw std::invalid_argument(
-        "ao_cholesky_vectors dimensions do not match n_ao");
-  }
-
-  Eigen::MatrixXd mo_vectors(n_mo * n_mo, rank);
-
-  // iterate over each Cholesky vector
-  for (size_t k = 0; k < rank; ++k) {
-    // Reshape the flat AO vector to a matrix (n_ao x n_ao)
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                   Eigen::RowMajor>>
-        V_ao(ao_cholesky_vectors.col(k).data(), n_ao, n_ao);
-
-    // Transform from AO to MO basis: C^T * V_ao * C
-    // Write directly to output column
-    Eigen::Map<Eigen::MatrixXd> V_mo_map(mo_vectors.col(k).data(), n_mo, n_mo);
-    V_mo_map.noalias() = mo_coeffs.transpose() * V_ao * mo_coeffs;
-  }
-
-  return mo_vectors;
-}
-
-Eigen::MatrixXd build_J_from_cholesky(
-    const Eigen::MatrixXd& ao_cholesky_vectors,
-    const Eigen::MatrixXd& density) {
-  QDK_LOG_TRACE_ENTERING();
-  size_t n_ao = density.rows();
-  size_t rank = ao_cholesky_vectors.cols();
-
-  // Validate dimensions
-  if (density.cols() != density.rows()) {
-    throw std::invalid_argument("Density matrix must be square");
-  }
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
-    throw std::invalid_argument(
-        "ao_cholesky_vectors dimensions do not match density matrix");
-  }
-
-  // Flatten density matrix
-  Eigen::Map<const Eigen::VectorXd> density_vec(density.data(), n_ao * n_ao);
-
-  // Compute all inner products at once: V_k = sum_{mu,nu} L^k_{mu,nu} *
-  // P_{mu,nu} V = L^T * vec(P)
-  Eigen::VectorXd V = ao_cholesky_vectors.transpose() * density_vec;
-
-  // Reconstruct J: J = sum_k L_k * V_k = L * V (reshaped)
-  Eigen::VectorXd J_vec = ao_cholesky_vectors * V;
-
-  // Reshape back to matrix
-  Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                 Eigen::RowMajor>>
-      J(J_vec.data(), n_ao, n_ao);
-  return J;
-}
-
-Eigen::MatrixXd build_K_from_cholesky(
-    const Eigen::MatrixXd& ao_cholesky_vectors, const Eigen::MatrixXd& coeffs,
-    const std::vector<size_t>& occ_orb_ind) {
-  QDK_LOG_TRACE_ENTERING();
-  size_t n_ao = coeffs.rows();
-  size_t n_occ = occ_orb_ind.size();
-  size_t rank = ao_cholesky_vectors.cols();
-
-  // Validate dimensions
-  if (ao_cholesky_vectors.rows() != n_ao * n_ao) {
-    throw std::invalid_argument(
-        "ao_cholesky_vectors dimensions do not match density matrix");
-  }
-
-  // Extract occupied orbital coefficients only
-  Eigen::MatrixXd C_occ(n_ao, n_occ);
-  for (size_t idx = 0; idx < n_occ; ++idx) {
-    C_occ.col(idx) = coeffs.col(occ_orb_ind[idx]);
-  }
-
-  // Transform to occupied MO basis only: L^k_{\sigma,i_occ} = L^k_{\mu\sigma} *
-  // C_{\mu,i_occ}
-  Eigen::MatrixXd L_sigma_occ(n_ao * n_occ, rank);
-  for (size_t k = 0; k < rank; ++k) {
-    Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                   Eigen::RowMajor>>
-        L_k(ao_cholesky_vectors.col(k).data(), n_ao, n_ao);
-    Eigen::Map<Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao, n_occ);
-    L_k_occ.noalias() = L_k * C_occ;
-  }
-
-  // Build K_{\lambda\sigma} = \sum_k L^k_{\lambda,i} * L^k_{\sigma,i}
-  Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n_ao, n_ao);
-  for (size_t k = 0; k < rank; ++k) {
-    Eigen::Map<const Eigen::MatrixXd> L_k_occ(L_sigma_occ.col(k).data(), n_ao,
-                                              n_occ);
-    K.noalias() += L_k_occ * L_k_occ.transpose();
-  }
-
-  return K;
-}
-
 }  // namespace detail
-
-namespace detail_chol {
-/**
- * @brief Validate active orbital indices
- * @param indices The indices to validate
- * @param spin_label Label for error messages (e.g., "Alpha", "Beta")
- * @param num_molecular_orbitals Total number of molecular orbitals
- * @return true if the indices are contiguous, false otherwise
- */
-bool validate_active_contiguous_indices(const std::vector<size_t>& indices,
-                                        const std::string& spin_label,
-                                        size_t num_molecular_orbitals) {
-  QDK_LOG_TRACE_ENTERING();
-  if (indices.empty()) return true;
-
-  // Cannot contain more than the total number of MOs
-  if (indices.size() > num_molecular_orbitals) {
-    throw std::runtime_error("Number of requested " + spin_label +
-                             " active orbitals exceeds total number of MOs");
-  }
-
-  // Make sure that the indices are within bounds
-  for (const auto& idx : indices) {
-    if (static_cast<size_t>(idx) >= num_molecular_orbitals) {
-      throw std::runtime_error(
-          spin_label +
-          " active orbital index out of bounds: " + std::to_string(idx));
-    }
-  }
-
-  // Make sure that the indices are unique
-  std::set<size_t> unique_indices(indices.begin(), indices.end());
-  if (unique_indices.size() != indices.size()) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be unique");
-  }
-
-  // Make sure that the indices are sorted
-  std::vector<size_t> sorted_indices(indices.begin(), indices.end());
-  std::sort(sorted_indices.begin(), sorted_indices.end());
-  if (indices != sorted_indices) {
-    throw std::runtime_error(spin_label +
-                             " active orbital indices must be sorted");
-  }
-
-  // Check if indices are contiguous
-  for (size_t i = 0; i < indices.size() - 1; ++i) {
-    if (indices[i + 1] - indices[i] != 1) {
-      return false;
-    }
-  }
-
-  return true;
-}
-}  // namespace detail_chol
 
 std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
+
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
@@ -621,15 +458,14 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   const size_t nactive_beta = active_indices_beta.size();
 
   // Validate alpha active orbitals and check contiguity
-  bool alpha_space_is_contiguous =
-      detail_chol::validate_active_contiguous_indices(
-          active_indices_alpha, "Alpha", num_molecular_orbitals);
+  bool alpha_space_is_contiguous = detail::validate_active_contiguous_indices(
+      active_indices_alpha, "Alpha", num_molecular_orbitals);
 
   // Validate beta active orbitals (if different from alpha) and check
   // contiguity
   bool beta_space_is_contiguous = true;
   if (active_indices_beta != active_indices_alpha) {
-    beta_space_is_contiguous = detail_chol::validate_active_contiguous_indices(
+    beta_space_is_contiguous = detail::validate_active_contiguous_indices(
         active_indices_beta, "Beta", num_molecular_orbitals);
   } else {
     beta_space_is_contiguous = alpha_space_is_contiguous;
@@ -735,7 +571,6 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   // get cholesky vectors
   auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
       *internal_basis_set, cholesky_tol, eri_tol);
-
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(
       output.data(), num_atomic_orbitals * num_atomic_orbitals,
@@ -747,11 +582,11 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   if (is_restricted_calc) {
     // Transform to MO
-    L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo = detail::transform_three_center_ao_to_mo(L_ao, Ca_active);
   } else {
     // Transform to MO (Alpha and Beta)
-    L_mo_alpha = detail::transform_cholesky_to_mo(L_ao, Ca_active);
-    L_mo_beta = detail::transform_cholesky_to_mo(L_ao, Cb_active);
+    L_mo_alpha = detail::transform_three_center_ao_to_mo(L_ao, Ca_active);
+    L_mo_beta = detail::transform_three_center_ao_to_mo(L_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -774,15 +609,15 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       Eigen::MatrixXd H_active(nactive, nactive);
       H_active = Ca_active.transpose() * H_full * Ca_active;
       Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
-      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_three_center_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CholeskyHamiltonianContainer>(
+            std::make_unique<data::ThreeCenterHamiltonianContainer>(
                 H_active, L_mo, orbitals,
                 structure->calculate_nuclear_repulsion_energy(), dummy_fock,
                 L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active, L_mo, orbitals,
               structure->calculate_nuclear_repulsion_energy(), dummy_fock));
     } else {
@@ -793,15 +628,15 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
       H_active_beta = Cb_active.transpose() * H_full * Cb_active;
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
-      if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+      if (_settings->get<bool>("store_ao_three_center_vectors")) {
         return std::make_shared<data::Hamiltonian>(
-            std::make_unique<data::CholeskyHamiltonianContainer>(
+            std::make_unique<data::ThreeCenterHamiltonianContainer>(
                 H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
                 structure->calculate_nuclear_repulsion_energy(),
                 dummy_fock_alpha, dummy_fock_beta, L_ao));
       }
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
               H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
               structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
               dummy_fock_beta));
@@ -812,180 +647,69 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
     // Restricted case
     const auto& inactive_indices = inactive_indices_alpha;
 
-    // Determine whether the inactive space is contiguous
-    bool inactive_space_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices.size() - 1; ++i) {
-      if (inactive_indices[i + 1] - inactive_indices[i] != 1) {
-        inactive_space_is_contiguous = false;
-        break;
-      }
-    }
+    // Compute inactive density and J/K from Cholesky vectors
+    Eigen::MatrixXd D_inactive = detail::build_inactive_density(
+        Ca, inactive_indices, num_atomic_orbitals);
+    Eigen::MatrixXd J_inactive_ao =
+        detail::build_J_from_three_center(L_ao, D_inactive);
+    Eigen::MatrixXd K_inactive_ao =
+        detail::build_K_from_three_center(L_ao, Ca, inactive_indices);
 
-    // Compute the inactive density matrix
-    Eigen::MatrixXd D_inactive =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    if (inactive_space_is_contiguous) {
-      auto C_inactive = Ca.block(0, inactive_indices.front(),
-                                 num_atomic_orbitals, inactive_indices.size());
-      D_inactive = C_inactive * C_inactive.transpose();
-    } else {
-      for (size_t i : inactive_indices) {
-        D_inactive += Ca.col(i) * Ca.col(i).transpose();
-      }
-    }
+    auto result = detail::compute_restricted_inactive(
+        J_inactive_ao, K_inactive_ao, H_full, Ca, inactive_indices,
+        active_indices_alpha);
 
-    // Compute the two electron part of the inactive fock matrix
-    Eigen::MatrixXd J_inactive_ao, K_inactive_ao;
-    // Use Cholesky vectors to build J and K
-    J_inactive_ao = detail::build_J_from_cholesky(L_ao, D_inactive);
-    K_inactive_ao = detail::build_K_from_cholesky(L_ao, Ca, inactive_indices);
-    Eigen::MatrixXd G_inactive_ao = 2 * J_inactive_ao - K_inactive_ao;
-
-    // Compute the inactive Fock matrix
-    Eigen::MatrixXd F_inactive_ao = G_inactive_ao + H_full;
-    Eigen::MatrixXd F_inactive(num_molecular_orbitals, num_molecular_orbitals);
-    F_inactive = Ca.transpose() * F_inactive_ao * Ca;
-
-    // Compute the inactive energy
-    double E_inactive = 0.0;
-    Eigen::MatrixXd H_mo = Ca.transpose() * H_full * Ca;
-    for (auto i : inactive_indices) {
-      E_inactive += H_mo(i, i) + F_inactive(i, i);
-    }
-
-    // Extract active space Hamiltonian
-    Eigen::MatrixXd H_active(nactive, nactive);
-    for (size_t i = 0; i < nactive; i++) {
-      for (size_t j = 0; j < nactive; j++) {
-        H_active(i, j) =
-            F_inactive(active_indices_alpha[i], active_indices_alpha[j]);
-      }
-    }
-
-    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_three_center_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active, L_mo, orbitals,
-              E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive, L_ao));
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
+              result.H_active, L_mo, orbitals,
+              result.E_inactive +
+                  structure->calculate_nuclear_repulsion_energy(),
+              result.F_inactive, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active, L_mo, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive));
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
+            result.H_active, L_mo, orbitals,
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            result.F_inactive));
   } else {
     // Unrestricted case
 
-    // Determine whether the alpha inactive space is contiguous
-    bool alpha_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_alpha.size() - 1; ++i) {
-      if (inactive_indices_alpha[i + 1] - inactive_indices_alpha[i] != 1) {
-        alpha_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    // Compute inactive densities and J/K from Cholesky vectors
+    Eigen::MatrixXd D_inactive_alpha = detail::build_inactive_density(
+        Ca, inactive_indices_alpha, num_atomic_orbitals);
+    Eigen::MatrixXd D_inactive_beta = detail::build_inactive_density(
+        Cb, inactive_indices_beta, num_atomic_orbitals);
 
-    // Determine whether the beta inactive space is contiguous
-    bool beta_inactive_is_contiguous = true;
-    for (size_t i = 0; i < inactive_indices_beta.size() - 1; ++i) {
-      if (inactive_indices_beta[i + 1] - inactive_indices_beta[i] != 1) {
-        beta_inactive_is_contiguous = false;
-        break;
-      }
-    }
+    Eigen::MatrixXd J_alpha_ao =
+        detail::build_J_from_three_center(L_ao, D_inactive_alpha);
+    Eigen::MatrixXd K_alpha_ao =
+        detail::build_K_from_three_center(L_ao, Ca, inactive_indices_alpha);
+    Eigen::MatrixXd J_beta_ao =
+        detail::build_J_from_three_center(L_ao, D_inactive_beta);
+    Eigen::MatrixXd K_beta_ao =
+        detail::build_K_from_three_center(L_ao, Cb, inactive_indices_beta);
 
-    // Compute separate alpha and beta inactive density matrices
-    Eigen::MatrixXd D_inactive_alpha =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    Eigen::MatrixXd D_inactive_beta =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
+    auto result = detail::compute_unrestricted_inactive(
+        J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao, H_full, Ca, Cb,
+        inactive_indices_alpha, inactive_indices_beta, active_indices_alpha,
+        active_indices_beta);
 
-    // Build alpha inactive density
-    if (alpha_inactive_is_contiguous && !inactive_indices_alpha.empty()) {
-      auto C_inactive_alpha =
-          Ca.block(0, inactive_indices_alpha.front(), num_atomic_orbitals,
-                   inactive_indices_alpha.size());
-      D_inactive_alpha = C_inactive_alpha * C_inactive_alpha.transpose();
-    } else {
-      for (size_t i : inactive_indices_alpha) {
-        D_inactive_alpha += Ca.col(i) * Ca.col(i).transpose();
-      }
-    }
-
-    // Build beta inactive density
-    if (beta_inactive_is_contiguous && !inactive_indices_beta.empty()) {
-      auto C_inactive_beta =
-          Cb.block(0, inactive_indices_beta.front(), num_atomic_orbitals,
-                   inactive_indices_beta.size());
-      D_inactive_beta = C_inactive_beta * C_inactive_beta.transpose();
-    } else {
-      for (size_t i : inactive_indices_beta) {
-        D_inactive_beta += Cb.col(i) * Cb.col(i).transpose();
-      }
-    }
-
-    // Compute J and K matrices for alpha and beta densities
-    Eigen::MatrixXd J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao;
-    // Use Cholesky vectors to build J and K
-    J_alpha_ao = detail::build_J_from_cholesky(L_ao, D_inactive_alpha);
-    K_alpha_ao =
-        detail::build_K_from_cholesky(L_ao, Ca, inactive_indices_alpha);
-    J_beta_ao = detail::build_J_from_cholesky(L_ao, D_inactive_beta);
-    K_beta_ao = detail::build_K_from_cholesky(L_ao, Cb, inactive_indices_beta);
-
-    Eigen::MatrixXd F_inactive_alpha_ao =
-        H_full + J_alpha_ao + J_beta_ao - K_alpha_ao;
-    Eigen::MatrixXd F_inactive_beta_ao =
-        H_full + J_alpha_ao + J_beta_ao - K_beta_ao;
-
-    // Transform to MO basis
-    Eigen::MatrixXd F_inactive_alpha(num_molecular_orbitals,
-                                     num_molecular_orbitals);
-    Eigen::MatrixXd F_inactive_beta(num_molecular_orbitals,
-                                    num_molecular_orbitals);
-    F_inactive_alpha = Ca.transpose() * F_inactive_alpha_ao * Ca;
-    F_inactive_beta = Cb.transpose() * F_inactive_beta_ao * Cb;
-
-    // Compute inactive energy
-    Eigen::MatrixXd H_mo_alpha = Ca.transpose() * H_full * Ca;
-    Eigen::MatrixXd H_mo_beta = Cb.transpose() * H_full * Cb;
-
-    double E_inactive = 0.0;
-    for (auto i : inactive_indices_alpha) {
-      E_inactive += H_mo_alpha(i, i) + F_inactive_alpha(i, i);
-    }
-    for (auto i : inactive_indices_beta) {
-      E_inactive += H_mo_beta(i, i) + F_inactive_beta(i, i);
-    }
-    // Avoid double counting of two-electron interactions
-    E_inactive *= 0.5;
-
-    // Extract active space Hamiltonians
-    Eigen::MatrixXd H_active_alpha(nactive, nactive);
-    Eigen::MatrixXd H_active_beta(nactive, nactive);
-
-    for (size_t i = 0; i < nactive; i++) {
-      for (size_t j = 0; j < nactive; j++) {
-        H_active_alpha(i, j) =
-            F_inactive_alpha(active_indices_alpha[i], active_indices_alpha[j]);
-        H_active_beta(i, j) =
-            F_inactive_beta(active_indices_beta[i], active_indices_beta[j]);
-      }
-    }
-
-    if (_settings->get<bool>("store_ao_cholesky_vectors")) {
+    if (_settings->get<bool>("store_ao_three_center_vectors")) {
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CholeskyHamiltonianContainer>(
-              H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-              E_inactive + structure->calculate_nuclear_repulsion_energy(),
-              F_inactive_alpha, F_inactive_beta, L_ao));
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
+              result.H_active_alpha, result.H_active_beta, L_mo_alpha,
+              L_mo_beta, orbitals,
+              result.E_inactive +
+                  structure->calculate_nuclear_repulsion_energy(),
+              result.F_inactive_alpha, result.F_inactive_beta, L_ao));
     }
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CholeskyHamiltonianContainer>(
-            H_active_alpha, H_active_beta, L_mo_alpha, L_mo_beta, orbitals,
-            E_inactive + structure->calculate_nuclear_repulsion_energy(),
-            F_inactive_alpha, F_inactive_beta));
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
+            result.H_active_alpha, result.H_active_beta, L_mo_alpha, L_mo_beta,
+            orbitals,
+            result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
+            result.F_inactive_alpha, result.F_inactive_beta));
   }
 }
 }  // namespace qdk::chemistry::algorithms::microsoft

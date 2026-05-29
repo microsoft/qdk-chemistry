@@ -2,25 +2,27 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "hamiltonian.hpp"
+#include "density_fitted_hamiltonian.hpp"
 
 #include "hamiltonian_util.hpp"
 
 // STL Headers
-#include <filesystem>
-#include <set>
-
-// MACIS Headers
-#include <macis/mcscf/fock_matrices.hpp>
+#include <cstddef>
+#include <memory>
 
 // QDK/Chemistry SCF headers
 #include <qdk/chemistry/scf/core/moeri.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
 #include <qdk/chemistry/scf/util/int1e.h>
+#include <qdk/chemistry/scf/util/libint2_util.h>
+
+#include <Eigen/Core>
 
 // QDK/Chemistry data::Hamiltonian headers
-#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <blas.hh>
+#include <lapack.hh>
+#include <qdk/chemistry/data/hamiltonian_containers/three_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "utils.hpp"
@@ -29,15 +31,48 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
+namespace detail_df {
+
+// Helper function that takes in DF integrals (ij|P) and metric integral (P|Q),
+// fold (P|Q)^(-1/2) into (ij|P), such that the resulting integrals (ij|P), also
+// written as B^Q_ij, can be used directly in the DF expression for four-center
+// integrals: (ij|kl) ≈ Σ_Q B^Q_ij B^Q_kl. This assumes everything is in the
+// atomic orbital basis. The variable df_eri is over-written upon output.
+void fold_metric_to_three_center(size_t num_atomic_orbitals, size_t naux,
+                                 std::unique_ptr<double[]>& df_eri,
+                                 std::unique_ptr<double[]>& df_metric) {
+  size_t nao = num_atomic_orbitals;
+
+  size_t nao2 = nao * nao;
+
+  // 1. Use cholesky factorization on metric:  df_metric = L L^{T}
+  lapack::potrf(lapack::Uplo::Lower, naux, df_metric.get(), naux);
+
+  // 2. Solve L B = eri_df  => B = L^{-1} eri_df = (metric)^(-1/2) eri_df
+  // save result in df_eri.
+  blas::trsm(blas::Layout::ColMajor, blas::Side::Right, blas::Uplo::Lower,
+             blas::Op::Trans, blas::Diag::NonUnit, nao2, naux, 1.0,
+             df_metric.get(), naux, df_eri.get(), nao2);
+}
+}  // namespace detail_df
+
+std::shared_ptr<data::Hamiltonian>
+DensityFittedHamiltonianConstructor::_run_impl(
     std::shared_ptr<data::Orbitals> orbitals) const {
   QDK_LOG_TRACE_ENTERING();
   // Initialize the backend if not already done
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
+  if (!basis_set->has_aux_basis()) {
+    throw std::runtime_error(
+        "An auxiliary basis set must be provided for density-fitted "
+        "Hamiltonian construction.");
+  }
+
   const auto& [Ca, Cb] = orbitals->get_coefficients();
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
+  const size_t num_auxiliary_orbitals = basis_set->get_num_auxiliary_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 
   // Get alpha and beta active space indices
@@ -70,10 +105,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     beta_space_is_contiguous = alpha_space_is_contiguous;
   }
 
-  // Overall contiguity requires both alpha and beta to be contiguous
-  bool active_space_is_contiguous =
-      alpha_space_is_contiguous && beta_space_is_contiguous;
-
   // Ensure alpha and beta active spaces have the same size
   if (nactive_alpha != nactive_beta) {
     throw std::runtime_error(
@@ -85,37 +116,16 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
 
   // Create internal Molecule
   auto structure = basis_set->get_structure();
+  auto mol = utils::microsoft::convert_to_molecule(*structure, 0, 1);
 
-  // Create internal BasisSet (includes ECP-adjusted nuclear charges)
+  // Create internal BasisSet
   auto internal_basis_set =
       utils::microsoft::convert_basis_set_from_qdk(*basis_set);
-  // Create dummy SCFConfig
-  auto scf_config = std::make_unique<qcs::SCFConfig>();
+  auto internal_aux_basis_set =
+      utils::microsoft::convert_aux_basis_set_from_qdk(*basis_set);
 
-  // Use the default MPI configuration (fallback to serial if MPI not enabled)
-  scf_config->mpi = qcs::mpi_default_input();
-  scf_config->require_gradient = false;
-  scf_config->basis = internal_basis_set->name;
-  scf_config->cartesian = !internal_basis_set->pure;
-  scf_config->scf_orbital_type = qcs::SCFOrbitalType::Restricted;
-
-  // Set ERI method based on settings
-  std::string method_name = _settings->get<std::string>("eri_method");
-  if (!method_name.compare("incore")) {
-    scf_config->eri.method = qcs::ERIMethod::Incore;
-    scf_config->k_eri.method = qcs::ERIMethod::Incore;
-  } else if (!method_name.compare("direct")) {
-    scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
-    scf_config->k_eri.method = qcs::ERIMethod::Libint2Direct;
-  } else {
-    throw std::runtime_error("Unsupported ERI method '" + method_name +
-                             "'. Only CPU ERI methods are supported now");
-  }
-
-  // Create Integral Instance
-  auto eri = qcs::ERIMultiplexer::create(*internal_basis_set, *scf_config, 0.0);
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      internal_basis_set.get(), internal_basis_set->mol.get(), scf_config->mpi);
+      internal_basis_set.get(), mol.get(), qcs::mpi_default_input());
 
   // Compute Core Hamiltonian in AO basis
   Eigen::MatrixXd T_full(num_atomic_orbitals, num_atomic_orbitals),
@@ -123,14 +133,6 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   int1e->kinetic_integral(T_full.data());
   int1e->nuclear_integral(V_full.data());
   Eigen::MatrixXd H_full = T_full + V_full;
-
-  // Add ECP integrals if present
-  if (internal_basis_set->ecp_shells.size() > 0) {
-    Eigen::MatrixXd ECP_full =
-        Eigen::MatrixXd::Zero(num_atomic_orbitals, num_atomic_orbitals);
-    int1e->ecp_integral(ECP_full.data());
-    H_full += ECP_full;
-  }
 
   // Build active coefficient matrices for alpha and beta (can have different
   // sizes)
@@ -159,72 +161,36 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     }
   }
 
-  // Convert to row-major for MOERI
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      Ca_active_rm = Ca_active;
-  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-      Cb_active_rm = Cb_active;
-
-  // Initialize MOERI
-  qcs::MOERI moeri_c(eri);
-
-  // Determine restricted/unrestricted from orbitals (auto behavior)
-  bool is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
-                            orbitals->is_restricted();
-
-  // SCFOrbitalType::RestrictedOpenShell is not supported for Hamiltonian
-  // construction, so we only use Restricted in restricted case
-  scf_config->scf_orbital_type = is_restricted_calc
-                                     ? qcs::SCFOrbitalType::Restricted
-                                     : qcs::SCFOrbitalType::Unrestricted;
-
   // Compute integrals (same size for alpha and beta)
   const size_t nactive = nactive_alpha;
 
   // Declare MOERI vectors
-  Eigen::VectorXd moeri_aaaa;
-  Eigen::VectorXd moeri_aabb;
-  Eigen::VectorXd moeri_bbbb;
+  Eigen::MatrixXd dfmoeri_aa;
+  Eigen::MatrixXd dfmoeri_bb;
 
-  const size_t moeri_size = nactive * nactive * nactive * nactive;
+  auto basis_libint2 =
+      qcs::libint2_util::convert_to_libint_basisset(*internal_basis_set);
+  auto aux_basis_libint2 =
+      qcs::libint2_util::convert_to_libint_basisset(*internal_aux_basis_set);
 
-  if (is_restricted_calc) {
-    // Only allocate and compute (αα|αα) integrals - the others are identical
-    moeri_aaaa.resize(moeri_size);
-    moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),
-                    moeri_aaaa.data());
-  } else {
-    // Unrestricted case - allocate and compute all three types of integrals
-    moeri_aaaa.resize(moeri_size);
-    moeri_aabb.resize(moeri_size);
-    moeri_bbbb.resize(moeri_size);
+  auto h_eri =
+      qcs::libint2_util::eri_df(internal_basis_set->mode, basis_libint2,
+                                aux_basis_libint2, 0, num_auxiliary_orbitals);
+  auto h_metric =
+      qcs::libint2_util::metric_df(internal_basis_set->mode, aux_basis_libint2);
 
-    // (αα|αα) integrals
-    moeri_c.compute(num_atomic_orbitals, nactive,
-                    Ca_active_rm.data(),  // 1st quarter: alpha
-                    Ca_active_rm.data(),  // 2nd quarter: alpha
-                    Ca_active_rm.data(),  // 3rd quarter: alpha
-                    Ca_active_rm.data(),  // 4th quarter: alpha
-                    moeri_aaaa.data());
+  bool is_restricted_calc = (active_indices_alpha == active_indices_beta) &&
+                            orbitals->is_restricted();
 
-    // (αα|ββ) integrals
-    // Here, the C's are accessed like beta, beta, alpha, alpha, but results in
-    // saving alpha, alpha, beta beta integrals that can be indexed "as usual"
-    // in αα|ββ order.
-    moeri_c.compute(num_atomic_orbitals, nactive,
-                    Cb_active_rm.data(),  // 1st quarter: beta
-                    Cb_active_rm.data(),  // 2nd quarter: beta
-                    Ca_active_rm.data(),  // 3rd quarter: alpha
-                    Ca_active_rm.data(),  // 4th quarter: alpha
-                    moeri_aabb.data());
+  detail_df::fold_metric_to_three_center(
+      num_atomic_orbitals, num_auxiliary_orbitals, h_eri, h_metric);
+  Eigen::Map<Eigen::MatrixXd> B_ao(h_eri.get(),
+                                   num_atomic_orbitals * num_atomic_orbitals,
+                                   num_auxiliary_orbitals);
+  dfmoeri_aa = detail::transform_three_center_ao_to_mo(B_ao, Ca_active);
 
-    // (ββ|ββ) integrals
-    moeri_c.compute(num_atomic_orbitals, nactive,
-                    Cb_active_rm.data(),  // 1st quarter: beta
-                    Cb_active_rm.data(),  // 2nd quarter: beta
-                    Cb_active_rm.data(),  // 3rd quarter: beta
-                    Cb_active_rm.data(),  // 4th quarter: beta
-                    moeri_bbbb.data());
+  if (!is_restricted_calc) {
+    dfmoeri_bb = detail::transform_three_center_ao_to_mo(B_ao, Cb_active);
   }
 
   // Get inactive space indices for both alpha and beta
@@ -246,11 +212,12 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       // Use restricted constructor
       Eigen::MatrixXd H_active(nactive, nactive);
       H_active = Ca_active.transpose() * H_full * Ca_active;
-      Eigen::MatrixXd dummy_fock = Eigen::MatrixXd::Zero(0, 0);
+      Eigen::MatrixXd dummy_inactive_fock = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active, moeri_aaaa, orbitals,
-              structure->calculate_nuclear_repulsion_energy(), dummy_fock));
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
+              H_active, dfmoeri_aa, orbitals,
+              structure->calculate_nuclear_repulsion_energy(),
+              dummy_inactive_fock));
     } else {
       // Use unrestricted constructor
       Eigen::MatrixXd H_active_alpha(nactive, nactive);
@@ -260,10 +227,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
       Eigen::MatrixXd dummy_fock_alpha = Eigen::MatrixXd::Zero(0, 0);
       Eigen::MatrixXd dummy_fock_beta = Eigen::MatrixXd::Zero(0, 0);
       return std::make_shared<data::Hamiltonian>(
-          std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-              H_active_alpha, H_active_beta, moeri_aaaa, moeri_aabb, moeri_bbbb,
-              orbitals, structure->calculate_nuclear_repulsion_energy(),
-              dummy_fock_alpha, dummy_fock_beta));
+          std::make_unique<data::ThreeCenterHamiltonianContainer>(
+              H_active_alpha, H_active_beta, dfmoeri_aa, dfmoeri_bb, orbitals,
+              structure->calculate_nuclear_repulsion_energy(), dummy_fock_alpha,
+              dummy_fock_beta));
     }
   }
 
@@ -271,45 +238,41 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
     // Restricted case
     auto inactive_indices = inactive_indices_alpha;
 
-    // Compute inactive density
+    // Compute inactive density and J/K from 3-center vectors
     Eigen::MatrixXd D_inactive = detail::build_inactive_density(
         Ca, inactive_indices, num_atomic_orbitals);
-
-    // Compute J and K via ERI
-    Eigen::MatrixXd J_inactive_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_inactive_ao(num_atomic_orbitals, num_atomic_orbitals);
-    eri->build_JK(D_inactive.data(), J_inactive_ao.data(), K_inactive_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_inactive_ao =
+        detail::build_J_from_three_center(B_ao, D_inactive);
+    Eigen::MatrixXd K_inactive_ao =
+        detail::build_K_from_three_center(B_ao, Ca, inactive_indices);
 
     auto result = detail::compute_restricted_inactive(
         J_inactive_ao, K_inactive_ao, H_full, Ca, inactive_indices,
         active_indices_alpha);
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-            result.H_active, moeri_aaaa, orbitals,
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
+            result.H_active, dfmoeri_aa, orbitals,
             result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive));
 
   } else {
     // Unrestricted case
 
-    // Compute inactive densities
+    // Compute inactive densities and J/K from 3-center vectors
     Eigen::MatrixXd D_inactive_alpha = detail::build_inactive_density(
         Ca, inactive_indices_alpha, num_atomic_orbitals);
     Eigen::MatrixXd D_inactive_beta = detail::build_inactive_density(
         Cb, inactive_indices_beta, num_atomic_orbitals);
 
-    // Compute J and K via ERI
-    Eigen::MatrixXd J_alpha_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_alpha_ao(num_atomic_orbitals, num_atomic_orbitals);
-    Eigen::MatrixXd J_beta_ao(num_atomic_orbitals, num_atomic_orbitals),
-        K_beta_ao(num_atomic_orbitals, num_atomic_orbitals);
-
-    eri->build_JK(D_inactive_alpha.data(), J_alpha_ao.data(), K_alpha_ao.data(),
-                  1.0, 0.0, 0.0);
-    eri->build_JK(D_inactive_beta.data(), J_beta_ao.data(), K_beta_ao.data(),
-                  1.0, 0.0, 0.0);
+    Eigen::MatrixXd J_alpha_ao =
+        detail::build_J_from_three_center(B_ao, D_inactive_alpha);
+    Eigen::MatrixXd K_alpha_ao =
+        detail::build_K_from_three_center(B_ao, Ca, inactive_indices_alpha);
+    Eigen::MatrixXd J_beta_ao =
+        detail::build_J_from_three_center(B_ao, D_inactive_beta);
+    Eigen::MatrixXd K_beta_ao =
+        detail::build_K_from_three_center(B_ao, Cb, inactive_indices_beta);
 
     auto result = detail::compute_unrestricted_inactive(
         J_alpha_ao, K_alpha_ao, J_beta_ao, K_beta_ao, H_full, Ca, Cb,
@@ -317,9 +280,9 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
         active_indices_beta);
 
     return std::make_shared<data::Hamiltonian>(
-        std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
-            result.H_active_alpha, result.H_active_beta, moeri_aaaa, moeri_aabb,
-            moeri_bbbb, orbitals,
+        std::make_unique<data::ThreeCenterHamiltonianContainer>(
+            result.H_active_alpha, result.H_active_beta, dfmoeri_aa, dfmoeri_bb,
+            orbitals,
             result.E_inactive + structure->calculate_nuclear_repulsion_energy(),
             result.F_inactive_alpha, result.F_inactive_beta));
   }

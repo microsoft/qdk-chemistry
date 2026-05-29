@@ -119,6 +119,35 @@ The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an 
       :start-after: # start-cell-alternative-run
       :end-before: # end-cell-alternative-run
 
+.. _scf-density-fitting:
+
+Density-fitted Coulomb integrals (DF-J)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For larger molecules, evaluation of the four-center Coulomb (J) integrals becomes the computational bottleneck.
+Density fitting (also known as the resolution-of-the-identity approximation for J) replaces the expensive four-center integrals with a three-center expansion using an auxiliary basis set, significantly reducing cost while introducing negligible error.
+
+To run an :term:`SCF` calculation with density fitting, provide a :class:`~qdk_chemistry.data.BasisSet` that includes an auxiliary basis.
+The solver will automatically detect the auxiliary shells and enable DF-J.
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/scf_solver.cpp
+      :language: cpp
+      :start-after: // start-cell-dfj
+      :end-before: // end-cell-dfj
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/scf_solver.py
+      :language: python
+      :start-after: # start-cell-dfj
+      :end-before: # end-cell-dfj
+
+.. note::
+   When using density fitting, ``eri_method`` must be set to ``"incore"``.
+   The ``integral_type`` setting defaults to ``"auto"``, which automatically enables DF-J when an auxiliary basis is detected.
+
 
 Available settings
 ------------------
@@ -182,6 +211,7 @@ The native QDK/Chemistry implementation provides high-performance :term:`SCF` ca
 
 - Restricted Hartree-Fock (:term:`RHF`) and Unrestricted Hartree-Fock (:term:`UHF`)
 - Restricted Kohn-Sham (:term:`RKS`) and Unrestricted Kohn-Sham (:term:`UKS`) :term:`DFT`
+- Density-fitted Coulomb integrals (DF-J) for accelerated :term:`SCF` with auxiliary basis sets
 - Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
 - Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for :term:`DFT`
   - Optimization algorithms including the direct inversion in the iterative subspace (:term:`DIIS`) method :cite:`Pulay1982`, and the geometric direct minimization (:term:`GDM`) method :cite:`VanVoorhis2002`
@@ -279,6 +309,18 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - bool
      - ``False``
      - Use atomic operations for :term:`ERI` computation
+   * - ``eri_method``
+     - string
+     - ``"direct"``
+     - Electron repulsion integral evaluation method: ``"direct"`` (on-the-fly) or ``"incore"`` (precomputed). When using density fitting (DF-J), ``"incore"`` is required.
+   * - ``integral_type``
+     - string
+     - ``"auto"``
+     - How to evaluate two-electron integrals: ``"four_center"`` for standard ERIs, ``"dfj"`` for density-fitted Coulomb (J) integrals, or ``"auto"`` to select automatically based on whether an auxiliary basis is present. When ``"dfj"`` is used, an auxiliary basis must be provided either embedded in the :class:`~qdk_chemistry.data.BasisSet` object or via the ``aux_basis`` setting. If the BasisSet already contains an auxiliary basis, it takes precedence over ``aux_basis``.
+   * - ``aux_basis``
+     - string
+     - ``""``
+     - Auxiliary basis set name for density-fitted Coulomb integrals (e.g., ``"def2-universal-jfit"``). Only used when ``integral_type`` is ``"dfj"``. Ignored if the :class:`~qdk_chemistry.data.BasisSet` object already contains an auxiliary basis.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

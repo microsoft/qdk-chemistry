@@ -11,6 +11,7 @@ import numpy as np
 from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, BasisSet
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 
 # Create the default ScfSolver instance
 scf_solver = create("scf_solver")
@@ -76,7 +77,36 @@ solver.settings().set("scf_type", "restricted")
 
 # Run with basis set specified as input parameter
 water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water_coords *= ANGSTROM_TO_BOHR
 water = Structure(water_coords, symbols=["O", "H", "H"])
 energy, wfn = solver.run(water, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz")
 # end-cell-pyscf-example
+################################################################################
+
+################################################################################
+# start-cell-dfj
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+from qdk_chemistry.data import BasisSet, Structure
+
+# Run SCF with density-fitted Coulomb integrals (DF-J)
+# Build a small molecule for the example
+water_coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.76, 0.59], [0.0, -0.76, 0.59]])
+water_coords *= ANGSTROM_TO_BOHR
+water = Structure(water_coords, symbols=["O", "H", "H"])
+
+# Create a basis set with an auxiliary basis for density fitting
+dfj_basis = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", water)
+
+# Configure the solver to use incore ERIs (required for DF-J)
+dfj_solver = create("scf_solver")
+dfj_solver.settings().set("eri_method", "incore")
+
+# Run - DF-J is automatically enabled when auxiliary basis is detected
+E_dfj, wfn_dfj = dfj_solver.run(
+    water, charge=0, spin_multiplicity=1, basis_or_guess=dfj_basis
+)
+print(f"DF-J SCF Energy: {E_dfj:.10f} Hartree")
+# end-cell-dfj
 ################################################################################

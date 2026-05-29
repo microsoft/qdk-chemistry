@@ -65,6 +65,11 @@ DynamicalCorrelationResult MP2Calculator::_run_impl(
   // Calculate total energy = reference energy + correlation energy
   double reference_energy_ = ansatz->calculate_energy();
   double total_energy = reference_energy_ + E_corr;
+
+  QDK_LOGGER().info("MP2 correlation energy: {}", E_corr);
+  QDK_LOGGER().info("MP2 reference energy: {}", reference_energy_);
+  QDK_LOGGER().info("MP2 total energy: {}", total_energy);
+
   return {total_energy, mp2_wavefunction, mp2_wavefunction};
 }
 

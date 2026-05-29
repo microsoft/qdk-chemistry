@@ -55,7 +55,9 @@ class SCFImpl {
   SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
           const RowMajorMatrix& density_matrix,
           std::shared_ptr<BasisSet> basis_set,
-          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false);
+          std::shared_ptr<BasisSet> raw_basis_set,
+          std::shared_ptr<BasisSet> aux_basis_set = nullptr,
+          bool delay_eri = false);
 
   /**
    * @brief Construct SCF implementation with initial density matrix
@@ -70,8 +72,9 @@ class SCFImpl {
    */
   SCFImpl(std::shared_ptr<Molecule> mol, const SCFConfig& cfg,
           std::shared_ptr<BasisSet> basis_set,
-          std::shared_ptr<BasisSet> raw_basis_set, bool delay_eri = false,
-          bool skip_verify = false);
+          std::shared_ptr<BasisSet> raw_basis_set,
+          std::shared_ptr<BasisSet> aux_basis_set = nullptr,
+          bool delay_eri = false, bool skip_verify = false);
 
   /**
    * @brief Virtual destructor

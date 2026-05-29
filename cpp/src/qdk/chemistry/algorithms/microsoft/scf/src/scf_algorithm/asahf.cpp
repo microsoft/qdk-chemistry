@@ -298,8 +298,8 @@ void get_atom_guess(const BasisSet& basis_set, const Molecule& mol,
     auto it = basis_to_dm_map.find(*atom_basis_set);
     if (it == basis_to_dm_map.end()) {
       // Create SCF solver with basis sets
-      SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, false,
-                         true);
+      SCFImpl scf_solver(atom_mol, cfg, atom_basis_set, atom_basis_set, nullptr,
+                         false, true);
       // Run SCF with ASAHF algorithm
       const auto& asahf_ctx = scf_solver.run();
       // store in map

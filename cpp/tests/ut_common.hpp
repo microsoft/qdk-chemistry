@@ -351,6 +351,46 @@ inline std::shared_ptr<Structure> create_oxygen_structure() {
 }
 
 /**
+ * @brief Creates an H2O structure matching the DFJ reference calculation
+ * geometry.
+ *
+ * Uses CODATA 2022 conversion factor for Å→Bohr consistency with
+ * qdk::chemistry::constants::angstrom_to_bohr.
+ */
+inline std::shared_ptr<Structure> create_h2o_dfj_structure() {
+  using qdk::chemistry::constants::angstrom_to_bohr;
+  std::vector<Eigen::Vector3d> coords = {
+      {0.00, 0.49 * angstrom_to_bohr, -0.79 * angstrom_to_bohr},
+      {0.00, 0.49 * angstrom_to_bohr, 0.79 * angstrom_to_bohr},
+      {0.00, -0.12 * angstrom_to_bohr, 0.00}};
+  std::vector<Element> elements = {Element::H, Element::H, Element::O};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Creates an O2 structure matching the DFJ reference calculation
+ * geometry (bond distance 1.21 Å).
+ */
+inline std::shared_ptr<Structure> create_o2_dfj_structure() {
+  using qdk::chemistry::constants::angstrom_to_bohr;
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0},
+                                         {0.0, 0.0, 1.21 * angstrom_to_bohr}};
+  std::vector<Element> elements = {Element::O, Element::O};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
+ * @brief Creates a BF (boron fluoride) structure matching the DFJ reference
+ * calculation geometry. Coordinates are already in Bohr.
+ */
+inline std::shared_ptr<Structure> create_bf_structure() {
+  std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.85543933},
+                                         {0.0, 0.0, -1.53978853}};
+  std::vector<Element> elements = {Element::F, Element::B};
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Creates an AgH (silver hydride) structure
  */
 inline std::shared_ptr<Structure> create_agh_structure() {
