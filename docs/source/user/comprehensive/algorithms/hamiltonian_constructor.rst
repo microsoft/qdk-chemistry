@@ -226,13 +226,7 @@ See ``examples/language/sample_mp2_reference_energy.py`` for an end-to-end examp
 
 .. rubric:: Settings
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
+This implementation has no configurable settings.
 
 Related classes
 ---------------
