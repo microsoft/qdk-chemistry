@@ -698,22 +698,6 @@ class TestEncodingMetadata:
         m = factory(n_modes)
         assert m.is_majorana_atomic is True
 
-    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
-    @pytest.mark.parametrize("n_modes", [2, 4])
-    def test_stabilizers_empty(self, name: str, factory, n_modes: int) -> None:
-        """Majorana-atomic encodings have no codespace stabilizers."""
-        del name
-        m = factory(n_modes)
-        assert m.stabilizers == ()
-
-    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
-    @pytest.mark.parametrize("n_modes", [2, 4])
-    def test_parity_sector_unrestricted(self, name: str, factory, n_modes: int) -> None:
-        """Majorana-atomic encodings span both parity sectors (sector 0)."""
-        del name
-        m = factory(n_modes)
-        assert m.parity_sector == 0
-
     def test_pauli_string_length_untapered(self) -> None:
         """For untapered encodings, bilinear/majorana strings have length ``num_qubits``."""
         m = MajoranaMapping.jordan_wigner(num_modes=4)

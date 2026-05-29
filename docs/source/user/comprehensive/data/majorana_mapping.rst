@@ -25,7 +25,6 @@ The :class:`~qdk_chemistry.data.MajoranaMapping` API therefore exposes:
 
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` — the unified primitive available on every encoding.
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` — the additional capability that Majorana-atomic encodings provide; gated by :py:attr:`~qdk_chemistry.data.MajoranaMapping.is_majorana_atomic`.
-- :py:attr:`~qdk_chemistry.data.MajoranaMapping.stabilizers` and :py:attr:`~qdk_chemistry.data.MajoranaMapping.parity_sector` — codespace metadata; empty / ``0`` for the Majorana-atomic encodings shipped today, populated for redundant encodings when those land.
 
 The current factory methods (Jordan-Wigner, Bravyi-Kitaev, parity, SCBK) are all Majorana-atomic, so both APIs are available and produce consistent results: :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` is computed on demand from the stored Majorana table.
 

@@ -279,40 +279,6 @@ encodings will return False, in which case only :py:meth:`bilinear`
 is available.
 )");
 
-  // stabilizers property: list of dense little-endian Pauli strings
-  mapping.def_property_readonly(
-      "stabilizers",
-      [](const MajoranaMapping& self) -> py::tuple {
-        const auto& s = self.stabilizers();
-        std::size_t nq = self.num_qubits();
-        py::tuple result(s.size());
-        for (std::size_t i = 0; i < s.size(); ++i) {
-          result[i] = py::cast(sparse_to_dense_le(s[i], nq));
-        }
-        return result;
-      },
-      R"(
-Stabilizer generators of the codespace, as a tuple of dense
-little-endian Pauli strings. Empty for Majorana-atomic encodings (no
-codespace constraint). Reserved for redundant encodings whose
-codespace is a fixed-parity sector stabilized by
-``num_qubits - num_modes`` Pauli operators.
-)");
-
-  mapping.def_property_readonly(
-      "parity_sector",
-      [](const MajoranaMapping& self) { return self.parity_sector(); },
-      R"(
-Parity sector of the codespace:
-
-- ``0``: unrestricted; the full Fock space spans both parity sectors
-  (Majorana-atomic encodings).
-- ``+1``: even-parity codespace.
-- ``-1``: odd-parity codespace.
-
-Always ``0`` for current encodings.
-)");
-
   // __call__ for γ_k lookup
   mapping.def(
       "__call__",

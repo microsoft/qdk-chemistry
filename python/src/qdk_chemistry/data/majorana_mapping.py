@@ -82,8 +82,6 @@ class MajoranaMapping(DataClass):
         num_qubits (int): Effective number of qubits after any tapering.
         name (str): Human-readable name of the encoding (may be empty for custom mappings).
         is_majorana_atomic (bool): True if individual gamma_k have a Pauli image (always True today).
-        stabilizers (tuple[str, ...]): Codespace stabilizer generators (empty for current encodings).
-        parity_sector (int): Codespace parity: 0 (unrestricted), +1 (even), -1 (odd). Always 0 today.
 
     Examples:
         Built-in encodings:
@@ -242,31 +240,6 @@ class MajoranaMapping(DataClass):
         only :py:meth:`bilinear` is available.
         """
         return bool(self._core.is_majorana_atomic)
-
-    @property
-    def stabilizers(self) -> tuple[str, ...]:
-        """Stabilizer generators of the codespace.
-
-        Empty for Majorana-atomic encodings (no codespace constraint: the
-        full qubit Hilbert space spanned by the Pauli table carries both
-        fermion-parity sectors). Reserved for redundant encodings, whose
-        codespace is a fixed-parity sector stabilized by
-        ``num_qubits - num_modes`` Pauli operators.
-        """
-        return tuple(self._core.stabilizers)
-
-    @property
-    def parity_sector(self) -> int:
-        """Parity sector of the codespace.
-
-        - ``0``: unrestricted; the full Fock space spans both parity sectors
-          (Majorana-atomic encodings).
-        - ``+1``: even-parity codespace.
-        - ``-1``: odd-parity codespace.
-
-        Always ``0`` for current encodings.
-        """
-        return int(self._core.parity_sector)
 
     def majorana(self, k: int) -> str:
         """Return the Pauli image of the Majorana operator gamma_k.

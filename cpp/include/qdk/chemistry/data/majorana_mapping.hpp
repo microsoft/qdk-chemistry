@@ -167,35 +167,6 @@ class MajoranaMapping {
   bool is_majorana_atomic() const { return true; }
 
   /**
-   * @brief Stabilizer generators of the codespace.
-   *
-   * Empty for Majorana-atomic encodings (no codespace constraint: the
-   * full 2^num_qubits qubit space carries both fermion-parity sectors).
-   * Reserved for redundant encodings whose codespace is a fixed-parity
-   * sector stabilized by ``num_qubits - num_modes`` Pauli operators.
-   *
-   * @return const reference to the stabilizer list (empty for current
-   *         encodings).
-   */
-  const std::vector<SparsePauliWord>& stabilizers() const {
-    return stabilizers_;
-  }
-
-  /**
-   * @brief Parity sector of the encoded codespace.
-   *
-   * - ``0``: unrestricted; the full Fock space spans both even and odd
-   *   parity (Majorana-atomic encodings).
-   * - ``+1``: even-parity codespace (typical for redundant encodings on
-   *   electron-number-conserving Hamiltonians).
-   * - ``-1``: odd-parity codespace (e.g. odd electron count by
-   *   construction).
-   *
-   * Always ``0`` for current encodings.
-   */
-  int parity_sector() const { return parity_sector_; }
-
-  /**
    * @brief Get the sign factor for Majorana operator gamma_k.
    * @param k Majorana index (0 <= k < 2N).
    * @return +1 or -1.
@@ -313,14 +284,6 @@ class MajoranaMapping {
 
   /// Cached qubit count (max qubit index + 1).
   std::size_t num_qubits_;
-
-  /// Stabilizer generators of the codespace. Empty for Majorana-atomic
-  /// encodings; reserved for redundant encodings.
-  std::vector<SparsePauliWord> stabilizers_{};
-
-  /// Parity sector of the codespace: 0 (unrestricted), +1 (even), or -1
-  /// (odd). Always 0 for current encodings.
-  int parity_sector_{0};
 
   /// Compute num_qubits_ from the table.
   static std::size_t compute_num_qubits(
