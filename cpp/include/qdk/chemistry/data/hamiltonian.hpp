@@ -59,9 +59,9 @@ class HamiltonianContainer {
   /**
    * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
    * and inactive Fock matrix (restricted).
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
                        const Eigen::MatrixXd& inactive_fock_matrix,
@@ -70,9 +70,9 @@ class HamiltonianContainer {
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with separate
    * spin components.
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals_alpha,
                        const Eigen::MatrixXd& one_body_integrals_beta,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -81,8 +81,8 @@ class HamiltonianContainer {
                        HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief SBT-native constructor for active space Hamiltonian.
-   * @param h1 One-body integrals as a rank-2 symmetry-blocked tensor.
+   * @brief SymmetryBlockedTensor constructor for active space Hamiltonian.
+   * @param one_body One-body integrals as a rank-2 symmetry-blocked tensor.
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
    * @param inactive_fock Inactive Fock matrix as a rank-2 symmetry-blocked
@@ -90,7 +90,7 @@ class HamiltonianContainer {
    * @param type Type of Hamiltonian (Hermitian by default).
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  HamiltonianContainer(SymmetryBlockedTensor<2> h1,
+  HamiltonianContainer(SymmetryBlockedTensor<2> one_body,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
                        SymmetryBlockedTensor<2> inactive_fock,
                        HamiltonianType type = HamiltonianType::Hermitian);
@@ -132,24 +132,24 @@ class HamiltonianContainer {
 
   /**
    * @brief Get tuple of alpha, beta one-electron integrals in MO basis
-   * @deprecated Use h1() for SBT-native access.
+   * @deprecated Use one_body_integrals() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use h1() for SBT-native access.")]]
+  [[deprecated("Use one_body_integrals() for SymmetryBlockedTensor access.")]]
   std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_one_body_integrals() const;
 
   /**
    * @brief One-body integrals as a rank-2 symmetry-blocked tensor.
-   * @return Const reference to the h1 SBT.
-   * @throws std::runtime_error if h1 is not set.
+   * @return Const reference to the one-body SymmetryBlockedTensor.
+   * @throws std::runtime_error if one-body integrals are not set.
    */
-  const SymmetryBlockedTensor<2>& h1() const;
+  const SymmetryBlockedTensor<2>& one_body_integrals() const;
 
   /**
    * @brief One-body integral block for the given row/column symmetry labels.
    * @return Const reference to the matrix block.
    */
-  const Eigen::MatrixXd& h1_block(const SymmetryLabel& row,
+  const Eigen::MatrixXd& one_body_integrals_block(const SymmetryLabel& row,
                                   const SymmetryLabel& col) const;
 
   /**
@@ -185,9 +185,9 @@ class HamiltonianContainer {
 
   /**
    * @brief Get inactive Fock matrix for the selected active space
-   * @deprecated Use inactive_fock() for SBT-native access.
+   * @deprecated Use inactive_fock() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use inactive_fock() for SBT-native access.")]]
+  [[deprecated("Use inactive_fock() for SymmetryBlockedTensor access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_inactive_fock_matrix() const;
 
@@ -199,7 +199,7 @@ class HamiltonianContainer {
 
   /**
    * @brief Inactive Fock matrix as a rank-2 symmetry-blocked tensor.
-   * @return Const reference to the inactive Fock SBT.
+   * @return Const reference to the inactive Fock SymmetryBlockedTensor.
    * @throws std::runtime_error if not set.
    */
   const SymmetryBlockedTensor<2>& inactive_fock() const;
@@ -302,10 +302,10 @@ class HamiltonianContainer {
   virtual bool is_valid() const = 0;
 
  protected:
-  /// SBT-canonical one-body integrals (source of truth)
+  /// SymmetryBlockedTensor-canonical one-body integrals (source of truth)
   std::shared_ptr<const SymmetryBlockedTensor<2>> _h1;
 
-  /// SBT-canonical inactive Fock matrix (source of truth)
+  /// SymmetryBlockedTensor-canonical inactive Fock matrix (source of truth)
   std::shared_ptr<const SymmetryBlockedTensor<2>> _inactive_fock_sbt;
 
   /// Non-owning views into _h1 blocks (for v1 dense access)
@@ -341,13 +341,13 @@ class HamiltonianContainer {
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
 
-  /// Build an SBT<2> from dense matrices + symmetries and set non-owning views.
+  /// Build an SymmetryBlockedTensor<2> from dense matrices + symmetries and set non-owning views.
   void _set_h1_container(const Eigen::MatrixXd& alpha,
                          const Eigen::MatrixXd* beta);
   void _set_inactive_fock_container(const Eigen::MatrixXd& alpha,
                                     const Eigen::MatrixXd* beta);
 
-  /// Derive non-owning views from an existing SBT container.
+  /// Derive non-owning views from an existing SymmetryBlockedTensor container.
   void _init_h1_views();
   void _init_inactive_fock_views();
 };

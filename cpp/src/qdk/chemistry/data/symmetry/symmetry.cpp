@@ -5,36 +5,16 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 
 #include <algorithm>
-#include <mutex>
-#include <qdk/chemistry/data/errors.hpp>
-#include <unordered_map>
+#include <stdexcept>
+#include <qdk/chemistry/utils/hash.hpp>
 #include <utility>
 
 namespace qdk::chemistry::data {
-
-namespace {
-
-// Mix a value into a running hash (boost::hash_combine style).
-inline void hash_combine(std::size_t& seed, std::size_t value) {
-  seed ^= value + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
-}
-
-}  // namespace
 
 std::string to_string(AxisName axis) {
   switch (axis) {
     case AxisName::Spin:
       return "spin";
-    case AxisName::PointGroup:
-      return "point_group";
-    case AxisName::Kramers:
-      return "kramers";
-    case AxisName::Mode:
-      return "mode";
-    case AxisName::Site:
-      return "site";
-    case AxisName::LatticeMomentum:
-      return "lattice_momentum";
   }
   return "unknown";
 }
@@ -42,10 +22,6 @@ std::string to_string(AxisName axis) {
 // ---------------------------------------------------------------------------
 // SpinValue
 // ---------------------------------------------------------------------------
-
-SpinValue::SpinValue(int two_ms) : _two_ms(two_ms) {}
-
-int SpinValue::value() const { return _two_ms; }
 
 bool SpinValue::equals(const SymmetryAxisValue& other) const {
   if (other.axis() != AxisName::Spin) {
@@ -56,13 +32,12 @@ bool SpinValue::equals(const SymmetryAxisValue& other) const {
 }
 
 std::size_t SpinValue::hash() const {
-  std::size_t seed = std::hash<int>{}(static_cast<int>(AxisName::Spin));
-  hash_combine(seed, std::hash<int>{}(_two_ms));
-  return seed;
+  return utils::hash_combine(
+      std::hash<int>{}(static_cast<int>(AxisName::Spin)), _two_ms);
 }
 
 nlohmann::json SpinValue::to_json() const {
-  return nlohmann::json{{"kind", kind_name()}, {"two_ms", _two_ms}};
+  return nlohmann::json{{"kind", to_string(axis())}, {"two_ms", _two_ms}};
 }
 
 std::shared_ptr<const SymmetryAxisValue> SpinValue::from_json(
@@ -71,56 +46,17 @@ std::shared_ptr<const SymmetryAxisValue> SpinValue::from_json(
 }
 
 // ---------------------------------------------------------------------------
-// Serialization registry
+// JSON dispatch (internal, no public registry)
 // ---------------------------------------------------------------------------
-
-namespace {
-
-using AxisValueFromJson =
-    std::function<std::shared_ptr<const SymmetryAxisValue>(
-        const nlohmann::json&)>;
-
-std::unordered_map<std::string, AxisValueFromJson>& axis_value_registry() {
-  static std::unordered_map<std::string, AxisValueFromJson> registry;
-  return registry;
-}
-
-std::mutex& axis_value_registry_mutex() {
-  static std::mutex mutex;
-  return mutex;
-}
-
-// Ensure the built-in axis value kinds are registered exactly once.
-void ensure_builtin_kinds_registered() {
-  static std::once_flag flag;
-  std::call_once(flag, [] {
-    register_symmetry_axis_value("spin", &SpinValue::from_json);
-  });
-}
-
-}  // namespace
-
-void register_symmetry_axis_value(const std::string& kind_name,
-                                  AxisValueFromJson from_json) {
-  std::lock_guard<std::mutex> lock(axis_value_registry_mutex());
-  axis_value_registry()[kind_name] = std::move(from_json);
-}
 
 std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
     const nlohmann::json& j) {
-  ensure_builtin_kinds_registered();
   const auto kind = j.at("kind").get<std::string>();
-  AxisValueFromJson handler;
-  {
-    std::lock_guard<std::mutex> lock(axis_value_registry_mutex());
-    auto it = axis_value_registry().find(kind);
-    if (it == axis_value_registry().end()) {
-      throw SymmetryConditionError(
-          "No registered symmetry axis value handler for kind '" + kind + "'.");
-    }
-    handler = it->second;
+  if (kind == "spin") {
+    return SpinValue::from_json(j);
   }
-  return handler(j);
+  throw std::runtime_error(
+      "Unknown symmetry axis value kind '" + kind + "'.");
 }
 
 // ---------------------------------------------------------------------------
@@ -133,11 +69,11 @@ SymmetryAxis::SymmetryAxis(
     : _name(name), _labels(std::move(labels)), _equivalent(equivalent) {
   for (const auto& label : _labels) {
     if (label == nullptr) {
-      throw SymmetryConditionError(
+      throw std::runtime_error(
           "SymmetryAxis labels must not be null pointers.");
     }
     if (label->axis() != _name) {
-      throw SymmetryConditionError(
+      throw std::runtime_error(
           "SymmetryAxis label belongs to axis '" + to_string(label->axis()) +
           "' but was added to axis '" + to_string(_name) + "'.");
     }
@@ -175,10 +111,10 @@ bool SymmetryAxis::operator==(const SymmetryAxis& other) const {
 }
 
 std::size_t SymmetryAxis::hash() const {
-  std::size_t seed = std::hash<int>{}(static_cast<int>(_name));
-  hash_combine(seed, std::hash<bool>{}(_equivalent));
+  std::size_t seed =
+      utils::hash_combine(std::hash<int>{}(static_cast<int>(_name)), _equivalent);
   for (const auto& label : _labels) {
-    hash_combine(seed, label->hash());
+    seed = utils::hash_combine(seed, label->hash());
   }
   return seed;
 }
@@ -195,26 +131,16 @@ nlohmann::json SymmetryAxis::to_json() const {
 
 SymmetryAxis SymmetryAxis::from_json(const nlohmann::json& j) {
   const auto name_str = j.at("name").get<std::string>();
-  AxisName name = AxisName::Spin;
-  bool matched = false;
-  for (AxisName candidate :
-       {AxisName::Spin, AxisName::PointGroup, AxisName::Kramers,
-        AxisName::Mode, AxisName::Site, AxisName::LatticeMomentum}) {
-    if (to_string(candidate) == name_str) {
-      name = candidate;
-      matched = true;
-      break;
-    }
-  }
-  if (!matched) {
-    throw SymmetryConditionError("Unknown symmetry axis name '" + name_str +
+  if (name_str != to_string(AxisName::Spin)) {
+    throw std::runtime_error("Unknown symmetry axis name '" + name_str +
                                  "'.");
   }
   std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
   for (const auto& label_json : j.at("labels")) {
     labels.push_back(symmetry_axis_value_from_json(label_json));
   }
-  return SymmetryAxis(name, std::move(labels), j.at("equivalent").get<bool>());
+  return SymmetryAxis(AxisName::Spin, std::move(labels),
+                     j.at("equivalent").get<bool>());
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +152,7 @@ Symmetries::Symmetries(std::vector<SymmetryAxis> axes)
   for (std::size_t i = 0; i < _axes.size(); ++i) {
     for (std::size_t k = i + 1; k < _axes.size(); ++k) {
       if (_axes[i].name() == _axes[k].name()) {
-        throw SymmetryConditionError(
+        throw std::runtime_error(
             "Symmetries must not contain duplicate axis '" +
             to_string(_axes[i].name()) + "'.");
       }
@@ -247,7 +173,7 @@ const SymmetryAxis& Symmetries::axis(AxisName name) const {
       return axis;
     }
   }
-  throw SymmetryConditionError("Symmetries has no axis '" + to_string(name) +
+  throw std::runtime_error("Symmetries has no axis '" + to_string(name) +
                                "'.");
 }
 
@@ -258,7 +184,7 @@ bool Symmetries::operator==(const Symmetries& other) const {
 std::size_t Symmetries::hash() const {
   std::size_t seed = 0xC0FFEEULL;
   for (const auto& axis : _axes) {
-    hash_combine(seed, axis.hash());
+    seed = utils::hash_combine(seed, axis.hash());
   }
   return seed;
 }
@@ -283,20 +209,21 @@ Symmetries Symmetries::from_json(const nlohmann::json& j) {
 // SymmetryLabel
 // ---------------------------------------------------------------------------
 
-void SymmetryLabel::_recompute_hash() {
+std::size_t SymmetryLabel::_compute_hash(
+    const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>& values) {
   // Order-independent combination over (axis, value-hash) pairs so the hash is
   // stable regardless of std::map iteration details.
   std::size_t accumulator = 0;
-  for (const auto& [axis, value] : _values) {
+  for (const auto& [axis, value] : values) {
     if (value == nullptr) {
-      throw SymmetryConditionError(
+      throw std::runtime_error(
           "SymmetryLabel values must not be null pointers.");
     }
-    std::size_t pair_hash = std::hash<int>{}(static_cast<int>(axis));
-    hash_combine(pair_hash, value->hash());
+    std::size_t pair_hash = utils::hash_combine(
+        std::hash<int>{}(static_cast<int>(axis)), value->hash());
     accumulator ^= pair_hash;
   }
-  _hash = accumulator;
+  return accumulator;
 }
 
 SymmetryLabel::SymmetryLabel(
@@ -309,25 +236,25 @@ SymmetryLabel::SymmetryLabel(
     : _hash(0) {
   for (auto& value : values) {
     if (value == nullptr) {
-      throw SymmetryConditionError(
+      throw std::runtime_error(
           "SymmetryLabel values must not be null pointers.");
     }
     const AxisName axis = value->axis();
     if (_values.count(axis) != 0) {
-      throw SymmetryConditionError(
+      throw std::runtime_error(
           "SymmetryLabel must carry at most one value per axis; axis '" +
           to_string(axis) + "' was specified more than once.");
     }
     _values.emplace(axis, std::move(value));
   }
-  _recompute_hash();
+  _hash = _compute_hash(_values);
 }
 
 std::shared_ptr<const SymmetryAxisValue> SymmetryLabel::get(
     AxisName axis) const {
   auto it = _values.find(axis);
   if (it == _values.end()) {
-    throw SymmetryConditionError("SymmetryLabel carries no value for axis '" +
+    throw std::runtime_error("SymmetryLabel carries no value for axis '" +
                                  to_string(axis) + "'.");
   }
   return it->second;

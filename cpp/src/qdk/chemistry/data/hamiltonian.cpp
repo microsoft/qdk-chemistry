@@ -63,10 +63,11 @@ HamiltonianContainer::HamiltonianContainer(
 }
 
 HamiltonianContainer::HamiltonianContainer(
-    SymmetryBlockedTensor<2> h1, std::shared_ptr<Orbitals> orbitals,
+    SymmetryBlockedTensor<2> one_body, std::shared_ptr<Orbitals> orbitals,
     double core_energy, SymmetryBlockedTensor<2> inactive_fock,
     HamiltonianType type)
-    : _h1(std::make_shared<const SymmetryBlockedTensor<2>>(std::move(h1))),
+    : _h1(std::make_shared<const SymmetryBlockedTensor<2>>(
+          std::move(one_body))),
       _inactive_fock_sbt(std::make_shared<const SymmetryBlockedTensor<2>>(
           std::move(inactive_fock))),
       _orbitals(orbitals),
@@ -412,7 +413,7 @@ void HamiltonianContainer::_init_inactive_fock_views() {
 
 // ---- SBT-native accessors --------------------------------------------------
 
-const SymmetryBlockedTensor<2>& HamiltonianContainer::h1() const {
+const SymmetryBlockedTensor<2>& HamiltonianContainer::one_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_h1) {
     throw std::runtime_error("One-body SBT (h1) is not set.");
@@ -420,9 +421,9 @@ const SymmetryBlockedTensor<2>& HamiltonianContainer::h1() const {
   return *_h1;
 }
 
-const Eigen::MatrixXd& HamiltonianContainer::h1_block(
+const Eigen::MatrixXd& HamiltonianContainer::one_body_integrals_block(
     const SymmetryLabel& row, const SymmetryLabel& col) const {
-  return h1().block({row, col});
+  return one_body_integrals().block({row, col});
 }
 
 const SymmetryBlockedTensor<2>& HamiltonianContainer::inactive_fock() const {

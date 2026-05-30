@@ -88,9 +88,9 @@ class TestSymmetries:
         assert syms.axis(sym.AxisName.Spin).name() == sym.AxisName.Spin
 
     def test_missing_axis_raises(self):
-        """Requesting an absent axis raises SymmetryConditionError."""
+        """Requesting an absent axis raises RuntimeError."""
         syms = sym.Symmetries([sym.axes.spin(0, True)])
-        with pytest.raises(sym.SymmetryConditionError):
+        with pytest.raises(RuntimeError):
             syms.axis(sym.AxisName.PointGroup)
 
     def test_equality_and_hash(self):
@@ -125,19 +125,16 @@ class TestSymmetryLabel:
         assert d[sym.SymmetryLabel([sym.axes.alpha()])] == 7
 
 
-class TestErrorHierarchy:
-    """Tests for the typed-error hierarchy exposed by the symmetry module."""
+class TestExceptionSurface:
+    """Tests for the standard exception surface exposed by the symmetry module."""
 
-    def test_qdk_error_is_runtime_error(self):
-        """QdkError is the root and derives from RuntimeError."""
-        assert issubclass(sym.QdkError, RuntimeError)
-
-    def test_symmetry_error_subclasses(self):
-        """Symmetry condition errors derive from SymmetryError and QdkError."""
-        assert issubclass(sym.SymmetryConditionError, sym.SymmetryError)
-        assert issubclass(sym.SymmetryError, sym.QdkError)
-
-    def test_sbt_error_subclasses(self):
-        """Block errors derive from SymmetryBlockedTensorError and QdkError."""
-        assert issubclass(sym.BlockLabelInvalidError, sym.SymmetryBlockedTensorError)
-        assert issubclass(sym.SymmetryBlockedTensorError, sym.QdkError)
+    def test_custom_error_names_are_not_exported(self):
+        """The module no longer exports custom exception classes."""
+        for name in (
+            "QdkError",
+            "SymmetryError",
+            "SymmetryConditionError",
+            "SymmetryBlockedTensorError",
+            "BlockLabelInvalidError",
+        ):
+            assert not hasattr(sym, name)

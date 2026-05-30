@@ -26,8 +26,8 @@ Exposed storage types are:
 - :class:`SymmetryBlockedTensorRank4` / :class:`SymmetryBlockedTensorRank4Complex`
 - :class:`SymmetryBlockedIndexSet`
 
-Exposed exceptions form a hierarchy rooted at :exc:`QdkError`. See the module
-source for the full set.
+Errors are surfaced as standard Python exceptions mapped from the underlying
+C++ standard-library exceptions.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -37,70 +37,36 @@ source for the full set.
 
 from qdk_chemistry._core.data.symmetry import (
     AxisName,
-    BasisSetError,
-    BasisSetSpinExtentMismatchError,
-    BlockAliasMismatchError,
-    BlockExtentMismatchError,
-    BlockLabelInvalidError,
-    IndexSetNotSortedUniqueError,
-    IndexSetOutOfRangeError,
-    ModelOrbitalsNoBasisSetError,
-    ModelOrbitalsProjectionError,
-    OrbitalSpacePartitioningDisjointnessError,
-    QdkError,
-    SingleParticleBasisError,
     SpinValue,
     Symmetries,
     SymmetryAxis,
     SymmetryAxisValue,
     SymmetryBlockedIndexSet,
-    SymmetryBlockedTensorError,
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank1Complex,
     SymmetryBlockedTensorRank2,
     SymmetryBlockedTensorRank2Complex,
     SymmetryBlockedTensorRank4,
     SymmetryBlockedTensorRank4Complex,
-    SymmetryConditionError,
-    SymmetryError,
-    SymmetryIncompatibleError,
     SymmetryLabel,
-    SymmetryProjectionError,
     axes,
     axis_name_to_string,
 )
 
 __all__ = [
     "AxisName",
-    "BasisSetError",
-    "BasisSetSpinExtentMismatchError",
-    "BlockAliasMismatchError",
-    "BlockExtentMismatchError",
-    "BlockLabelInvalidError",
-    "IndexSetNotSortedUniqueError",
-    "IndexSetOutOfRangeError",
-    "ModelOrbitalsNoBasisSetError",
-    "ModelOrbitalsProjectionError",
-    "OrbitalSpacePartitioningDisjointnessError",
-    "QdkError",
-    "SingleParticleBasisError",
     "SpinValue",
     "Symmetries",
     "SymmetryAxis",
     "SymmetryAxisValue",
     "SymmetryBlockedIndexSet",
-    "SymmetryBlockedTensorError",
     "SymmetryBlockedTensorRank1",
     "SymmetryBlockedTensorRank1Complex",
     "SymmetryBlockedTensorRank2",
     "SymmetryBlockedTensorRank2Complex",
     "SymmetryBlockedTensorRank4",
     "SymmetryBlockedTensorRank4Complex",
-    "SymmetryConditionError",
-    "SymmetryError",
-    "SymmetryIncompatibleError",
     "SymmetryLabel",
-    "SymmetryProjectionError",
     "axes",
     "axis_name_to_string",
 ]

@@ -17,7 +17,7 @@ namespace qdk::chemistry::data {
  * @brief Abstract base for objects describing a single-particle (orbital)
  * basis.
  *
- * A single-particle basis exposes the symmetry vocabulary its modes are blocked
+ * A single-particle basis exposes the symmetry definitions its modes are blocked
  * under, the per-label mode extents, and the total number of modes. Concrete
  * subclasses (e.g. @ref Orbitals) supply the actual coefficient/energy data.
  *
@@ -34,7 +34,7 @@ class SingleParticleBasis : public DataClass {
   ~SingleParticleBasis() override = default;
 
   /**
-   * @brief Symmetry vocabulary the single-particle modes are blocked under.
+   * @brief Symmetry definitions the single-particle modes are blocked under.
    * @return Shared pointer to the mode @ref Symmetries
    */
   virtual std::shared_ptr<const Symmetries> symmetries() const = 0;

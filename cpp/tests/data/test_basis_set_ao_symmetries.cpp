@@ -6,8 +6,8 @@
 
 #include <Eigen/Dense>
 #include <memory>
+#include <stdexcept>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/errors.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <string>
@@ -69,7 +69,7 @@ TEST(BasisSetAoSymmetries, RestrictedExtentMismatchThrows) {
   };
   EXPECT_THROW(BasisSet("custom", make_shells(), make_structure(), sym,
                         std::move(extents)),
-               BasisSetSpinExtentMismatchError);
+               std::invalid_argument);
 }
 
 TEST(BasisSetAoSymmetries, UnrestrictedAllowsDistinctExtents) {

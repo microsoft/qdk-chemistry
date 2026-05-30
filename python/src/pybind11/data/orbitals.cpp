@@ -10,11 +10,9 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
-#include <qdk/chemistry/data/orbital_containers/basis_coefficients.hpp>
-#include <qdk/chemistry/data/orbital_containers/orbital_energies.hpp>
-#include <qdk/chemistry/data/orbital_containers/orbital_space_partitioning.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/single_particle_basis.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -194,43 +192,35 @@ Examples:
           std::tuple<std::vector<size_t>, std::vector<size_t>,
                      std::vector<size_t>, std::vector<size_t>>>{});
 
-  // SBT-native constructor (symmetry-blocked containers)
+  // SBT-native constructor (symmetry-blocked tensors)
   orbitals.def(
-      py::init<std::shared_ptr<const BasisCoefficients>,
-               std::shared_ptr<const OrbitalEnergies>,
-               std::shared_ptr<const OrbitalSpacePartitioning>,
+      py::init<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+               std::shared_ptr<const SymmetryBlockedTensor<1>>,
                const std::optional<Eigen::MatrixXd> &,
                std::shared_ptr<qdk::chemistry::data::BasisSet>>(),
       R"(
-Construct from symmetry-blocked single-particle containers.
+Construct from symmetry-blocked tensors.
 
 This is the preferred (non-deprecated) construction path. The orbital
-coefficients and energies are supplied as symmetry-blocked containers, and the
-active/inactive/virtual layout is supplied as an
-:class:`OrbitalSpacePartitioning`.
+coefficients and energies are supplied as SymmetryBlockedTensor objects.
 
 Args:
-    coefficients (BasisCoefficients): The molecular orbital coefficient container
-    energies (OrbitalEnergies | None): The orbital energy container, can be None
-    partitioning (OrbitalSpacePartitioning | None): The orbital-space partitioning; defaults to all-active when None
+    coefficients (SymmetryBlockedTensor): Rank-2 coefficient tensor [AO x MO]
+    energies (SymmetryBlockedTensor | None): Rank-1 energy tensor, can be None
     ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
     basis_set (BasisSet | None): The basis set, can be None
 )",
-      py::arg("coefficients"), py::arg("energies"), py::arg("partitioning"),
+      py::arg("coefficients"), py::arg("energies"),
       py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
       py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{});
 
   // SBT-native accessors
-  orbitals.def("basis_coefficients", &Orbitals::basis_coefficients,
-               "The molecular-orbital coefficients as a symmetry-blocked "
-               "BasisCoefficients container.");
-  orbitals.def("orbital_energies", &Orbitals::orbital_energies,
-               "The orbital energies as a symmetry-blocked OrbitalEnergies "
-               "container.");
-  orbitals.def("orbital_space_partitioning",
-               &Orbitals::orbital_space_partitioning,
-               "The active/inactive/virtual layout as an "
-               "OrbitalSpacePartitioning container.");
+  orbitals.def("coefficients", &Orbitals::coefficients,
+               "The molecular-orbital coefficients as a rank-2 "
+               "SymmetryBlockedTensor.");
+  orbitals.def("energies", &Orbitals::energies,
+               "The orbital energies as a rank-1 "
+               "SymmetryBlockedTensor.");
   orbitals.def("get_coefficients", &Orbitals::get_coefficients,
                R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.
@@ -867,8 +857,14 @@ Examples:
   // for model systems without an underlying AO basis set).
   data.def(
       "ao_symmetries",
-      [](const std::shared_ptr<const SingleParticleBasis> &basis) {
-        return ao_symmetries(basis);
+      [](const std::shared_ptr<const SingleParticleBasis> &basis)
+          -> std::shared_ptr<const Symmetries> {
+        auto orbitals =
+            std::dynamic_pointer_cast<const Orbitals>(basis);
+        if (!orbitals || !orbitals->has_basis_set()) {
+          return nullptr;
+        }
+        return orbitals->get_basis_set()->ao_symmetries();
       },
       py::arg("basis"),
       R"(

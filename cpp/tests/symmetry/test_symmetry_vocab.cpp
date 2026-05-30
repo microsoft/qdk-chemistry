@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include <qdk/chemistry/data/errors.hpp>
+#include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 
 using namespace qdk::chemistry::data;
@@ -15,7 +15,7 @@ TEST(SymmetryVocabTest, SpinValueBasics) {
   EXPECT_TRUE(axes::alpha()->equals(*axes::spin_value(1)));
   EXPECT_FALSE(axes::alpha()->equals(*axes::beta()));
   EXPECT_EQ(axes::alpha()->axis(), AxisName::Spin);
-  EXPECT_EQ(axes::alpha()->kind_name(), "spin");
+  EXPECT_EQ(to_string(axes::alpha()->axis()), "spin");
 }
 
 TEST(SymmetryVocabTest, InternedAlphaBeta) {
@@ -36,23 +36,20 @@ TEST(SymmetryVocabTest, SpinAxisAdmits) {
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {
   Symmetries sym({axes::spin(0, true)});
   EXPECT_TRUE(sym.has_axis(AxisName::Spin));
-  EXPECT_FALSE(sym.has_axis(AxisName::PointGroup));
   EXPECT_EQ(sym.axis(AxisName::Spin).name(), AxisName::Spin);
-  EXPECT_THROW(sym.axis(AxisName::PointGroup), SymmetryConditionError);
 }
 
 TEST(SymmetryVocabTest, DuplicateAxisRejected) {
   EXPECT_THROW(Symmetries({axes::spin(0, true), axes::spin(0, false)}),
-               SymmetryConditionError);
+               std::runtime_error);
 }
 
 TEST(SymmetryVocabTest, SymmetryLabelOnePerAxis) {
   SymmetryLabel label({axes::alpha()});
   EXPECT_TRUE(label.has(AxisName::Spin));
   EXPECT_EQ(label.get(AxisName::Spin)->equals(*axes::alpha()), true);
-  EXPECT_THROW(label.get(AxisName::PointGroup), SymmetryConditionError);
   EXPECT_THROW(SymmetryLabel({axes::alpha(), axes::beta()}),
-               SymmetryConditionError);
+               std::runtime_error);
 }
 
 TEST(SymmetryVocabTest, SymmetryLabelEqualityAndHash) {
@@ -93,5 +90,5 @@ TEST(SymmetryVocabTest, RoundTripSymmetryLabelJson) {
 
 TEST(SymmetryVocabTest, UnknownKindThrows) {
   nlohmann::json bad = {{"kind", "not_a_real_kind"}};
-  EXPECT_THROW(symmetry_axis_value_from_json(bad), SymmetryConditionError);
+  EXPECT_THROW(symmetry_axis_value_from_json(bad), std::runtime_error);
 }

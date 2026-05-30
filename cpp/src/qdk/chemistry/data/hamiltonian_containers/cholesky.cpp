@@ -75,13 +75,13 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
 }
 
 CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
-    SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<2> three_center,
+    SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     SymmetryBlockedTensor<2> inactive_fock,
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
-    : HamiltonianContainer(std::move(h1), orbitals, core_energy,
+    : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
                            std::move(inactive_fock), type),
-      _three_center_sbt(std::make_shared<const SymmetryBlockedTensor<2>>(
+      _three_center_sbt(std::make_shared<const SymmetryBlockedTensor<3>>(
           std::move(three_center))),
       _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
@@ -321,38 +321,40 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
   auto mo_sym = _orbitals->symmetries();
   auto active_indices = _orbitals->get_active_space_indices();
   std::size_t n_active = active_indices.first.size();
-  std::size_t nrows = n_active * n_active;
   std::size_t naux = static_cast<std::size_t>(aa.cols());
 
   SymmetryLabel alpha_label({axes::alpha()});
   SymmetryLabel beta_label({axes::beta()});
 
-  // Row axis: MO spin symmetries, extent = norb^2 per spin label
-  std::unordered_map<SymmetryLabel, std::size_t> row_ext;
-  row_ext[alpha_label] = nrows;
-  row_ext[beta_label] = nrows;
+  // MO extents per spin label.
+  std::unordered_map<SymmetryLabel, std::size_t> mo_ext;
+  mo_ext[alpha_label] = n_active;
+  mo_ext[beta_label] = n_active;
 
-  // Column axis: no symmetry (auxiliary basis dimension)
-  auto aux_sym = std::make_shared<const Symmetries>(Symmetries({}));
-  SymmetryLabel aux_label({});
-  std::unordered_map<SymmetryLabel, std::size_t> col_ext;
-  col_ext[aux_label] = naux;
+  // Auxiliary axis: trivial symmetry (single label, entire range).
+  auto aux_sym = std::make_shared<const Symmetries>(Symmetries::trivial());
+  SymmetryLabel aux_label;
+  std::unordered_map<SymmetryLabel, std::size_t> aux_ext;
+  aux_ext[aux_label] = naux;
 
-  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {mo_sym, aux_sym};
-  SymmetryBlockedTensor<2>::ExtentsArray extents = {row_ext, col_ext};
+  SymmetryBlockedTensor<3>::SymmetriesArray symmetries = {mo_sym, mo_sym,
+                                                          aux_sym};
+  SymmetryBlockedTensor<3>::ExtentsArray extents = {mo_ext, mo_ext, aux_ext};
 
-  auto aa_block = std::make_shared<const Eigen::MatrixXd>(aa);
-  SymmetryBlockedTensor<2>::BlockMap blocks;
-  blocks[{alpha_label, aux_label}] = aa_block;
+  // Flatten the dense [norb^2 x naux] matrix into a rank-3 flat-packed vector
+  // per spin block (alpha-alpha-aux, beta-beta-aux).
+  auto aa_flat = std::make_shared<const Eigen::VectorXd>(
+      Eigen::Map<const Eigen::VectorXd>(aa.data(), aa.size()));
+  SymmetryBlockedTensor<3>::BlockMap blocks;
+  blocks[{alpha_label, alpha_label, aux_label}] = aa_flat;
 
   if (bb != nullptr) {
-    auto bb_block = std::make_shared<const Eigen::MatrixXd>(*bb);
-    blocks[{beta_label, aux_label}] = bb_block;
+    auto bb_flat = std::make_shared<const Eigen::VectorXd>(
+        Eigen::Map<const Eigen::VectorXd>(bb->data(), bb->size()));
+    blocks[{beta_label, beta_label, aux_label}] = bb_flat;
   }
-  // Restricted: no auto-aliasing (slots have different symmetries)
-  // so we must explicitly set the beta view for restricted.
 
-  _three_center_sbt = std::make_shared<const SymmetryBlockedTensor<2>>(
+  _three_center_sbt = std::make_shared<const SymmetryBlockedTensor<3>>(
       std::move(symmetries), std::move(extents), std::move(blocks));
   _init_three_center_views();
 }
@@ -360,21 +362,31 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
 void CholeskyHamiltonianContainer::_init_three_center_views() {
   SymmetryLabel alpha_label({axes::alpha()});
   SymmetryLabel beta_label({axes::beta()});
-  SymmetryLabel aux_label({});
+  SymmetryLabel aux_label;
 
-  _three_center_integrals.first =
-      _three_center_sbt->block_ptr({alpha_label, aux_label});
+  // Reconstruct dense [norb^2, naux] view from the flat-packed rank-3 block.
+  auto make_view = [&](const SymmetryLabel& spin) {
+    const auto& flat = _three_center_sbt->block({spin, spin, aux_label});
+    std::size_t norb = _three_center_sbt->extents()[0].at(spin);
+    std::size_t naux = _three_center_sbt->extents()[2].at(aux_label);
+    auto mat = std::make_shared<Eigen::MatrixXd>(
+        Eigen::Map<const Eigen::MatrixXd>(flat.data(), norb * norb, naux));
+    return mat;
+  };
 
-  if (_three_center_sbt->has_block({beta_label, aux_label})) {
-    _three_center_integrals.second =
-        _three_center_sbt->block_ptr({beta_label, aux_label});
+  _three_center_integrals.first = make_view(alpha_label);
+
+  if (_three_center_sbt->has_block({beta_label, beta_label, aux_label}) &&
+      _three_center_sbt->block_ptr({beta_label, beta_label, aux_label}).get() !=
+          _three_center_sbt->block_ptr({alpha_label, alpha_label, aux_label})
+              .get()) {
+    _three_center_integrals.second = make_view(beta_label);
   } else {
-    // Restricted: beta shares alpha storage.
     _three_center_integrals.second = _three_center_integrals.first;
   }
 }
 
-const SymmetryBlockedTensor<2>& CholeskyHamiltonianContainer::three_center()
+const SymmetryBlockedTensor<3>& CholeskyHamiltonianContainer::three_center()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_three_center_sbt) {

@@ -77,20 +77,6 @@ void bind_sbt_instance(py::module& m, const char* name) {
           "The dense numpy block stored for the given per-slot labels.")
       .def("num_blocks", &SBT::num_blocks,
            "Total number of stored blocks (including aliases).")
-      .def("canonical_block_labels", &SBT::canonical_block_labels,
-           "Representative labels for each independent (non-aliased) block.")
-      .def(
-          "canonical_blocks",
-          [](const SBT& self) {
-            std::vector<std::pair<Labels, BlockTensor>> out;
-            for (const auto& [labels, ptr] : self.canonical_blocks()) {
-              out.emplace_back(labels, *ptr);
-            }
-            return out;
-          },
-          "Representative (labels, block) pairs, one per unique data pointer.")
-      .def("is_restricted", &SBT::is_restricted,
-           "True iff any two distinct labels alias the same storage.")
       .def("get_data_type_name", &SBT::get_data_type_name)
       .def("get_summary", &SBT::get_summary)
       .def("__repr__", &SBT::get_summary)

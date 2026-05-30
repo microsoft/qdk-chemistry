@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -33,7 +34,7 @@ template <std::size_t Rank, class Scalar = double>
 using SparseMapBlock = std::map<std::array<unsigned, Rank>, Scalar>;
 
 /**
- * @brief Immutable symmetry-blocked sparse map.
+ * @brief Symmetry-blocked sparse map.
  *
  * A @ref SymmetryBlockedSparseMap stores the non-zero symmetry sectors of a
  * rank-@p Rank sparse index-value map.  Each block is a
@@ -62,10 +63,9 @@ class SymmetryBlockedSparseMap
    * @brief Construct from per-slot symmetries, per-slot extents, and a block
    * map of sparse blocks.
    *
-   * @throws BlockLabelInvalidError   if a label is not admissible.
-   * @throws BlockExtentMismatchError if restricted orbit partners have
-   *         unequal extents or a sparse entry index exceeds the extent.
-   * @throws BlockAliasMismatchError  if orbit partners don't share storage.
+   * @throws std::invalid_argument if a label is not admissible, if restricted
+   *         orbit partners have unequal extents, if a sparse entry index
+   *         exceeds the extent, or if orbit partners do not share storage.
    */
   SymmetryBlockedSparseMap(SymmetriesArray symmetries, ExtentsArray extents,
                            BlockMap blocks)
@@ -106,7 +106,7 @@ class SymmetryBlockedSparseMap
     std::ostringstream oss;
     oss << "SymmetryBlockedSparseMap(rank=" << Rank
         << ", blocks=" << this->num_blocks() << ", entries=" << num_entries()
-        << ", restricted=" << (this->is_restricted() ? "true" : "false") << ")";
+        << ")";
     return oss.str();
   }
 
@@ -211,7 +211,7 @@ class SymmetryBlockedSparseMap
         for (std::size_t i = 0; i < Rank; ++i) {
           auto extent = this->_extent_for(i, labels[i]);
           if (idx[i] >= extent) {
-            throw BlockExtentMismatchError(
+            throw std::invalid_argument(
                 "SymmetryBlockedSparseMap entry index exceeds block extent.");
           }
         }

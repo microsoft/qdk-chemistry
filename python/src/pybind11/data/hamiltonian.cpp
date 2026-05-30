@@ -123,17 +123,6 @@ Note:
 )");
 
   // HamiltonianContainer methods (read-only accessors)
-  bind_getter_as_property(hamiltonian_container, "get_one_body_integrals",
-                          &HamiltonianContainer::get_one_body_integrals,
-                          R"(
-Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: One-electron integral matrices [norb x norb]
-    for alpha and beta spin channels.
-)",
-                          py::return_value_policy::reference_internal);
-
   hamiltonian_container.def("has_one_body_integrals",
                             &HamiltonianContainer::has_one_body_integrals,
                             R"(
@@ -158,15 +147,6 @@ Returns:
 )",
       py::arg("i"), py::arg("j"), py::arg("channel") = SpinChannel::aa);
 
-  bind_getter_as_property(hamiltonian_container, "get_inactive_fock_matrix",
-                          &HamiltonianContainer::get_inactive_fock_matrix,
-                          R"(
-Get tuple of inactive Fock matrices (alpha, beta).
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: Inactive Fock matrices for the active space
-)");
-
   hamiltonian_container.def("has_inactive_fock_matrix",
                             &HamiltonianContainer::has_inactive_fock_matrix,
                             R"(
@@ -178,7 +158,7 @@ Returns:
 
   // SBT-native accessors
   hamiltonian_container.def(
-      "h1", &HamiltonianContainer::h1, py::return_value_policy::reference_internal,
+      "one_body_integrals", &HamiltonianContainer::one_body_integrals, py::return_value_policy::reference_internal,
       R"(
 One-body integrals as a rank-2 symmetry-blocked tensor.
 
@@ -187,7 +167,7 @@ Returns:
 )");
 
   hamiltonian_container.def(
-      "h1_block", &HamiltonianContainer::h1_block,
+      "one_body_integrals_block", &HamiltonianContainer::one_body_integrals_block,
       py::return_value_policy::reference_internal,
       R"(
 One-body integral block for the given row/column symmetry labels.
@@ -399,22 +379,6 @@ Examples:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // Three-center integral access
-  bind_getter_as_property(
-      cholesky_container, "get_three_center_integrals",
-      &CholeskyHamiltonianContainer::get_three_center_integrals,
-      R"(
-Get three-center integrals in MO basis for all spin channels.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: Pair of (aa, bb) three-center
-    two-electron integral matrices, each of dimension [(norb*norb) x naux]
-    with the orbital pair index stored in row-major order.
-
-Raises:
-    RuntimeError: If three-center integrals are not set
-)",
-      py::return_value_policy::reference_internal);
-
   // AO Cholesky vectors access
   cholesky_container.def(
       "get_ao_cholesky_vectors",
@@ -446,21 +410,6 @@ Returns:
 )");
 
   // Two-body integral access (lazily computed from three-center integrals)
-  bind_getter_as_property(cholesky_container, "get_two_body_integrals",
-                          &CholeskyHamiltonianContainer::get_two_body_integrals,
-                          R"(
-Get two-electron integrals in molecular orbital basis.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
-
-Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
-)",
-                          py::return_value_policy::reference_internal);
-
   cholesky_container.def("get_two_body_element",
                          &CholeskyHamiltonianContainer::get_two_body_element,
                          R"(
@@ -648,22 +597,6 @@ Examples:
 
   // Two-body integral access (specific to
   // CanonicalFourCenterHamiltonianContainer)
-  bind_getter_as_property(
-      canonical_four_center, "get_two_body_integrals",
-      &CanonicalFourCenterHamiltonianContainer::get_two_body_integrals,
-      R"(
-Get two-electron integrals in molecular orbital basis.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
-
-Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
-)",
-      py::return_value_policy::reference_internal);
-
   canonical_four_center.def(
       "get_two_body_element",
       &CanonicalFourCenterHamiltonianContainer::get_two_body_element,
@@ -701,7 +634,7 @@ Returns:
 
   // SBT-native h2 accessors
   canonical_four_center.def(
-      "h2", &CanonicalFourCenterHamiltonianContainer::h2,
+      "two_body_integrals", &CanonicalFourCenterHamiltonianContainer::two_body_integrals,
       py::return_value_policy::reference_internal,
       R"(
 Two-body integrals as a rank-4 symmetry-blocked tensor.
@@ -711,7 +644,7 @@ Returns:
 )");
 
   canonical_four_center.def(
-      "h2_block", &CanonicalFourCenterHamiltonianContainer::h2_block,
+      "two_body_integrals_block", &CanonicalFourCenterHamiltonianContainer::two_body_integrals_block,
       py::return_value_policy::reference_internal,
       R"(
 Two-body integral block for the given symmetry labels.
@@ -850,22 +783,6 @@ Args:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // -- Base-class overrides --
-  bind_getter_as_property(sparse_container, "get_two_body_integrals",
-                          &SparseHamiltonianContainer::get_two_body_integrals,
-                          R"(
-Get two-electron integrals as dense vectors for all spin channels.
-
-Materialises the sparse map into a dense n^4 vector on first access (cached).
-Model Hamiltonians are restricted so all three channels are identical.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: (aaaa, aabb, bbbb) integrals.
-
-Raises:
-    RuntimeError: If no two-body integrals are stored.
-)",
-                          py::return_value_policy::reference_internal);
-
   sparse_container.def("get_two_body_element",
                        &SparseHamiltonianContainer::get_two_body_element,
                        R"(
@@ -1013,24 +930,6 @@ Examples:
                   py::arg("container"));
 
   // One-body integral access
-  bind_getter_as_property(hamiltonian, "get_one_body_integrals",
-                          &Hamiltonian::get_one_body_integrals,
-                          R"(
-Get tuple of one-electron integrals (alpha, beta) in molecular orbital basis.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: One-electron integral matrices [norb x norb]
-    for alpha and beta spin channels.
-
-Raises:
-    RuntimeError: If one-body integrals have not been set
-
-Examples:
-    >>> h1_alpha, h1_beta = hamiltonian.get_one_body_integrals
-    >>> print(f"One-body matrix shape: {h1_alpha.shape}")
-)",
-                          py::return_value_policy::reference_internal);
-
   hamiltonian.def("has_one_body_integrals",
                   &Hamiltonian::has_one_body_integrals,
                   R"(
@@ -1056,23 +955,6 @@ Returns:
                   py::arg("channel") = SpinChannel::aa);
 
   // Two-body integral access
-  bind_getter_as_property(hamiltonian, "get_two_body_integrals",
-                          &Hamiltonian::get_two_body_integrals,
-                          R"(
-Get two-electron integrals in molecular orbital basis.
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of two-electron
-    integral vectors [norb^4] for aaaa, aabb, and bbbb spin channels.
-
-Raises:
-    RuntimeError: If two-body integrals have not been set
-
-Notes:
-    Integrals are stored as flattened vectors in chemist notation <ij|kl>
-)",
-                          py::return_value_policy::reference_internal);
-
   hamiltonian.def("get_two_body_element", &Hamiltonian::get_two_body_element,
                   R"(
 Get specific two-electron integral element <ij|kl>.
@@ -1135,15 +1017,6 @@ Check if inactive Fock matrix is available.
 
 Returns:
     bool: True if inactive Fock matrix has been set
-)");
-
-  bind_getter_as_property(hamiltonian, "get_inactive_fock_matrix",
-                          &Hamiltonian::get_inactive_fock_matrix,
-                          R"(
-Get tuple of inactive Fock matrices (alpha, beta).
-
-Returns:
-    tuple[numpy.ndarray, numpy.ndarray]: Inactive Fock matrices for the active space
 )");
 
   // Type and restriction checks

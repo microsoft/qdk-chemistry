@@ -202,18 +202,18 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Direct access to the sparse two-body integral map.
-   * @deprecated Use h2_sparse() for SBT-native access.
+   * @deprecated Use two_body_integrals_sparse() for SymmetryBlockedTensor access.
    * @return Const reference to the internal two-body map
    */
-  [[deprecated("Use h2_sparse() for SBT-native access.")]]
+  [[deprecated("Use two_body_integrals_sparse() for SymmetryBlockedTensor access.")]]
   const TwoBodyMap& sparse_two_body_integrals() const;
 
   /**
    * @brief Two-body integrals as a rank-4 symmetry-blocked sparse map.
-   * @return Const reference to the h2 sparse SBT.
+   * @return Const reference to the two-body sparse SymmetryBlockedTensor.
    * @throws std::runtime_error if not set.
    */
-  const SymmetryBlockedSparseMap<4>& h2_sparse() const;
+  const SymmetryBlockedSparseMap<4>& two_body_integrals_sparse() const;
 
   /**
    * @brief Access a single one-body integral element.
@@ -230,7 +230,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   /// Sparse storage of one-body integrals
   Eigen::SparseMatrix<double> _one_body_sparse;
 
-  /// SBT-canonical sparse two-body integrals (source of truth)
+  /// SymmetryBlockedTensor-canonical sparse two-body integrals (source of truth)
   std::shared_ptr<const SymmetryBlockedSparseMap<4>> _h2_sparse;
 
   /// v1 stored two-body map (same data as _h2_sparse, different key type)

@@ -52,9 +52,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    */
   /**
    * @brief Constructor for restricted Cholesky Hamiltonian.
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& three_center_integrals,
@@ -65,9 +65,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Constructor for unrestricted Cholesky Hamiltonian.
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -80,19 +80,18 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief SBT-native constructor for Cholesky Hamiltonian.
-   * @param h1 One-body integrals as rank-2 SBT.
-   * @param three_center Three-center integrals as rank-2 SBT. Row axis keyed
-   *   by MO spin symmetries (extent = norb^2 per spin), column axis has no
-   *   symmetry (extent = naux).
+   * @brief SymmetryBlockedTensor constructor for Cholesky Hamiltonian.
+   * @param one_body One-body integrals as rank-2 SymmetryBlockedTensor.
+   * @param three_center Three-center integrals as rank-3
+   *   SymmetryBlockedTensor. Slots are [MO_row, MO_col, auxiliary].
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
-   * @param inactive_fock Inactive Fock matrix as rank-2 SBT.
+   * @param inactive_fock Inactive Fock matrix as rank-2 SymmetryBlockedTensor.
    * @param ao_cholesky_vectors Optional AO Cholesky vectors.
    * @param type Hamiltonian type.
    */
   CholeskyHamiltonianContainer(
-      SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<2> three_center,
+      SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       SymmetryBlockedTensor<2> inactive_fock,
       std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
@@ -129,19 +128,19 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
-   * @deprecated Use three_center() for SBT-native access.
+   * @deprecated Use three_center() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use three_center() for SBT-native access.")]]
+  [[deprecated("Use three_center() for SymmetryBlockedTensor access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
 
   /**
-   * @brief Three-center integrals as a rank-2 symmetry-blocked tensor.
-   * Row axis keyed by MO spin symmetries, column axis has no symmetry.
-   * @return Const reference to the three-center SBT.
+   * @brief Three-center integrals as a rank-3 symmetry-blocked tensor.
+   * Slots are [MO_row, MO_col, auxiliary].
+   * @return Const reference to the three-center SymmetryBlockedTensor.
    * @throws std::runtime_error if not set.
    */
-  const SymmetryBlockedTensor<2>& three_center() const;
+  const SymmetryBlockedTensor<3>& three_center() const;
 
   /**
    * @brief Get the optional AO Cholesky vectors
@@ -218,10 +217,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
-  /// SBT-canonical three-center integrals (source of truth).
-  /// Row axis: MO spin sym (extent = norb^2). Column axis: no sym (extent =
-  /// naux).
-  std::shared_ptr<const SymmetryBlockedTensor<2>> _three_center_sbt;
+  /// SymmetryBlockedTensor-canonical three-center integrals (source of truth).
+  /// Rank-3: slots are [MO_row, MO_col, auxiliary].
+  std::shared_ptr<const SymmetryBlockedTensor<3>> _three_center_sbt;
 
   /// Non-owning views into _three_center_sbt blocks (for v1 dense access)
   std::pair<std::shared_ptr<const Eigen::MatrixXd>,
@@ -252,10 +250,10 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
 
-  /// Build SBT<2> from dense three-center matrices and set views.
+  /// Build SymmetryBlockedTensor<3> from dense three-center matrices and set views.
   void _set_three_center_container(const Eigen::MatrixXd& aa,
                                    const Eigen::MatrixXd* bb);
-  /// Derive non-owning views from existing SBT<2>.
+  /// Derive non-owning views from existing SymmetryBlockedTensor<3>.
   void _init_three_center_views();
 
   /** Serialization version */

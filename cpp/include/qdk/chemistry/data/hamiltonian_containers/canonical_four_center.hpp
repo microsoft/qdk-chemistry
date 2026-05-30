@@ -42,9 +42,9 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Constructor for restricted active space Hamiltonian with four center
    * integrals.
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
@@ -55,9 +55,9 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with four
    * center integrals using separate spin components.
-   * @deprecated Use the SBT-native constructor instead.
+   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SBT-native constructor instead.")]]
+  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -70,16 +70,16 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief SBT-native constructor.
-   * @param h1 One-body integrals as rank-2 SBT.
-   * @param h2 Two-body integrals as rank-4 SBT.
+   * @brief SymmetryBlockedTensor constructor.
+   * @param one_body One-body integrals as rank-2 SymmetryBlockedTensor.
+   * @param two_body Two-body integrals as rank-4 SymmetryBlockedTensor.
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
-   * @param inactive_fock Inactive Fock matrix as rank-2 SBT.
+   * @param inactive_fock Inactive Fock matrix as rank-2 SymmetryBlockedTensor.
    * @param type Hamiltonian type.
    */
   CanonicalFourCenterHamiltonianContainer(
-      SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<4> h2,
+      SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<4> two_body,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       SymmetryBlockedTensor<2> inactive_fock,
       HamiltonianType type = HamiltonianType::Hermitian);
@@ -104,25 +104,25 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
-   * @deprecated Use h2() for SBT-native access.
+   * @deprecated Use two_body_integrals() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use h2() for SBT-native access.")]]
+  [[deprecated("Use two_body_integrals() for SymmetryBlockedTensor access.")]]
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
              const Eigen::VectorXd&> get_two_body_integrals()
       const override final;
 
   /**
    * @brief Two-body integrals as a rank-4 symmetry-blocked tensor.
-   * @return Const reference to the h2 SBT.
-   * @throws std::runtime_error if h2 is not set.
+   * @return Const reference to the two-body SymmetryBlockedTensor.
+   * @throws std::runtime_error if two-body integrals are not set.
    */
-  const SymmetryBlockedTensor<4>& h2() const;
+  const SymmetryBlockedTensor<4>& two_body_integrals() const;
 
   /**
    * @brief Two-body integral block for the given symmetry labels.
    * @return Const reference to the flat-packed vector block.
    */
-  const Eigen::VectorXd& h2_block(const SymmetryLabel& p,
+  const Eigen::VectorXd& two_body_integrals_block(const SymmetryLabel& p,
                                   const SymmetryLabel& q,
                                   const SymmetryLabel& r,
                                   const SymmetryLabel& s) const;
@@ -192,7 +192,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  protected:
-  /// SBT-canonical two-body integrals (source of truth)
+  /// SymmetryBlockedTensor-canonical two-body integrals (source of truth)
   std::shared_ptr<const SymmetryBlockedTensor<4>> _h2;
 
   /// Non-owning views into _h2 blocks (for v1 dense access: aaaa, aabb, bbbb)
@@ -211,11 +211,11 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
                     std::shared_ptr<Eigen::VectorXd>>
   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
 
-  /// Build SBT<4> from dense vectors and set non-owning views.
+  /// Build SymmetryBlockedTensor<4> from dense vectors and set non-owning views.
   void _set_h2_container(const Eigen::VectorXd& aaaa,
                          const Eigen::VectorXd* aabb,
                          const Eigen::VectorXd* bbbb);
-  /// Derive non-owning views from an existing SBT<4> container.
+  /// Derive non-owning views from an existing SymmetryBlockedTensor<4> container.
   void _init_h2_views();
 
   /// Serialization version

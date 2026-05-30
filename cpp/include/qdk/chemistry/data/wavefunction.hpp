@@ -424,12 +424,12 @@ class WavefunctionContainer {
    */
   virtual bool has_two_rdm_spin_traced() const;
 
-  // ---- SBT-native RDM accessors -------------------------------------------
+  // ---- SymmetryBlockedTensor RDM accessors -------------------------------------------
 
   /**
    * @brief Spin-dependent 1-RDM as a rank-2 symmetry-blocked tensor.
    * Blocks: (αα), (ββ). Restricted aliases β to α.
-   * @return Const reference to the 1-RDM SBT.
+   * @return Const reference to the 1-RDM SymmetryBlockedTensor.
    * @throws std::runtime_error if not available.
    */
   const SymmetryBlockedTensor<2>& one_rdm() const;
@@ -441,14 +441,14 @@ class WavefunctionContainer {
                                        const SymmetryLabel& col) const;
 
   /**
-   * @brief True if spin-dependent 1-RDM SBT is available.
+   * @brief True if spin-dependent 1-RDM SymmetryBlockedTensor is available.
    */
   bool has_one_rdm() const;
 
   /**
    * @brief Spin-dependent 2-RDM as a rank-4 symmetry-blocked tensor.
    * Blocks: (αααα), (ααββ), (ββββ) + orbit aliases.
-   * @return Const reference to the 2-RDM SBT.
+   * @return Const reference to the 2-RDM SymmetryBlockedTensor.
    * @throws std::runtime_error if not available.
    */
   const SymmetryBlockedTensor<4>& two_rdm() const;
@@ -462,7 +462,7 @@ class WavefunctionContainer {
                                        const SymmetryLabel& s) const;
 
   /**
-   * @brief True if spin-dependent 2-RDM SBT is available.
+   * @brief True if spin-dependent 2-RDM SymmetryBlockedTensor is available.
    */
   bool has_two_rdm() const;
 
@@ -580,13 +580,13 @@ class WavefunctionContainer {
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
 
-  // SBT-canonical RDM containers (built eagerly from spin-dependent channels)
+  // SymmetryBlockedTensor-canonical RDM containers (built eagerly from spin-dependent channels)
   mutable std::shared_ptr<const SymmetryBlockedTensor<2>> _one_rdm_sbt;
   mutable std::shared_ptr<const SymmetryBlockedTensor<4>> _two_rdm_sbt;
 
-  /// Build 1-RDM SBT from spin-dependent channels if available.
+  /// Build 1-RDM SymmetryBlockedTensor from spin-dependent channels if available.
   void _build_one_rdm_sbt() const;
-  /// Build 2-RDM SBT from spin-dependent channels if available.
+  /// Build 2-RDM SymmetryBlockedTensor from spin-dependent channels if available.
   void _build_two_rdm_sbt() const;
 
   // Orbital entropies

@@ -8,8 +8,8 @@
 #include <cstdint>
 #include <memory>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked.hpp>
 #include <span>
 #include <string>
 #include <unordered_map>
@@ -18,48 +18,52 @@
 namespace qdk::chemistry::data {
 
 /**
- * @brief Immutable set of symmetry-blocked, sorted-unique integer indices.
+ * @brief Set of symmetry-blocked, sorted-unique integer indices.
  *
  * A @ref SymmetryBlockedIndexSet describes, for each admissible
- * @ref SymmetryLabel of a single @ref Symmetries vocabulary, a sorted set of
+ * @ref SymmetryLabel of a single @ref Symmetries, a sorted set of
  * unique indices drawn from @c [0, extent) for that label. It is used to carve
  * out symmetry-respecting subspaces (for example core / active / virtual
  * orbital partitions) of a @ref SymmetryBlockedTensor.
  */
-class SymmetryBlockedIndexSet : public DataClass {
+class SymmetryBlockedIndexSet
+    : public SymmetryBlocked<1, std::vector<std::uint32_t>> {
+  using Base = SymmetryBlocked<1, std::vector<std::uint32_t>>;
+
  public:
   /**
-   * @brief Construct from a symmetry vocabulary, per-label extents, and
+   * @brief Construct from symmetry definitions, per-label extents, and
    * per-label index lists.
    *
-   * @throws BlockLabelInvalidError       if a label is not admissible under
-   *         @p symmetries or lacks a declared extent.
-   * @throws IndexSetOutOfRangeError      if an index is >= its label's extent.
-   * @throws IndexSetNotSortedUniqueError if an index list is not strictly
-   *         increasing.
+   * @throws std::invalid_argument if a label is not admissible under
+   *         @p symmetries, lacks a declared extent, or an index list is not
+   *         strictly increasing.
+   * @throws std::out_of_range if an index is >= its label's extent.
    */
   SymmetryBlockedIndexSet(
       std::shared_ptr<const Symmetries> symmetries,
       std::unordered_map<SymmetryLabel, std::size_t> extents,
       std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices);
 
-  /** @brief The symmetry vocabulary this index set is blocked under. */
-  std::shared_ptr<const Symmetries> symmetries() const { return _symmetries; }
+  /** @brief The symmetry definitions this index set is blocked under. */
+  std::shared_ptr<const Symmetries> symmetries() const {
+    return Base::symmetries()[0];
+  }
 
   /** @brief Per-label extents. */
   const std::unordered_map<SymmetryLabel, std::size_t>& extents() const {
-    return _extents;
+    return Base::SymmetryBlocked::extents()[0];
   }
 
   /**
    * @brief View of the (sorted, unique) indices stored for @p label.
-   * @throws BlockLabelInvalidError if no indices are stored for @p label.
+   * @throws std::invalid_argument if no indices are stored for @p label.
    */
   std::span<const std::uint32_t> indices(const SymmetryLabel& label) const;
 
   /** @brief True iff indices are stored for @p label. */
   bool has(const SymmetryLabel& label) const {
-    return _indices.find(label) != _indices.end();
+    return Base::has_block(Labels{label});
   }
 
   /** @brief The labels for which indices are stored. */
@@ -89,11 +93,9 @@ class SymmetryBlockedIndexSet : public DataClass {
       const std::string& filename, const std::string& type);
 
  private:
-  std::shared_ptr<const Symmetries> _symmetries;
-  std::unordered_map<SymmetryLabel, std::size_t> _extents;
-  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> _indices;
-
-  void _validate() const;
+  static Base::BlockMap _build_block_map(
+      std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>& indices);
+  void _validate_indices() const;
 };
 
 }  // namespace qdk::chemistry::data

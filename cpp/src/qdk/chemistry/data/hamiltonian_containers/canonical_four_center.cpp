@@ -70,12 +70,12 @@ CanonicalFourCenterHamiltonianContainer::
 
 CanonicalFourCenterHamiltonianContainer::
     CanonicalFourCenterHamiltonianContainer(
-        SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<4> h2,
+        SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<4> two_body,
         std::shared_ptr<Orbitals> orbitals, double core_energy,
         SymmetryBlockedTensor<2> inactive_fock, HamiltonianType type)
-    : HamiltonianContainer(std::move(h1), orbitals, core_energy,
+    : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
                            std::move(inactive_fock), type),
-      _h2(std::make_shared<const SymmetryBlockedTensor<4>>(std::move(h2))) {
+      _h2(std::make_shared<const SymmetryBlockedTensor<4>>(std::move(two_body))) {
   QDK_LOG_TRACE_ENTERING();
 
   _init_h2_views();
@@ -296,7 +296,7 @@ void CanonicalFourCenterHamiltonianContainer::_init_h2_views() {
                                         _h2->block_ptr({b, b, b, b}));
 }
 
-const SymmetryBlockedTensor<4>& CanonicalFourCenterHamiltonianContainer::h2()
+const SymmetryBlockedTensor<4>& CanonicalFourCenterHamiltonianContainer::two_body_integrals()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_h2) {
@@ -305,10 +305,10 @@ const SymmetryBlockedTensor<4>& CanonicalFourCenterHamiltonianContainer::h2()
   return *_h2;
 }
 
-const Eigen::VectorXd& CanonicalFourCenterHamiltonianContainer::h2_block(
+const Eigen::VectorXd& CanonicalFourCenterHamiltonianContainer::two_body_integrals_block(
     const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
     const SymmetryLabel& s) const {
-  return h2().block({p, q, r, s});
+  return two_body_integrals().block({p, q, r, s});
 }
 
 nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {

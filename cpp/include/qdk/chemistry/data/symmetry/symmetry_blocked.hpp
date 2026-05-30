@@ -9,8 +9,9 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
-#include <qdk/chemistry/data/errors.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/utils/hash.hpp>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -29,7 +30,7 @@ struct LabelsHash {
       const std::array<SymmetryLabel, Rank>& labels) const noexcept {
     std::size_t seed = 0;
     for (const auto& label : labels) {
-      seed ^= label.hash() + 0x9e3779b97f4a7c15ULL + (seed << 6) + (seed >> 2);
+      seed = utils::hash_combine(seed, label.hash());
     }
     return seed;
   }
@@ -49,24 +50,23 @@ std::array<SymmetryLabel, Rank> make_labels(
 }  // namespace detail
 
 /**
- * @brief Immutable symmetry-addressed container of per-block storage.
+ * @brief Symmetry-addressed container of per-block storage.
  *
  * A @ref SymmetryBlocked stores a sparse map from per-slot
  * @ref SymmetryLabel arrays to opaque block values of type @p Block.
- * Each slot carries its own @ref Symmetries vocabulary and a per-label extent.
- * Blocks are held via @c shared_ptr<const Block> so that orbit-equivalent
+ * Each slot carries its own @ref Symmetries and a per-label extent.
+ * Blocks are held via @c shared_ptr<const Block> so that symmetry-equivalent
  * sectors can alias the same storage.
  *
- * Orbit equivalence is defined on the spin axis: a simultaneous
+ * Symmetry aliasing is defined on the spin axis: a simultaneous
  * @f$\alpha \leftrightarrow \beta@f$ swap across all slots. When every slot
  * shares the same @ref Symmetries instance and the spin axis is marked
- * @c equivalent (restricted), the constructor auto-aliases each orbit's
- * partner block to the supplied representative. When the slots carry distinct
- * @ref Symmetries (intertwiner storage such as basis coefficients), no
- * auto-aliasing is performed.
+ * @c equivalent, the constructor auto-aliases each partner block to the
+ * supplied representative. Aliasing can also be achieved by the producer
+ * supplying the same @c shared_ptr for both spin partners (e.g. restricted
+ * basis coefficients share the same MO matrix for both spins).
  *
- * Instances are immutable: the full block map is supplied at construction and
- * there is no mutation API.
+ * The full block map is supplied at construction.
  *
  * Derived classes (e.g. @ref SymmetryBlockedTensor) add block-type-specific
  * validation and serialization.
@@ -93,13 +93,11 @@ class SymmetryBlocked : public DataClass {
    * null pointers, then applies orbit aliasing.  Derived classes should call
    * their own block-shape validation after this constructor returns.
    *
-   * @throws BlockLabelInvalidError   if a block or extent label is not
-   *         admissible under the matching slot's @ref Symmetries, or if a
-   *         block pointer is null.
-   * @throws BlockExtentMismatchError if restricted orbit partners have
-   *         unequal extents.
-   * @throws BlockAliasMismatchError  if both orbit partners are supplied but
-   *         do not share storage.
+   * @throws std::invalid_argument if a block or extent label is not
+   *         admissible under the matching slot's @ref Symmetries, if a block
+   *         pointer is null, if restricted orbit partners have unequal
+   *         extents, or if both orbit partners are supplied but do not share
+   *         storage.
    */
   SymmetryBlocked(SymmetriesArray symmetries, ExtentsArray extents,
                   BlockMap blocks)
@@ -111,31 +109,57 @@ class SymmetryBlocked : public DataClass {
     _apply_orbit_aliasing();
   }
 
-  /** @brief Per-slot symmetry vocabularies. */
+  /** @brief Per-slot symmetry definitions. */
   const SymmetriesArray& symmetries() const { return _symmetries; }
 
   /** @brief Per-slot per-label extents. */
   const ExtentsArray& extents() const { return _extents; }
 
-  /** @brief True iff a block is stored for @p labels. */
+  /**
+   * @brief True iff a block is stored for @p labels.
+   *
+   * If all labels in the key are trivial (empty), returns true when exactly
+   * one unique block exists.
+   */
   bool has_block(const Labels& labels) const {
+    if (_is_trivial_key(labels)) {
+      return _blocks.size() == 1 ||
+             _group_by_pointer().size() == 1;
+    }
     return _blocks.find(labels) != _blocks.end();
   }
 
   /**
    * @brief Reference to the block stored for @p labels.
-   * @throws BlockLabelInvalidError if no such block exists.
+   *
+   * If all labels in the key are trivial (empty), returns the sole block
+   * when exactly one unique block exists.
+   * @throws std::invalid_argument if no such block exists or the trivial key
+   *         is ambiguous.
    */
   const Block& block(const Labels& labels) const { return *block_ptr(labels); }
 
   /**
    * @brief Shared pointer to the block stored for @p labels.
-   * @throws BlockLabelInvalidError if no such block exists.
+   *
+   * If all labels in the key are trivial (empty), returns the sole block
+   * when exactly one unique block exists.
+   * @throws std::invalid_argument if no such block exists or the trivial key
+   *         is ambiguous.
    */
   BlockPtr block_ptr(const Labels& labels) const {
+    if (_is_trivial_key(labels)) {
+      auto groups = _group_by_pointer();
+      if (groups.size() == 1) {
+        return groups[0].ptr;
+      }
+      throw std::invalid_argument(
+          "Trivial (empty) label key is ambiguous: multiple independent "
+          "blocks exist.");
+    }
     auto it = _blocks.find(labels);
     if (it == _blocks.end()) {
-      throw BlockLabelInvalidError(
+      throw std::invalid_argument(
           "SymmetryBlocked has no block for the requested labels.");
     }
     return it->second;
@@ -144,53 +168,19 @@ class SymmetryBlocked : public DataClass {
   /** @brief Total number of stored blocks (including aliases). */
   std::size_t num_blocks() const { return _blocks.size(); }
 
-  /**
-   * @brief Representative labels for each independent (non-aliased) block.
-   *
-   * Blocks that share storage (orbit partners under a restricted spin axis,
-   * or producer-shared blocks) are represented once, by the spin-canonical
-   * key among those sharing the pointer.
-   */
-  std::vector<Labels> canonical_block_labels() const {
-    std::vector<Labels> result;
-    for (const auto& group : _group_by_pointer()) {
-      result.push_back(group.representative);
-    }
-    return result;
-  }
-
-  /** @brief Representative (labels, block-pointer) pairs, one per unique data
-   * pointer. */
-  std::vector<std::pair<Labels, BlockPtr>> canonical_blocks() const {
-    std::vector<std::pair<Labels, BlockPtr>> result;
-    for (const auto& group : _group_by_pointer()) {
-      result.emplace_back(group.representative, group.ptr);
-    }
-    return result;
-  }
-
-  /**
-   * @brief True iff any two distinct labels alias the same storage.
-   *
-   * Mirrors the historical restricted check of pointer equality between the
-   * @f$\alpha@f$ and @f$\beta@f$ coefficient blocks.
-   */
-  bool is_restricted() const {
-    for (const auto& [labels_a, ptr_a] : _blocks) {
-      for (const auto& [labels_b, ptr_b] : _blocks) {
-        if (!(labels_a == labels_b) && ptr_a.get() == ptr_b.get() &&
-            ptr_a != nullptr) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
  protected:
   SymmetriesArray _symmetries;
   ExtentsArray _extents;
   BlockMap _blocks;
+
+  static bool _is_trivial_key(const Labels& labels) {
+    for (const auto& label : labels) {
+      if (!label.empty()) {
+        return false;
+      }
+    }
+    return true;
+  }
 
   /** @brief Internal grouping for canonical-block enumeration. */
   struct PointerGroup {
@@ -218,13 +208,13 @@ class SymmetryBlocked : public DataClass {
   void _validate_symmetries_and_extents() const {
     for (std::size_t i = 0; i < Rank; ++i) {
       if (_symmetries[i] == nullptr) {
-        throw BlockLabelInvalidError(
+        throw std::invalid_argument(
             "SymmetryBlocked slot symmetries must not be null.");
       }
       for (const auto& [label, extent] : _extents[i]) {
         (void)extent;
         if (!_label_admissible(*_symmetries[i], label)) {
-          throw BlockLabelInvalidError(
+          throw std::invalid_argument(
               "SymmetryBlocked extent label is not admissible under the "
               "slot's symmetries.");
         }
@@ -235,12 +225,12 @@ class SymmetryBlocked : public DataClass {
   void _validate_block_labels() const {
     for (const auto& [labels, ptr] : _blocks) {
       if (ptr == nullptr) {
-        throw BlockLabelInvalidError(
+        throw std::invalid_argument(
             "SymmetryBlocked block pointers must not be null.");
       }
       for (std::size_t i = 0; i < Rank; ++i) {
         if (!_label_admissible(*_symmetries[i], labels[i])) {
-          throw BlockLabelInvalidError(
+          throw std::invalid_argument(
               "SymmetryBlocked block label is not admissible under the "
               "slot's symmetries.");
         }
@@ -251,7 +241,7 @@ class SymmetryBlocked : public DataClass {
   std::size_t _extent_for(std::size_t slot, const SymmetryLabel& label) const {
     auto it = _extents[slot].find(label);
     if (it == _extents[slot].end()) {
-      throw BlockLabelInvalidError(
+      throw std::invalid_argument(
           "SymmetryBlocked block label has no declared extent.");
     }
     return it->second;
@@ -324,7 +314,7 @@ class SymmetryBlocked : public DataClass {
         SymmetryLabel partner = _swap_spin(label);
         auto it = _extents[i].find(partner);
         if (it != _extents[i].end() && it->second != extent) {
-          throw BlockExtentMismatchError(
+          throw std::invalid_argument(
               "Restricted spin orbit partners must share the same extent.");
         }
       }
@@ -339,7 +329,7 @@ class SymmetryBlocked : public DataClass {
       auto partner_it = _blocks.find(partner);
       if (partner_it != _blocks.end()) {
         if (partner_it->second.get() != ptr.get()) {
-          throw BlockAliasMismatchError(
+          throw std::invalid_argument(
               "Restricted spin orbit partners must share block storage.");
         }
       } else {

@@ -7,68 +7,67 @@
 #include <H5Cpp.h>
 
 #include <fstream>
-#include <qdk/chemistry/data/errors.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
 namespace qdk::chemistry::data {
 
-namespace {
+namespace detail {
 
-constexpr const char* kHdf5JsonDataset = "symmetry_blocked_index_set_json";
+static constexpr const char* k_sbis_hdf5_json_dataset =
+    "symmetry_blocked_index_set_json";
 
-bool label_admissible(const Symmetries& sym, const SymmetryLabel& label) {
-  if (label.values().size() != sym.axes().size()) {
-    return false;
-  }
-  for (const auto& axis : sym.axes()) {
-    if (!label.has(axis.name()) || !axis.admits(*label.get(axis.name()))) {
-      return false;
+}  // namespace detail
+
+SymmetryBlockedIndexSet::BlockMap SymmetryBlockedIndexSet::_build_block_map(
+    std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>& indices) {
+  BlockMap blocks;
+  // Build shared_ptr blocks, reusing the same pointer for orbit-equivalent
+  // labels that carry identical index lists.
+  std::unordered_map<Labels, BlockPtr, LabelsHash<1>> built;
+  for (auto& [label, list] : indices) {
+    Labels key{label};
+    // Check if a spin partner already exists with equal data.
+    bool aliased = false;
+    for (const auto& [existing_key, existing_ptr] : built) {
+      if (*existing_ptr == list) {
+        blocks.emplace(key, existing_ptr);
+        aliased = true;
+        break;
+      }
+    }
+    if (!aliased) {
+      auto ptr = std::make_shared<const std::vector<std::uint32_t>>(
+          std::move(list));
+      blocks.emplace(key, ptr);
+      built.emplace(key, ptr);
     }
   }
-  return true;
+  return blocks;
 }
-
-}  // namespace
 
 SymmetryBlockedIndexSet::SymmetryBlockedIndexSet(
     std::shared_ptr<const Symmetries> symmetries,
     std::unordered_map<SymmetryLabel, std::size_t> extents,
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices)
-    : _symmetries(std::move(symmetries)),
-      _extents(std::move(extents)),
-      _indices(std::move(indices)) {
-  _validate();
+    : Base(SymmetriesArray{std::move(symmetries)},
+           ExtentsArray{std::move(extents)},
+           _build_block_map(indices)) {
+  _validate_indices();
 }
 
-void SymmetryBlockedIndexSet::_validate() const {
-  if (_symmetries == nullptr) {
-    throw BlockLabelInvalidError(
-        "SymmetryBlockedIndexSet symmetries must not be null.");
-  }
-  for (const auto& [label, extent] : _extents) {
-    (void)extent;
-    if (!label_admissible(*_symmetries, label)) {
-      throw BlockLabelInvalidError(
-          "SymmetryBlockedIndexSet extent label is not admissible under the "
-          "supplied symmetries.");
-    }
-  }
-  for (const auto& [label, list] : _indices) {
-    auto extent_it = _extents.find(label);
-    if (extent_it == _extents.end()) {
-      throw BlockLabelInvalidError(
-          "SymmetryBlockedIndexSet index label has no declared extent.");
-    }
-    const std::size_t extent = extent_it->second;
+void SymmetryBlockedIndexSet::_validate_indices() const {
+  for (const auto& [labels, ptr] : _blocks) {
+    const auto extent = _extent_for(0, labels[0]);
+    const auto& list = *ptr;
     for (std::size_t i = 0; i < list.size(); ++i) {
       if (list[i] >= extent) {
-        throw IndexSetOutOfRangeError(
+        throw std::out_of_range(
             "SymmetryBlockedIndexSet index exceeds the declared extent.");
       }
       if (i > 0 && list[i] <= list[i - 1]) {
-        throw IndexSetNotSortedUniqueError(
+        throw std::invalid_argument(
             "SymmetryBlockedIndexSet indices must be strictly increasing.");
       }
     }
@@ -77,48 +76,44 @@ void SymmetryBlockedIndexSet::_validate() const {
 
 std::span<const std::uint32_t> SymmetryBlockedIndexSet::indices(
     const SymmetryLabel& label) const {
-  auto it = _indices.find(label);
-  if (it == _indices.end()) {
-    throw BlockLabelInvalidError(
-        "SymmetryBlockedIndexSet has no indices for the requested label.");
-  }
-  return std::span<const std::uint32_t>(it->second.data(), it->second.size());
+  const auto& list = block(Labels{label});
+  return std::span<const std::uint32_t>(list.data(), list.size());
 }
 
 std::vector<SymmetryLabel> SymmetryBlockedIndexSet::labels() const {
   std::vector<SymmetryLabel> result;
-  result.reserve(_indices.size());
-  for (const auto& [label, list] : _indices) {
-    (void)list;
-    result.push_back(label);
+  result.reserve(_blocks.size());
+  for (const auto& [labels, ptr] : _blocks) {
+    (void)ptr;
+    result.push_back(labels[0]);
   }
   return result;
 }
 
 std::string SymmetryBlockedIndexSet::get_summary() const {
   std::ostringstream oss;
-  oss << "SymmetryBlockedIndexSet(labels=" << _indices.size() << ")";
+  oss << "SymmetryBlockedIndexSet(labels=" << _blocks.size() << ")";
   return oss.str();
 }
 
 nlohmann::json SymmetryBlockedIndexSet::to_json() const {
   nlohmann::json j;
   j["type"] = "SymmetryBlockedIndexSet";
-  j["symmetries"] = _symmetries->to_json();
+  j["symmetries"] = symmetries()->to_json();
 
-  nlohmann::json extents = nlohmann::json::array();
-  for (const auto& [label, extent] : _extents) {
-    extents.push_back(
+  nlohmann::json extents_json = nlohmann::json::array();
+  for (const auto& [label, extent] : extents()) {
+    extents_json.push_back(
         nlohmann::json{{"label", label.to_json()}, {"extent", extent}});
   }
-  j["extents"] = std::move(extents);
+  j["extents"] = std::move(extents_json);
 
-  nlohmann::json indices = nlohmann::json::array();
-  for (const auto& [label, list] : _indices) {
-    indices.push_back(
-        nlohmann::json{{"label", label.to_json()}, {"indices", list}});
+  nlohmann::json indices_json = nlohmann::json::array();
+  for (const auto& [labels, ptr] : _blocks) {
+    indices_json.push_back(
+        nlohmann::json{{"label", labels[0].to_json()}, {"indices", *ptr}});
   }
-  j["indices"] = std::move(indices);
+  j["indices"] = std::move(indices_json);
   return j;
 }
 
@@ -133,7 +128,8 @@ void SymmetryBlockedIndexSet::to_json_file(const std::string& filename) const {
 void SymmetryBlockedIndexSet::to_hdf5(H5::Group& group) const {
   H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
   H5::DataSpace scalar_space(H5S_SCALAR);
-  auto dataset = group.createDataSet(kHdf5JsonDataset, str_type, scalar_space);
+  auto dataset = group.createDataSet(detail::k_sbis_hdf5_json_dataset,
+                                      str_type, scalar_space);
   dataset.write(to_json().dump(), str_type);
 }
 
@@ -188,7 +184,7 @@ SymmetryBlockedIndexSet::from_json_file(const std::string& filename) {
 std::shared_ptr<SymmetryBlockedIndexSet> SymmetryBlockedIndexSet::from_hdf5(
     H5::Group& group) {
   H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  auto dataset = group.openDataSet(kHdf5JsonDataset);
+  auto dataset = group.openDataSet(detail::k_sbis_hdf5_json_dataset);
   std::string payload;
   dataset.read(payload, str_type);
   return from_json(nlohmann::json::parse(payload));

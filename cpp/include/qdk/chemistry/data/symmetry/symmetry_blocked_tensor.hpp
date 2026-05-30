@@ -12,9 +12,10 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked.hpp>
+#include <qdk/chemistry/utils/scalar_traits.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -32,71 +33,46 @@ struct TensorType;
 
 template <class S>
 struct TensorType<1, S> {
-  using T = Eigen::Matrix<S, Eigen::Dynamic, 1>;
+  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
 };
 template <class S>
 struct TensorType<2, S> {
-  using T = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
+  using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
+};
+template <class S>
+struct TensorType<3, S> {
+  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
 };
 template <class S>
 struct TensorType<4, S> {
-  using T = Eigen::Matrix<S, Eigen::Dynamic, 1>;
+  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
 };
 
 /** @brief Storage type for one block of a rank-@p Rank tensor over @p Scalar.
  */
 template <std::size_t Rank, class Scalar = double>
-using Tensor = typename TensorType<Rank, Scalar>::T;
-
-namespace detail {
-
-template <class S>
-struct is_complex_scalar : std::false_type {};
-template <class S>
-struct is_complex_scalar<std::complex<S>> : std::true_type {};
-
-template <class S>
-nlohmann::json scalar_to_json(const S& value) {
-  if constexpr (is_complex_scalar<S>::value) {
-    return nlohmann::json::array({value.real(), value.imag()});
-  } else {
-    return value;
-  }
-}
-
-template <class S>
-S scalar_from_json(const nlohmann::json& j) {
-  if constexpr (is_complex_scalar<S>::value) {
-    using Real = typename S::value_type;
-    return S(j.at(0).get<Real>(), j.at(1).get<Real>());
-  } else {
-    return j.get<S>();
-  }
-}
-
-}  // namespace detail
+using Tensor = typename TensorType<Rank, Scalar>::type;
 
 /**
- * @brief Immutable symmetry-blocked dense tensor.
+ * @brief Symmetry-blocked dense tensor.
  *
  * A @ref SymmetryBlockedTensor stores the non-zero symmetry sectors of a
  * rank-@p Rank tensor as a sparse map from per-slot @ref SymmetryLabel arrays
- * to dense Eigen blocks. Each slot carries its own @ref Symmetries vocabulary
+ * to dense Eigen blocks. Each slot carries its own @ref Symmetries
  * and a per-label extent. Blocks are held via @c shared_ptr<const Tensor> so
- * that orbit-equivalent sectors can alias the same storage.
+ * that symmetry-equivalent sectors can alias the same storage.
  *
- * Orbit equivalence is defined on the spin axis: a simultaneous
+ * Symmetry aliasing is defined on the spin axis: a simultaneous
  * @f$\alpha \leftrightarrow \beta@f$ swap across all slots. When every slot
  * shares the same @ref Symmetries instance and the spin axis is marked
- * @c equivalent (restricted), the constructor auto-aliases each orbit's
- * partner block to the supplied representative. When the slots carry distinct
- * @ref Symmetries (intertwiner storage such as basis coefficients), no
- * auto-aliasing is performed.
+ * @c equivalent, the constructor auto-aliases each partner block to the
+ * supplied representative. When the slots carry distinct @ref Symmetries
+ * (intertwiner storage such as basis coefficients), no auto-aliasing is
+ * performed.
  *
- * Instances are immutable: the full block map is supplied at construction and
- * there is no mutation API.
+ * The full block map is supplied at construction.
  *
- * @tparam Rank   Tensor rank (1, 2 or 4 are instantiated).
+ * @tparam Rank   Tensor rank (1, 2, 3, or 4 are instantiated).
  * @tparam Scalar Element type (@c double or @c std::complex<double>).
  */
 template <std::size_t Rank, class Scalar = double>
@@ -115,13 +91,11 @@ class SymmetryBlockedTensor
    * @brief Construct from per-slot symmetries, per-slot extents, and a block
    * map. See the class description for the validation rules.
    *
-   * @throws BlockLabelInvalidError    if a block or extent label is not
-   *         admissible under the matching slot's @ref Symmetries.
-   * @throws BlockExtentMismatchError  if a block's shape does not match the
-   *         declared extents (or restricted orbit partners have unequal
-   *         extents).
-   * @throws BlockAliasMismatchError   if both orbit partners are supplied but
-   *         do not share storage.
+   * @throws std::invalid_argument if a block or extent label is not
+   *         admissible under the matching slot's @ref Symmetries, if a
+   *         block's shape does not match the declared extents, if restricted
+   *         orbit partners have unequal extents, or if both orbit partners
+   *         are supplied but do not share storage.
    */
   SymmetryBlockedTensor(SymmetriesArray symmetries, ExtentsArray extents,
                         BlockMap blocks)
@@ -138,10 +112,9 @@ class SymmetryBlockedTensor
   std::string get_summary() const override {
     std::ostringstream oss;
     oss << "SymmetryBlockedTensor(rank=" << Rank << ", scalar="
-        << (detail::is_complex_scalar<Scalar>::value ? "complex" : "real")
+        << (utils::is_complex_scalar_v<Scalar> ? "complex" : "real")
         << ", blocks=" << this->num_blocks()
-        << ", independent=" << this->canonical_blocks().size()
-        << ", restricted=" << (this->is_restricted() ? "true" : "false") << ")";
+        << ", independent=" << this->_group_by_pointer().size() << ")";
     return oss.str();
   }
 
@@ -149,7 +122,7 @@ class SymmetryBlockedTensor
     nlohmann::json j;
     j["type"] = "SymmetryBlockedTensor";
     j["rank"] = Rank;
-    j["scalar"] = detail::is_complex_scalar<Scalar>::value ? "complex" : "real";
+    j["scalar"] = utils::is_complex_scalar_v<Scalar> ? "complex" : "real";
     j["symmetries"] = this->_symmetries_to_json();
     j["extents"] = this->_extents_to_json();
 
@@ -256,23 +229,23 @@ class SymmetryBlockedTensor
                                     const Tensor<Rank, Scalar>& block) {
     if constexpr (Rank == 1) {
       if (static_cast<std::size_t>(block.size()) != dims[0]) {
-        throw BlockExtentMismatchError(
+        throw std::invalid_argument(
             "SymmetryBlockedTensor rank-1 block size does not match extent.");
       }
     } else if constexpr (Rank == 2) {
       if (static_cast<std::size_t>(block.rows()) != dims[0] ||
           static_cast<std::size_t>(block.cols()) != dims[1]) {
-        throw BlockExtentMismatchError(
+        throw std::invalid_argument(
             "SymmetryBlockedTensor rank-2 block shape does not match extents.");
       }
     } else {
-      // Rank-4 blocks are stored flat-packed; the exact length is
+      // Rank-3 and rank-4 blocks are stored flat-packed; the exact length is
       // producer/symmetry-dependent (permutational packing), so only require a
       // non-empty single-column vector here.
       if (block.cols() != 1 || block.size() == 0) {
-        throw BlockExtentMismatchError(
-            "SymmetryBlockedTensor rank-4 block must be a non-empty flat "
-            "vector.");
+        throw std::invalid_argument(
+            "SymmetryBlockedTensor rank-" + std::to_string(Rank) +
+            " block must be a non-empty flat vector.");
       }
     }
   }
@@ -284,7 +257,7 @@ class SymmetryBlockedTensor
     nlohmann::json data = nlohmann::json::array();
     for (Eigen::Index r = 0; r < block.rows(); ++r) {
       for (Eigen::Index c = 0; c < block.cols(); ++c) {
-        data.push_back(detail::scalar_to_json<Scalar>(block(r, c)));
+        data.push_back(utils::scalar_to_json<Scalar>(block(r, c)));
       }
     }
     j["data"] = std::move(data);
@@ -299,7 +272,7 @@ class SymmetryBlockedTensor
     Eigen::Index k = 0;
     for (Eigen::Index r = 0; r < rows; ++r) {
       for (Eigen::Index c = 0; c < cols; ++c) {
-        block(r, c) = detail::scalar_from_json<Scalar>(data.at(k++));
+        block(r, c) = utils::scalar_from_json<Scalar>(data.at(k++));
       }
     }
     return block;
@@ -309,9 +282,11 @@ class SymmetryBlockedTensor
 // Explicit instantiation declarations (definitions emitted in the .cpp).
 extern template class SymmetryBlockedTensor<1, double>;
 extern template class SymmetryBlockedTensor<2, double>;
+extern template class SymmetryBlockedTensor<3, double>;
 extern template class SymmetryBlockedTensor<4, double>;
 extern template class SymmetryBlockedTensor<1, std::complex<double>>;
 extern template class SymmetryBlockedTensor<2, std::complex<double>>;
+extern template class SymmetryBlockedTensor<3, std::complex<double>>;
 extern template class SymmetryBlockedTensor<4, std::complex<double>>;
 
 }  // namespace qdk::chemistry::data

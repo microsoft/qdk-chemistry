@@ -6,7 +6,7 @@
 
 #include <Eigen/Dense>
 #include <memory>
-#include <qdk/chemistry/data/errors.hpp>
+#include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 
@@ -44,11 +44,8 @@ TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
 
   EXPECT_TRUE(tensor.has_block(aa()));
   EXPECT_TRUE(tensor.has_block(bb()));
-  // Orbit partner is the same storage.
+  // Symmetry-equivalent partner is the same storage.
   EXPECT_EQ(tensor.block_ptr(aa()).get(), tensor.block_ptr(bb()).get());
-  EXPECT_TRUE(tensor.is_restricted());
-  // Only one independent block.
-  EXPECT_EQ(tensor.canonical_blocks().size(), 1u);
   EXPECT_EQ(tensor.num_blocks(), 2u);
 }
 
@@ -67,8 +64,7 @@ TEST(SymmetryBlockedTensorTest, UnrestrictedKeepsDistinctBlocks) {
   SBT2 tensor({sym, sym}, extents2(2), blocks);
 
   EXPECT_NE(tensor.block_ptr(aa()).get(), tensor.block_ptr(bb()).get());
-  EXPECT_FALSE(tensor.is_restricted());
-  EXPECT_EQ(tensor.canonical_blocks().size(), 2u);
+  EXPECT_EQ(tensor.num_blocks(), 2u);
 }
 
 TEST(SymmetryBlockedTensorTest, ExtentMismatchRejected) {
@@ -81,7 +77,7 @@ TEST(SymmetryBlockedTensorTest, ExtentMismatchRejected) {
   blocks.emplace(aa(), block);
 
   EXPECT_THROW(SBT2({sym, sym}, extents2(3), blocks),
-               BlockExtentMismatchError);
+               std::invalid_argument);
 }
 
 TEST(SymmetryBlockedTensorTest, InvalidLabelRejected) {
@@ -100,7 +96,7 @@ TEST(SymmetryBlockedTensorTest, InvalidLabelRejected) {
   SBT2::BlockMap blocks;
   blocks.emplace(bad, block);
 
-  EXPECT_THROW(SBT2({sym, sym}, ext, blocks), BlockLabelInvalidError);
+  EXPECT_THROW(SBT2({sym, sym}, ext, blocks), std::invalid_argument);
 }
 
 TEST(SymmetryBlockedTensorTest, AliasMismatchRejected) {
@@ -115,7 +111,7 @@ TEST(SymmetryBlockedTensorTest, AliasMismatchRejected) {
   blocks.emplace(aa(), block_aa);
   blocks.emplace(bb(), block_bb);  // distinct storage, but equivalent axis
 
-  EXPECT_THROW(SBT2({sym, sym}, extents2(2), blocks), BlockAliasMismatchError);
+  EXPECT_THROW(SBT2({sym, sym}, extents2(2), blocks), std::invalid_argument);
 }
 
 TEST(SymmetryBlockedTensorTest, MissingBlockThrows) {
@@ -128,7 +124,7 @@ TEST(SymmetryBlockedTensorTest, MissingBlockThrows) {
   SBT2 tensor({sym, sym}, extents2(2), blocks);
 
   EXPECT_FALSE(tensor.has_block(bb()));
-  EXPECT_THROW(tensor.block(bb()), BlockLabelInvalidError);
+  EXPECT_THROW(tensor.block(bb()), std::invalid_argument);
 }
 
 TEST(SymmetryBlockedTensorTest, JsonRoundTripRestricted) {
@@ -142,7 +138,6 @@ TEST(SymmetryBlockedTensorTest, JsonRoundTripRestricted) {
   SBT2 tensor({sym, sym}, extents2(2), blocks);
 
   auto restored = SBT2::from_json(tensor.to_json());
-  EXPECT_TRUE(restored->is_restricted());
   EXPECT_EQ(restored->block_ptr(aa()).get(), restored->block_ptr(bb()).get());
   EXPECT_TRUE(restored->block(aa()).isApprox(data));
 }
@@ -160,7 +155,7 @@ TEST(SymmetryBlockedTensorTest, JsonRoundTripUnrestricted) {
   SBT2 tensor({sym, sym}, extents2(2), blocks);
 
   auto restored = SBT2::from_json(tensor.to_json());
-  EXPECT_FALSE(restored->is_restricted());
+  EXPECT_NE(restored->block_ptr(aa()).get(), restored->block_ptr(bb()).get());
   EXPECT_EQ(restored->block(aa())(0, 0), 1.0);
   EXPECT_EQ(restored->block(bb())(0, 0), 5.0);
 }

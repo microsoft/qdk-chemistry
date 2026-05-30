@@ -61,9 +61,11 @@ SymmetryBlockedTensor<Rank, Scalar>::from_hdf5_file(
 
 template class SymmetryBlockedTensor<1, double>;
 template class SymmetryBlockedTensor<2, double>;
+template class SymmetryBlockedTensor<3, double>;
 template class SymmetryBlockedTensor<4, double>;
 template class SymmetryBlockedTensor<1, std::complex<double>>;
 template class SymmetryBlockedTensor<2, std::complex<double>>;
+template class SymmetryBlockedTensor<3, std::complex<double>>;
 template class SymmetryBlockedTensor<4, std::complex<double>>;
 
 }  // namespace qdk::chemistry::data

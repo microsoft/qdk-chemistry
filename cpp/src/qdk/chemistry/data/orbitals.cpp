@@ -3,7 +3,6 @@
 // license information.
 
 #include <algorithm>
-#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -13,7 +12,6 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
-#include <span>
 #include <stdexcept>
 
 #include "filename_utils.hpp"
@@ -233,53 +231,26 @@ Orbitals::Orbitals(
 
 Orbitals::~Orbitals() = default;
 
-Orbitals::Orbitals(std::shared_ptr<const BasisCoefficients> coefficients,
-                   std::shared_ptr<const OrbitalEnergies> energies,
-                   std::shared_ptr<const OrbitalSpacePartitioning> partitioning,
+Orbitals::Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
+                   std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
                    const std::optional<Eigen::MatrixXd>& ao_overlap,
                    std::shared_ptr<BasisSet> basis_set) {
   QDK_LOG_TRACE_ENTERING();
   if (!coefficients) {
     throw std::invalid_argument(
-        "Orbitals: basis coefficients container must not be null");
+        "Orbitals: basis-coefficient tensor must not be null");
   }
-  const SymmetryLabel a({axes::alpha()});
-  const SymmetryLabel b({axes::beta()});
 
-  // Store the canonical containers as the source of truth and point the dense
+  // Store the canonical tensors as the source of truth and point the dense
   // views at the blocks they own (no coefficient/energy data is copied).
-  _basis_coefficients = std::move(coefficients);
-  _orbital_energies = std::move(energies);
+  _coefficients_sbt = std::move(coefficients);
+  _energies_sbt = std::move(energies);
   _init_coefficient_views();
 
-  // Project the partitioning (if provided) into the dense index vectors.
-  if (partitioning) {
-    auto span_to_vec = [](std::span<const std::uint32_t> s) {
-      std::vector<size_t> v;
-      v.reserve(s.size());
-      for (auto x : s) {
-        v.push_back(static_cast<size_t>(x));
-      }
-      return v;
-    };
-    if (partitioning->active()->has(a)) {
-      _active_space_indices.first =
-          span_to_vec(partitioning->active()->indices(a));
-    }
-    if (partitioning->active()->has(b)) {
-      _active_space_indices.second =
-          span_to_vec(partitioning->active()->indices(b));
-    }
-    if (partitioning->inactive()->has(a)) {
-      _inactive_space_indices.first =
-          span_to_vec(partitioning->inactive()->indices(a));
-    }
-    if (partitioning->inactive()->has(b)) {
-      _inactive_space_indices.second =
-          span_to_vec(partitioning->inactive()->indices(b));
-    }
-    _orbital_space_partitioning = std::move(partitioning);
-  }
+  std::vector<size_t> all_indices(get_num_molecular_orbitals());
+  std::iota(all_indices.begin(), all_indices.end(), 0);
+  _active_space_indices.first = all_indices;
+  _active_space_indices.second = all_indices;
 
   if (ao_overlap) {
     _ao_overlap = std::make_unique<Eigen::MatrixXd>(*ao_overlap);
@@ -291,12 +262,10 @@ Orbitals::Orbitals(std::shared_ptr<const BasisCoefficients> coefficients,
 
 Orbitals::Orbitals(const Orbitals& other) {
   QDK_LOG_TRACE_ENTERING();
-  // The canonical containers are immutable; share them and re-derive the dense
+  // The canonical tensors are immutable; share them and re-derive the dense
   // views so restricted aliasing (pointer-equality) is preserved.
-  _basis_coefficients = other._basis_coefficients;
-  _orbital_energies = other._orbital_energies;
-  _orbital_space_partitioning = other._orbital_space_partitioning;
-  _mo_symmetries_cache = other._mo_symmetries_cache;
+  _coefficients_sbt = other._coefficients_sbt;
+  _energies_sbt = other._energies_sbt;
   _init_coefficient_views();
 
   // Copy active / inactive space information
@@ -320,11 +289,9 @@ Orbitals::Orbitals(const Orbitals& other) {
 Orbitals& Orbitals::operator=(const Orbitals& other) {
   QDK_LOG_TRACE_ENTERING();
   if (this != &other) {  // Self-assignment check
-    // Share the immutable canonical containers and re-derive the dense views.
-    _basis_coefficients = other._basis_coefficients;
-    _orbital_energies = other._orbital_energies;
-    _orbital_space_partitioning = other._orbital_space_partitioning;
-    _mo_symmetries_cache = other._mo_symmetries_cache;
+    // Share the immutable canonical tensors and re-derive the dense views.
+    _coefficients_sbt = other._coefficients_sbt;
+    _energies_sbt = other._energies_sbt;
     _init_coefficient_views();
 
     // Copy active / inactive space
@@ -640,6 +607,9 @@ std::vector<size_t> Orbitals::get_all_mo_indices() const {
 // === Symmetry-blocked (SBT-native) interface ===
 
 std::shared_ptr<const Symmetries> Orbitals::_build_mo_symmetries() const {
+  if (_coefficients_sbt) {
+    return _coefficients_sbt->symmetries()[1];
+  }
   // The single-particle spin axis records only whether the alpha/beta channels
   // are equivalent (restricted); the total spin (two_s) is a many-body quantity
   // and is not tracked here.
@@ -650,14 +620,17 @@ std::shared_ptr<const Symmetries> Orbitals::_build_mo_symmetries() const {
 
 std::shared_ptr<const Symmetries> Orbitals::symmetries() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_mo_symmetries_cache) {
-    _mo_symmetries_cache = _build_mo_symmetries();
+  if (_coefficients_sbt) {
+    return _coefficients_sbt->symmetries()[1];
   }
-  return _mo_symmetries_cache;
+  return _build_mo_symmetries();
 }
 
 std::unordered_map<SymmetryLabel, std::size_t> Orbitals::mo_extents() const {
   QDK_LOG_TRACE_ENTERING();
+  if (_coefficients_sbt) {
+    return _coefficients_sbt->extents()[1];
+  }
   const std::size_t nmo = get_num_molecular_orbitals();
   std::unordered_map<SymmetryLabel, std::size_t> extents;
   extents.emplace(SymmetryLabel({axes::alpha()}), nmo);
@@ -670,31 +643,22 @@ std::size_t Orbitals::num_modes() const {
   return get_num_molecular_orbitals();
 }
 
-std::shared_ptr<const BasisCoefficients> Orbitals::basis_coefficients() const {
+std::shared_ptr<const SymmetryBlockedTensor<2>> Orbitals::coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_basis_coefficients) {
+  if (!_coefficients_sbt) {
     throw std::runtime_error(
         "Cannot provide basis coefficients: orbital coefficients not set");
   }
-  return _basis_coefficients;
+  return _coefficients_sbt;
 }
 
-std::shared_ptr<const OrbitalEnergies> Orbitals::orbital_energies() const {
+std::shared_ptr<const SymmetryBlockedTensor<1>> Orbitals::energies() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_orbital_energies) {
+  if (!_energies_sbt) {
     throw std::runtime_error(
         "Cannot provide orbital energies: orbital energies not set");
   }
-  return _orbital_energies;
-}
-
-std::shared_ptr<const OrbitalSpacePartitioning>
-Orbitals::orbital_space_partitioning() const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!_orbital_space_partitioning) {
-    _orbital_space_partitioning = _build_orbital_space_partitioning();
-  }
-  return _orbital_space_partitioning;
+  return _energies_sbt;
 }
 
 void Orbitals::_set_coefficient_containers(
@@ -717,31 +681,29 @@ void Orbitals::_set_coefficient_containers(
   mo_ext.emplace(b, nmo);
 
   {
-    using Sbt = BasisCoefficients::Sbt;
-    Sbt::BlockMap blocks;
-    blocks.emplace(Sbt::Labels{a, a}, std::move(coefficients_alpha));
+    using SBT2 = SymmetryBlockedTensor<2, double>;
+    SBT2::BlockMap blocks;
+    blocks.emplace(SBT2::Labels{a, a}, std::move(coefficients_alpha));
     if (!restricted) {
-      blocks.emplace(Sbt::Labels{b, b}, std::move(coefficients_beta));
+      blocks.emplace(SBT2::Labels{b, b}, std::move(coefficients_beta));
     }
-    auto sbt = std::make_shared<const Sbt>(Sbt::SymmetriesArray{sym, sym},
-                                           Sbt::ExtentsArray{ao_ext, mo_ext},
-                                           std::move(blocks));
-    _basis_coefficients = std::make_shared<const BasisCoefficients>(sbt);
+    _coefficients_sbt = std::make_shared<const SBT2>(
+        SBT2::SymmetriesArray{sym, sym}, SBT2::ExtentsArray{ao_ext, mo_ext},
+        std::move(blocks));
   }
 
   if (energies_alpha) {
-    using Sbt = OrbitalEnergies::Sbt;
-    Sbt::BlockMap blocks;
-    blocks.emplace(Sbt::Labels{a}, std::move(energies_alpha));
+    using SBT1 = SymmetryBlockedTensor<1, double>;
+    SBT1::BlockMap blocks;
+    blocks.emplace(SBT1::Labels{a}, std::move(energies_alpha));
     if (!restricted) {
-      blocks.emplace(Sbt::Labels{b}, std::move(energies_beta));
+      blocks.emplace(SBT1::Labels{b}, std::move(energies_beta));
     }
-    auto sbt = std::make_shared<const Sbt>(Sbt::SymmetriesArray{sym},
-                                           Sbt::ExtentsArray{mo_ext},
-                                           std::move(blocks));
-    _orbital_energies = std::make_shared<const OrbitalEnergies>(sbt);
+    _energies_sbt = std::make_shared<const SBT1>(
+        SBT1::SymmetriesArray{sym}, SBT1::ExtentsArray{mo_ext},
+        std::move(blocks));
   } else {
-    _orbital_energies = nullptr;
+    _energies_sbt = nullptr;
   }
 
   _init_coefficient_views();
@@ -750,79 +712,25 @@ void Orbitals::_set_coefficient_containers(
 void Orbitals::_init_coefficient_views() {
   const SymmetryLabel a({axes::alpha()});
   const SymmetryLabel b({axes::beta()});
-  if (_basis_coefficients) {
-    using Sbt = BasisCoefficients::Sbt;
-    const auto& tensor = _basis_coefficients->tensor();
-    _coefficients.first = tensor->block_ptr(Sbt::Labels{a, a});
-    _coefficients.second = _basis_coefficients->is_restricted()
-                               ? _coefficients.first
-                               : tensor->block_ptr(Sbt::Labels{b, b});
+  if (_coefficients_sbt) {
+    using SBT2 = SymmetryBlockedTensor<2, double>;
+    _coefficients.first = _coefficients_sbt->block_ptr(SBT2::Labels{a, a});
+    auto beta_ptr = _coefficients_sbt->has_block(SBT2::Labels{b, b})
+                        ? _coefficients_sbt->block_ptr(SBT2::Labels{b, b})
+                        : _coefficients.first;
+    _coefficients.second = beta_ptr;
   } else {
     _coefficients = {nullptr, nullptr};
   }
-  if (_orbital_energies) {
-    using Sbt = OrbitalEnergies::Sbt;
-    const auto& tensor = _orbital_energies->tensor();
-    _energies.first = tensor->block_ptr(Sbt::Labels{a});
-    _energies.second = tensor->has_block(Sbt::Labels{b})
-                           ? tensor->block_ptr(Sbt::Labels{b})
+  if (_energies_sbt) {
+    using SBT1 = SymmetryBlockedTensor<1, double>;
+    _energies.first = _energies_sbt->block_ptr(SBT1::Labels{a});
+    _energies.second = _energies_sbt->has_block(SBT1::Labels{b})
+                           ? _energies_sbt->block_ptr(SBT1::Labels{b})
                            : _energies.first;
   } else {
     _energies = {nullptr, nullptr};
   }
-}
-
-std::shared_ptr<const OrbitalSpacePartitioning>
-Orbitals::_build_orbital_space_partitioning() const {
-  auto sym = symmetries();
-  auto mo_ext = mo_extents();
-
-  const bool has_partition = !_active_space_indices.first.empty() ||
-                             !_inactive_space_indices.first.empty() ||
-                             !_active_space_indices.second.empty() ||
-                             !_inactive_space_indices.second.empty();
-  if (!has_partition) {
-    return OrbitalSpacePartitioning::all_active(sym, mo_ext);
-  }
-
-  auto virtual_indices = get_virtual_space_indices();
-
-  auto to_sorted_u32 = [](const std::vector<size_t>& v) {
-    std::vector<std::uint32_t> out;
-    out.reserve(v.size());
-    for (size_t i : v) {
-      out.push_back(static_cast<std::uint32_t>(i));
-    }
-    std::sort(out.begin(), out.end());
-    out.erase(std::unique(out.begin(), out.end()), out.end());
-    return out;
-  };
-
-  const SymmetryLabel a({axes::alpha()});
-  const SymmetryLabel b({axes::beta()});
-
-  auto make_index_set = [&](const std::vector<size_t>& alpha_v,
-                            const std::vector<size_t>& beta_v) {
-    std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> idx;
-    idx.emplace(a, to_sorted_u32(alpha_v));
-    idx.emplace(b, to_sorted_u32(beta_v));
-    return std::make_shared<const SymmetryBlockedIndexSet>(sym, mo_ext, idx);
-  };
-
-  OrbitalSpacePartitioning::IndexSetArray spaces;
-  spaces[static_cast<std::size_t>(OrbitalSpace::Frozen)] =
-      make_index_set({}, {});
-  spaces[static_cast<std::size_t>(OrbitalSpace::Inactive)] = make_index_set(
-      _inactive_space_indices.first, _inactive_space_indices.second);
-  spaces[static_cast<std::size_t>(OrbitalSpace::Active)] =
-      make_index_set(_active_space_indices.first, _active_space_indices.second);
-  spaces[static_cast<std::size_t>(OrbitalSpace::Virtual)] =
-      make_index_set(virtual_indices.first, virtual_indices.second);
-  spaces[static_cast<std::size_t>(OrbitalSpace::External)] =
-      make_index_set({}, {});
-
-  return std::make_shared<const OrbitalSpacePartitioning>(
-      OrbitalSpacePartitioning(spaces));
 }
 
 bool Orbitals::is_restricted() const {
@@ -1204,17 +1112,13 @@ void Orbitals::to_hdf5(H5::Group& group) const {
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
     restricted_dataset.write(&restricted, H5::PredType::NATIVE_HBOOL);
 
-    // Save coefficient matrices using helper functions
-    if (_coefficients.first) {
-      save_matrix_to_group(group, "coefficients_alpha", *_coefficients.first);
+    if (_coefficients_sbt) {
+      H5::Group coefficients_group = group.createGroup("coefficients");
+      _coefficients_sbt->to_hdf5(coefficients_group);
     }
-    if (_coefficients.second) {
-      save_matrix_to_group(group, "coefficients_beta", *_coefficients.second);
-    }
-    // Save energies if available
-    if (_energies.first && _energies.second) {
-      save_vector_to_group(group, "energies_alpha", *_energies.first);
-      save_vector_to_group(group, "energies_beta", *_energies.second);
+    if (_energies_sbt) {
+      H5::Group energies_group = group.createGroup("energies");
+      _energies_sbt->to_hdf5(energies_group);
     }
 
     // Save active space indices if available
@@ -1291,7 +1195,11 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version_str;
     version_attr.read(string_type, version_str);
-    validate_serialization_version(SERIALIZATION_VERSION, version_str);
+    if (version_str == "0.1.0") {
+      // Deprecated v0.1.0 format — accepted for backward compatibility.
+    } else {
+      validate_serialization_version(SERIALIZATION_VERSION, version_str);
+    }
 
     // Check type information in metadata (if present) to handle ModelOrbitals
     std::string type_name = "Orbitals";  // Default
@@ -1319,29 +1227,15 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
           "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
     }
 
-    // Handle regular Orbitals case
-    // Load coefficients (required)
-    auto coeffs_alpha = load_matrix_from_group(group, "coefficients_alpha");
-
-    // Only read beta coefficients if unrestricted
-    std::optional<Eigen::MatrixXd> coeffs_beta_opt;
-    if (!restricted) {
-      try {
-        auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
-        coeffs_beta_opt = coeffs_beta;
-      } catch (const H5::Exception&) {
-        throw std::invalid_argument(
-            "HDF5 file missing 'coefficients_beta' for unrestricted orbitals");
-      }
+    std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients_sbt;
+    std::shared_ptr<const SymmetryBlockedTensor<1>> energies_sbt;
+    if (group.nameExists("coefficients")) {
+      H5::Group coefficients_group = group.openGroup("coefficients");
+      coefficients_sbt = SymmetryBlockedTensor<2>::from_hdf5(coefficients_group);
     }
-
-    // Load optional energies
-    std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
-    if (dataset_exists_in_group(group, "energies_alpha")) {
-      energies_alpha = load_vector_from_group(group, "energies_alpha");
-    }
-    if (!restricted && dataset_exists_in_group(group, "energies_beta")) {
-      energies_beta = load_vector_from_group(group, "energies_beta");
+    if (group.nameExists("energies")) {
+      H5::Group energies_group = group.openGroup("energies");
+      energies_sbt = SymmetryBlockedTensor<1>::from_hdf5(energies_group);
     }
 
     // Load optional AO overlap
@@ -1362,10 +1256,12 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
 
     // Load optional active space information
     std::vector<size_t> active_indices_alpha, active_indices_beta;
+    bool has_active_indices = false;
     try {
       if (group.nameExists("active_space_indices_alpha")) {
         active_indices_alpha =
             load_size_vector_from_group(group, "active_space_indices_alpha");
+        has_active_indices = true;
       }
     } catch (const std::exception&) { /* optional */
     }
@@ -1373,16 +1269,19 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       if (group.nameExists("active_space_indices_beta")) {
         active_indices_beta =
             load_size_vector_from_group(group, "active_space_indices_beta");
+        has_active_indices = true;
       }
     } catch (const std::exception&) { /* optional */
     }
 
     // Load optional inactive space information
     std::vector<size_t> inactive_indices_alpha, inactive_indices_beta;
+    bool has_inactive_indices = false;
     try {
       if (group.nameExists("inactive_space_indices_alpha")) {
         inactive_indices_alpha =
             load_size_vector_from_group(group, "inactive_space_indices_alpha");
+        has_inactive_indices = true;
       }
     } catch (const std::exception&) { /* optional */
     }
@@ -1390,26 +1289,61 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       if (group.nameExists("inactive_space_indices_beta")) {
         inactive_indices_beta =
             load_size_vector_from_group(group, "inactive_space_indices_beta");
+        has_inactive_indices = true;
       }
     } catch (const std::exception&) { /* optional */
     }
 
+    if (coefficients_sbt) {
+      auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
+                                                 ao_overlap, basis_set);
+      if (has_active_indices) {
+        orbitals->_active_space_indices =
+            {std::move(active_indices_alpha), std::move(active_indices_beta)};
+      }
+      if (has_inactive_indices) {
+        orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
+                                             std::move(inactive_indices_beta)};
+      }
+      orbitals->_post_construction_validate();
+      return orbitals;
+    }
+
+    // Handle legacy dense Orbitals serialization.
+    auto coeffs_alpha = load_matrix_from_group(group, "coefficients_alpha");
+
+    std::optional<Eigen::MatrixXd> coeffs_beta_opt;
+    if (!restricted) {
+      try {
+        auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
+        coeffs_beta_opt = coeffs_beta;
+      } catch (const H5::Exception&) {
+        throw std::invalid_argument(
+            "HDF5 file missing 'coefficients_beta' for unrestricted orbitals");
+      }
+    }
+
+    std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
+    if (dataset_exists_in_group(group, "energies_alpha")) {
+      energies_alpha = load_vector_from_group(group, "energies_alpha");
+    }
+    if (!restricted && dataset_exists_in_group(group, "energies_beta")) {
+      energies_beta = load_vector_from_group(group, "energies_beta");
+    }
+
     if (restricted || !coeffs_beta_opt) {
-      // Restricted case - use single-matrix constructor to share the pointer
       return std::make_shared<Orbitals>(
           coeffs_alpha, energies_alpha, ao_overlap, basis_set,
           std::make_tuple(std::move(active_indices_alpha),
                           std::move(inactive_indices_alpha)));
-    } else {
-      // Unrestricted case
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
-          ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(active_indices_beta),
-                          std::move(inactive_indices_alpha),
-                          std::move(inactive_indices_beta)));
     }
+    return std::make_shared<Orbitals>(
+        coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
+        ao_overlap, basis_set,
+        std::make_tuple(std::move(active_indices_alpha),
+                        std::move(active_indices_beta),
+                        std::move(inactive_indices_alpha),
+                        std::move(inactive_indices_beta)));
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -1436,14 +1370,10 @@ nlohmann::json Orbitals::to_json() const {
   j["is_restricted"] = is_restricted();
   j["has_overlap_matrix"] = has_overlap_matrix();
 
-  // Save coefficients as nested arrays
-  j["coefficients"] = {{"alpha", matrix_to_json(*_coefficients.first)},
-                       {"beta", matrix_to_json(*_coefficients.second)}};
+  j["coefficients"] = _coefficients_sbt->to_json();
 
-  // Save energies if available
-  if (_energies.first && _energies.second) {
-    j["energies"] = {{"alpha", vector_to_json(*_energies.first)},
-                     {"beta", vector_to_json(*_energies.second)}};
+  if (_energies_sbt) {
+    j["energies"] = _energies_sbt->to_json();
   }
 
   // Save AO overlap if available
@@ -1480,7 +1410,12 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
     }
-    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+    const auto version_str = j["version"].get<std::string>();
+    if (version_str == "0.1.0") {
+      // Deprecated v0.1.0 format — accepted for backward compatibility.
+    } else {
+      validate_serialization_version(SERIALIZATION_VERSION, version_str);
+    }
 
     // Check if this is a ModelOrbitals type (both new and old formats)
     if (j.contains("type") && j["type"] == "ModelOrbitals") {
@@ -1493,28 +1428,20 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
       return ModelOrbitals::from_json(j);
     }
 
-    // Load coefficients (required for regular Orbitals)
-    if (!j.contains("coefficients") || !j["coefficients"].contains("alpha") ||
-        !j["coefficients"].contains("beta")) {
+    if (!j.contains("coefficients")) {
       throw std::invalid_argument("JSON missing required coefficient data");
     }
 
-    if (!j.contains("is_restricted")) {
-      throw std::invalid_argument(
-          "JSON missing required 'is_restricted' field");
+    std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients_sbt;
+    std::shared_ptr<const SymmetryBlockedTensor<1>> energies_sbt;
+    if (j["coefficients"].is_object() && j["coefficients"].contains("type") &&
+        j["coefficients"]["type"] == "SymmetryBlockedTensor") {
+      coefficients_sbt = SymmetryBlockedTensor<2>::from_json(j["coefficients"]);
     }
-    const auto is_restricted = j["is_restricted"].get<bool>();
-    auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
-
-    // Load optional energies
-    std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
-    if (j.contains("energies")) {
-      if (j["energies"].contains("alpha")) {
-        energies_alpha = json_to_vector(j["energies"]["alpha"]);
-      }
-      if (j["energies"].contains("beta")) {
-        energies_beta = json_to_vector(j["energies"]["beta"]);
-      }
+    if (j.contains("energies") && j["energies"].is_object() &&
+        j["energies"].contains("type") &&
+        j["energies"]["type"] == "SymmetryBlockedTensor") {
+      energies_sbt = SymmetryBlockedTensor<1>::from_json(j["energies"]);
     }
 
     // Load optional AO overlap
@@ -1531,6 +1458,7 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
 
     // Load optional active space information
     std::vector<size_t> active_indices_alpha, active_indices_beta;
+    bool has_active_indices = false;
     if (j.contains("active_space_indices") &&
         j["active_space_indices"].contains("alpha") &&
         j["active_space_indices"].contains("beta")) {
@@ -1538,10 +1466,12 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
           j["active_space_indices"]["alpha"].get<std::vector<size_t>>();
       active_indices_beta =
           j["active_space_indices"]["beta"].get<std::vector<size_t>>();
+      has_active_indices = true;
     }
 
     // Load optional inactive space information
     std::vector<size_t> inactive_indices_alpha, inactive_indices_beta;
+    bool has_inactive_indices = false;
     if (j.contains("inactive_space_indices") &&
         j["inactive_space_indices"].contains("alpha") &&
         j["inactive_space_indices"].contains("beta")) {
@@ -1549,27 +1479,60 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
           j["inactive_space_indices"]["alpha"].get<std::vector<size_t>>();
       inactive_indices_beta =
           j["inactive_space_indices"]["beta"].get<std::vector<size_t>>();
+      has_inactive_indices = true;
+    }
+
+    if (coefficients_sbt) {
+      auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
+                                                 ao_overlap, basis_set);
+      if (has_active_indices) {
+        orbitals->_active_space_indices =
+            {std::move(active_indices_alpha), std::move(active_indices_beta)};
+      }
+      if (has_inactive_indices) {
+        orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
+                                             std::move(inactive_indices_beta)};
+      }
+      orbitals->_post_construction_validate();
+      return orbitals;
+    }
+
+    if (!j["coefficients"].contains("alpha") ||
+        !j["coefficients"].contains("beta")) {
+      throw std::invalid_argument("JSON missing required coefficient data");
+    }
+    if (!j.contains("is_restricted")) {
+      throw std::invalid_argument(
+          "JSON missing required 'is_restricted' field");
+    }
+    const auto is_restricted = j["is_restricted"].get<bool>();
+    auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
+
+    std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
+    if (j.contains("energies")) {
+      if (j["energies"].contains("alpha")) {
+        energies_alpha = json_to_vector(j["energies"]["alpha"]);
+      }
+      if (j["energies"].contains("beta")) {
+        energies_beta = json_to_vector(j["energies"]["beta"]);
+      }
     }
 
     if (is_restricted) {
-      // For restricted, use single values for energies, treat as restricted
-      std::optional<Eigen::VectorXd> energies = energies_alpha;
-
       return std::make_shared<Orbitals>(
-          coeffs_alpha, energies, ao_overlap, basis_set,
+          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
           std::make_tuple(std::move(active_indices_alpha),
                           std::move(inactive_indices_alpha)));
-    } else {
-      auto coeffs_beta = json_to_matrix(j["coefficients"]["beta"]);
-
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, ao_overlap,
-          basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(active_indices_beta),
-                          std::move(inactive_indices_alpha),
-                          std::move(inactive_indices_beta)));
     }
+
+    auto coeffs_beta = json_to_matrix(j["coefficients"]["beta"]);
+    return std::make_shared<Orbitals>(
+        coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, ao_overlap,
+        basis_set,
+        std::make_tuple(std::move(active_indices_alpha),
+                        std::move(active_indices_beta),
+                        std::move(inactive_indices_alpha),
+                        std::move(inactive_indices_beta)));
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Error parsing JSON: " + std::string(e.what()));
@@ -1852,52 +1815,52 @@ ModelOrbitals& ModelOrbitals::operator=(const ModelOrbitals& other) {
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 ModelOrbitals::get_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_coefficients() not available for model systems");
 }
 
 std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
 ModelOrbitals::get_energies() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_energies() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_overlap_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_overlap_matrix() not available for model systems");
 }
 
 std::shared_ptr<BasisSet> ModelOrbitals::get_basis_set() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_basis_set() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_coefficients_alpha() not available for model "
       "systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_coefficients_beta() not available for model "
       "systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_energies_alpha() not available for model systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: get_energies_beta() not available for model systems");
 }
 
@@ -1906,7 +1869,7 @@ ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations_alpha,
     const Eigen::VectorXd& occupations_beta) const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
 }
@@ -1914,7 +1877,7 @@ ModelOrbitals::calculate_ao_density_matrix(
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations) const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
 }
@@ -1923,7 +1886,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm_alpha, const Eigen::MatrixXd& rdm_beta) const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
       "model systems");
@@ -1932,7 +1895,7 @@ ModelOrbitals::calculate_ao_density_matrix_from_rdm(
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm) const {
   QDK_LOG_TRACE_ENTERING();
-  throw ModelOrbitalsNoBasisSetError(
+  throw std::runtime_error(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
       "model systems");
@@ -2035,7 +1998,10 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     // Validate version first (only if version field exists, for backward
     // compatibility)
     if (j.contains("version")) {
-      validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+      const auto ver = j["version"].get<std::string>();
+      if (ver != "0.1.0") {
+        validate_serialization_version(SERIALIZATION_VERSION, ver);
+      }
     }
 
     // Load required data
@@ -2155,7 +2121,9 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version;
     version_attr.read(string_type, version);
-    validate_serialization_version(SERIALIZATION_VERSION, version);
+    if (version != "0.1.0") {
+      validate_serialization_version(SERIALIZATION_VERSION, version);
+    }
 
     // Load metadata
     H5::Group metadata_group = group.openGroup("metadata");
@@ -2231,13 +2199,5 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
   }
 }
 
-std::shared_ptr<const Symmetries> ao_symmetries(
-    const std::shared_ptr<const SingleParticleBasis>& basis) {
-  auto orbitals = std::dynamic_pointer_cast<const Orbitals>(basis);
-  if (!orbitals || !orbitals->has_basis_set()) {
-    return nullptr;
-  }
-  return orbitals->get_basis_set()->ao_symmetries();
-}
 }  // namespace data
 }  // namespace qdk::chemistry

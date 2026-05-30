@@ -77,20 +77,20 @@ class TestSymmetryBlockedTensorRank2:
         assert len(sbt.canonical_block_labels()) == 2
 
     def test_missing_block_raises(self, unrestricted_spin):
-        """Requesting an absent block raises BlockLabelInvalidError."""
+        """Requesting an absent block raises ValueError."""
         syms, alpha, beta = unrestricted_spin
         sbt = sym.SymmetryBlockedTensorRank2(
             [syms, syms],
             [{alpha: 2, beta: 2}, {alpha: 2, beta: 2}],
             [((alpha, alpha), np.zeros((2, 2)))],
         )
-        with pytest.raises(sym.BlockLabelInvalidError):
+        with pytest.raises(ValueError):
             sbt.block((beta, beta))
 
     def test_extent_mismatch_raises(self, unrestricted_spin):
-        """A block whose shape disagrees with extents raises BlockExtentMismatchError."""
+        """A block whose shape disagrees with extents raises ValueError."""
         syms, alpha, beta = unrestricted_spin
-        with pytest.raises(sym.BlockExtentMismatchError):
+        with pytest.raises(ValueError):
             sym.SymmetryBlockedTensorRank2(
                 [syms, syms],
                 [{alpha: 3, beta: 3}, {alpha: 3, beta: 3}],
@@ -137,15 +137,15 @@ class TestSymmetryBlockedIndexSet:
         assert len(sbis.labels()) == 2
 
     def test_out_of_range_raises(self, restricted_spin):
-        """An index >= its extent raises IndexSetOutOfRangeError."""
+        """An index >= its extent raises IndexError."""
         syms, alpha, beta = restricted_spin
-        with pytest.raises(sym.IndexSetOutOfRangeError):
+        with pytest.raises(IndexError):
             sym.SymmetryBlockedIndexSet(syms, {alpha: 3, beta: 3}, {alpha: [0, 5]})
 
     def test_not_sorted_unique_raises(self, restricted_spin):
-        """A non-increasing index list raises IndexSetNotSortedUniqueError."""
+        """A non-increasing index list raises ValueError."""
         syms, alpha, beta = restricted_spin
-        with pytest.raises(sym.IndexSetNotSortedUniqueError):
+        with pytest.raises(ValueError):
             sym.SymmetryBlockedIndexSet(syms, {alpha: 5, beta: 5}, {alpha: [2, 1]})
 
 

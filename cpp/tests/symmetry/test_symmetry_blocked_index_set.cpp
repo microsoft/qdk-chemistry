@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <memory>
-#include <qdk/chemistry/data/errors.hpp>
+#include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 
@@ -44,7 +44,7 @@ TEST(SymmetryBlockedIndexSetTest, OutOfRangeRejected) {
                   std::vector<std::uint32_t>{0, 3});
 
   EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-               IndexSetOutOfRangeError);
+               std::out_of_range);
 }
 
 TEST(SymmetryBlockedIndexSetTest, UnsortedRejected) {
@@ -55,7 +55,7 @@ TEST(SymmetryBlockedIndexSetTest, UnsortedRejected) {
                   std::vector<std::uint32_t>{2, 1});
 
   EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-               IndexSetNotSortedUniqueError);
+               std::invalid_argument);
 }
 
 TEST(SymmetryBlockedIndexSetTest, DuplicateRejected) {
@@ -66,7 +66,7 @@ TEST(SymmetryBlockedIndexSetTest, DuplicateRejected) {
                   std::vector<std::uint32_t>{1, 1});
 
   EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-               IndexSetNotSortedUniqueError);
+               std::invalid_argument);
 }
 
 TEST(SymmetryBlockedIndexSetTest, MissingLabelThrows) {
@@ -78,7 +78,7 @@ TEST(SymmetryBlockedIndexSetTest, MissingLabelThrows) {
   SymmetryBlockedIndexSet set(spin_symmetries(), extents, indices);
 
   EXPECT_THROW(set.indices(SymmetryLabel({axes::beta()})),
-               BlockLabelInvalidError);
+               std::invalid_argument);
 }
 
 TEST(SymmetryBlockedIndexSetTest, JsonRoundTrip) {
