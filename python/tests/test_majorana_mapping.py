@@ -5,8 +5,11 @@ Tests cover:
 - Clifford algebra anticommutation validation
 - Custom mapping construction
 - from_mode_pairs construction
+- from_bilinears construction (bilinear-only mappings)
+- Bilinear caching correctness
+- Sparse/dense Pauli string conversion helpers
 - Immutability enforcement
-- Serialization round-trips (JSON, HDF5, file)
+- Serialization round-trips (JSON, HDF5, file) and backward compatibility
 - Invalid input rejection
 - Reference output comparison for small systems
 """
@@ -234,6 +237,58 @@ class TestFromBilinears:
         bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
         with pytest.raises(ValueError, match="bilinear-only"):
             bl.majorana(0)
+
+    def test_num_qubits(self) -> None:
+        """num_qubits is derived from the bilinear Pauli words."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=4)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(8):
+            for k in range(j + 1, 8):
+                bilinears[(j, k)] = jw.bilinear(j, k)
+        bl = MajoranaMapping.from_bilinears(num_modes=4, bilinears=bilinears)
+        assert bl.num_qubits == 4
+
+    def test_wrong_count_raises(self) -> None:
+        """from_bilinears raises ValueError if entry count doesn't match num_modes."""
+        with pytest.raises(ValueError, match="upper-triangle"):
+            MajoranaMapping.from_bilinears(num_modes=2, bilinears={(0, 1): (1.0, "IZ")})
+
+    def test_missing_entry_raises(self) -> None:
+        """from_bilinears raises ValueError if a required (j,k) pair is missing."""
+        with pytest.raises(ValueError):
+            MajoranaMapping.from_bilinears(
+                num_modes=2,
+                bilinears={
+                    (0, 1): (1.0, "IZ"),
+                    (0, 2): (1.0, "XZ"),
+                    (0, 3): (1.0, "YZ"),
+                    (1, 2): (1.0, "XI"),
+                    # missing (1, 3)
+                    (2, 3): (1.0, "ZI"),
+                },
+            )
+
+    def test_bilinear_out_of_range_raises(self) -> None:
+        """bilinear() raises IndexError for out-of-range indices on bilinear-only mapping."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(4):
+            for k in range(j + 1, 4):
+                bilinears[(j, k)] = jw.bilinear(j, k)
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        with pytest.raises(IndexError):
+            bl.bilinear(0, 99)
+
+    def test_bilinear_equal_indices_raises(self) -> None:
+        """bilinear(j, j) raises ValueError on bilinear-only mapping."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(4):
+            for k in range(j + 1, 4):
+                bilinears[(j, k)] = jw.bilinear(j, k)
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        with pytest.raises(ValueError):
+            bl.bilinear(1, 1)
 
 
 # ─── Validation Tests ────────────────────────────────────────────────────
@@ -776,3 +831,92 @@ class TestEncodingMetadata:
                     continue
                 _, w = scbk.bilinear(j, k)
                 assert len(w) == 8
+
+
+# ─── Sparse/dense conversion helpers ────────────────────────────────────
+
+
+class TestSparseConversion:
+    """Tests for _dense_le_to_sparse and _sparse_to_dense_le."""
+
+    def test_roundtrip_identity(self) -> None:
+        """All-identity string round-trips to empty sparse word."""
+        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
+
+        assert _dense_le_to_sparse("IIII") == []
+        assert _sparse_to_dense_le([], 4) == "IIII"
+
+    def test_roundtrip_single_pauli(self) -> None:
+        """Single non-identity Pauli round-trips correctly."""
+        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
+
+        for label in ("IIIX", "IIYI", "ZIII", "IXII"):
+            sparse = _dense_le_to_sparse(label)
+            assert _sparse_to_dense_le(sparse, 4) == label
+
+    def test_roundtrip_jw_table(self) -> None:
+        """JW table entries survive sparse→dense round-trip."""
+        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
+
+        jw = MajoranaMapping.jordan_wigner(num_modes=4)
+        for entry in jw.table:
+            sparse = _dense_le_to_sparse(entry)
+            assert _sparse_to_dense_le(sparse, len(entry)) == entry
+
+    def test_invalid_character_raises(self) -> None:
+        """Invalid Pauli character raises ValueError."""
+        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse
+
+        with pytest.raises(ValueError, match="Invalid Pauli character"):
+            _dense_le_to_sparse("IXAZ")
+
+    def test_case_insensitive(self) -> None:
+        """Lowercase Pauli characters are accepted."""
+        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse
+
+        assert _dense_le_to_sparse("ix") == _dense_le_to_sparse("IX")
+
+
+class TestSerializationBackwardCompat:
+    """Backward compatibility for serialized data that may contain phases."""
+
+    def test_json_with_phases_key_ignored(self) -> None:
+        """Old JSON with a 'phases' key deserializes without error."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        data = jw.to_json()
+        data["phases"] = [1, 1, 1, 1]
+        loaded = MajoranaMapping.from_json(data)
+        assert loaded.table == jw.table
+
+    def test_hdf5_with_phases_dataset_ignored(self) -> None:
+        """Old HDF5 with a 'phases' dataset deserializes without error."""
+        import numpy as np
+
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                jw.to_hdf5(hf)
+                hf.create_dataset("phases", data=np.array([1, 1, 1, 1], dtype=np.int8))
+            with h5py.File(f.name, "r") as hf:
+                loaded = MajoranaMapping.from_hdf5(hf)
+        assert loaded.table == jw.table
+
+
+class TestBilinearCaching:
+    """Verify that bilinear results are cached and consistent."""
+
+    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
+    def test_cached_bilinear_matches_manual_multiply(self, name: str, factory) -> None:
+        """Cached bilinear(j,k) matches manual Pauli multiply of table entries."""
+        del name
+        m = factory(4)
+        for j in range(2 * m.num_modes):
+            for k in range(j + 1, 2 * m.num_modes):
+                coeff, word = m.bilinear(j, k)
+                phase, product = PauliTermAccumulator.multiply_uncached(m.core(j), m.core(k))
+                from qdk_chemistry.data.majorana_mapping import _sparse_to_dense_le
+
+                expected_word = _sparse_to_dense_le(product, m.num_qubits)
+                expected_coeff = 1j * phase
+                assert word == expected_word, f"bilinear({j},{k}) word mismatch"
+                assert abs(coeff - expected_coeff) < 1e-12, f"bilinear({j},{k}) coeff mismatch"
