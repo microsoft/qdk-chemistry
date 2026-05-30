@@ -142,14 +142,12 @@ class MajoranaMapping(DataClass):
             sparse_table = [_dense_le_to_sparse(label) for label in table]
             self._core = _CoreMajoranaMapping.from_table(sparse_table, name)
 
-        # Cache immutable properties from the core
         self._name = name if name else self._core.name
         self._num_modes = self._core.num_modes
         self._num_qubits = self._core.num_qubits
         self._table = tuple(_sparse_to_dense_le(word, self._num_qubits) for word in self._core.table)
         self._tapering = tapering
 
-        # Mark immutable
         super().__init__()
 
     @property

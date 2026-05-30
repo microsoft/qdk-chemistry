@@ -197,7 +197,6 @@ MajoranaMapResult majorana_map_impl(
 
   PackedAccumulator<NW> acc;
 
-  // Convert all Majorana table entries to packed form.
   std::vector<PackedPauliWord<NW>> packed_mapping(2 * n_modes);
   for (std::size_t k = 0; k < 2 * n_modes; ++k) {
     packed_mapping[k] = sparse_to_packed<NW>(mapping(k));

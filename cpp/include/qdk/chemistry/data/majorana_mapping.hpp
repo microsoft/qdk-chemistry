@@ -37,7 +37,7 @@ class MajoranaMapping {
    * @brief Construct a Majorana-atomic mapping from a 2N-entry table.
    *
    * @param table 2N SparsePauliWord entries (gamma_0, ..., gamma_{2N-1}).
-   * @param name  Optional encoding label. Stored but not used for dispatch.
+   * @param name  Optional encoding label.
    * @throws std::invalid_argument If the table is empty or its size is odd.
    */
   static MajoranaMapping from_table(std::vector<SparsePauliWord> table,
