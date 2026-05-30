@@ -80,15 +80,13 @@ class MajoranaMapping {
   /**
    * @brief Pauli image of the bilinear i*gamma_j*gamma_k.
    *
-   * Returns (coeff, word) such that coeff*word equals i*gamma_j*gamma_k in the
-   * encoded representation. For Majorana-atomic mappings, the coefficient is
-   * real (+/-1); for bilinear-only mappings, it is whatever was provided at
-   * construction.
+   * O(1) lookup. For Majorana-atomic mappings the coefficient is real (+/-1);
+   * for bilinear-only mappings it is whatever was provided at construction.
    *
    * @throws std::out_of_range if j or k >= 2N.
    * @throws std::invalid_argument if j == k.
    */
-  std::pair<std::complex<double>, SparsePauliWord> bilinear(
+  std::pair<std::complex<double>, const SparsePauliWord&> bilinear(
       std::size_t j, std::size_t k) const;
 
   /// Whether individual Majoranas have a Pauli image.
@@ -115,20 +113,15 @@ class MajoranaMapping {
   static MajoranaMapping parity(std::size_t num_modes);
 
  private:
-  /// Private constructor for table-based (Majorana-atomic) mappings.
-  MajoranaMapping(std::vector<SparsePauliWord> table, std::string name,
-                  std::size_t num_modes, std::size_t num_qubits);
-
-  /// Private constructor for bilinear-only mappings.
   MajoranaMapping(
-      std::size_t num_modes, std::size_t num_qubits,
+      std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
-      std::string name);
+      std::string name, std::size_t num_modes, std::size_t num_qubits);
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
 
-  /// Pre-computed bilinear table, upper triangle row-major (empty for atomic).
+  /// Cached bilinear table, upper triangle row-major. Always populated.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears_;
 
   /// Human-readable encoding name.

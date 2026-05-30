@@ -14,14 +14,16 @@ namespace qdk::chemistry::data {
 
 // ── MajoranaMapping implementation ───────────────────────────────────
 
-MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
-                                 std::string name, std::size_t num_modes,
-                                 std::size_t num_qubits)
+MajoranaMapping::MajoranaMapping(
+    std::vector<SparsePauliWord> table,
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
+    std::string name, std::size_t num_modes, std::size_t num_qubits)
     : table_(std::move(table)),
+      bilinears_(std::move(bilinears)),
       name_(std::move(name)),
       num_modes_(num_modes),
       num_qubits_(num_qubits),
-      majorana_atomic_(true) {}
+      majorana_atomic_(!table_.empty()) {}
 
 MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
                                             std::string name) {
@@ -36,19 +38,23 @@ MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
   }
   auto num_modes = table.size() / 2;
   auto num_qubits = compute_num_qubits(table);
-  return MajoranaMapping(std::move(table), std::move(name), num_modes,
-                         num_qubits);
-}
 
-MajoranaMapping::MajoranaMapping(
-    std::size_t num_modes, std::size_t num_qubits,
-    std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
-    std::string name)
-    : bilinears_(std::move(bilinears)),
-      name_(std::move(name)),
-      num_modes_(num_modes),
-      num_qubits_(num_qubits),
-      majorana_atomic_(false) {}
+  // Precompute all bilinears from the table.
+  const std::size_t M = table.size();
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
+  bilinears.reserve(M * (M - 1) / 2);
+  for (std::size_t j = 0; j < M; ++j) {
+    for (std::size_t k = j + 1; k < M; ++k) {
+      auto [phase, word] =
+          PauliTermAccumulator::multiply_uncached(table[j], table[k]);
+      bilinears.emplace_back(std::complex<double>(0.0, 1.0) * phase,
+                             std::move(word));
+    }
+  }
+
+  return MajoranaMapping(std::move(table), std::move(bilinears),
+                         std::move(name), num_modes, num_qubits);
+}
 
 MajoranaMapping MajoranaMapping::from_bilinears(
     std::size_t num_modes,
@@ -68,7 +74,6 @@ MajoranaMapping MajoranaMapping::from_bilinears(
         std::to_string(num_modes) + " modes, got " +
         std::to_string(upper_triangle.size()));
   }
-  // Compute num_qubits from the bilinear words
   std::uint64_t max_idx = 0;
   bool has_any = false;
   for (const auto& [_, word] : upper_triangle) {
@@ -81,8 +86,8 @@ MajoranaMapping MajoranaMapping::from_bilinears(
     }
   }
   auto nq = has_any ? static_cast<std::size_t>(max_idx + 1) : 0;
-  return MajoranaMapping(num_modes, nq, std::move(upper_triangle),
-                         std::move(name));
+  return MajoranaMapping({}, std::move(upper_triangle), std::move(name),
+                         num_modes, nq);
 }
 
 const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
@@ -99,8 +104,8 @@ const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
   return table_[k];
 }
 
-std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
-    std::size_t j, std::size_t k) const {
+std::pair<std::complex<double>, const SparsePauliWord&>
+MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
   const std::size_t M = 2 * num_modes_;
   if (j >= M || k >= M) {
     throw std::out_of_range(
@@ -114,20 +119,10 @@ std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
         std::to_string(j) +
         "); the bilinear i*gamma_j*gamma_k requires distinct indices.");
   }
-
-  if (majorana_atomic_) {
-    auto [pauli_phase, word] =
-        PauliTermAccumulator::multiply_uncached(table_[j], table_[k]);
-    std::complex<double> coeff = std::complex<double>(0.0, 1.0) * pauli_phase;
-    return {coeff, std::move(word)};
-  }
-
-  // Bilinear-only: look up from stored upper triangle
   if (j < k) {
     const auto& entry = bilinears_[bilinear_index(j, k)];
     return {entry.first, entry.second};
   }
-  // Antisymmetry: i*gamma_k*gamma_j = -(i*gamma_j*gamma_k)
   const auto& entry = bilinears_[bilinear_index(k, j)];
   return {-entry.first, entry.second};
 }
