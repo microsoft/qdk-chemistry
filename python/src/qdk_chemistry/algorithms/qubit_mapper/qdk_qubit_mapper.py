@@ -69,9 +69,9 @@ class QdkQubitMapper(QubitMapper):
     ``name`` and ``base_encoding`` are used only for metadata on the
     output :class:`~qdk_chemistry.data.QubitHamiltonian`, not for dispatch.
 
-    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
-    For unrestricted systems, the engine handles all four spin-channel ERI
-    blocks (aa, ab, ba, bb) independently.
+    Both restricted (RHF) and unrestricted (UHF) orbital sets are supported.
+    For restricted orbitals the engine uses a spin-summed fast path; for
+    unrestricted orbitals it handles all spin-channel ERI blocks independently.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -143,8 +143,9 @@ class QdkQubitMapper(QubitMapper):
         h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
         n_spatial = h1_alpha.shape[0]
         n_spin_orbitals = 2 * n_spatial
-        # Restricted orbitals imply spin-free integrals (h_alpha == h_beta).
-        is_spin_free = hamiltonian.get_orbitals().is_restricted()
+        # Restricted orbitals produce spin-symmetric integrals, enabling the
+        # spin-summed fast path in the engine.
+        spin_symmetric = hamiltonian.get_orbitals().is_restricted()
 
         if base_mapping.num_modes != n_spin_orbitals:
             raise ValueError(
@@ -154,14 +155,13 @@ class QdkQubitMapper(QubitMapper):
             )
 
         # Use ravel() instead of flatten() to avoid copying contiguous arrays.
-        # For spin-free Hamiltonians the containers share the same two-body
-        # vector across aaaa/aabb/bbbb, so pass the same array to avoid
-        # materializing unused copies.
+        # For spin-symmetric integrals (restricted orbitals) the containers
+        # share the same arrays across spin channels.
         h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
-        h1_b_flat = h1_a_flat if is_spin_free else np.ascontiguousarray(h1_beta).ravel()
+        h1_b_flat = h1_a_flat if spin_symmetric else np.ascontiguousarray(h1_beta).ravel()
         h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
-        h2_aabb_flat = h2_aaaa_flat if is_spin_free else np.ascontiguousarray(h2_aabb).ravel()
-        h2_bbbb_flat = h2_aaaa_flat if is_spin_free else np.ascontiguousarray(h2_bbbb).ravel()
+        h2_aabb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_aabb).ravel()
+        h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
 
         # Single C++ call: Majorana-loop engine builds all Pauli terms as sparse words
         words, coefficients = majorana_map_hamiltonian(
@@ -173,7 +173,7 @@ class QdkQubitMapper(QubitMapper):
             h2_aabb_flat,
             h2_bbbb_flat,
             n_spatial,
-            is_spin_free,
+            spin_symmetric,
             threshold,
             integral_threshold,
         )

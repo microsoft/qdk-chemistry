@@ -18,10 +18,15 @@ Across fermion-to-qubit encodings, the most general primitive that admits a Paul
 Bilinears generate the parity-even subalgebra of the Majorana Clifford algebra, so any parity-conserving operator decomposes into ordered bilinear products, and higher-degree even monomials are products of bilinears.
 
 Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings.
-The :class:`~qdk_chemistry.data.MajoranaMapping` API therefore exposes:
+In **bilinear-only** encodings (where :math:`m > n` qubits represent :math:`n` modes), single Majoranas anticommute with codespace stabilizers and have no representation in the physical subspace; only the bilinears are observable.
+
+The :class:`~qdk_chemistry.data.MajoranaMapping` supports both forms:
 
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` — the unified primitive available on every encoding.
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` — the additional capability provided by Majorana-atomic encodings; gated by :py:attr:`~qdk_chemistry.data.MajoranaMapping.is_majorana_atomic`.
+
+Majorana-atomic mappings are constructed from a Pauli-string table (the constructor or factory methods).
+Bilinear-only mappings are constructed via :py:meth:`~qdk_chemistry.data.MajoranaMapping.from_bilinears`.
 
 Convention
 ~~~~~~~~~~

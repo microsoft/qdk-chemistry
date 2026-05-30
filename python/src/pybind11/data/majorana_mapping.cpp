@@ -68,6 +68,8 @@ convention of QubitHamiltonian (qubit 0 has the smallest index).
           return self(k);
         } catch (const std::out_of_range& e) {
           throw py::index_error(e.what());
+        } catch (const std::logic_error& e) {
+          throw py::value_error(e.what());
         }
       },
       py::arg("k"), "Sparse Pauli word for Majorana operator gamma_k.");
@@ -79,6 +81,8 @@ convention of QubitHamiltonian (qubit 0 has the smallest index).
           return self.majorana(k);
         } catch (const std::out_of_range& e) {
           throw py::index_error(e.what());
+        } catch (const std::logic_error& e) {
+          throw py::value_error(e.what());
         }
       },
       py::arg("k"), "Sparse Pauli word for Majorana operator gamma_k.");
@@ -154,6 +158,22 @@ convention of QubitHamiltonian (qubit 0 has the smallest index).
       },
       py::arg("num_modes"), "Construct a parity encoding.");
 
+  mapping.def_static(
+      "from_bilinears",
+      [](std::size_t num_modes,
+         const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+             upper_triangle,
+         const std::string& name) {
+        try {
+          return MajoranaMapping::from_bilinears(num_modes, upper_triangle,
+                                                 name);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("num_modes"), py::arg("upper_triangle"), py::arg("name") = "",
+      "Construct a bilinear-only mapping from pre-computed bilinears.");
+
   data.def(
       "majorana_map_hamiltonian",
       [](const MajoranaMapping& mapping, double core_energy,
@@ -166,24 +186,27 @@ convention of QubitHamiltonian (qubit 0 has the smallest index).
              eri_aabb,
          py::array_t<double, py::array::c_style | py::array::forcecast>
              eri_bbbb,
-         std::size_t n_spatial, bool is_spin_free, double threshold,
+         std::size_t n_spatial, bool spin_symmetric, double threshold,
          double integral_threshold) -> py::tuple {
         auto result = majorana_map_hamiltonian(
             mapping, core_energy, h1_alpha.data(), h1_beta.data(),
             eri_aaaa.data(), eri_aabb.data(), eri_bbbb.data(), n_spatial,
-            is_spin_free, threshold, integral_threshold);
+            spin_symmetric, threshold, integral_threshold);
         return py::make_tuple(py::cast(result.words),
                               py::cast(result.coefficients));
       },
       py::arg("mapping"), py::arg("core_energy"), py::arg("h1_alpha"),
       py::arg("h1_beta"), py::arg("eri_aaaa"), py::arg("eri_aabb"),
-      py::arg("eri_bbbb"), py::arg("n_spatial"), py::arg("is_spin_free"),
+      py::arg("eri_bbbb"), py::arg("n_spatial"), py::arg("spin_symmetric"),
       py::arg("threshold"), py::arg("integral_threshold"),
       R"(
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
-Limitation: only valid for spin-free Hamiltonians (spin-independent
-integrals). Returns ``(words, coefficients)`` where ``words`` is a list of
-sparse Pauli words.
+When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
+identical integrals across spin channels (restricted orbitals). When false,
+handles each spin channel independently (unrestricted orbitals).
+
+Returns ``(words, coefficients)`` where ``words`` is a list of sparse
+Pauli words.
 )");
 }

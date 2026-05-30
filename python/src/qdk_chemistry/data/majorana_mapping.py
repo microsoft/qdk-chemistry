@@ -68,16 +68,24 @@ def _sparse_to_dense_le(word: SparsePauliWord, num_qubits: int) -> str:
 class MajoranaMapping(DataClass):
     """Immutable data class describing a fermion-to-qubit encoding.
 
-    Stores a 2N-entry table mapping each Majorana operator gamma_k to a Pauli
-    word. The bilinear ``i*gamma_j*gamma_k`` is the unified primitive and is
-    computed on demand from the table, accessible via :py:meth:`bilinear`.
+    Two construction forms are supported:
+
+    - **Majorana-atomic** (the table constructor and all factory methods):
+      stores a 2N-entry table mapping each individual gamma_k to a Pauli word.
+      The bilinear ``i*gamma_j*gamma_k`` is computed on demand from the table.
+
+    - **Bilinear-only** (via :py:meth:`from_bilinears`): stores the bilinear
+      images directly. Individual gamma_k have no Pauli image; only
+      :py:meth:`bilinear` is available. This form supports encodings where
+      m > n qubits represent n modes and single Majoranas anticommute with
+      codespace stabilizers.
 
     Pauli strings use the same **little-endian** convention as
     :class:`~qdk_chemistry.data.QubitHamiltonian`: qubit 0 is the rightmost
     character.
 
     Attributes:
-        table (tuple[str, ...]): Tuple of 2N dense Pauli strings in little-endian format.
+        table (tuple[str, ...]): Tuple of 2N dense Pauli strings (empty for bilinear-only mappings).
         num_modes (int): Number of fermionic modes (spin-orbitals), N.
         num_qubits (int): Effective number of qubits after any tapering.
         name (str): Human-readable name of the encoding (may be empty for custom mappings).
@@ -146,7 +154,7 @@ class MajoranaMapping(DataClass):
 
     @property
     def table(self) -> tuple[str, ...]:
-        """Tuple of 2N dense Pauli strings in little-endian format (qubit 0 = rightmost char)."""
+        """Tuple of 2N dense Pauli strings (empty for bilinear-only mappings)."""
         return self._table
 
     @property
@@ -222,9 +230,10 @@ class MajoranaMapping(DataClass):
     def majorana(self, k: int) -> str:
         """Return the Pauli image of the Majorana operator gamma_k.
 
-        Available only for :py:attr:`is_majorana_atomic` encodings. For tapered
-        encodings the returned Pauli string is in the encoding's native
-        (pre-taper) qubit basis; tapering is applied downstream.
+        Available only for :py:attr:`is_majorana_atomic` encodings; raises
+        :class:`ValueError` for bilinear-only mappings. For tapered encodings
+        the returned Pauli string is in the encoding's native (pre-taper)
+        qubit basis; tapering is applied downstream.
 
         Args:
             k (int): Majorana index (0 <= k < 2 * num_modes).
@@ -234,6 +243,7 @@ class MajoranaMapping(DataClass):
 
         Raises:
             IndexError: If k is out of range.
+            ValueError: If the mapping is not Majorana-atomic.
 
         """
         return _sparse_to_dense_le(self._core.majorana(k), self._num_qubits)
@@ -413,6 +423,57 @@ class MajoranaMapping(DataClass):
             table.append(even)
             table.append(odd)
         return cls(table=table, name=name)
+
+    @classmethod
+    def from_bilinears(
+        cls,
+        num_modes: int,
+        bilinears: dict[tuple[int, int], tuple[complex, str]],
+        name: str = "",
+    ) -> MajoranaMapping:
+        """Construct a bilinear-only mapping from pre-computed bilinears.
+
+        For encodings where individual Majorana operators have no Pauli image,
+        this constructor accepts the bilinear images directly.
+        :py:meth:`bilinear` is available; :py:meth:`majorana` will raise.
+
+        Args:
+            num_modes (int): Number of fermionic modes (spin-orbitals). Must be > 0.
+            bilinears (dict[tuple[int, int], tuple[complex, str]]): Mapping from ``(j, k)`` with ``j < k`` to ``(coeff, pauli_str)``, one entry per distinct ordered pair of Majorana indices.
+            name (str): Optional human-readable label. Default ``""``.
+
+        Returns:
+            MajoranaMapping: A bilinear-only mapping.
+
+        Raises:
+            ValueError: If sizes are inconsistent or num_modes is zero.
+
+        """
+        M = 2 * num_modes
+        expected = M * (M - 1) // 2
+        if len(bilinears) != expected:
+            raise ValueError(
+                f"Expected {expected} upper-triangle bilinear entries for "
+                f"{num_modes} modes, got {len(bilinears)}"
+            )
+        # Build upper-triangle flat list in row-major order
+        upper_triangle: list[tuple[complex, SparsePauliWord]] = []
+        for j in range(M):
+            for k in range(j + 1, M):
+                if (j, k) not in bilinears:
+                    raise ValueError(f"Missing bilinear entry for ({j}, {k})")
+                coeff, label = bilinears[(j, k)]
+                upper_triangle.append((complex(coeff), _dense_le_to_sparse(label)))
+        core = _CoreMajoranaMapping.from_bilinears(num_modes, upper_triangle, name)
+        result = cls.__new__(cls)
+        result._core = core
+        result._name = name if name else core.name
+        result._num_modes = core.num_modes
+        result._num_qubits = core.num_qubits
+        result._table = ()
+        result._tapering = None
+        DataClass.__init__(result)
+        return result
 
     @classmethod
     def _from_core(cls, core: _CoreMajoranaMapping) -> MajoranaMapping:
