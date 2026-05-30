@@ -66,48 +66,14 @@ def _sparse_to_dense_le(word: SparsePauliWord, num_qubits: int) -> str:
 
 
 class MajoranaMapping(DataClass):
-    """Data class describing a fermion-to-qubit encoding.
+    """Fermion-to-qubit encoding.
 
-    Two construction forms are supported:
-
-    - **Majorana-atomic** (the table constructor and all factory methods):
-      stores a 2N-entry table mapping each individual gamma_k to a Pauli word.
-      The bilinear ``i*gamma_j*gamma_k`` is computed on demand from the table.
-
-    - **Bilinear-only** (via :py:meth:`from_bilinears`): stores the bilinear
-      images directly. Individual gamma_k have no Pauli image; only
-      :py:meth:`bilinear` is available. This form supports encodings where
-      m > n qubits represent n modes and single Majoranas anticommute with
-      codespace stabilizers.
-
-    Pauli strings use the same **little-endian** convention as
-    :class:`~qdk_chemistry.data.QubitHamiltonian`: qubit 0 is the rightmost
-    character.
-
-    Attributes:
-        table (tuple[str, ...]): Tuple of 2N dense Pauli strings (empty for bilinear-only mappings).
-        num_modes (int): Number of fermionic modes (spin-orbitals), N.
-        num_qubits (int): Effective number of qubits after any tapering.
-        name (str): Human-readable name of the encoding (may be empty for custom mappings).
-        is_majorana_atomic (bool): True if individual gamma_k have a Pauli image.
+    Majorana-atomic mappings store a 2N-entry Pauli table for individual
+    gamma_k; bilinear-only mappings (via :py:meth:`from_bilinears`) store
+    the bilinear images directly. :py:meth:`bilinear` is available on both.
 
     Examples:
-        Built-in encodings:
-
         >>> jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        >>> jw.num_modes
-        4
-        >>> jw.num_qubits
-        4
-
-        Custom encoding from Pauli string labels:
-
-        >>> custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="my-jw")
-        >>> custom.table
-        ('IX', 'IY', 'XZ', 'YZ')
-
-        Bilinear lookup:
-
         >>> coeff, pauli = jw.bilinear(0, 1)
 
     """

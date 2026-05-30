@@ -121,7 +121,7 @@ class QubitMapper(Algorithm):
 
         Convenience helper for backends.  If ``mapping.tapering`` is
         ``None``, returns *qh* unchanged.  Otherwise, applies
-        :func:`~qdk_chemistry.utils.tapering.taper_qubits` and relabels
+        :func:`~qdk_chemistry.data.tapering.taper_qubits` and relabels
         the result with the mapping's final encoding name.
 
         Args:
@@ -137,7 +137,7 @@ class QubitMapper(Algorithm):
             return qh
 
         from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
-        from qdk_chemistry.utils.tapering import taper_qubits  # noqa: PLC0415
+        from qdk_chemistry.data.tapering import taper_qubits  # noqa: PLC0415
 
         tapered = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
         result = QubitHamiltonian(

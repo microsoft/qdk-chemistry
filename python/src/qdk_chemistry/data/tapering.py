@@ -15,7 +15,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Symmetries
+    from collections.abc import Sequence
+
+    from qdk_chemistry.data import QubitHamiltonian, Symmetries
 
 __all__: list[str] = []
 
@@ -249,3 +251,110 @@ class TaperingSpecification:
     def __hash__(self) -> int:
         """Return hash."""
         return hash((self._qubit_indices, self._eigenvalues, self._source_num_qubits, self._source_encoding))
+
+
+def taper_qubits(
+    qubit_hamiltonian: QubitHamiltonian,
+    qubit_indices: Sequence[int],
+    eigenvalues: Sequence[int],
+) -> QubitHamiltonian:
+    """Remove qubits with known Z eigenvalues from a qubit Hamiltonian.
+
+    For each specified qubit, every Pauli term that has Z on that qubit gets
+    its coefficient multiplied by the eigenvalue, and the Z is replaced with I.
+    Terms with X or Y on a tapered qubit are dropped. After replacement, the
+    tapered qubit positions are removed and the remaining qubits are renumbered.
+
+    Args:
+        qubit_hamiltonian (QubitHamiltonian): The qubit Hamiltonian to taper.
+        qubit_indices (Sequence[int]): Qubit indices to taper (0-indexed).
+        eigenvalues (Sequence[int]): Corresponding Z eigenvalues (+1 or -1) for each qubit.
+
+    Returns:
+        QubitHamiltonian: Tapered Hamiltonian with fewer qubits.
+
+    Raises:
+        ValueError: If lengths don't match, indices are out of range, contain duplicates, or eigenvalues are not +/-1.
+
+    """
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    import numpy as np  # noqa: PLC0415
+
+    qubit_indices = list(qubit_indices)
+    eigenvalues = list(eigenvalues)
+
+    if len(qubit_indices) != len(eigenvalues):
+        raise ValueError(
+            f"qubit_indices length ({len(qubit_indices)}) must match eigenvalues length ({len(eigenvalues)})"
+        )
+    if len(set(qubit_indices)) != len(qubit_indices):
+        raise ValueError("qubit_indices must not contain duplicates")
+
+    nq = qubit_hamiltonian.num_qubits
+    for q in qubit_indices:
+        if q < 0 or q >= nq:
+            raise ValueError(f"Qubit index {q} out of range [0, {nq})")
+    for ev in eigenvalues:
+        if ev not in (1, -1):
+            raise ValueError(f"Eigenvalue must be +1 or -1, got {ev}")
+
+    positions_to_remove = sorted([nq - 1 - q for q in qubit_indices])
+    eigenvalue_map = dict(zip(qubit_indices, eigenvalues, strict=True))
+
+    new_strings: list[str] = []
+    new_coeffs: list[complex] = []
+
+    for pauli_str, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True):
+        skip = False
+        adjusted_coeff = complex(coeff)
+
+        for q, ev in eigenvalue_map.items():
+            pos = nq - 1 - q
+            char = pauli_str[pos]
+            if char == "Z":
+                adjusted_coeff *= ev
+            elif char in ("X", "Y"):
+                skip = True
+                break
+
+        if skip:
+            continue
+
+        chars = [c for i, c in enumerate(pauli_str) if i not in positions_to_remove]
+        new_strings.append("".join(chars))
+        new_coeffs.append(adjusted_coeff)
+
+    new_nq = nq - len(qubit_indices)
+
+    if not new_strings:
+        identity_str = "I" * new_nq
+        return QubitHamiltonian(
+            pauli_strings=[identity_str],
+            coefficients=np.array([0.0]),
+            encoding=qubit_hamiltonian.encoding,
+            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+        )
+
+    merged: dict[str, complex] = {}
+    for s, c in zip(new_strings, new_coeffs, strict=True):
+        merged[s] = merged.get(s, 0.0) + c
+
+    final_strings = []
+    final_coeffs = []
+    for s, c in merged.items():
+        if abs(c) > 1e-12:
+            final_strings.append(s)
+            final_coeffs.append(c)
+
+    if not final_strings:
+        identity_str = "I" * new_nq
+        final_strings = [identity_str]
+        final_coeffs = [0.0]
+
+    return QubitHamiltonian(
+        pauli_strings=final_strings,
+        coefficients=np.array(final_coeffs),
+        encoding=qubit_hamiltonian.encoding,
+        fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+    )
