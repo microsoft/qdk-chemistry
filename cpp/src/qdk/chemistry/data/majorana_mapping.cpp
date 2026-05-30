@@ -141,21 +141,29 @@ using detail::OP_Z;
 // ── MajoranaMapping implementation ───────────────────────────────────
 
 MajoranaMapping::MajoranaMapping(std::vector<SparsePauliWord> table,
-                                 std::string name)
+                                 std::string name, std::size_t num_modes,
+                                 std::size_t num_qubits)
     : table_(std::move(table)),
       name_(std::move(name)),
-      num_modes_(table_.size() / 2),
-      num_qubits_(compute_num_qubits(table_)),
-      majorana_atomic_(true) {
-  if (table_.empty()) {
+      num_modes_(num_modes),
+      num_qubits_(num_qubits),
+      majorana_atomic_(true) {}
+
+MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
+                                            std::string name) {
+  if (table.empty()) {
     throw std::invalid_argument("MajoranaMapping table must not be empty");
   }
-  if (table_.size() % 2 != 0) {
+  if (table.size() % 2 != 0) {
     throw std::invalid_argument(
         "MajoranaMapping table must have an even number of entries "
         "(2 per fermionic mode), got " +
-        std::to_string(table_.size()));
+        std::to_string(table.size()));
   }
+  auto num_modes = table.size() / 2;
+  auto num_qubits = compute_num_qubits(table);
+  return MajoranaMapping(std::move(table), std::move(name), num_modes,
+                         num_qubits);
 }
 
 MajoranaMapping::MajoranaMapping(
@@ -293,7 +301,7 @@ MajoranaMapping MajoranaMapping::jordan_wigner(std::size_t num_modes) {
     table.push_back(build_sorted_word(std::move(odd_entries)));
   }
 
-  return MajoranaMapping(std::move(table), "jordan-wigner");
+  return MajoranaMapping::from_table(std::move(table), "jordan-wigner");
 }
 
 // ── Factory: Bravyi-Kitaev ───────────────────────────────────────────
@@ -352,7 +360,7 @@ MajoranaMapping MajoranaMapping::bravyi_kitaev(std::size_t num_modes) {
     }
   }
 
-  return MajoranaMapping(std::move(table), "bravyi-kitaev");
+  return MajoranaMapping::from_table(std::move(table), "bravyi-kitaev");
 }
 
 // ── Factory: Bravyi-Kitaev tree ──────────────────────────────────────
@@ -441,7 +449,7 @@ MajoranaMapping MajoranaMapping::bravyi_kitaev_tree(std::size_t num_modes) {
     }
   }
 
-  return MajoranaMapping(std::move(table), "bravyi-kitaev-tree");
+  return MajoranaMapping::from_table(std::move(table), "bravyi-kitaev-tree");
 }
 
 // ── Factory: Parity ──────────────────────────────────────────────────
@@ -478,7 +486,7 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes) {
     }
   }
 
-  return MajoranaMapping(std::move(table), "parity");
+  return MajoranaMapping::from_table(std::move(table), "parity");
 }
 
 }  // namespace qdk::chemistry::data

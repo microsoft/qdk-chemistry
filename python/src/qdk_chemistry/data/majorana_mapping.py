@@ -140,7 +140,7 @@ class MajoranaMapping(DataClass):
             if table and len({len(label) for label in table}) > 1:
                 raise ValueError("All Pauli strings must have the same length")
             sparse_table = [_dense_le_to_sparse(label) for label in table]
-            self._core = _CoreMajoranaMapping(sparse_table, name)
+            self._core = _CoreMajoranaMapping.from_table(sparse_table, name)
 
         # Cache immutable properties from the core
         self._name = name if name else self._core.name

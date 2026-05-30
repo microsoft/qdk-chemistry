@@ -28,16 +28,18 @@ is computed on demand from the table. Sparse Pauli words use the little-endian
 convention of QubitHamiltonian (qubit 0 has the smallest index).
 )");
 
-  mapping.def(py::init([](const std::vector<SparsePauliWord>& table,
-                          const std::string& name) {
-                try {
-                  return MajoranaMapping(table, name);
-                } catch (const std::invalid_argument& e) {
-                  throw py::value_error(e.what());
-                }
-              }),
-              py::arg("table"), py::arg("name") = "",
-              "Construct from a list of 2N sparse Pauli words.");
+  mapping.def_static(
+      "from_table",
+      [](const std::vector<SparsePauliWord>& table, const std::string& name) {
+        try {
+          return MajoranaMapping::from_table(table, name);
+        } catch (const std::invalid_argument& e) {
+          throw py::value_error(e.what());
+        }
+      },
+      py::arg("table"), py::arg("name") = "",
+      "Construct a Majorana-atomic mapping from a list of 2N sparse Pauli "
+      "words.");
 
   mapping.def_property_readonly(
       "num_modes", [](const MajoranaMapping& self) { return self.num_modes(); },

@@ -173,6 +173,69 @@ class TestCustomMapping:
         assert jw.table == pairs.table
 
 
+class TestFromBilinears:
+    """Tests for the from_bilinears construction."""
+
+    def test_bilinear_only_basic(self) -> None:
+        """Bilinear-only mapping stores and retrieves bilinears correctly."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(4):
+            for k in range(j + 1, 4):
+                coeff, pauli = jw.bilinear(j, k)
+                bilinears[(j, k)] = (coeff, pauli)
+
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears, name="test-bl")
+        assert bl.num_modes == 2
+        assert bl.name == "test-bl"
+        assert bl.is_majorana_atomic is False
+        assert bl.table == ()
+
+    def test_bilinear_lookup_matches_table(self) -> None:
+        """Bilinear-only mapping reproduces the same bilinears as the table form."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=3)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(6):
+            for k in range(j + 1, 6):
+                coeff, pauli = jw.bilinear(j, k)
+                bilinears[(j, k)] = (coeff, pauli)
+
+        bl = MajoranaMapping.from_bilinears(num_modes=3, bilinears=bilinears)
+        for j in range(6):
+            for k in range(j + 1, 6):
+                c_bl, p_bl = bl.bilinear(j, k)
+                c_jw, p_jw = jw.bilinear(j, k)
+                assert p_bl == p_jw, f"bilinear({j},{k}): {p_bl} != {p_jw}"
+                assert abs(c_bl - c_jw) < 1e-12, f"bilinear({j},{k}) coeff: {c_bl} != {c_jw}"
+
+    def test_bilinear_antisymmetry(self) -> None:
+        """bilinear(k,j) = -bilinear(j,k) for bilinear-only mappings."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(4):
+            for k in range(j + 1, 4):
+                bilinears[(j, k)] = jw.bilinear(j, k)
+
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        for j in range(4):
+            for k in range(j + 1, 4):
+                c_fwd, p_fwd = bl.bilinear(j, k)
+                c_rev, p_rev = bl.bilinear(k, j)
+                assert p_fwd == p_rev
+                assert abs(c_fwd + c_rev) < 1e-12
+
+    def test_majorana_raises_for_bilinear_only(self) -> None:
+        """majorana(k) raises ValueError for bilinear-only mappings."""
+        jw = MajoranaMapping.jordan_wigner(num_modes=2)
+        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
+        for j in range(4):
+            for k in range(j + 1, 4):
+                bilinears[(j, k)] = jw.bilinear(j, k)
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        with pytest.raises(ValueError, match="bilinear-only"):
+            bl.majorana(0)
+
+
 # ─── Validation Tests ────────────────────────────────────────────────────
 
 

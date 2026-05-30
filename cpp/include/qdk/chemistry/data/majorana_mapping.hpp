@@ -40,8 +40,8 @@ class MajoranaMapping {
    * @param name  Optional encoding label. Stored but not used for dispatch.
    * @throws std::invalid_argument If the table is empty or its size is odd.
    */
-  explicit MajoranaMapping(std::vector<SparsePauliWord> table,
-                           std::string name = "");
+  static MajoranaMapping from_table(std::vector<SparsePauliWord> table,
+                                    std::string name = "");
 
   /**
    * @brief Construct a bilinear-only mapping from pre-computed bilinears.
@@ -115,6 +115,10 @@ class MajoranaMapping {
   static MajoranaMapping parity(std::size_t num_modes);
 
  private:
+  /// Private constructor for table-based (Majorana-atomic) mappings.
+  MajoranaMapping(std::vector<SparsePauliWord> table, std::string name,
+                  std::size_t num_modes, std::size_t num_qubits);
+
   /// Private constructor for bilinear-only mappings.
   MajoranaMapping(
       std::size_t num_modes, std::size_t num_qubits,
