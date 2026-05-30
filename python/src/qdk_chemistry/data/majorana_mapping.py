@@ -128,13 +128,7 @@ class MajoranaMapping(DataClass):
 
     @property
     def num_qubits(self) -> int:
-        """Effective number of qubits after any tapering.
-
-        For untapered encodings this equals the number of qubits in the Pauli
-        table.  For tapering-based encodings (e.g. symmetry-conserving
-        Bravyi-Kitaev, parity with two-qubit reduction) this reflects the
-        reduced qubit count that downstream consumers will see.
-        """
+        """Number of qubits, accounting for any tapering."""
         if self._tapering is not None:
             return self._num_qubits - self._tapering.num_tapered
         return self._num_qubits
@@ -257,12 +251,6 @@ class MajoranaMapping(DataClass):
     def bravyi_kitaev_tree(cls, num_modes: int) -> MajoranaMapping:
         """Construct a balanced binary tree Bravyi-Kitaev encoding.
 
-        Implementation from arXiv:1701.07072 (Havlíček et al.). Unlike the
-        Fenwick-tree variant (:meth:`bravyi_kitaev`), the balanced tree has
-        guaranteed Z₂ symmetries at qubit positions ``(n/2-1)`` and ``(n-1)``
-        for any even ``n``, making it the required base encoding for
-        :meth:`symmetry_conserving_bravyi_kitaev` tapering.
-
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals).
 
@@ -281,18 +269,12 @@ class MajoranaMapping(DataClass):
     ) -> MajoranaMapping:
         """Construct a parity encoding, optionally with two-qubit reduction.
 
-        When ``symmetries`` is provided, the mapping includes a
-        :class:`~qdk_chemistry.data.TaperingSpecification` that tapers the two
-        Z₂ symmetry qubits (total electron-number parity and alpha-spin
-        parity), reducing the qubit count by 2.  This is the same two-qubit
-        reduction used by Qiskit Nature's ``ParityMapper(num_particles=...)``.
-
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals).
-            symmetries (Symmetries | None): If provided, enables two-qubit reduction for the target symmetry sector.
+            symmetries (Symmetries | None): If provided, enables two-qubit reduction.
 
         Returns:
-            MajoranaMapping: Mapping with name ``"parity"`` (untapered) or ``"parity-2q-reduced"`` (tapered).
+            MajoranaMapping: Mapping with name ``"parity"`` or ``"parity-2q-reduced"``.
 
         """
         core = _CoreMajoranaMapping.parity(num_modes)
@@ -309,31 +291,15 @@ class MajoranaMapping(DataClass):
     ) -> MajoranaMapping:
         """Construct a symmetry-conserving Bravyi-Kitaev (SCBK) encoding.
 
-        Combines the balanced binary tree BK mapping
-        (:meth:`bravyi_kitaev_tree`) with a
-        :class:`~qdk_chemistry.data.TaperingSpecification` that removes the two Z₂
-        symmetry qubits (total electron-number parity and alpha-spin parity),
-        reducing the qubit count by 2.
-
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals). Must be even and >= 4.
             symmetries (Symmetries): Electron counts for the target symmetry sector.
 
         Returns:
-            MajoranaMapping: BK-tree mapping with SCBK tapering, name ``"symmetry-conserving-bravyi-kitaev"``.
+            MajoranaMapping: BK-tree mapping with SCBK tapering.
 
         Raises:
             ValueError: If num_modes < 4 or odd, or electron counts are invalid.
-
-        Examples:
-            >>> from qdk_chemistry.data import MajoranaMapping, Symmetries
-            >>> mapping = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-            >>> mapping.name
-            'symmetry-conserving-bravyi-kitaev'
-            >>> mapping.base_encoding
-            'bravyi-kitaev-tree'
-            >>> mapping.tapering.num_tapered
-            2
 
         """
         tapering = TaperingSpecification.symmetry_conserving_bravyi_kitaev(num_modes, symmetries)

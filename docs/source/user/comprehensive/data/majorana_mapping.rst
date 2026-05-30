@@ -18,7 +18,7 @@ Across fermion-to-qubit encodings, the most general primitive that admits a Paul
 Bilinears generate the parity-even subalgebra of the Majorana Clifford algebra, so any parity-conserving operator decomposes into ordered bilinear products, and higher-degree even monomials are products of bilinears.
 
 Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings.
-In **bilinear-only** encodings (where :math:`m > n` qubits represent :math:`n` modes), single Majoranas anticommute with codespace stabilizers and have no representation in the physical subspace; only the bilinears are observable.
+In **bilinear-only** encodings (where :math:`m > n` qubits represent :math:`n` modes), single Majoranas have no representation in the physical subspace; only the bilinears are observable.
 
 The :class:`~qdk_chemistry.data.MajoranaMapping` supports both forms:
 

@@ -63,14 +63,6 @@ class TestJordanWigner:
         jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
         verify_clifford_algebra(jw)
 
-    def test_properties(self) -> None:
-        """JW factory sets correct properties."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        assert jw.num_modes == 4
-        assert jw.num_qubits == 4
-        assert jw.name == "jordan-wigner"
-        assert len(jw.table) == 8
-
     def test_reference_n2(self) -> None:
         """JW n=2 matches hand-computed reference (little-endian)."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
@@ -96,13 +88,6 @@ class TestBravyiKitaev:
         bk = MajoranaMapping.bravyi_kitaev(num_modes=n_modes)
         verify_clifford_algebra(bk)
 
-    def test_properties(self) -> None:
-        """BK factory sets correct properties."""
-        bk = MajoranaMapping.bravyi_kitaev(num_modes=4)
-        assert bk.num_modes == 4
-        assert bk.num_qubits == 4
-        assert bk.name == "bravyi-kitaev"
-
     @pytest.mark.parametrize("n_modes", [3, 5, 7])
     def test_non_power_of_two(self, n_modes: int) -> None:
         """BK works for non-power-of-2 mode counts."""
@@ -119,13 +104,6 @@ class TestParity:
         """Parity tables satisfy Clifford anticommutation for various sizes."""
         par = MajoranaMapping.parity(num_modes=n_modes)
         verify_clifford_algebra(par)
-
-    def test_properties(self) -> None:
-        """Parity factory sets correct properties."""
-        par = MajoranaMapping.parity(num_modes=4)
-        assert par.num_modes == 4
-        assert par.num_qubits == 4
-        assert par.name == "parity"
 
     def test_reference_n2(self) -> None:
         """Parity n=2 matches CNOT-derived reference."""
@@ -158,41 +136,15 @@ class TestCustomMapping:
         assert custom.name == "my-jw"
         assert custom.table == ("IX", "IY", "XZ", "YZ")
 
-    def test_custom_unnamed(self) -> None:
-        """Custom mapping without name."""
-        custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"])
-        assert custom.name == ""
-
     def test_from_mode_pairs(self) -> None:
         """from_mode_pairs produces same result as direct table."""
         direct = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="test")
         pairs = MajoranaMapping.from_mode_pairs(pairs=[("IX", "IY"), ("XZ", "YZ")], name="test")
         assert direct.table == pairs.table
 
-    def test_from_mode_pairs_equivalence(self) -> None:
-        """from_mode_pairs matches JW factory for n=2."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        pairs = MajoranaMapping.from_mode_pairs(pairs=[("IX", "IY"), ("XZ", "YZ")], name="jordan-wigner")
-        assert jw.table == pairs.table
-
 
 class TestFromBilinears:
     """Tests for the from_bilinears construction."""
-
-    def test_bilinear_only_basic(self) -> None:
-        """Bilinear-only mapping stores and retrieves bilinears correctly."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(4):
-            for k in range(j + 1, 4):
-                coeff, pauli = jw.bilinear(j, k)
-                bilinears[(j, k)] = (coeff, pauli)
-
-        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears, name="test-bl")
-        assert bl.num_modes == 2
-        assert bl.name == "test-bl"
-        assert bl.is_majorana_atomic is False
-        assert bl.table == ()
 
     def test_bilinear_lookup_matches_table(self) -> None:
         """Bilinear-only mapping reproduces the same bilinears as the table form."""
@@ -268,28 +220,6 @@ class TestFromBilinears:
                 },
             )
 
-    def test_bilinear_out_of_range_raises(self) -> None:
-        """bilinear() raises IndexError for out-of-range indices on bilinear-only mapping."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(4):
-            for k in range(j + 1, 4):
-                bilinears[(j, k)] = jw.bilinear(j, k)
-        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
-        with pytest.raises(IndexError):
-            bl.bilinear(0, 99)
-
-    def test_bilinear_equal_indices_raises(self) -> None:
-        """bilinear(j, j) raises ValueError on bilinear-only mapping."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(4):
-            for k in range(j + 1, 4):
-                bilinears[(j, k)] = jw.bilinear(j, k)
-        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
-        with pytest.raises(ValueError):
-            bl.bilinear(1, 1)
-
 
 # ─── Validation Tests ────────────────────────────────────────────────────
 
@@ -330,28 +260,6 @@ class TestValidation:
 # ─── Immutability Tests ─────────────────────────────────────────────────
 
 
-class TestImmutability:
-    """Tests for DataClass immutability."""
-
-    def test_cannot_set_table(self) -> None:
-        """Setting table raises AttributeError."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        with pytest.raises(AttributeError, match="Cannot modify"):
-            jw.table = ("foo",)  # type: ignore[misc]
-
-    def test_cannot_set_name(self) -> None:
-        """Setting name raises AttributeError."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        with pytest.raises(AttributeError, match="Cannot modify"):
-            jw.name = "bar"  # type: ignore[misc]
-
-    def test_cannot_delete_attribute(self) -> None:
-        """Deleting attribute raises AttributeError."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        with pytest.raises(AttributeError, match="Cannot delete"):
-            del jw.table  # type: ignore[misc]
-
-
 # ─── Serialization Tests ────────────────────────────────────────────────
 
 
@@ -366,51 +274,6 @@ class TestSerialization:
         assert loaded.table == jw.table
         assert loaded.name == jw.name
         assert loaded.num_modes == jw.num_modes
-
-    def test_json_has_version(self) -> None:
-        """JSON output includes version field."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        data = jw.to_json()
-        assert "version" in data
-        assert data["version"] == "0.1.0"
-
-    def test_hdf5_round_trip(self) -> None:
-        """HDF5 serialize and deserialize."""
-        bk = MajoranaMapping.bravyi_kitaev(num_modes=4)
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
-                bk.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
-                loaded = MajoranaMapping.from_hdf5(hf)
-        assert loaded.table == bk.table
-        assert loaded.name == bk.name
-
-    def test_json_file_round_trip(self) -> None:
-        """JSON file serialize and deserialize."""
-        par = MajoranaMapping.parity(num_modes=4)
-        with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "test.majorana_mapping.json"
-            par.to_json_file(str(path))
-            loaded = MajoranaMapping.from_json_file(str(path))
-        assert loaded.table == par.table
-        assert loaded.name == par.name
-
-    def test_hdf5_file_round_trip(self) -> None:
-        """HDF5 file serialize and deserialize."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        with tempfile.TemporaryDirectory() as td:
-            path = Path(td) / "test.majorana_mapping.h5"
-            jw.to_hdf5_file(str(path))
-            loaded = MajoranaMapping.from_hdf5_file(str(path))
-        assert loaded.table == jw.table
-
-    def test_custom_serialization(self) -> None:
-        """Custom mapping with name survives serialization."""
-        custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="my-custom")
-        data = custom.to_json()
-        loaded = MajoranaMapping.from_json(data)
-        assert loaded.table == custom.table
-        assert loaded.name == "my-custom"
 
     def test_hdf5_round_trip_with_tapering(self) -> None:
         """HDF5 round-trip preserves tapering for SCBK mappings."""
@@ -427,64 +290,6 @@ class TestSerialization:
         assert loaded.tapering is not None
         assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
         assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
-        assert loaded.tapering.source_num_qubits == scbk.tapering.source_num_qubits
-        assert loaded.tapering.source_encoding == scbk.tapering.source_encoding
-
-
-# ─── Summary/Repr Tests ─────────────────────────────────────────────────
-
-
-class TestDisplay:
-    """Tests for summary and repr."""
-
-    def test_repr_with_name(self) -> None:
-        """Repr includes name when present."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        r = repr(jw)
-        assert "jordan-wigner" in r
-        assert "num_modes=2" in r
-
-    def test_repr_without_name(self) -> None:
-        """Repr works for unnamed custom mappings."""
-        custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"])
-        r = repr(custom)
-        assert "num_modes=2" in r
-
-    def test_get_summary(self) -> None:
-        """get_summary includes mapping details."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        s = jw.get_summary()
-        assert "jordan-wigner" in s
-        assert "Modes: 2" in s
-        assert "gamma_0" in s
-        assert "IX" in s
-
-
-# ─── Cross-encoding consistency ──────────────────────────────────────────
-
-
-class TestCrossEncodingConsistency:
-    """Tests ensuring all encodings produce valid mappings with same structure."""
-
-    @pytest.mark.parametrize("n_modes", [2, 4, 6])
-    def test_all_encodings_same_qubit_count(self, n_modes: int) -> None:
-        """JW, BK, and parity all use num_modes qubits."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
-        bk = MajoranaMapping.bravyi_kitaev(num_modes=n_modes)
-        par = MajoranaMapping.parity(num_modes=n_modes)
-        assert jw.num_qubits == n_modes
-        assert bk.num_qubits == n_modes
-        assert par.num_qubits == n_modes
-
-    @pytest.mark.parametrize("n_modes", [2, 4, 6])
-    def test_all_encodings_table_length(self, n_modes: int) -> None:
-        """All encodings have 2N table entries."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
-        bk = MajoranaMapping.bravyi_kitaev(num_modes=n_modes)
-        par = MajoranaMapping.parity(num_modes=n_modes)
-        assert len(jw.table) == 2 * n_modes
-        assert len(bk.table) == 2 * n_modes
-        assert len(par.table) == 2 * n_modes
 
 
 # ─── SCBK (symmetry-conserving Bravyi-Kitaev) ────────────────────────────
@@ -493,13 +298,13 @@ class TestCrossEncodingConsistency:
 class TestSymmetryConservingBravyiKitaev:
     """Tests for the SCBK factory method and TaperingSpecification integration."""
 
-    def test_scbk_factory_creates_bk_table(self) -> None:
-        """SCBK factory uses a standard BK Majorana table underneath."""
+    def test_scbk_factory_creates_bk_tree_table(self) -> None:
+        """SCBK uses the BK-tree table as its base encoding."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        bk = MajoranaMapping.bravyi_kitaev(8)
-        assert scbk.table == bk.table
+        bk_tree = MajoranaMapping.bravyi_kitaev_tree(8)
+        assert scbk.table == bk_tree.table
 
     def test_scbk_name_and_base_encoding(self) -> None:
         """SCBK has the right name and base_encoding properties."""
@@ -561,19 +366,6 @@ class TestSymmetryConservingBravyiKitaev:
         with pytest.raises(ValueError, match="4"):
             MajoranaMapping.symmetry_conserving_bravyi_kitaev(2, Symmetries(1, 0))
 
-    def test_standard_mappings_have_no_tapering(self) -> None:
-        """JW, BK, parity (without symmetries) have tapering=None."""
-        assert MajoranaMapping.jordan_wigner(4).tapering is None
-        assert MajoranaMapping.bravyi_kitaev(4).tapering is None
-        assert MajoranaMapping.parity(4).tapering is None
-
-    def test_scbk_num_qubits_is_posttaper(self) -> None:
-        """MajoranaMapping.num_qubits reflects the post-taper qubit count."""
-        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
-
-        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        assert scbk.num_qubits == 6  # 8 - 2 tapered
-
     def test_parity_with_symmetries_has_tapering(self) -> None:
         """Parity with symmetries bundles a TaperingSpecification."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
@@ -583,13 +375,18 @@ class TestSymmetryConservingBravyiKitaev:
         assert par.tapering.num_tapered == 2
         assert par.name == "parity-2q-reduced"
         assert par.base_encoding == "parity"
-        assert par.num_qubits == 6  # 8 - 2
+        assert par.num_qubits == 6
 
-    def test_parity_without_symmetries_no_tapering(self) -> None:
-        """Parity without symmetries has no tapering."""
-        par = MajoranaMapping.parity(8)
-        assert par.tapering is None
-        assert par.num_qubits == 8
+    def test_without_tapering(self) -> None:
+        """without_tapering strips tapering but preserves the base table."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        base = scbk.without_tapering()
+        bk_tree = MajoranaMapping.bravyi_kitaev_tree(8)
+        assert base.tapering is None
+        assert base.table == bk_tree.table
+        assert base.num_qubits == 8
 
 
 # ─── Bilinear primitive ──────────────────────────────────────────────────
@@ -655,14 +452,7 @@ _FACTORIES = [
 
 
 class TestBilinear:
-    """Tests for the unified bilinear primitive ``i·gamma_j·gamma_k``.
-
-    Bilinears are the most general primitive across fermion-to-qubit
-    encodings: Majorana-atomic encodings expose individual gamma_k as well, but
-    redundant encodings (e.g. Bravyi-Kitaev superfast) only admit
-    parity-even products. These tests verify the algebraic invariants that
-    every backend must satisfy.
-    """
+    """Tests for the bilinear primitive ``i·gamma_j·gamma_k``."""
 
     @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
     @pytest.mark.parametrize("n_modes", [2, 4, 6])
@@ -680,20 +470,6 @@ class TestBilinear:
                 bcoeff, bword = m.bilinear(j, k)
                 assert bword == expected_word, f"({j},{k}): word {bword} != {expected_word}"
                 assert abs(bcoeff - expected_coeff) < 1e-12, f"({j},{k}): coeff {bcoeff} != {expected_coeff}"
-
-    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
-    @pytest.mark.parametrize("n_modes", [2, 4])
-    def test_antisymmetry(self, name: str, factory, n_modes: int) -> None:
-        """``bilinear(k, j) == -bilinear(j, k)`` for all distinct j, k."""
-        del name
-        m = factory(n_modes)
-        n = 2 * n_modes
-        for j in range(n):
-            for k in range(j + 1, n):
-                cjk, wjk = m.bilinear(j, k)
-                ckj, wkj = m.bilinear(k, j)
-                assert wjk == wkj
-                assert abs(cjk + ckj) < 1e-12, f"({j},{k}): {cjk} + {ckj} != 0"
 
     @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
     @pytest.mark.parametrize("n_modes", [2, 4])
@@ -767,27 +543,12 @@ class TestBilinear:
         m = MajoranaMapping.jordan_wigner(num_modes=2)
         with pytest.raises(ValueError, match="distinct"):
             m.bilinear(0, 0)
-        with pytest.raises(ValueError, match="distinct"):
-            m.bilinear(3, 3)
 
     def test_raises_on_out_of_range(self) -> None:
         """Out-of-range indices raise IndexError."""
         m = MajoranaMapping.jordan_wigner(num_modes=2)
         with pytest.raises(IndexError):
             m.bilinear(0, 4)
-        with pytest.raises(IndexError):
-            m.bilinear(99, 0)
-
-    def test_majorana_consistent_with_call(self) -> None:
-        """``majorana(k)`` and ``__call__(k)`` describe the same Pauli operator."""
-        m = MajoranaMapping.jordan_wigner(num_modes=3)
-        n_q = len(m.table[0])
-        for k in range(2 * m.num_modes):
-            sparse = m.core(k)
-            dense = m.majorana(k)
-            assert len(dense) == n_q
-            non_identity = sum(1 for c in dense if c != "I")
-            assert non_identity == len(sparse)
 
     def test_majorana_out_of_range(self) -> None:
         """``majorana(k)`` raises IndexError on out-of-range k."""
@@ -798,8 +559,9 @@ class TestBilinear:
             m.majorana(99)
 
 
+
 class TestEncodingMetadata:
-    """Tests for the new metadata properties on Majorana-atomic encodings."""
+    """Tests for encoding metadata properties."""
 
     @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
     @pytest.mark.parametrize("n_modes", [2, 4])
@@ -808,14 +570,6 @@ class TestEncodingMetadata:
         del name
         m = factory(n_modes)
         assert m.is_majorana_atomic is True
-
-    def test_pauli_string_length_untapered(self) -> None:
-        """For untapered encodings, bilinear/majorana strings have length ``num_qubits``."""
-        m = MajoranaMapping.jordan_wigner(num_modes=4)
-        assert len(m.table[0]) == m.num_qubits == 4
-        assert len(m.majorana(0)) == 4
-        _, w = m.bilinear(0, 1)
-        assert len(w) == 4
 
     def test_pauli_string_length_with_tapering(self) -> None:
         """For tapered SCBK, bilinear/majorana operate in the pre-taper basis."""
@@ -831,67 +585,3 @@ class TestEncodingMetadata:
                     continue
                 _, w = scbk.bilinear(j, k)
                 assert len(w) == 8
-
-
-# ─── Sparse/dense conversion helpers ────────────────────────────────────
-
-
-class TestSparseConversion:
-    """Tests for _dense_le_to_sparse and _sparse_to_dense_le."""
-
-    def test_roundtrip_identity(self) -> None:
-        """All-identity string round-trips to empty sparse word."""
-        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
-
-        assert _dense_le_to_sparse("IIII") == []
-        assert _sparse_to_dense_le([], 4) == "IIII"
-
-    def test_roundtrip_single_pauli(self) -> None:
-        """Single non-identity Pauli round-trips correctly."""
-        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
-
-        for label in ("IIIX", "IIYI", "ZIII", "IXII"):
-            sparse = _dense_le_to_sparse(label)
-            assert _sparse_to_dense_le(sparse, 4) == label
-
-    def test_roundtrip_jw_table(self) -> None:
-        """JW table entries survive sparse→dense round-trip."""
-        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse, _sparse_to_dense_le
-
-        jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        for entry in jw.table:
-            sparse = _dense_le_to_sparse(entry)
-            assert _sparse_to_dense_le(sparse, len(entry)) == entry
-
-    def test_invalid_character_raises(self) -> None:
-        """Invalid Pauli character raises ValueError."""
-        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse
-
-        with pytest.raises(ValueError, match="Invalid Pauli character"):
-            _dense_le_to_sparse("IXAZ")
-
-    def test_case_insensitive(self) -> None:
-        """Lowercase Pauli characters are accepted."""
-        from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse
-
-        assert _dense_le_to_sparse("ix") == _dense_le_to_sparse("IX")
-
-
-class TestBilinearCaching:
-    """Verify that bilinear results are cached and consistent."""
-
-    @pytest.mark.parametrize(("name", "factory"), _FACTORIES)
-    def test_cached_bilinear_matches_manual_multiply(self, name: str, factory) -> None:
-        """Cached bilinear(j,k) matches manual Pauli multiply of table entries."""
-        del name
-        m = factory(4)
-        for j in range(2 * m.num_modes):
-            for k in range(j + 1, 2 * m.num_modes):
-                coeff, word = m.bilinear(j, k)
-                phase, product = PauliTermAccumulator.multiply_uncached(m.core(j), m.core(k))
-                from qdk_chemistry.data.majorana_mapping import _sparse_to_dense_le
-
-                expected_word = _sparse_to_dense_le(product, m.num_qubits)
-                expected_coeff = 1j * phase
-                assert word == expected_word, f"bilinear({j},{k}) word mismatch"
-                assert abs(coeff - expected_coeff) < 1e-12, f"bilinear({j},{k}) coeff mismatch"

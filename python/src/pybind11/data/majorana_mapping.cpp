@@ -22,10 +22,9 @@ void bind_majorana_mapping(pybind11::module& data) {
   py::class_<MajoranaMapping> mapping(data, "MajoranaMapping", R"(
 Fermion-to-qubit encoding.
 
-Stores a 2N-entry table mapping each Majorana operator gamma_k to a sparse
-Pauli word. The bilinear ``i*gamma_j*gamma_k`` is the unified primitive and
-is computed on demand from the table. Sparse Pauli words use the little-endian
-convention of QubitHamiltonian (qubit 0 has the smallest index).
+Majorana-atomic mappings store a 2N-entry Pauli table for individual gamma_k;
+bilinear-only mappings (via from_bilinears) store the bilinear images directly.
+bilinear(j, k) is available on both forms.
 )");
 
   mapping.def_static(
@@ -56,7 +55,7 @@ convention of QubitHamiltonian (qubit 0 has the smallest index).
 
   mapping.def_property_readonly(
       "table", [](const MajoranaMapping& self) { return self.table(); },
-      "List of 2N sparse Pauli words [(qubit_idx, op_type), ...].");
+      "List of 2N sparse Pauli words (empty for bilinear-only mappings).");
 
   mapping.def_property_readonly(
       "is_majorana_atomic",

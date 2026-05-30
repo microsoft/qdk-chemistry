@@ -15,21 +15,9 @@ namespace qdk::chemistry::data {
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
- * A MajoranaMapping encodes 2N Majorana operators into Pauli operators.
- * Two construction forms are supported:
- *
- * - **Majorana-atomic** (the table constructor and all factory methods):
- *   stores a 2N-entry table mapping each individual gamma_k to a Pauli word.
- *   The bilinear i*gamma_j*gamma_k is computed on demand from the table via
- *   PauliTermAccumulator::multiply_uncached.
- *
- * - **Bilinear-only** (via from_bilinears): stores the bilinear images
- *   directly. Individual gamma_k have no Pauli image; only bilinear(j,k)
- *   is available. This form supports encodings where m > n qubits represent
- *   n modes and single Majoranas anticommute with codespace stabilizers.
- *
- * Pauli words use the little-endian convention of QubitHamiltonian (qubit 0
- * has the smallest sparse index).
+ * Majorana-atomic mappings store a 2N-entry Pauli table for individual
+ * gamma_k; bilinear-only mappings (via from_bilinears) store the bilinear
+ * images directly. bilinear(j, k) is available on both forms.
  */
 class MajoranaMapping {
  public:
