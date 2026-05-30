@@ -66,7 +66,7 @@ def _sparse_to_dense_le(word: SparsePauliWord, num_qubits: int) -> str:
 
 
 class MajoranaMapping(DataClass):
-    """Immutable data class describing a fermion-to-qubit encoding.
+    """Data class describing a fermion-to-qubit encoding.
 
     Two construction forms are supported:
 

@@ -13,7 +13,7 @@
 namespace qdk::chemistry::data {
 
 /**
- * @brief Immutable data class describing a fermion-to-qubit encoding.
+ * @brief Data class describing a fermion-to-qubit encoding.
  *
  * A MajoranaMapping encodes 2N Majorana operators into Pauli operators.
  * Two construction forms are supported:

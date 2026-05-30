@@ -1,9 +1,9 @@
 MajoranaMapping
 ===============
 
-The :class:`~qdk_chemistry.data.MajoranaMapping` class in QDK/Chemistry is an immutable data class that defines a fermion-to-qubit encoding.
+The :class:`~qdk_chemistry.data.MajoranaMapping` class defines a fermion-to-qubit encoding.
 It exposes the **bilinear** :math:`i\,\gamma_j\,\gamma_k` as the unified primitive available across every encoding, and (for Majorana-atomic encodings) individual Majorana operators :math:`\gamma_k` as an additional capability.
-As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's immutable data pattern.
+As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's data class pattern.
 
 Overview
 --------

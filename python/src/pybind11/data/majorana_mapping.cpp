@@ -20,7 +20,7 @@ void bind_majorana_mapping(pybind11::module& data) {
   using namespace qdk::chemistry::data;
 
   py::class_<MajoranaMapping> mapping(data, "MajoranaMapping", R"(
-Immutable fermion-to-qubit encoding.
+Fermion-to-qubit encoding.
 
 Stores a 2N-entry table mapping each Majorana operator gamma_k to a sparse
 Pauli word. The bilinear ``i*gamma_j*gamma_k`` is the unified primitive and
