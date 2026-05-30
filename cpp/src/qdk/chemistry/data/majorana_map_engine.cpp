@@ -197,27 +197,66 @@ MajoranaMapResult majorana_map_impl(
 
   PackedAccumulator<NW> acc;
 
-  std::vector<PackedPauliWord<NW>> packed_mapping(2 * n_modes);
-  for (std::size_t k = 0; k < 2 * n_modes; ++k) {
-    packed_mapping[k] = sparse_to_packed<NW>(mapping(k));
-  }
+  // ─── Pair product cache ───────────────────────────────────────────
+  //
+  // Precompute γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block
+  // pair. Using bilinear() as the access primitive makes this work for both
+  // Majorana-atomic and bilinear-only mappings.
+
+  struct PackedPairProduct {
+    std::complex<double> coeff;
+    PackedPauliWord<NW> word;
+  };
+  const std::size_t maj_per_spin = 2 * n_spatial;
+  const std::size_t alpha_offset = 0;
+  const std::size_t beta_offset = maj_per_spin;
+
+  auto build_pair_cache =
+      [&](std::size_t global_offset) -> std::vector<PackedPairProduct> {
+    std::vector<PackedPairProduct> cache(maj_per_spin * maj_per_spin);
+    for (std::size_t i = 0; i < maj_per_spin; ++i) {
+      cache[i * maj_per_spin + i] = {{1.0, 0.0}, PackedPauliWord<NW>{}};
+      for (std::size_t j = 0; j < maj_per_spin; ++j) {
+        if (i == j) continue;
+        auto [bl_coeff, bl_word] =
+            mapping.bilinear(i + global_offset, j + global_offset);
+        cache[i * maj_per_spin + j] = {
+            std::complex<double>(0.0, -1.0) * bl_coeff,
+            sparse_to_packed<NW>(bl_word)};
+      }
+    }
+    return cache;
+  };
+
+  auto ppair_alpha = build_pair_cache(alpha_offset);
+  auto ppair_beta = build_pair_cache(beta_offset);
+
+  auto alpha_pair = [&](std::size_t i,
+                        std::size_t j) -> const PackedPairProduct& {
+    return ppair_alpha[i * maj_per_spin + j];
+  };
+  auto beta_pair = [&](std::size_t i,
+                       std::size_t j) -> const PackedPairProduct& {
+    return ppair_beta[i * maj_per_spin + j];
+  };
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
     return p + n_spatial;
   };
 
-  // E_pq = (1/4) Σ_{a,b} coeff[a][b] · P(2p+a) · P(2q+b)
   auto accumulate_epq = [&](std::size_t mode_p, std::size_t mode_q,
                             double h_pq) {
+    bool is_alpha = mode_p < n_spatial;
+    auto& cache = is_alpha ? ppair_alpha : ppair_beta;
+    std::size_t bp = is_alpha ? mode_p : (mode_p - n_spatial);
+    std::size_t bq = is_alpha ? mode_q : (mode_q - n_spatial);
     for (int a = 0; a < 2; ++a) {
-      std::size_t idx_pa = 2 * mode_p + a;
       for (int b = 0; b < 2; ++b) {
-        std::size_t idx_qb = 2 * mode_q + b;
-        auto [ph, word] =
-            multiply_packed(packed_mapping[idx_pa], packed_mapping[idx_qb]);
+        const auto& [coeff, word] =
+            cache[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
         acc.accumulate(word,
-                       apply_phase(ph, h_pq * 0.25 * excitation_coeff[a][b]));
+                       coeff * h_pq * 0.25 * excitation_coeff[a][b]);
       }
     }
   };
@@ -241,7 +280,6 @@ MajoranaMapResult majorana_map_impl(
       double h_a = h1_alpha[p * n_spatial + s];
       double h_b = spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
       if (spin_symmetric) {
-        // Fold δ_{qr} contraction into the one-body integrals.
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
           delta_corr += eri_aaaa[idx4(p, q, q, s)];
@@ -269,37 +307,7 @@ MajoranaMapResult majorana_map_impl(
 
   // ─── Two-body terms ───────────────────────────────────────────────
 
-  // Precompute Majorana pair products in packed form (same-spin only).
-  struct PackedPairProduct {
-    int phase;
-    PackedPauliWord<NW> word;
-  };
-  const std::size_t maj_per_spin = 2 * n_spatial;
-  std::vector<PackedPairProduct> ppair_alpha(maj_per_spin * maj_per_spin);
-  std::vector<PackedPairProduct> ppair_beta(maj_per_spin * maj_per_spin);
-
-  for (std::size_t i = 0; i < maj_per_spin; ++i) {
-    for (std::size_t j = 0; j < maj_per_spin; ++j) {
-      auto [ph_a, w_a] = multiply_packed(packed_mapping[i], packed_mapping[j]);
-      ppair_alpha[i * maj_per_spin + j] = {ph_a, std::move(w_a)};
-
-      auto [ph_b, w_b] = multiply_packed(packed_mapping[i + maj_per_spin],
-                                         packed_mapping[j + maj_per_spin]);
-      ppair_beta[i * maj_per_spin + j] = {ph_b, std::move(w_b)};
-    }
-  }
-
-  auto alpha_pair = [&](std::size_t i,
-                        std::size_t j) -> const PackedPairProduct& {
-    return ppair_alpha[i * maj_per_spin + j];
-  };
-  auto beta_pair = [&](std::size_t i,
-                       std::size_t j) -> const PackedPairProduct& {
-    return ppair_beta[i * maj_per_spin + j];
-  };
-
   if (spin_symmetric) {
-    // Precompute spin-summed E_pq for all (p,q):
     struct SpinSummedE {
       std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
@@ -310,18 +318,17 @@ MajoranaMapResult majorana_map_impl(
         auto& sse = ss_e[p * n_spatial + q];
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
-            const auto& [phase_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
+            const auto& [coeff_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(
-                apply_phase(phase_a, 0.25 * excitation_coeff[a][b]), word_a);
-            const auto& [phase_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
+                coeff_a * 0.25 * excitation_coeff[a][b], word_a);
+            const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(
-                apply_phase(phase_b, 0.25 * excitation_coeff[a][b]), word_b);
+                coeff_b * 0.25 * excitation_coeff[a][b], word_b);
           }
         }
       }
     }
 
-    // Precompute symmetrized S_pq = E_pq + E_qp (merged) for p <= q.
     struct SymmetrizedE {
       std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
@@ -357,7 +364,6 @@ MajoranaMapResult majorana_map_impl(
       }
     }
 
-    // Two-body: exploit full 8-fold ERI symmetry via (pq)<=(rs) exchange.
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = p; q < n_spatial; ++q) {
         std::size_t pq_idx = sym_map[p * n_spatial + q];
@@ -394,8 +400,6 @@ MajoranaMapResult majorana_map_impl(
     }
 
   } else {
-    // Channel-separated path for unrestricted orbitals.
-
     auto accumulate_two_body_product =
         [&](std::size_t mode_p, std::size_t mode_q, std::size_t mode_r,
             std::size_t mode_s, double eri) {
@@ -411,16 +415,15 @@ MajoranaMapResult majorana_map_impl(
           double half_eri = 0.5 * eri;
           for (int a = 0; a < 2; ++a) {
             for (int b = 0; b < 2; ++b) {
-              const auto& [ph1, w1] =
+              const auto& [coeff1, w1] =
                   cache_pq[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
               for (int c = 0; c < 2; ++c) {
                 for (int d = 0; d < 2; ++d) {
-                  const auto& [ph2, w2] =
+                  const auto& [coeff2, w2] =
                       cache_rs[(2 * br + c) * maj_per_spin + (2 * bs + d)];
-                  std::complex<double> scale = apply_phase(
-                      (ph1 + ph2) & 3,
-                      half_eri * 0.0625 * excitation_coeff[a][b] *
-                          excitation_coeff[c][d]);
+                  std::complex<double> scale =
+                      coeff1 * coeff2 * half_eri * 0.0625 *
+                      excitation_coeff[a][b] * excitation_coeff[c][d];
                   acc.accumulate_product(w1, w2, scale);
                 }
               }
