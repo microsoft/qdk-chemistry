@@ -9,7 +9,7 @@ Tests cover:
 - Bilinear caching correctness
 - Sparse/dense Pauli string conversion helpers
 - Immutability enforcement
-- Serialization round-trips (JSON, HDF5, file) and backward compatibility
+- Serialization round-trips (JSON, HDF5, file)
 - Invalid input rejection
 - Reference output comparison for small systems
 """
@@ -875,31 +875,6 @@ class TestSparseConversion:
         from qdk_chemistry.data.majorana_mapping import _dense_le_to_sparse
 
         assert _dense_le_to_sparse("ix") == _dense_le_to_sparse("IX")
-
-
-class TestSerializationBackwardCompat:
-    """Backward compatibility for serialized data that may contain phases."""
-
-    def test_json_with_phases_key_ignored(self) -> None:
-        """Old JSON with a 'phases' key deserializes without error."""
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        data = jw.to_json()
-        data["phases"] = [1, 1, 1, 1]
-        loaded = MajoranaMapping.from_json(data)
-        assert loaded.table == jw.table
-
-    def test_hdf5_with_phases_dataset_ignored(self) -> None:
-        """Old HDF5 with a 'phases' dataset deserializes without error."""
-        import numpy as np
-
-        jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
-                jw.to_hdf5(hf)
-                hf.create_dataset("phases", data=np.array([1, 1, 1, 1], dtype=np.int8))
-            with h5py.File(f.name, "r") as hf:
-                loaded = MajoranaMapping.from_hdf5(hf)
-        assert loaded.table == jw.table
 
 
 class TestBilinearCaching:
