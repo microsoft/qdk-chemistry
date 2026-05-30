@@ -188,11 +188,6 @@ class MajoranaMapping(DataClass):
     def without_tapering(self) -> MajoranaMapping:
         """Return a copy of this mapping with tapering stripped.
 
-        The returned mapping has the same Majorana table but ``tapering=None``
-        and ``name`` set to :attr:`base_encoding`. Used by
-        :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper` to separate
-        the base encoding from post-mapping tapering.
-
         Returns:
             A new :class:`MajoranaMapping` with no tapering.
 
@@ -201,15 +196,11 @@ class MajoranaMapping(DataClass):
 
     @property
     def base_encoding(self) -> str:
-        """The base encoding name used for the Majorana-to-Pauli table.
+        """The base encoding name for the Majorana-to-Pauli table.
 
         For standard encodings this equals :attr:`name`. For tapering-based
         encodings it returns the underlying encoding (e.g.
         ``"bravyi-kitaev-tree"``) while :attr:`name` returns the final label.
-
-        Name-dispatched :class:`~qdk_chemistry.algorithms.QubitMapper` backends
-        use this property to select the third-party transform; they ignore
-        :attr:`table` and rebuild the qubit operator from scratch.
         """
         return self._core.name
 
@@ -231,9 +222,7 @@ class MajoranaMapping(DataClass):
         """Return the Pauli image of the Majorana operator gamma_k.
 
         Available only for :py:attr:`is_majorana_atomic` encodings; raises
-        :class:`ValueError` for bilinear-only mappings. For tapered encodings
-        the returned Pauli string is in the encoding's native (pre-taper)
-        qubit basis; tapering is applied downstream.
+        :class:`ValueError` for bilinear-only mappings.
 
         Args:
             k (int): Majorana index (0 <= k < 2 * num_modes).
@@ -256,9 +245,6 @@ class MajoranaMapping(DataClass):
         all distinct ``j != k`` in ``[0, 2 * num_modes)``. The coefficient is
         real (±1) for the factory encodings but typed :class:`complex` for
         generality.
-
-        For tapered encodings the returned Pauli string is in the encoding's
-        native (pre-taper) qubit basis; tapering is applied downstream.
 
         Args:
             j (int): First Majorana index (0 <= j < 2 * num_modes).
@@ -364,10 +350,6 @@ class MajoranaMapping(DataClass):
         :class:`~qdk_chemistry.data.TaperingSpecification` that removes the two Z₂
         symmetry qubits (total electron-number parity and alpha-spin parity),
         reducing the qubit count by 2.
-
-        When passed to :meth:`~qdk_chemistry.algorithms.QubitMapper.run`, the
-        mapper applies the BK-tree mapping first, then tapers the symmetry
-        qubits automatically.
 
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals). Must be even and >= 4.

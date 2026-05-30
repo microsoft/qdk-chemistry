@@ -35,7 +35,7 @@ Convention
    The number of fermionic modes (spin-orbitals) in the system.
 
 Pauli strings use little-endian qubit ordering, consistent with the rest of QDK/Chemistry's :doc:`PauliOperator <pauli_operator>` layer.
-:py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` and :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` return Pauli strings in the encoding's native (pre-taper) qubit basis, i.e. of length ``len(mapping.table[0])``; any tapering specification is applied downstream by the qubit mapper.
+:py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` and :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` return Pauli strings in the encoding's native (pre-taper) qubit basis.
 
 Built-in encodings
 ------------------
