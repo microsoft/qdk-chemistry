@@ -34,7 +34,7 @@ E_scf, wfn_scf = scf_solver.run(
 # 3. Hamiltonian and qubit mapping
 hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 
 n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
 qubit_mapper = create("qubit_mapper")

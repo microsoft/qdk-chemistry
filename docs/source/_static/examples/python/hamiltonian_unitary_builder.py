@@ -68,7 +68,7 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
 
 # 4. Qubit mapping
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 
 n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
 qubit_mapper = create("qubit_mapper")

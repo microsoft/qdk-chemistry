@@ -26,7 +26,7 @@ from qdk_chemistry.algorithms import (
     create,
 )
 from qdk_chemistry.data import AlgorithmRef, Circuit, Structure
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")

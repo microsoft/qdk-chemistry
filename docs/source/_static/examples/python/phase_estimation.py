@@ -62,7 +62,7 @@ cas_solver = create("multi_configuration_calculator")
 E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 
 # 5. Qubit mapping
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 
 n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
 qubit_mapper = create("qubit_mapper")

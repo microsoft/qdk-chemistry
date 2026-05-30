@@ -21,7 +21,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 
 # OpenFermion must be installed to run this example.

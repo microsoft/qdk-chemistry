@@ -34,7 +34,7 @@ except ImportError as ex:
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import (
     iterative_phase_feedback_update,
