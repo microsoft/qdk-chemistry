@@ -10,7 +10,9 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/data/errors.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <string_view>
@@ -302,6 +304,31 @@ class BasisSet : public DataClass,
            AOType basis_type = AOType::Spherical);
 
   /**
+   * @brief Constructor with explicit atomic-orbital (AO) symmetries
+   *
+   * Use this overload to block the AO basis under a non-default symmetry
+   * vocabulary. The default (used by every other constructor) is a restricted
+   * spin axis (@c axes::spin(1, true)) whose @f$\alpha@f$/@f$\beta@f$ labels
+   * each carry an extent equal to @ref get_num_atomic_orbitals().
+   *
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param structure The molecular structure
+   * @param ao_symmetries Symmetry vocabulary the AO basis is blocked under
+   * @param ao_extents Per-label AO extents; if empty, defaults to
+   *        @ref get_num_atomic_orbitals() for every admissible label
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @throws BasisSetSpinExtentMismatchError if extents are inadmissible or
+   *         violate orbit equivalence
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           const Structure& structure,
+           std::shared_ptr<const Symmetries> ao_symmetries,
+           std::unordered_map<SymmetryLabel, std::size_t> ao_extents = {},
+           AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
    * @brief Default destructor
    */
   virtual ~BasisSet() = default;
@@ -522,6 +549,27 @@ class BasisSet : public DataClass,
    * @return Total number of atomic orbitals
    */
   size_t get_num_atomic_orbitals() const;
+
+  /**
+   * @brief Symmetry vocabulary the atomic-orbital basis is blocked under
+   *
+   * Defaults to a restricted spin axis (@c axes::spin(1, true)). Override at
+   * construction with the AO-symmetries constructor overload.
+   *
+   * @return Shared pointer to the AO @ref Symmetries
+   */
+  std::shared_ptr<const Symmetries> ao_symmetries() const;
+
+  /**
+   * @brief Per-label extents of the atomic-orbital basis
+   *
+   * Maps each admissible @ref SymmetryLabel to the number of atomic orbitals it
+   * carries. With the default restricted spin axis, both @f$\alpha@f$ and
+   * @f$\beta@f$ labels carry @ref get_num_atomic_orbitals() orbitals.
+   *
+   * @return Map from AO symmetry label to extent
+   */
+  const std::unordered_map<SymmetryLabel, std::size_t>& ao_extents() const;
 
   /**
    * @brief Get the atom index for a atomic orbital
@@ -818,6 +866,12 @@ class BasisSet : public DataClass,
   /// Number of ECP electrons replaced for each atom
   std::vector<size_t> _ecp_electrons;
 
+  /// Symmetry vocabulary the AO basis is blocked under (lazily defaulted)
+  mutable std::shared_ptr<const Symmetries> _ao_symmetries;
+
+  /// Per-label AO extents (lazily defaulted alongside @ref _ao_symmetries)
+  mutable std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;
+
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
 
@@ -841,6 +895,19 @@ class BasisSet : public DataClass,
    * @return True if basis set is valid
    */
   bool _is_valid() const;
+
+  /**
+   * @brief Populate @ref _ao_symmetries / @ref _ao_extents with the default
+   * restricted-spin vocabulary if they have not been set.
+   */
+  void _ensure_ao_symmetries() const;
+
+  /**
+   * @brief Validate that @ref _ao_extents keys are admissible and satisfy
+   * orbit equivalence under @ref _ao_symmetries.
+   * @throws BasisSetSpinExtentMismatchError on violation
+   */
+  void _validate_ao_symmetries() const;
 
   /**
    * @brief Validate consistency with the associated molecular structure

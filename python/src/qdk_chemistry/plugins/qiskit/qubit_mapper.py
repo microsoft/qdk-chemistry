@@ -25,7 +25,7 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Symmetries
+    from qdk_chemistry.data import SymmetriesV1
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 
@@ -77,7 +77,7 @@ class QiskitQubitMapper(QubitMapper):
         self._settings = QiskitQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:  # noqa: ARG002
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: SymmetriesV1 | None = None) -> QubitHamiltonian:  # noqa: ARG002
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:

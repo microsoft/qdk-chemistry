@@ -1,0 +1,99 @@
+"""Deprecation warning wrappers for v1 Hamiltonian and Wavefunction accessors.
+
+This module patches deprecated C++ methods on the _core data classes to emit
+Python DeprecationWarning at call time.  It is imported by data/__init__.py
+so the warnings fire regardless of how users import the classes.
+"""
+
+import warnings
+from typing import Any
+
+from qdk_chemistry._core.data import (
+    CanonicalFourCenterHamiltonianContainer,
+    CholeskyHamiltonianContainer,
+    HamiltonianContainer,
+    SparseHamiltonianContainer,
+    WavefunctionContainer,
+)
+
+
+def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
+    """Replace *method_name* on *cls* with a wrapper that emits DeprecationWarning.
+
+    Also patches the corresponding property (e.g. ``one_body_integrals`` for
+    ``get_one_body_integrals``) if one exists, so both call styles warn.
+    """
+    original = getattr(cls, method_name, None)
+    if original is None:
+        return
+
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        warnings.warn(
+            f"{cls.__name__}.{method_name} is deprecated. Use {replacement} instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return original(*args, **kwargs)
+
+    wrapper.__name__ = method_name
+    wrapper.__doc__ = getattr(original, "__doc__", None)
+    setattr(cls, method_name, wrapper)
+
+    # Patch the corresponding property created by bind_getter_as_property
+    # (e.g. "get_one_body_integrals" → "one_body_integrals" property).
+    if method_name.startswith("get_"):
+        prop_name = method_name[4:]
+    elif method_name.startswith("sparse_"):
+        prop_name = None
+    else:
+        prop_name = None
+
+    if prop_name:
+        # Properties live on the base class and propagate via Python MRO
+        # (unlike pybind11 methods). Check the class itself AND its bases.
+        for klass in cls.__mro__:
+            existing = klass.__dict__.get(prop_name)
+            if existing is not None and isinstance(existing, property):
+                def prop_wrapper(self: Any, _orig: Any = original, _pn: str = prop_name, _cls: type = cls, _repl: str = replacement) -> Any:
+                    warnings.warn(
+                        f"{_cls.__name__}.{_pn} is deprecated. Use {_repl} instead.",
+                        DeprecationWarning,
+                        stacklevel=2,
+                    )
+                    return _orig(self)
+
+                setattr(klass, prop_name, property(prop_wrapper, doc=existing.__doc__))
+                break
+
+
+def _install_deprecation_warnings() -> None:
+    """Patch all deprecated v1 accessors to emit DeprecationWarning."""
+
+    # pybind11 C++ MRO doesn't pick up Python overrides on base classes,
+    # so we must patch each concrete subclass that exposes the method.
+    # Only patch the subclass (not the abstract base) to avoid double-firing.
+    ham_subclasses = (CanonicalFourCenterHamiltonianContainer,
+                      CholeskyHamiltonianContainer,
+                      SparseHamiltonianContainer)
+
+    # -- HamiltonianContainer base methods on each subclass --
+    for cls in ham_subclasses:
+        _wrap_deprecated(cls, "get_one_body_integrals", "h1()")
+        _wrap_deprecated(cls, "get_inactive_fock_matrix", "inactive_fock()")
+
+    # -- CanonicalFourCenterHamiltonianContainer --
+    _wrap_deprecated(CanonicalFourCenterHamiltonianContainer, "get_two_body_integrals", "h2()")
+
+    # -- CholeskyHamiltonianContainer --
+    _wrap_deprecated(CholeskyHamiltonianContainer, "get_three_center_integrals", "three_center()")
+    _wrap_deprecated(CholeskyHamiltonianContainer, "get_two_body_integrals", "three_center()")
+
+    # -- SparseHamiltonianContainer --
+    _wrap_deprecated(SparseHamiltonianContainer, "sparse_two_body_integrals", "h2_sparse()")
+    _wrap_deprecated(SparseHamiltonianContainer, "get_two_body_integrals", "h2_sparse()")
+
+    # -- WavefunctionContainer (abstract, but used via Wavefunction.get_container()) --
+    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_dependent", "one_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_dependent", "two_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_traced", "one_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_traced", "two_rdm()")

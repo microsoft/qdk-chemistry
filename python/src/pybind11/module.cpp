@@ -9,7 +9,14 @@
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
+void bind_symmetry(py::module& m);
+void bind_symmetry_blocked_tensor(py::module& m);
+void bind_symmetry_blocked_index_set(py::module& m);
 void bind_element_data(py::module& m);
+void bind_single_particle_basis(py::module& m);
+void bind_basis_coefficients(py::module& m);
+void bind_orbital_energies(py::module& m);
+void bind_orbital_space_partitioning(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
@@ -53,13 +60,24 @@ PYBIND11_MODULE(_core, m) {
   auto utils = m.def_submodule("utils");
   utils.doc() = R"(Utilities submodule)";
 
+  auto symmetry = data.def_submodule("symmetry");
+  symmetry.doc() =
+      R"(Single-particle symmetry vocabulary and symmetry-blocked storage)";
+
   // Ordering is important!
 
   bind_base_class(data);
+  bind_symmetry(symmetry);  // vocab + SBT/SBIS before orbital containers
+  bind_symmetry_blocked_tensor(symmetry);
+  bind_symmetry_blocked_index_set(symmetry);
   bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
+  bind_single_particle_basis(data);  // abstract base before Orbitals
+  bind_basis_coefficients(data);
+  bind_orbital_energies(data);
+  bind_orbital_space_partitioning(data);
   bind_orbitals(data);
   bind_lattice_graph(data);
   bind_hamiltonian(data);

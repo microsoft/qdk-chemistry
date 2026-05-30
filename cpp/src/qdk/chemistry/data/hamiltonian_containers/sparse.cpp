@@ -65,8 +65,9 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           Eigen::MatrixXd::Zero(one_body_integrals.rows(),
                                 one_body_integrals.cols()),
           type),
-      _one_body_sparse(std::move(one_body_integrals)),
-      _two_body_map(std::move(two_body_integrals)) {}
+      _one_body_sparse(std::move(one_body_integrals)) {
+  _set_h2_sparse_container(std::move(two_body_integrals));
+}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals, double core_energy,
@@ -78,7 +79,9 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           Eigen::MatrixXd::Zero(one_body_integrals.rows(),
                                 one_body_integrals.cols()),
           type),
-      _one_body_sparse(std::move(one_body_integrals)) {}
+      _one_body_sparse(std::move(one_body_integrals)) {
+  _set_h2_sparse_container({});
+}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
@@ -91,9 +94,10 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           Eigen::MatrixXd::Zero(one_body_integrals.rows(),
                                 one_body_integrals.cols()),
           type),
-      _one_body_sparse(_to_sparse(one_body_integrals)),
-      _two_body_map(_to_map(two_body_integrals,
-                            static_cast<size_t>(one_body_integrals.rows()))) {}
+      _one_body_sparse(_to_sparse(one_body_integrals)) {
+  _set_h2_sparse_container(_to_map(
+      two_body_integrals, static_cast<size_t>(one_body_integrals.rows())));
+}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals, double core_energy,
@@ -105,7 +109,9 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           Eigen::MatrixXd::Zero(one_body_integrals.rows(),
                                 one_body_integrals.cols()),
           type),
-      _one_body_sparse(_to_sparse(one_body_integrals)) {}
+      _one_body_sparse(_to_sparse(one_body_integrals)) {
+  _set_h2_sparse_container({});
+}
 
 std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
     const {
@@ -622,6 +628,51 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
           if (val != 0.0) m[{p, q, r, s}] = val;
         }
   return m;
+}
+
+void SparseHamiltonianContainer::_set_h2_sparse_container(TwoBodyMap map) {
+  _two_body_map = std::move(map);
+
+  auto sym = _orbitals->symmetries();
+  auto active_indices = _orbitals->get_active_space_indices();
+  std::size_t n_active = active_indices.first.size();
+
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[alpha_label] = n_active;
+  ext[beta_label] = n_active;
+
+  SymmetryBlockedSparseMap<4>::SymmetriesArray symmetries = {sym, sym, sym,
+                                                             sym};
+  SymmetryBlockedSparseMap<4>::ExtentsArray extents = {ext, ext, ext, ext};
+
+  // Convert TwoBodyMap (tuple keys) → SparseMapBlock (array keys)
+  auto block = std::make_shared<SparseMapBlock<4>>();
+  auto* mutable_block = const_cast<SparseMapBlock<4>*>(block.get());
+  for (const auto& [idx, val] : _two_body_map) {
+    auto [p, q, r, s] = idx;
+    (*mutable_block)[{static_cast<unsigned>(p), static_cast<unsigned>(q),
+                      static_cast<unsigned>(r), static_cast<unsigned>(s)}] =
+        val;
+  }
+
+  SymmetryBlockedSparseMap<4>::BlockMap blocks;
+  // Restricted: aaaa block; aabb shares pointer; orbit aliasing gets bbbb/bbaa
+  blocks[{alpha_label, alpha_label, alpha_label, alpha_label}] = block;
+  blocks[{alpha_label, alpha_label, beta_label, beta_label}] = block;
+
+  _h2_sparse = std::make_shared<const SymmetryBlockedSparseMap<4>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+}
+
+const SymmetryBlockedSparseMap<4>& SparseHamiltonianContainer::h2_sparse()
+    const {
+  if (!_h2_sparse) {
+    throw std::runtime_error("Sparse two-body SBT (h2_sparse) is not set.");
+  }
+  return *_h2_sparse;
 }
 
 }  // namespace qdk::chemistry::data

@@ -40,20 +40,11 @@ namespace qdk::chemistry::data {
 class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
-   *
-   * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param two_body_integrals Two-electron integrals in MO basis [norb x norb x
-   * norb x norb]
-   * @param orbitals Shared pointer to molecular orbital data for the system
-   * @param core_energy Core energy (nuclear repulsion + inactive orbital
-   * energy)
-   * @param inactive_fock_matrix Inactive Fock matrix for the selected active
-   * space
-   * @param type Type of Hamiltonian (Hermitian by default)
-   *
-   * @throws std::invalid_argument if orbitals pointer is nullptr
+   * @brief Constructor for restricted active space Hamiltonian with four center
+   * integrals.
+   * @deprecated Use the SBT-native constructor instead.
    */
+  [[deprecated("Use the SBT-native constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
@@ -62,28 +53,11 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for active space Hamiltonian with four center integrals
-   * using separate spin components
-   *
-   * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
-   * basis
-   * @param one_body_integrals_beta One-electron integrals for beta spin in MO
-   * basis
-   * @param two_body_integrals_aaaa Two-electron alpha-alpha-alpha-alpha
-   * integrals
-   * @param two_body_integrals_aabb Two-electron alpha-beta-alpha-beta integrals
-   * @param two_body_integrals_bbbb Two-electron beta-beta-beta-beta integrals
-   * @param orbitals Shared pointer to molecular orbital data for the system
-   * @param core_energy Core energy (nuclear repulsion + inactive orbital
-   * energy)
-   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
-   * the selected active space
-   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
-   * selected active space
-   * @param type Type of Hamiltonian (Hermitian by default)
-   *
-   * @throws std::invalid_argument if orbitals pointer is nullptr
+   * @brief Constructor for unrestricted active space Hamiltonian with four
+   * center integrals using separate spin components.
+   * @deprecated Use the SBT-native constructor instead.
    */
+  [[deprecated("Use the SBT-native constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -93,6 +67,21 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
+      HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief SBT-native constructor.
+   * @param h1 One-body integrals as rank-2 SBT.
+   * @param h2 Two-body integrals as rank-4 SBT.
+   * @param orbitals Shared pointer to molecular orbital data.
+   * @param core_energy Core energy.
+   * @param inactive_fock Inactive Fock matrix as rank-2 SBT.
+   * @param type Hamiltonian type.
+   */
+  CanonicalFourCenterHamiltonianContainer(
+      SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<4> h2,
+      std::shared_ptr<Orbitals> orbitals, double core_energy,
+      SymmetryBlockedTensor<2> inactive_fock,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -115,13 +104,28 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
-   * @return Tuple of references to (aaaa, aabb, bbbb) two-electron integrals
-   * vectors
-   * @throws std::runtime_error if integrals are not set
+   * @deprecated Use h2() for SBT-native access.
    */
+  [[deprecated("Use h2() for SBT-native access.")]]
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-             const Eigen::VectorXd&>
-  get_two_body_integrals() const override final;
+             const Eigen::VectorXd&> get_two_body_integrals()
+      const override final;
+
+  /**
+   * @brief Two-body integrals as a rank-4 symmetry-blocked tensor.
+   * @return Const reference to the h2 SBT.
+   * @throws std::runtime_error if h2 is not set.
+   */
+  const SymmetryBlockedTensor<4>& h2() const;
+
+  /**
+   * @brief Two-body integral block for the given symmetry labels.
+   * @return Const reference to the flat-packed vector block.
+   */
+  const Eigen::VectorXd& h2_block(const SymmetryLabel& p,
+                                  const SymmetryLabel& q,
+                                  const SymmetryLabel& r,
+                                  const SymmetryLabel& s) const;
 
   /**
    * @brief Get specific two-electron integral element
@@ -188,11 +192,13 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  protected:
-  /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
-  /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = (ij|kl)
-  const std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>,
-                   std::shared_ptr<Eigen::VectorXd>>
+  /// SBT-canonical two-body integrals (source of truth)
+  std::shared_ptr<const SymmetryBlockedTensor<4>> _h2;
+
+  /// Non-owning views into _h2 blocks (for v1 dense access: aaaa, aabb, bbbb)
+  std::tuple<std::shared_ptr<const Eigen::VectorXd>,
+             std::shared_ptr<const Eigen::VectorXd>,
+             std::shared_ptr<const Eigen::VectorXd>>
       _two_body_integrals;
 
   /// Validation helpers
@@ -204,6 +210,13 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
                     std::shared_ptr<Eigen::VectorXd>,
                     std::shared_ptr<Eigen::VectorXd>>
   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
+
+  /// Build SBT<4> from dense vectors and set non-owning views.
+  void _set_h2_container(const Eigen::VectorXd& aaaa,
+                         const Eigen::VectorXd* aabb,
+                         const Eigen::VectorXd* bbbb);
+  /// Derive non-owning views from an existing SBT<4> container.
+  void _init_h2_views();
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

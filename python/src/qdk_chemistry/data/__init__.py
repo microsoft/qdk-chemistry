@@ -43,7 +43,7 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
-- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
+- :class:`SymmetriesV1`: Physical symmetries of an electronic state (formerly ``Symmetries``).
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`UnitaryRepresentation`: Unitary representation.
@@ -64,12 +64,14 @@ Exposed exceptions are:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
     AlgorithmRef,
     Ansatz,
     AOType,
+    BasisCoefficients,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     CasWavefunctionContainer,
@@ -85,7 +87,9 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     ModelOrbitals,
     MP2Container,
+    OrbitalEnergies,
     Orbitals,
+    OrbitalSpacePartitioning,
     OrbitalType,
     PauliOperator,
     PauliTermAccumulator,
@@ -96,6 +100,7 @@ from qdk_chemistry._core.data import (
     SettingTypeMismatch,
     SettingValue,
     Shell,
+    SingleParticleBasis,
     SlaterDeterminantContainer,
     SparseHamiltonianContainer,
     SpinChannel,
@@ -104,6 +109,7 @@ from qdk_chemistry._core.data import (
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
+    ao_symmetries,
     get_current_ciaaw_version,
 )
 from qdk_chemistry.data.base import DataClass
@@ -116,7 +122,7 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
-from qdk_chemistry.data.symmetries import Symmetries
+from qdk_chemistry.data.symmetries import SymmetriesV1
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
@@ -131,11 +137,17 @@ SettingNotFoundError = SettingNotFound
 SettingTypeMismatchError = SettingTypeMismatch
 SettingsAreLockedError = SettingsAreLocked
 
+# Install Python-level DeprecationWarning on v1 Hamiltonian/Wavefunction accessors
+from qdk_chemistry.data._v1_deprecation import _install_deprecation_warnings
+
+_install_deprecation_warnings()
+
 
 __all__ = [
     "AOType",
     "AlgorithmRef",
     "Ansatz",
+    "BasisCoefficients",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
     "CasWavefunctionContainer",
@@ -163,6 +175,8 @@ __all__ = [
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
+    "OrbitalEnergies",
+    "OrbitalSpacePartitioning",
     "OrbitalType",
     "Orbitals",
     "PauliOperator",
@@ -181,12 +195,13 @@ __all__ = [
     "SettingsAreLocked",
     "SettingsAreLockedError",
     "Shell",
+    "SingleParticleBasis",
     "SlaterDeterminantContainer",
     "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
     "Structure",
-    "Symmetries",
+    "SymmetriesV1",
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
@@ -195,6 +210,39 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
+    "ao_symmetries",
     "get_current_ciaaw_version",
     "validate_encoding_compatibility",
 ]
+
+
+# Deprecated alias: the name ``Symmetries`` previously referred to the
+# many-body electronic-state container now named :class:`SymmetriesV1`. The
+# name is now reserved for the single-particle symmetry vocabulary in
+# :mod:`qdk_chemistry.data.symmetry`. Accessing ``qdk_chemistry.data.Symmetries``
+# still returns :class:`SymmetriesV1` but emits a ``DeprecationWarning``.
+_DEPRECATED_ALIASES = {
+    "Symmetries": ("SymmetriesV1", SymmetriesV1),
+}
+
+
+def __getattr__(name: str):
+    """Provide deprecated aliases with a ``DeprecationWarning`` on access."""
+    alias = _DEPRECATED_ALIASES.get(name)
+    if alias is not None:
+        new_name, target = alias
+        warnings.warn(
+            f"qdk_chemistry.data.{name} is deprecated and will be removed in a "
+            f"future release; use qdk_chemistry.data.{new_name} instead. "
+            f"Note that qdk_chemistry.data.symmetry.Symmetries now refers to the "
+            f"single-particle symmetry vocabulary.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return target
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    """Include deprecated aliases in ``dir()`` for discoverability."""
+    return sorted(set(globals()) | set(_DEPRECATED_ALIASES))

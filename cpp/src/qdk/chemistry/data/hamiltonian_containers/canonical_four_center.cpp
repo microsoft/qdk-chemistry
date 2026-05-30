@@ -25,10 +25,10 @@ CanonicalFourCenterHamiltonianContainer::
         std::shared_ptr<Orbitals> orbitals, double core_energy,
         const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
-                           inactive_fock_matrix, type),
-      _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)) {
+                           inactive_fock_matrix, type) {
   QDK_LOG_TRACE_ENTERING();
+
+  _set_h2_container(two_body_integrals, nullptr, nullptr);
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
@@ -52,12 +52,33 @@ CanonicalFourCenterHamiltonianContainer::
         const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
-                           inactive_fock_matrix_beta, type),
-      _two_body_integrals(
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)) {
+                           inactive_fock_matrix_beta, type) {
   QDK_LOG_TRACE_ENTERING();
+
+  _set_h2_container(two_body_integrals_aaaa, &two_body_integrals_aabb,
+                    &two_body_integrals_bbbb);
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
+  if (!is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
+}
+
+CanonicalFourCenterHamiltonianContainer::
+    CanonicalFourCenterHamiltonianContainer(
+        SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<4> h2,
+        std::shared_ptr<Orbitals> orbitals, double core_energy,
+        SymmetryBlockedTensor<2> inactive_fock, HamiltonianType type)
+    : HamiltonianContainer(std::move(h1), orbitals, core_energy,
+                           std::move(inactive_fock), type),
+      _h2(std::make_shared<const SymmetryBlockedTensor<4>>(std::move(h2))) {
+  QDK_LOG_TRACE_ENTERING();
+
+  _init_h2_views();
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
@@ -224,6 +245,70 @@ CanonicalFourCenterHamiltonianContainer::make_restricted_two_body_integrals(
   return std::make_tuple(
       shared_integrals, shared_integrals,
       shared_integrals);  // aaaa, aabb, bbbb all point to same data
+}
+
+// ---- SBT-canonical container builders and accessors ------------------------
+
+void CanonicalFourCenterHamiltonianContainer::_set_h2_container(
+    const Eigen::VectorXd& aaaa, const Eigen::VectorXd* aabb,
+    const Eigen::VectorXd* bbbb) {
+  auto sym = _orbitals->symmetries();
+  auto active_indices = _orbitals->get_active_space_indices();
+  std::size_t n_active_alpha = active_indices.first.size();
+  std::size_t n_active_beta = active_indices.second.size();
+
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[alpha_label] = n_active_alpha;
+  ext[beta_label] = n_active_beta;
+
+  SymmetryBlockedTensor<4>::SymmetriesArray symmetries = {sym, sym, sym, sym};
+  SymmetryBlockedTensor<4>::ExtentsArray extents = {ext, ext, ext, ext};
+
+  auto aaaa_block = std::make_shared<const Eigen::VectorXd>(aaaa);
+  SymmetryBlockedTensor<4>::BlockMap blocks;
+  blocks[{alpha_label, alpha_label, alpha_label, alpha_label}] = aaaa_block;
+
+  if (aabb != nullptr && bbbb != nullptr) {
+    // Unrestricted: separate blocks for aabb and bbbb
+    auto aabb_block = std::make_shared<const Eigen::VectorXd>(*aabb);
+    auto bbbb_block = std::make_shared<const Eigen::VectorXd>(*bbbb);
+    blocks[{alpha_label, alpha_label, beta_label, beta_label}] = aabb_block;
+    blocks[{beta_label, beta_label, beta_label, beta_label}] = bbbb_block;
+  } else {
+    // Restricted: aabb shares storage with aaaa (orbit aliasing gets bbbb)
+    blocks[{alpha_label, alpha_label, beta_label, beta_label}] = aaaa_block;
+  }
+
+  _h2 = std::make_shared<const SymmetryBlockedTensor<4>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+  _init_h2_views();
+}
+
+void CanonicalFourCenterHamiltonianContainer::_init_h2_views() {
+  SymmetryLabel a({axes::alpha()});
+  SymmetryLabel b({axes::beta()});
+
+  _two_body_integrals = std::make_tuple(_h2->block_ptr({a, a, a, a}),
+                                        _h2->block_ptr({a, a, b, b}),
+                                        _h2->block_ptr({b, b, b, b}));
+}
+
+const SymmetryBlockedTensor<4>& CanonicalFourCenterHamiltonianContainer::h2()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_h2) {
+    throw std::runtime_error("Two-body SBT (h2) is not set.");
+  }
+  return *_h2;
+}
+
+const Eigen::VectorXd& CanonicalFourCenterHamiltonianContainer::h2_block(
+    const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
+    const SymmetryLabel& s) const {
+  return h2().block({p, q, r, s});
 }
 
 nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {

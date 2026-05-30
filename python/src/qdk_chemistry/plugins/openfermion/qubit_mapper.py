@@ -27,7 +27,7 @@ from qdk_chemistry.plugins.openfermion.conversion import (
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
+    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, SymmetriesV1
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 
@@ -47,7 +47,7 @@ class OpenFermionQubitMapperSettings(QubitMapperSettings):
     Available encodings:
         - ``"jordan-wigner"`` (default)
         - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
+        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.SymmetriesV1`)
         - ``"bravyi-kitaev-tree"``
 
     """
@@ -64,7 +64,7 @@ class OpenFermionQubitMapper(QubitMapper):
     Available encodings:
         - ``"jordan-wigner"`` (default)
         - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
+        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.SymmetriesV1`)
         - ``"bravyi-kitaev-tree"``
 
     """
@@ -81,7 +81,7 @@ class OpenFermionQubitMapper(QubitMapper):
         self._settings = OpenFermionQubitMapperSettings()
         self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: SymmetriesV1 | None = None) -> QubitHamiltonian:
         """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
 
         Args:
@@ -148,7 +148,7 @@ class OpenFermionQubitMapper(QubitMapper):
         transform = transform_map[encoding]
         return transform(fermion_op)
 
-    def _map_scbk(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None) -> of.QubitOperator:
+    def _map_scbk(self, hamiltonian: Hamiltonian, symmetries: SymmetriesV1 | None) -> of.QubitOperator:
         """Apply symmetry-conserving Bravyi-Kitaev transformation.
 
         This transform reduces the qubit count by 2 by exploiting particle number
@@ -168,11 +168,11 @@ class OpenFermionQubitMapper(QubitMapper):
         """
         if symmetries is None:
             raise ValueError(
-                "The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries "
+                "The symmetry-conserving Bravyi-Kitaev encoding requires a SymmetriesV1 "
                 "object specifying the number of active electrons.\n"
                 "Example:\n"
-                "  from qdk_chemistry.data import Symmetries\n"
-                "  symmetries = Symmetries(n_alpha=1, n_beta=1)\n"
+                "  from qdk_chemistry.data import SymmetriesV1\n"
+                "  symmetries = SymmetriesV1(n_alpha=1, n_beta=1)\n"
                 "  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)"
             )
 

@@ -176,6 +176,56 @@ Returns:
     bool: True if inactive Fock matrix has been set
 )");
 
+  // SBT-native accessors
+  hamiltonian_container.def(
+      "h1", &HamiltonianContainer::h1, py::return_value_policy::reference_internal,
+      R"(
+One-body integrals as a rank-2 symmetry-blocked tensor.
+
+Returns:
+    SymmetryBlockedTensorRank2Real: The h1 SBT.
+)");
+
+  hamiltonian_container.def(
+      "h1_block", &HamiltonianContainer::h1_block,
+      py::return_value_policy::reference_internal,
+      R"(
+One-body integral block for the given row/column symmetry labels.
+
+Args:
+    row (SymmetryLabel): Row symmetry label.
+    col (SymmetryLabel): Column symmetry label.
+
+Returns:
+    numpy.ndarray: The matrix block.
+)",
+      py::arg("row"), py::arg("col"));
+
+  hamiltonian_container.def(
+      "inactive_fock", &HamiltonianContainer::inactive_fock,
+      py::return_value_policy::reference_internal,
+      R"(
+Inactive Fock matrix as a rank-2 symmetry-blocked tensor.
+
+Returns:
+    SymmetryBlockedTensorRank2Real: The inactive Fock SBT.
+)");
+
+  hamiltonian_container.def(
+      "inactive_fock_block", &HamiltonianContainer::inactive_fock_block,
+      py::return_value_policy::reference_internal,
+      R"(
+Inactive Fock block for the given row/column symmetry labels.
+
+Args:
+    row (SymmetryLabel): Row symmetry label.
+    col (SymmetryLabel): Column symmetry label.
+
+Returns:
+    numpy.ndarray: The matrix block.
+)",
+      py::arg("row"), py::arg("col"));
+
   bind_getter_as_property(hamiltonian_container, "get_orbitals",
                           &HamiltonianContainer::get_orbitals,
                           R"(
@@ -444,6 +494,20 @@ Returns:
     bool: True if alpha and beta integrals are identical
 )");
 
+  // SBT-native three-center accessor
+  cholesky_container.def(
+      "three_center", &CholeskyHamiltonianContainer::three_center,
+      py::return_value_policy::reference_internal,
+      R"(
+Three-center integrals as a rank-2 symmetry-blocked tensor.
+
+Row axis keyed by MO spin symmetries (extent = norb^2 per spin),
+column axis has no symmetry (extent = naux).
+
+Returns:
+    SymmetryBlockedTensorRank2Real: The three-center SBT.
+)");
+
   cholesky_container.def("is_valid", &CholeskyHamiltonianContainer::is_valid,
                          R"(
 Check if the Hamiltonian data is complete and consistent.
@@ -634,6 +698,34 @@ Check if Hamiltonian is restricted (alpha == beta).
 Returns:
     bool: True if alpha and beta integrals are identical
 )");
+
+  // SBT-native h2 accessors
+  canonical_four_center.def(
+      "h2", &CanonicalFourCenterHamiltonianContainer::h2,
+      py::return_value_policy::reference_internal,
+      R"(
+Two-body integrals as a rank-4 symmetry-blocked tensor.
+
+Returns:
+    SymmetryBlockedTensorRank4Real: The h2 SBT.
+)");
+
+  canonical_four_center.def(
+      "h2_block", &CanonicalFourCenterHamiltonianContainer::h2_block,
+      py::return_value_policy::reference_internal,
+      R"(
+Two-body integral block for the given symmetry labels.
+
+Args:
+    p (SymmetryLabel): First symmetry label.
+    q (SymmetryLabel): Second symmetry label.
+    r (SymmetryLabel): Third symmetry label.
+    s (SymmetryLabel): Fourth symmetry label.
+
+Returns:
+    numpy.ndarray: The flat-packed vector block.
+)",
+      py::arg("p"), py::arg("q"), py::arg("r"), py::arg("s"));
 
   canonical_four_center.def("is_valid",
                             &CanonicalFourCenterHamiltonianContainer::is_valid,

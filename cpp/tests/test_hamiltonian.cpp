@@ -14,6 +14,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/errors.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
@@ -174,7 +175,7 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           one_body, two_body, orbitals_with_inactive, core_energy,
           wrong_dim_inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 }
 
 TEST_F(HamiltonianTest, MoveConstructor) {
@@ -468,7 +469,7 @@ TEST_F(HamiltonianTest, ValidationTests) {
   EXPECT_THROW(
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           bad_one_body, bad_two_body, orbitals, core_energy, inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 
   // Test validation with non-square one-body matrix
   Eigen::MatrixXd non_square_one_body(2, 3);  // 2x3 non-square matrix
@@ -479,7 +480,7 @@ TEST_F(HamiltonianTest, ValidationTests) {
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           non_square_one_body, any_two_body, orbitals, core_energy,
           inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 
   // Test validation passes with correct dimensions
   Eigen::MatrixXd correct_one_body = Eigen::MatrixXd::Identity(2, 2);
@@ -533,7 +534,7 @@ TEST_F(HamiltonianTest, ValidationEdgeCases) {
   EXPECT_THROW(
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           three_by_three, off_by_one, orbitals, core_energy, inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 }
 
 TEST_F(HamiltonianConstructorTest, Factory) {
@@ -1802,7 +1803,7 @@ TEST_F(HamiltonianTest, ErrorHandlingUnrestrictedMismatchedActiveSpace) {
                 two_body_bbbb, unrestricted_orbitals, core_energy, empty_fock,
                 empty_fock));
       },
-      std::invalid_argument);
+      BlockExtentMismatchError);
 }
 
 TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
@@ -2187,7 +2188,7 @@ TEST_F(HamiltonianTest, IsValidComprehensive) {
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           wrong_one_body, wrong_two_body, orbitals, core_energy,
           inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 
   // Non-square one-body matrix should fail during construction
   Eigen::MatrixXd non_square(2, 3);  // 2x3 matrix
@@ -2195,7 +2196,7 @@ TEST_F(HamiltonianTest, IsValidComprehensive) {
   EXPECT_THROW(
       Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
           non_square, two_body, orbitals, core_energy, inactive_fock)),
-      std::invalid_argument);
+      BlockExtentMismatchError);
 }
 
 // Dummy container type for testing get_container bad_cast

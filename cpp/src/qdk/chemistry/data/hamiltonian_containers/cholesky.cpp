@@ -31,10 +31,10 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
     : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
                            inactive_fock_matrix, type),
-      _three_center_integrals(
-          make_restricted_three_center_integrals(three_center_integrals)),
       _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
+
+  _set_three_center_container(three_center_integrals, nullptr);
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
@@ -58,11 +58,35 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
                            orbitals, core_energy, inactive_fock_matrix_alpha,
                            inactive_fock_matrix_beta, type),
-      _three_center_integrals(
-          std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
-          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)),
       _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
+
+  _set_three_center_container(three_center_integrals_aa,
+                              &three_center_integrals_bb);
+
+  validate_integral_dimensions();
+  validate_restrictedness_consistency();
+  validate_active_space_dimensions();
+
+  if (!is_valid()) {
+    throw std::invalid_argument(
+        "Tried to generate invalid Hamiltonian object.");
+  }
+}
+
+CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+    SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<2> three_center,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    SymmetryBlockedTensor<2> inactive_fock,
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    : HamiltonianContainer(std::move(h1), orbitals, core_energy,
+                           std::move(inactive_fock), type),
+      _three_center_sbt(std::make_shared<const SymmetryBlockedTensor<2>>(
+          std::move(three_center))),
+      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
+  QDK_LOG_TRACE_ENTERING();
+
+  _init_three_center_views();
 
   validate_integral_dimensions();
   validate_restrictedness_consistency();
@@ -288,6 +312,75 @@ CholeskyHamiltonianContainer::make_restricted_three_center_integrals(
   QDK_LOG_TRACE_ENTERING();
   auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
   return std::make_pair(shared_integrals, shared_integrals);
+}
+
+// ---- SBT-canonical container builders and accessors ------------------------
+
+void CholeskyHamiltonianContainer::_set_three_center_container(
+    const Eigen::MatrixXd& aa, const Eigen::MatrixXd* bb) {
+  auto mo_sym = _orbitals->symmetries();
+  auto active_indices = _orbitals->get_active_space_indices();
+  std::size_t n_active = active_indices.first.size();
+  std::size_t nrows = n_active * n_active;
+  std::size_t naux = static_cast<std::size_t>(aa.cols());
+
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  // Row axis: MO spin symmetries, extent = norb^2 per spin label
+  std::unordered_map<SymmetryLabel, std::size_t> row_ext;
+  row_ext[alpha_label] = nrows;
+  row_ext[beta_label] = nrows;
+
+  // Column axis: no symmetry (auxiliary basis dimension)
+  auto aux_sym = std::make_shared<const Symmetries>(Symmetries({}));
+  SymmetryLabel aux_label({});
+  std::unordered_map<SymmetryLabel, std::size_t> col_ext;
+  col_ext[aux_label] = naux;
+
+  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {mo_sym, aux_sym};
+  SymmetryBlockedTensor<2>::ExtentsArray extents = {row_ext, col_ext};
+
+  auto aa_block = std::make_shared<const Eigen::MatrixXd>(aa);
+  SymmetryBlockedTensor<2>::BlockMap blocks;
+  blocks[{alpha_label, aux_label}] = aa_block;
+
+  if (bb != nullptr) {
+    auto bb_block = std::make_shared<const Eigen::MatrixXd>(*bb);
+    blocks[{beta_label, aux_label}] = bb_block;
+  }
+  // Restricted: no auto-aliasing (slots have different symmetries)
+  // so we must explicitly set the beta view for restricted.
+
+  _three_center_sbt = std::make_shared<const SymmetryBlockedTensor<2>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+  _init_three_center_views();
+}
+
+void CholeskyHamiltonianContainer::_init_three_center_views() {
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+  SymmetryLabel aux_label({});
+
+  _three_center_integrals.first =
+      _three_center_sbt->block_ptr({alpha_label, aux_label});
+
+  if (_three_center_sbt->has_block({beta_label, aux_label})) {
+    _three_center_integrals.second =
+        _three_center_sbt->block_ptr({beta_label, aux_label});
+  } else {
+    // Restricted: beta shares alpha storage.
+    _three_center_integrals.second = _three_center_integrals.first;
+  }
+}
+
+const SymmetryBlockedTensor<2>& CholeskyHamiltonianContainer::three_center()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_three_center_sbt) {
+    throw std::runtime_error("Three-center SBT is not set.");
+  }
+  return *_three_center_sbt;
 }
 
 nlohmann::json CholeskyHamiltonianContainer::to_json() const {

@@ -12,10 +12,16 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
     orbitals.cpp
+    orbital_containers/basis_coefficients.cpp
+    orbital_containers/orbital_energies.cpp
+    orbital_containers/orbital_space_partitioning.cpp
     pauli_operator.cpp
     settings.cpp
     stability_result.cpp
     structure.cpp
+    symmetry/symmetry.cpp
+    symmetry/symmetry_blocked_tensor.cpp
+    symmetry/symmetry_blocked_index_set.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
     wavefunction_containers/cc.cpp

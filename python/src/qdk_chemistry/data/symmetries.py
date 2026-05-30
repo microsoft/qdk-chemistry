@@ -1,7 +1,13 @@
 """Symmetries data class for encoding physical symmetries of an electronic state.
 
-The :class:`Symmetries` class is a general container for symmetry information
+The :class:`SymmetriesV1` class is a general container for symmetry information
 that quantum algorithms can exploit to reduce circuit depth or qubit count.
+
+.. note::
+    This class was previously named ``Symmetries``. The name ``Symmetries`` is
+    now used for the single-particle symmetry vocabulary in
+    :mod:`qdk_chemistry.data.symmetry`. The legacy name remains available as a
+    deprecated alias for :class:`SymmetriesV1`.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -20,13 +26,13 @@ if TYPE_CHECKING:
 
     from qdk_chemistry.data import Ansatz, Wavefunction
 
-__all__ = ["Symmetries"]
+__all__ = ["SymmetriesV1"]
 
 
-class Symmetries(DataClass):
+class SymmetriesV1(DataClass):
     r"""Immutable container for the physical symmetries of an electronic state.
 
-    ``Symmetries`` serves as the central object for communicating symmetry
+    ``SymmetriesV1`` serves as the central object for communicating symmetry
     information to algorithms that can exploit it.
 
     Args:
@@ -37,11 +43,11 @@ class Symmetries(DataClass):
         ValueError: If ``n_alpha`` or ``n_beta`` is negative.
 
     Examples:
-        >>> sym = Symmetries(n_alpha=2, n_beta=2)
+        >>> sym = SymmetriesV1(n_alpha=2, n_beta=2)
         >>> sym.n_particles
         4
 
-        >>> sym = Symmetries.from_wavefunction(wfn)
+        >>> sym = SymmetriesV1.from_wavefunction(wfn)
 
     """
 
@@ -52,7 +58,7 @@ class Symmetries(DataClass):
     _serialization_version = "0.1.0"
 
     def __init__(self, n_alpha: int, n_beta: int) -> None:
-        """Initialize Symmetries with active-space electron counts."""
+        """Initialize SymmetriesV1 with active-space electron counts."""
         if n_alpha < 0:
             raise ValueError(f"n_alpha must be non-negative, got {n_alpha}")
         if n_beta < 0:
@@ -65,8 +71,8 @@ class Symmetries(DataClass):
     # -- Factory methods -------------------------------------------------------
 
     @classmethod
-    def from_wavefunction(cls, wavefunction: Wavefunction) -> Symmetries:
-        """Construct ``Symmetries`` from a :class:`~qdk_chemistry.data.Wavefunction`.
+    def from_wavefunction(cls, wavefunction: Wavefunction) -> SymmetriesV1:
+        """Construct ``SymmetriesV1`` from a :class:`~qdk_chemistry.data.Wavefunction`.
 
         Reads the active-space electron counts via ``get_active_num_electrons()``.
 
@@ -74,15 +80,15 @@ class Symmetries(DataClass):
             wavefunction: A wavefunction carrying active-space electron information.
 
         Returns:
-            A new ``Symmetries`` instance.
+            A new ``SymmetriesV1`` instance.
 
         """
         n_alpha, n_beta = wavefunction.get_active_num_electrons()
         return cls(n_alpha=int(n_alpha), n_beta=int(n_beta))
 
     @classmethod
-    def from_ansatz(cls, ansatz: Ansatz) -> Symmetries:
-        """Construct ``Symmetries`` from an :class:`~qdk_chemistry.data.Ansatz`.
+    def from_ansatz(cls, ansatz: Ansatz) -> SymmetriesV1:
+        """Construct ``SymmetriesV1`` from an :class:`~qdk_chemistry.data.Ansatz`.
 
         Delegates to :meth:`from_wavefunction` using the ansatz's wavefunction.
 
@@ -90,7 +96,7 @@ class Symmetries(DataClass):
             ansatz: An ansatz bundling a Hamiltonian and wavefunction.
 
         Returns:
-            A new ``Symmetries`` instance.
+            A new ``SymmetriesV1`` instance.
 
         """
         return cls.from_wavefunction(ansatz.get_wavefunction())
@@ -126,11 +132,11 @@ class Symmetries(DataClass):
 
     def __repr__(self) -> str:
         """Return a string representation."""
-        return f"Symmetries(n_alpha={self._n_alpha}, n_beta={self._n_beta})"
+        return f"SymmetriesV1(n_alpha={self._n_alpha}, n_beta={self._n_beta})"
 
     def __eq__(self, other: object) -> bool:
         """Check equality."""
-        if not isinstance(other, Symmetries):
+        if not isinstance(other, SymmetriesV1):
             return NotImplemented
         return self._n_alpha == other._n_alpha and self._n_beta == other._n_beta
 
@@ -148,7 +154,7 @@ class Symmetries(DataClass):
 
         """
         return (
-            f"Symmetries\n"
+            f"SymmetriesV1\n"
             f"  Alpha electrons: {self._n_alpha}\n"
             f"  Beta electrons: {self._n_beta}\n"
             f"  Total particles: {self.n_particles}\n"
@@ -181,14 +187,14 @@ class Symmetries(DataClass):
         group.attrs["n_beta"] = self._n_beta
 
     @classmethod
-    def from_json(cls, json_data: dict[str, Any]) -> Symmetries:
-        """Create a Symmetries from a JSON dictionary.
+    def from_json(cls, json_data: dict[str, Any]) -> SymmetriesV1:
+        """Create a SymmetriesV1 from a JSON dictionary.
 
         Args:
             json_data (dict[str, Any]): Dictionary containing the serialized data.
 
         Returns:
-            Symmetries: New instance reconstructed from JSON data.
+            SymmetriesV1: New instance reconstructed from JSON data.
 
         Raises:
             RuntimeError: If version field is missing or incompatible.
@@ -201,14 +207,14 @@ class Symmetries(DataClass):
         )
 
     @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> Symmetries:
-        """Load a Symmetries from an HDF5 group.
+    def from_hdf5(cls, group: h5py.Group) -> SymmetriesV1:
+        """Load a SymmetriesV1 from an HDF5 group.
 
         Args:
             group (h5py.Group): HDF5 group or file containing the data.
 
         Returns:
-            Symmetries: New instance reconstructed from HDF5 data.
+            SymmetriesV1: New instance reconstructed from HDF5 data.
 
         Raises:
             RuntimeError: If version attribute is missing or incompatible.

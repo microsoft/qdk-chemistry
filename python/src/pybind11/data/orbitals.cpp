@@ -10,7 +10,11 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
+#include <qdk/chemistry/data/orbital_containers/basis_coefficients.hpp>
+#include <qdk/chemistry/data/orbital_containers/orbital_energies.hpp>
+#include <qdk/chemistry/data/orbital_containers/orbital_space_partitioning.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/single_particle_basis.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -62,8 +66,9 @@ void bind_orbitals(py::module &data) {
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
-  py::class_<Orbitals, DataClass, py::smart_holder> orbitals(data, "Orbitals",
-                                                             R"(
+  py::class_<Orbitals, SingleParticleBasis, py::smart_holder> orbitals(
+      data, "Orbitals",
+      R"(
 Represents molecular orbitals with coefficients and energies.
 
 This class stores and manipulates molecular orbital data including:
@@ -189,7 +194,43 @@ Examples:
           std::tuple<std::vector<size_t>, std::vector<size_t>,
                      std::vector<size_t>, std::vector<size_t>>>{});
 
-  // Coefficient access (read-only)
+  // SBT-native constructor (symmetry-blocked containers)
+  orbitals.def(
+      py::init<std::shared_ptr<const BasisCoefficients>,
+               std::shared_ptr<const OrbitalEnergies>,
+               std::shared_ptr<const OrbitalSpacePartitioning>,
+               const std::optional<Eigen::MatrixXd> &,
+               std::shared_ptr<qdk::chemistry::data::BasisSet>>(),
+      R"(
+Construct from symmetry-blocked single-particle containers.
+
+This is the preferred (non-deprecated) construction path. The orbital
+coefficients and energies are supplied as symmetry-blocked containers, and the
+active/inactive/virtual layout is supplied as an
+:class:`OrbitalSpacePartitioning`.
+
+Args:
+    coefficients (BasisCoefficients): The molecular orbital coefficient container
+    energies (OrbitalEnergies | None): The orbital energy container, can be None
+    partitioning (OrbitalSpacePartitioning | None): The orbital-space partitioning; defaults to all-active when None
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
+    basis_set (BasisSet | None): The basis set, can be None
+)",
+      py::arg("coefficients"), py::arg("energies"), py::arg("partitioning"),
+      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+      py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{});
+
+  // SBT-native accessors
+  orbitals.def("basis_coefficients", &Orbitals::basis_coefficients,
+               "The molecular-orbital coefficients as a symmetry-blocked "
+               "BasisCoefficients container.");
+  orbitals.def("orbital_energies", &Orbitals::orbital_energies,
+               "The orbital energies as a symmetry-blocked OrbitalEnergies "
+               "container.");
+  orbitals.def("orbital_space_partitioning",
+               &Orbitals::orbital_space_partitioning,
+               "The active/inactive/virtual layout as an "
+               "OrbitalSpacePartitioning container.");
   orbitals.def("get_coefficients", &Orbitals::get_coefficients,
                R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.
@@ -821,6 +862,28 @@ Examples:
 
   // Data type name class attribute
   orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
+
+  // Free helper: AO symmetries backing a single-particle basis (nullptr/None
+  // for model systems without an underlying AO basis set).
+  data.def(
+      "ao_symmetries",
+      [](const std::shared_ptr<const SingleParticleBasis> &basis) {
+        return ao_symmetries(basis);
+      },
+      py::arg("basis"),
+      R"(
+Return the AO-basis symmetry vocabulary backing a single-particle basis.
+
+For :class:`Orbitals` carrying a basis set, this returns the AO symmetries of
+that basis set. For :class:`ModelOrbitals` (or any single-particle basis
+without an underlying AO basis set), it returns ``None``.
+
+Args:
+    basis: Single-particle basis to inspect (may be ``None``).
+
+Returns:
+    The AO Symmetries, or ``None`` if the basis has no underlying AO basis set.
+)");
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

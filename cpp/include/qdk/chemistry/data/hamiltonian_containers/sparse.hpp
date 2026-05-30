@@ -11,6 +11,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_sparse_map.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -201,9 +202,18 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Direct access to the sparse two-body integral map.
+   * @deprecated Use h2_sparse() for SBT-native access.
    * @return Const reference to the internal two-body map
    */
+  [[deprecated("Use h2_sparse() for SBT-native access.")]]
   const TwoBodyMap& sparse_two_body_integrals() const;
+
+  /**
+   * @brief Two-body integrals as a rank-4 symmetry-blocked sparse map.
+   * @return Const reference to the h2 sparse SBT.
+   * @throws std::runtime_error if not set.
+   */
+  const SymmetryBlockedSparseMap<4>& h2_sparse() const;
 
   /**
    * @brief Access a single one-body integral element.
@@ -219,7 +229,11 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /// Sparse storage of one-body integrals
   Eigen::SparseMatrix<double> _one_body_sparse;
-  /// Sparse storage of two-body integrals (p,q,r,s) -> value
+
+  /// SBT-canonical sparse two-body integrals (source of truth)
+  std::shared_ptr<const SymmetryBlockedSparseMap<4>> _h2_sparse;
+
+  /// v1 stored two-body map (same data as _h2_sparse, different key type)
   TwoBodyMap _two_body_map;
 
   /// Lazy-materialized dense two-body vector for base class interface
@@ -240,6 +254,9 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /// Convert a dense two-body vector to sparse map.
   static TwoBodyMap _to_map(const Eigen::VectorXd& v, size_t n);
+
+  /// Build SymmetryBlockedSparseMap<4> from a TwoBodyMap and set view.
+  void _set_h2_sparse_container(TwoBodyMap map);
 };
 
 }  // namespace qdk::chemistry::data

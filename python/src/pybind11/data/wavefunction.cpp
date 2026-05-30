@@ -187,6 +187,25 @@ It uses variant types to support both real and complex arithmetic.
            &WavefunctionContainer::has_two_rdm_spin_traced,
            "Check if spin-traced two-particle RDM for active orbitals is "
            "available")
+      // SBT-native RDM accessors
+      .def("one_rdm", &WavefunctionContainer::one_rdm,
+           py::return_value_policy::reference_internal,
+           "Spin-dependent 1-RDM as a rank-2 symmetry-blocked tensor.")
+      .def("one_rdm_block", &WavefunctionContainer::one_rdm_block,
+           py::return_value_policy::reference_internal,
+           "1-RDM block for given row/col symmetry labels.", py::arg("row"),
+           py::arg("col"))
+      .def("has_one_rdm", &WavefunctionContainer::has_one_rdm,
+           "True if spin-dependent 1-RDM SBT is available.")
+      .def("two_rdm", &WavefunctionContainer::two_rdm,
+           py::return_value_policy::reference_internal,
+           "Spin-dependent 2-RDM as a rank-4 symmetry-blocked tensor.")
+      .def("two_rdm_block", &WavefunctionContainer::two_rdm_block,
+           py::return_value_policy::reference_internal,
+           "2-RDM block for given symmetry labels.", py::arg("p"), py::arg("q"),
+           py::arg("r"), py::arg("s"))
+      .def("has_two_rdm", &WavefunctionContainer::has_two_rdm,
+           "True if spin-dependent 2-RDM SBT is available.")
       .def("is_complex", &WavefunctionContainer::is_complex,
            "Check if the wavefunction is complex-valued")
       .def("has_single_orbital_entropies",

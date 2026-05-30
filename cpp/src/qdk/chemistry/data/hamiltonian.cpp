@@ -29,23 +29,17 @@ HamiltonianContainer::HamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
-    : _one_body_integrals(
-          make_restricted_one_body_integrals(one_body_integrals)),
-      _inactive_fock_matrix(
-          make_restricted_inactive_fock_matrix(inactive_fock_matrix)),
-      _orbitals(orbitals),
-      _core_energy(core_energy),
-      _type(type) {
+    : _orbitals(orbitals), _core_energy(core_energy), _type(type) {
   QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
-
-  // Validate that orbitals have the necessary data
   if (!orbitals->has_active_space()) {
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
+  _set_h1_container(one_body_integrals, nullptr);
+  _set_inactive_fock_container(inactive_fock_matrix, nullptr);
 }
 
 HamiltonianContainer::HamiltonianContainer(
@@ -54,12 +48,27 @@ HamiltonianContainer::HamiltonianContainer(
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
-    : _one_body_integrals(
-          std::make_unique<Eigen::MatrixXd>(one_body_integrals_alpha),
-          std::make_unique<Eigen::MatrixXd>(one_body_integrals_beta)),
-      _inactive_fock_matrix(
-          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_alpha),
-          std::make_unique<Eigen::MatrixXd>(inactive_fock_matrix_beta)),
+    : _orbitals(orbitals), _core_energy(core_energy), _type(type) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!orbitals) {
+    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
+  }
+  if (!orbitals->has_active_space()) {
+    throw std::runtime_error(
+        "Orbitals must have an active space set for HamiltonianContainer");
+  }
+  _set_h1_container(one_body_integrals_alpha, &one_body_integrals_beta);
+  _set_inactive_fock_container(inactive_fock_matrix_alpha,
+                               &inactive_fock_matrix_beta);
+}
+
+HamiltonianContainer::HamiltonianContainer(
+    SymmetryBlockedTensor<2> h1, std::shared_ptr<Orbitals> orbitals,
+    double core_energy, SymmetryBlockedTensor<2> inactive_fock,
+    HamiltonianType type)
+    : _h1(std::make_shared<const SymmetryBlockedTensor<2>>(std::move(h1))),
+      _inactive_fock_sbt(std::make_shared<const SymmetryBlockedTensor<2>>(
+          std::move(inactive_fock))),
       _orbitals(orbitals),
       _core_energy(core_energy),
       _type(type) {
@@ -67,12 +76,12 @@ HamiltonianContainer::HamiltonianContainer(
   if (!orbitals) {
     throw std::invalid_argument("Orbitals pointer cannot be nullptr");
   }
-
-  // Validate that orbitals have the necessary data
   if (!orbitals->has_active_space()) {
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
+  _init_h1_views();
+  _init_inactive_fock_views();
 }
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
@@ -295,6 +304,138 @@ HamiltonianContainer::make_restricted_inactive_fock_matrix(
   return std::make_pair(
       shared_matrix,
       shared_matrix);  // Both alpha and beta point to same data
+}
+
+// ---- SBT-canonical container builders and view initialisers ----------------
+
+void HamiltonianContainer::_set_h1_container(const Eigen::MatrixXd& alpha,
+                                             const Eigen::MatrixXd* beta) {
+  if (alpha.size() == 0) {
+    // Empty h1 — set views to empty matrices (no SBT).
+    auto empty = std::make_shared<const Eigen::MatrixXd>(alpha);
+    _one_body_integrals = {
+        empty, beta ? std::make_shared<const Eigen::MatrixXd>(*beta) : empty};
+    return;
+  }
+
+  auto sym = _orbitals->symmetries();
+  auto active_indices = _orbitals->get_active_space_indices();
+  std::size_t n_active_alpha = active_indices.first.size();
+  std::size_t n_active_beta = active_indices.second.size();
+
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[alpha_label] = n_active_alpha;
+  ext[beta_label] = n_active_beta;
+
+  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {sym, sym};
+  SymmetryBlockedTensor<2>::ExtentsArray extents = {ext, ext};
+
+  auto alpha_block = std::make_shared<const Eigen::MatrixXd>(alpha);
+  SymmetryBlockedTensor<2>::BlockMap blocks;
+  blocks[{alpha_label, alpha_label}] = alpha_block;
+
+  if (beta != nullptr) {
+    auto beta_block = std::make_shared<const Eigen::MatrixXd>(*beta);
+    blocks[{beta_label, beta_label}] = beta_block;
+  }
+
+  _h1 = std::make_shared<const SymmetryBlockedTensor<2>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+  _init_h1_views();
+}
+
+void HamiltonianContainer::_set_inactive_fock_container(
+    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd* beta) {
+  if (alpha.size() == 0) {
+    // Empty inactive Fock — set views to empty matrices (no SBT).
+    auto empty = std::make_shared<const Eigen::MatrixXd>(alpha);
+    _inactive_fock_matrix = {
+        empty, beta ? std::make_shared<const Eigen::MatrixXd>(*beta) : empty};
+    return;
+  }
+
+  auto sym = _orbitals->symmetries();
+  std::size_t nmo = _orbitals->get_num_molecular_orbitals();
+
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[alpha_label] = nmo;
+  ext[beta_label] = nmo;
+
+  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {sym, sym};
+  SymmetryBlockedTensor<2>::ExtentsArray extents = {ext, ext};
+
+  auto alpha_block = std::make_shared<const Eigen::MatrixXd>(alpha);
+  SymmetryBlockedTensor<2>::BlockMap blocks;
+  blocks[{alpha_label, alpha_label}] = alpha_block;
+
+  if (beta != nullptr) {
+    auto beta_block = std::make_shared<const Eigen::MatrixXd>(*beta);
+    blocks[{beta_label, beta_label}] = beta_block;
+  }
+
+  _inactive_fock_sbt = std::make_shared<const SymmetryBlockedTensor<2>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+  _init_inactive_fock_views();
+}
+
+void HamiltonianContainer::_init_h1_views() {
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  _one_body_integrals.first = _h1->block_ptr({alpha_label, alpha_label});
+  if (_h1->has_block({beta_label, beta_label})) {
+    _one_body_integrals.second = _h1->block_ptr({beta_label, beta_label});
+  } else {
+    _one_body_integrals.second = _one_body_integrals.first;
+  }
+}
+
+void HamiltonianContainer::_init_inactive_fock_views() {
+  SymmetryLabel alpha_label({axes::alpha()});
+  SymmetryLabel beta_label({axes::beta()});
+
+  _inactive_fock_matrix.first =
+      _inactive_fock_sbt->block_ptr({alpha_label, alpha_label});
+  if (_inactive_fock_sbt->has_block({beta_label, beta_label})) {
+    _inactive_fock_matrix.second =
+        _inactive_fock_sbt->block_ptr({beta_label, beta_label});
+  } else {
+    _inactive_fock_matrix.second = _inactive_fock_matrix.first;
+  }
+}
+
+// ---- SBT-native accessors --------------------------------------------------
+
+const SymmetryBlockedTensor<2>& HamiltonianContainer::h1() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_h1) {
+    throw std::runtime_error("One-body SBT (h1) is not set.");
+  }
+  return *_h1;
+}
+
+const Eigen::MatrixXd& HamiltonianContainer::h1_block(
+    const SymmetryLabel& row, const SymmetryLabel& col) const {
+  return h1().block({row, col});
+}
+
+const SymmetryBlockedTensor<2>& HamiltonianContainer::inactive_fock() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_inactive_fock_sbt) {
+    throw std::runtime_error("Inactive Fock SBT is not set.");
+  }
+  return *_inactive_fock_sbt;
+}
+
+const Eigen::MatrixXd& HamiltonianContainer::inactive_fock_block(
+    const SymmetryLabel& row, const SymmetryLabel& col) const {
+  return inactive_fock().block({row, col});
 }
 
 void HamiltonianContainer::to_fcidump_file(const std::string& filename,

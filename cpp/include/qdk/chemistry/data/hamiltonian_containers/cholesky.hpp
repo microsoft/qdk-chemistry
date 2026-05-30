@@ -50,6 +50,11 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
    *
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
+  /**
+   * @brief Constructor for restricted Cholesky Hamiltonian.
+   * @deprecated Use the SBT-native constructor instead.
+   */
+  [[deprecated("Use the SBT-native constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& three_center_integrals,
@@ -59,32 +64,10 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
-   * @brief Constructor for active space Hamiltonian with three center integrals
-   * using separate spin components
-   *
-   * @param one_body_integrals_alpha One-electron integrals for alpha spin in MO
-   * basis
-   * @param one_body_integrals_beta One-electron integrals for beta spin in MO
-   * basis
-   * @param three_center_integrals_aa Three-center two-electron alpha-alpha
-   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
-   * order
-   * @param three_center_integrals_bb Three-center two-electron beta-beta
-   * integrals (ij|Q), where the orbital pair index ij are stored in row-major
-   * order
-   * @param orbitals Shared pointer to molecular orbital data for the system
-   * @param core_energy Core energy (nuclear repulsion + inactive orbital
-   * energy)
-   * @param inactive_fock_matrix_alpha Inactive Fock matrix for alpha spin in
-   * the selected active space
-   * @param inactive_fock_matrix_beta Inactive Fock matrix for beta spin in the
-   * selected active space
-   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
-   * (default: std::nullopt)
-   * @param type Type of Hamiltonian (Hermitian by default)
-   *
-   * @throws std::invalid_argument if orbitals pointer is nullptr
+   * @brief Constructor for unrestricted Cholesky Hamiltonian.
+   * @deprecated Use the SBT-native constructor instead.
    */
+  [[deprecated("Use the SBT-native constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -93,6 +76,25 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
       std::shared_ptr<Orbitals> orbitals, double core_energy,
       const Eigen::MatrixXd& inactive_fock_matrix_alpha,
       const Eigen::MatrixXd& inactive_fock_matrix_beta,
+      std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
+      HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief SBT-native constructor for Cholesky Hamiltonian.
+   * @param h1 One-body integrals as rank-2 SBT.
+   * @param three_center Three-center integrals as rank-2 SBT. Row axis keyed
+   *   by MO spin symmetries (extent = norb^2 per spin), column axis has no
+   *   symmetry (extent = naux).
+   * @param orbitals Shared pointer to molecular orbital data.
+   * @param core_energy Core energy.
+   * @param inactive_fock Inactive Fock matrix as rank-2 SBT.
+   * @param ao_cholesky_vectors Optional AO Cholesky vectors.
+   * @param type Hamiltonian type.
+   */
+  CholeskyHamiltonianContainer(
+      SymmetryBlockedTensor<2> h1, SymmetryBlockedTensor<2> three_center,
+      std::shared_ptr<Orbitals> orbitals, double core_energy,
+      SymmetryBlockedTensor<2> inactive_fock,
       std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
@@ -127,13 +129,19 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
-   * @return Pair of references to (aa, bb) three-center two-electron
-   * integrals matrices, where each matrix is of dimension [(norb x norb) x
-   * naux], with the (norb x norb) part stored in row-major order
-   * @throws std::runtime_error if integrals are not set
+   * @deprecated Use three_center() for SBT-native access.
    */
+  [[deprecated("Use three_center() for SBT-native access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
+
+  /**
+   * @brief Three-center integrals as a rank-2 symmetry-blocked tensor.
+   * Row axis keyed by MO spin symmetries, column axis has no symmetry.
+   * @return Const reference to the three-center SBT.
+   * @throws std::runtime_error if not set.
+   */
+  const SymmetryBlockedTensor<2>& three_center() const;
 
   /**
    * @brief Get the optional AO Cholesky vectors
@@ -210,13 +218,14 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
-  /**
-   * Three-center integrals in MO basis, where each channel is stored as a
-   * matrix of dimension [(norb x norb) x naux] where norb x norb is stored in
-   * row major order
-   */
-  const std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                  std::shared_ptr<Eigen::MatrixXd>>
+  /// SBT-canonical three-center integrals (source of truth).
+  /// Row axis: MO spin sym (extent = norb^2). Column axis: no sym (extent =
+  /// naux).
+  std::shared_ptr<const SymmetryBlockedTensor<2>> _three_center_sbt;
+
+  /// Non-owning views into _three_center_sbt blocks (for v1 dense access)
+  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
+            std::shared_ptr<const Eigen::MatrixXd>>
       _three_center_integrals;
 
   /**
@@ -242,6 +251,12 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   static std::pair<std::shared_ptr<Eigen::MatrixXd>,
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
+
+  /// Build SBT<2> from dense three-center matrices and set views.
+  void _set_three_center_container(const Eigen::MatrixXd& aa,
+                                   const Eigen::MatrixXd* bb);
+  /// Derive non-owning views from existing SBT<2>.
+  void _init_three_center_views();
 
   /** Serialization version */
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

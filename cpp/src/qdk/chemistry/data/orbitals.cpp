@@ -2,6 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -11,6 +13,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <set>
+#include <span>
 #include <stdexcept>
 
 #include "filename_utils.hpp"
@@ -45,15 +48,15 @@ Orbitals::Orbitals(
         "Energy vector size must match number of orbitals");
   }
 
-  // Set coefficients (restricted)
-  _coefficients.first = std::make_shared<Eigen::MatrixXd>(coefficients);
-  _coefficients.second = _coefficients.first;
-
-  // Set energies if provided
-  if (energies.has_value()) {
-    _energies.first = std::make_shared<Eigen::VectorXd>(energies.value());
-    _energies.second = _energies.first;  // Restricted: alpha = beta
-  }
+  // Build the canonical coefficient/energy containers (restricted: alpha and
+  // beta blocks alias) and point the dense views at them.
+  auto c_alpha = std::make_shared<const Eigen::MatrixXd>(coefficients);
+  std::shared_ptr<const Eigen::VectorXd> e_alpha =
+      energies.has_value()
+          ? std::make_shared<const Eigen::VectorXd>(energies.value())
+          : nullptr;
+  _set_coefficient_containers(c_alpha, c_alpha, e_alpha, e_alpha,
+                              /*restricted=*/true);
 
   // Set AO overlap if provided
   if (ao_overlap.has_value()) {
@@ -157,17 +160,20 @@ Orbitals::Orbitals(
         "Beta energy vector size must match number of orbitals");
   }
 
-  // Set coefficients (unrestricted)
-  _coefficients.first = std::make_shared<Eigen::MatrixXd>(coefficients_alpha);
-  _coefficients.second = std::make_shared<Eigen::MatrixXd>(coefficients_beta);
-
-  // Set energies if provided
-  if (energies_alpha.has_value()) {
-    _energies.first = std::make_shared<Eigen::VectorXd>(energies_alpha.value());
-  }
-  if (energies_beta.has_value()) {
-    _energies.second = std::make_shared<Eigen::VectorXd>(energies_beta.value());
-  }
+  // Build the canonical coefficient/energy containers (unrestricted: distinct
+  // alpha and beta blocks) and point the dense views at them.
+  auto c_alpha = std::make_shared<const Eigen::MatrixXd>(coefficients_alpha);
+  auto c_beta = std::make_shared<const Eigen::MatrixXd>(coefficients_beta);
+  std::shared_ptr<const Eigen::VectorXd> e_alpha =
+      energies_alpha.has_value()
+          ? std::make_shared<const Eigen::VectorXd>(energies_alpha.value())
+          : nullptr;
+  std::shared_ptr<const Eigen::VectorXd> e_beta =
+      energies_beta.has_value()
+          ? std::make_shared<const Eigen::VectorXd>(energies_beta.value())
+          : nullptr;
+  _set_coefficient_containers(c_alpha, c_beta, e_alpha, e_beta,
+                              /*restricted=*/false);
 
   // Set AO overlap if provided
   if (ao_overlap.has_value()) {
@@ -227,55 +233,74 @@ Orbitals::Orbitals(
 
 Orbitals::~Orbitals() = default;
 
+Orbitals::Orbitals(std::shared_ptr<const BasisCoefficients> coefficients,
+                   std::shared_ptr<const OrbitalEnergies> energies,
+                   std::shared_ptr<const OrbitalSpacePartitioning> partitioning,
+                   const std::optional<Eigen::MatrixXd>& ao_overlap,
+                   std::shared_ptr<BasisSet> basis_set) {
+  QDK_LOG_TRACE_ENTERING();
+  if (!coefficients) {
+    throw std::invalid_argument(
+        "Orbitals: basis coefficients container must not be null");
+  }
+  const SymmetryLabel a({axes::alpha()});
+  const SymmetryLabel b({axes::beta()});
+
+  // Store the canonical containers as the source of truth and point the dense
+  // views at the blocks they own (no coefficient/energy data is copied).
+  _basis_coefficients = std::move(coefficients);
+  _orbital_energies = std::move(energies);
+  _init_coefficient_views();
+
+  // Project the partitioning (if provided) into the dense index vectors.
+  if (partitioning) {
+    auto span_to_vec = [](std::span<const std::uint32_t> s) {
+      std::vector<size_t> v;
+      v.reserve(s.size());
+      for (auto x : s) {
+        v.push_back(static_cast<size_t>(x));
+      }
+      return v;
+    };
+    if (partitioning->active()->has(a)) {
+      _active_space_indices.first =
+          span_to_vec(partitioning->active()->indices(a));
+    }
+    if (partitioning->active()->has(b)) {
+      _active_space_indices.second =
+          span_to_vec(partitioning->active()->indices(b));
+    }
+    if (partitioning->inactive()->has(a)) {
+      _inactive_space_indices.first =
+          span_to_vec(partitioning->inactive()->indices(a));
+    }
+    if (partitioning->inactive()->has(b)) {
+      _inactive_space_indices.second =
+          span_to_vec(partitioning->inactive()->indices(b));
+    }
+    _orbital_space_partitioning = std::move(partitioning);
+  }
+
+  if (ao_overlap) {
+    _ao_overlap = std::make_unique<Eigen::MatrixXd>(*ao_overlap);
+  }
+  _basis_set = std::move(basis_set);
+
+  _post_construction_validate();
+}
+
 Orbitals::Orbitals(const Orbitals& other) {
   QDK_LOG_TRACE_ENTERING();
-  // Copy coefficients
-  if (other._coefficients.first) {
-    _coefficients.first =
-        std::make_shared<Eigen::MatrixXd>(*other._coefficients.first);
-  } else {
-    _coefficients.first = nullptr;
-  }
+  // The canonical containers are immutable; share them and re-derive the dense
+  // views so restricted aliasing (pointer-equality) is preserved.
+  _basis_coefficients = other._basis_coefficients;
+  _orbital_energies = other._orbital_energies;
+  _orbital_space_partitioning = other._orbital_space_partitioning;
+  _mo_symmetries_cache = other._mo_symmetries_cache;
+  _init_coefficient_views();
 
-  // For restricted calculation, share the same pointer for alpha and beta
-  if (other._coefficients.second) {
-    if (other._coefficients.first == other._coefficients.second) {
-      // If restricted in source, maintain restriction in copy
-      _coefficients.second = _coefficients.first;
-    } else {
-      // If unrestricted in source, create separate beta coefficients
-      _coefficients.second =
-          std::make_shared<Eigen::MatrixXd>(*other._coefficients.second);
-    }
-  } else {
-    _coefficients.second = nullptr;
-  }
-
-  // Copy energies
-  if (other._energies.first) {
-    _energies.first = std::make_shared<Eigen::VectorXd>(*other._energies.first);
-  } else {
-    _energies.first = nullptr;
-  }
-
-  // For restricted calculation, share the same pointer for alpha and beta
-  if (other._energies.second) {
-    if (other._energies.first == other._energies.second) {
-      // If restricted in source, maintain restriction in copy
-      _energies.second = _energies.first;
-    } else {
-      // If unrestricted in source, create separate beta energies
-      _energies.second =
-          std::make_shared<Eigen::VectorXd>(*other._energies.second);
-    }
-  } else {
-    _energies.second = nullptr;
-  }
-
-  // Copy active space information
+  // Copy active / inactive space information
   _active_space_indices = other._active_space_indices;
-
-  // Copy inactive space information
   _inactive_space_indices = other._inactive_space_indices;
 
   // Copy AO overlap
@@ -285,12 +310,8 @@ Orbitals::Orbitals(const Orbitals& other) {
     _ao_overlap = nullptr;
   }
 
-  // Copy basis set
-  if (other._basis_set) {
-    _basis_set = other._basis_set;  // Shared pointer can be safely copied
-  } else {
-    _basis_set = nullptr;
-  }
+  // Copy basis set (shared pointer can be safely copied)
+  _basis_set = other._basis_set;
 
   // Validate after construction is complete to ensure virtual dispatch works
   _post_construction_validate();
@@ -299,54 +320,15 @@ Orbitals::Orbitals(const Orbitals& other) {
 Orbitals& Orbitals::operator=(const Orbitals& other) {
   QDK_LOG_TRACE_ENTERING();
   if (this != &other) {  // Self-assignment check
-    // Copy coefficients
-    if (other._coefficients.first) {
-      _coefficients.first =
-          std::make_shared<Eigen::MatrixXd>(*other._coefficients.first);
-    } else {
-      _coefficients.first = nullptr;
-    }
+    // Share the immutable canonical containers and re-derive the dense views.
+    _basis_coefficients = other._basis_coefficients;
+    _orbital_energies = other._orbital_energies;
+    _orbital_space_partitioning = other._orbital_space_partitioning;
+    _mo_symmetries_cache = other._mo_symmetries_cache;
+    _init_coefficient_views();
 
-    // For restricted calculation, share the same pointer for alpha and beta
-    if (other._coefficients.second) {
-      if (other._coefficients.first == other._coefficients.second) {
-        // If restricted in source, maintain restriction in copy
-        _coefficients.second = _coefficients.first;
-      } else {
-        // If unrestricted in source, create separate beta coefficients
-        _coefficients.second =
-            std::make_shared<Eigen::MatrixXd>(*other._coefficients.second);
-      }
-    } else {
-      _coefficients.second = nullptr;
-    }
-
-    // Copy energies
-    if (other._energies.first) {
-      _energies.first =
-          std::make_shared<Eigen::VectorXd>(*other._energies.first);
-    } else {
-      _energies.first = nullptr;
-    }
-
-    // For restricted calculation, share the same pointer for alpha and beta
-    if (other._energies.second) {
-      if (other._energies.first == other._energies.second) {
-        // If restricted in source, maintain restriction in copy
-        _energies.second = _energies.first;
-      } else {
-        // If unrestricted in source, create separate beta energies
-        _energies.second =
-            std::make_shared<Eigen::VectorXd>(*other._energies.second);
-      }
-    } else {
-      _energies.second = nullptr;
-    }
-
-    // Copy active space
+    // Copy active / inactive space
     _active_space_indices = other._active_space_indices;
-
-    // Copy inactive space
     _inactive_space_indices = other._inactive_space_indices;
 
     // Copy AO overlap
@@ -356,12 +338,8 @@ Orbitals& Orbitals::operator=(const Orbitals& other) {
       _ao_overlap = nullptr;
     }
 
-    // Copy basis set
-    if (other._basis_set) {
-      _basis_set = other._basis_set;  // Shared pointer can be safely copied
-    } else {
-      _basis_set = nullptr;
-    }
+    // Copy basis set (shared pointer can be safely copied)
+    _basis_set = other._basis_set;
   }
   return *this;
 }
@@ -657,6 +635,194 @@ std::vector<size_t> Orbitals::get_all_mo_indices() const {
   std::vector<size_t> indices(num_molecular_orbitals);
   std::iota(indices.begin(), indices.end(), 0);
   return indices;
+}
+
+// === Symmetry-blocked (SBT-native) interface ===
+
+std::shared_ptr<const Symmetries> Orbitals::_build_mo_symmetries() const {
+  // The single-particle spin axis records only whether the alpha/beta channels
+  // are equivalent (restricted); the total spin (two_s) is a many-body quantity
+  // and is not tracked here.
+  const bool equivalent = is_restricted();
+  return std::make_shared<const Symmetries>(
+      Symmetries({axes::spin(0, equivalent)}));
+}
+
+std::shared_ptr<const Symmetries> Orbitals::symmetries() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_mo_symmetries_cache) {
+    _mo_symmetries_cache = _build_mo_symmetries();
+  }
+  return _mo_symmetries_cache;
+}
+
+std::unordered_map<SymmetryLabel, std::size_t> Orbitals::mo_extents() const {
+  QDK_LOG_TRACE_ENTERING();
+  const std::size_t nmo = get_num_molecular_orbitals();
+  std::unordered_map<SymmetryLabel, std::size_t> extents;
+  extents.emplace(SymmetryLabel({axes::alpha()}), nmo);
+  extents.emplace(SymmetryLabel({axes::beta()}), nmo);
+  return extents;
+}
+
+std::size_t Orbitals::num_modes() const {
+  QDK_LOG_TRACE_ENTERING();
+  return get_num_molecular_orbitals();
+}
+
+std::shared_ptr<const BasisCoefficients> Orbitals::basis_coefficients() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_basis_coefficients) {
+    throw std::runtime_error(
+        "Cannot provide basis coefficients: orbital coefficients not set");
+  }
+  return _basis_coefficients;
+}
+
+std::shared_ptr<const OrbitalEnergies> Orbitals::orbital_energies() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_orbital_energies) {
+    throw std::runtime_error(
+        "Cannot provide orbital energies: orbital energies not set");
+  }
+  return _orbital_energies;
+}
+
+std::shared_ptr<const OrbitalSpacePartitioning>
+Orbitals::orbital_space_partitioning() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_orbital_space_partitioning) {
+    _orbital_space_partitioning = _build_orbital_space_partitioning();
+  }
+  return _orbital_space_partitioning;
+}
+
+void Orbitals::_set_coefficient_containers(
+    std::shared_ptr<const Eigen::MatrixXd> coefficients_alpha,
+    std::shared_ptr<const Eigen::MatrixXd> coefficients_beta,
+    std::shared_ptr<const Eigen::VectorXd> energies_alpha,
+    std::shared_ptr<const Eigen::VectorXd> energies_beta, bool restricted) {
+  const SymmetryLabel a({axes::alpha()});
+  const SymmetryLabel b({axes::beta()});
+  auto sym = std::make_shared<const Symmetries>(
+      Symmetries({axes::spin(0, restricted)}));
+
+  const std::size_t nao = static_cast<std::size_t>(coefficients_alpha->rows());
+  const std::size_t nmo = static_cast<std::size_t>(coefficients_alpha->cols());
+  std::unordered_map<SymmetryLabel, std::size_t> ao_ext;
+  ao_ext.emplace(a, nao);
+  ao_ext.emplace(b, nao);
+  std::unordered_map<SymmetryLabel, std::size_t> mo_ext;
+  mo_ext.emplace(a, nmo);
+  mo_ext.emplace(b, nmo);
+
+  {
+    using Sbt = BasisCoefficients::Sbt;
+    Sbt::BlockMap blocks;
+    blocks.emplace(Sbt::Labels{a, a}, std::move(coefficients_alpha));
+    if (!restricted) {
+      blocks.emplace(Sbt::Labels{b, b}, std::move(coefficients_beta));
+    }
+    auto sbt = std::make_shared<const Sbt>(Sbt::SymmetriesArray{sym, sym},
+                                           Sbt::ExtentsArray{ao_ext, mo_ext},
+                                           std::move(blocks));
+    _basis_coefficients = std::make_shared<const BasisCoefficients>(sbt);
+  }
+
+  if (energies_alpha) {
+    using Sbt = OrbitalEnergies::Sbt;
+    Sbt::BlockMap blocks;
+    blocks.emplace(Sbt::Labels{a}, std::move(energies_alpha));
+    if (!restricted) {
+      blocks.emplace(Sbt::Labels{b}, std::move(energies_beta));
+    }
+    auto sbt = std::make_shared<const Sbt>(Sbt::SymmetriesArray{sym},
+                                           Sbt::ExtentsArray{mo_ext},
+                                           std::move(blocks));
+    _orbital_energies = std::make_shared<const OrbitalEnergies>(sbt);
+  } else {
+    _orbital_energies = nullptr;
+  }
+
+  _init_coefficient_views();
+}
+
+void Orbitals::_init_coefficient_views() {
+  const SymmetryLabel a({axes::alpha()});
+  const SymmetryLabel b({axes::beta()});
+  if (_basis_coefficients) {
+    using Sbt = BasisCoefficients::Sbt;
+    const auto& tensor = _basis_coefficients->tensor();
+    _coefficients.first = tensor->block_ptr(Sbt::Labels{a, a});
+    _coefficients.second = _basis_coefficients->is_restricted()
+                               ? _coefficients.first
+                               : tensor->block_ptr(Sbt::Labels{b, b});
+  } else {
+    _coefficients = {nullptr, nullptr};
+  }
+  if (_orbital_energies) {
+    using Sbt = OrbitalEnergies::Sbt;
+    const auto& tensor = _orbital_energies->tensor();
+    _energies.first = tensor->block_ptr(Sbt::Labels{a});
+    _energies.second = tensor->has_block(Sbt::Labels{b})
+                           ? tensor->block_ptr(Sbt::Labels{b})
+                           : _energies.first;
+  } else {
+    _energies = {nullptr, nullptr};
+  }
+}
+
+std::shared_ptr<const OrbitalSpacePartitioning>
+Orbitals::_build_orbital_space_partitioning() const {
+  auto sym = symmetries();
+  auto mo_ext = mo_extents();
+
+  const bool has_partition = !_active_space_indices.first.empty() ||
+                             !_inactive_space_indices.first.empty() ||
+                             !_active_space_indices.second.empty() ||
+                             !_inactive_space_indices.second.empty();
+  if (!has_partition) {
+    return OrbitalSpacePartitioning::all_active(sym, mo_ext);
+  }
+
+  auto virtual_indices = get_virtual_space_indices();
+
+  auto to_sorted_u32 = [](const std::vector<size_t>& v) {
+    std::vector<std::uint32_t> out;
+    out.reserve(v.size());
+    for (size_t i : v) {
+      out.push_back(static_cast<std::uint32_t>(i));
+    }
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+  };
+
+  const SymmetryLabel a({axes::alpha()});
+  const SymmetryLabel b({axes::beta()});
+
+  auto make_index_set = [&](const std::vector<size_t>& alpha_v,
+                            const std::vector<size_t>& beta_v) {
+    std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> idx;
+    idx.emplace(a, to_sorted_u32(alpha_v));
+    idx.emplace(b, to_sorted_u32(beta_v));
+    return std::make_shared<const SymmetryBlockedIndexSet>(sym, mo_ext, idx);
+  };
+
+  OrbitalSpacePartitioning::IndexSetArray spaces;
+  spaces[static_cast<std::size_t>(OrbitalSpace::Frozen)] =
+      make_index_set({}, {});
+  spaces[static_cast<std::size_t>(OrbitalSpace::Inactive)] = make_index_set(
+      _inactive_space_indices.first, _inactive_space_indices.second);
+  spaces[static_cast<std::size_t>(OrbitalSpace::Active)] =
+      make_index_set(_active_space_indices.first, _active_space_indices.second);
+  spaces[static_cast<std::size_t>(OrbitalSpace::Virtual)] =
+      make_index_set(virtual_indices.first, virtual_indices.second);
+  spaces[static_cast<std::size_t>(OrbitalSpace::External)] =
+      make_index_set({}, {});
+
+  return std::make_shared<const OrbitalSpacePartitioning>(
+      OrbitalSpacePartitioning(spaces));
 }
 
 bool Orbitals::is_restricted() const {
@@ -1686,52 +1852,52 @@ ModelOrbitals& ModelOrbitals::operator=(const ModelOrbitals& other) {
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 ModelOrbitals::get_coefficients() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_coefficients() not available for model systems");
 }
 
 std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
 ModelOrbitals::get_energies() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_energies() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_overlap_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_overlap_matrix() not available for model systems");
 }
 
 std::shared_ptr<BasisSet> ModelOrbitals::get_basis_set() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_basis_set() not available for model systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_coefficients_alpha() not available for model "
       "systems");
 }
 
 const Eigen::MatrixXd& ModelOrbitals::get_coefficients_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_coefficients_beta() not available for model "
       "systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_energies_alpha() not available for model systems");
 }
 
 const Eigen::VectorXd& ModelOrbitals::get_energies_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: get_energies_beta() not available for model systems");
 }
 
@@ -1740,7 +1906,7 @@ ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations_alpha,
     const Eigen::VectorXd& occupations_beta) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
 }
@@ -1748,7 +1914,7 @@ ModelOrbitals::calculate_ao_density_matrix(
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix(
     const Eigen::VectorXd& occupations) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: calculate_ao_density_matrix() not available for model "
       "systems");
 }
@@ -1757,7 +1923,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
 ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm_alpha, const Eigen::MatrixXd& rdm_beta) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
       "model systems");
@@ -1766,7 +1932,7 @@ ModelOrbitals::calculate_ao_density_matrix_from_rdm(
 Eigen::MatrixXd ModelOrbitals::calculate_ao_density_matrix_from_rdm(
     const Eigen::MatrixXd& rdm) const {
   QDK_LOG_TRACE_ENTERING();
-  throw std::runtime_error(
+  throw ModelOrbitalsNoBasisSetError(
       "ModelOrbitals: calculate_ao_density_matrix_from_rdm() not available "
       "for "
       "model systems");
@@ -2063,6 +2229,15 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
+}
+
+std::shared_ptr<const Symmetries> ao_symmetries(
+    const std::shared_ptr<const SingleParticleBasis>& basis) {
+  auto orbitals = std::dynamic_pointer_cast<const Orbitals>(basis);
+  if (!orbitals || !orbitals->has_basis_set()) {
+    return nullptr;
+  }
+  return orbitals->get_basis_set()->ao_symmetries();
 }
 }  // namespace data
 }  // namespace qdk::chemistry

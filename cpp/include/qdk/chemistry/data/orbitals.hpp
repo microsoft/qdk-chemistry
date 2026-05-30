@@ -10,8 +10,14 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/data/errors.hpp>
+#include <qdk/chemistry/data/orbital_containers/basis_coefficients.hpp>
+#include <qdk/chemistry/data/orbital_containers/orbital_energies.hpp>
+#include <qdk/chemistry/data/orbital_containers/orbital_space_partitioning.hpp>
+#include <qdk/chemistry/data/single_particle_basis.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -32,7 +38,7 @@ namespace qdk::chemistry::data {
  * This class is immutable after construction - all data must be provided
  * during construction and cannot be modified afterward.
  */
-class Orbitals : public DataClass,
+class Orbitals : public SingleParticleBasis,
                  public std::enable_shared_from_this<Orbitals> {
  public:
   typedef std::tuple<std::vector<size_t>, std::vector<size_t>>
@@ -79,6 +85,27 @@ class Orbitals : public DataClass,
            const std::optional<UnrestrictedCASIndices>& indices = std::nullopt);
 
   /**
+   * @brief Constructor from symmetry-blocked storage primitives (SBT-native).
+   *
+   * This is the preferred construction path: it builds an Orbitals object
+   * directly from the symmetry-blocked containers, without going through the
+   * dense (deprecated) v1 inputs. It emits no deprecation warnings.
+   *
+   * @param coefficients Basis coefficient container (AO x MO blocks)
+   * @param energies Orbital energy container (may be nullptr if unavailable)
+   * @param partitioning Orbital-space partitioning (may be nullptr; defaults to
+   * all-active over the molecular-orbital extents)
+   * @param ao_overlap The atomic orbital overlap matrix (optional)
+   * @param basis_set The basis set as shared pointer (may be nullptr)
+   * @throws QdkError if the containers are inconsistent
+   */
+  Orbitals(std::shared_ptr<const BasisCoefficients> coefficients,
+           std::shared_ptr<const OrbitalEnergies> energies,
+           std::shared_ptr<const OrbitalSpacePartitioning> partitioning,
+           const std::optional<Eigen::MatrixXd>& ao_overlap,
+           std::shared_ptr<BasisSet> basis_set);
+
+  /**
    * @brief Destructor
    */
   virtual ~Orbitals();
@@ -97,10 +124,53 @@ class Orbitals : public DataClass,
   Orbitals& operator=(const Orbitals& other);
 
   /**
+   * @brief Get the molecular-orbital basis coefficients as a symmetry-blocked
+   * container (SBT-native accessor).
+   * @return Shared pointer to the basis-coefficient container
+   * @throws std::runtime_error if coefficients are not set
+   */
+  std::shared_ptr<const BasisCoefficients> basis_coefficients() const;
+
+  /**
+   * @brief Get the orbital energies as a symmetry-blocked container
+   * (SBT-native accessor).
+   * @return Shared pointer to the orbital-energy container
+   * @throws std::runtime_error if energies are not set
+   */
+  std::shared_ptr<const OrbitalEnergies> orbital_energies() const;
+
+  /**
+   * @brief Get the orbital-space partitioning as a symmetry-blocked container
+   * (SBT-native accessor).
+   * @return Shared pointer to the orbital-space partitioning container
+   */
+  std::shared_ptr<const OrbitalSpacePartitioning> orbital_space_partitioning()
+      const;
+
+  /**
+   * @brief Single-particle symmetries over the molecular-orbital modes.
+   * @return Shared pointer to the molecular-orbital symmetries
+   */
+  std::shared_ptr<const Symmetries> symmetries() const override;
+
+  /**
+   * @brief Molecular-orbital extents keyed by symmetry label.
+   * @return Map from symmetry label to number of molecular orbitals
+   */
+  std::unordered_map<SymmetryLabel, std::size_t> mo_extents() const override;
+
+  /**
+   * @brief Number of single-particle modes (molecular orbitals).
+   * @return Number of molecular orbitals
+   */
+  std::size_t num_modes() const override;
+
+  /**
    * @brief Get orbital coefficients
    * @return Pair of references to (alpha, beta) coefficient matrices
    * @throws std::runtime_error if coefficients are not set
    */
+  [[deprecated("Use basis_coefficients() instead.")]]
   virtual std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_coefficients() const;
 
@@ -109,6 +179,7 @@ class Orbitals : public DataClass,
    * @return Pair of references to (alpha, beta) energy vectors
    * @throws std::runtime_error if energies are not set
    */
+  [[deprecated("Use orbital_energies() instead.")]]
   virtual std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
   get_energies() const;
 
@@ -122,6 +193,7 @@ class Orbitals : public DataClass,
    * @brief Get active space information
    * @return Pair of (alpha, beta) active space indices
    */
+  [[deprecated("Use orbital_space_partitioning() instead.")]]
   virtual std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_active_space_indices() const;
 
@@ -129,6 +201,7 @@ class Orbitals : public DataClass,
    * @brief Get inactive space information
    * @return Pair of (alpha, beta) inactive space indices
    */
+  [[deprecated("Use orbital_space_partitioning() instead.")]]
   std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_inactive_space_indices() const;
 
@@ -136,6 +209,7 @@ class Orbitals : public DataClass,
    * @brief Get virtual space information (orbitals not in active or inactive)
    * @return Pair of (alpha, beta) virtual space indices
    */
+  [[deprecated("Use orbital_space_partitioning() instead.")]]
   std::pair<std::vector<size_t>, std::vector<size_t>>
   get_virtual_space_indices() const;
 
@@ -157,6 +231,7 @@ class Orbitals : public DataClass,
    * alpha-alpha. For orthonormal MOs, alpha-alpha and beta-beta should be
    * identity matrices.
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd>
   get_mo_overlap() const;
 
@@ -171,6 +246,7 @@ class Orbitals : public DataClass,
    * coefficients. For orthonormal alpha MOs, this should be the identity
    * matrix.
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_alpha_alpha() const;
 
   /**
@@ -181,6 +257,7 @@ class Orbitals : public DataClass,
    * Computes the overlap matrix between alpha and beta molecular orbitals.
    * For restricted calculations, this equals the alpha-alpha overlap matrix.
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_alpha_beta() const;
 
   /**
@@ -194,6 +271,7 @@ class Orbitals : public DataClass,
    * For orthonormal beta MOs, this should be the identity matrix.
    * For restricted calculations, this equals the alpha-alpha overlap matrix.
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_beta_beta() const;
 
   /**
@@ -255,24 +333,28 @@ class Orbitals : public DataClass,
    * @brief Get alpha orbital coefficients
    * @return Reference to alpha coefficient matrix
    */
+  [[deprecated("Use basis_coefficients()->block(...) instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_alpha() const;
 
   /**
    * @brief Get beta orbital coefficients
    * @return Reference to beta coefficient matrix
    */
+  [[deprecated("Use basis_coefficients()->block(...) instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_beta() const;
 
   /**
    * @brief Get alpha orbital energies
    * @return Reference to alpha energy vector
    */
+  [[deprecated("Use orbital_energies()->block(...) instead.")]]
   virtual const Eigen::VectorXd& get_energies_alpha() const;
 
   /**
    * @brief Get beta orbital energies
    * @return Reference to beta energy vector
    */
+  [[deprecated("Use orbital_energies()->block(...) instead.")]]
   virtual const Eigen::VectorXd& get_energies_beta() const;
 
   /**
@@ -299,6 +381,7 @@ class Orbitals : public DataClass,
    * @throws std::runtime_error if occupation vector sizes don't match number of
    * MOs
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
   calculate_ao_density_matrix(const Eigen::VectorXd& occupations_alpha,
                               const Eigen::VectorXd& occupations_beta) const;
@@ -311,6 +394,7 @@ class Orbitals : public DataClass,
    * @throws std::runtime_error if occupation vector size doesn't match number
    * of MOs
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual Eigen::MatrixXd calculate_ao_density_matrix(
       const Eigen::VectorXd& occupations) const;
 
@@ -323,6 +407,7 @@ class Orbitals : public DataClass,
    * @return Pair of (alpha, beta) AO density matrices
    * @throws std::runtime_error if 1RDM matrix sizes don't match number of MOs
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
   calculate_ao_density_matrix_from_rdm(const Eigen::MatrixXd& rdm_alpha,
                                        const Eigen::MatrixXd& rdm_beta) const;
@@ -334,6 +419,7 @@ class Orbitals : public DataClass,
    * @return AO density matrix (total alpha + beta)
    * @throws std::runtime_error if 1RDM matrix size doesn't match number of MOs
    */
+  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual Eigen::MatrixXd calculate_ao_density_matrix_from_rdm(
       const Eigen::MatrixXd& rdm) const;
 
@@ -435,15 +521,79 @@ class Orbitals : public DataClass,
 
  protected:
   /**
-   * Orbital coefficients [AO x MO] for (alpha, beta) spin channels
+   * Cached single-particle (molecular-orbital) symmetries, lazily built.
    */
-  std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
+  mutable std::shared_ptr<const Symmetries> _mo_symmetries_cache = nullptr;
+
+  /**
+   * Canonical symmetry-blocked coefficient/energy storage (the source of
+   * truth). The dense @ref _coefficients / @ref _energies pairs below are
+   * non-owning views aliasing the blocks owned by these containers; they hold
+   * no orbital data of their own. Both are null for @ref ModelOrbitals, which
+   * carries no basis.
+   */
+  std::shared_ptr<const BasisCoefficients> _basis_coefficients = nullptr;
+  std::shared_ptr<const OrbitalEnergies> _orbital_energies = nullptr;
+
+  /**
+   * Canonical orbital-space partitioning, lazily projected from the
+   * order-preserving active/inactive index vectors below (which remain the
+   * writable store so v1 index ordering, serialization order, and direct
+   * subclass writes via set_active_space() are preserved exactly).
+   */
+  mutable std::shared_ptr<const OrbitalSpacePartitioning>
+      _orbital_space_partitioning = nullptr;
+
+  /**
+   * @brief Build (and cache) the molecular-orbital symmetries from the current
+   * restricted/unrestricted state.
+   */
+  std::shared_ptr<const Symmetries> _build_mo_symmetries() const;
+
+  /**
+   * @brief Build the canonical @ref BasisCoefficients / @ref OrbitalEnergies
+   * containers from dense spin blocks, then point the dense views at them.
+   * @param coefficients_alpha Alpha coefficient block [AO x MO] (required)
+   * @param coefficients_beta Beta coefficient block [AO x MO] (ignored when
+   *        @p restricted)
+   * @param energies_alpha Alpha energy block, or null when energies are unset
+   * @param energies_beta Beta energy block (ignored when @p restricted)
+   * @param restricted True iff the spin blocks alias (restricted)
+   */
+  void _set_coefficient_containers(
+      std::shared_ptr<const Eigen::MatrixXd> coefficients_alpha,
+      std::shared_ptr<const Eigen::MatrixXd> coefficients_beta,
+      std::shared_ptr<const Eigen::VectorXd> energies_alpha,
+      std::shared_ptr<const Eigen::VectorXd> energies_beta, bool restricted);
+
+  /**
+   * @brief Point the dense @ref _coefficients / @ref _energies views at the
+   * blocks owned by the canonical containers (no data is copied). Leaves the
+   * views null when the corresponding container is null.
+   */
+  void _init_coefficient_views();
+
+  /**
+   * @brief Project the order-preserving active/inactive index vectors into an
+   * @ref OrbitalSpacePartitioning container.
+   */
+  std::shared_ptr<const OrbitalSpacePartitioning>
+  _build_orbital_space_partitioning() const;
+
+  /**
+   * Dense views over the (alpha, beta) coefficient blocks [AO x MO], aliasing
+   * into @ref _basis_coefficients (no independent ownership).
+   */
+  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
+            std::shared_ptr<const Eigen::MatrixXd>>
       _coefficients = {nullptr, nullptr};
 
   /**
-   * Orbital energies for (alpha, beta) spin channels
+   * Dense views over the (alpha, beta) orbital-energy blocks, aliasing into
+   * @ref _orbital_energies (no independent ownership).
    */
-  std::pair<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>>
+  std::pair<std::shared_ptr<const Eigen::VectorXd>,
+            std::shared_ptr<const Eigen::VectorXd>>
       _energies = {nullptr, nullptr};
 
   /**
@@ -657,5 +807,21 @@ class ModelOrbitals : public Orbitals {
 static_assert(DataClassCompliant<Orbitals>,
               "Orbitals must derive from DataClass and implement all required "
               "deserialization methods");
+
+/**
+ * @brief Retrieve the AO-basis symmetry vocabulary backing a single-particle
+ * basis, if it has one.
+ *
+ * For an @ref Orbitals carrying a basis set, this returns the AO symmetries of
+ * that basis set (see @ref BasisSet::ao_symmetries). For a @ref ModelOrbitals
+ * (or any single-particle basis without an underlying AO basis set), it returns
+ * @c nullptr.
+ *
+ * @param basis Single-particle basis to inspect (may be @c nullptr)
+ * @return Shared pointer to the AO @ref Symmetries, or @c nullptr if the basis
+ *         has no underlying AO basis set
+ */
+std::shared_ptr<const Symmetries> ao_symmetries(
+    const std::shared_ptr<const SingleParticleBasis>& basis);
 
 }  // namespace qdk::chemistry::data
