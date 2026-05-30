@@ -69,9 +69,9 @@ class QdkQubitMapper(QubitMapper):
     ``name`` and ``base_encoding`` are used only for metadata on the
     output :class:`~qdk_chemistry.data.QubitHamiltonian`, not for dispatch.
 
-    Both restricted (RHF) and unrestricted (UHF) orbital sets are supported.
-    For restricted orbitals the engine uses a spin-summed fast path; for
-    unrestricted orbitals it handles all spin-channel ERI blocks independently.
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, the engine handles all four spin-channel ERI
+    blocks (aa, ab, ba, bb) independently.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
