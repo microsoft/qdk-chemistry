@@ -13,6 +13,7 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/sparse.cpp
     majorana_map_engine.cpp
     majorana_mapping.cpp
+    majorana_mapping_factories.cpp
     orbitals.cpp
     pauli_operator.cpp
     settings.cpp

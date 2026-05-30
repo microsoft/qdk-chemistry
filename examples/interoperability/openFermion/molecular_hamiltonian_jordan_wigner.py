@@ -76,7 +76,7 @@ Logger.info(f"  SCF total energy: {scf_energy: .8f} Hartree")
 # 3. QDK → OpenFermion: map to qubits via the plugin, then exact-diagonalise
 ########################################################################################
 mapper = create("qubit_mapper", "openfermion")
-n_spin_orbitals = 2 * active_hamiltonian.get_one_body_integrals()[0].shape[0]
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
 mapping = MajoranaMapping.jordan_wigner(n_spin_orbitals)
 qdk_qubit_ham = mapper.run(active_hamiltonian, mapping)
 

@@ -36,7 +36,7 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
 from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 
-n_spin_orbitals = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
 qubit_mapper = create("qubit_mapper")
 qubit_ham = qubit_mapper.run(
     hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)

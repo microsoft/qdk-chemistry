@@ -53,7 +53,7 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(active_orbitals)
 
 # Determine the number of spin-orbitals
-n_spatial = hamiltonian.get_one_body_integrals()[0].shape[0]
+n_spatial = hamiltonian.get_orbitals().get_num_molecular_orbitals()
 n_spin_orbitals = 2 * n_spatial
 
 # Choose an encoding
