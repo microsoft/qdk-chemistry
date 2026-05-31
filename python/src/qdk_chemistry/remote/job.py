@@ -135,8 +135,7 @@ class Job:
         """Reconstruct a ``Job`` from a previously saved file.
 
         Args:
-            path: Path to a ``job_<id>.json`` file.
-
+            path: Path to a ``*.job.json`` file.
         Returns:
             A fully re-hydrated ``Job`` ready for
             :meth:`check`, :meth:`cancel`, or :meth:`fetch`.
@@ -186,7 +185,7 @@ class Job:
     @property
     def is_terminal(self) -> bool:
         """Whether the job has reached a final state."""
-        return self.status in ("Succeeded", "Failed", "canceled", "retrieved")
+        return (self.status or "").lower() in ("succeeded", "failed", "canceled", "cancelled", "retrieved")
 
     def __repr__(self) -> str:
         """Return a developer-friendly string representation."""
