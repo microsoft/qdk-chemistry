@@ -50,8 +50,7 @@ class QubitMapper(Algorithm):
         mapping engine.  Any valid table works, including custom encodings
         that have no name.
 
-    **Name-dispatched backends** (e.g. ``OpenFermionQubitMapper``,
-    ``QiskitQubitMapper``)
+    **Name-dispatched backends** (e.g. ``OpenFermionQubitMapper``, ``QiskitQubitMapper``)
         **Ignore** ``mapping.table`` entirely.  Instead they read
         ``mapping.base_encoding`` (a string like ``"jordan-wigner"`` or
         ``"bravyi-kitaev-tree"``) and use it to look up the corresponding
