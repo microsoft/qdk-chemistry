@@ -6,11 +6,13 @@
 #include <H5Cpp.h>
 
 #include <Eigen/Dense>
+#include <cstdint>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/single_particle_basis.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
@@ -198,6 +200,18 @@ class Orbitals : public SingleParticleBasis,
   [[deprecated("Use Orbitals virtual-space index vectors directly.")]]
   std::pair<std::vector<size_t>, std::vector<size_t>>
   get_virtual_space_indices() const;
+
+  /**
+   * @brief Get active-space indices as a symmetry-blocked index set.
+   * @return Shared pointer to the active-space index set, or null if unset
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> active_indices() const;
+
+  /**
+   * @brief Get inactive-space indices as a symmetry-blocked index set.
+   * @return Shared pointer to the inactive-space index set, or null if unset
+   */
+  std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices() const;
 
   // === Molecular orbital overlap ===
 
@@ -546,6 +560,16 @@ class Orbitals : public SingleParticleBasis,
   void _init_coefficient_views();
 
   /**
+   * @brief Lazily build the active-space symmetry-blocked index set cache.
+   */
+  void _build_active_indices_sbt() const;
+
+  /**
+   * @brief Lazily build the inactive-space symmetry-blocked index set cache.
+   */
+  void _build_inactive_indices_sbt() const;
+
+  /**
    * Dense views over the (alpha, beta) coefficient blocks [AO x MO], aliasing
    * into @ref _coefficients_sbt (no independent ownership).
    */
@@ -568,10 +592,22 @@ class Orbitals : public SingleParticleBasis,
       {}, {}};
 
   /**
+   * Active-space indices as a derived symmetry-blocked index-set view.
+   */
+  mutable std::shared_ptr<const SymmetryBlockedIndexSet> _active_indices_sbt =
+      nullptr;
+
+  /**
    * Inactive space indices for (alpha, beta) spin channels
    */
   std::pair<std::vector<size_t>, std::vector<size_t>> _inactive_space_indices =
       {{}, {}};
+
+  /**
+   * Inactive-space indices as a derived symmetry-blocked index-set view.
+   */
+  mutable std::shared_ptr<const SymmetryBlockedIndexSet> _inactive_indices_sbt =
+      nullptr;
 
   /**
    * Atomic orbital overlap matrix [AO x AO]
@@ -646,6 +682,11 @@ class Orbitals : public SingleParticleBasis,
   static std::shared_ptr<Orbitals> _from_hdf5_file(const std::string& filename);
 
  protected:
+  /**
+   * @brief Invalidate cached symmetry-blocked active/inactive index views.
+   */
+  void _invalidate_space_index_sets();
+
   // Protected default constructor for use by subclasses
   Orbitals() = default;
 };

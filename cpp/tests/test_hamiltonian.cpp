@@ -1771,6 +1771,7 @@ class ForceUnrestrictedOrbitals : public Orbitals {
   void set_active_space(const std::vector<size_t>& alpha_active,
                         const std::vector<size_t>& beta_active) {
     _active_space_indices = {alpha_active, beta_active};
+    _invalidate_space_index_sets();
   }
 };
 

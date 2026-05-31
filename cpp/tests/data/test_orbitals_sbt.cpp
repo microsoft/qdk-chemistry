@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <filesystem>
 #include <memory>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
@@ -87,6 +88,76 @@ TEST(OrbitalsSbtTest, ActiveInactiveVectorsReflectIndices) {
   auto [virtual_alpha, virtual_beta] = orbitals->get_virtual_space_indices();
   EXPECT_EQ(virtual_alpha, std::vector<size_t>({3, 4}));
   EXPECT_EQ(virtual_beta, std::vector<size_t>({3, 4}));
+}
+
+TEST(OrbitalsSbtTest, ActiveInactiveIndexSetsAreBuiltLazilyFromDenseVectors) {
+  Eigen::MatrixXd c = Eigen::MatrixXd::Identity(5, 5);
+  Orbitals::UnrestrictedCASIndices indices({1, 3}, {0, 4}, {0}, {2});
+  auto basis = testing::create_random_basis_set(c.rows());
+  auto orbitals = std::make_shared<Orbitals>(c, c, std::nullopt, std::nullopt,
+                                             std::nullopt, basis,
+                                             std::make_optional(indices));
+
+  auto active = orbitals->active_indices();
+  auto inactive = orbitals->inactive_indices();
+  ASSERT_NE(active, nullptr);
+  ASSERT_NE(inactive, nullptr);
+  EXPECT_EQ(active.get(), orbitals->active_indices().get());
+  EXPECT_EQ(inactive.get(), orbitals->inactive_indices().get());
+
+  auto active_alpha = active->indices(alpha());
+  auto active_beta = active->indices(beta());
+  ASSERT_EQ(active_alpha.size(), 2u);
+  ASSERT_EQ(active_beta.size(), 2u);
+  EXPECT_EQ(active_alpha[0], 1u);
+  EXPECT_EQ(active_alpha[1], 3u);
+  EXPECT_EQ(active_beta[0], 0u);
+  EXPECT_EQ(active_beta[1], 4u);
+  EXPECT_EQ(active->extents().at(alpha()), 5u);
+  EXPECT_EQ(active->extents().at(beta()), 5u);
+
+  auto inactive_alpha = inactive->indices(alpha());
+  auto inactive_beta = inactive->indices(beta());
+  ASSERT_EQ(inactive_alpha.size(), 1u);
+  ASSERT_EQ(inactive_beta.size(), 1u);
+  EXPECT_EQ(inactive_alpha[0], 0u);
+  EXPECT_EQ(inactive_beta[0], 2u);
+}
+
+TEST(OrbitalsSbtTest, IndexSetsRebuildFromSerializedDenseIndices) {
+  Eigen::MatrixXd c = Eigen::MatrixXd::Identity(4, 4);
+  Orbitals::RestrictedCASIndices indices({1, 2}, {0});
+  auto basis = testing::create_random_basis_set(c.rows());
+  auto orbitals = std::make_shared<Orbitals>(
+      c, std::nullopt, std::nullopt, basis, std::make_optional(indices));
+
+  auto restored_from_json = Orbitals::from_json(orbitals->to_json());
+  auto active_from_json = restored_from_json->active_indices();
+  auto inactive_from_json = restored_from_json->inactive_indices();
+  ASSERT_NE(active_from_json, nullptr);
+  ASSERT_NE(inactive_from_json, nullptr);
+  EXPECT_EQ(active_from_json->indices(alpha()).size(), 2u);
+  EXPECT_EQ(active_from_json->indices(beta()).size(), 2u);
+  EXPECT_EQ(inactive_from_json->indices(alpha()).size(), 1u);
+  EXPECT_EQ(inactive_from_json->indices(beta()).size(), 1u);
+
+  const auto filename = "orbitals_sbt_index_sets.orbitals.h5";
+  orbitals->to_hdf5_file(filename);
+  auto cleanup = [&filename]() { std::filesystem::remove(filename); };
+
+  auto restored_from_hdf5 = Orbitals::from_hdf5_file(filename);
+  cleanup();
+
+  auto active_from_hdf5 = restored_from_hdf5->active_indices();
+  auto inactive_from_hdf5 = restored_from_hdf5->inactive_indices();
+  ASSERT_NE(active_from_hdf5, nullptr);
+  ASSERT_NE(inactive_from_hdf5, nullptr);
+  EXPECT_EQ(active_from_hdf5->indices(alpha())[0], 1u);
+  EXPECT_EQ(active_from_hdf5->indices(alpha())[1], 2u);
+  EXPECT_EQ(active_from_hdf5->indices(beta())[0], 1u);
+  EXPECT_EQ(active_from_hdf5->indices(beta())[1], 2u);
+  EXPECT_EQ(inactive_from_hdf5->indices(alpha())[0], 0u);
+  EXPECT_EQ(inactive_from_hdf5->indices(beta())[0], 0u);
 }
 
 TEST(OrbitalsSbtTest, SbtNativeConstructorRoundTrips) {

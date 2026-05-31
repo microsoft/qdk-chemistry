@@ -3,6 +3,7 @@
 // license information.
 
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <numeric>
@@ -21,6 +22,14 @@
 
 namespace qdk::chemistry {
 namespace data {
+
+namespace {
+
+std::vector<std::uint32_t> to_u32_indices(const std::vector<size_t>& indices) {
+  return std::vector<std::uint32_t>(indices.begin(), indices.end());
+}
+
+}  // namespace
 
 Orbitals::Orbitals(
     const Eigen::MatrixXd& coefficients,
@@ -92,6 +101,7 @@ Orbitals::Orbitals(
     _active_space_indices.second =
         generate_all_indices();  // Restricted: alpha = beta
   }
+  _invalidate_space_index_sets();
 
   // Validate that active and inactive spaces do not overlap
   std::set<size_t> active_set_alpha(_active_space_indices.first.begin(),
@@ -209,6 +219,7 @@ Orbitals::Orbitals(
     // Default to all orbital indices for beta
     _active_space_indices.second = generate_all_indices();
   }
+  _invalidate_space_index_sets();
 
   // Validate that active and inactive spaces do not overlap
   std::set<size_t> active_set_alpha(_active_space_indices.first.begin(),
@@ -251,6 +262,7 @@ Orbitals::Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
   std::iota(all_indices.begin(), all_indices.end(), 0);
   _active_space_indices.first = all_indices;
   _active_space_indices.second = all_indices;
+  _invalidate_space_index_sets();
 
   if (ao_overlap) {
     _ao_overlap = std::make_unique<Eigen::MatrixXd>(*ao_overlap);
@@ -271,6 +283,7 @@ Orbitals::Orbitals(const Orbitals& other) {
   // Copy active / inactive space information
   _active_space_indices = other._active_space_indices;
   _inactive_space_indices = other._inactive_space_indices;
+  _invalidate_space_index_sets();
 
   // Copy AO overlap
   if (other._ao_overlap) {
@@ -297,6 +310,7 @@ Orbitals& Orbitals::operator=(const Orbitals& other) {
     // Copy active / inactive space
     _active_space_indices = other._active_space_indices;
     _inactive_space_indices = other._inactive_space_indices;
+    _invalidate_space_index_sets();
 
     // Copy AO overlap
     if (other._ao_overlap) {
@@ -487,6 +501,23 @@ Orbitals::get_virtual_space_indices() const {
   }
 
   return {virtual_alpha, virtual_beta};
+}
+
+std::shared_ptr<const SymmetryBlockedIndexSet> Orbitals::active_indices() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_active_indices_sbt && has_active_space()) {
+    _build_active_indices_sbt();
+  }
+  return _active_indices_sbt;
+}
+
+std::shared_ptr<const SymmetryBlockedIndexSet>
+Orbitals::inactive_indices() const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_inactive_indices_sbt && has_inactive_space()) {
+    _build_inactive_indices_sbt();
+  }
+  return _inactive_indices_sbt;
 }
 
 // === AO overlap matrix ===
@@ -736,6 +767,50 @@ void Orbitals::_init_coefficient_views() {
   } else {
     _energies = {nullptr, nullptr};
   }
+}
+
+void Orbitals::_build_active_indices_sbt() const {
+  if (!has_active_space()) {
+    _active_indices_sbt = nullptr;
+    return;
+  }
+
+  auto sym = symmetries();
+  auto extents = mo_extents();
+  const SymmetryLabel alpha({axes::alpha()});
+  const SymmetryLabel beta({axes::beta()});
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices;
+  if (!_active_space_indices.first.empty()) {
+    indices.emplace(alpha, to_u32_indices(_active_space_indices.first));
+  }
+  if (!_active_space_indices.second.empty()) {
+    indices.emplace(beta, to_u32_indices(_active_space_indices.second));
+  }
+
+  _active_indices_sbt = std::make_shared<const SymmetryBlockedIndexSet>(
+      std::move(sym), std::move(extents), std::move(indices));
+}
+
+void Orbitals::_build_inactive_indices_sbt() const {
+  if (!has_inactive_space()) {
+    _inactive_indices_sbt = nullptr;
+    return;
+  }
+
+  auto sym = symmetries();
+  auto extents = mo_extents();
+  const SymmetryLabel alpha({axes::alpha()});
+  const SymmetryLabel beta({axes::beta()});
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices;
+  if (!_inactive_space_indices.first.empty()) {
+    indices.emplace(alpha, to_u32_indices(_inactive_space_indices.first));
+  }
+  if (!_inactive_space_indices.second.empty()) {
+    indices.emplace(beta, to_u32_indices(_inactive_space_indices.second));
+  }
+
+  _inactive_indices_sbt = std::make_shared<const SymmetryBlockedIndexSet>(
+      std::move(sym), std::move(extents), std::move(indices));
 }
 
 bool Orbitals::is_restricted() const {
@@ -1310,6 +1385,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
         orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
                                              std::move(inactive_indices_beta)};
       }
+      orbitals->_invalidate_space_index_sets();
       orbitals->_post_construction_validate();
       return orbitals;
     }
@@ -1498,6 +1574,7 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
         orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
                                              std::move(inactive_indices_beta)};
       }
+      orbitals->_invalidate_space_index_sets();
       orbitals->_post_construction_validate();
       return orbitals;
     }
@@ -1640,6 +1717,7 @@ ModelOrbitals::ModelOrbitals(size_t basis_size, bool restricted)
     _active_space_indices = {all_indices, all_indices};
   }
   // Inactive space remains empty by default
+  _invalidate_space_index_sets();
 }
 
 ModelOrbitals::ModelOrbitals(
@@ -1690,6 +1768,7 @@ ModelOrbitals::ModelOrbitals(
   // Set active and inactive space indices (restricted case)
   _active_space_indices = {active_space_indices, active_space_indices};
   _inactive_space_indices = {inactive_space_indices, inactive_space_indices};
+  _invalidate_space_index_sets();
 }
 
 ModelOrbitals::ModelOrbitals(
@@ -1788,6 +1867,7 @@ ModelOrbitals::ModelOrbitals(
                            active_space_indices_beta};
   _inactive_space_indices = {inactive_space_indices_alpha,
                              inactive_space_indices_beta};
+  _invalidate_space_index_sets();
 }
 
 // Copy constructor for ModelOrbitals
@@ -1799,6 +1879,7 @@ ModelOrbitals::ModelOrbitals(const ModelOrbitals& other)
   // Copy the active/inactive space indices from the base class
   _active_space_indices = other._active_space_indices;
   _inactive_space_indices = other._inactive_space_indices;
+  _invalidate_space_index_sets();
 
   // No need to call _post_construction_validate() since ModelOrbitals are
   // always valid
@@ -1812,8 +1893,14 @@ ModelOrbitals& ModelOrbitals::operator=(const ModelOrbitals& other) {
     _is_restricted = other._is_restricted;
     _active_space_indices = other._active_space_indices;
     _inactive_space_indices = other._inactive_space_indices;
+    _invalidate_space_index_sets();
   }
   return *this;
+}
+
+void Orbitals::_invalidate_space_index_sets() {
+  _active_indices_sbt = nullptr;
+  _inactive_indices_sbt = nullptr;
 }
 
 // Override methods to throw errors for model systems
