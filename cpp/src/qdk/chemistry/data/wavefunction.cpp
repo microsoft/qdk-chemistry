@@ -526,7 +526,11 @@ const Eigen::MatrixXd& WavefunctionContainer::one_rdm_block(
 
 bool WavefunctionContainer::has_one_rdm() const {
   if (_one_rdm_sbt) return true;
-  return has_one_rdm_spin_dependent();
+  if (!has_one_rdm_spin_dependent()) return false;
+  // Only available for real-valued RDMs.
+  auto [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
+  (void)bb_var;
+  return std::holds_alternative<Eigen::MatrixXd>(aa_var);
 }
 
 const SymmetryBlockedTensor<4>& WavefunctionContainer::two_rdm() const {
@@ -546,7 +550,12 @@ const Eigen::VectorXd& WavefunctionContainer::two_rdm_block(
 
 bool WavefunctionContainer::has_two_rdm() const {
   if (_two_rdm_sbt) return true;
-  return has_two_rdm_spin_dependent();
+  if (!has_two_rdm_spin_dependent()) return false;
+  // Only available for real-valued RDMs.
+  auto [aaaa_var, aabb_var, bbbb_var] = get_active_two_rdm_spin_dependent();
+  (void)aabb_var;
+  (void)bbbb_var;
+  return std::holds_alternative<Eigen::VectorXd>(aaaa_var);
 }
 
 // entropies

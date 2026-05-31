@@ -671,6 +671,11 @@ void Orbitals::_set_coefficient_containers(
   auto sym = std::make_shared<const Symmetries>(
       Symmetries({axes::spin(0, restricted)}));
 
+  // Use the BasisSet's AO symmetries when available.
+  auto ao_sym = (_basis_set && _basis_set->ao_symmetries())
+                    ? _basis_set->ao_symmetries()
+                    : sym;
+
   const std::size_t nao = static_cast<std::size_t>(coefficients_alpha->rows());
   const std::size_t nmo = static_cast<std::size_t>(coefficients_alpha->cols());
   std::unordered_map<SymmetryLabel, std::size_t> ao_ext;
@@ -688,8 +693,8 @@ void Orbitals::_set_coefficient_containers(
       blocks.emplace(SBT2::Labels{b, b}, std::move(coefficients_beta));
     }
     _coefficients_sbt = std::make_shared<const SBT2>(
-        SBT2::SymmetriesArray{sym, sym}, SBT2::ExtentsArray{ao_ext, mo_ext},
-        std::move(blocks));
+        SBT2::SymmetriesArray{ao_sym, sym},
+        SBT2::ExtentsArray{ao_ext, mo_ext}, std::move(blocks));
   }
 
   if (energies_alpha) {

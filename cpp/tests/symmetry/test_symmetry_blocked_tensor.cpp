@@ -4,7 +4,9 @@
 
 #include <gtest/gtest.h>
 
+#include <H5Cpp.h>
 #include <Eigen/Dense>
+#include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
@@ -176,4 +178,72 @@ TEST(SymmetryBlockedTensorTest, ComplexRank1) {
   auto restored = SBT1c::from_json(tensor.to_json());
   EXPECT_TRUE(restored->block(SBT1c::Labels{SymmetryLabel({axes::alpha()})})
                   .isApprox(v));
+}
+
+TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresNativeDoubleBlocks) {
+  const std::filesystem::path filename =
+      "symmetry_blocked_tensor_native_real.h5";
+  std::filesystem::remove(filename);
+
+  auto sym = std::make_shared<const Symmetries>(
+      Symmetries({axes::spin(0, true)}));
+  Eigen::MatrixXd data(2, 2);
+  data << 1.0, 2.0, 3.0, 4.0;
+  auto block = std::make_shared<const Eigen::MatrixXd>(data);
+  SBT2::BlockMap blocks;
+  blocks.emplace(aa(), block);
+  SBT2 tensor({sym, sym}, extents2(2), blocks);
+
+  tensor.to_hdf5_file(filename.string());
+  auto restored = SBT2::from_hdf5_file(filename.string());
+
+  EXPECT_EQ(restored->block_ptr(aa()).get(), restored->block_ptr(bb()).get());
+  EXPECT_TRUE(restored->block(aa()).isApprox(data));
+
+  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+  auto metadata = file.openDataSet("symmetry_blocked_tensor_metadata");
+  EXPECT_EQ(metadata.getTypeClass(), H5T_STRING);
+
+  auto block_dataset = file.openDataSet("block_0");
+  EXPECT_EQ(block_dataset.getTypeClass(), H5T_FLOAT);
+  EXPECT_EQ(block_dataset.getDataType().getSize(), sizeof(double));
+
+  auto dataspace = block_dataset.getSpace();
+  EXPECT_EQ(dataspace.getSimpleExtentNdims(), 2);
+  hsize_t dims[2] = {0, 0};
+  dataspace.getSimpleExtentDims(dims);
+  EXPECT_EQ(dims[0], 2u);
+  EXPECT_EQ(dims[1], 2u);
+
+  std::filesystem::remove(filename);
+}
+
+TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresComplexBlocksAsNativeDoubles) {
+  using SBT1c = SymmetryBlockedTensor<1, std::complex<double>>;
+  const std::filesystem::path filename =
+      "symmetry_blocked_tensor_native_complex.h5";
+  std::filesystem::remove(filename);
+
+  auto sym = std::make_shared<const Symmetries>(
+      Symmetries({axes::spin(0, false)}));
+  Eigen::VectorXcd v(2);
+  v << std::complex<double>(1.0, -1.0), std::complex<double>(2.0, 3.0);
+  auto block = std::make_shared<const Eigen::VectorXcd>(v);
+  std::unordered_map<SymmetryLabel, std::size_t> slot;
+  slot.emplace(SymmetryLabel({axes::alpha()}), 2);
+  SBT1c::BlockMap blocks;
+  blocks.emplace(SBT1c::Labels{SymmetryLabel({axes::alpha()})}, block);
+  SBT1c tensor({sym}, {slot}, blocks);
+
+  tensor.to_hdf5_file(filename.string());
+  auto restored = SBT1c::from_hdf5_file(filename.string());
+
+  EXPECT_TRUE(restored->block(SBT1c::Labels{SymmetryLabel({axes::alpha()})})
+                  .isApprox(v));
+
+  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+  EXPECT_EQ(file.openDataSet("block_0_real").getTypeClass(), H5T_FLOAT);
+  EXPECT_EQ(file.openDataSet("block_0_imag").getTypeClass(), H5T_FLOAT);
+
+  std::filesystem::remove(filename);
 }

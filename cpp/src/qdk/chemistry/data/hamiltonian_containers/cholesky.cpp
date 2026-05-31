@@ -375,14 +375,14 @@ void CholeskyHamiltonianContainer::_init_three_center_views() {
   SymmetryLabel beta_label({axes::beta()});
   SymmetryLabel aux_label;
 
-  // Reconstruct dense [norb^2, naux] view from the flat-packed rank-3 block.
+  // Reshape the flat-packed rank-3 block into a dense [norb^2, naux] matrix.
+  // TODO: eliminate this copy by storing rank-3 blocks as MatrixXd directly.
   auto make_view = [&](const SymmetryLabel& spin) {
     const auto& flat = _three_center_sbt->block({spin, spin, aux_label});
     std::size_t norb = _three_center_sbt->extents()[0].at(spin);
     std::size_t naux = _three_center_sbt->extents()[2].at(aux_label);
-    auto mat = std::make_shared<Eigen::MatrixXd>(
+    return std::make_shared<Eigen::MatrixXd>(
         Eigen::Map<const Eigen::MatrixXd>(flat.data(), norb * norb, naux));
-    return mat;
   };
 
   _three_center_integrals.first = make_view(alpha_label);

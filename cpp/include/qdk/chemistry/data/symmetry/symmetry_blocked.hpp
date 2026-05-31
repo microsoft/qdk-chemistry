@@ -264,16 +264,14 @@ class SymmetryBlocked : public DataClass {
   }
 
   bool _spin_aliasing_active() const {
-    for (std::size_t i = 1; i < Rank; ++i) {
-      if (_symmetries[i] != _symmetries[0]) {
+    for (std::size_t i = 0; i < Rank; ++i) {
+      if (_symmetries[i] == nullptr ||
+          !_symmetries[i]->has_axis(AxisName::Spin) ||
+          !_symmetries[i]->axis(AxisName::Spin).equivalent()) {
         return false;
       }
     }
-    if (_symmetries[0] == nullptr ||
-        !_symmetries[0]->has_axis(AxisName::Spin)) {
-      return false;
-    }
-    return _symmetries[0]->axis(AxisName::Spin).equivalent();
+    return true;
   }
 
   static SymmetryLabel _swap_spin(const SymmetryLabel& label) {
