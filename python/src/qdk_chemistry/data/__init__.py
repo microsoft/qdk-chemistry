@@ -118,7 +118,6 @@ from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
-from qdk_chemistry.data.tapering import TaperingSpecification
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
@@ -189,7 +188,6 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
-    "TaperingSpecification",
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",

@@ -2,7 +2,7 @@
 
 This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
 using different mapping strategies. The encoding is determined by the MajoranaMapping passed
-to :meth:`run`.
+to ``run()``.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -71,7 +71,7 @@ class OpenFermionQubitMapper(QubitMapper):
 
     Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are
     supported — each backend handles tapering in its own ``_run_impl()``
-    via the :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper._taper_result`
+    via the ``QubitMapper._taper_result()``
     helper.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
@@ -79,9 +79,9 @@ class OpenFermionQubitMapper(QubitMapper):
     via ``hamiltonian_to_interaction_operator``.
 
     Supported base encodings:
-        - ``"jordan-wigner"`` → :func:`openfermion.transforms.jordan_wigner`
-        - ``"bravyi-kitaev"`` → :func:`openfermion.transforms.bravyi_kitaev`
-        - ``"bravyi-kitaev-tree"`` → :func:`openfermion.transforms.bravyi_kitaev_tree`
+        - ``"jordan-wigner"`` → ``openfermion.transforms.jordan_wigner``
+        - ``"bravyi-kitaev"`` → ``openfermion.transforms.bravyi_kitaev``
+        - ``"bravyi-kitaev-tree"`` → ``openfermion.transforms.bravyi_kitaev_tree``
 
     Examples:
         >>> from qdk_chemistry.algorithms import create

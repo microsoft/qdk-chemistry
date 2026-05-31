@@ -2,7 +2,7 @@
 
 This module provides the QdkQubitMapper class for transforming electronic structure
 Hamiltonians to qubit Hamiltonians. The encoding is specified by a
-:class:`~qdk_chemistry.data.MajoranaMapping` passed to :meth:`run`, making the
+:class:`~qdk_chemistry.data.MajoranaMapping` passed to ``run()``, making the
 mapper encoding-agnostic.
 """
 

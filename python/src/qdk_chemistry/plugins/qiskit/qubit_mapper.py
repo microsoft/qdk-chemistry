@@ -67,7 +67,7 @@ class QiskitQubitMapper(QubitMapper):
 
     Tapering-based encodings (e.g. parity two-qubit reduction) are
     supported — each backend handles tapering in its own ``_run_impl()``
-    via the :meth:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapper._taper_result`
+    via the ``QubitMapper._taper_result()``
     helper.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
