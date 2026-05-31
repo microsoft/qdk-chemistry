@@ -116,21 +116,30 @@ void HashContext::update(const void* data, size_t len) {
 }
 
 void HashContext::update(double val) {
-  // Use memcpy to avoid strict aliasing issues
+  // Encode as little-endian bytes for cross-platform determinism
+  uint64_t bits;
+  std::memcpy(&bits, &val, 8);
   uint8_t buf[8];
-  std::memcpy(buf, &val, 8);
+  for (int i = 0; i < 8; ++i) {
+    buf[i] = static_cast<uint8_t>(bits >> (i * 8));
+  }
   update(buf, 8);
 }
 
 void HashContext::update(int64_t val) {
   uint8_t buf[8];
-  std::memcpy(buf, &val, 8);
+  auto uval = static_cast<uint64_t>(val);
+  for (int i = 0; i < 8; ++i) {
+    buf[i] = static_cast<uint8_t>(uval >> (i * 8));
+  }
   update(buf, 8);
 }
 
 void HashContext::update(uint64_t val) {
   uint8_t buf[8];
-  std::memcpy(buf, &val, 8);
+  for (int i = 0; i < 8; ++i) {
+    buf[i] = static_cast<uint8_t>(val >> (i * 8));
+  }
   update(buf, 8);
 }
 
@@ -153,40 +162,39 @@ void HashContext::update(const Eigen::MatrixXd& m) {
   // Hash dimensions for disambiguation
   update(static_cast<int64_t>(m.rows()));
   update(static_cast<int64_t>(m.cols()));
-  if (m.size() > 0) {
-    update(m.data(), static_cast<size_t>(m.size()) * sizeof(double));
+  for (Eigen::Index i = 0; i < m.size(); ++i) {
+    update(m.data()[i]);
   }
 }
 
 void HashContext::update(const Eigen::VectorXd& v) {
   update(static_cast<int64_t>(v.size()));
-  if (v.size() > 0) {
-    update(v.data(), static_cast<size_t>(v.size()) * sizeof(double));
+  for (Eigen::Index i = 0; i < v.size(); ++i) {
+    update(v[i]);
   }
 }
 
 void HashContext::update(const Eigen::VectorXi& v) {
   update(static_cast<int64_t>(v.size()));
-  if (v.size() > 0) {
-    update(v.data(), static_cast<size_t>(v.size()) * sizeof(int));
+  for (Eigen::Index i = 0; i < v.size(); ++i) {
+    update(static_cast<int64_t>(v[i]));
   }
 }
 
 void HashContext::update(const Eigen::MatrixXcd& m) {
   update(static_cast<int64_t>(m.rows()));
   update(static_cast<int64_t>(m.cols()));
-  if (m.size() > 0) {
-    // complex<double> is 16 bytes (2 doubles)
-    update(m.data(),
-           static_cast<size_t>(m.size()) * sizeof(std::complex<double>));
+  for (Eigen::Index i = 0; i < m.size(); ++i) {
+    update(m.data()[i].real());
+    update(m.data()[i].imag());
   }
 }
 
 void HashContext::update(const Eigen::VectorXcd& v) {
   update(static_cast<int64_t>(v.size()));
-  if (v.size() > 0) {
-    update(v.data(),
-           static_cast<size_t>(v.size()) * sizeof(std::complex<double>));
+  for (Eigen::Index i = 0; i < v.size(); ++i) {
+    update(v[i].real());
+    update(v[i].imag());
   }
 }
 

@@ -164,7 +164,7 @@ class Job:
 
         Args:
             directory: Folder to scan (non-recursively) for
-                ``job_*.json`` files.
+                ``*.job.json`` files.
 
         Returns:
             List of ``Job`` instances, sorted by
@@ -173,7 +173,7 @@ class Job:
         """
         directory = Path(directory)
         jobs = []
-        for p in sorted(directory.glob("job_*.json")):
+        for p in sorted(directory.glob("*.job.json")):
             try:
                 jobs.append(cls.load(p))
             except (json.JSONDecodeError, KeyError, OSError):

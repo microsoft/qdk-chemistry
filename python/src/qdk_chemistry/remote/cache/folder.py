@@ -110,8 +110,9 @@ class FolderCache(CacheBackend):
 
     def get_data(self, content_hash: str) -> DataClass | list | None:
         """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
-        # Check for list manifest first
-        list_matches = list(self._root.glob(f"{content_hash}.list[*].json"))
+        # Check for list manifest first — escape literal brackets so glob
+        # doesn't treat them as a character class.
+        list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
         if list_matches:
             return self._get_data_list(list_matches[0])
         # Glob for <content_hash>.*.h5 — the type name is in the filename
@@ -174,7 +175,9 @@ class FolderCache(CacheBackend):
 
     def has_data(self, content_hash: str) -> bool:
         """Fast existence check via glob (no deserialization)."""
-        return bool(list(self._root.glob(f"{content_hash}.*.h5")))
+        return bool(list(self._root.glob(f"{content_hash}.*.h5"))) or bool(
+            list(self._root.glob(f"{content_hash}.list[[]*].json"))
+        )
 
     def to_config(self) -> dict:
         """Return kwargs to reconstruct this FolderCache."""
@@ -197,13 +200,27 @@ class FolderCache(CacheBackend):
         return True
 
     def delete_data(self, content_hash: str) -> bool:
-        """Remove a DataClass blob by content hash."""
-        matches = list(self._root.glob(f"{content_hash}.*.h5"))
-        if not matches:
-            return False
-        for f in matches:
+        """Remove a DataClass blob (or list manifest and its items) by content hash."""
+        deleted = False
+
+        # Remove list manifests and their per-item blobs
+        list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
+        for manifest_path in list_matches:
+            import json as _json  # noqa: PLC0415
+
+            manifest = _json.loads(manifest_path.read_text())
+            for item_hash in manifest.get("items", []):
+                for f in self._root.glob(f"{item_hash}.*.h5"):
+                    f.unlink()
+            manifest_path.unlink()
+            deleted = True
+
+        # Remove single-object blobs
+        for f in self._root.glob(f"{content_hash}.*.h5"):
             f.unlink()
-        return True
+            deleted = True
+
+        return deleted
 
     def clear(self) -> None:
         """Remove all cached jobs and data blobs."""

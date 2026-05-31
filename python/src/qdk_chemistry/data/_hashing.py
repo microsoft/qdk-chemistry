@@ -7,11 +7,14 @@
 
 import hashlib
 import struct
+import sys
 from typing import Any
 
 import numpy as np
 
 __all__: list[str] = []
+
+_NATIVE_IS_BIG = sys.byteorder == "big"
 
 
 def _hash_bytes(h: "hashlib._Hash", data: bytes) -> None:
@@ -22,9 +25,20 @@ def _hash_bytes(h: "hashlib._Hash", data: bytes) -> None:
 def _hash_str(h: "hashlib._Hash", s: str) -> None:
     """Hash a string with length prefix to avoid collisions.
 
-    Strings are normalised (stripped + lowercased) before hashing so that
-    case and whitespace differences (e.g. ``"STO-3G"`` vs ``"sto-3g"``)
-    produce identical hashes.
+    The string is hashed byte-exact (no normalization).
+    Use ``_hash_normalized_str`` for inputs where case/whitespace
+    should be ignored (e.g. basis set names).
+    """
+    encoded = s.encode("utf-8")
+    h.update(struct.pack("<Q", len(encoded)))
+    h.update(encoded)
+
+
+def _hash_normalized_str(h: "hashlib._Hash", s: str) -> None:
+    """Hash a string after normalizing case and whitespace.
+
+    Use this for identifiers where case differences should not
+    produce distinct hashes (e.g. ``"STO-3G"`` vs ``"sto-3g"``).
     """
     encoded = s.strip().lower().encode("utf-8")
     h.update(struct.pack("<Q", len(encoded)))
@@ -53,11 +67,16 @@ def _hash_bool(h: "hashlib._Hash", b: bool) -> None:
 
 def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
     """Hash a numpy array deterministically."""
-    arr = np.ascontiguousarray(arr)
     # Hash shape first for disambiguation
     _hash_uint(h, len(arr.shape))
     for dim in arr.shape:
         _hash_int(h, dim)
+    # Force little-endian byte order for cross-platform determinism
+    arr = np.ascontiguousarray(arr)
+    if arr.dtype.byteorder not in ("<", "=", "|"):
+        arr = arr.astype(arr.dtype.newbyteorder("<"))
+    elif arr.dtype.byteorder == "=" and _NATIVE_IS_BIG:
+        arr = arr.astype(arr.dtype.newbyteorder("<"))
     h.update(arr.tobytes())
 
 

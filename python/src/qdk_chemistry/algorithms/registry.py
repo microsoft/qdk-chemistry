@@ -46,8 +46,11 @@ class _AlgorithmWrapper:
 
     Forwards every other attribute to the wrapped algorithm so it
     behaves identically for ``settings()``, ``hash()``, ``type_name()``,
-    ``name()``, etc.  The ``__class__`` property ensures that
-    ``isinstance()`` checks against the wrapped type still pass.
+    ``name()``, etc.  The ``__class__`` property makes CPython's
+    ``isinstance()`` report the wrapped type because the default
+    ``object.__instancecheck__`` reads ``obj.__class__`` (not
+    ``type(obj)``) when the two differ.  Note that ``type(wrapper)``
+    still returns ``_AlgorithmWrapper``.
     """
 
     __slots__ = ("_algo",)
