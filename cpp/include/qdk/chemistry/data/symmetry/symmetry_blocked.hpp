@@ -42,6 +42,11 @@ namespace detail {
 template <std::size_t Rank>
 std::array<SymmetryLabel, Rank> make_labels(
     const std::vector<SymmetryLabel>& values) {
+  if (values.size() != Rank) {
+    throw std::invalid_argument(
+        "make_labels: expected " + std::to_string(Rank) + " labels, got " +
+        std::to_string(values.size()));
+  }
   return [&]<std::size_t... I>(std::index_sequence<I...>) {
     return std::array<SymmetryLabel, Rank>{values[I]...};
   }(std::make_index_sequence<Rank>{});
@@ -149,9 +154,20 @@ class SymmetryBlocked : public DataClass {
    */
   BlockPtr block_ptr(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
-      auto groups = _group_by_pointer();
-      if (groups.size() == 1) {
-        return groups[0].ptr;
+      if (_blocks.size() == 1) {
+        return _blocks.begin()->second;
+      }
+      // Check if all blocks alias the same pointer (restricted).
+      const auto* first = _blocks.begin()->second.get();
+      bool all_same = true;
+      for (const auto& [k, v] : _blocks) {
+        if (v.get() != first) {
+          all_same = false;
+          break;
+        }
+      }
+      if (all_same) {
+        return _blocks.begin()->second;
       }
       throw std::invalid_argument(
           "Trivial (empty) label key is ambiguous: multiple independent "

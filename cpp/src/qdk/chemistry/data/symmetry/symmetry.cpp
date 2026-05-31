@@ -211,19 +211,17 @@ Symmetries Symmetries::from_json(const nlohmann::json& j) {
 
 std::size_t SymmetryLabel::_compute_hash(
     const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>& values) {
-  // Order-independent combination over (axis, value-hash) pairs so the hash is
-  // stable regardless of std::map iteration details.
-  std::size_t accumulator = 0;
+  std::size_t seed = 0;
   for (const auto& [axis, value] : values) {
     if (value == nullptr) {
       throw std::runtime_error(
           "SymmetryLabel values must not be null pointers.");
     }
-    std::size_t pair_hash = utils::hash_combine(
-        std::hash<int>{}(static_cast<int>(axis)), value->hash());
-    accumulator ^= pair_hash;
+    seed = utils::hash_combine(
+        seed, utils::hash_combine(
+                  std::hash<int>{}(static_cast<int>(axis)), value->hash()));
   }
-  return accumulator;
+  return seed;
 }
 
 SymmetryLabel::SymmetryLabel(
@@ -265,6 +263,9 @@ bool SymmetryLabel::has(AxisName axis) const {
 }
 
 bool SymmetryLabel::operator==(const SymmetryLabel& other) const {
+  if (_hash != other._hash) {
+    return false;
+  }
   if (_values.size() != other._values.size()) {
     return false;
   }

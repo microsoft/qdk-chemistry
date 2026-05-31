@@ -53,6 +53,29 @@ struct TensorType<4, S> {
 template <std::size_t Rank, class Scalar = double>
 using Tensor = typename TensorType<Rank, Scalar>::type;
 
+namespace detail {
+
+template <class S>
+nlohmann::json scalar_to_json(const S& value) {
+  if constexpr (utils::is_complex_scalar_v<S>) {
+    return nlohmann::json::array({value.real(), value.imag()});
+  } else {
+    return value;
+  }
+}
+
+template <class S>
+S scalar_from_json(const nlohmann::json& j) {
+  if constexpr (utils::is_complex_scalar_v<S>) {
+    using Real = typename S::value_type;
+    return S(j.at(0).get<Real>(), j.at(1).get<Real>());
+  } else {
+    return j.get<S>();
+  }
+}
+
+}  // namespace detail
+
 /**
  * @brief Symmetry-blocked dense tensor.
  *
@@ -254,28 +277,40 @@ class SymmetryBlockedTensor
     nlohmann::json j;
     j["rows"] = static_cast<std::size_t>(block.rows());
     j["cols"] = static_cast<std::size_t>(block.cols());
-    nlohmann::json data = nlohmann::json::array();
-    for (Eigen::Index r = 0; r < block.rows(); ++r) {
-      for (Eigen::Index c = 0; c < block.cols(); ++c) {
-        data.push_back(utils::scalar_to_json<Scalar>(block(r, c)));
+    if constexpr (utils::is_complex_scalar_v<Scalar>) {
+      // Complex: serialize as array of [real, imag] pairs.
+      nlohmann::json data = nlohmann::json::array();
+      for (Eigen::Index r = 0; r < block.rows(); ++r) {
+        for (Eigen::Index c = 0; c < block.cols(); ++c) {
+          data.push_back(detail::scalar_to_json<Scalar>(block(r, c)));
+        }
       }
+      j["data"] = std::move(data);
+    } else {
+      // Real: bulk assign from contiguous storage.
+      const auto* ptr = block.data();
+      j["data"] = std::vector<Scalar>(ptr, ptr + block.size());
     }
-    j["data"] = std::move(data);
     return j;
   }
 
   static Tensor<Rank, Scalar> _block_from_json(const nlohmann::json& j) {
     const auto rows = j.at("rows").get<Eigen::Index>();
     const auto cols = j.at("cols").get<Eigen::Index>();
-    Tensor<Rank, Scalar> block(rows, cols);
-    const auto& data = j.at("data");
-    Eigen::Index k = 0;
-    for (Eigen::Index r = 0; r < rows; ++r) {
-      for (Eigen::Index c = 0; c < cols; ++c) {
-        block(r, c) = utils::scalar_from_json<Scalar>(data.at(k++));
+    if constexpr (utils::is_complex_scalar_v<Scalar>) {
+      Tensor<Rank, Scalar> block(rows, cols);
+      const auto& data = j.at("data");
+      Eigen::Index k = 0;
+      for (Eigen::Index r = 0; r < rows; ++r) {
+        for (Eigen::Index c = 0; c < cols; ++c) {
+          block(r, c) = detail::scalar_from_json<Scalar>(data.at(k++));
+        }
       }
+      return block;
+    } else {
+      auto vec = j.at("data").get<std::vector<Scalar>>();
+      return Eigen::Map<const Tensor<Rank, Scalar>>(vec.data(), rows, cols);
     }
-    return block;
   }
 };
 

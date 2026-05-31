@@ -320,7 +320,8 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
     const Eigen::MatrixXd& aa, const Eigen::MatrixXd* bb) {
   auto mo_sym = _orbitals->symmetries();
   auto active_indices = _orbitals->get_active_space_indices();
-  std::size_t n_active = active_indices.first.size();
+  std::size_t n_active_alpha = active_indices.first.size();
+  std::size_t n_active_beta = active_indices.second.size();
   std::size_t naux = static_cast<std::size_t>(aa.cols());
 
   SymmetryLabel alpha_label({axes::alpha()});
@@ -328,10 +329,10 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
 
   // MO extents per spin label.
   std::unordered_map<SymmetryLabel, std::size_t> mo_ext;
-  mo_ext[alpha_label] = n_active;
-  mo_ext[beta_label] = n_active;
+  mo_ext[alpha_label] = n_active_alpha;
+  mo_ext[beta_label] = n_active_beta;
 
-  // Auxiliary axis: trivial symmetry (single label, entire range).
+  // Auxiliary axis: trivial symmetry.
   auto aux_sym = std::make_shared<const Symmetries>(Symmetries::trivial());
   SymmetryLabel aux_label;
   std::unordered_map<SymmetryLabel, std::size_t> aux_ext;
@@ -341,14 +342,24 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
                                                           aux_sym};
   SymmetryBlockedTensor<3>::ExtentsArray extents = {mo_ext, mo_ext, aux_ext};
 
-  // Flatten the dense [norb^2 x naux] matrix into a rank-3 flat-packed vector
-  // per spin block (alpha-alpha-aux, beta-beta-aux).
+  // Validate dimensions before flattening.
+  if (static_cast<std::size_t>(aa.rows()) !=
+      n_active_alpha * n_active_alpha) {
+    throw std::invalid_argument(
+        "Alpha three-center rows does not match n_active_alpha^2");
+  }
+
   auto aa_flat = std::make_shared<const Eigen::VectorXd>(
       Eigen::Map<const Eigen::VectorXd>(aa.data(), aa.size()));
   SymmetryBlockedTensor<3>::BlockMap blocks;
   blocks[{alpha_label, alpha_label, aux_label}] = aa_flat;
 
   if (bb != nullptr) {
+    if (static_cast<std::size_t>(bb->rows()) !=
+        n_active_beta * n_active_beta) {
+      throw std::invalid_argument(
+          "Beta three-center rows does not match n_active_beta^2");
+    }
     auto bb_flat = std::make_shared<const Eigen::VectorXd>(
         Eigen::Map<const Eigen::VectorXd>(bb->data(), bb->size()));
     blocks[{beta_label, beta_label, aux_label}] = bb_flat;

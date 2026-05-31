@@ -352,7 +352,11 @@ BasisSet::BasisSet(const std::string& name,
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    std::shared_ptr<Structure> structure,
                    AOType atomic_orbital_type)
-    : BasisSet(name, shells, *structure, nullptr, {}, atomic_orbital_type) {
+    : BasisSet(name, shells,
+               structure ? *structure
+                         : throw std::invalid_argument(
+                               "Structure shared_ptr cannot be nullptr"),
+               nullptr, {}, atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
