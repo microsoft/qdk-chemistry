@@ -2,7 +2,11 @@
 
 Built-in backends:
     - ``folder``: Plain-file content-addressed cache
+    - ``tiered``: Layered cache that combines multiple backends
 
+Custom backends can be registered with ``@register_cache`` or via
+the ``qdk_chemistry.cache_backends`` entry-point group.
+"""
 Custom backends can be registered with ``@register_cache`` or via
 the ``qdk_chemistry.cache_backends`` entry-point group.
 """
@@ -83,7 +87,7 @@ def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> Cac
     if isinstance(cache, Path):
         return FolderCache(path=cache, **kwargs)
     # str — could be a registered name or a path
-    if cache in _CACHES:
+    if isinstance(cache, str) and cache in _CACHES and kwargs:
         return _CACHES[cache](**kwargs)
     # Treat as a filesystem path
     return FolderCache(path=cache, **kwargs)
@@ -112,6 +116,7 @@ _load_plugin_caches()
 __all__ = [
     "CacheBackend",
     "FolderCache",
+    "TieredCache",
     "available_caches",
     "get_cache",
     "register_cache",

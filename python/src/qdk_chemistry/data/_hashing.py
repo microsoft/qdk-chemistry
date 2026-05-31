@@ -46,9 +46,8 @@ def _hash_normalized_str(h: "hashlib._Hash", s: str) -> None:
 
 
 def _hash_float(h: "hashlib._Hash", f: float) -> None:
-    """Hash a float (8 bytes, native byte order)."""
+    """Hash a float (8 bytes, little-endian)."""
     h.update(struct.pack("<d", float(f)))
-
 
 def _hash_int(h: "hashlib._Hash", i: int) -> None:
     """Hash an int (8 bytes, little-endian signed)."""

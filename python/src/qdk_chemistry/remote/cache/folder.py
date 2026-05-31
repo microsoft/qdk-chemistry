@@ -159,6 +159,8 @@ class FolderCache(CacheBackend):
         """Store a list of DataClass objects as individual files."""
         if not data_list:
             return
+        if not hasattr(data_list[0], "_data_type_name"):
+            raise TypeError("FolderCache only supports caching lists of DataClass objects")
         import json  # noqa: PLC0415
 
         type_name = data_list[0]._data_type_name  # noqa: SLF001

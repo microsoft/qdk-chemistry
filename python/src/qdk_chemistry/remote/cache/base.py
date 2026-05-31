@@ -22,14 +22,22 @@ if TYPE_CHECKING:
 class CacheBackend(ABC):
     """Abstract base class for result caches.
 
-    Implementations must provide four operations:
+    Implementations must provide these operations:
 
     - **get_job** / **put_job**: persist ``Job`` metadata keyed by
       the deterministic *run_hash*.
     - **get_data** / **put_data**: content-addressed storage for
-      ``DataClass`` objects.  Primitives (floats, ints, …) are
-      stored inline in the Job metadata and never touch these methods.
+      ``DataClass`` objects. Primitives (floats, ints, …) are stored inline
+      in the Job metadata and never touch these methods.
+    - **delete_job** / **delete_data**: remove cached metadata or blobs.
+    - **clear**: remove all entries from the cache.
 
+    Args:
+        is_shared: Set to ``True`` when the backing store is reachable
+            from multiple machines (e.g. a network-mounted folder).
+            Defaults to ``False``.
+
+    """
     Args:
         is_shared: Set to ``True`` when the backing store is reachable
             from multiple machines (e.g. a network-mounted folder).

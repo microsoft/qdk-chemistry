@@ -172,12 +172,13 @@ class Job:
 
         """
         directory = Path(directory)
-        jobs = []
-        for p in sorted(directory.glob("*.job.json")):
+        jobs: list[Job] = []
+        for p in directory.glob("*.job.json"):
             try:
                 jobs.append(cls.load(p))
             except (json.JSONDecodeError, KeyError, OSError):
                 continue  # skip corrupt files
+        jobs.sort(key=lambda j: j.submitted_at or "")
         return jobs
 
     # ── Conveniences ─────────────────────────────────────────────────────
