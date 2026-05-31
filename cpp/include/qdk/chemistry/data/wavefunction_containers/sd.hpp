@@ -252,6 +252,8 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   bool is_complex() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Single determinant - optimized storage for exactly one determinant
   const Configuration _determinant;
 

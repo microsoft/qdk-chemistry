@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import h5py
-from qdk.simulation import NoiseConfig
+from qsharp._simulation import NoiseConfig
 from ruamel.yaml import YAML
 
+from qdk_chemistry.data._hashing import _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -172,6 +173,26 @@ class QuantumErrorProfile(DataClass):
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "quantum_error_profile")
+        _hash_str(h, self.name)
+        _hash_str(h, self.description)
+        # Hash errors dict in sorted order
+        _hash_uint(h, len(self.errors))
+        for gate_key in sorted(self.errors.keys(), key=str):
+            _hash_str(h, str(gate_key))
+            error_dict = self.errors[gate_key]
+            for error_type in sorted(error_dict.keys(), key=str):
+                _hash_str(h, str(error_type))
+                h.update(str(error_dict[error_type]).encode("utf-8"))
+        _hash_uint(h, len(self.one_qubit_gates))
+        for g in self.one_qubit_gates:
+            _hash_str(h, g)
+        _hash_uint(h, len(self.two_qubit_gates))
+        for g in self.two_qubit_gates:
+            _hash_str(h, g)
 
     def __eq__(self, other: object) -> bool:
         """Check equality between two QuantumErrorProfile instances.

@@ -323,6 +323,8 @@ class MP2Container : public WavefunctionContainer {
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /** @brief Cached coefficients */
   VectorVariant _cached_coefficients;
   /** @brief Cached determinants */

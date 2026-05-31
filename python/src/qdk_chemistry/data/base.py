@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -134,6 +135,43 @@ class DataClass(_CoreDataClass):
         super().__init__()
         # Mark instance as immutable after construction
         object.__setattr__(self, "_initialized", True)
+
+    def content_hash(self, truncate_chars: int = 16) -> str:
+        """Compute a deterministic content hash of this object's identifying data.
+
+        Returns a truncated SHA-256 hex digest. Two objects with identical
+        defining data will produce identical hashes.
+
+        Args:
+            truncate_chars: Number of hex characters in the result (default 16)
+
+        Returns:
+            str: Hex string content hash
+
+        """
+        if truncate_chars < 0:
+            raise ValueError("truncate_chars must be non-negative")
+
+        # C++ classes have their own content_hash via pybind11.
+        # For pure-Python subclasses, use _hash_update.
+        h = hashlib.sha256()
+        self._hash_update(h)
+        digest = h.hexdigest()
+        if truncate_chars == 0:
+            return digest
+        return digest[:truncate_chars]
+
+    def _hash_update(self, h: "hashlib._Hash") -> None:
+        """Feed this object's identifying data into a SHA-256 hasher.
+
+        Pure-Python DataClass subclasses must override this method.
+        C++ classes do NOT use this method; they have native hash_update().
+
+        Args:
+            h: The hashlib hasher to update
+
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} must implement _hash_update()")
 
     def __getattr__(self, name: str) -> Any:
         """Provide dynamic access to 'get_' prefixed methods as properties.

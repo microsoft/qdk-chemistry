@@ -664,24 +664,25 @@ bool Orbitals::is_restricted() const {
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error(
         "Cannot determine if orbitals are restricted: orbital coefficients "
-        "not set");
+        "not "
+        "set");
   }
-  // Verify energy pointers are consistent with coefficients
-  if (_energies.first && _energies.second) {
-    if (_coefficients.first == _coefficients.second &&
-        _energies.first != _energies.second) {
-      throw std::runtime_error(
-          "Inconsistent orbital state: coefficients are shared but energies "
-          "are not");
-    }
-    if (_coefficients.first != _coefficients.second &&
-        _energies.first == _energies.second) {
-      throw std::runtime_error(
-          "Inconsistent orbital state: coefficients are separate but energies "
-          "are shared");
+  // Compare coefficient pointers first for efficiency
+  if (_coefficients.first == _coefficients.second) {
+    return true;
+  }
+  // If pointers are different, check if the data is the same
+  if (!_coefficients.first->isApprox(*_coefficients.second)) {
+    return false;
+  } else {
+    // Also check energies if both are set
+    if (_energies.first && _energies.second) {
+      if (!_energies.first->isApprox(*_energies.second)) {
+        return false;
+      }
     }
   }
-  return _coefficients.first == _coefficients.second;
+  return true;
 }
 
 bool Orbitals::has_active_space() const {
@@ -1142,31 +1143,17 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       return ModelOrbitals::from_hdf5(group);
     }
 
-    // Read is_restricted flag from metadata
-    bool restricted = false;
-    try {
-      H5::Group metadata_group = group.openGroup("metadata");
-      H5::DataSet ds = metadata_group.openDataSet("is_restricted");
-      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
-    } catch (const H5::Exception&) {
-      throw std::invalid_argument(
-          "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
-    }
-
     // Handle regular Orbitals case
     // Load coefficients (required)
     auto coeffs_alpha = load_matrix_from_group(group, "coefficients_alpha");
 
-    // Only read beta coefficients if unrestricted
+    // Check if beta coefficients exist
     std::optional<Eigen::MatrixXd> coeffs_beta_opt;
-    if (!restricted) {
-      try {
-        auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
-        coeffs_beta_opt = coeffs_beta;
-      } catch (const H5::Exception&) {
-        throw std::invalid_argument(
-            "HDF5 file missing 'coefficients_beta' for unrestricted orbitals");
-      }
+    try {
+      auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
+      coeffs_beta_opt = coeffs_beta;
+    } catch (const std::exception&) {
+      // Beta coefficients don't exist - this is a restricted calculation
     }
 
     // Load optional energies
@@ -1174,7 +1161,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     if (dataset_exists_in_group(group, "energies_alpha")) {
       energies_alpha = load_vector_from_group(group, "energies_alpha");
     }
-    if (!restricted && dataset_exists_in_group(group, "energies_beta")) {
+    if (dataset_exists_in_group(group, "energies_beta")) {
       energies_beta = load_vector_from_group(group, "energies_beta");
     }
 
@@ -1228,13 +1215,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     } catch (const std::exception&) { /* optional */
     }
 
-    if (restricted || !coeffs_beta_opt) {
-      // Restricted case - use single-matrix constructor to share the pointer
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(inactive_indices_alpha)));
-    } else {
+    if (coeffs_beta_opt) {
       // Unrestricted case
       return std::make_shared<Orbitals>(
           coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
@@ -1243,6 +1224,12 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
                           std::move(active_indices_beta),
                           std::move(inactive_indices_alpha),
                           std::move(inactive_indices_beta)));
+    } else {
+      // Restricted case
+      return std::make_shared<Orbitals>(
+          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
+          std::make_tuple(std::move(active_indices_alpha),
+                          std::move(inactive_indices_alpha)));
     }
 
   } catch (const H5::Exception& e) {
@@ -1330,14 +1317,10 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     // Load coefficients (required for regular Orbitals)
     if (!j.contains("coefficients") || !j["coefficients"].contains("alpha") ||
         !j["coefficients"].contains("beta")) {
-      throw std::invalid_argument("JSON missing required coefficient data");
+      throw std::runtime_error("JSON missing required coefficient data");
     }
 
-    if (!j.contains("is_restricted")) {
-      throw std::invalid_argument(
-          "JSON missing required 'is_restricted' field");
-    }
-    const auto is_restricted = j["is_restricted"].get<bool>();
+    const auto is_restricted = j.value("is_restricted", false);
     auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
 
     // Load optional energies
@@ -2064,5 +2047,33 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
 }
+
+void Orbitals::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update_optional(_coefficients.first);
+  ctx.update_optional(_coefficients.second);
+  ctx.update_optional(_energies.first);
+  ctx.update_optional(_energies.second);
+  // AO overlap
+  if (_ao_overlap) {
+    ctx.update(uint8_t(1));
+    ctx.update(*_ao_overlap);
+  } else {
+    ctx.update(uint8_t(0));
+  }
+  // Active/inactive space indices
+  ctx.update(_active_space_indices.first);
+  ctx.update(_active_space_indices.second);
+  ctx.update(_inactive_space_indices.first);
+  ctx.update(_inactive_space_indices.second);
+  // Fold in basis set hash
+  if (_basis_set) {
+    ctx.update(uint8_t(1));
+    ctx.update(_basis_set->content_hash());
+  } else {
+    ctx.update(uint8_t(0));
+  }
+}
+
 }  // namespace data
 }  // namespace qdk::chemistry

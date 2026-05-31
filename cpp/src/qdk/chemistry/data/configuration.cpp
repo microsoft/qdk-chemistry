@@ -442,4 +442,9 @@ Configuration Configuration::from_binary_strings(std::string alpha_string,
   }
   return Configuration(orbital_rep);
 }
+
+void Configuration::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(to_string());
+}
 }  // namespace qdk::chemistry::data

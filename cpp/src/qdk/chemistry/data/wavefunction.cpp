@@ -2044,4 +2044,18 @@ std::string Wavefunction::get_summary() const {
 
   return oss.str();
 }
+
+void WavefunctionContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  // Base class hashes the type
+  ctx.update(static_cast<int64_t>(_type));
+  // Note: mutable RDM caches and entropies are excluded;
+  // subclasses hash their own defining data
+}
+
+void Wavefunction::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  // Delegate to the container which has all the data
+  _container->hash_update(ctx);
+}
+
 }  // namespace qdk::chemistry::data

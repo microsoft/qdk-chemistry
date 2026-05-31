@@ -904,4 +904,28 @@ bool Hamiltonian::is_unrestricted() const {
   return !_container->is_restricted();
 }
 
+void HamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(_core_energy);
+  ctx.update(static_cast<int64_t>(_type));
+  // One-body integrals
+  ctx.update_optional(_one_body_integrals.first);
+  ctx.update_optional(_one_body_integrals.second);
+  // Inactive Fock matrix
+  ctx.update_optional(_inactive_fock_matrix.first);
+  ctx.update_optional(_inactive_fock_matrix.second);
+  // Fold in orbitals hash
+  if (_orbitals) {
+    ctx.update(uint8_t(1));
+    ctx.update(_orbitals->content_hash());
+  } else {
+    ctx.update(uint8_t(0));
+  }
+}
+
+void Hamiltonian::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  // Delegate to the container which has all the data
+  _container->hash_update(ctx);
+}
+
 }  // namespace qdk::chemistry::data

@@ -147,6 +147,8 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  qdk::chemistry::python::add_hash_method(stability_checker);
+
   // Factory class binding - creates StabilityCheckerFactory class with static
   // methods
   bind_algorithm_factory<StabilityCheckerFactory, StabilityChecker,

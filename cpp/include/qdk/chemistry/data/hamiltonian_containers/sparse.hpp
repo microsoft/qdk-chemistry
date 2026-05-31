@@ -214,6 +214,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   double one_body_element(int i, int j) const;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 

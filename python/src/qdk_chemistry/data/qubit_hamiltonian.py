@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from qdk_chemistry.data._hashing import _hash_array, _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
@@ -138,6 +139,15 @@ class QubitHamiltonian(DataClass):
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "qubit_hamiltonian")
+        _hash_uint(h, len(self.pauli_strings))
+        for ps in self.pauli_strings:
+            _hash_str(h, ps)
+        _hash_array(h, self.coefficients)
+        _hash_optional(h, self.encoding, _hash_str)
 
     @property
     def num_qubits(self) -> int:

@@ -156,6 +156,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(hamiltonian_constructor);
+
   // Factory class binding - creates HamiltonianConstructorFactory class with
   // static methods
   qdk::chemistry::python::bind_algorithm_factory<HamiltonianConstructorFactory,

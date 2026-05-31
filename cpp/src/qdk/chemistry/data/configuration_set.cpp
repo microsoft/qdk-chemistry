@@ -539,4 +539,19 @@ ConfigurationSet ConfigurationSet::from_hdf5_file(const std::string& filename) {
   }
 }
 
+void ConfigurationSet::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(static_cast<uint64_t>(_configurations.size()));
+  for (const auto& config : _configurations) {
+    ctx.update(config.content_hash());
+  }
+  if (_orbitals) {
+    ctx.update(uint8_t(1));
+    ctx.update(_orbitals->content_hash());
+  } else {
+    ctx.update(uint8_t(0));
+  }
+}
+
 }  // namespace qdk::chemistry::data

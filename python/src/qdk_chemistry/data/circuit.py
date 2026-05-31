@@ -18,24 +18,13 @@ from dataclasses import dataclass
 from typing import Any
 
 import h5py
-from qdk import qsharp
-from qdk.estimator import EstimatorParams, EstimatorResult
-from qdk.openqasm import OutputSemantics
-from qdk.openqasm import circuit as openqasm_circuit
-from qdk.openqasm import compile as openqasm_compile
-from qdk.openqasm import estimate as openqasm_estimate
+import qsharp._native
+import qsharp.openqasm
+from qsharp.openqasm import OutputSemantics
 
+from qdk_chemistry.data._hashing import _hash_optional, _hash_str
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
-
-try:
-    from qdk._interpreter import QirInputData
-    from qdk._native import Circuit as QdkCircuitType
-
-except ImportError:
-    from qsharp._native import Circuit as QdkCircuitType
-    from qsharp._qsharp import QirInputData
-
 
 __all__: list[str] = ["QsharpFactoryData"]
 
@@ -64,8 +53,8 @@ class Circuit(DataClass):
     def __init__(
         self,
         qasm: str | None = None,
-        qir: QirInputData | str | None = None,
-        qsharp: QdkCircuitType | None = None,
+        qir: qsharp._qsharp.QirInputData | str | None = None,
+        qsharp: qsharp._native.Circuit | None = None,
         qsharp_op: Callable[..., Any] | None = None,
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
@@ -144,7 +133,7 @@ class Circuit(DataClass):
         qir = self.get_qir()
         return qasm3.dumps(qir_ir_to_qiskit(str(qir)))
 
-    def get_qir(self) -> QirInputData | str:
+    def get_qir(self) -> qsharp._qsharp.QirInputData | str:
         """Get QIR representation of the quantum circuit.
 
         Returns:
@@ -166,11 +155,11 @@ class Circuit(DataClass):
             object.__setattr__(self, "qir", compiled_qir)
             return compiled_qir
         if self.qasm:
-            return openqasm_compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
+            return qsharp.openqasm.compile(self.qasm, output_semantics=OutputSemantics.OpenQasm)
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
-    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> QdkCircuitType:
+    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> qsharp._native.Circuit:
         """Parse a Circuit object into a Q# circuit object.
 
         Args:
@@ -178,7 +167,7 @@ class Circuit(DataClass):
                 when converting from Q# factory data.
 
         Returns:
-            qdk._native.Circuit: A Q# Circuit object.
+            qsharp._native.Circuit: A Q# Circuit object.
 
         Raises:
             RuntimeError: If the circuit cannot be converted to Q# format.
@@ -200,36 +189,9 @@ class Circuit(DataClass):
                 prune_classical_qubits=prune_classical_qubits,
             )
         if self.qasm:
-            return openqasm_circuit(self.qasm)
+            return qsharp.openqasm.circuit(self.qasm)
 
         raise RuntimeError("The quantum circuit is not set in a Q# format.")
-
-    def estimate(
-        self,
-        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
-    ) -> EstimatorResult:
-        """Estimate resources for the quantum circuit.
-
-        Args:
-            params: Resource estimation parameters. Accepts a dict, list, or ``qdk.estimator.EstimatorParams``.
-
-        Returns:
-            The estimated resources.
-
-        Raises:
-            RuntimeError: If no suitable circuit representation is available for estimation.
-
-        """
-        if self._qsharp_factory is not None:
-            return qsharp.estimate(
-                self._qsharp_factory.program,
-                params,
-                *self._qsharp_factory.parameter.values(),
-            )
-        if self.qasm is not None:
-            return openqasm_estimate(self.qasm, params)
-
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
     def get_qiskit_circuit(self):
         """Convert the Circuit to a Qiskit QuantumCircuit.
@@ -285,6 +247,20 @@ class Circuit(DataClass):
         if self.encoding is not None:
             lines.append(f"  Encoding: {self.encoding}")
         return "\n".join(lines)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "circuit")
+        if self.qasm is not None:
+            _hash_str(h, "qasm")
+            _hash_str(h, self.qasm)
+        elif self.qir is not None:
+            _hash_str(h, "qir")
+            _hash_str(h, str(self.qir))
+        elif self.qsharp is not None:
+            _hash_str(h, "qsharp")
+            _hash_str(h, self.qsharp.json())
+        _hash_optional(h, self.encoding, _hash_str)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.

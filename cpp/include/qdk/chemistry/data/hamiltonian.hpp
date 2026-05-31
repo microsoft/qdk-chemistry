@@ -274,6 +274,12 @@ class HamiltonianContainer {
    */
   virtual bool is_valid() const = 0;
 
+  /**
+   * @brief Feed identifying data into a hash context.
+   * Subclasses override to add their container-specific data.
+   */
+  virtual void hash_update(qdk::chemistry::utils::HashContext& ctx) const;
+
  protected:
   /// One-electron integrals in MO basis [norb x norb]
   const std::pair<std::shared_ptr<Eigen::MatrixXd>,
@@ -607,6 +613,8 @@ class Hamiltonian : public DataClass,
                        size_t nbeta) const;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Container holding the Hamiltonian implementation
   std::unique_ptr<const HamiltonianContainer> _container;
 

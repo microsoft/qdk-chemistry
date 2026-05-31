@@ -158,6 +158,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(mc_calculator);
+
   // Factory class binding - creates MultiConfigurationCalculatorFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<

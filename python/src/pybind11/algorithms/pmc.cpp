@@ -165,6 +165,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(pmc_calculator);
+
   // Factory class binding - creates
   // ProjectedMultiConfigurationCalculatorFactory class with static methods
   qdk::chemistry::python::bind_algorithm_factory<

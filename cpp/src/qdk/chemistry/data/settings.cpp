@@ -1962,4 +1962,44 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
   return settings;
 }
 
+void Settings::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  // settings_ is a std::map which is already sorted by key
+  ctx.update(static_cast<uint64_t>(settings_.size()));
+  for (const auto& [key, value] : settings_) {
+    ctx.update(key);
+    // Visit the variant and hash each type
+    std::visit(
+        [&ctx](const auto& v) {
+          using T = std::decay_t<decltype(v)>;
+          if constexpr (std::is_same_v<T, bool>) {
+            ctx.update(uint8_t(0));
+            ctx.update(v);
+          } else if constexpr (std::is_same_v<T, int64_t>) {
+            ctx.update(uint8_t(1));
+            ctx.update(v);
+          } else if constexpr (std::is_same_v<T, double>) {
+            ctx.update(uint8_t(2));
+            ctx.update(v);
+          } else if constexpr (std::is_same_v<T, std::string>) {
+            ctx.update(uint8_t(3));
+            ctx.update(v);
+          } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
+            ctx.update(uint8_t(4));
+            ctx.update(static_cast<uint64_t>(v.size()));
+            for (auto val : v) ctx.update(val);
+          } else if constexpr (std::is_same_v<T, std::vector<double>>) {
+            ctx.update(uint8_t(5));
+            ctx.update(static_cast<uint64_t>(v.size()));
+            for (auto val : v) ctx.update(val);
+          } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
+            ctx.update(uint8_t(6));
+            ctx.update(static_cast<uint64_t>(v.size()));
+            for (const auto& val : v) ctx.update(val);
+          }
+        },
+        value);
+  }
+}
+
 }  // namespace qdk::chemistry::data

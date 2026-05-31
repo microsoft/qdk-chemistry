@@ -806,4 +806,14 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 }
 
+void CholeskyHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  // Hash base class common fields
+  HamiltonianContainer::hash_update(ctx);
+  // Use cholesky-specific tag (not canonical_four_center)
+  ctx.update(get_container_type());
+  // L_ao is the source of truth - smaller than dense two-body
+  ctx.update_optional(_ao_cholesky_vectors);
+}
+
 }  // namespace qdk::chemistry::data

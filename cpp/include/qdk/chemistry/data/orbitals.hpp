@@ -228,14 +228,14 @@ class Orbitals : public DataClass,
   virtual std::vector<size_t> get_all_mo_indices() const;
 
   /**
-   * @brief Check if calculation is restricted (RHF/RKS/ROHF/ROKS)
-   * @return True if orbitals are restricted
+   * @brief Check if calculation is restricted (RHF/RKS)
+   * @return True if alpha and beta coefficients are identical
    */
   virtual bool is_restricted() const;
 
   /**
    * @brief Check if calculation is unrestricted (UHF/UKS)
-   * @return True if orbitals are unrestricted
+   * @return True if alpha and beta coefficients are different
    */
   virtual bool is_unrestricted() const;
 
@@ -434,6 +434,8 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> from_json(const nlohmann::json& j);
 
  protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * Orbital coefficients [AO x MO] for (alpha, beta) spin channels
    */

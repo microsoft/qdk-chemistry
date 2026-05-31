@@ -942,4 +942,11 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
   return LatticeGraph(std::move(sparse), std::move(coloring));
 }
 
+void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(static_cast<uint64_t>(_num_sites));
+  ctx.update(adjacency_);
+  ctx.update(_is_symmetric);
+}
+
 }  // namespace qdk::chemistry::data

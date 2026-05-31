@@ -797,6 +797,8 @@ class BasisSet : public DataClass,
   static AOType string_to_atomic_orbital_type(const std::string& basis_string);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Basis set name (e.g., "6-31G", "cc-pVDZ")
   std::string _name;
 

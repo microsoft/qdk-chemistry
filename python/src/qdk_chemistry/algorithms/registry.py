@@ -40,6 +40,141 @@ if TYPE_CHECKING:
 
     from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 
+class _AlgorithmWrapper:
+    """Thin wrapper that adds a ``cache`` kwarg to ``run()``.
+
+    Forwards every other attribute to the wrapped algorithm so it
+    behaves identically for ``settings()``, ``hash()``, ``type_name()``,
+    ``name()``, etc.
+    """
+
+    __slots__ = ("_algo",)
+
+    def __init__(self, algo: Any) -> None:
+        object.__setattr__(self, "_algo", algo)
+
+    def run(
+        self,
+        *args: Any,
+        cache: Any = None,
+        force_rerun: bool = False,
+        **kwargs: Any,
+    ) -> Any:
+        """Execute the algorithm with optional caching.
+
+        Without ``cache`` this is equivalent to calling
+        the underlying ``algorithm.run()`` directly.
+
+        Args:
+            *args: Positional arguments for the algorithm.
+            cache: Cache backend — a :class:`CacheBackend`, a path
+                (``str`` / ``Path`` → :class:`FolderCache`), or ``None``.
+            force_rerun: If ``True``, skip the cache lookup and re-execute,
+                overwriting any previously cached result.
+            **kwargs: Keyword arguments for the algorithm.
+
+        Returns:
+            The algorithm result.
+
+        """
+        if cache is None:
+            return self._algo.run(*args, **kwargs)
+
+        from qdk_chemistry.remote.cache import resolve_cache  # noqa: PLC0415
+
+        resolved_cache = resolve_cache(cache)
+        if resolved_cache is None:
+            return self._algo.run(*args, **kwargs)
+
+        # Compute deterministic run hash
+        import contextlib  # noqa: PLC0415
+
+        run_hash = None
+        with contextlib.suppress(Exception):
+            run_hash = self._algo.hash(*args, **kwargs)
+
+        if run_hash is None:
+            return self._algo.run(*args, **kwargs)
+
+        # Check the cache (skip on force_rerun)
+        if not force_rerun:
+            hit = _try_cache_hit(resolved_cache, run_hash)
+            if hit is not None:
+                return hit
+
+        # Cache miss — execute locally and store
+        result = self._algo.run(*args, **kwargs)
+        _store_result(resolved_cache, run_hash, self._algo, result, args, kwargs)
+        return result
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._algo, name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        setattr(self._algo, name, value)
+
+    def __repr__(self) -> str:
+        return repr(self._algo)
+
+
+def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
+    """Return the cached result if available, else None."""
+    job = cache.get_job(run_hash)
+    if job is None or not job.output_hashes:
+        return None
+
+    items: list[Any] = []
+    for entry in job.output_hashes:
+        if "value" in entry:
+            items.append(entry["value"])
+        else:
+            data = cache.get_data(entry["hash"])
+            if data is None:
+                return None
+            items.append(data)
+    return items[0] if len(items) == 1 else tuple(items)
+
+
+def _store_result(
+    cache: Any, run_hash: str, algorithm: Any, result: Any, args: tuple, kwargs: dict,
+) -> None:
+    """Store a computation result in the cache."""
+    from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415
+    from qdk_chemistry.remote.job import Job  # noqa: PLC0415
+
+    output_hashes = collect_content_hashes(result)
+
+    input_hashes: dict[str, str] = {}
+    for i, arg in enumerate(args):
+        input_hashes[f"arg_{i}"] = _item_content_hash(arg)
+    for key, val in kwargs.items():
+        input_hashes[key] = _item_content_hash(val)
+
+    job = Job(
+        job_id=run_hash[:12],
+        backend="local",
+        backend_config={},
+        backend_state={},
+        algorithm_info={
+            "type": algorithm.type_name(),
+            "name": algorithm.name(),
+            "settings": algorithm.settings().to_dict(),
+        },
+        status="retrieved",
+        run_hash=run_hash,
+        input_hashes=input_hashes or None,
+        output_hashes=output_hashes,
+    )
+
+    # Persist DataClass blobs
+    items = result if isinstance(result, tuple) else (result,)
+    for entry, item in zip(output_hashes, items, strict=False):
+        if "value" not in entry:
+            cache.put_data(entry["hash"], item)
+
+    cache.put_job(run_hash, job)
+
+
 __all__ = [
     "available",
     "create",
@@ -111,7 +246,7 @@ def create(algorithm_type: str, algorithm_name: str | None = None, **kwargs) -> 
             try:
                 instance = factory.create(algorithm_name)
                 instance.settings().update(kwargs or {})
-                return instance
+                return _AlgorithmWrapper(instance)
             except (KeyError, RuntimeError, ValueError) as e:
                 available_algorithms = factory.available()
                 if not available_algorithms:

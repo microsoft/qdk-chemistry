@@ -165,6 +165,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(selector);
+
   // Factory class binding - creates ActiveSpaceSelectorFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<

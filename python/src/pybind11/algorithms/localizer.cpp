@@ -155,6 +155,8 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  qdk::chemistry::python::add_hash_method(localizer);
+
   // Factory class binding - creates LocalizerFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<LocalizerFactory, Localizer,

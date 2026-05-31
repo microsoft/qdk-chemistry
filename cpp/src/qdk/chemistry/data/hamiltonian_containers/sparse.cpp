@@ -624,4 +624,22 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
   return m;
 }
 
+void SparseHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  // Hash base class common fields
+  HamiltonianContainer::hash_update(ctx);
+  ctx.update(get_container_type());
+  ctx.update(_one_body_sparse);
+  ctx.update(static_cast<uint64_t>(_two_body_map.size()));
+  // std::map is already sorted
+  for (const auto& [idx, val] : _two_body_map) {
+    auto [p, q, r, s] = idx;
+    ctx.update(static_cast<int64_t>(p));
+    ctx.update(static_cast<int64_t>(q));
+    ctx.update(static_cast<int64_t>(r));
+    ctx.update(static_cast<int64_t>(s));
+    ctx.update(val);
+  }
+}
+
 }  // namespace qdk::chemistry::data

@@ -210,6 +210,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * Three-center integrals in MO basis, where each channel is stored as a
    * matrix of dimension [(norb x norb) x naux] where norb x norb is stored in

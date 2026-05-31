@@ -24,6 +24,18 @@ class PyDataClass : public DataClass, public py::trampoline_self_life_support {
     PYBIND11_OVERRIDE_PURE(std::string, DataClass, get_summary);
   }
 
+  std::string content_hash(size_t truncate_chars = 16) const override {
+    // Try Python override first, fall back to C++ default
+    PYBIND11_OVERRIDE(std::string, DataClass, content_hash, truncate_chars);
+  }
+
+ protected:
+  void hash_update(
+      qdk::chemistry::utils::HashContext & /*ctx*/) const override {
+    // For Python-derived classes, content_hash() is overridden in Python
+    // directly. This C++ method is not called for Python classes.
+  }
+
   void to_file(const std::string &filename,
                const std::string &type) const override {
     PYBIND11_OVERRIDE_PURE(void, DataClass, to_file, filename, type);
@@ -228,6 +240,27 @@ Returns:
     str: The data type name (e.g., "structure", "wavefunction")
 
 )")
+
+      .def("content_hash", &DataClass::content_hash, R"(
+Compute a deterministic content hash of this object's identifying data.
+
+Returns a truncated SHA-256 hex digest. Two objects with identical defining
+data will produce identical hashes. Lazy/cached data is excluded; only
+constructor-supplied data participates.
+
+Args:
+    truncate_chars (int): Number of hex characters in the result (default 16)
+
+Returns:
+    str: Hex string content hash
+
+Examples:
+    >>> h1 = structure1.content_hash()
+    >>> h2 = structure2.content_hash()
+    >>> assert h1 == h2  # if structures are identical
+
+)",
+           py::arg("truncate_chars") = 16)
 
       .def("get_summary", &DataClass::get_summary, R"(
 Get a human-readable summary of the object.

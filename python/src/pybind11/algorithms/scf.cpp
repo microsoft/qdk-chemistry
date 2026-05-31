@@ -163,6 +163,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(scf_solver);
+
   // Factory class binding - creates ScfSolverFactory class with static methods
   bind_algorithm_factory<ScfSolverFactory, ScfSolver, ScfSolverBase>(
       m, "ScfSolverFactory");

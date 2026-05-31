@@ -188,6 +188,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
   /// Two-electron integrals in MO basis, stored as flattened arrays [norb^4]
   /// Access pattern: V[i*norb^3 + j*norb^2 + k*norb + l] = (ij|kl)
   const std::tuple<std::shared_ptr<Eigen::VectorXd>,

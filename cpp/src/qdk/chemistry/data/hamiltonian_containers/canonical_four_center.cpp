@@ -722,4 +722,15 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 }
 
+void CanonicalFourCenterHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  // Call the base class hash_update for common fields
+  HamiltonianContainer::hash_update(ctx);
+  // Add the two-body integrals specific to this container
+  ctx.update(get_container_type());
+  ctx.update(*std::get<0>(_two_body_integrals));
+  ctx.update(*std::get<1>(_two_body_integrals));
+  ctx.update(*std::get<2>(_two_body_integrals));
+}
+
 }  // namespace qdk::chemistry::data

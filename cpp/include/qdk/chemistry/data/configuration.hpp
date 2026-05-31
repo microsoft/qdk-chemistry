@@ -331,6 +331,8 @@ class Configuration : public DataClass {
                                            std::string beta_string);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Friend classes that need direct access to packed data for efficient
   // serialization
   friend class ConfigurationSet;

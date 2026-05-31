@@ -1155,4 +1155,14 @@ void Structure::_validate_dimensions() const {
   }
 }
 
+void Structure::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(_coordinates);
+  for (const auto& elem : _elements) {
+    ctx.update(static_cast<int64_t>(elem));
+  }
+  ctx.update(_masses);
+  ctx.update(_nuclear_charges);
+}
+
 }  // namespace qdk::chemistry::data

@@ -159,6 +159,8 @@ Returns:
 
 )");
 
+  qdk::chemistry::python::add_hash_method(multi_configuration_scf);
+
   multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {
     return "<qdk_chemistry.algorithms.MultiConfigurationScf>";
   });
