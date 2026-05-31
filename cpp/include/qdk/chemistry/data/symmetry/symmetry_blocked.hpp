@@ -154,6 +154,10 @@ class SymmetryBlocked : public DataClass {
    */
   BlockPtr block_ptr(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
+      if (_blocks.empty()) {
+        throw std::invalid_argument(
+            "SymmetryBlocked has no blocks.");
+      }
       if (_blocks.size() == 1) {
         return _blocks.begin()->second;
       }

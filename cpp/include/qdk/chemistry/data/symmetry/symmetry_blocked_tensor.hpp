@@ -297,6 +297,10 @@ class SymmetryBlockedTensor
   static Tensor<Rank, Scalar> _block_from_json(const nlohmann::json& j) {
     const auto rows = j.at("rows").get<Eigen::Index>();
     const auto cols = j.at("cols").get<Eigen::Index>();
+    if (rows < 0 || cols < 0) {
+      throw std::invalid_argument(
+          "SymmetryBlockedTensor block has negative dimensions.");
+    }
     if constexpr (utils::is_complex_scalar_v<Scalar>) {
       Tensor<Rank, Scalar> block(rows, cols);
       const auto& data = j.at("data");
@@ -309,6 +313,10 @@ class SymmetryBlockedTensor
       return block;
     } else {
       auto vec = j.at("data").get<std::vector<Scalar>>();
+      if (static_cast<Eigen::Index>(vec.size()) != rows * cols) {
+        throw std::invalid_argument(
+            "SymmetryBlockedTensor block data size does not match dimensions.");
+      }
       return Eigen::Map<const Tensor<Rank, Scalar>>(vec.data(), rows, cols);
     }
   }

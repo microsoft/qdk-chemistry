@@ -360,6 +360,10 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
       throw std::invalid_argument(
           "Beta three-center rows does not match n_active_beta^2");
     }
+    if (static_cast<std::size_t>(bb->cols()) != naux) {
+      throw std::invalid_argument(
+          "Beta three-center cols does not match alpha naux");
+    }
     auto bb_flat = std::make_shared<const Eigen::VectorXd>(
         Eigen::Map<const Eigen::VectorXd>(bb->data(), bb->size()));
     blocks[{beta_label, beta_label, aux_label}] = bb_flat;
