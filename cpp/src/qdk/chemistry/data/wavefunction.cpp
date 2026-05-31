@@ -428,8 +428,7 @@ void WavefunctionContainer::_build_one_rdm_sbt() const {
   if (_one_rdm_sbt) return;
   if (!has_one_rdm_spin_dependent()) return;
 
-  // Resolve the spin-dependent channels (lazy derivation may fill them)
-  auto [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
+  const auto& [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
 
   // Only build SBT for real-valued RDMs
   if (!std::holds_alternative<Eigen::MatrixXd>(aa_var)) return;
@@ -438,8 +437,9 @@ void WavefunctionContainer::_build_one_rdm_sbt() const {
   const auto& bb = std::get<Eigen::MatrixXd>(bb_var);
   std::size_t n = static_cast<std::size_t>(aa.rows());
 
+  bool restricted = get_orbitals()->is_restricted();
   auto sym = std::make_shared<const Symmetries>(
-      Symmetries({axes::spin(0, &aa == &bb)}));
+      Symmetries({axes::spin(0, restricted)}));
 
   SymmetryLabel alpha_label({axes::alpha()});
   SymmetryLabel beta_label({axes::beta()});
@@ -455,7 +455,7 @@ void WavefunctionContainer::_build_one_rdm_sbt() const {
   SymmetryBlockedTensor<2>::BlockMap blocks;
   blocks[{alpha_label, alpha_label}] = aa_block;
 
-  if (&aa != &bb) {
+  if (!restricted) {
     blocks[{beta_label, beta_label}] =
         std::make_shared<const Eigen::MatrixXd>(bb);
   }
@@ -468,7 +468,8 @@ void WavefunctionContainer::_build_two_rdm_sbt() const {
   if (_two_rdm_sbt) return;
   if (!has_two_rdm_spin_dependent()) return;
 
-  auto [aabb_var, aaaa_var, bbbb_var] = get_active_two_rdm_spin_dependent();
+  const auto& [aabb_var, aaaa_var, bbbb_var] =
+      get_active_two_rdm_spin_dependent();
 
   if (!std::holds_alternative<Eigen::VectorXd>(aaaa_var)) return;
 
@@ -481,7 +482,7 @@ void WavefunctionContainer::_build_two_rdm_sbt() const {
   std::size_t n = 1;
   while (n * n * n * n < n4) ++n;
 
-  bool restricted = (&aaaa == &bbbb);
+  bool restricted = get_orbitals()->is_restricted();
   auto sym = std::make_shared<const Symmetries>(
       Symmetries({axes::spin(0, restricted)}));
 

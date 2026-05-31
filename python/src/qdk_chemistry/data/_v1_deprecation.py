@@ -79,19 +79,19 @@ def _install_deprecation_warnings() -> None:
     """Patch all deprecated v1 accessors to emit DeprecationWarning."""
 
     # -- HamiltonianContainer base methods --
-    _wrap_deprecated(HamiltonianContainer, "get_one_body_integrals", "h1()")
+    _wrap_deprecated(HamiltonianContainer, "get_one_body_integrals", "one_body_integrals()")
     _wrap_deprecated(HamiltonianContainer, "get_inactive_fock_matrix", "inactive_fock()")
 
     # -- CanonicalFourCenterHamiltonianContainer --
-    _wrap_deprecated(CanonicalFourCenterHamiltonianContainer, "get_two_body_integrals", "h2()")
+    _wrap_deprecated(CanonicalFourCenterHamiltonianContainer, "get_two_body_integrals", "two_body_integrals()")
 
     # -- CholeskyHamiltonianContainer --
     _wrap_deprecated(CholeskyHamiltonianContainer, "get_three_center_integrals", "three_center()")
     _wrap_deprecated(CholeskyHamiltonianContainer, "get_two_body_integrals", "three_center()")
 
     # -- SparseHamiltonianContainer --
-    _wrap_deprecated(SparseHamiltonianContainer, "sparse_two_body_integrals", "h2_sparse()")
-    _wrap_deprecated(SparseHamiltonianContainer, "get_two_body_integrals", "h2_sparse()")
+    _wrap_deprecated(SparseHamiltonianContainer, "sparse_two_body_integrals", "two_body_integrals_sparse()")
+    _wrap_deprecated(SparseHamiltonianContainer, "get_two_body_integrals", "two_body_integrals_sparse()")
 
     # -- Hamiltonian wrapper --
     _wrap_deprecated(
@@ -100,7 +100,7 @@ def _install_deprecation_warnings() -> None:
     _wrap_deprecated(
         Hamiltonian,
         "get_two_body_integrals",
-        "the underlying container's non-deprecated two-body accessor",
+        "get_container().two_body_integrals()",
     )
     _wrap_deprecated(Hamiltonian, "get_inactive_fock_matrix", "get_container().inactive_fock()")
 
