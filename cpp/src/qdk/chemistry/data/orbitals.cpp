@@ -664,25 +664,24 @@ bool Orbitals::is_restricted() const {
   if (!_coefficients.first || !_coefficients.second) {
     throw std::runtime_error(
         "Cannot determine if orbitals are restricted: orbital coefficients "
-        "not "
-        "set");
+        "not set");
   }
-  // Compare coefficient pointers first for efficiency
-  if (_coefficients.first == _coefficients.second) {
-    return true;
-  }
-  // If pointers are different, check if the data is the same
-  if (!_coefficients.first->isApprox(*_coefficients.second)) {
-    return false;
-  } else {
-    // Also check energies if both are set
-    if (_energies.first && _energies.second) {
-      if (!_energies.first->isApprox(*_energies.second)) {
-        return false;
-      }
+  // Verify energy pointers are consistent with coefficients
+  if (_energies.first && _energies.second) {
+    if (_coefficients.first == _coefficients.second &&
+        _energies.first != _energies.second) {
+      throw std::runtime_error(
+          "Inconsistent orbital state: coefficients are shared but energies "
+          "are not");
+    }
+    if (_coefficients.first != _coefficients.second &&
+        _energies.first == _energies.second) {
+      throw std::runtime_error(
+          "Inconsistent orbital state: coefficients are separate but energies "
+          "are shared");
     }
   }
-  return true;
+  return _coefficients.first == _coefficients.second;
 }
 
 bool Orbitals::has_active_space() const {
