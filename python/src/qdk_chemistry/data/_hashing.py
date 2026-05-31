@@ -75,8 +75,9 @@ def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
     arr = np.ascontiguousarray(arr)
     if arr.dtype.byteorder not in ("<", "=", "|") or (arr.dtype.byteorder == "=" and _NATIVE_IS_BIG):
         arr = arr.astype(arr.dtype.newbyteorder("<"))
+    # Include dtype to avoid collisions between equal byte payloads of different dtypes
+    _hash_str(h, arr.dtype.str)
     h.update(arr.tobytes())
-
 
 def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
     """Hash an optional value: 0x00 if None, 0x01 + data if present."""
@@ -116,10 +117,10 @@ def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
             _hash_arg(h, item)
     elif isinstance(arg, dict):
         _hash_uint(h, len(arg))
-        for key in sorted(arg.keys()):
+        for key in sorted(arg.keys(), key=lambda k: (type(k).__name__, str(k))):
+            _hash_str(h, type(key).__name__)
             _hash_str(h, str(key))
             _hash_arg(h, arg[key])
-    elif arg is None:
         h.update(b"\x00")
     else:
         raise TypeError(f"Unsupported hash argument type: {type(arg).__name__}")

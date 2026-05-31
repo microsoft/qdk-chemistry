@@ -179,6 +179,7 @@ class QuantumErrorProfile(DataClass):
         _hash_str(h, "quantum_error_profile")
         _hash_str(h, self.name)
         _hash_str(h, self.description)
+
         # Hash errors dict in sorted order
         _hash_uint(h, len(self.errors))
         for gate_key in sorted(self.errors.keys(), key=str):
@@ -186,14 +187,18 @@ class QuantumErrorProfile(DataClass):
             error_dict = self.errors[gate_key]
             for error_type in sorted(error_dict.keys(), key=str):
                 _hash_str(h, str(error_type))
-                h.update(str(error_dict[error_type]).encode("utf-8"))
-        _hash_uint(h, len(self.one_qubit_gates))
-        for g in self.one_qubit_gates:
-            _hash_str(h, g)
-        _hash_uint(h, len(self.two_qubit_gates))
-        for g in self.two_qubit_gates:
-            _hash_str(h, g)
+                _hash_str(h, repr(error_dict[error_type]))
 
+        # These sets are derived from `errors`, but include them deterministically
+        for label, gates in (
+            ("one_qubit_gates", self.one_qubit_gates),
+            ("two_qubit_gates", self.two_qubit_gates),
+            ("three_qubit_gates", self.three_qubit_gates),
+        ):
+            _hash_str(h, label)
+            _hash_uint(h, len(gates))
+            for g in sorted(gates, key=str):
+                _hash_str(h, str(g))
     def __eq__(self, other: object) -> bool:
         """Check equality between two QuantumErrorProfile instances.
 

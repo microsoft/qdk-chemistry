@@ -112,11 +112,11 @@ class FolderCache(CacheBackend):
         """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
         # Check for list manifest first — escape literal brackets so glob
         # doesn't treat them as a character class.
-        list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
+        list_matches = sorted(self._root.glob(f"{content_hash}.list[[]*].json"))
         if list_matches:
             return self._get_data_list(list_matches[0])
         # Glob for <content_hash>.*.h5 — the type name is in the filename
-        matches = list(self._root.glob(f"{content_hash}.*.h5"))
+        matches = sorted(self._root.glob(f"{content_hash}.*.h5"))
         if not matches:
             return None
         filepath = matches[0]
@@ -137,7 +137,7 @@ class FolderCache(CacheBackend):
             return None
         items = []
         for item_hash in manifest["items"]:
-            matches = list(self._root.glob(f"{item_hash}.*.h5"))
+            matches = sorted(self._root.glob(f"{item_hash}.*.h5"))
             if not matches:
                 return None
             items.append(dataclass_type.from_hdf5_file(str(matches[0])))  # type: ignore[attr-defined]

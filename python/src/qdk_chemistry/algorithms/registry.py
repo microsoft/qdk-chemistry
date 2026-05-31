@@ -103,7 +103,7 @@ class _AlgorithmWrapper:
         import contextlib  # noqa: PLC0415
 
         run_hash = None
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(AttributeError):
             run_hash = self._algo.hash(*args, **kwargs)
 
         if run_hash is None:

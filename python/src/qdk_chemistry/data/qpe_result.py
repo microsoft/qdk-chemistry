@@ -91,7 +91,12 @@ class QpeResult(DataClass):
         for b in self.branching:
             _hash_float(h, b)
         _hash_optional(h, self.resolved_energy, _hash_float)
-        _hash_optional(h, self.bits_msb_first, lambda h_, v: [_hash_arg(h_, x) for x in v])
+        if self.bits_msb_first is None:
+            h.update(b"\x00")
+        else:
+            h.update(b"\x01")
+            for x in self.bits_msb_first:
+                _hash_arg(h, x)
         _hash_optional(h, self.bitstring_msb_first, _hash_str)
         _hash_optional(h, self.metadata, _hash_arg)
 
