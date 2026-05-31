@@ -1142,17 +1142,31 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       return ModelOrbitals::from_hdf5(group);
     }
 
+    // Read is_restricted flag from metadata
+    bool restricted = false;
+    try {
+      H5::Group metadata_group = group.openGroup("metadata");
+      H5::DataSet ds = metadata_group.openDataSet("is_restricted");
+      ds.read(&restricted, H5::PredType::NATIVE_HBOOL);
+    } catch (const H5::Exception&) {
+      throw std::invalid_argument(
+          "HDF5 file missing 'metadata' group or 'is_restricted' dataset");
+    }
+
     // Handle regular Orbitals case
     // Load coefficients (required)
     auto coeffs_alpha = load_matrix_from_group(group, "coefficients_alpha");
 
-    // Check if beta coefficients exist
+    // Only read beta coefficients if unrestricted
     std::optional<Eigen::MatrixXd> coeffs_beta_opt;
-    try {
-      auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
-      coeffs_beta_opt = coeffs_beta;
-    } catch (const std::exception&) {
-      // Beta coefficients don't exist - this is a restricted calculation
+    if (!restricted) {
+      try {
+        auto coeffs_beta = load_matrix_from_group(group, "coefficients_beta");
+        coeffs_beta_opt = coeffs_beta;
+      } catch (const H5::Exception&) {
+        throw std::invalid_argument(
+            "HDF5 file missing 'coefficients_beta' for unrestricted orbitals");
+      }
     }
 
     // Load optional energies
@@ -1160,7 +1174,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     if (dataset_exists_in_group(group, "energies_alpha")) {
       energies_alpha = load_vector_from_group(group, "energies_alpha");
     }
-    if (dataset_exists_in_group(group, "energies_beta")) {
+    if (!restricted && dataset_exists_in_group(group, "energies_beta")) {
       energies_beta = load_vector_from_group(group, "energies_beta");
     }
 
@@ -1214,7 +1228,13 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     } catch (const std::exception&) { /* optional */
     }
 
-    if (coeffs_beta_opt) {
+    if (restricted || !coeffs_beta_opt) {
+      // Restricted case - use single-matrix constructor to share the pointer
+      return std::make_shared<Orbitals>(
+          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
+          std::make_tuple(std::move(active_indices_alpha),
+                          std::move(inactive_indices_alpha)));
+    } else {
       // Unrestricted case
       return std::make_shared<Orbitals>(
           coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
@@ -1223,12 +1243,6 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
                           std::move(active_indices_beta),
                           std::move(inactive_indices_alpha),
                           std::move(inactive_indices_beta)));
-    } else {
-      // Restricted case
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(inactive_indices_alpha)));
     }
 
   } catch (const H5::Exception& e) {
@@ -1316,10 +1330,14 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     // Load coefficients (required for regular Orbitals)
     if (!j.contains("coefficients") || !j["coefficients"].contains("alpha") ||
         !j["coefficients"].contains("beta")) {
-      throw std::runtime_error("JSON missing required coefficient data");
+      throw std::invalid_argument("JSON missing required coefficient data");
     }
 
-    const auto is_restricted = j.value("is_restricted", false);
+    if (!j.contains("is_restricted")) {
+      throw std::invalid_argument(
+          "JSON missing required 'is_restricted' field");
+    }
+    const auto is_restricted = j["is_restricted"].get<bool>();
     auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
 
     // Load optional energies

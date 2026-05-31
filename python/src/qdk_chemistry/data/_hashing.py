@@ -73,9 +73,7 @@ def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
         _hash_int(h, dim)
     # Force little-endian byte order for cross-platform determinism
     arr = np.ascontiguousarray(arr)
-    if arr.dtype.byteorder not in ("<", "=", "|"):
-        arr = arr.astype(arr.dtype.newbyteorder("<"))
-    elif arr.dtype.byteorder == "=" and _NATIVE_IS_BIG:
+    if arr.dtype.byteorder not in ("<", "=", "|") or (arr.dtype.byteorder == "=" and _NATIVE_IS_BIG):
         arr = arr.astype(arr.dtype.newbyteorder("<"))
     h.update(arr.tobytes())
 
