@@ -929,9 +929,7 @@ TEST_F(StabilityCheckerTest, QDK_RHF_H2_Stretched_STO3G_External_Instability) {
 }
 
 TEST_F(StabilityCheckerTest,
-       DISABLED_QDK_UHF_H2_Stretched_STO3G_distinguished_restricted) {
-  // DISABLED: QDK SCF does not implement automatic spin symmetry breaking
-  // for closed-shell (spin 0) systems, so UHF converges to the RHF solution.
+       QDK_UHF_H2_Stretched_STO3G_distinguished_restricted) {
   // Test stability analysis on stretched H2 molecule with unrestricted UHF.
   // Only internal stability is valid for UHF.
   std::vector<Eigen::Vector3d> coords = {
