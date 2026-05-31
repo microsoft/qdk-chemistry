@@ -49,6 +49,7 @@ def _hash_float(h: "hashlib._Hash", f: float) -> None:
     """Hash a float (8 bytes, little-endian)."""
     h.update(struct.pack("<d", float(f)))
 
+
 def _hash_int(h: "hashlib._Hash", i: int) -> None:
     """Hash an int (8 bytes, little-endian signed)."""
     h.update(struct.pack("<q", int(i)))
@@ -77,6 +78,7 @@ def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
     # Include dtype to avoid collisions between equal byte payloads of different dtypes
     _hash_str(h, arr.dtype.str)
     h.update(arr.tobytes())
+
 
 def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
     """Hash an optional value: 0x00 if None, 0x01 + data if present."""

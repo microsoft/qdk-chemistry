@@ -38,12 +38,6 @@ class CacheBackend(ABC):
             Defaults to ``False``.
 
     """
-    Args:
-        is_shared: Set to ``True`` when the backing store is reachable
-            from multiple machines (e.g. a network-mounted folder).
-            Defaults to ``False``.
-
-    """
 
     name: str  # Cache backend name (e.g. "folder", "sqlite")
 

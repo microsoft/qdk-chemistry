@@ -7,9 +7,6 @@ Built-in backends:
 Custom backends can be registered with ``@register_cache`` or via
 the ``qdk_chemistry.cache_backends`` entry-point group.
 """
-Custom backends can be registered with ``@register_cache`` or via
-the ``qdk_chemistry.cache_backends`` entry-point group.
-"""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -73,7 +70,7 @@ def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> Cac
 
     Accepts any of the following:
 
-    - ``None`` → returns ``None``
+    - ``None`` returns ``None``
     - A ``CacheBackend`` instance → returned as-is
     - A ``Path`` or path-like string → ``FolderCache(path=...)``
     - A registered name string → looked up in the registry; extra

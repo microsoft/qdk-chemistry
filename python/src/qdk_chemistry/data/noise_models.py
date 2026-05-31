@@ -199,6 +199,7 @@ class QuantumErrorProfile(DataClass):
             _hash_uint(h, len(gates))
             for g in sorted(gates, key=str):
                 _hash_str(h, str(g))
+
     def __eq__(self, other: object) -> bool:
         """Check equality between two QuantumErrorProfile instances.
 
