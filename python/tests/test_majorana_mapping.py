@@ -20,7 +20,6 @@ Tests cover:
 # --------------------------------------------------------------------------------------------
 
 import tempfile
-from pathlib import Path
 
 import h5py
 import pytest
@@ -207,7 +206,7 @@ class TestFromBilinears:
 
     def test_missing_entry_raises(self) -> None:
         """from_bilinears raises ValueError if a required (j,k) pair is missing."""
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="Missing bilinear"):
             MajoranaMapping.from_bilinears(
                 num_modes=2,
                 bilinears={
@@ -215,7 +214,7 @@ class TestFromBilinears:
                     (0, 2): (1.0, "XZ"),
                     (0, 3): (1.0, "YZ"),
                     (1, 2): (1.0, "XI"),
-                    # missing (1, 3)
+                    # (1, 3) intentionally omitted
                     (2, 3): (1.0, "ZI"),
                 },
             )
@@ -557,7 +556,6 @@ class TestBilinear:
             m.majorana(4)
         with pytest.raises(IndexError):
             m.majorana(99)
-
 
 
 class TestEncodingMetadata:

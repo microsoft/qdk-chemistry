@@ -114,7 +114,9 @@ class TaperingSpecification:
         return len(self._qubit_indices)
 
     @classmethod
-    def symmetry_conserving_bravyi_kitaev(cls, num_modes: int, symmetries: Symmetries) -> TaperingSpecification:
+    def symmetry_conserving_bravyi_kitaev(
+        cls, num_modes: int, symmetries: Symmetries, source_encoding: str = "bravyi-kitaev"
+    ) -> TaperingSpecification:
         """Create a tapering specification for symmetry-conserving Bravyi-Kitaev.
 
         Tapers the two Z₂ symmetry qubits of the Bravyi-Kitaev encoding:
@@ -124,6 +126,7 @@ class TaperingSpecification:
         Args:
             num_modes (int): Number of spin-orbitals (= number of Bravyi-Kitaev qubits).
             symmetries (Symmetries): Electron counts for the target symmetry sector.
+            source_encoding (str): Encoding label for the pre-taper mapping. Default ``"bravyi-kitaev"``.
 
         Returns:
             TaperingSpecification: Tapering specification for symmetry-conserving Bravyi-Kitaev.
@@ -152,7 +155,7 @@ class TaperingSpecification:
             qubit_indices=(q_alpha, q_total),
             eigenvalues=(ev_alpha, ev_total),
             source_num_qubits=n,
-            source_encoding="bravyi-kitaev",
+            source_encoding=source_encoding,
         )
 
     @classmethod
@@ -277,9 +280,9 @@ def taper_qubits(
         ValueError: If lengths don't match, indices are out of range, contain duplicates, or eigenvalues are not +/-1.
 
     """
-    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
-
     import numpy as np  # noqa: PLC0415
+
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
 
     qubit_indices = list(qubit_indices)
     eigenvalues = list(eigenvalues)
@@ -357,4 +360,40 @@ def taper_qubits(
         coefficients=np.array(final_coeffs),
         encoding=qubit_hamiltonian.encoding,
         fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+    )
+
+
+def taper_to_scbk(
+    qubit_hamiltonian: QubitHamiltonian,
+    symmetries: Symmetries,
+) -> QubitHamiltonian:
+    """Apply symmetry-conserving Bravyi-Kitaev tapering to a qubit Hamiltonian.
+
+    Computes the SCBK tapering specification from symmetries, applies
+    :func:`taper_qubits` to remove the two Z_2 symmetry qubits, and returns the
+    reduced Hamiltonian with encoding set to ``"symmetry-conserving-bravyi-kitaev"``
+    and tapering metadata attached.
+
+    Args:
+        qubit_hamiltonian (QubitHamiltonian): A qubit Hamiltonian produced by a Bravyi-Kitaev mapping.
+        symmetries (Symmetries): Electron counts (n_alpha, n_beta) for the target symmetry sector.
+
+    Returns:
+        QubitHamiltonian: Tapered Hamiltonian with two fewer qubits, SCBK encoding label, and tapering metadata.
+
+    """
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    tapering = TaperingSpecification.symmetry_conserving_bravyi_kitaev(
+        num_modes=qubit_hamiltonian.num_qubits,
+        symmetries=symmetries,
+        source_encoding=qubit_hamiltonian.encoding or "bravyi-kitaev",
+    )
+    tapered = taper_qubits(qubit_hamiltonian, tapering.qubit_indices, tapering.eigenvalues)
+    return QubitHamiltonian(
+        pauli_strings=tapered.pauli_strings,
+        coefficients=tapered.coefficients,
+        encoding="symmetry-conserving-bravyi-kitaev",
+        fermion_mode_order=tapered.fermion_mode_order,
+        tapering=tapering,
     )

@@ -68,11 +68,11 @@ MajoranaMapping MajoranaMapping::from_bilinears(
   const std::size_t M = 2 * num_modes;
   const std::size_t expected = M * (M - 1) / 2;
   if (upper_triangle.size() != expected) {
-    throw std::invalid_argument(
-        "MajoranaMapping::from_bilinears: expected " +
-        std::to_string(expected) + " upper-triangle entries for " +
-        std::to_string(num_modes) + " modes, got " +
-        std::to_string(upper_triangle.size()));
+    throw std::invalid_argument("MajoranaMapping::from_bilinears: expected " +
+                                std::to_string(expected) +
+                                " upper-triangle entries for " +
+                                std::to_string(num_modes) + " modes, got " +
+                                std::to_string(upper_triangle.size()));
   }
   std::uint64_t max_idx = 0;
   bool has_any = false;

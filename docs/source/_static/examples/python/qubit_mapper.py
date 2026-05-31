@@ -39,11 +39,12 @@ _, wfn_hf = scf_solver.run(
 )
 
 # Select an active space
+num_active_orbitals = 6
 active_space_selector = create(
     "active_space_selector",
     algorithm_name="qdk_valence",
     num_active_electrons=4,
-    num_active_orbitals=6,
+    num_active_orbitals=num_active_orbitals,
 )
 active_wfn = active_space_selector.run(wfn_hf)
 active_orbitals = active_wfn.get_orbitals()
@@ -52,9 +53,8 @@ active_orbitals = active_wfn.get_orbitals()
 hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(active_orbitals)
 
-# Determine the number of spin-orbitals
-n_spatial = hamiltonian.get_orbitals().get_num_molecular_orbitals()
-n_spin_orbitals = 2 * n_spatial
+# Determine the number of spin-orbitals in the active space
+n_spin_orbitals = 2 * num_active_orbitals
 
 # Choose an encoding
 mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)

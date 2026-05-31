@@ -255,7 +255,7 @@ class QubitHamiltonian(DataClass):
 
         Raises:
             TypeError: If *other* is not a ``QubitHamiltonian``.
-            ValueError: If the two Hamiltonians have different qubit counts, encodings, fermion mode orders, or tapering.
+            ValueError: If the two Hamiltonians have different qubit counts, encodings, or modes.
 
         """
         if not isinstance(other, QubitHamiltonian):

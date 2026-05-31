@@ -670,10 +670,10 @@ class TestQubitHamiltonianArithmetic:
 class TestTaperingPropagation:
     """Verify tapering metadata survives arithmetic and reordering."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def tapering(self):
         """Create a sample tapering specification."""
-        from qdk_chemistry.data.tapering import TaperingSpecification
+        from qdk_chemistry.data.tapering import TaperingSpecification  # noqa: PLC0415
 
         return TaperingSpecification(
             qubit_indices=(3, 1),
@@ -682,7 +682,7 @@ class TestTaperingPropagation:
             source_encoding="bravyi-kitaev-tree",
         )
 
-    @pytest.fixture()
+    @pytest.fixture
     def tapered_h(self, tapering):
         """Create a QubitHamiltonian with tapering metadata."""
         return QubitHamiltonian(
@@ -705,7 +705,7 @@ class TestTaperingPropagation:
 
     def test_add_mismatched_tapering_raises(self, tapered_h):
         """H1 + H2 with different tapering should raise ValueError."""
-        from qdk_chemistry.data.tapering import TaperingSpecification
+        from qdk_chemistry.data.tapering import TaperingSpecification  # noqa: PLC0415
 
         other_tapering = TaperingSpecification(
             qubit_indices=(3, 1),

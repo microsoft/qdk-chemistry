@@ -11,8 +11,12 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.data import QubitHamiltonian, Symmetries
-from qdk_chemistry.data.tapering import TaperingSpecification
-from qdk_chemistry.utils.tapering import taper_qubits, taper_to_scbk
+from qdk_chemistry.data.tapering import TaperingSpecification, taper_qubits, taper_to_scbk
+
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    orthonormality_error_tolerance,
+)
 
 # -------------------------------------------------------------------------------------
 # taper_qubits — core tests
@@ -158,3 +162,37 @@ class TestTaperToScbk:
         # n_alpha=1 (odd) → ev_alpha=-1, n_total=1 (odd) → ev_total=-1
         assert result.tapering is not None
         assert result.tapering.eigenvalues == (-1, -1)
+
+    def test_tapered_eigenvalues_subset_of_full(self) -> None:
+        """Tapered Hamiltonian eigenvalues are a subset of the full BK eigenvalues."""
+        base_strings = ["IIII", "IIIZ", "IIZZ", "IZII", "ZZZI"]
+        base_coeffs = [2.0, -0.5, -0.5, -0.5, -0.5]
+
+        qh_clean = QubitHamiltonian(
+            pauli_strings=base_strings,
+            coefficients=np.array(base_coeffs),
+            encoding="bravyi-kitaev",
+        )
+
+        qh_with_xy = QubitHamiltonian(
+            pauli_strings=[*base_strings, "IIXI", "IIYI", "XIIX"],
+            coefficients=np.array([*base_coeffs, 0.3, 0.3, 0.2]),
+            encoding="bravyi-kitaev",
+        )
+
+        symmetries = Symmetries(n_alpha=1, n_beta=1)
+        result_clean = taper_to_scbk(qh_clean, symmetries)
+        result_with_xy = taper_to_scbk(qh_with_xy, symmetries)
+
+        # X/Y terms on tapered qubits must be dropped — results should be identical
+        assert result_with_xy.num_qubits == 2
+        assert result_clean.pauli_strings == result_with_xy.pauli_strings
+        np.testing.assert_allclose(
+            result_clean.coefficients, result_with_xy.coefficients, atol=float_comparison_absolute_tolerance
+        )
+
+        # Also verify eigenvalue subset for the symmetry-preserving Hamiltonian
+        full_eigs = np.linalg.eigvalsh(qh_clean.to_matrix())
+        tapered_eigs = np.linalg.eigvalsh(result_clean.to_matrix())
+        for e in tapered_eigs:
+            assert np.any(np.isclose(full_eigs, e, atol=orthonormality_error_tolerance))

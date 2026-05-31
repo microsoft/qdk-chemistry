@@ -542,7 +542,7 @@ class TestQdkQubitMapper:
 
         n = 6
         mapping = MajoranaMapping.parity(n)
-        I_n = np.eye(2**n)
+        I_n = np.eye(2**n)  # noqa: N806
 
         for j in range(n):
             g0 = pauli_to_sparse_matrix([mapping.table[2 * j]], np.array([1.0])).toarray()
@@ -734,8 +734,16 @@ class TestUnrestrictedHamiltonians:
                         for s in range(n):
                             if h2[p, q, r, s] == 0:
                                 v = rng.standard_normal() * 0.2
-                                for a, b, c, d in {(p, q, r, s), (q, p, r, s), (p, q, s, r), (q, p, s, r),
-                                                    (r, s, p, q), (s, r, p, q), (r, s, q, p), (s, r, q, p)}:
+                                for a, b, c, d in {
+                                    (p, q, r, s),
+                                    (q, p, r, s),
+                                    (p, q, s, r),
+                                    (q, p, s, r),
+                                    (r, s, p, q),
+                                    (s, r, p, q),
+                                    (r, s, q, p),
+                                    (s, r, q, p),
+                                }:
                                     h2[a, b, c, d] = v
             return h2.ravel()
 
@@ -756,9 +764,19 @@ class TestUnrestrictedHamiltonians:
         h2_aabb = h2_aabb_4d.ravel()
 
         fock_a, fock_b = np.eye(0), np.eye(0)
-        h = Hamiltonian(CanonicalFourCenterHamiltonianContainer(
-            h1_alpha, h1_beta, h2_aaaa, h2_aabb, h2_bbbb, orbitals, 0.0, fock_a, fock_b,
-        ))
+        h = Hamiltonian(
+            CanonicalFourCenterHamiltonianContainer(
+                h1_alpha,
+                h1_beta,
+                h2_aaaa,
+                h2_aabb,
+                h2_bbbb,
+                orbitals,
+                0.0,
+                fock_a,
+                fock_b,
+            )
+        )
 
         n_modes = 2 * n
         mapper = create("qubit_mapper", "qdk")
@@ -1117,7 +1135,7 @@ class TestScbkOneStep:
     def test_scbk_matches_two_step(self) -> None:
         """One-step symmetry-conserving BK matches explicit BK-tree + internal taper."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
-        from qdk_chemistry.utils.tapering import taper_to_scbk  # noqa: PLC0415
+        from qdk_chemistry.data.tapering import taper_to_scbk  # noqa: PLC0415
 
         hamiltonian = create_nontrivial_test_hamiltonian()
         n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
@@ -1155,7 +1173,7 @@ class TestScbkOneStep:
 
         # Exact: project JW Hamiltonian onto all matching-parity sectors
         jw_mapping = MajoranaMapping.jordan_wigner(n)
-        H_jw = mapper.run(hamiltonian, jw_mapping).to_matrix()
+        H_jw = mapper.run(hamiltonian, jw_mapping).to_matrix()  # noqa: N806
         all_eigs: list[float] = []
         for na in range(n_spatial + 1):
             for nb in range(n_spatial + 1):
@@ -1203,15 +1221,12 @@ class TestBravyiKitaevTreeMapper:
             assert mapping.num_qubits == n
 
     def test_bk_tree_clifford_algebra(self) -> None:
-        """BK-tree Majorana operators satisfy {γ_i, γ_j} = 2δ_{ij}."""
+        """BK-tree Majorana operators satisfy anticommutation."""
         from qdk_chemistry.utils.pauli_matrix import pauli_to_sparse_matrix  # noqa: PLC0415
 
         for n in (4, 6, 8):
             mapping = MajoranaMapping.bravyi_kitaev_tree(n)
-            gammas = [
-                pauli_to_sparse_matrix([mapping.table[k]], np.array([1.0])).toarray()
-                for k in range(2 * n)
-            ]
+            gammas = [pauli_to_sparse_matrix([mapping.table[k]], np.array([1.0])).toarray() for k in range(2 * n)]
             for i in range(2 * n):
                 for j in range(i, 2 * n):
                     anticomm = gammas[i] @ gammas[j] + gammas[j] @ gammas[i]
@@ -1237,11 +1252,11 @@ class TestBravyiKitaevTreeMapper:
         n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
         mapper = create("qubit_mapper", "qdk")
 
-        H = mapper.run(hamiltonian, MajoranaMapping.bravyi_kitaev_tree(n)).to_matrix()
+        H = mapper.run(hamiltonian, MajoranaMapping.bravyi_kitaev_tree(n)).to_matrix()  # noqa: N806
 
         # Build Z_{n-1} and Z_{n/2-1} operators
         for q in (n // 2 - 1, n - 1):
-            Z_q = np.eye(2**n, dtype=complex)
+            Z_q = np.eye(2**n, dtype=complex)  # noqa: N806
             for i in range(2**n):
                 if (i >> q) & 1:
                     Z_q[i, i] = -1.0

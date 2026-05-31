@@ -64,7 +64,6 @@ def _sparse_to_dense_le(word: SparsePauliWord, num_qubits: int) -> str:
     return "".join(chars)
 
 
-
 class MajoranaMapping(DataClass):
     """Fermion-to-qubit encoding.
 
@@ -150,7 +149,7 @@ class MajoranaMapping(DataClass):
             A new :class:`MajoranaMapping` with no tapering.
 
         """
-        return MajoranaMapping(table=[], _core=self._core)
+        return self._from_core(self._core)
 
     @property
     def base_encoding(self) -> str:
@@ -351,7 +350,7 @@ class MajoranaMapping(DataClass):
 
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals). Must be > 0.
-            bilinears (dict[tuple[int, int], tuple[complex, str]]): Mapping from ``(j, k)`` with ``j < k`` to ``(coeff, pauli_str)``, one entry per distinct ordered pair of Majorana indices.
+            bilinears (dict[tuple[int, int], tuple[complex, str]]): Upper-triangle bilinear images.
             name (str): Optional human-readable label. Default ``""``.
 
         Returns:
@@ -361,12 +360,11 @@ class MajoranaMapping(DataClass):
             ValueError: If sizes are inconsistent or num_modes is zero.
 
         """
-        M = 2 * num_modes
+        M = 2 * num_modes  # noqa: N806
         expected = M * (M - 1) // 2
         if len(bilinears) != expected:
             raise ValueError(
-                f"Expected {expected} upper-triangle bilinear entries for "
-                f"{num_modes} modes, got {len(bilinears)}"
+                f"Expected {expected} upper-triangle bilinear entries for {num_modes} modes, got {len(bilinears)}"
             )
         # Build upper-triangle flat list in row-major order
         upper_triangle: list[tuple[complex, SparsePauliWord]] = []
@@ -377,15 +375,7 @@ class MajoranaMapping(DataClass):
                 coeff, label = bilinears[(j, k)]
                 upper_triangle.append((complex(coeff), _dense_le_to_sparse(label)))
         core = _CoreMajoranaMapping.from_bilinears(num_modes, upper_triangle, name)
-        result = cls.__new__(cls)
-        result._core = core
-        result._name = name if name else core.name
-        result._num_modes = core.num_modes
-        result._num_qubits = core.num_qubits
-        result._table = ()
-        result._tapering = None
-        DataClass.__init__(result)
-        return result
+        return cls(table=[], name=name, _core=core)
 
     @classmethod
     def _from_core(cls, core: _CoreMajoranaMapping) -> MajoranaMapping:

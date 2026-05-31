@@ -112,6 +112,8 @@ std::pair<int, PackedPauliWord<NW>> multiply_packed(
     phase_exp += std::popcount(cyc);
     phase_exp -= std::popcount(anti);
   }
+  // Pauli multiplication phases cycle mod 4:
+  // 0: +1, 1: +i, 2: −1, 3: −i.
   return {phase_exp & 3, result};
 }
 
@@ -255,8 +257,7 @@ MajoranaMapResult majorana_map_impl(
       for (int b = 0; b < 2; ++b) {
         const auto& [coeff, word] =
             cache[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
-        acc.accumulate(word,
-                       coeff * h_pq * 0.25 * excitation_coeff[a][b]);
+        acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
       }
     }
   };
@@ -319,11 +320,11 @@ MajoranaMapResult majorana_map_impl(
         for (int a = 0; a < 2; ++a) {
           for (int b = 0; b < 2; ++b) {
             const auto& [coeff_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(
-                coeff_a * 0.25 * excitation_coeff[a][b], word_a);
+            sse.terms.emplace_back(coeff_a * 0.25 * excitation_coeff[a][b],
+                                   word_a);
             const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(
-                coeff_b * 0.25 * excitation_coeff[a][b], word_b);
+            sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
+                                   word_b);
           }
         }
       }
@@ -421,9 +422,9 @@ MajoranaMapResult majorana_map_impl(
                 for (int d = 0; d < 2; ++d) {
                   const auto& [coeff2, w2] =
                       cache_rs[(2 * br + c) * maj_per_spin + (2 * bs + d)];
-                  std::complex<double> scale =
-                      coeff1 * coeff2 * half_eri * 0.0625 *
-                      excitation_coeff[a][b] * excitation_coeff[c][d];
+                  std::complex<double> scale = coeff1 * coeff2 * half_eri *
+                                               0.0625 * excitation_coeff[a][b] *
+                                               excitation_coeff[c][d];
                   acc.accumulate_product(w1, w2, scale);
                 }
               }
@@ -498,10 +499,11 @@ MajoranaMapResult majorana_map_impl(
 }
 
 // Dispatch table: function pointer per NW, covering 1..16 (up to 1024 qubits).
-using DispatchFn = MajoranaMapResult (*)(
-    const MajoranaMapping&, double, const double*, const double*,
-    const double*, const double*, const double*, std::size_t, bool,
-    double, double);
+using DispatchFn = MajoranaMapResult (*)(const MajoranaMapping&, double,
+                                         const double*, const double*,
+                                         const double*, const double*,
+                                         const double*, std::size_t, bool,
+                                         double, double);
 
 template <std::size_t... Is>
 constexpr std::array<DispatchFn, sizeof...(Is)> make_dispatch_table(
@@ -529,15 +531,15 @@ MajoranaMapResult majorana_map_hamiltonian(
   if (num_words > detail::max_nw) {
     throw std::invalid_argument(
         "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
-        " exceeds the maximum of " +
-        std::to_string(detail::max_nw * 64) + " qubits.");
+        " exceeds the maximum of " + std::to_string(detail::max_nw * 64) +
+        " qubits.");
   }
 
   static const auto table =
       detail::make_dispatch_table(std::make_index_sequence<detail::max_nw>{});
-  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta,
-                               eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
-                               spin_symmetric, threshold, integral_threshold);
+  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta, eri_aaaa,
+                              eri_aabb, eri_bbbb, n_spatial, spin_symmetric,
+                              threshold, integral_threshold);
 }
 
 }  // namespace qdk::chemistry::data
