@@ -67,6 +67,8 @@ def _hash_bool(h: "hashlib._Hash", b: bool) -> None:
 
 def _hash_array(h: "hashlib._Hash", arr: np.ndarray) -> None:
     """Hash a numpy array deterministically."""
+    if arr.dtype.hasobject:
+        raise TypeError("Unsupported hash argument type: ndarray with object dtype")
     # Hash shape first for disambiguation
     _hash_uint(h, len(arr.shape))
     for dim in arr.shape:
@@ -120,11 +122,15 @@ def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
             _hash_arg(h, item)
     elif isinstance(arg, dict):
         _hash_uint(h, len(arg))
-        for key in sorted(arg.keys(), key=lambda k: (type(k).__name__, str(k))):
-            _hash_str(h, type(key).__name__)
-            _hash_str(h, str(key))
+
+        def _key_sort_key(k: Any) -> tuple[str, bytes]:
+            hk = hashlib.sha256()
+            _hash_arg(hk, k)
+            return (type(k).__name__, hk.digest())
+
+        for key in sorted(arg.keys(), key=_key_sort_key):
+            _hash_arg(h, key)
             _hash_arg(h, arg[key])
-        h.update(b"\x00")
     else:
         raise TypeError(f"Unsupported hash argument type: {type(arg).__name__}")
 

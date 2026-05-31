@@ -84,8 +84,13 @@ def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> Cac
     if isinstance(cache, Path):
         return FolderCache(path=cache, **kwargs)
     # str — could be a registered name or a path
-    if isinstance(cache, str) and cache in _CACHES and kwargs:
-        return _CACHES[cache](**kwargs)
+    if isinstance(cache, str) and cache in _CACHES:
+        try:
+            return _CACHES[cache](**kwargs)
+        except TypeError as e:
+            raise ValueError(
+                f"Cache name '{cache}' requires configuration. Pass a filesystem path (e.g. './cache') or use get_cache('{cache}', ...)."
+            ) from e
     # Treat as a filesystem path
     return FolderCache(path=cache, **kwargs)
 

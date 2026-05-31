@@ -32,8 +32,8 @@ class PyDataClass : public DataClass, public py::trampoline_self_life_support {
  protected:
   void hash_update(
       qdk::chemistry::utils::HashContext & /*ctx*/) const override {
-    // For Python-derived classes, content_hash() is overridden in Python
-    // directly. This C++ method is not called for Python classes.
+    pybind11::pybind11_fail(
+        "Python class must override content_hash(truncate_chars=...) to enable deterministic caching");
   }
 
   void to_file(const std::string &filename,
