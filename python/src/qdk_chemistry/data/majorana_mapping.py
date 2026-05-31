@@ -149,7 +149,7 @@ class MajoranaMapping(DataClass):
             A new :class:`MajoranaMapping` with no tapering.
 
         """
-        return self._from_core(self._core)
+        return MajoranaMapping(table=[], _core=self._core)
 
     @property
     def base_encoding(self) -> str:
@@ -350,7 +350,7 @@ class MajoranaMapping(DataClass):
 
         Args:
             num_modes (int): Number of fermionic modes (spin-orbitals). Must be > 0.
-            bilinears (dict[tuple[int, int], tuple[complex, str]]): Upper-triangle bilinear images.
+            bilinears (dict[tuple[int, int], tuple[complex, str]]): Bilinear images ``{(j, k): (coeff, pauli_str)}``.
             name (str): Optional human-readable label. Default ``""``.
 
         Returns:
@@ -360,16 +360,16 @@ class MajoranaMapping(DataClass):
             ValueError: If sizes are inconsistent or num_modes is zero.
 
         """
-        M = 2 * num_modes  # noqa: N806
-        expected = M * (M - 1) // 2
+        num_majoranas = 2 * num_modes
+        expected = num_majoranas * (num_majoranas - 1) // 2
         if len(bilinears) != expected:
             raise ValueError(
                 f"Expected {expected} upper-triangle bilinear entries for {num_modes} modes, got {len(bilinears)}"
             )
         # Build upper-triangle flat list in row-major order
         upper_triangle: list[tuple[complex, SparsePauliWord]] = []
-        for j in range(M):
-            for k in range(j + 1, M):
+        for j in range(num_majoranas):
+            for k in range(j + 1, num_majoranas):
                 if (j, k) not in bilinears:
                     raise ValueError(f"Missing bilinear entry for ({j}, {k})")
                 coeff, label = bilinears[(j, k)]

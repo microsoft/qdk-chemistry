@@ -206,7 +206,7 @@ class TestFromBilinears:
 
     def test_missing_entry_raises(self) -> None:
         """from_bilinears raises ValueError if a required (j,k) pair is missing."""
-        with pytest.raises(ValueError, match="Missing bilinear"):
+        with pytest.raises(ValueError, match="upper-triangle bilinear entries"):
             MajoranaMapping.from_bilinears(
                 num_modes=2,
                 bilinears={
