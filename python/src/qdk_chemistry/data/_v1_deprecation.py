@@ -11,6 +11,7 @@ from typing import Any
 from qdk_chemistry._core.data import (
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
+    Hamiltonian,
     HamiltonianContainer,
     SparseHamiltonianContainer,
     WavefunctionContainer,
@@ -20,27 +21,28 @@ from qdk_chemistry._core.data import (
 def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
     """Replace *method_name* on *cls* with a wrapper that emits DeprecationWarning.
 
-    Also patches the corresponding property (e.g. ``one_body_integrals`` for
-    ``get_one_body_integrals``) if one exists, so both call styles warn.
+    Also patches the corresponding property if a legacy property binding still
+    exists, so both call styles warn during the deprecation period.
     """
     original = getattr(cls, method_name, None)
     if original is None:
         return
 
-    def wrapper(*args: Any, **kwargs: Any) -> Any:
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         warnings.warn(
             f"{cls.__name__}.{method_name} is deprecated. Use {replacement} instead.",
             DeprecationWarning,
             stacklevel=2,
         )
-        return original(*args, **kwargs)
+        bound = original.__get__(self, type(self)) if hasattr(original, "__get__") else original
+        return bound(*args, **kwargs)
 
     wrapper.__name__ = method_name
     wrapper.__doc__ = getattr(original, "__doc__", None)
     setattr(cls, method_name, wrapper)
 
-    # Patch the corresponding property created by bind_getter_as_property
-    # (e.g. "get_one_body_integrals" → "one_body_integrals" property).
+    # Patch a matching legacy property if one is still present
+    # (e.g. "get_one_body_integrals" → "one_body_integrals").
     if method_name.startswith("get_"):
         prop_name = method_name[4:]
     elif method_name.startswith("sparse_"):
@@ -54,13 +56,20 @@ def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
         for klass in cls.__mro__:
             existing = klass.__dict__.get(prop_name)
             if existing is not None and isinstance(existing, property):
-                def prop_wrapper(self: Any, _orig: Any = original, _pn: str = prop_name, _cls: type = cls, _repl: str = replacement) -> Any:
+                def prop_wrapper(
+                    self: Any,
+                    _orig: Any = original,
+                    _pn: str = prop_name,
+                    _cls: type = cls,
+                    _repl: str = replacement,
+                ) -> Any:
                     warnings.warn(
                         f"{_cls.__name__}.{_pn} is deprecated. Use {_repl} instead.",
                         DeprecationWarning,
                         stacklevel=2,
                     )
-                    return _orig(self)
+                    bound = _orig.__get__(self, type(self)) if hasattr(_orig, "__get__") else _orig
+                    return bound()
 
                 setattr(klass, prop_name, property(prop_wrapper, doc=existing.__doc__))
                 break
@@ -69,17 +78,9 @@ def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
 def _install_deprecation_warnings() -> None:
     """Patch all deprecated v1 accessors to emit DeprecationWarning."""
 
-    # pybind11 C++ MRO doesn't pick up Python overrides on base classes,
-    # so we must patch each concrete subclass that exposes the method.
-    # Only patch the subclass (not the abstract base) to avoid double-firing.
-    ham_subclasses = (CanonicalFourCenterHamiltonianContainer,
-                      CholeskyHamiltonianContainer,
-                      SparseHamiltonianContainer)
-
-    # -- HamiltonianContainer base methods on each subclass --
-    for cls in ham_subclasses:
-        _wrap_deprecated(cls, "get_one_body_integrals", "h1()")
-        _wrap_deprecated(cls, "get_inactive_fock_matrix", "inactive_fock()")
+    # -- HamiltonianContainer base methods --
+    _wrap_deprecated(HamiltonianContainer, "get_one_body_integrals", "h1()")
+    _wrap_deprecated(HamiltonianContainer, "get_inactive_fock_matrix", "inactive_fock()")
 
     # -- CanonicalFourCenterHamiltonianContainer --
     _wrap_deprecated(CanonicalFourCenterHamiltonianContainer, "get_two_body_integrals", "h2()")
@@ -91,6 +92,17 @@ def _install_deprecation_warnings() -> None:
     # -- SparseHamiltonianContainer --
     _wrap_deprecated(SparseHamiltonianContainer, "sparse_two_body_integrals", "h2_sparse()")
     _wrap_deprecated(SparseHamiltonianContainer, "get_two_body_integrals", "h2_sparse()")
+
+    # -- Hamiltonian wrapper --
+    _wrap_deprecated(
+        Hamiltonian, "get_one_body_integrals", "get_container().one_body_integrals()"
+    )
+    _wrap_deprecated(
+        Hamiltonian,
+        "get_two_body_integrals",
+        "the underlying container's non-deprecated two-body accessor",
+    )
+    _wrap_deprecated(Hamiltonian, "get_inactive_fock_matrix", "get_container().inactive_fock()")
 
     # -- WavefunctionContainer (abstract, but used via Wavefunction.get_container()) --
     _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_dependent", "one_rdm()")
