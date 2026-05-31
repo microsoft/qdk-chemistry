@@ -40,18 +40,28 @@ if TYPE_CHECKING:
 
     from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 
+
 class _AlgorithmWrapper:
     """Thin wrapper that adds a ``cache`` kwarg to ``run()``.
 
     Forwards every other attribute to the wrapped algorithm so it
     behaves identically for ``settings()``, ``hash()``, ``type_name()``,
-    ``name()``, etc.
+    ``name()``, etc.  The ``__class__`` property ensures that
+    ``isinstance()`` checks against the wrapped type still pass.
     """
 
     __slots__ = ("_algo",)
 
     def __init__(self, algo: Any) -> None:
         object.__setattr__(self, "_algo", algo)
+
+    @property  # type: ignore[override]
+    def __class__(self):
+        return self._algo.__class__
+
+    @__class__.setter
+    def __class__(self, value: type) -> None:  # type: ignore[override]
+        object.__setattr__(self._algo, "__class__", value)
 
     def run(
         self,
@@ -136,7 +146,12 @@ def _try_cache_hit(cache: Any, run_hash: str) -> Any | None:
 
 
 def _store_result(
-    cache: Any, run_hash: str, algorithm: Any, result: Any, args: tuple, kwargs: dict,
+    cache: Any,
+    run_hash: str,
+    algorithm: Any,
+    result: Any,
+    args: tuple,
+    kwargs: dict,
 ) -> None:
     """Store a computation result in the cache."""
     from qdk_chemistry.data._hashing import _item_content_hash, collect_content_hashes  # noqa: PLC0415

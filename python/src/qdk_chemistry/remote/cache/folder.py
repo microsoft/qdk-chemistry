@@ -28,6 +28,28 @@ if TYPE_CHECKING:
     from qdk_chemistry.remote.job import Job
 
 
+def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
+    """Find the DataClass subclass whose ``_data_type_name`` matches *type_name*."""
+    import qdk_chemistry.data  # noqa: PLC0415, F401 — ensure all subclasses are imported
+    from qdk_chemistry._core.data import DataClass as _CppBase  # noqa: PLC0415
+    from qdk_chemistry.data.base import DataClass as _PyBase  # noqa: PLC0415
+
+    # Walk both the Python and C++ DataClass hierarchies since C++ types
+    # (Orbitals, Wavefunction, …) inherit from the pybind11 base, not the
+    # Python base.
+    stack = list(_PyBase.__subclasses__()) + list(_CppBase.__subclasses__())
+    seen: set[int] = set()
+    while stack:
+        cls = stack.pop()
+        if id(cls) in seen:
+            continue
+        seen.add(id(cls))
+        if getattr(cls, "_data_type_name", None) == type_name:
+            return cls  # type: ignore[return-value]
+        stack.extend(cls.__subclasses__())
+    return None
+
+
 class FolderCache(CacheBackend):
     """Content-addressed folder cache.
 
@@ -99,9 +121,7 @@ class FolderCache(CacheBackend):
         filepath = matches[0]
         # Extract type name from filename: <hash>.<type_name>.h5
         type_name = filepath.name.removeprefix(f"{content_hash}.").removesuffix(".h5")
-        from qdk_chemistry.remote.serialization import FileSerializer  # noqa: PLC0415
-
-        dataclass_type = FileSerializer._get_dataclass_type(type_name)  # noqa: SLF001
+        dataclass_type = _resolve_dataclass_type(type_name)
         if dataclass_type is None:
             return None
         return dataclass_type.from_hdf5_file(str(filepath))  # type: ignore[attr-defined]
@@ -110,10 +130,8 @@ class FolderCache(CacheBackend):
         """Reconstruct a list of DataClass objects from a manifest."""
         import json  # noqa: PLC0415
 
-        from qdk_chemistry.remote.serialization import FileSerializer  # noqa: PLC0415
-
         manifest = json.loads(manifest_path.read_text())
-        dataclass_type = FileSerializer._get_dataclass_type(manifest["type"])  # noqa: SLF001
+        dataclass_type = _resolve_dataclass_type(manifest["type"])
         if dataclass_type is None:
             return None
         items = []
