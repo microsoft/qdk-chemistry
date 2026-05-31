@@ -91,7 +91,9 @@ def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
 
 def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
     """Hash an arbitrary argument, dispatching by type."""
-    if hasattr(arg, "content_hash"):
+    if arg is None:
+        h.update(b"\x00")
+    elif hasattr(arg, "content_hash"):
         _hash_str(h, arg.content_hash())
     elif isinstance(arg, bool):
         _hash_bool(h, arg)
