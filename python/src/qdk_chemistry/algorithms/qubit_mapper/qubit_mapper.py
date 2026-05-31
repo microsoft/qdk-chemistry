@@ -57,6 +57,7 @@ class QubitMapper(Algorithm):
        The backend then builds a qubit operator from scratch using its
        own independent fermion-to-qubit pipeline.
 
+<<<<<<< HEAD
     For name-dispatched backends, the ``MajoranaMapping`` serves only as an
     encoding selector — its Pauli table is not consulted.  Consistency
     between the table and the name is not verified at runtime.  If a
@@ -68,6 +69,31 @@ class QubitMapper(Algorithm):
     test suite verify this for every supported factory x backend combination.
     Custom or manually constructed mappings with non-standard names cannot
     be used with name-dispatched backends.
+=======
+    **Name-dispatched backends** (e.g. ``OpenFermionQubitMapper``, ``QiskitQubitMapper``)
+        **Ignore** ``mapping.table`` entirely.  Instead they read
+        ``mapping.base_encoding`` (a string like ``"jordan-wigner"`` or
+        ``"bravyi-kitaev-tree"``) and use it to look up the corresponding
+        transform function in their own library.  The backend then builds
+        a qubit operator from scratch using its own independent
+        fermion-to-qubit pipeline.
+
+        This means:
+
+        *  The ``MajoranaMapping`` serves only as an **encoding selector**
+           for name-dispatched backends — its Pauli table is not consulted.
+        *  Consistency between the table and the name is **not verified at
+           runtime**.  If a ``MajoranaMapping`` is constructed with a table
+           that does not match its ``base_encoding`` name (e.g. a BK table
+           labelled ``"jordan-wigner"``), a name-dispatched backend will
+           silently use the wrong transform.
+        *  Factory-produced mappings (``MajoranaMapping.jordan_wigner()``,
+           ``.bravyi_kitaev()``, etc.) are guaranteed to be consistent.
+           Cross-backend eigenvalue tests in the test suite verify this for
+           every supported factory x backend combination.
+        *  Custom or manually constructed mappings with non-standard names
+           cannot be used with name-dispatched backends.
+>>>>>>> origin/session/majorana-qubit-operators
 
     .. rubric:: Tapering
 
