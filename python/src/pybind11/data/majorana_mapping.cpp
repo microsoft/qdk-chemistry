@@ -54,10 +54,61 @@ Immutable specification for post-mapping qubit tapering.
           },
           py::arg("num_modes"), py::arg("symmetries"))
       .def("__eq__", &TaperingSpecification::operator==, py::arg("other"))
-      .def("__hash__", [](const TaperingSpecification& self) {
-        return py::hash(
-            py::make_tuple(self.qubit_indices(), self.eigenvalues()));
-      });
+      .def("__hash__",
+           [](const TaperingSpecification& self) {
+             return py::hash(py::make_tuple(
+                 py::tuple(py::cast(self.qubit_indices())),
+                 py::tuple(py::cast(self.eigenvalues()))));
+           })
+      .def(
+          "to_json",
+          [](const TaperingSpecification& self) {
+            py::module_ json = py::module_::import("json");
+            return json.attr("loads")(self.to_json().dump());
+          },
+          "Serialize to a JSON-compatible dictionary.")
+      .def_static(
+          "from_json",
+          [](const py::object& json_data) {
+            py::module_ json = py::module_::import("json");
+            return TaperingSpecification::from_json(nlohmann::json::parse(
+                json.attr("dumps")(json_data).cast<std::string>()));
+          },
+          py::arg("json_data"),
+          "Deserialize from a JSON-compatible dictionary.")
+      .def(
+          "to_hdf5",
+          [](const TaperingSpecification& self, const py::object& group) {
+            group.attr("attrs").attr("__setitem__")("json",
+                                                    self.to_json().dump());
+          },
+          py::arg("group"),
+          "Serialize to an HDF5 group.")
+      .def_static(
+          "from_hdf5",
+          [](const py::object& group) {
+            auto json = group.attr("attrs")
+                            .attr("__getitem__")("json")
+                            .cast<std::string>();
+            return TaperingSpecification::from_json(
+                nlohmann::json::parse(json));
+          },
+          py::arg("group"),
+          "Deserialize from an HDF5 group.")
+      .def(
+          "to_json_file",
+          [](const TaperingSpecification& self, const py::object& filename) {
+            self.to_json_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_json_file",
+          [](const py::object& filename) {
+            return TaperingSpecification::from_json_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"));
 
   py::class_<MajoranaMapping, DataClass, py::smart_holder> mapping(
       data, "MajoranaMapping", R"(

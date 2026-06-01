@@ -109,7 +109,7 @@ def test_openfermion_bk_tree_encoding():
     """
     hamiltonian = create_nontrivial_test_hamiltonian()
     n = _num_spin_orbitals(hamiltonian)
-    mapping = MajoranaMapping.from_table(list(MajoranaMapping.jordan_wigner(n).table), name="bravyi-kitaev-tree")
+    mapping = MajoranaMapping.bravyi_kitaev_tree(n)
 
     qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
 

@@ -173,6 +173,17 @@ nlohmann::json MajoranaMapping::to_json() const {
   if (tapering_) {
     data["tapering"] = tapering_->to_json();
   }
+  // Bilinear-only mappings: persist the bilinear entries so the mapping can
+  // round-trip even when the Majorana table is empty.
+  if (!majorana_atomic_) {
+    data["num_modes"] = num_modes_;
+    nlohmann::json bl_array = nlohmann::json::array();
+    for (const auto& [coeff, word] : bilinears_) {
+      bl_array.push_back(
+          {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
+    }
+    data["bilinears"] = bl_array;
+  }
   return data;
 }
 
@@ -194,6 +205,26 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   std::optional<TaperingSpecification> tapering = std::nullopt;
   if (data.contains("tapering") && !data.at("tapering").is_null()) {
     tapering = TaperingSpecification::from_json(data.at("tapering"));
+  }
+
+  // Bilinear-only mapping: table is empty, bilinears stored explicitly.
+  if (table.empty() && data.contains("bilinears")) {
+    auto num_modes = data.at("num_modes").get<std::size_t>();
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
+    for (const auto& entry : data.at("bilinears")) {
+      double real = entry.at("real").get<double>();
+      double imag = entry.at("imag").get<double>();
+      auto word = entry.at("word").get<SparsePauliWord>();
+      bilinears.emplace_back(std::complex<double>(real, imag), std::move(word));
+    }
+    auto mapping = MajoranaMapping::from_bilinears(
+        num_modes, std::move(bilinears), base_encoding);
+    if (name == base_encoding && !tapering) {
+      return mapping;
+    }
+    return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
+                           mapping.num_modes_, mapping.num_qubits_,
+                           std::move(base_encoding), std::move(tapering));
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);

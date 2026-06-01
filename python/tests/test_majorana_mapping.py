@@ -21,6 +21,7 @@ Tests cover:
 import tempfile
 
 import h5py
+import numpy as np
 import pytest
 
 from qdk_chemistry._core.data import (
@@ -567,18 +568,13 @@ class TestTaperingSpecificationSerialization:
 
     def test_json_contains_tapering_fields(self) -> None:
         """TaperingSpecification.to_json() produces the expected structure."""
-        import json  # noqa: PLC0415
-
         from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
 
         tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        data = json.loads(tap.to_json())
+        data = tap.to_json()
         assert "qubit_indices" in data
         assert "eigenvalues" in data
-        reconstructed = TaperingSpecification(
-            qubit_indices=list(data["qubit_indices"]),
-            eigenvalues=list(data["eigenvalues"]),
-        )
+        reconstructed = TaperingSpecification.from_json(data)
         assert reconstructed == tap
 
     def test_hdf5_standalone_roundtrip(self) -> None:
@@ -607,3 +603,140 @@ class TestTaperingSpecificationSerialization:
         assert loaded.tapering is not None
         assert loaded.tapering.qubit_indices == par.tapering.qubit_indices
         assert loaded.tapering.eigenvalues == par.tapering.eigenvalues
+
+    def test_tapering_standalone_json_roundtrip(self) -> None:
+        """TaperingSpecification round-trips through its own to_json/from_json."""
+        from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        data = tap.to_json()
+        loaded = TaperingSpecification.from_json(data)
+        assert loaded == tap
+        assert loaded.qubit_indices == tap.qubit_indices
+        assert loaded.eigenvalues == tap.eigenvalues
+
+    def test_tapering_standalone_hdf5_roundtrip(self) -> None:
+        """TaperingSpecification round-trips through its own to_hdf5/from_hdf5."""
+        from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                tap.to_hdf5(hf)
+            with h5py.File(f.name, "r") as hf:
+                loaded = TaperingSpecification.from_hdf5(hf)
+        assert loaded == tap
+
+    def test_tapering_hash(self) -> None:
+        """TaperingSpecification is hashable and works in sets/dicts."""
+        from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap1 = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        tap2 = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        assert hash(tap1) == hash(tap2)
+        assert len({tap1, tap2}) == 1
+
+
+# ─── Bilinear-only Mapping Serialization ────────────────────────────────
+
+
+class TestBilinearOnlySerialization:
+    """Serialization round-trip tests for bilinear-only MajoranaMappings."""
+
+    @staticmethod
+    def _make_bilinear_mapping(num_modes: int = 4) -> MajoranaMapping:
+        """Create a bilinear-only mapping from a JW mapping's bilinears."""
+        jw = MajoranaMapping.jordan_wigner(num_modes)
+        bilinears = []
+        m = 2 * num_modes
+        for j in range(m):
+            for k in range(j + 1, m):
+                coeff, word = jw.bilinear(j, k)
+                bilinears.append((coeff, list(word)))
+        return MajoranaMapping.from_bilinears(num_modes, bilinears, name="test-bilinear")
+
+    def test_json_roundtrip(self) -> None:
+        """Bilinear-only mapping survives JSON round-trip."""
+        mapping = self._make_bilinear_mapping()
+        data = mapping.to_json()
+        loaded = MajoranaMapping.from_json(data)
+        assert not loaded.is_majorana_atomic
+        assert loaded.num_modes == mapping.num_modes
+        assert loaded.num_qubits == mapping.num_qubits
+        assert loaded.name == mapping.name
+        for j in range(2 * mapping.num_modes):
+            for k in range(j + 1, 2 * mapping.num_modes):
+                c_orig, w_orig = mapping.bilinear(j, k)
+                c_load, w_load = loaded.bilinear(j, k)
+                assert abs(c_orig - c_load) < 1e-14
+                assert list(w_orig) == list(w_load)
+
+    def test_hdf5_roundtrip(self) -> None:
+        """Bilinear-only mapping survives HDF5 round-trip."""
+        mapping = self._make_bilinear_mapping()
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                mapping.to_hdf5(hf)
+            with h5py.File(f.name, "r") as hf:
+                loaded = MajoranaMapping.from_hdf5(hf)
+        assert not loaded.is_majorana_atomic
+        assert loaded.num_modes == mapping.num_modes
+        assert loaded.num_qubits == mapping.num_qubits
+
+    def test_json_contains_bilinear_fields(self) -> None:
+        """Bilinear-only mapping JSON includes the bilinear and num_modes fields."""
+        mapping = self._make_bilinear_mapping()
+        data = mapping.to_json()
+        assert data["table"] == []
+        assert "bilinears" in data
+        assert "num_modes" in data
+        assert data["num_modes"] == mapping.num_modes
+
+
+# ─── Tapered QubitHamiltonian Serialization ─────────────────────────────
+
+
+class TestTaperedQubitHamiltonianSerialization:
+    """Round-trip tests for QubitHamiltonian with tapering metadata."""
+
+    @staticmethod
+    def _make_tapered_qh():
+        """Create a QubitHamiltonian with tapering metadata."""
+        from qdk_chemistry.data import QubitHamiltonian, Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        return QubitHamiltonian(
+            pauli_strings=["IIIIII", "ZZXXII", "XXYYZZ"],
+            coefficients=np.array([0.5, 0.25, -0.1]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tap,
+        )
+
+    def test_json_roundtrip(self) -> None:
+        """Tapered QubitHamiltonian survives JSON round-trip."""
+        import json  # noqa: PLC0415
+
+        qh = self._make_tapered_qh()
+        data = qh.to_json()
+        assert "tapering" in data
+        assert isinstance(data["tapering"], dict)
+        loaded = type(qh).from_json(data)
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == qh.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == qh.tapering.eigenvalues
+        assert loaded.pauli_strings == qh.pauli_strings
+
+    def test_hdf5_roundtrip(self) -> None:
+        """Tapered QubitHamiltonian survives HDF5 round-trip."""
+        import numpy as np  # noqa: PLC0415
+
+        qh = self._make_tapered_qh()
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                qh.to_hdf5(hf)
+            with h5py.File(f.name, "r") as hf:
+                loaded = type(qh).from_hdf5(hf)
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == qh.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == qh.tapering.eigenvalues
+        assert np.allclose(loaded.coefficients, qh.coefficients)

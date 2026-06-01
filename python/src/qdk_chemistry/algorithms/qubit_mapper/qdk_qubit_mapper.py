@@ -173,7 +173,7 @@ class QdkQubitMapper(QubitMapper):
         n_qubits = base_mapping.num_qubits
         pauli_strings = [sparse_pauli_word_to_label(word, n_qubits) for word in words]
 
-        Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
+        Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {n_qubits} qubits")
 
         qh = QubitHamiltonian(
             pauli_strings=pauli_strings,

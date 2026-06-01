@@ -42,6 +42,10 @@ def _taper_qubits(
         raise ValueError("qubit_indices must not contain duplicates")
 
     nq = qubit_hamiltonian.num_qubits
+    if len(qubit_indices) >= nq:
+        raise ValueError(
+            f"Cannot taper all {nq} qubits — at least one qubit must remain"
+        )
     for q in qubit_indices:
         if q < 0 or q >= nq:
             raise ValueError(f"Qubit index {q} out of range [0, {nq})")
