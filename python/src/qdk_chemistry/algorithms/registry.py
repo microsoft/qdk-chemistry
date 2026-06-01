@@ -47,8 +47,8 @@ class _AlgorithmWrapper:
     Forwards every other attribute to the wrapped algorithm so it
     behaves identically for ``settings()``, ``hash()``, ``type_name()``,
     ``name()``, etc.  The ``__class__`` property makes CPython's
-    ``isinstance()`` report the wrapped type because the default
-    ``object.__instancecheck__`` reads ``obj.__class__`` (not
+    ``isinstance()`` report the wrapped type because
+    ``type.__instancecheck__`` reads ``obj.__class__`` (not
     ``type(obj)``) when the two differ.  Note that ``type(wrapper)``
     still returns ``_AlgorithmWrapper``.
     """

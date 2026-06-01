@@ -28,8 +28,15 @@ if TYPE_CHECKING:
     from qdk_chemistry.remote.job import Job
 
 
+_dataclass_type_cache: dict[str, type[DataClass]] = {}
+
+
 def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
     """Find the DataClass subclass whose ``_data_type_name`` matches *type_name*."""
+    cached = _dataclass_type_cache.get(type_name)
+    if cached is not None:
+        return cached
+
     import qdk_chemistry.data  # noqa: PLC0415, F401 — ensure all subclasses are imported
     from qdk_chemistry._core.data import DataClass as _CppBase  # noqa: PLC0415
     from qdk_chemistry.data.base import DataClass as _PyBase  # noqa: PLC0415
@@ -45,6 +52,7 @@ def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
             continue
         seen.add(id(cls))
         if getattr(cls, "_data_type_name", None) == type_name:
+            _dataclass_type_cache[type_name] = cls  # type: ignore[assignment]
             return cls  # type: ignore[return-value]
         stack.extend(cls.__subclasses__())
     return None

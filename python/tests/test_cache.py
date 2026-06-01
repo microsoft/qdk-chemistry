@@ -129,8 +129,8 @@ class TestFolderCacheJobs:
         """Deleting a nonexistent job returns False."""
         assert not folder_cache.delete_job("no_such_hash")
 
-    def test_delete_job_removes_associated_data(self, folder_cache, sample_job, sample_orbitals):
-        """delete_job also removes data blobs referenced in output_hashes."""
+    def test_delete_job_preserves_associated_data(self, folder_cache, sample_job, sample_orbitals):
+        """delete_job removes only the job file, not referenced data blobs."""
         # Store a data object first
         folder_cache.put_data("hash_wfn_result", sample_orbitals)
         assert folder_cache.get_data("hash_wfn_result") is not None
@@ -138,8 +138,9 @@ class TestFolderCacheJobs:
         folder_cache.put_job("run_abc", sample_job)
         folder_cache.delete_job("run_abc")
 
-        # Data blob should be removed (only non-primitive entries)
-        assert folder_cache.get_data("hash_wfn_result") is None
+        # Job should be gone but data blob should still be present
+        assert folder_cache.get_job("run_abc") is None
+        assert folder_cache.get_data("hash_wfn_result") is not None
 
 
 # ── FolderCache: DataClass blobs ─────────────────────────────────────────────

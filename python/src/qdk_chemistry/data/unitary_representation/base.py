@@ -39,7 +39,7 @@ class UnitaryRepresentation(DataClass):
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
-        _hash_str(h, "time_evolution_unitary")
+        _hash_str(h, "unitary_representation")
         _hash_str(h, self._container.content_hash())
 
     def get_container_type(self) -> str:

@@ -10,8 +10,12 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import h5py
-from qsharp._simulation import NoiseConfig
 from ruamel.yaml import YAML
+
+try:
+    from qdk.simulation import NoiseConfig
+except ImportError:
+    from qsharp._simulation import NoiseConfig
 
 from qdk_chemistry.data._hashing import _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
@@ -185,6 +189,7 @@ class QuantumErrorProfile(DataClass):
         for gate_key in sorted(self.errors.keys(), key=str):
             _hash_str(h, str(gate_key))
             error_dict = self.errors[gate_key]
+            _hash_uint(h, len(error_dict))
             for error_type in sorted(error_dict.keys(), key=str):
                 _hash_str(h, str(error_type))
                 _hash_str(h, repr(error_dict[error_type]))

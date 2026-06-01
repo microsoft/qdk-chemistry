@@ -95,6 +95,7 @@ class QpeResult(DataClass):
             h.update(b"\x00")
         else:
             h.update(b"\x01")
+            _hash_uint(h, len(self.bits_msb_first))
             for x in self.bits_msb_first:
                 _hash_arg(h, x)
         _hash_optional(h, self.bitstring_msb_first, _hash_str)
