@@ -169,10 +169,12 @@ This distinction has practical consequences:
   transform.
 
 - **Tapering** is each backend's responsibility.  The base class provides
-  a ``_taper_result()`` helper that strips tapering from the mapping,
-  performs the base transform, and reapplies tapering to the output.  All
-  shipped backends use this helper, but third-party backends are free to
-  handle tapering however they choose.
+  a ``_taper_result()`` helper that applies tapering and qubit relabeling
+  to an *already mapped* ``QubitHamiltonian``.  Backends must first run
+  the base transform (typically using ``mapping.without_tapering()``) and
+  then call ``_taper_result()`` on the output.  All shipped backends use
+  this helper, but third-party backends are free to handle tapering
+  however they choose.
 
 .. _qdk-qubit-mapper:
 

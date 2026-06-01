@@ -78,6 +78,7 @@ def _taper_qubits(
         new_coeffs.append(adjusted_coeff)
 
     new_nq = nq - len(qubit_indices)
+    assert new_nq >= 1, "Tapering all qubits should have been rejected above"
 
     if not new_strings:
         return QubitHamiltonian(

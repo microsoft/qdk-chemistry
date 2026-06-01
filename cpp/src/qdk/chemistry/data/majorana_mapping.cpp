@@ -35,10 +35,10 @@ MajoranaMapping::MajoranaMapping(
   if (base_encoding_.empty()) {
     base_encoding_ = name_;
   }
-  if (tapering_ && tapering_->num_tapered() > num_qubits_) {
+  if (tapering_ && tapering_->num_tapered() >= num_qubits_) {
     throw std::invalid_argument(
-        "MajoranaMapping tapering removes more qubits than the base mapping "
-        "contains");
+        "MajoranaMapping tapering removes all (or more) qubits than the base "
+        "mapping contains — at least one qubit must remain");
   }
 }
 
