@@ -100,7 +100,16 @@ class MajoranaMapping : public DataClass {
     return tapering_;
   }
 
-  /// Return a copy with tapering removed and the base encoding name restored.
+  /**
+   * @brief Return a copy with tapering removed and the base encoding name
+   *        restored.
+   *
+   * The returned mapping has the same Pauli table and bilinears as the
+   * original, but ``tapering()`` is ``std::nullopt`` and ``name()`` equals
+   * ``base_encoding()``.
+   *
+   * @return An untapered copy of this mapping.
+   */
   MajoranaMapping without_tapering() const;
 
   /// @brief Get the data type name for serialization.
@@ -151,23 +160,86 @@ class MajoranaMapping : public DataClass {
 
   // --- Factory methods for standard encodings ---
 
-  /// Jordan-Wigner encoding on num_modes qubits.
+  /**
+   * @brief Jordan-Wigner encoding.
+   *
+   * Maps fermionic modes to qubits using the Jordan-Wigner transform.
+   * Each mode maps to one qubit; the Pauli-Z string encodes parity.
+   *
+   * @param num_modes Number of fermionic modes (= number of qubits).
+   * @return MajoranaMapping with name ``"jordan-wigner"``.
+   * @throws std::invalid_argument If num_modes == 0.
+   */
   static MajoranaMapping jordan_wigner(std::size_t num_modes);
 
-  /// Bravyi-Kitaev (Fenwick-tree) encoding on num_modes qubits.
+  /**
+   * @brief Bravyi-Kitaev (Fenwick-tree) encoding.
+   *
+   * Uses the Fenwick-tree construction to balance parity and occupation
+   * information across qubits.
+   *
+   * @param num_modes Number of fermionic modes (= number of qubits).
+   * @return MajoranaMapping with name ``"bravyi-kitaev"``.
+   * @throws std::invalid_argument If num_modes == 0.
+   */
   static MajoranaMapping bravyi_kitaev(std::size_t num_modes);
 
-  /// Balanced binary-tree Bravyi-Kitaev encoding.
+  /**
+   * @brief Balanced binary-tree Bravyi-Kitaev encoding.
+   *
+   * Recursive balanced binary-tree construction.  Produces shorter
+   * Pauli strings than the Fenwick variant for non-power-of-two mode
+   * counts.
+   *
+   * @param num_modes Number of fermionic modes (= number of qubits).
+   * @return MajoranaMapping with name ``"bravyi-kitaev-tree"``.
+   * @throws std::invalid_argument If num_modes == 0.
+   */
   static MajoranaMapping bravyi_kitaev_tree(std::size_t num_modes);
 
-  /// Parity encoding on num_modes qubits.
+  /**
+   * @brief Parity encoding.
+   *
+   * Each qubit stores the parity (cumulative occupation) up to its
+   * corresponding mode, rather than the occupation itself.
+   *
+   * @param num_modes Number of fermionic modes (= number of qubits).
+   * @return MajoranaMapping with name ``"parity"``.
+   * @throws std::invalid_argument If num_modes == 0.
+   */
   static MajoranaMapping parity(std::size_t num_modes);
 
-  /// Parity encoding with two-qubit reduction metadata.
+  /**
+   * @brief Parity encoding with two-qubit reduction.
+   *
+   * Attaches TaperingSpecification metadata for post-mapping removal
+   * of two symmetry qubits (alpha-parity and total-parity).
+   *
+   * @param num_modes Number of fermionic modes.
+   * @param n_alpha   Number of alpha electrons.
+   * @param n_beta    Number of beta electrons.
+   * @return MajoranaMapping with name ``"parity-2q-reduced"`` and tapering.
+   * @throws std::invalid_argument If num_modes is odd, < 4, or electron
+   *         counts exceed spatial orbitals.
+   */
   static MajoranaMapping parity(std::size_t num_modes, std::size_t n_alpha,
                                 std::size_t n_beta);
 
-  /// Symmetry-conserving Bravyi-Kitaev encoding with tapering metadata.
+  /**
+   * @brief Symmetry-conserving Bravyi-Kitaev (SCBK) encoding.
+   *
+   * Combines a balanced BK-tree base mapping with tapering metadata
+   * that removes two symmetry qubits.  Post-mapping tapering is applied
+   * by the qubit mapper backends.
+   *
+   * @param num_modes Number of fermionic modes.
+   * @param n_alpha   Number of alpha electrons.
+   * @param n_beta    Number of beta electrons.
+   * @return MajoranaMapping with name ``"symmetry-conserving-bravyi-kitaev"``
+   *         and tapering.
+   * @throws std::invalid_argument If num_modes is odd, < 4, or electron
+   *         counts exceed spatial orbitals.
+   */
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
@@ -222,7 +294,9 @@ class MajoranaMapping : public DataClass {
  * Parallel arrays of Pauli words and their complex coefficients.
  */
 struct MajoranaMapResult {
+  /// Pauli words (one per non-zero term).
   std::vector<SparsePauliWord> words;
+  /// Complex coefficients (parallel to ``words``).
   std::vector<std::complex<double>> coefficients;
 };
 
