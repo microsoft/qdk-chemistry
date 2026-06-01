@@ -58,7 +58,7 @@ class _AlgorithmWrapper:
     def __init__(self, algo: Any) -> None:
         object.__setattr__(self, "_algo", algo)
 
-    @property  # type: ignore[override]
+    @property  # type: ignore[misc, override]
     def __class__(self):
         return self._algo.__class__
 

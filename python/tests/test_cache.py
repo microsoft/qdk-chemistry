@@ -14,6 +14,7 @@ import pytest
 
 from qdk_chemistry.data import Orbitals
 from qdk_chemistry.remote.cache import (
+    _CACHES,
     CacheBackend,
     FolderCache,
     get_cache,
@@ -280,11 +281,9 @@ class TestCacheRegistry:
             def clear(self):
                 pass
 
-        import qdk_chemistry.remote.cache as cache_mod
-
         register_cache("test_dummy")(DummyCache)
         try:
             cache = get_cache("test_dummy")
             assert isinstance(cache, DummyCache)
         finally:
-            cache_mod._CACHES.pop("test_dummy", None)
+            _CACHES.pop("test_dummy", None)

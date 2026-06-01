@@ -184,16 +184,14 @@ class FolderCache(CacheBackend):
     # ── Deletion ────────────────────────────────────────────────────────────
 
     def delete_job(self, run_hash: str) -> bool:
-        """Remove job metadata and its associated data blobs."""
+        """Remove job metadata by *run_hash*.
+
+        Only the ``.job.json`` file is deleted.  Data blobs are left intact
+        because they may be referenced by other jobs.
+        """
         p = self._job_path(run_hash)
         if not p.exists():
             return False
-        # Remove associated data blobs
-        job = self.get_job(run_hash)
-        if job and job.output_hashes:
-            for entry in job.output_hashes:
-                if "value" not in entry:
-                    self.delete_data(entry["hash"])
         p.unlink()
         return True
 
