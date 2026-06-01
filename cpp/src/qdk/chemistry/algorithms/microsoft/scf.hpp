@@ -4,9 +4,19 @@
 
 #pragma once
 
+#include <Eigen/Dense>
 #include <qdk/chemistry/algorithms/scf.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
+
+/**
+ * @brief Internal SCF result including optional analytic nuclear gradients.
+ */
+struct ScfCalculationResult {
+  double energy;
+  std::shared_ptr<data::Wavefunction> wavefunction;
+  std::optional<Eigen::VectorXd> nuclear_gradient;
+};
 
 /**
  * @class ScfSettings
@@ -122,6 +132,16 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
 
   virtual std::string name() const final { return "qdk"; }
 
+  /**
+   * @brief Run the internal SCF solver and return analytic nuclear gradients.
+   *
+   * Settings are locked in the same way as the base run() API. The returned
+   * gradient vector is atom-major with length 3 * number of atoms.
+   */
+  ScfCalculationResult run_with_analytic_gradient(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, BasisOrGuessType basis_or_guess) const;
+
  protected:
   /**
    * @brief Perform an SCF calculation on the given molecular structure
@@ -154,6 +174,12 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
   std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Structure> structure, int charge,
       int spin_multiplicity, BasisOrGuessType basis_or_guess) const override;
+
+ private:
+  ScfCalculationResult _run_with_options(
+      std::shared_ptr<data::Structure> structure, int charge,
+      int spin_multiplicity, BasisOrGuessType basis_or_guess,
+      bool require_gradient) const;
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

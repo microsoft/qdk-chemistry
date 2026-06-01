@@ -29,6 +29,8 @@ Exposed classes are:
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
+- :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
+- :class:`NuclearHessian`: Nuclear Hessian matrix associated with a molecular structure.
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
@@ -85,6 +87,8 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     ModelOrbitals,
     MP2Container,
+    NuclearGradients,
+    NuclearHessian,
     Orbitals,
     OrbitalType,
     PauliOperator,
@@ -163,6 +167,8 @@ __all__ = [
     "MP2Container",
     "MeasurementData",
     "ModelOrbitals",
+    "NuclearGradients",
+    "NuclearHessian",
     "OrbitalType",
     "Orbitals",
     "PauliOperator",

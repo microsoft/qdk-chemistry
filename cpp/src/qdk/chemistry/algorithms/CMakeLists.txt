@@ -4,6 +4,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     localization.cpp
     mc.cpp
+    nuclear_derivative.cpp
     pmc.cpp
     dynamical_correlation_calculator.cpp
     scf.cpp

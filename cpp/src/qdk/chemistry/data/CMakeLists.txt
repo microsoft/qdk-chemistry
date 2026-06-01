@@ -12,6 +12,8 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
     orbitals.cpp
+    nuclear_gradients.cpp
+    nuclear_hessian.cpp
     pauli_operator.cpp
     settings.cpp
     stability_result.cpp
