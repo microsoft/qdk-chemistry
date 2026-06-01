@@ -27,6 +27,16 @@ from .test_helpers import (
     create_test_orbitals,
 )
 
+_PAULI_ID_TO_CHAR = {0: "I", 1: "X", 2: "Y", 3: "Z"}
+
+
+def _table_entry_to_pauli_string(entry: list[tuple[int, int]], num_qubits: int) -> str:
+    """Convert a sparse MajoranaMapping table entry to a dense Pauli label string."""
+    chars = ["I"] * num_qubits
+    for qubit, pauli_id in entry:
+        chars[qubit] = _PAULI_ID_TO_CHAR[pauli_id]
+    return "".join(chars)
+
 
 @pytest.fixture
 def test_data_path() -> Path:
@@ -545,18 +555,23 @@ class TestQdkQubitMapper:
         I_n = np.eye(2**n)  # noqa: N806
 
         for j in range(n):
-            g0 = pauli_to_sparse_matrix([mapping.table[2 * j]], np.array([1.0])).toarray()
-            g1 = pauli_to_sparse_matrix([mapping.table[2 * j + 1]], np.array([1.0])).toarray()
+            ps0 = _table_entry_to_pauli_string(mapping.table[2 * j], mapping.num_qubits)
+            ps1 = _table_entry_to_pauli_string(mapping.table[2 * j + 1], mapping.num_qubits)
+            g0 = pauli_to_sparse_matrix([ps0], np.array([1.0])).toarray()
+            g1 = pauli_to_sparse_matrix([ps1], np.array([1.0])).toarray()
             nj = (I_n + 1j * g0 @ g1) / 2
 
-            # Build expected Z structure: Z_0 for j=0, Z_{j-1}·Z_j for j≥1
+            # Build expected Z structure, using big-endian qubit convention
+            # (Pauli label index 0 = MSB = bit n-1).  Qubit q in the
+            # Pauli string maps to bit (n - 1 - q) in the state index.
+            q = n - 1 - j  # bit position for qubit j
             z_op = np.eye(2**n, dtype=complex)
             for idx in range(2**n):
                 if j == 0:
-                    if (idx >> 0) & 1:
+                    if (idx >> q) & 1:
                         z_op[idx, idx] = -1.0
                 else:
-                    parity = ((idx >> (j - 1)) & 1) ^ ((idx >> j) & 1)
+                    parity = ((idx >> q) & 1) ^ ((idx >> (q + 1)) & 1)
                     if parity:
                         z_op[idx, idx] = -1.0
             expected_nj = (I_n - z_op) / 2
@@ -1225,7 +1240,13 @@ class TestBravyiKitaevTreeMapper:
 
         for n in (4, 6, 8):
             mapping = MajoranaMapping.bravyi_kitaev_tree(n)
-            gammas = [pauli_to_sparse_matrix([mapping.table[k]], np.array([1.0])).toarray() for k in range(2 * n)]
+            gammas = [
+                pauli_to_sparse_matrix(
+                    [_table_entry_to_pauli_string(mapping.table[k], mapping.num_qubits)],
+                    np.array([1.0]),
+                ).toarray()
+                for k in range(2 * n)
+            ]
             for i in range(2 * n):
                 for j in range(i, 2 * n):
                     anticomm = gammas[i] @ gammas[j] + gammas[j] @ gammas[i]
