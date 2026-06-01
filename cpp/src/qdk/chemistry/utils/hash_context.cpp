@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <qdk/chemistry/utils/hash_context.hpp>
 #include <sstream>
-
+#include <type_traits>
 namespace qdk::chemistry::utils {
 
 // SHA-256 constants (first 32 bits of the fractional parts of the cube roots

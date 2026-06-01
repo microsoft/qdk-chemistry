@@ -280,6 +280,11 @@ class TestCacheRegistry:
             def clear(self):
                 pass
 
+        import qdk_chemistry.remote.cache as cache_mod
+
         register_cache("test_dummy")(DummyCache)
-        cache = get_cache("test_dummy")
-        assert isinstance(cache, DummyCache)
+        try:
+            cache = get_cache("test_dummy")
+            assert isinstance(cache, DummyCache)
+        finally:
+            cache_mod._CACHES.pop("test_dummy", None)

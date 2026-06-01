@@ -61,6 +61,7 @@ class _AlgorithmWrapper:
     @property  # type: ignore[override]
     def __class__(self):
         return self._algo.__class__
+
     def run(
         self,
         *args: Any,

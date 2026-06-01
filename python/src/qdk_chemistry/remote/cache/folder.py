@@ -86,21 +86,8 @@ class FolderCache(CacheBackend):
         if not p.exists():
             return None
         try:
-            data = json.loads(p.read_text())
-            return Job(
-                job_id=data["job_id"],
-                backend=data["backend"],
-                backend_config=data.get("backend_config", {}),
-                backend_state=data.get("backend_state", {}),
-                algorithm_info=data.get("algorithm_info", {}),
-                status=data.get("status", "unknown"),
-                submitted_at=data.get("submitted_at"),
-                file_path=p,
-                run_hash=data.get("run_hash"),
-                input_hashes=data.get("input_hashes"),
-                output_hashes=data.get("output_hashes"),
-            )
-        except (json.JSONDecodeError, KeyError, OSError):
+            return Job.load(p)
+        except (json.JSONDecodeError, KeyError, OSError, ValueError):
             return None
 
     def put_job(self, run_hash: str, job: Job) -> None:
@@ -164,6 +151,12 @@ class FolderCache(CacheBackend):
             return
         if not hasattr(data_list[0], "_data_type_name"):
             raise TypeError("FolderCache only supports caching lists of DataClass objects")
+        type_name = data_list[0]._data_type_name  # noqa: SLF001
+        for item in data_list:
+            if not hasattr(item, "_data_type_name"):
+                raise TypeError("FolderCache only supports caching lists of DataClass objects")
+            if item._data_type_name != type_name:  # noqa: SLF001
+                raise TypeError("FolderCache only supports caching lists of a single DataClass type")
         import json  # noqa: PLC0415
 
         type_name = data_list[0]._data_type_name  # noqa: SLF001

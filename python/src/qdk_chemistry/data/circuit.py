@@ -295,6 +295,10 @@ class Circuit(DataClass):
         elif self.qsharp is not None:
             _hash_str(h, "qsharp")
             _hash_str(h, self.qsharp.json())
+        elif self._qsharp_factory is not None:
+            # Deterministically identify factory-based circuits by hashing the compiled QIR.
+            _hash_str(h, "qsharp_factory_qir")
+            _hash_str(h, str(self.get_qir()))
         _hash_optional(h, self.encoding, _hash_str)
 
     def to_json(self) -> dict[str, Any]:
