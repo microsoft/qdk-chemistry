@@ -145,6 +145,9 @@ class Job:
         """
         path = pathlib.Path(path)
         data = json.loads(path.read_text())
+        version = data.get("version", 1)
+        if version > _JOB_FILE_VERSION:
+            raise ValueError(f"Unsupported job file version {version} (max supported {_JOB_FILE_VERSION})")
         return cls(
             job_id=data["job_id"],
             backend=data["backend"],
