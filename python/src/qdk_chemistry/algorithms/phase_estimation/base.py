@@ -26,21 +26,15 @@ class PhaseEstimationSettings(Settings):
     def __init__(self):
         """Initialize the settings for Phase Estimation.
 
-        Includes nested algorithm references for the evolution builder,
-        circuit mapper, and circuit executor.
+        Includes nested algorithm references for the circuit builder
+        and circuit executor.
 
         """
         super().__init__()
-        self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
         self._set_default(
-            "unitary_builder",
+            "qpe_circuit_builder",
             "algorithm_ref",
-            AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
-        )
-        self._set_default(
-            "circuit_mapper",
-            "algorithm_ref",
-            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            AlgorithmRef("qpe_circuit_builder", "iterative"),
         )
         self._set_default(
             "circuit_executor",
@@ -52,16 +46,10 @@ class PhaseEstimationSettings(Settings):
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self, num_bits: int = -1):
-        """Initialize the PhaseEstimation with default settings.
-
-        Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-
-        """
+    def __init__(self):
+        """Initialize the PhaseEstimation with default settings."""
         super().__init__()
         self._settings = PhaseEstimationSettings()
-        self._settings.set("num_bits", num_bits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as phase_estimation."""

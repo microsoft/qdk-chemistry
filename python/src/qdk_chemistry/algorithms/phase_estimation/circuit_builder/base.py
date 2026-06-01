@@ -17,9 +17,11 @@ from qdk_chemistry.data import (
 )
 
 __all__: list[str] = [
+    "IterativeQpeCircuitBuilder",
     "QpeCircuitBuilder",
     "QpeCircuitBuilderFactory",
     "QpeCircuitBuilderSettings",
+    "StandardQpeCircuitBuilder",
 ]
 
 
@@ -122,3 +124,21 @@ class QpeCircuitBuilderFactory(AlgorithmFactory):
     def default_algorithm_name(self) -> str:
         """Return iterative as default algorithm name."""
         return "iterative"
+
+
+class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
+    """Abstract base class for iterative phase estimation circuit builders.
+
+    Serves as a type-checking abstraction for implementations of the iterative
+    (Kitaev-style) quantum phase estimation algorithm.
+
+    """
+
+
+class StandardQpeCircuitBuilder(QpeCircuitBuilder):
+    """Abstract base class for standard (QFT-based) phase estimation circuit builders.
+
+    Serves as a type-checking abstraction for implementations of the standard
+    (non-iterative) quantum phase estimation algorithm using QFT.
+
+    """

@@ -19,12 +19,12 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import QpeCircuitBuilder, QpeCircuitBuilderSettings
+from .base import IterativeQpeCircuitBuilder, QpeCircuitBuilderSettings
 
-__all__: list[str] = ["IterativeQpeCircuitBuilder", "IterativeQpeCircuitBuilderSettings"]
+__all__: list[str] = ["IterativeQpeCircuitBuilder", "QdkIterativeQpeCircuitBuilderSettings"]
 
 
-class IterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
+class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
     """Settings for the Iterative Phase Estimation Builder."""
 
     def __init__(self):
@@ -36,7 +36,7 @@ class IterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
         )
 
 
-class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
+class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     """Iterative Phase Estimation circuit builder.
 
     Constructs the quantum circuits for each IQPE iteration without executing them.
@@ -55,7 +55,7 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
         """
         Logger.trace_entering()
         super().__init__(num_bits=num_bits)
-        self._settings = IterativeQpeCircuitBuilderSettings()
+        self._settings = QdkIterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
         self._settings.set("num_iteration", num_iteration)
@@ -140,11 +140,9 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
                 state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
             )
 
-        if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
-            return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
-
         raise RuntimeError(
-            "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
+            "Failed to create iteration circuit: Q# operations are not available. "
+            "For Qiskit support, use QiskitIterativeQpeCircuitBuilder from the qiskit plugin."
         )
 
     def _create_circuit_from_qsharp_op(
@@ -182,47 +180,9 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
             )
         )
 
-    def _create_circuit_from_qiskit(
-        self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float
-    ) -> Circuit:
-        """Create a Circuit object from Qiskit QuantumCircuit objects.
-
-        Args:
-            state_preparation: Circuit object containing a Qiskit QuantumCircuit for state preparation.
-            controlled_unitary_circuit: Circuit object containing a Qiskit QuantumCircuit for the controlled unitary.
-            phase_correction: Feedback phase angle to apply before controlled unitary.
-
-        Returns:
-            A Circuit object representing the IQPE iteration.
-
-        """
-        from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
-
-        state_prep_qc = state_preparation.get_qiskit_circuit()
-        ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
-        classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
-        circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
-        circuit.h(control)
-
-        # Apply phase correction if provided
-        if phase_correction:
-            circuit.rz(phase_correction, control)
-
-        # Append the controlled unitary circuit
-        circuit.append(ctrl_unitary_qc.to_gate(), [control, *target_qubits])
-        circuit.h(control)
-        circuit.measure(control, classical[0])
-
-        return Circuit(qasm=qasm3.dumps(circuit))
-
     def name(self) -> str:
         """Return the name of the builder algorithm."""
-        return "iterative"
+        return "qdk_iterative"
 
 
 def _validate_iteration_inputs(iteration: int, total_iterations: int) -> None:

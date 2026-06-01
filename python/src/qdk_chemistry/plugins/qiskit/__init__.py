@@ -56,21 +56,22 @@ def qiskit_load():
     """Load the Qiskit plugins into QDK/Chemistry."""
     Logger.trace_entering()
 
-    from qdk_chemistry.algorithms import register  # noqa: PLC0415
-    from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import (  # noqa: PLC0415
-        QiskitStandardPhaseEstimation,
+    from python.src.qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
+        QiskitIterativeQpeCircuitBuilder,
         QiskitStandardQpeCircuitBuilder,
     )
 
+    from qdk_chemistry.algorithms import register  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
+
     register(lambda: RegularIsometryStatePreparation())
-    register(lambda: QiskitStandardPhaseEstimation())
+    register(lambda: QiskitIterativeQpeCircuitBuilder())
     register(lambda: QiskitStandardQpeCircuitBuilder())
 
     Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
-        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}], "
+        f"[{QiskitIterativeQpeCircuitBuilder().type_name()}: {QiskitIterativeQpeCircuitBuilder().name()}], "
         f"[{QiskitStandardQpeCircuitBuilder().type_name()}: {QiskitStandardQpeCircuitBuilder().name()}]."
     )
 

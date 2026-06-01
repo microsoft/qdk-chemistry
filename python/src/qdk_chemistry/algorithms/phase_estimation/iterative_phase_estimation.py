@@ -15,7 +15,6 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import IterativeQpeCircuitBuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -26,6 +25,7 @@ from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
 from .base import PhaseEstimation, PhaseEstimationSettings
+from .circuit_builder.base import IterativeQpeCircuitBuilder
 
 __all__: list[str] = ["IterativePhaseEstimation", "IterativePhaseEstimationSettings"]
 
@@ -54,35 +54,18 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     def __init__(
         self,
-        num_bits: int = -1,
         shots_per_bit: int = 3,
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
         Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             shots_per_bit: The number of shots to execute per measuring a bit in the iterative phase estimation.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits)
+        super().__init__()
         self._settings = IterativePhaseEstimationSettings()
-        self._settings.set("num_bits", num_bits)
         self._settings.set("shots_per_bit", shots_per_bit)
-
-    def _create_circuit_builder(self) -> IterativeQpeCircuitBuilder:
-        """Create an IterativeQpeCircuitBuilder with settings propagated from this algorithm.
-
-        Returns:
-            An IterativeQpeCircuitBuilder instance configured with matching
-            unitary_builder, circuit_mapper, and num_bits settings.
-
-        """
-        builder = IterativeQpeCircuitBuilder()
-        builder.settings().update("num_bits", self.settings().get("num_bits"))
-        builder.settings().update("unitary_builder", self.settings().get("unitary_builder"))
-        builder.settings().update("circuit_mapper", self.settings().get("circuit_mapper"))
-        return builder
 
     def _run_impl(
         self,
@@ -104,18 +87,19 @@ class IterativePhaseEstimation(PhaseEstimation):
         """
         # Create nested algorithms from settings
         circuit_executor = self._create_nested("circuit_executor")
-        circuit_builder = self._create_circuit_builder()
+        circuit_builder = self._create_nested("qpe_circuit_builder")
+        if not isinstance(circuit_builder, IterativeQpeCircuitBuilder):
+            raise TypeError(
+                f"Expected qpe_circuit_builder to be an instance of IterativeQpeCircuitBuilder, "
+                f"but got {type(circuit_builder)} instead."
+            )
+        num_bits = circuit_builder.settings().get("num_bits")
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
 
-        if self.settings().get("num_bits") <= 0:
-            raise ValueError(
-                f"Number of bits to estimate must be positive. Got {self.settings().get('num_bits')} instead."
-            )
-
         # Iterate over the number of phase bits
-        for iteration in range(self.settings().get("num_bits")):
+        for iteration in range(num_bits):
             # Create the iteration circuit via the builder
             circuit_builder.settings().update("phase_correction", phase_feedback)
             circuit_builder.settings().update("num_iteration", iteration)
@@ -123,16 +107,13 @@ class IterativePhaseEstimation(PhaseEstimation):
                 state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
             )
             iteration_circuit = iteration_circuits[0]
-            Logger.info(f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: circuit generated.")
+            Logger.info(f"Iteration {iteration + 1} / {num_bits}: circuit generated.")
             # Run the iteration circuit on the simulator
             executor_data = circuit_executor.run(
                 iteration_circuit, shots=self.settings().get("shots_per_bit"), noise=noise
             )
             bitstring_result = executor_data.bitstring_counts
-            Logger.info(
-                f"Iteration {iteration + 1} / {self.settings().get('num_bits')}: "
-                f"Measurement results: {bitstring_result}"
-            )
+            Logger.info(f"Iteration {iteration + 1} / {num_bits}: Measurement results: {bitstring_result}")
             # Phase bit through majority vote
             measured_bit = 0 if bitstring_result.get("0", 0) >= bitstring_result.get("1", 0) else 1
             Logger.debug(f"Majority measured bit: {measured_bit}")
