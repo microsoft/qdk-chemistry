@@ -581,6 +581,22 @@ class TestTaperingSpecificationSerialization:
         )
         assert reconstructed == tap
 
+    def test_hdf5_standalone_roundtrip(self) -> None:
+        """TaperingSpecification survives a standalone HDF5 round-trip."""
+        from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            tap.to_hdf5_file(f.name)
+            with h5py.File(f.name, "r") as hf:
+                assert "qubit_indices" in hf
+                assert "eigenvalues" in hf
+                reconstructed = TaperingSpecification(
+                    qubit_indices=[int(x) for x in hf["qubit_indices"][:]],
+                    eigenvalues=[int(x) for x in hf["eigenvalues"][:]],
+                )
+        assert reconstructed == tap
+
     def test_parity_tapering_json_roundtrip_via_mapping(self) -> None:
         """Parity two-qubit reduction tapering survives a JSON round-trip."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
