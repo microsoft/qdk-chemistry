@@ -154,7 +154,7 @@ class QubitMapper(Algorithm):
     Factory-produced mappings (``MajoranaMapping.jordan_wigner()``,
     ``.bravyi_kitaev()``, etc.) always keep the table and name in sync.
     Cross-backend eigenvalue tests in the test suite verify this for every
-    supported factory × backend combination.  Custom or manually built
+    supported factory x backend combination.  Custom or manually built
     mappings with non-standard names cannot be used with third-party
     backends.
 
