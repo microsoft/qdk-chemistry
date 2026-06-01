@@ -18,7 +18,7 @@ and never written as separate files.
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import pathlib
 from typing import TYPE_CHECKING, Any
 
 from qdk_chemistry.remote.cache.base import CacheBackend
@@ -64,18 +64,18 @@ class FolderCache(CacheBackend):
 
     def __init__(
         self,
-        path: str | Path,
+        path: str | pathlib.Path,
         *,
         is_shared: bool = False,
         **_kwargs: Any,
     ):
         """Initialise with the cache directory path."""
         super().__init__(is_shared=is_shared)
-        self._root = Path(path)
+        self._root = pathlib.Path(path)
 
     # ── Job metadata ─────────────────────────────────────────────────────
 
-    def _job_path(self, run_hash: str) -> Path:
+    def _job_path(self, run_hash: str) -> pathlib.Path:
         return self._root / f"{run_hash}.job.json"
 
     def get_job(self, run_hash: str) -> Job | None:
@@ -127,7 +127,7 @@ class FolderCache(CacheBackend):
             return None
         return dataclass_type.from_hdf5_file(str(filepath))  # type: ignore[attr-defined]
 
-    def _get_data_list(self, manifest_path: Path) -> list | None:
+    def _get_data_list(self, manifest_path: pathlib.Path) -> list | None:
         """Reconstruct a list of DataClass objects from a manifest."""
         import json  # noqa: PLC0415
 

@@ -30,8 +30,8 @@ def run_content_hash(
         algorithm_type: The algorithm type name (e.g., "scf_solver").
         algorithm_name: The algorithm name (e.g., "pyscf").
         settings: The Settings object for the algorithm.
-        *args: Positional arguments that would be passed to run().
-        **kwargs: Keyword arguments that would be passed to run().
+        args: Positional arguments that would be passed to run().
+        kwargs: Keyword arguments that would be passed to run().
 
     Returns:
         str: A 16-character hex string content hash.

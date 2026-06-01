@@ -15,7 +15,7 @@ the ``qdk_chemistry.cache_backends`` entry-point group.
 
 from __future__ import annotations
 
-from pathlib import Path
+import pathlib
 from typing import Any
 
 from qdk_chemistry.remote.cache.base import CacheBackend
@@ -53,7 +53,7 @@ def get_cache(name: str, **config: Any) -> CacheBackend:
 
     Args:
         name: Backend name (e.g. ``"folder"``).
-        **config: Backend-specific configuration.
+        config: Backend-specific configuration.
 
     Raises:
         ValueError: If no cache is registered with that name.
@@ -65,7 +65,7 @@ def get_cache(name: str, **config: Any) -> CacheBackend:
     return _CACHES[name](**config)
 
 
-def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> CacheBackend | None:
+def resolve_cache(cache: str | pathlib.Path | CacheBackend | None, **kwargs: Any) -> CacheBackend | None:
     """Normalise a user-supplied cache argument.
 
     Accepts any of the following:
@@ -74,14 +74,14 @@ def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> Cac
     - A ``CacheBackend`` instance → returned as-is
     - A ``Path`` or path-like string → ``FolderCache(path=...)``
     - A registered name string → looked up in the registry; extra
-      *kwargs* are forwarded to the backend constructor.
+      ``kwargs`` are forwarded to the backend constructor.
 
     """
     if cache is None:
         return None
     if isinstance(cache, CacheBackend):
         return cache
-    if isinstance(cache, Path):
+    if isinstance(cache, pathlib.Path):
         return FolderCache(path=cache, **kwargs)
     # str — could be a registered name or a path
     if isinstance(cache, str) and cache in _CACHES:
@@ -89,7 +89,8 @@ def resolve_cache(cache: str | Path | CacheBackend | None, **kwargs: Any) -> Cac
             return _CACHES[cache](**kwargs)
         except TypeError as e:
             raise ValueError(
-                f"Cache name '{cache}' requires configuration. Pass a filesystem path (e.g. './cache') or use get_cache('{cache}', ...)."
+                f"Cache name '{cache}' requires configuration. "
+                f"Pass a filesystem path (e.g. './cache') or use get_cache('{cache}', ...)."
             ) from e
     # Treat as a filesystem path
     return FolderCache(path=cache, **kwargs)
@@ -116,9 +117,6 @@ def _load_plugin_caches() -> None:
 _load_plugin_caches()
 
 __all__ = [
-    "CacheBackend",
-    "FolderCache",
-    "TieredCache",
     "available_caches",
     "get_cache",
     "register_cache",

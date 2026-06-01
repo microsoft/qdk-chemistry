@@ -33,7 +33,8 @@ class PyDataClass : public DataClass, public py::trampoline_self_life_support {
   void hash_update(
       qdk::chemistry::utils::HashContext & /*ctx*/) const override {
     pybind11::pybind11_fail(
-        "Python class must override content_hash(truncate_chars=...) to enable deterministic caching");
+        "Python class must override content_hash(truncate_chars=...) to enable "
+        "deterministic caching");
   }
 
   void to_file(const std::string &filename,

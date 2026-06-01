@@ -13,9 +13,11 @@ be recovered across sessions.
 from __future__ import annotations
 
 import json
+import pathlib
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
+
+__all__ = ["Job"]
 
 _JOB_FILE_VERSION = 2
 
@@ -51,8 +53,8 @@ class Job:
                         with ``"hash"`` and ``"type"`` keys.  Primitives
                         also carry a ``"value"`` key so they can be
                         reconstructed without a cache backend.  Populated
-                        by :meth:`fetch`.  ``None`` until results are
-                        retrieved.
+                        when results are fetched.  ``None`` until results
+                        are retrieved.
 
     """
 
@@ -66,7 +68,7 @@ class Job:
         algorithm_info: dict[str, Any] | None = None,
         status: str = "submitted",
         submitted_at: str | None = None,
-        file_path: str | Path | None = None,
+        file_path: str | pathlib.Path | None = None,
         run_hash: str | None = None,
         input_hashes: dict[str, str] | None = None,
         output_hashes: list[dict[str, Any]] | None = None,
@@ -79,7 +81,7 @@ class Job:
         self.algorithm_info = algorithm_info or {}
         self.status = status
         self.submitted_at = submitted_at or datetime.now(timezone.utc).isoformat()
-        self.file_path: Path | None = Path(file_path) if file_path else None
+        self.file_path: pathlib.Path | None = pathlib.Path(file_path) if file_path else None
         self.run_hash: str | None = run_hash
         self.input_hashes: dict[str, str] | None = input_hashes
         self.output_hashes: list[dict[str, Any]] | None = output_hashes
@@ -106,7 +108,7 @@ class Job:
             d["output_hashes"] = self.output_hashes
         return d
 
-    def save(self, path: str | Path | None = None) -> Path:
+    def save(self, path: str | pathlib.Path | None = None) -> pathlib.Path:
         """Write the job file to disk.
 
         Args:
@@ -121,27 +123,27 @@ class Job:
             ValueError: If no path is available.
 
         """
-        path = Path(path) if path else self.file_path
+        path = pathlib.Path(path) if path else self.file_path
         if path is None:
             raise ValueError("No file path specified.  Pass a path or set job.file_path.")
-        path = Path(path)
+        path = pathlib.Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(self.to_dict(), indent=2))
         self.file_path = path
         return path
 
     @classmethod
-    def load(cls, path: str | Path) -> Job:
+    def load(cls, path: str | pathlib.Path) -> Job:
         """Reconstruct a ``Job`` from a previously saved file.
 
         Args:
             path: Path to a ``*.job.json`` file.
+
         Returns:
-            A fully re-hydrated ``Job`` ready for
-            :meth:`check`, :meth:`cancel`, or :meth:`fetch`.
+            A fully re-hydrated ``Job``.
 
         """
-        path = Path(path)
+        path = pathlib.Path(path)
         data = json.loads(path.read_text())
         return cls(
             job_id=data["job_id"],
@@ -158,7 +160,7 @@ class Job:
         )
 
     @classmethod
-    def discover(cls, directory: str | Path) -> list[Job]:
+    def discover(cls, directory: str | pathlib.Path) -> list[Job]:
         """Find all job files in a directory.
 
         Args:
@@ -170,7 +172,7 @@ class Job:
             ``submitted_at`` (oldest first).
 
         """
-        directory = Path(directory)
+        directory = pathlib.Path(directory)
         jobs: list[Job] = []
         for p in directory.glob("*.job.json"):
             try:
