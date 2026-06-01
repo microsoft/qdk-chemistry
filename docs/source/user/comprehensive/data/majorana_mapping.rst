@@ -14,12 +14,19 @@ The :class:`~qdk_chemistry.data.MajoranaMapping` class encapsulates such an enco
 Bilinears as the unified primitive
 ----------------------------------
 
-Across fermion-to-qubit encodings, the most general primitive that admits a Pauli-string image is the **bilinear** :math:`i\,\gamma_j\,\gamma_k`.
-Bilinears generate the parity-even subalgebra of the Majorana Clifford algebra, so any parity-conserving operator decomposes into ordered bilinear products, and higher-degree even monomials are products of bilinears.
-This Majorana-operator viewpoint follows the fermion-to-qubit encoding formalism described by `Bravyi and Kitaev <https://arxiv.org/abs/quant-ph/0003137>`_.
+Every fermion-to-qubit encoding can express the **bilinear** product :math:`i\,\gamma_j\,\gamma_k` as a Pauli string.
+This makes the bilinear the most general building block that all encodings share.
 
-Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings.
-In **bilinear-only** encodings (where :math:`m > n` qubits represent :math:`n` modes), single Majoranas have no representation in the physical subspace; only the bilinears are observable.
+Why bilinears?  Physical (parity-conserving) fermionic operators can always be
+written as products of bilinears, so any Hamiltonian can be mapped through
+bilinears alone — even if the encoding does not assign a Pauli image to
+individual Majorana operators :math:`\gamma_k`.
+
+For the formal foundations, see `Bravyi and Kitaev (2002) <https://arxiv.org/abs/quant-ph/0003137>`_,
+which develops the Majorana-operator perspective on fermion-to-qubit encodings.
+
+Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings (e.g. Jordan-Wigner, Bravyi-Kitaev, Parity).
+In **bilinear-only** encodings — where the number of qubits exceeds the number of fermionic modes — single Majoranas have no representation in the physical subspace; only the bilinears are observable.
 
 The :class:`~qdk_chemistry.data.MajoranaMapping` supports both forms:
 

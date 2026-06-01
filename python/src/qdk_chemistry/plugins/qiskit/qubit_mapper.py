@@ -48,21 +48,21 @@ class QiskitQubitMapperSettings(QubitMapperSettings):
 class QiskitQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using Qiskit.
 
-    This is a **name-dispatched** backend: it reads
+    This is a **third-party** backend: it reads
     ``mapping.base_encoding`` to select the corresponding Qiskit Nature
-    mapper class and **ignores** ``mapping.table`` entirely.  The qubit
-    operator is built from scratch using Qiskit Nature's own
-    fermion-to-qubit pipeline.
+    mapper class and **ignores** ``mapping.table``.  The qubit operator
+    is built from scratch using Qiskit Nature's own fermion-to-qubit
+    pipeline.
 
     .. warning::
 
-       Because this backend dispatches on the encoding *name* rather than
-       the Pauli table, it relies on the assumption that the mapping's
-       ``base_encoding`` string is consistent with its table contents.
-       This invariant is guaranteed for factory-produced mappings
+       Because this backend chooses its transform by encoding *name*
+       rather than from the Pauli table, it relies on the mapping's
+       ``base_encoding`` string being consistent with its table.
+       This is guaranteed for factory-produced mappings
        (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)
        and is verified by cross-backend eigenvalue tests in the test
-       suite.  Manually constructed mappings with mismatched names will
+       suite.  Manually built mappings with mismatched names will
        produce silently incorrect results.
 
     Tapering-based encodings (e.g. parity two-qubit reduction) are
@@ -101,11 +101,11 @@ class QiskitQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping,
     ) -> QubitHamiltonian:
-        """Build a qubit Hamiltonian via Qiskit Nature (name-dispatched).
+        """Build a qubit Hamiltonian via Qiskit Nature.
 
         Reads ``mapping.base_encoding`` to select a Qiskit Nature mapper
         class.  ``mapping.table`` is **not used** — the qubit operator
-        is rebuilt entirely by Qiskit's own pipeline.
+        is built entirely by Qiskit's own pipeline.
 
         If *mapping* carries tapering metadata, the base encoding is
         extracted first, mapped, and tapering is applied to the result
@@ -124,7 +124,7 @@ class QiskitQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        # --- Name dispatch (see QubitMapper class docstring) ---
+        # --- Select transform by encoding name (see QubitMapper class docstring) ---
         encoding_name = mapping.base_encoding
 
         if encoding_name not in _SUPPORTED_ENCODINGS:

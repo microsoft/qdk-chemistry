@@ -92,7 +92,7 @@ class MajoranaMapping : public DataClass {
   /// Encoding name (may be empty for custom encodings).
   const std::string& name() const { return name_; }
 
-  /// Underlying table encoding name used by name-dispatched plugin backends.
+  /// Encoding name used by third-party plugin backends to select their own transform.
   const std::string& base_encoding() const { return base_encoding_; }
 
   /// Optional post-mapping tapering specification.

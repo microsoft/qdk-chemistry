@@ -531,3 +531,63 @@ class TestEncodingMetadata:
                     continue
                 _, w = scbk.bilinear(j, k)
                 assert len(word_to_label(w, scbk.num_qubits)) == 8
+
+
+# ─── TaperingSpecification Serialization ────────────────────────────────
+
+
+class TestTaperingSpecificationSerialization:
+    """Serialization round-trip tests for TaperingSpecification."""
+
+    def test_json_roundtrip_via_mapping(self) -> None:
+        """TaperingSpecification survives a JSON round-trip through MajoranaMapping."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        data = scbk.to_json()
+        loaded = MajoranaMapping.from_json(data)
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
+        assert loaded.tapering.num_tapered == scbk.tapering.num_tapered
+
+    def test_hdf5_roundtrip_via_mapping(self) -> None:
+        """TaperingSpecification survives an HDF5 round-trip through MajoranaMapping."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
+            with h5py.File(f.name, "w") as hf:
+                scbk.to_hdf5(hf)
+            with h5py.File(f.name, "r") as hf:
+                loaded = MajoranaMapping.from_hdf5(hf)
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == scbk.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == scbk.tapering.eigenvalues
+
+    def test_json_contains_tapering_fields(self) -> None:
+        """TaperingSpecification.to_json() produces the expected structure."""
+        import json  # noqa: PLC0415
+
+        from qdk_chemistry.data import Symmetries, TaperingSpecification  # noqa: PLC0415
+
+        tap = TaperingSpecification.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
+        data = json.loads(tap.to_json())
+        assert "qubit_indices" in data
+        assert "eigenvalues" in data
+        reconstructed = TaperingSpecification(
+            qubit_indices=list(data["qubit_indices"]),
+            eigenvalues=list(data["eigenvalues"]),
+        )
+        assert reconstructed == tap
+
+    def test_parity_tapering_json_roundtrip_via_mapping(self) -> None:
+        """Parity two-qubit reduction tapering survives a JSON round-trip."""
+        from qdk_chemistry.data import Symmetries  # noqa: PLC0415
+
+        par = MajoranaMapping.parity(8, Symmetries(2, 2))
+        data = par.to_json()
+        loaded = MajoranaMapping.from_json(data)
+        assert loaded.tapering is not None
+        assert loaded.tapering.qubit_indices == par.tapering.qubit_indices
+        assert loaded.tapering.eigenvalues == par.tapering.eigenvalues

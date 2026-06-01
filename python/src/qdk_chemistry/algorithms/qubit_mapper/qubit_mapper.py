@@ -125,47 +125,45 @@ class QubitMapperSettings(Settings):
 class QubitMapper(Algorithm):
     """Abstract base class for mapping a Hamiltonian to a QubitHamiltonian.
 
-    .. rubric:: Backend dispatch contract
+    .. rubric:: How backends use the MajoranaMapping
 
-    There are two fundamentally different kinds of ``QubitMapper`` backend,
-    and they use the :class:`~qdk_chemistry.data.MajoranaMapping` argument
-    in different ways:
+    ``QubitMapper`` backends fall into two groups, and they use the
+    :class:`~qdk_chemistry.data.MajoranaMapping` argument differently:
 
     *  **Table-driven backends** (e.g. :class:`QdkQubitMapper`) read
-       ``mapping.table`` — the actual 2N Pauli strings that define the
-       Majorana-to-qubit encoding — and use them directly in the mapping
-       engine.  Any valid table works, including custom encodings that
-       have no name.
-    *  **Name-dispatched backends** (e.g. ``OpenFermionQubitMapper``,
-       ``QiskitQubitMapper``) **ignore** ``mapping.table`` entirely.
-       Instead they read ``mapping.base_encoding`` (a string like
-       ``"jordan-wigner"`` or ``"bravyi-kitaev-tree"``) and use it to
-       look up the corresponding transform function in their own library.
-       The backend then builds a qubit operator from scratch using its
-       own independent fermion-to-qubit pipeline.
+       ``mapping.table`` — the Pauli strings that define the encoding —
+       and feed them directly to the mapping engine.  Any valid table
+       works, including custom encodings with no standard name.
 
-    .. rubric:: Name-dispatched backends
+    *  **Third-party backends** (e.g. ``OpenFermionQubitMapper``,
+       ``QiskitQubitMapper``) **ignore** ``mapping.table``.  Instead
+       they read ``mapping.base_encoding`` (a string like
+       ``"jordan-wigner"``) and pass it to their own library to select
+       the matching transform.  The qubit operator is then built entirely
+       by the third-party library's own pipeline.
 
-    For name-dispatched backends, the ``MajoranaMapping`` serves only as an
-    encoding selector — its Pauli table is not consulted.  Consistency
-    between the table and the name is not verified at runtime.  If a
-    ``MajoranaMapping`` is constructed with a table that does not match its
-    ``base_encoding`` name, a name-dispatched backend will silently use the
-    wrong transform.  Factory-produced mappings
-    (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.) are
-    guaranteed to be consistent.  Cross-backend eigenvalue tests in the
-    test suite verify this for every supported factory x backend combination.
-    Custom or manually constructed mappings with non-standard names cannot
-    be used with name-dispatched backends.
+    .. rubric:: Third-party backends
+
+    Because third-party backends choose their transform by encoding
+    *name*, the Pauli table in the ``MajoranaMapping`` is not used.
+    Consistency between the table and the name is not checked at runtime.
+    If a ``MajoranaMapping`` is manually built with a table that does not
+    match its ``base_encoding`` name, a third-party backend will silently
+    use the wrong transform.
+
+    Factory-produced mappings (``MajoranaMapping.jordan_wigner()``,
+    ``.bravyi_kitaev()``, etc.) always keep the table and name in sync.
+    Cross-backend eigenvalue tests in the test suite verify this for every
+    supported factory × backend combination.  Custom or manually built
+    mappings with non-standard names cannot be used with third-party
+    backends.
 
     .. rubric:: Tapering
 
-    Each backend is responsible for handling tapering in its own
-    ``_run_impl()``.  The static helper ``_taper_result`` provides
-    the common taper-then-relabel logic so backends don't have to
-    reimplement it, but backends are free to handle tapering however they
-    choose.  All shipped backends (QDK, OpenFermion, Qiskit) use the
-    helper.
+    Each backend handles tapering in its own ``_run_impl()``.  The
+    static helper ``_taper_result`` provides shared taper-then-relabel
+    logic so backends don't have to reimplement it.  All shipped
+    backends (QDK, OpenFermion, Qiskit) use this helper.
 
     """
 
@@ -240,23 +238,19 @@ class QubitMapper(Algorithm):
         """Construct a QubitHamiltonian from a Hamiltonian using the given mapping.
 
         Implementations receive the **full** mapping, which may include
-        tapering.  Each backend is responsible for handling tapering —
-        typically by stripping it via ``mapping.without_tapering()``,
-        performing the base mapping, and calling ``_taper_result``
-        to apply tapering to the output.
+        tapering.  Each backend handles tapering — typically by stripping
+        it via ``mapping.without_tapering()``, performing the base mapping,
+        and calling ``_taper_result`` to apply tapering to the output.
 
         .. important::
 
-           **Table-driven** backends (e.g. :class:`QdkQubitMapper`) should
-           read ``mapping.table`` and pass the mapping to the native engine to
-           perform the transformation.
+           **Table-driven** backends (e.g. :class:`QdkQubitMapper`) read
+           ``mapping.table`` and pass the Pauli strings to the native engine.
 
-           **Name-dispatched** backends (e.g. ``OpenFermionQubitMapper``)
-           should read ``mapping.base_encoding`` to select a third-party
-           transform function.  These backends do **not** use
-           ``mapping.table`` — they rebuild the qubit operator from scratch
-           using the third-party library's own pipeline.  See the class
-           docstring for the full dispatch contract and its implications.
+           **Third-party** backends (e.g. ``OpenFermionQubitMapper``)
+           read ``mapping.base_encoding`` to choose a transform function
+           from their own library.  They do **not** use ``mapping.table``.
+           See the class docstring for details and caveats.
 
         Args:
             hamiltonian: The fermionic Hamiltonian.
