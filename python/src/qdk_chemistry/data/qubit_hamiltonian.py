@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     import h5py
     import scipy
 
+from qdk_chemistry._core.data import TaperingSpecification
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
@@ -74,6 +75,9 @@ class QubitHamiltonian(DataClass):
             partitions, into parallelisable layers within each group).  Set by
             geometry-aware constructors and by ``term_grouper`` algorithms; reset
             to ``None`` by transformations that change the term ordering.
+        tapering (TaperingSpecification | None): If this Hamiltonian was produced by a
+            tapering-based encoding (e.g. SCBK), records the applied tapering
+            for downstream consumers. ``None`` for untapered encodings.
 
     Supports arithmetic: ``H1 + H2`` concatenates terms and merges
     partitions; ``scalar * H`` scales coefficients and preserves the
@@ -94,6 +98,7 @@ class QubitHamiltonian(DataClass):
         encoding: str | None = None,
         fermion_mode_order: FermionModeOrder | str | None = None,
         term_partition: TermPartition | None = None,
+        tapering: TaperingSpecification | None = None,
     ) -> None:
         """Initialize a QubitHamiltonian.
 
@@ -103,6 +108,7 @@ class QubitHamiltonian(DataClass):
             encoding (str | None): Fermion-to-qubit encoding (e.g., ``"jordan-wigner"``). Default ``None``.
             fermion_mode_order (FermionModeOrder | str | None): Mode ordering (``"blocked"``/``"interleaved"``).
             term_partition (TermPartition | None): Optional ``TermPartition`` carrying group/layer metadata.
+            tapering (TaperingSpecification | None): Applied tapering metadata, or None if untapered.
 
         Raises:
             ValueError: If the number of Pauli strings and coefficients don't match,
@@ -120,6 +126,7 @@ class QubitHamiltonian(DataClass):
             FermionModeOrder(fermion_mode_order) if fermion_mode_order is not None else None
         )
         self.term_partition: TermPartition | None = term_partition
+        self.tapering: TaperingSpecification | None = tapering
 
         # Validate Pauli strings
         _validate_pauli_strings(pauli_strings)
@@ -233,11 +240,11 @@ class QubitHamiltonian(DataClass):
     def __add__(self, other: QubitHamiltonian) -> QubitHamiltonian:
         """Return the sum of two qubit Hamiltonians.
 
-        Pauli strings and coefficients are concatenated.  The ``encoding``
-        and ``fermion_mode_order`` metadata must match between operands
-        (or both be ``None``); a mismatch raises ``ValueError``.  If both
-        operands carry a :attr:`term_partition` of the same concrete type,
-        the partitions are merged (with the right-hand operand's indices
+        Pauli strings and coefficients are concatenated.  The ``encoding``,
+        ``fermion_mode_order``, and ``tapering`` metadata must match between
+        operands (or both be ``None``); a mismatch raises ``ValueError``.
+        If both operands carry a :attr:`term_partition` of the same concrete
+        type, the partitions are merged (with the right-hand operand's indices
         offset).  Otherwise the result has no partition.
 
         Args:
@@ -248,7 +255,7 @@ class QubitHamiltonian(DataClass):
 
         Raises:
             TypeError: If *other* is not a ``QubitHamiltonian``.
-            ValueError: If the two Hamiltonians have different qubit counts, encodings, or fermion mode orders.
+            ValueError: If the two Hamiltonians have different qubit counts, encodings, or modes.
 
         """
         if not isinstance(other, QubitHamiltonian):
@@ -264,6 +271,10 @@ class QubitHamiltonian(DataClass):
                 f"Cannot add Hamiltonians with different fermion_mode_order: "
                 f"{self.fermion_mode_order!r} vs {other.fermion_mode_order!r}."
             )
+        if self.tapering != other.tapering:
+            raise ValueError(
+                f"Cannot add Hamiltonians with different tapering: {self.tapering!r} vs {other.tapering!r}."
+            )
 
         pauli_strings = list(self.pauli_strings) + list(other.pauli_strings)
         coefficients = np.concatenate([self.coefficients, other.coefficients])
@@ -278,6 +289,7 @@ class QubitHamiltonian(DataClass):
             encoding=self.encoding,
             fermion_mode_order=self.fermion_mode_order,
             term_partition=partition,
+            tapering=self.tapering,
         )
 
     def __mul__(self, scalar) -> QubitHamiltonian:
@@ -300,6 +312,7 @@ class QubitHamiltonian(DataClass):
             encoding=self.encoding,
             fermion_mode_order=self.fermion_mode_order,
             term_partition=self.term_partition,
+            tapering=self.tapering,
         )
 
     def __rmul__(self, scalar: float) -> QubitHamiltonian:
@@ -390,6 +403,7 @@ class QubitHamiltonian(DataClass):
             coefficients=self.coefficients.copy(),
             encoding=self.encoding,
             fermion_mode_order=FermionModeOrder.INTERLEAVED,
+            tapering=self.tapering,
         )
 
     # DataClass interface implementation
@@ -432,6 +446,8 @@ class QubitHamiltonian(DataClass):
             data["fermion_mode_order"] = str(self.fermion_mode_order)
         if self.term_partition is not None:
             data["term_partition"] = self.term_partition.to_json()
+        if self.tapering is not None:
+            data["tapering"] = self.tapering.to_json()
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -450,6 +466,8 @@ class QubitHamiltonian(DataClass):
             group.attrs["fermion_mode_order"] = str(self.fermion_mode_order)
         if self.term_partition is not None:
             group.attrs["term_partition"] = json.dumps(self.term_partition.to_json())
+        if self.tapering is not None:
+            group.attrs["tapering"] = json.dumps(self.tapering.to_json())
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> QubitHamiltonian:
@@ -475,12 +493,15 @@ class QubitHamiltonian(DataClass):
             coefficients = np.array(coeff_data)
         partition_data = json_data.get("term_partition")
         term_partition = TermPartition.from_json(partition_data) if partition_data is not None else None
+        tapering_data = json_data.get("tapering")
+        tapering = TaperingSpecification.from_json(tapering_data) if tapering_data is not None else None
         return cls(
             pauli_strings=json_data["pauli_strings"],
             coefficients=coefficients,
             encoding=json_data.get("encoding"),
             fermion_mode_order=json_data.get("fermion_mode_order"),
             term_partition=term_partition,
+            tapering=tapering,
         )
 
     @classmethod
@@ -514,12 +535,20 @@ class QubitHamiltonian(DataClass):
             term_partition = TermPartition.from_json(json.loads(partition_attr))
         else:
             term_partition = None
+        tapering_attr = group.attrs.get("tapering")
+        if tapering_attr is not None:
+            if isinstance(tapering_attr, bytes):
+                tapering_attr = tapering_attr.decode("utf-8")
+            tapering = TaperingSpecification.from_json(json.loads(tapering_attr))
+        else:
+            tapering = None
         return cls(
             pauli_strings=pauli_strings,
             coefficients=coefficients,
             encoding=encoding,
             fermion_mode_order=fermion_mode_order,
             term_partition=term_partition,
+            tapering=tapering,
         )
 
 
