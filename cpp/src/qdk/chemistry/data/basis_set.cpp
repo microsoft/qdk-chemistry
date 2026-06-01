@@ -2,7 +2,10 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <fcntl.h>
 #include <qdk/chemistry/scf/config.h>
+#include <sys/file.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <fstream>
@@ -62,10 +65,25 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
     std::filesystem::create_directories(temp_dir);
   }
 
-  // Check if basis set JSON already exists (avoids tar race in parallel runs)
+  // Use an exclusive file lock to serialize concurrent extractions.
+  // flock(LOCK_EX) blocks until the lock is available, so concurrent
+  // processes wait for the first extractor to finish rather than failing.
   std::filesystem::path expected_json =
       temp_dir / "basis" / (normalized_name + ".json");
+  std::filesystem::path lock_path = temp_dir / (normalized_name + ".lock");
+  int lock_fd = open(lock_path.c_str(), O_CREAT | O_RDWR, 0644);
+  if (lock_fd < 0) {
+    throw std::runtime_error("Failed to open lock file: " + lock_path.string());
+  }
+  if (flock(lock_fd, LOCK_EX) != 0) {
+    close(lock_fd);
+    throw std::runtime_error("Failed to acquire lock: " + lock_path.string());
+  }
+
+  // Check after acquiring the lock — if the file exists, extraction is complete
   if (std::filesystem::exists(expected_json)) {
+    flock(lock_fd, LOCK_UN);
+    close(lock_fd);
     return temp_dir;
   }
 
@@ -73,6 +91,8 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
              temp_dir.generic_string() + "\"";
   int return_code = std::system(cmd.c_str());
+  flock(lock_fd, LOCK_UN);
+  close(lock_fd);
   if (return_code != 0) {
     throw std::runtime_error("command execution failed: " + cmd);
   }

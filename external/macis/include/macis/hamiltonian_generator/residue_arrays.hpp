@@ -53,7 +53,9 @@ class ResidueArrayHamiltonianGenerator
                           rank4_span_t trdm_aaaa, rank4_span_t trdm_bbbb,
                           rank4_span_t trdm_aabb) override {
     const bool is_symm = bra_begin == ket_begin && bra_end == ket_end;
-    if (!is_symm)
+    // Fall back for single-electron spaces (no double-excitation residues)
+    const size_t n_elec = bra_begin->count();
+    if (!is_symm || n_elec < 2)
       return base_type::form_rdms_spin_dep(bra_begin, bra_end, ket_begin,
                                            ket_end, C, ordm_aa, ordm_bb,
                                            trdm_aaaa, trdm_bbbb, trdm_aabb);
@@ -120,7 +122,10 @@ class ResidueArrayHamiltonianGenerator
   sparse_matrix_type<index_t> make_csr_hamiltonian_block_(
       full_det_iterator bra_begin, full_det_iterator bra_end,
       full_det_iterator ket_begin, full_det_iterator ket_end, double H_thresh) {
-    if ((bra_begin != ket_begin) || (bra_end != ket_end))
+    const size_t n_elec = bra_begin->count();
+    // Fall back to SortedDoubleLoop for single-electron spaces where only
+    // single excitations exist.
+    if ((bra_begin != ket_begin) || (bra_end != ket_end) || n_elec < 2)
       return base_type::template make_csr_hamiltonian_block_<index_t>(
           bra_begin, bra_end, ket_begin, ket_end, H_thresh);
     return residue_array_build_<index_t>(bra_begin, bra_end, H_thresh);

@@ -9,6 +9,7 @@
 
 #pragma once
 #include <array>
+#include <cassert>
 #include <macis/hamiltonian_generator/connection_build_utils.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 
@@ -47,7 +48,10 @@ class DynamicBitMaskHamiltonianGenerator
   DynamicBitMaskHamiltonianGenerator(Args&&... args)
       : base_type(std::forward<Args>(args)...) {}
 
-  void set_num_masks(int n) { n_masks_ = n; }
+  void set_num_masks(int n) {
+    assert(n >= 4 && "DBM requires at least 4 masks to form C(n,4) combos");
+    n_masks_ = n;
+  }
   int num_masks() const { return n_masks_; }
 
   // form_rdms, form_rdms_spin_dep, form_entropies: NOT overridden.
