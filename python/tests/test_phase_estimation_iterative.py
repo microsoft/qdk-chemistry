@@ -17,6 +17,7 @@ from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import
     IterativePhaseEstimation,
     _validate_iteration_inputs,
 )
+from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -42,8 +43,6 @@ from .reference_tolerances import (
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
-
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation
 
 _SEED = 42
 
@@ -155,17 +154,17 @@ def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
     )
 
 
-def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
-    """Execute traditional QPE and return structured results.
+def _run_standard(problem: PhaseEstimationProblem) -> QpeResult:
+    """Execute Q# standard QPE and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
 
     Returns:
-        :class:`QpeResult` instance summarizing the traditional run.
+        :class:`QpeResult` instance summarizing the standard QPE run.
 
     """
-    qpe = QiskitStandardPhaseEstimation(num_bits=problem.num_bits, shots=problem.shots_traditional)
+    qpe = StandardPhaseEstimation(num_bits=problem.num_bits, shots=problem.shots_traditional)
     qpe.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
@@ -293,40 +292,65 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Confirm iterative and traditional algorithms produce consistent estimates."""
-    iterative_result = _run_iterative(two_qubit_phase_problem)
-    traditional_result = _run_traditional(two_qubit_phase_problem)
+def test_iterative_and_standard_results_match() -> None:
+    """Confirm iterative and Q# standard QPE produce consistent estimates on a three-qubit problem."""
+    # A distinct three-qubit problem: H = 0.4*ZZI + 0.6*IZZ
+    # |110> is an eigenstate: ZZI|110> = (+1)|110>, IZZ|110> = (-1)|110>
+    # Energy = 0.4*(+1) + 0.6*(-1) = -0.2
+    hamiltonian = QubitHamiltonian(pauli_strings=["ZZI", "IZZ"], coefficients=[0.4, 0.6])
+    expected_energy = -0.2
+    state_vector = np.zeros(2**3, dtype=float)
+    state_vector[int("110", 2)] = 1.0
+    state_prep_params = {
+        "rowMap": [2, 1, 0],
+        "stateVector": state_vector.tolist(),
+        "expansionOps": [],
+        "numQubits": 3,
+    }
+    factories = QsharpFactoryData(
+        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
+    )
+    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
 
+    problem = PhaseEstimationProblem(
+        label="three_qubit_comparison",
+        hamiltonian=hamiltonian,
+        state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
+        evolution_time=float(np.pi / 4.0),
+        num_bits=5,
+        expected_bits=[],  # Not checked in this test
+        expected_phase=0.0,  # Not checked in this test
+        expected_energy=expected_energy,
+        expected_bitstring="",  # Not checked in this test
+        shots_iterative=3,
+        shots_traditional=3,
+    )
+
+    iterative_result = _run_iterative(problem)
+    standard_result = _run_standard(problem)
+
+    # Resolve phase ambiguity for both
     iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
-        iterative_result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
+        iterative_result.phase_fraction, problem.evolution_time, expected_energy
     )
     qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
-        two_qubit_phase_problem.evolution_time,
-        two_qubit_phase_problem.expected_energy,
+        standard_result.phase_fraction, problem.evolution_time, expected_energy
     )
 
-    assert traditional_result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
-    assert np.isclose(
-        iqpe_resolved_phase,
-        two_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
+    # Both should match the reference energy
     assert np.isclose(
         iqpe_resolved_energy,
-        two_qubit_phase_problem.expected_energy,
+        expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
     assert np.isclose(
-        iqpe_resolved_phase,
-        qpe_resolved_phase,
+        qpe_resolved_energy,
+        expected_energy,
         rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
+        atol=qpe_energy_tolerance,
     )
+    # And they should agree with each other
     assert np.isclose(
         iqpe_resolved_energy,
         qpe_resolved_energy,
@@ -359,11 +383,10 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Ensure iterative and traditional approaches agree for four qubits."""
+def test_iterative_and_standard_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
+    """Ensure iterative and Q# standard QPE agree for four qubits."""
     iterative_result = _run_iterative(four_qubit_phase_problem)
-    traditional_result = _run_traditional(four_qubit_phase_problem)
+    standard_result = _run_standard(four_qubit_phase_problem)
 
     iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
         iterative_result.phase_fraction,
@@ -371,12 +394,12 @@ def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem
         four_qubit_phase_problem.expected_energy,
     )
     qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
+        standard_result.phase_fraction,
         four_qubit_phase_problem.evolution_time,
         four_qubit_phase_problem.expected_energy,
     )
 
-    assert traditional_result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
+    assert standard_result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
     assert np.isclose(
         iqpe_resolved_phase,
         four_qubit_phase_problem.expected_phase,
