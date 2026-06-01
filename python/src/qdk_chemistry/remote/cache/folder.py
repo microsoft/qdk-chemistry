@@ -85,20 +85,23 @@ class FolderCache(CacheBackend):
         p = self._job_path(run_hash)
         if not p.exists():
             return None
-        data = json.loads(p.read_text())
-        return Job(
-            job_id=data["job_id"],
-            backend=data["backend"],
-            backend_config=data.get("backend_config", {}),
-            backend_state=data.get("backend_state", {}),
-            algorithm_info=data.get("algorithm_info", {}),
-            status=data.get("status", "unknown"),
-            submitted_at=data.get("submitted_at"),
-            file_path=p,
-            run_hash=data.get("run_hash"),
-            input_hashes=data.get("input_hashes"),
-            output_hashes=data.get("output_hashes"),
-        )
+        try:
+            data = json.loads(p.read_text())
+            return Job(
+                job_id=data["job_id"],
+                backend=data["backend"],
+                backend_config=data.get("backend_config", {}),
+                backend_state=data.get("backend_state", {}),
+                algorithm_info=data.get("algorithm_info", {}),
+                status=data.get("status", "unknown"),
+                submitted_at=data.get("submitted_at"),
+                file_path=p,
+                run_hash=data.get("run_hash"),
+                input_hashes=data.get("input_hashes"),
+                output_hashes=data.get("output_hashes"),
+            )
+        except (json.JSONDecodeError, KeyError, OSError):
+            return None
 
     def put_job(self, run_hash: str, job: Job) -> None:
         """Store (or update) job metadata keyed by *run_hash*."""
