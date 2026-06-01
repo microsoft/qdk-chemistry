@@ -714,8 +714,6 @@ class TestTaperedQubitHamiltonianSerialization:
 
     def test_json_roundtrip(self) -> None:
         """Tapered QubitHamiltonian survives JSON round-trip."""
-        import json  # noqa: PLC0415
-
         qh = self._make_tapered_qh()
         data = qh.to_json()
         assert "tapering" in data

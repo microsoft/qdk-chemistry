@@ -56,9 +56,9 @@ Immutable specification for post-mapping qubit tapering.
       .def("__eq__", &TaperingSpecification::operator==, py::arg("other"))
       .def("__hash__",
            [](const TaperingSpecification& self) {
-             return py::hash(py::make_tuple(
-                 py::tuple(py::cast(self.qubit_indices())),
-                 py::tuple(py::cast(self.eigenvalues()))));
+             return py::hash(
+                 py::make_tuple(py::tuple(py::cast(self.qubit_indices())),
+                                py::tuple(py::cast(self.eigenvalues()))));
            })
       .def(
           "to_json",
@@ -82,8 +82,7 @@ Immutable specification for post-mapping qubit tapering.
             group.attr("attrs").attr("__setitem__")("json",
                                                     self.to_json().dump());
           },
-          py::arg("group"),
-          "Serialize to an HDF5 group.")
+          py::arg("group"), "Serialize to an HDF5 group.")
       .def_static(
           "from_hdf5",
           [](const py::object& group) {
@@ -93,8 +92,7 @@ Immutable specification for post-mapping qubit tapering.
             return TaperingSpecification::from_json(
                 nlohmann::json::parse(json));
           },
-          py::arg("group"),
-          "Deserialize from an HDF5 group.")
+          py::arg("group"), "Deserialize from an HDF5 group.")
       .def(
           "to_json_file",
           [](const TaperingSpecification& self, const py::object& filename) {
