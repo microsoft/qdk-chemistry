@@ -638,21 +638,21 @@ Examples:
   wavefunction.def(
       "get_active_two_rdm_spin_dependent",
       [](const Wavefunction& self) {
-        auto [aaaa, aabb, bbbb] = self.get_active_two_rdm_spin_dependent();
-        return py::make_tuple(variant_to_python(aaaa), variant_to_python(aabb),
+        auto [aabb, aaaa, bbbb] = self.get_active_two_rdm_spin_dependent();
+        return py::make_tuple(variant_to_python(aabb), variant_to_python(aaaa),
                               variant_to_python(bbbb));
       },
       R"(
 Get spin-dependent two-particle reduced density matrices (RDMs) for active orbitals only.
 
 Returns:
-    tuple: Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals
+    tuple: Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals
 
 Raises:
     RuntimeError: If the spin-dependent 2-RDM is not available
 
 Examples:
-    >>> aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+    >>> aabb, aaaa, bbbb = wf.get_active_two_rdm_spin_dependent()
 )");
 
   wavefunction.def(
@@ -818,7 +818,7 @@ Returns:
 
 Examples:
     >>> if wf.has_two_rdm_spin_dependent():
-    ...     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+    ...     aabb, aaaa, bbbb = wf.get_active_two_rdm_spin_dependent()
 )");
 
   wavefunction.def("has_two_rdm_spin_traced",

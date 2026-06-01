@@ -211,7 +211,7 @@ int main() {
   // Get RDMs
   auto [rdm1_aa, rdm1_bb] = sd_wavefunction.get_active_one_rdm_spin_dependent();
   auto rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced();
-  auto [rdm2_aa, rdm2_aabb, rdm2_bbbb] =
+  auto [rdm2_aabb, rdm2_aaaa, rdm2_bbbb] =
       sd_wavefunction.get_active_two_rdm_spin_dependent();
   auto rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced();
 
