@@ -6,14 +6,18 @@
 
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/settings.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 class HamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
   HamiltonianSettings() {
-    set_default("eri_method", "direct");
-    set_default("scf_type", "auto");
+    set_default("eri_method", std::string("direct"),
+                "ERI evaluation method: 'direct' computes integrals "
+                "on-the-fly, 'incore' stores all integrals in memory",
+                data::ListConstraint<std::string>{
+                    {std::vector<std::string>{"direct", "incore"}}});
   }
   ~HamiltonianSettings() override = default;
 };
