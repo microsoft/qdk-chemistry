@@ -25,7 +25,7 @@ from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+    from qdk_chemistry.data import MajoranaMapping
 
 __all__ = ["QiskitQubitMapper", "QiskitQubitMapperSettings"]
 

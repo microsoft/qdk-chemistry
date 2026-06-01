@@ -4,10 +4,15 @@
 
 #include <complex>
 #include <cstdint>
+#include <fstream>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
+#include <qdk/chemistry/data/tapering.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -17,13 +22,25 @@ namespace qdk::chemistry::data {
 MajoranaMapping::MajoranaMapping(
     std::vector<SparsePauliWord> table,
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
-    std::string name, std::size_t num_modes, std::size_t num_qubits)
+    std::string name, std::size_t num_modes, std::size_t num_qubits,
+    std::string base_encoding, std::optional<TaperingSpecification> tapering)
     : table_(std::move(table)),
       bilinears_(std::move(bilinears)),
       name_(std::move(name)),
+      base_encoding_(std::move(base_encoding)),
       num_modes_(num_modes),
       num_qubits_(num_qubits),
-      majorana_atomic_(!table_.empty()) {}
+      majorana_atomic_(!table_.empty()),
+      tapering_(std::move(tapering)) {
+  if (base_encoding_.empty()) {
+    base_encoding_ = name_;
+  }
+  if (tapering_ && tapering_->num_tapered() > num_qubits_) {
+    throw std::invalid_argument(
+        "MajoranaMapping tapering removes more qubits than the base mapping "
+        "contains");
+  }
+}
 
 MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
                                             std::string name) {
@@ -52,8 +69,10 @@ MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
     }
   }
 
+  auto base_encoding = name;
   return MajoranaMapping(std::move(table), std::move(bilinears),
-                         std::move(name), num_modes, num_qubits);
+                         std::move(name), num_modes, num_qubits,
+                         std::move(base_encoding));
 }
 
 MajoranaMapping MajoranaMapping::from_bilinears(
@@ -86,8 +105,9 @@ MajoranaMapping MajoranaMapping::from_bilinears(
     }
   }
   auto nq = has_any ? static_cast<std::size_t>(max_idx + 1) : 0;
+  auto base_encoding = name;
   return MajoranaMapping({}, std::move(upper_triangle), std::move(name),
-                         num_modes, nq);
+                         num_modes, nq, std::move(base_encoding));
 }
 
 const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
@@ -125,6 +145,117 @@ MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
   }
   const auto& entry = bilinears_[bilinear_index(k, j)];
   return {-entry.first, entry.second};
+}
+
+MajoranaMapping MajoranaMapping::without_tapering() const {
+  return MajoranaMapping(table_, bilinears_, base_encoding_, num_modes_,
+                         num_qubits_, base_encoding_);
+}
+
+std::string MajoranaMapping::get_summary() const {
+  std::ostringstream ss;
+  ss << "MajoranaMapping";
+  if (!name_.empty()) {
+    ss << " '" << name_ << "'";
+  }
+  ss << "\n  Modes: " << num_modes_ << "\n  Qubits: " << num_qubits_;
+  if (tapering_) {
+    ss << "\n  Tapered qubits: " << tapering_->num_tapered();
+  }
+  return ss.str();
+}
+
+nlohmann::json MajoranaMapping::to_json() const {
+  nlohmann::json data{{"version", SERIALIZATION_VERSION},
+                      {"table", table_},
+                      {"name", name_},
+                      {"base_encoding", base_encoding_}};
+  if (tapering_) {
+    data["tapering"] = tapering_->to_json();
+  }
+  return data;
+}
+
+void MajoranaMapping::to_file(const std::string& filename,
+                              const std::string& type) const {
+  if (type == "json") {
+    to_json_file(filename);
+  } else if (type == "hdf5" || type == "h5") {
+    to_hdf5_file(filename);
+  } else {
+    throw std::invalid_argument("Unsupported format type: " + type);
+  }
+}
+
+MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
+  auto table = data.at("table").get<std::vector<SparsePauliWord>>();
+  std::string name = data.value("name", "");
+  std::string base_encoding = data.value("base_encoding", name);
+  std::optional<TaperingSpecification> tapering = std::nullopt;
+  if (data.contains("tapering") && !data.at("tapering").is_null()) {
+    tapering = TaperingSpecification::from_json(data.at("tapering"));
+  }
+
+  auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
+  if (name == base_encoding && !tapering) {
+    return mapping;
+  }
+  return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
+                         mapping.num_modes_, mapping.num_qubits_,
+                         std::move(base_encoding), std::move(tapering));
+}
+
+void MajoranaMapping::to_json_file(const std::string& filename) const {
+  std::ofstream file(filename);
+  if (!file) {
+    throw std::runtime_error("Unable to open file for writing: " + filename);
+  }
+  file << to_json().dump(2);
+}
+
+MajoranaMapping MajoranaMapping::from_json_file(const std::string& filename) {
+  std::ifstream file(filename);
+  if (!file) {
+    throw std::runtime_error("Unable to open file for reading: " + filename);
+  }
+  nlohmann::json data;
+  file >> data;
+  return from_json(data);
+}
+
+void MajoranaMapping::to_hdf5(H5::Group& group) const {
+  const std::string json = to_json().dump();
+  group.createAttribute("json", H5::StrType(0, H5T_VARIABLE), H5::DataSpace())
+      .write(H5::StrType(0, H5T_VARIABLE), json);
+}
+
+MajoranaMapping MajoranaMapping::from_hdf5(H5::Group& group) {
+  std::string json;
+  group.openAttribute("json").read(H5::StrType(0, H5T_VARIABLE), json);
+  return from_json(nlohmann::json::parse(json));
+}
+
+void MajoranaMapping::to_hdf5_file(const std::string& filename) const {
+  H5::H5File file(filename, H5F_ACC_TRUNC);
+  H5::Group root = file.openGroup("/");
+  to_hdf5(root);
+}
+
+MajoranaMapping MajoranaMapping::from_hdf5_file(const std::string& filename) {
+  H5::H5File file(filename, H5F_ACC_RDONLY);
+  H5::Group root = file.openGroup("/");
+  return from_hdf5(root);
+}
+
+MajoranaMapping MajoranaMapping::from_file(const std::string& filename,
+                                           const std::string& type) {
+  if (type == "json") {
+    return from_json_file(filename);
+  }
+  if (type == "hdf5" || type == "h5") {
+    return from_hdf5_file(filename);
+  }
+  throw std::invalid_argument("Unsupported format type: " + type);
 }
 
 std::size_t MajoranaMapping::compute_num_qubits(

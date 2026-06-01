@@ -673,13 +673,11 @@ class TestTaperingPropagation:
     @pytest.fixture
     def tapering(self):
         """Create a sample tapering specification."""
-        from qdk_chemistry.data.tapering import TaperingSpecification  # noqa: PLC0415
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
 
         return TaperingSpecification(
             qubit_indices=(3, 1),
             eigenvalues=(1, -1),
-            source_num_qubits=4,
-            source_encoding="bravyi-kitaev-tree",
         )
 
     @pytest.fixture
@@ -705,13 +703,11 @@ class TestTaperingPropagation:
 
     def test_add_mismatched_tapering_raises(self, tapered_h):
         """H1 + H2 with different tapering should raise ValueError."""
-        from qdk_chemistry.data.tapering import TaperingSpecification  # noqa: PLC0415
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
 
         other_tapering = TaperingSpecification(
             qubit_indices=(3, 1),
             eigenvalues=(1, 1),
-            source_num_qubits=4,
-            source_encoding="bravyi-kitaev-tree",
         )
         h2 = QubitHamiltonian(
             ["XX"],

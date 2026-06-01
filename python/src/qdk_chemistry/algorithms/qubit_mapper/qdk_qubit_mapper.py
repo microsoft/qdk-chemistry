@@ -17,16 +17,14 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry._core.data import majorana_map_hamiltonian
+from qdk_chemistry._core.data import majorana_map_hamiltonian, sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
-from qdk_chemistry.data.majorana_mapping import _sparse_to_dense_le
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian
-    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 
@@ -115,8 +113,8 @@ class QdkQubitMapper(QubitMapper):
     ) -> QubitHamiltonian:
         """Transform a fermionic Hamiltonian to a qubit Hamiltonian (table-driven).
 
-        This backend reads ``mapping.core`` (the C++ MajoranaMapping) and
-        uses the Pauli-string table directly.  The ``base_encoding`` name
+        This backend passes the C++ ``MajoranaMapping`` directly to the
+        native mapper.  The ``base_encoding`` name
         is used only for metadata on the output, not for dispatch.
 
         If *mapping* carries tapering metadata, the base encoding is
@@ -159,7 +157,7 @@ class QdkQubitMapper(QubitMapper):
         h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
 
         words, coefficients = majorana_map_hamiltonian(
-            base_mapping.core,
+            base_mapping,
             0.0,
             h1_a_flat,
             h1_b_flat,
@@ -173,7 +171,7 @@ class QdkQubitMapper(QubitMapper):
         )
 
         n_qubits = base_mapping.num_qubits
-        pauli_strings = [_sparse_to_dense_le(word, n_qubits) for word in words]
+        pauli_strings = [sparse_pauli_word_to_label(word, n_qubits) for word in words]
 
         Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {2 * n_spatial} qubits")
 

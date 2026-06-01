@@ -3,7 +3,7 @@ MajoranaMapping
 
 The :class:`~qdk_chemistry.data.MajoranaMapping` class defines a fermion-to-qubit encoding.
 It exposes the **bilinear** :math:`i\,\gamma_j\,\gamma_k` as the unified primitive available across every encoding, and (for Majorana-atomic encodings) individual Majorana operators :math:`\gamma_k` as an additional capability.
-As a core :doc:`data class <../design/index>`, it follows QDK/Chemistry's data class pattern.
+It follows QDK/Chemistry's data-container conventions for immutable fermion-to-qubit encoding data.
 
 Overview
 --------
@@ -16,6 +16,7 @@ Bilinears as the unified primitive
 
 Across fermion-to-qubit encodings, the most general primitive that admits a Pauli-string image is the **bilinear** :math:`i\,\gamma_j\,\gamma_k`.
 Bilinears generate the parity-even subalgebra of the Majorana Clifford algebra, so any parity-conserving operator decomposes into ordered bilinear products, and higher-degree even monomials are products of bilinears.
+This Majorana-operator viewpoint follows the fermion-to-qubit encoding formalism described by `Bravyi and Kitaev <https://arxiv.org/abs/quant-ph/0003137>`_.
 
 Individual Majorana operators :math:`\gamma_k` have a Pauli image only in **Majorana-atomic** encodings.
 In **bilinear-only** encodings (where :math:`m > n` qubits represent :math:`n` modes), single Majoranas have no representation in the physical subspace; only the bilinears are observable.
@@ -85,20 +86,15 @@ See :ref:`encoding-parity` for a description of the encoding.
 Custom encodings
 ----------------
 
-A custom Majorana-atomic encoding can be defined by providing a Pauli-string table directly:
+A custom Majorana-atomic encoding can be defined by providing a sparse Pauli-word table directly:
 
 .. code-block:: python
 
    from qdk_chemistry.data import MajoranaMapping
 
-   # Provide a list of Pauli strings, one per Majorana operator
-   mapping = MajoranaMapping(table=[...], name="my-custom-encoding")
-
-Alternatively, construct from mode pairs:
-
-.. code-block:: python
-
-   mapping = MajoranaMapping.from_mode_pairs(...)
+   # Provide one sparse Pauli word per Majorana operator.
+   # Entries are (qubit_index, operator_code), with X=1, Y=2, Z=3.
+   mapping = MajoranaMapping.from_table([...], name="my-custom-encoding")
 
 Serialization
 -------------

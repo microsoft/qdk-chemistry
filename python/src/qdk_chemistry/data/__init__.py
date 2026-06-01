@@ -84,6 +84,7 @@ from qdk_chemistry._core.data import (
     HamiltonianContainer,
     HamiltonianType,
     LatticeGraph,
+    MajoranaMapping,
     ModelOrbitals,
     MP2Container,
     Orbitals,
@@ -102,6 +103,7 @@ from qdk_chemistry._core.data import (
     SpinChannel,
     StabilityResult,
     Structure,
+    TaperingSpecification,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -113,7 +115,6 @@ from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
-from qdk_chemistry.data.majorana_mapping import MajoranaMapping
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -188,6 +189,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "TaperingSpecification",
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",

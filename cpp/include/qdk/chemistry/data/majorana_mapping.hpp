@@ -3,9 +3,15 @@
 // license information.
 
 #pragma once
+#include <H5Cpp.h>
+
 #include <complex>
 #include <cstdint>
+#include <nlohmann/json_fwd.hpp>
+#include <optional>
+#include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
+#include <qdk/chemistry/data/tapering.hpp>
 #include <string>
 #include <utility>
 #include <vector>
@@ -19,7 +25,7 @@ namespace qdk::chemistry::data {
  * gamma_k; bilinear-only mappings (via from_bilinears) store the bilinear
  * images directly. bilinear(j, k) is available on both forms.
  */
-class MajoranaMapping {
+class MajoranaMapping : public DataClass {
  public:
   /**
    * @brief Construct a Majorana-atomic mapping from a 2N-entry table.
@@ -52,7 +58,7 @@ class MajoranaMapping {
   /// Number of fermionic modes.
   std::size_t num_modes() const { return num_modes_; }
 
-  /// Number of qubits (max qubit index + 1, or 0 if all entries are identity).
+  /// Number of qubits in the encoding table.
   std::size_t num_qubits() const { return num_qubits_; }
 
   /**
@@ -86,6 +92,63 @@ class MajoranaMapping {
   /// Encoding name (may be empty for custom encodings).
   const std::string& name() const { return name_; }
 
+  /// Underlying table encoding name used by name-dispatched plugin backends.
+  const std::string& base_encoding() const { return base_encoding_; }
+
+  /// Optional post-mapping tapering specification.
+  const std::optional<TaperingSpecification>& tapering() const {
+    return tapering_;
+  }
+
+  /// Return a copy with tapering removed and the base encoding name restored.
+  MajoranaMapping without_tapering() const;
+
+  /// @brief Get the data type name for serialization.
+  std::string get_data_type_name() const override { return "majorana_mapping"; }
+
+  /// @brief Get a human-readable summary of the mapping.
+  std::string get_summary() const override;
+
+  /**
+   * @brief Save to file in the specified format.
+   * @param filename Path to the output file.
+   * @param type Format type ("json", "hdf5", or "h5").
+   */
+  void to_file(const std::string& filename,
+               const std::string& type) const override;
+
+  /// @brief Serialize to JSON.
+  nlohmann::json to_json() const override;
+
+  /// @brief Deserialize from JSON.
+  static MajoranaMapping from_json(const nlohmann::json& data);
+
+  /// @brief Save to a JSON file.
+  void to_json_file(const std::string& filename) const override;
+
+  /// @brief Load from a JSON file.
+  static MajoranaMapping from_json_file(const std::string& filename);
+
+  /// @brief Save to an HDF5 group.
+  void to_hdf5(H5::Group& group) const override;
+
+  /// @brief Load from an HDF5 group.
+  static MajoranaMapping from_hdf5(H5::Group& group);
+
+  /// @brief Save to an HDF5 file.
+  void to_hdf5_file(const std::string& filename) const override;
+
+  /// @brief Load from an HDF5 file.
+  static MajoranaMapping from_hdf5_file(const std::string& filename);
+
+  /**
+   * @brief Load from file in the specified format.
+   * @param filename Path to the input file.
+   * @param type Format type ("json", "hdf5", or "h5").
+   */
+  static MajoranaMapping from_file(const std::string& filename,
+                                   const std::string& type);
+
   // --- Factory methods for standard encodings ---
 
   /// Jordan-Wigner encoding on num_modes qubits.
@@ -94,17 +157,27 @@ class MajoranaMapping {
   /// Bravyi-Kitaev (Fenwick-tree) encoding on num_modes qubits.
   static MajoranaMapping bravyi_kitaev(std::size_t num_modes);
 
-  /// Balanced binary-tree Bravyi-Kitaev encoding (arXiv:1701.07072).
+  /// Balanced binary-tree Bravyi-Kitaev encoding.
   static MajoranaMapping bravyi_kitaev_tree(std::size_t num_modes);
 
   /// Parity encoding on num_modes qubits.
   static MajoranaMapping parity(std::size_t num_modes);
 
+  /// Parity encoding with two-qubit reduction metadata.
+  static MajoranaMapping parity(std::size_t num_modes, std::size_t n_alpha,
+                                std::size_t n_beta);
+
+  /// Symmetry-conserving Bravyi-Kitaev encoding with tapering metadata.
+  static MajoranaMapping symmetry_conserving_bravyi_kitaev(
+      std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
-      std::string name, std::size_t num_modes, std::size_t num_qubits);
+      std::string name, std::size_t num_modes, std::size_t num_qubits,
+      std::string base_encoding,
+      std::optional<TaperingSpecification> tapering = std::nullopt);
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
@@ -115,6 +188,9 @@ class MajoranaMapping {
   /// Human-readable encoding name.
   std::string name_;
 
+  /// Base encoding name associated with the pre-taper Pauli table.
+  std::string base_encoding_;
+
   /// Number of fermionic modes.
   std::size_t num_modes_;
 
@@ -124,6 +200,9 @@ class MajoranaMapping {
   /// True for table-constructed mappings, false for bilinear-only.
   bool majorana_atomic_;
 
+  /// Optional tapering metadata for post-mapping qubit reduction.
+  std::optional<TaperingSpecification> tapering_;
+
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
     const std::size_t M = 2 * num_modes_;
@@ -132,6 +211,9 @@ class MajoranaMapping {
 
   static std::size_t compute_num_qubits(
       const std::vector<SparsePauliWord>& table);
+
+  /// Serialization schema version.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 /**

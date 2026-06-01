@@ -4,7 +4,6 @@ Tests cover:
 - Factory construction (JW, BK, parity) for various sizes
 - Clifford algebra anticommutation validation
 - Custom mapping construction
-- from_mode_pairs construction
 - from_bilinears construction (bilinear-only mappings)
 - Bilinear caching correctness
 - Sparse/dense Pauli string conversion helpers
@@ -24,19 +23,43 @@ import tempfile
 import h5py
 import pytest
 
-from qdk_chemistry._core.data import PauliTermAccumulator
+from qdk_chemistry._core.data import (
+    PauliTermAccumulator,
+    label_to_sparse_pauli_word,
+    sparse_pauli_word_to_label,
+)
 from qdk_chemistry.data import MajoranaMapping
 
 # ─── Helpers ─────────────────────────────────────────────────────────────
+
+
+def label_to_word(label: str) -> list[tuple[int, int]]:
+    """Convert a QubitHamiltonian label to a sparse Pauli word."""
+    return label_to_sparse_pauli_word(label)
+
+
+def word_to_label(word: list[tuple[int, int]], num_qubits: int) -> str:
+    """Convert a sparse Pauli word to a QubitHamiltonian label."""
+    return sparse_pauli_word_to_label(word, num_qubits)
+
+
+def table_labels(mapping: MajoranaMapping) -> tuple[str, ...]:
+    """Return dense labels for a mapping's sparse table."""
+    return tuple(word_to_label(word, mapping.num_qubits) for word in mapping.table)
+
+
+def bilinear_entries(mapping: MajoranaMapping) -> list[tuple[complex, list[tuple[int, int]]]]:
+    """Return upper-triangle bilinear entries in C++ row-major order."""
+    return [mapping.bilinear(j, k) for j in range(2 * mapping.num_modes) for k in range(j + 1, 2 * mapping.num_modes)]
 
 
 def verify_clifford_algebra(mapping: MajoranaMapping) -> None:
     """Verify {gamma_i, gamma_j} = 2δ_{ij}·I for all pairs."""
     n = 2 * mapping.num_modes
     for i in range(n):
-        wi = mapping.core(i)
+        wi = mapping.majorana(i)
         for j in range(i, n):
-            wj = mapping.core(j)
+            wj = mapping.majorana(j)
             phase_ij, word_ij = PauliTermAccumulator.multiply_uncached(wi, wj)
             phase_ji, word_ji = PauliTermAccumulator.multiply_uncached(wj, wi)
 
@@ -69,13 +92,14 @@ class TestJordanWigner:
         # gamma_1 = Y_0 → "IY"
         # gamma_2 = Z_0 X_1 → "XZ" (qubit 0 = Z, qubit 1 = X)
         # gamma_3 = Z_0 Y_1 → "YZ"
-        assert jw.table == ("IX", "IY", "XZ", "YZ")
+        assert table_labels(jw) == ("IX", "IY", "XZ", "YZ")
 
     def test_reference_n4(self) -> None:
         """JW n=4 spot check: gamma_6 = Z_0 Z_1 Z_2 X_3."""
         jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        assert jw.table[6] == "XZZZ"  # X_3 Z_2 Z_1 Z_0 in little-endian
-        assert jw.table[7] == "YZZZ"  # Y_3 Z_2 Z_1 Z_0
+        labels = table_labels(jw)
+        assert labels[6] == "XZZZ"  # X_3 Z_2 Z_1 Z_0 in little-endian
+        assert labels[7] == "YZZZ"  # Y_3 Z_2 Z_1 Z_0
 
 
 class TestBravyiKitaev:
@@ -112,13 +136,13 @@ class TestParity:
         # gamma_1 = Y_0 X_1 → "XY" (little-endian: qubit 0=Y, qubit 1=X)
         # gamma_2 = Z_0 X_1 → "XZ"
         # gamma_3 = Y_1     → "YI"
-        assert par.table == ("XX", "XY", "XZ", "YI")
+        assert table_labels(par) == ("XX", "XY", "XZ", "YI")
 
     def test_reference_n4(self) -> None:
         """Parity n=4 matches standard-convention reference."""
         par = MajoranaMapping.parity(num_modes=4)
         expected = ("XXXX", "XXXY", "XXXZ", "XXYI", "XXZI", "XYII", "XZII", "YIII")
-        assert par.table == expected
+        assert table_labels(par) == expected
 
 
 # ─── Custom Mapping Tests ────────────────────────────────────────────────
@@ -129,17 +153,11 @@ class TestCustomMapping:
 
     def test_custom_from_table(self) -> None:
         """Custom mapping from table list."""
-        custom = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="my-jw")
+        custom = MajoranaMapping.from_table([label_to_word(s) for s in ("IX", "IY", "XZ", "YZ")], name="my-jw")
         assert custom.num_modes == 2
         assert custom.num_qubits == 2
         assert custom.name == "my-jw"
-        assert custom.table == ("IX", "IY", "XZ", "YZ")
-
-    def test_from_mode_pairs(self) -> None:
-        """from_mode_pairs produces same result as direct table."""
-        direct = MajoranaMapping(table=["IX", "IY", "XZ", "YZ"], name="test")
-        pairs = MajoranaMapping.from_mode_pairs(pairs=[("IX", "IY"), ("XZ", "YZ")], name="test")
-        assert direct.table == pairs.table
+        assert table_labels(custom) == ("IX", "IY", "XZ", "YZ")
 
 
 class TestFromBilinears:
@@ -148,13 +166,7 @@ class TestFromBilinears:
     def test_bilinear_lookup_matches_table(self) -> None:
         """Bilinear-only mapping reproduces the same bilinears as the table form."""
         jw = MajoranaMapping.jordan_wigner(num_modes=3)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(6):
-            for k in range(j + 1, 6):
-                coeff, pauli = jw.bilinear(j, k)
-                bilinears[(j, k)] = (coeff, pauli)
-
-        bl = MajoranaMapping.from_bilinears(num_modes=3, bilinears=bilinears)
+        bl = MajoranaMapping.from_bilinears(num_modes=3, bilinears=bilinear_entries(jw))
         for j in range(6):
             for k in range(j + 1, 6):
                 c_bl, p_bl = bl.bilinear(j, k)
@@ -165,12 +177,7 @@ class TestFromBilinears:
     def test_bilinear_antisymmetry(self) -> None:
         """bilinear(k,j) = -bilinear(j,k) for bilinear-only mappings."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(4):
-            for k in range(j + 1, 4):
-                bilinears[(j, k)] = jw.bilinear(j, k)
-
-        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinear_entries(jw))
         for j in range(4):
             for k in range(j + 1, 4):
                 c_fwd, p_fwd = bl.bilinear(j, k)
@@ -181,42 +188,34 @@ class TestFromBilinears:
     def test_majorana_raises_for_bilinear_only(self) -> None:
         """majorana(k) raises ValueError for bilinear-only mappings."""
         jw = MajoranaMapping.jordan_wigner(num_modes=2)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(4):
-            for k in range(j + 1, 4):
-                bilinears[(j, k)] = jw.bilinear(j, k)
-        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinears)
+        bl = MajoranaMapping.from_bilinears(num_modes=2, bilinears=bilinear_entries(jw))
         with pytest.raises(ValueError, match="bilinear-only"):
             bl.majorana(0)
 
     def test_num_qubits(self) -> None:
         """num_qubits is derived from the bilinear Pauli words."""
         jw = MajoranaMapping.jordan_wigner(num_modes=4)
-        bilinears: dict[tuple[int, int], tuple[complex, str]] = {}
-        for j in range(8):
-            for k in range(j + 1, 8):
-                bilinears[(j, k)] = jw.bilinear(j, k)
-        bl = MajoranaMapping.from_bilinears(num_modes=4, bilinears=bilinears)
+        bl = MajoranaMapping.from_bilinears(num_modes=4, bilinears=bilinear_entries(jw))
         assert bl.num_qubits == 4
 
     def test_wrong_count_raises(self) -> None:
         """from_bilinears raises ValueError if entry count doesn't match num_modes."""
         with pytest.raises(ValueError, match="upper-triangle"):
-            MajoranaMapping.from_bilinears(num_modes=2, bilinears={(0, 1): (1.0, "IZ")})
+            MajoranaMapping.from_bilinears(num_modes=2, bilinears=[(1.0, label_to_word("IZ"))])
 
     def test_missing_entry_raises(self) -> None:
         """from_bilinears raises ValueError if a required (j,k) pair is missing."""
-        with pytest.raises(ValueError, match="upper-triangle bilinear entries"):
+        with pytest.raises(ValueError, match="upper-triangle entries"):
             MajoranaMapping.from_bilinears(
                 num_modes=2,
-                bilinears={
-                    (0, 1): (1.0, "IZ"),
-                    (0, 2): (1.0, "XZ"),
-                    (0, 3): (1.0, "YZ"),
-                    (1, 2): (1.0, "XI"),
-                    # (1, 3) intentionally omitted
-                    (2, 3): (1.0, "ZI"),
-                },
+                bilinears=[
+                    (1.0, label_to_word("IZ")),
+                    (1.0, label_to_word("XZ")),
+                    (1.0, label_to_word("YZ")),
+                    (1.0, label_to_word("XI")),
+                    # One entry intentionally omitted.
+                    (1.0, label_to_word("ZI")),
+                ],
             )
 
 
@@ -229,22 +228,17 @@ class TestValidation:
     def test_empty_table(self) -> None:
         """Empty table raises ValueError."""
         with pytest.raises(ValueError, match="must not be empty"):
-            MajoranaMapping(table=[])
+            MajoranaMapping.from_table([])
 
     def test_odd_length_table(self) -> None:
         """Odd-length table raises ValueError."""
         with pytest.raises(ValueError, match="even number"):
-            MajoranaMapping(table=["IX", "IY", "XZ"])
+            MajoranaMapping.from_table([label_to_word(s) for s in ("IX", "IY", "XZ")])
 
     def test_invalid_characters(self) -> None:
         """Non-IXYZ characters raise ValueError."""
         with pytest.raises(ValueError, match="Invalid Pauli character"):
-            MajoranaMapping(table=["IX", "IA", "XZ", "YZ"])
-
-    def test_inconsistent_lengths(self) -> None:
-        """Strings of different lengths raise ValueError."""
-        with pytest.raises(ValueError, match="same length"):
-            MajoranaMapping(table=["IX", "IYZ", "XZ", "YZ"])
+            label_to_word("IA")
 
     def test_zero_modes(self) -> None:
         """Zero modes raises ValueError in factories."""
@@ -320,8 +314,6 @@ class TestSymmetryConservingBravyiKitaev:
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
         assert scbk.tapering is not None
         assert scbk.tapering.num_tapered == 2
-        assert scbk.tapering.source_num_qubits == 8
-        assert scbk.tapering.source_encoding == "bravyi-kitaev"
 
     def test_scbk_eigenvalues_depend_on_alpha_beta(self) -> None:
         """Different (n_alpha, n_beta) produce different eigenvalues."""
@@ -331,12 +323,12 @@ class TestSymmetryConservingBravyiKitaev:
         scbk_20 = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 0))
         assert scbk_11.tapering.eigenvalues != scbk_20.tapering.eigenvalues
 
-    def test_scbk_num_qubits_is_posttaper_via_property(self) -> None:
-        """MajoranaMapping.num_qubits reflects the reduced qubit count."""
+    def test_scbk_num_qubits_is_base_register_size(self) -> None:
+        """MajoranaMapping.num_qubits reflects the base encoding register."""
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        assert scbk.num_qubits == 6
+        assert scbk.num_qubits == 8
 
     def test_scbk_json_roundtrip(self) -> None:
         """SCBK mapping with tapering survives JSON serialization."""
@@ -374,7 +366,7 @@ class TestSymmetryConservingBravyiKitaev:
         assert par.tapering.num_tapered == 2
         assert par.name == "parity-2q-reduced"
         assert par.base_encoding == "parity"
-        assert par.num_qubits == 6
+        assert par.num_qubits == 8
 
     def test_without_tapering(self) -> None:
         """without_tapering strips tapering but preserves the base table."""
@@ -391,56 +383,9 @@ class TestSymmetryConservingBravyiKitaev:
 # ─── Bilinear primitive ──────────────────────────────────────────────────
 
 
-def _dense_to_sparse(s: str) -> list[tuple[int, str]]:
-    """Convert a dense little-endian Pauli string to a sparse word list.
-
-    The dense representation is ``s[0]`` = highest-index qubit, ``s[-1]`` =
-    qubit 0. The sparse representation is a list of ``(qubit_index, gate)``
-    pairs sorted by ``qubit_index``, omitting identities.
-    """
-    n = len(s)
-    return [(n - 1 - i, c) for i, c in enumerate(s) if c != "I"]
-
-
-def _sparse_to_dense(word: list[tuple[int, str]], n_qubits: int) -> str:
-    """Inverse of ``_dense_to_sparse``."""
-    chars = ["I"] * n_qubits
-    for q, g in word:
-        chars[q] = g
-    return "".join(reversed(chars))
-
-
-# Single-qubit Pauli multiplication table: (a, b) -> (phase, c) where a*b = phase * c.
-_PAULI_MULT = {
-    ("I", "I"): (1 + 0j, "I"),
-    ("I", "X"): (1 + 0j, "X"),
-    ("I", "Y"): (1 + 0j, "Y"),
-    ("I", "Z"): (1 + 0j, "Z"),
-    ("X", "I"): (1 + 0j, "X"),
-    ("X", "X"): (1 + 0j, "I"),
-    ("X", "Y"): (1j, "Z"),
-    ("X", "Z"): (-1j, "Y"),
-    ("Y", "I"): (1 + 0j, "Y"),
-    ("Y", "X"): (-1j, "Z"),
-    ("Y", "Y"): (1 + 0j, "I"),
-    ("Y", "Z"): (1j, "X"),
-    ("Z", "I"): (1 + 0j, "Z"),
-    ("Z", "X"): (1j, "Y"),
-    ("Z", "Y"): (-1j, "X"),
-    ("Z", "Z"): (1 + 0j, "I"),
-}
-
-
-def _multiply_dense(a: str, b: str) -> tuple[complex, str]:
-    """Multiply two dense little-endian Pauli strings of equal length."""
-    assert len(a) == len(b)
-    phase: complex = 1 + 0j
-    chars: list[str] = []
-    for ca, cb in zip(a, b, strict=True):
-        p, c = _PAULI_MULT[(ca, cb)]
-        phase *= p
-        chars.append(c)
-    return phase, "".join(chars)
+def _multiply_words(a: list[tuple[int, int]], b: list[tuple[int, int]]) -> tuple[complex, list[tuple[int, int]]]:
+    """Multiply two sparse Pauli words."""
+    return PauliTermAccumulator.multiply_uncached(a, b)
 
 
 _FACTORIES = [
@@ -464,7 +409,7 @@ class TestBilinear:
             for k in range(n):
                 if j == k:
                     continue
-                expected_phase, expected_word = _multiply_dense(m.majorana(j), m.majorana(k))
+                expected_phase, expected_word = _multiply_words(m.majorana(j), m.majorana(k))
                 expected_coeff = 1j * expected_phase
                 bcoeff, bword = m.bilinear(j, k)
                 assert bword == expected_word, f"({j},{k}): word {bword} != {expected_word}"
@@ -477,14 +422,13 @@ class TestBilinear:
         del name
         m = factory(n_modes)
         n = 2 * n_modes
-        identity = "I" * len(m.table[0])
         for j in range(n):
             for k in range(n):
                 if j == k:
                     continue
                 coeff, word = m.bilinear(j, k)
-                phase, prod = _multiply_dense(word, word)
-                assert prod == identity, f"({j},{k}): word² = {prod}, not identity"
+                phase, prod = _multiply_words(word, word)
+                assert prod == [], f"({j},{k}): word² = {prod}, not identity"
                 assert abs((coeff * coeff) * phase - 1.0) < 1e-12, (
                     f"({j},{k}): bilinear² coeff = {coeff * coeff * phase}"
                 )
@@ -504,8 +448,8 @@ class TestBilinear:
                 if shared == 2:
                     continue
                 c2, w2 = m.bilinear(j2, k2)
-                p_ab, w_ab = _multiply_dense(w1, w2)
-                p_ba, w_ba = _multiply_dense(w2, w1)
+                p_ab, w_ab = _multiply_words(w1, w2)
+                p_ba, w_ba = _multiply_words(w2, w1)
                 assert w_ab == w_ba
                 ab = c1 * c2 * p_ab
                 ba = c2 * c1 * p_ba
@@ -532,10 +476,15 @@ class TestBilinear:
     def test_jw_n2_known_values(self) -> None:
         """JW(num_modes=2): gamma_0=X_0, gamma_1=Y_0, gamma_2=Z_0 X_1, gamma_3=Z_0 Y_1."""
         m = MajoranaMapping.jordan_wigner(num_modes=2)
-        assert m.bilinear(0, 1) == (-1 + 0j, "IZ")
-        assert m.bilinear(1, 0) == (1 + 0j, "IZ")
-        assert m.bilinear(0, 2) == (1 + 0j, "XY")
-        assert m.bilinear(2, 3) == (-1 + 0j, "ZI")
+        for (j, k), expected in {
+            (0, 1): (-1 + 0j, "IZ"),
+            (1, 0): (1 + 0j, "IZ"),
+            (0, 2): (1 + 0j, "XY"),
+            (2, 3): (-1 + 0j, "ZI"),
+        }.items():
+            coeff, word = m.bilinear(j, k)
+            assert coeff == expected[0]
+            assert word_to_label(word, m.num_qubits) == expected[1]
 
     def test_raises_on_equal_indices(self) -> None:
         """``bilinear(j, j)`` is undefined and must raise ValueError."""
@@ -574,12 +523,11 @@ class TestEncodingMetadata:
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
 
         scbk = MajoranaMapping.symmetry_conserving_bravyi_kitaev(8, Symmetries(2, 2))
-        assert len(scbk.table[0]) == 8
-        assert scbk.num_qubits == 6
+        assert scbk.num_qubits == 8
         for j in range(2 * scbk.num_modes):
-            assert len(scbk.majorana(j)) == 8
+            assert len(word_to_label(scbk.majorana(j), scbk.num_qubits)) == 8
             for k in range(2 * scbk.num_modes):
                 if j == k:
                     continue
                 _, w = scbk.bilinear(j, k)
-                assert len(w) == 8
+                assert len(word_to_label(w, scbk.num_qubits)) == 8

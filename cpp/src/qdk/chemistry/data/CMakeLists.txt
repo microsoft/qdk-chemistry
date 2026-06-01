@@ -19,6 +19,7 @@ target_sources(chemistry PRIVATE
     settings.cpp
     stability_result.cpp
     structure.cpp
+    tapering.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
     wavefunction_containers/cc.cpp

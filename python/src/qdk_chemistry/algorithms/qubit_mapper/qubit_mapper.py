@@ -15,10 +15,97 @@ from qdk_chemistry.data import Settings
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:  # Only needed for type annotations; avoid importing into module namespace
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
-    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+    from collections.abc import Sequence
+
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
 
 __all__: list[str] = []
+
+
+def _taper_qubits(
+    qubit_hamiltonian: QubitHamiltonian,
+    qubit_indices: Sequence[int],
+    eigenvalues: Sequence[int],
+) -> QubitHamiltonian:
+    import numpy as np  # noqa: PLC0415
+
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    qubit_indices = list(qubit_indices)
+    eigenvalues = list(eigenvalues)
+
+    if len(qubit_indices) != len(eigenvalues):
+        raise ValueError(
+            f"qubit_indices length ({len(qubit_indices)}) must match eigenvalues length ({len(eigenvalues)})"
+        )
+    if len(set(qubit_indices)) != len(qubit_indices):
+        raise ValueError("qubit_indices must not contain duplicates")
+
+    nq = qubit_hamiltonian.num_qubits
+    for q in qubit_indices:
+        if q < 0 or q >= nq:
+            raise ValueError(f"Qubit index {q} out of range [0, {nq})")
+    for ev in eigenvalues:
+        if ev not in (1, -1):
+            raise ValueError(f"Eigenvalue must be +1 or -1, got {ev}")
+
+    positions_to_remove = sorted([nq - 1 - q for q in qubit_indices])
+    eigenvalue_map = dict(zip(qubit_indices, eigenvalues, strict=True))
+
+    new_strings: list[str] = []
+    new_coeffs: list[complex] = []
+
+    for pauli_str, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True):
+        skip = False
+        adjusted_coeff = complex(coeff)
+
+        for q, ev in eigenvalue_map.items():
+            pos = nq - 1 - q
+            char = pauli_str[pos]
+            if char == "Z":
+                adjusted_coeff *= ev
+            elif char in ("X", "Y"):
+                skip = True
+                break
+
+        if skip:
+            continue
+
+        chars = [c for i, c in enumerate(pauli_str) if i not in positions_to_remove]
+        new_strings.append("".join(chars))
+        new_coeffs.append(adjusted_coeff)
+
+    new_nq = nq - len(qubit_indices)
+
+    if not new_strings:
+        return QubitHamiltonian(
+            pauli_strings=["I" * new_nq],
+            coefficients=np.array([0.0]),
+            encoding=qubit_hamiltonian.encoding,
+            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+        )
+
+    merged: dict[str, complex] = {}
+    for s, c in zip(new_strings, new_coeffs, strict=True):
+        merged[s] = merged.get(s, 0.0) + c
+
+    final_strings = []
+    final_coeffs = []
+    for s, c in merged.items():
+        if abs(c) > 1e-12:
+            final_strings.append(s)
+            final_coeffs.append(c)
+
+    if not final_strings:
+        final_strings = ["I" * new_nq]
+        final_coeffs = [0.0]
+
+    return QubitHamiltonian(
+        pauli_strings=final_strings,
+        coefficients=np.array(final_coeffs),
+        encoding=qubit_hamiltonian.encoding,
+        fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
+    )
 
 
 class QubitMapperSettings(Settings):
@@ -117,7 +204,6 @@ class QubitMapper(Algorithm):
 
         Convenience helper for backends.  If ``mapping.tapering`` is
         ``None``, returns *qh* unchanged.  Otherwise, applies
-        :func:`~qdk_chemistry.data.tapering.taper_qubits` and relabels
         the result with the mapping's final encoding name.
 
         Args:
@@ -133,9 +219,8 @@ class QubitMapper(Algorithm):
             return qh
 
         from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian  # noqa: PLC0415
-        from qdk_chemistry.data.tapering import taper_qubits  # noqa: PLC0415
 
-        tapered = taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
+        tapered = _taper_qubits(qh, tapering.qubit_indices, tapering.eigenvalues)
         result = QubitHamiltonian(
             pauli_strings=tapered.pauli_strings,
             coefficients=tapered.coefficients,
@@ -163,8 +248,8 @@ class QubitMapper(Algorithm):
         .. important::
 
            **Table-driven** backends (e.g. :class:`QdkQubitMapper`) should
-           read ``mapping.table`` and ``mapping.core`` to perform the
-           transformation.
+           read ``mapping.table`` and pass the mapping to the native engine to
+           perform the transformation.
 
            **Name-dispatched** backends (e.g. ``OpenFermionQubitMapper``)
            should read ``mapping.base_encoding`` to select a third-party

@@ -134,8 +134,8 @@ You can discover available implementations programmatically:
 
 .. _backend-dispatch-contract:
 
-Backend dispatch contract
-~~~~~~~~~~~~~~~~~~~~~~~~~
+Details for extending implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Implementations fall into two categories that use the
 :class:`~qdk_chemistry.data.MajoranaMapping` argument differently:

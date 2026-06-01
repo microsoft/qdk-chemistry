@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
+#include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -308,6 +309,28 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes) {
   }
 
   return MajoranaMapping::from_table(std::move(table), "parity");
+}
+
+MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
+                                        std::size_t n_alpha,
+                                        std::size_t n_beta) {
+  auto base = MajoranaMapping::parity(num_modes);
+  auto tapering = TaperingSpecification::parity_two_qubit_reduction(
+      num_modes, n_alpha, n_beta);
+  return MajoranaMapping(base.table_, base.bilinears_, "parity-2q-reduced",
+                         base.num_modes_, base.num_qubits_, "parity",
+                         std::move(tapering));
+}
+
+MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
+    std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta) {
+  auto base = MajoranaMapping::bravyi_kitaev_tree(num_modes);
+  auto tapering = TaperingSpecification::symmetry_conserving_bravyi_kitaev(
+      num_modes, n_alpha, n_beta);
+  return MajoranaMapping(base.table_, base.bilinears_,
+                         "symmetry-conserving-bravyi-kitaev", base.num_modes_,
+                         base.num_qubits_, "bravyi-kitaev-tree",
+                         std::move(tapering));
 }
 
 }  // namespace qdk::chemistry::data

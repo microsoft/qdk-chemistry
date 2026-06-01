@@ -487,7 +487,7 @@ class TestQdkQubitMapper:
         n_modes = 2 * 2
 
         jw = MajoranaMapping.jordan_wigner(num_modes=n_modes)
-        custom = MajoranaMapping(table=list(jw.table), name="")
+        custom = MajoranaMapping.from_table(list(jw.table), name="")
 
         result_jw = mapper.run(hamiltonian, jw)
         result_custom = mapper.run(hamiltonian, custom)
@@ -1129,13 +1129,12 @@ class TestScbkOneStep:
 
         qh = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
         assert qh.tapering is not None
-        assert qh.tapering.source_num_qubits == n
         assert qh.tapering.num_tapered == 2
 
     def test_scbk_matches_two_step(self) -> None:
         """One-step symmetry-conserving BK matches explicit BK-tree + internal taper."""
+        from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper  # noqa: PLC0415
         from qdk_chemistry.data import Symmetries  # noqa: PLC0415
-        from qdk_chemistry.data.tapering import taper_to_scbk  # noqa: PLC0415
 
         hamiltonian = create_nontrivial_test_hamiltonian()
         n = 2 * hamiltonian.get_one_body_integrals()[0].shape[0]
@@ -1148,7 +1147,7 @@ class TestScbkOneStep:
         # Two-step: use BK-tree (the base encoding for SCBK)
         bk_tree_mapping = MajoranaMapping.bravyi_kitaev_tree(n)
         qh_bk = create("qubit_mapper", "qdk").run(hamiltonian, bk_tree_mapping)
-        qh_two_step = taper_to_scbk(qh_bk, sym)
+        qh_two_step = QubitMapper._taper_result(qh_bk, scbk_mapping)
 
         assert qh_one_step.equiv(qh_two_step)
 

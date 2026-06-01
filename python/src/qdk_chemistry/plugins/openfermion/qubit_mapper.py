@@ -28,8 +28,7 @@ from qdk_chemistry.utils import Logger
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian
-    from qdk_chemistry.data.majorana_mapping import MajoranaMapping
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 

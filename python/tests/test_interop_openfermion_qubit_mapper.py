@@ -109,7 +109,7 @@ def test_openfermion_bk_tree_encoding():
     """
     hamiltonian = create_nontrivial_test_hamiltonian()
     n = _num_spin_orbitals(hamiltonian)
-    mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name="bravyi-kitaev-tree")
+    mapping = MajoranaMapping.from_table(list(MajoranaMapping.jordan_wigner(n).table), name="bravyi-kitaev-tree")
 
     qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
 
@@ -203,7 +203,7 @@ def test_scbk_name_dispatch_removed():
     hamiltonian = create_nontrivial_test_hamiltonian()
     n_spin = _num_spin_orbitals(hamiltonian)
     jw = MajoranaMapping.jordan_wigner(n_spin)
-    mapping = MajoranaMapping(table=list(jw.table), name="symmetry-conserving-bravyi-kitaev")
+    mapping = MajoranaMapping.from_table(list(jw.table), name="symmetry-conserving-bravyi-kitaev")
 
     mapper = create("qubit_mapper", "openfermion")
     with pytest.raises(NotImplementedError, match="does not support base encoding"):
@@ -255,7 +255,7 @@ def test_openfermion_unsupported_mapping_raises():
     """A mapping with an unsupported name raises NotImplementedError."""
     hamiltonian = create_nontrivial_test_hamiltonian()
     n = _num_spin_orbitals(hamiltonian)
-    mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name="invalid-encoding")
+    mapping = MajoranaMapping.from_table(list(MajoranaMapping.jordan_wigner(n).table), name="invalid-encoding")
 
     mapper = create("qubit_mapper", "openfermion")
     with pytest.raises(NotImplementedError, match="invalid-encoding"):
@@ -380,7 +380,7 @@ def test_openfermion_standard_sets_blocked_order(encoding):
     if encoding in _ENCODING_TO_MAPPING:
         mapping = _ENCODING_TO_MAPPING[encoding](n)
     else:
-        mapping = MajoranaMapping(table=list(MajoranaMapping.jordan_wigner(n).table), name=encoding)
+        mapping = MajoranaMapping.from_table(list(MajoranaMapping.jordan_wigner(n).table), name=encoding)
     qh = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
     assert qh.fermion_mode_order == FermionModeOrder.BLOCKED
 
