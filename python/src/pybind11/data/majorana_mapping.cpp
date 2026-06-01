@@ -106,6 +106,20 @@ Immutable specification for post-mapping qubit tapering.
             return TaperingSpecification::from_json_file(
                 qdk::chemistry::python::utils::to_string_path(filename));
           },
+          py::arg("filename"))
+      .def(
+          "to_hdf5_file",
+          [](const TaperingSpecification& self, const py::object& filename) {
+            self.to_hdf5_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_hdf5_file",
+          [](const py::object& filename) {
+            return TaperingSpecification::from_hdf5_file(
+                qdk::chemistry::python::utils::to_string_path(filename));
+          },
           py::arg("filename"));
 
   py::class_<MajoranaMapping, DataClass, py::smart_holder> mapping(
