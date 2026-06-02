@@ -84,10 +84,17 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
 fi
 python3 -m pip install "${WHEEL[0]}[test]"
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in buildenv.
+# Files matching `*.component-detection-pip-report.json` are auto-discovered when
+# placed next to a setup.py or requirements.txt. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+echo "------------------ Installed Python packages (testenv) ------------------"
+python3 -m pip freeze --all --exclude qdk_chemistry | tee /tmp/testenv-freeze.txt
+echo "-------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report "$REPO_ROOT/.pipelines/testenv.component-detection-pip-report.json" \
+    -r /tmp/testenv-freeze.txt
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false

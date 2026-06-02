@@ -120,10 +120,17 @@ python3 -m pip install --upgrade pip
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
 python3 -m pip install -r .pipelines/requirements.txt
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in buildenv.
+# Files matching `*.component-detection-pip-report.json` are auto-discovered when
+# placed next to a setup.py or requirements.txt. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+echo "------------------ Installed Python packages (buildenv) ------------------"
+python3 -m pip freeze --all | tee /tmp/buildenv-freeze.txt
+echo "---------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report .pipelines/buildenv.component-detection-pip-report.json \
+    -r /tmp/buildenv-freeze.txt
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
