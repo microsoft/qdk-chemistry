@@ -20,9 +20,22 @@ qpe = create("phase_estimation", "qiskit_standard")
 ################################################################################
 # start-cell-configure-iqpe
 # Configure iterative phase estimation
+from qdk_chemistry.data import AlgorithmRef
+
 iqpe = create("phase_estimation", "iterative")
-iqpe.settings().set("num_bits", 10)
 iqpe.settings().set("shots_per_bit", 10)
+iqpe.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=10,
+        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=0.1
+        ),
+    ),
+)
 # end-cell-configure-iqpe
 ################################################################################
 
@@ -30,9 +43,24 @@ iqpe.settings().set("shots_per_bit", 10)
 # start-cell-configure-standard
 # Configure standard QFT-based phase estimation
 qpe = create("phase_estimation", "qiskit_standard")
-qpe.settings().set("num_bits", 10)
 qpe.settings().set("shots", 100)
-qpe.settings().set("qft_do_swaps", True)
+qpe.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_standard",
+        num_bits=10,
+        qft_do_swaps=True,
+    ),
+)
+qpe.settings().set(
+    "circuit_mapper",
+    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+)
+qpe.settings().set(
+    "unitary_builder",
+    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
+)
 # end-cell-configure-standard
 ################################################################################
 
@@ -72,12 +100,20 @@ circuit = state_prep.run(wfn_cas)
 # 7. Create and run IQPE with nested algorithm settings
 from qdk_chemistry.data import AlgorithmRef
 
-iqpe = create("phase_estimation", "iterative", num_bits=10, shots_per_bit=10)
+iqpe = create("phase_estimation", "iterative", shots_per_bit=10)
 
-# Configure nested algorithms — kwargs override the algorithm's defaults
+# Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
 iqpe.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2, time=0.1),
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=10,
+        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", order=2, time=0.1
+        ),
+    ),
 )
 iqpe.settings().set(
     "circuit_executor",

@@ -114,20 +114,23 @@ Logger.info(
 iqpe = create(
     "phase_estimation",
     "iterative",
-    num_bits=M_PRECISION,
     shots_per_bit=SHOTS_PER_BIT,
+)
+iqpe.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=M_PRECISION,
+        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=T_TIME
+        ),
+    ),
 )
 iqpe.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED),
-)
-iqpe.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=T_TIME),
-)
-iqpe.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
 )
 
 

@@ -19,7 +19,6 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import IterativeQpeCircuitBuilder, QpeCircuitBuilderSettings
 
 __all__: list[str] = [
-    "IterativeQpeCircuitBuilder",
     "QdkIterativeQpeCircuitBuilder",
     "QdkIterativeQpeCircuitBuilderSettings",
     "_validate_iteration_inputs",
