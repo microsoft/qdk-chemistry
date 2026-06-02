@@ -21,7 +21,10 @@ namespace qdk::chemistry::algorithms::microsoft {
 class VVHVLocalizerSettings : public IterativeOrbitalLocalizationSettings {
  public:
   VVHVLocalizerSettings() {
-    set_default("minimal_basis", std::string("sto-3g"));
+    set_default("minimal_basis", std::string("sto-3g"),
+                "Minimal basis set for VVHV partitioning",
+                data::ListConstraint<std::string>{
+                    {std::vector<std::string>{"sto-3g", "sto-3g*"}}});
     set_default("weighted_orthogonalization", true);
   }
 };

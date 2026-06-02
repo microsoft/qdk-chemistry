@@ -82,8 +82,13 @@ cas_solver = create("multi_configuration_calculator")
 E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 
 # 5. Qubit mapping
-qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
-qubit_ham = qubit_mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_mapper = create("qubit_mapper")
+qubit_ham = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 # 6. State preparation
 state_prep = create("state_prep", "sparse_isometry_gf2x")
