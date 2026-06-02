@@ -16,6 +16,18 @@ Breaking changes
   Pre-group with ``create("term_grouper", "qubit_wise_commuting")`` to restore
   the previous behavior.
 
+Deprecations
+------------
+
+- :class:`~qdk_chemistry.data.Orbitals` (and :class:`ModelOrbitals`)
+  serialization format bumped from ``0.1.0`` to ``0.2.0`` to reflect the
+  switch to :class:`SymmetryBlockedTensor`-backed coefficient and energy
+  storage. Files written by earlier versions are still loaded for backward
+  compatibility, but a deprecation warning is emitted via the QDK logger and
+  the legacy code path will be removed in a future release. Re-save affected
+  files with ``orbitals.to_json()`` or ``orbitals.to_hdf5()`` to upgrade them
+  to ``0.2.0`` in place.
+
 Version 1.1.0
 =============
 

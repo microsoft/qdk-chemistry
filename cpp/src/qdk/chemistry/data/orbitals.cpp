@@ -1278,6 +1278,13 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     version_attr.read(string_type, version_str);
     if (version_str == "0.1.0") {
       // Deprecated v0.1.0 format — accepted for backward compatibility.
+      // Re-save the file via to_hdf5() to upgrade to the current format.
+      QDK_LOGGER().warn(
+          "Loading deprecated Orbitals HDF5 format v0.1.0; the current "
+          "format is v{}. Backward compatibility for v0.1.0 will be "
+          "removed in a future release — re-save the file with to_hdf5() "
+          "to upgrade.",
+          SERIALIZATION_VERSION);
     } else {
       validate_serialization_version(SERIALIZATION_VERSION, version_str);
     }
@@ -1496,6 +1503,13 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     const auto version_str = j["version"].get<std::string>();
     if (version_str == "0.1.0") {
       // Deprecated v0.1.0 format — accepted for backward compatibility.
+      // Re-save the file via to_json() to upgrade to the current format.
+      QDK_LOGGER().warn(
+          "Loading deprecated Orbitals JSON format v0.1.0; the current "
+          "format is v{}. Backward compatibility for v0.1.0 will be "
+          "removed in a future release — re-save the file with to_json() "
+          "to upgrade.",
+          SERIALIZATION_VERSION);
     } else {
       validate_serialization_version(SERIALIZATION_VERSION, version_str);
     }
@@ -2093,7 +2107,16 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     // compatibility)
     if (j.contains("version")) {
       const auto ver = j["version"].get<std::string>();
-      if (ver != "0.1.0") {
+      if (ver == "0.1.0") {
+        // Deprecated v0.1.0 format — accepted for backward compatibility.
+        // Re-save the file via to_json() to upgrade to the current format.
+        QDK_LOGGER().warn(
+            "Loading deprecated ModelOrbitals JSON format v0.1.0; the "
+            "current format is v{}. Backward compatibility for v0.1.0 will "
+            "be removed in a future release — re-save the file with "
+            "to_json() to upgrade.",
+            SERIALIZATION_VERSION);
+      } else {
         validate_serialization_version(SERIALIZATION_VERSION, ver);
       }
     }
@@ -2215,7 +2238,16 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version;
     version_attr.read(string_type, version);
-    if (version != "0.1.0") {
+    if (version == "0.1.0") {
+      // Deprecated v0.1.0 format — accepted for backward compatibility.
+      // Re-save the file via to_hdf5() to upgrade to the current format.
+      QDK_LOGGER().warn(
+          "Loading deprecated ModelOrbitals HDF5 format v0.1.0; the "
+          "current format is v{}. Backward compatibility for v0.1.0 will "
+          "be removed in a future release — re-save the file with "
+          "to_hdf5() to upgrade.",
+          SERIALIZATION_VERSION);
+    } else {
       validate_serialization_version(SERIALIZATION_VERSION, version);
     }
 

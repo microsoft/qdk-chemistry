@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <stdexcept>
@@ -310,6 +311,48 @@ TEST_F(OrbitalsTest, HDF5Serialization) {
             orb_from_file->get_num_atomic_orbitals());
   EXPECT_EQ(orb.get_num_molecular_orbitals(),
             orb_from_file->get_num_molecular_orbitals());
+}
+
+// Verify that the deprecated v0.1.0 JSON layout (legacy "coefficients.alpha"
+// / "coefficients.beta" / "energies.alpha" / "energies.beta" with the dense
+// matrix-of-arrays representation) still loads in the current
+// SymmetryBlockedTensor-based code path. A deprecation warning is emitted via
+// QDK_LOGGER().warn(); re-saving the resulting Orbitals via to_json() upgrades
+// the file to the current SERIALIZATION_VERSION ("0.2.0").
+TEST_F(OrbitalsTest, BackwardCompatLoadsV010Json) {
+  // Build a basis set to embed in the legacy fixture (v0.1.0 already had a
+  // "basis_set" sub-document, serialized via BasisSet::to_json()).
+  auto basis_set = testing::create_random_basis_set(2);
+
+  // Hand-build a minimal valid v0.1.0 JSON document (restricted, 2 AOs x 2 MOs)
+  nlohmann::json legacy = {
+      {"version", "0.1.0"},
+      {"is_restricted", true},
+      {"coefficients",
+       {{"alpha", {{0.1, 0.2}, {0.3, 0.4}}},
+        {"beta", {{0.1, 0.2}, {0.3, 0.4}}}}},
+      {"energies", {{"alpha", {-1.0, 0.5}}, {"beta", {-1.0, 0.5}}}},
+      {"basis_set", basis_set->to_json()}};
+
+  std::shared_ptr<Orbitals> orb;
+  ASSERT_NO_THROW(orb = Orbitals::from_json(legacy));
+  ASSERT_NE(orb, nullptr);
+  EXPECT_EQ(orb->get_num_atomic_orbitals(), 2u);
+  EXPECT_EQ(orb->get_num_molecular_orbitals(), 2u);
+  EXPECT_TRUE(orb->is_restricted());
+
+  auto [coeffs_a, coeffs_b] = orb->get_coefficients();
+  Eigen::MatrixXd expected(2, 2);
+  expected << 0.1, 0.2, 0.3, 0.4;
+  EXPECT_TRUE(coeffs_a.isApprox(expected, testing::json_tolerance));
+  EXPECT_TRUE(coeffs_b.isApprox(expected, testing::json_tolerance));
+
+  // Re-serialization upgrades the on-disk format to the current version.
+  // Must match Orbitals::SERIALIZATION_VERSION (protected; see orbitals.hpp).
+  const auto upgraded = orb->to_json();
+  ASSERT_TRUE(upgraded.contains("version"));
+  EXPECT_EQ(upgraded["version"].get<std::string>(), "0.2.0");
+  EXPECT_NE(upgraded["version"].get<std::string>(), "0.1.0");
 }
 
 TEST_F(OrbitalsTest, UnrestrictedCalculations) {
