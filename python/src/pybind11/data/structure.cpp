@@ -164,7 +164,7 @@ Examples:
 Create structure from coordinates, elements, masses, and nuclear charges.
 
 Args:
-    coordinates (numpy.ndarray): Matrix of atomic coordinates (N x 3) in Angstrom
+    coordinates (numpy.ndarray): Matrix of atomic coordinates (N x 3) in Bohr
     elements (list[Element]): Vector of atomic elements using Element enum
     masses (numpy.ndarray | None): Vector of atomic masses in AMU (default: use standard masses)
     nuclear_charges (numpy.ndarray | None): Vector of nuclear charges (default: use standard charges)
