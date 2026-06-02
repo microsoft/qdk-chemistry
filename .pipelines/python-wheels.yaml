@@ -115,6 +115,7 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+              hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: $(CPU_POOL_ARM)
