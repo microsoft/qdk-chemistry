@@ -244,6 +244,18 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
+
+          - script: |
+              set -x
+              echo "Check repository state after build and test steps"
+              cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
+              pwd
+              ls -la .
+              ls -la .pipelines
+              ls -la python
+              ls -la python/repaired_wheelhouse
+            displayName: Check repository state
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
