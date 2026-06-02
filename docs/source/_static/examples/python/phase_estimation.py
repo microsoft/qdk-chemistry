@@ -99,7 +99,7 @@ from qdk_chemistry.data import AlgorithmRef
 
 iqpe = create("phase_estimation", "iterative", shots_per_bit=10)
 
-# Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
+# 8. Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
 iqpe.settings().set(
     "qpe_circuit_builder",
     AlgorithmRef(
