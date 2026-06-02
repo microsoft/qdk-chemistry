@@ -114,7 +114,6 @@ conda-lock lock \
     --lockfile "$PYTHON_DIR/manifest/testenv.conda-lock.json"
 echo "------------------ testenv conda lock (CG input) ------------------"
 cat "$PYTHON_DIR/manifest/testenv.conda-lock.json"
-echo
 echo "-------------------------------------------------------------------"
 
 # Disable telemetry during testing

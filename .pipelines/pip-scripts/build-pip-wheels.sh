@@ -149,7 +149,6 @@ conda-lock lock \
     --lockfile python/manifest/buildenv.conda-lock.json
 echo "------------------ buildenv conda lock (CG input) ------------------"
 cat python/manifest/buildenv.conda-lock.json
-echo
 echo "--------------------------------------------------------------------"
 
 # Prepare README for PyPI
