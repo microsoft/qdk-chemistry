@@ -32,6 +32,70 @@ void expect_same_structure(const std::shared_ptr<Structure>& left,
   EXPECT_EQ(left->get_elements(), right->get_elements());
 }
 
+void expect_qdk_analytic_gradient_runs_for_functional(
+    const std::string& functional) {
+  auto calculator = NuclearDerivativeCalculatorFactory::create("qdk");
+  AlgorithmRef scf_ref("scf_solver", "qdk");
+  scf_ref.get_settings()->set("method", functional);
+  calculator->settings().set("energy_calculator", scf_ref);
+
+  auto [energy, gradients, hessian, wavefunction] =
+      calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+
+  ASSERT_TRUE(std::isfinite(energy));
+  EXPECT_LT(energy, 0.0);
+  ASSERT_NE(gradients, nullptr);
+  EXPECT_EQ(gradients->get_num_atoms(), 2);
+  EXPECT_EQ(gradients->get_values().size(), 6);
+  EXPECT_TRUE(gradients->get_values().allFinite());
+
+  auto gradient_matrix = gradients->as_matrix();
+  EXPECT_NEAR(gradient_matrix.col(0).sum(), 0.0, 1.0e-8);
+  EXPECT_NEAR(gradient_matrix.col(1).sum(), 0.0, 1.0e-8);
+  EXPECT_NEAR(gradient_matrix.col(2).sum(), 0.0, 1.0e-8);
+
+  EXPECT_FALSE(hessian.has_value());
+  ASSERT_TRUE(wavefunction.has_value());
+  EXPECT_NE(*wavefunction, nullptr);
+}
+
+NuclearDerivativeResult run_qdk_derivative_for_functional(
+    const std::string& calculator_name, const std::string& functional) {
+  auto calculator = NuclearDerivativeCalculatorFactory::create(calculator_name);
+  AlgorithmRef scf_ref("scf_solver", "qdk");
+  scf_ref.get_settings()->set("method", functional);
+  calculator->settings().set("energy_calculator", scf_ref);
+  calculator->settings().set("finite_difference_step", 1.0e-2);
+
+  return calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+}
+
+void expect_qdk_analytic_gradient_matches_numeric(
+    const std::string& functional) {
+  auto [numeric_energy, numeric_gradients, numeric_hessian,
+        numeric_wavefunction] =
+      run_qdk_derivative_for_functional("finite_difference", functional);
+  auto [analytic_energy, analytic_gradients, analytic_hessian,
+        analytic_wavefunction] =
+      run_qdk_derivative_for_functional("qdk", functional);
+
+  EXPECT_NEAR(analytic_energy, numeric_energy, 1.0e-8);
+  ASSERT_NE(numeric_gradients, nullptr);
+  ASSERT_NE(analytic_gradients, nullptr);
+  EXPECT_FALSE(numeric_hessian.has_value());
+  EXPECT_FALSE(analytic_hessian.has_value());
+  ASSERT_TRUE(numeric_wavefunction.has_value());
+  ASSERT_TRUE(analytic_wavefunction.has_value());
+
+  const auto& numeric_values = numeric_gradients->get_values();
+  const auto& analytic_values = analytic_gradients->get_values();
+  ASSERT_EQ(analytic_values.size(), numeric_values.size());
+  for (Eigen::Index i = 0; i < analytic_values.size(); ++i) {
+    EXPECT_NEAR(analytic_values(i), numeric_values(i), 1.0e-3)
+        << "gradient component " << i;
+  }
+}
+
 }  // namespace
 
 TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
@@ -100,28 +164,32 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForH2) {
   EXPECT_NE(*wavefunction, nullptr);
 }
 
-TEST(NuclearDerivativeCalculatorTest, QdkAnalyticGradientRunsRealDftForH2) {
-  auto calculator = NuclearDerivativeCalculatorFactory::create("qdk");
-  AlgorithmRef scf_ref("scf_solver", "qdk");
-  scf_ref.get_settings()->set("method", std::string("pbe"));
-  calculator->settings().set("energy_calculator", scf_ref);
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientRunsRealNonHybridDftForH2) {
+  expect_qdk_analytic_gradient_runs_for_functional("pbe");
+}
 
-  auto [energy, gradients, hessian, wavefunction] =
-      calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientRunsRealHybridDftForH2) {
+  expect_qdk_analytic_gradient_runs_for_functional("b3lyp");
+}
 
-  ASSERT_TRUE(std::isfinite(energy));
-  EXPECT_LT(energy, 0.0);
-  ASSERT_NE(gradients, nullptr);
-  EXPECT_EQ(gradients->get_num_atoms(), 2);
-  EXPECT_EQ(gradients->get_values().size(), 6);
-  EXPECT_TRUE(gradients->get_values().allFinite());
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientRunsRealRangeSeparatedHybridDftForH2) {
+  expect_qdk_analytic_gradient_runs_for_functional("wB97x");
+}
 
-  auto gradient_matrix = gradients->as_matrix();
-  EXPECT_NEAR(gradient_matrix.col(0).sum(), 0.0, 1.0e-8);
-  EXPECT_NEAR(gradient_matrix.col(1).sum(), 0.0, 1.0e-8);
-  EXPECT_NEAR(gradient_matrix.col(2).sum(), 0.0, 1.0e-8);
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientMatchesNumericHybridGgaDftForH2) {
+  expect_qdk_analytic_gradient_matches_numeric("b3lyp");
+}
 
-  EXPECT_FALSE(hessian.has_value());
-  ASSERT_TRUE(wavefunction.has_value());
-  EXPECT_NE(*wavefunction, nullptr);
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientMatchesNumericGgaDftForH2) {
+  expect_qdk_analytic_gradient_matches_numeric("pbe");
+}
+
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForH2) {
+  expect_qdk_analytic_gradient_matches_numeric("wB97x");
 }
