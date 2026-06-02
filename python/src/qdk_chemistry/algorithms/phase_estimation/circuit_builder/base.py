@@ -52,16 +52,27 @@ class QpeCircuitBuilderSettings(Settings):
 class QpeCircuitBuilder(Algorithm):
     """Abstract base class for phase estimation circuit builders."""
 
-    def __init__(self, num_bits: int = -1):
+    def __init__(
+        self,
+        num_bits: int = -1,
+        unitary_builder: AlgorithmRef | None = None,
+        circuit_mapper: AlgorithmRef | None = None,
+    ):
         """Initialize the QpeCircuitBuilder with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
+            unitary_builder: Optional algorithm reference for the unitary builder.
+            circuit_mapper: Optional algorithm reference for the circuit mapper.
 
         """
         super().__init__()
         self._settings = QpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
+        if unitary_builder is not None:
+            self._settings.set("unitary_builder", unitary_builder)
+        if circuit_mapper is not None:
+            self._settings.set("circuit_mapper", circuit_mapper)
 
     def type_name(self) -> str:
         """Return the algorithm type name as qpe_circuit_builder."""
@@ -122,8 +133,8 @@ class QpeCircuitBuilderFactory(AlgorithmFactory):
         return "qpe_circuit_builder"
 
     def default_algorithm_name(self) -> str:
-        """Return iterative as default algorithm name."""
-        return "iterative"
+        """Return qdk_iterative as default algorithm name."""
+        return "qdk_iterative"
 
 
 class IterativeQpeCircuitBuilder(QpeCircuitBuilder):

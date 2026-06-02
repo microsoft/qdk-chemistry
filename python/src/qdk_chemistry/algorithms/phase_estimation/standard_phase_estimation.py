@@ -53,7 +53,7 @@ class StandardPhaseEstimationSettings(PhaseEstimationSettings):
 class StandardPhaseEstimation(PhaseEstimation):
     """Standard QFT-based (non-iterative) phase estimation."""
 
-    def __init__(self, num_bits: int = -1, shots: int = 3):
+    def __init__(self, shots: int = 3):
         """Initialize the standard phase estimation routine.
 
         Args:
@@ -62,9 +62,8 @@ class StandardPhaseEstimation(PhaseEstimation):
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits)
+        super().__init__()
         self._settings = StandardPhaseEstimationSettings()
-        self._settings.set("num_bits", num_bits)
         self._settings.set("shots", shots)
 
     def _run_impl(
@@ -87,7 +86,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
-        builder = self._create_nested("circuit_builder")
+        builder = self._create_nested("qpe_circuit_builder")
         if not isinstance(builder, StandardQpeCircuitBuilder):
             raise TypeError(
                 f"Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder, "

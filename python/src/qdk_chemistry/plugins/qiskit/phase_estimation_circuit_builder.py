@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitIterativeQpeCircuitBuilder", "QiskitStandardQpeCircuitBuilder"]
@@ -45,16 +45,24 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
     """
 
-    def __init__(self, num_bits: int = -1, qft_do_swaps: bool = True):
+    def __init__(
+        self,
+        num_bits: int = -1,
+        qft_do_swaps: bool = True,
+        circuit_mapper: AlgorithmRef | None = None,
+        unitary_builder: AlgorithmRef | None = None,
+    ):
         """Initialize QiskitStandardQpeCircuitBuilder with the given settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             qft_do_swaps: Whether to apply swap gates in the QFT. Defaults to True.
+            circuit_mapper: Optional algorithm reference for the circuit mapper.
+            unitary_builder: Optional algorithm reference for the unitary builder.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits)
+        super().__init__(num_bits=num_bits, circuit_mapper=circuit_mapper, unitary_builder=unitary_builder)
         self._settings = QiskitStandardQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("qft_do_swaps", qft_do_swaps)

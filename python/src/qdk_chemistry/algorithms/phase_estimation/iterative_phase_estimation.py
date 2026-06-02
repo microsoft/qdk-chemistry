@@ -94,6 +94,8 @@ class IterativePhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
         num_bits = circuit_builder.settings().get("num_bits")
+        if num_bits <= 0:
+            raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
         # Initialize the parameters
         phase_feedback = 0.0
         bits: list[int] = []
@@ -127,7 +129,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         phase_fraction = phase_fraction_from_feedback(phase_feedback)
         # Create and return the result
 
-        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         if isinstance(unitary_builder, TimeEvolutionBuilder):
             evolution_time = unitary_builder.settings().get("time")
             return QpeResult.from_phase_fraction(

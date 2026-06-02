@@ -26,7 +26,6 @@ if QDK_CHEMISTRY_HAS_QISKIT:
 
     from qdk_chemistry.plugins.qiskit.standard_phase_estimation import (
         QiskitStandardPhaseEstimation,
-        QiskitStandardQpeCircuitBuilder,
     )
     from qdk_chemistry.utils.phase import energy_from_phase
 
@@ -36,7 +35,6 @@ else:
     qasm3 = object
     QiskitStatePreparation = object
     QiskitStandardPhaseEstimation = object
-    QiskitStandardQpeCircuitBuilder = object
 
 
 pytestmark = pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -247,51 +245,6 @@ def test_raises_not_implemented_for_non_time_evolution_builder(
 
     with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
         qpe.run(
-            state_preparation=two_qubit_phase_problem.state_prep,
-            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        )
-
-
-def test_builder_run_returns_circuits(two_qubit_phase_problem: TraditionalProblem) -> None:
-    """Validate that QiskitStandardQpeCircuitBuilder.run produces a single QPE circuit."""
-    builder = QiskitStandardQpeCircuitBuilder(num_bits=two_qubit_phase_problem.num_bits)
-    builder.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    builder.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
-
-    circuits = builder.run(
-        state_preparation=two_qubit_phase_problem.state_prep,
-        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-    )
-
-    assert isinstance(circuits, list)
-    assert len(circuits) == 1
-    circuit = circuits[0]
-    assert isinstance(circuit, Circuit)
-    result = circuit.estimate()
-    assert result is not None
-    assert hasattr(result, "logical_counts")
-
-
-def test_builder_raises_invalid_num_bits_error(two_qubit_phase_problem: TraditionalProblem) -> None:
-    """Validate that QiskitStandardQpeCircuitBuilder raises ValueError for invalid num_bits."""
-    builder = QiskitStandardQpeCircuitBuilder(num_bits=0)  # Invalid number of bits
-    builder.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    builder.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
-
-    with pytest.raises(ValueError, match="num_bits must be a positive integer"):
-        builder.run(
             state_preparation=two_qubit_phase_problem.state_prep,
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )

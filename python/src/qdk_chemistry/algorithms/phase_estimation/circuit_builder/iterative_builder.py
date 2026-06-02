@@ -11,17 +11,19 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import (
-    Circuit,
-    QubitHamiltonian,
-)
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import IterativeQpeCircuitBuilder, QpeCircuitBuilderSettings
 
-__all__: list[str] = ["IterativeQpeCircuitBuilder", "QdkIterativeQpeCircuitBuilderSettings"]
+__all__: list[str] = [
+    "IterativeQpeCircuitBuilder",
+    "QdkIterativeQpeCircuitBuilder",
+    "QdkIterativeQpeCircuitBuilderSettings",
+    "_validate_iteration_inputs",
+]
 
 
 class QdkIterativeQpeCircuitBuilderSettings(QpeCircuitBuilderSettings):
@@ -44,17 +46,26 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
     """
 
-    def __init__(self, num_bits: int = -1, phase_correction: float = 0.0, num_iteration: int = -1):
+    def __init__(
+        self,
+        num_bits: int = -1,
+        phase_correction: float = 0.0,
+        num_iteration: int = -1,
+        circuit_mapper: AlgorithmRef | None = None,
+        unitary_builder: AlgorithmRef | None = None,
+    ):
         """Initialize the IterativeQpeCircuitBuilder.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
+            circuit_mapper: Optional algorithm reference for the circuit mapper.
+            unitary_builder: Optional algorithm reference for the unitary builder.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits)
+        super().__init__(num_bits=num_bits, circuit_mapper=circuit_mapper, unitary_builder=unitary_builder)
         self._settings = QdkIterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
