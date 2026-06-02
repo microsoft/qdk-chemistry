@@ -97,24 +97,27 @@ circuit = state_prep.run(wfn_cas)
 # 7. Create and run IQPE with nested algorithm settings
 from qdk_chemistry.data import AlgorithmRef
 
-iqpe = create("phase_estimation", "iterative", shots_per_bit=10)
+iqpe = create("phase_estimation", "iterative", shots_per_bit=3)
 
 # 8. Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
-iqpe.settings().set(
+iqpe_circuit_builder = AlgorithmRef(
     "qpe_circuit_builder",
-    AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_iterative",
-        num_bits=10,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder", "trotter", order=2, time=0.1
-        ),
+    "qdk_iterative",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
+    ),
+    unitary_builder=AlgorithmRef(
+        "hamiltonian_unitary_builder", "trotter", order=2, time=0.1
     ),
 )
 iqpe.settings().set(
+    "qpe_circuit_builder",
+    iqpe_circuit_builder,
+)
+iqpe.settings().set(
     "circuit_executor",
-    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=42),
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
 )
 
 result = iqpe.run(
