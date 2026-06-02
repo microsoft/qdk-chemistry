@@ -124,7 +124,7 @@ class TestIterativeQpeCircuitBuilder:
         """Validate that IterativeQpeCircuitBuilder.run produces one circuit per phase bit."""
         builder = QdkIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -152,7 +152,7 @@ class TestIterativeQpeCircuitBuilder:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
         builder = QdkIterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -181,7 +181,7 @@ class TestIterativeQpeCircuitBuilder:
             num_iteration=iteration,
         )
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -220,7 +220,7 @@ class TestIterativeQpeCircuitBuilder:
 
         builder = QdkIterativeQpeCircuitBuilder(num_bits=4)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(

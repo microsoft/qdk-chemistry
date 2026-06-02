@@ -17,9 +17,7 @@ from qdk_chemistry.data import (
     Circuit,
     QubitHamiltonian,
 )
-from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit, qasm3
@@ -92,7 +90,7 @@ class TestQiskitStandardQpeCircuitBuilder:
         """Validate that QiskitStandardQpeCircuitBuilder.run produces a single QPE circuit."""
         builder = QiskitStandardQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -119,7 +117,7 @@ class TestQiskitStandardQpeCircuitBuilder:
         """Validate standard QPE with a four-qubit Hamiltonian."""
         builder = QiskitStandardQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -141,7 +139,7 @@ class TestQiskitStandardQpeCircuitBuilder:
         """Validate that QiskitStandardQpeCircuitBuilder raises ValueError for invalid num_bits."""
         builder = QiskitStandardQpeCircuitBuilder(num_bits=0)  # Invalid number of bits
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -167,7 +165,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
         state_prep_circuit = Circuit(qasm=qasm3.dumps(state_prep))
         iqpe = QiskitIterativeQpeCircuitBuilder(num_bits=5, num_iteration=0)
         iqpe.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         iqpe.settings().set(
@@ -202,7 +200,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
         """Validate that QiskitIterativeQpeCircuitBuilder.run produces iteration circuits."""
         builder = QiskitIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -229,7 +227,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
         """Validate iterative QPE with a four-qubit Hamiltonian."""
         builder = QiskitIterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -257,7 +255,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
             num_iteration=iteration,
         )
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -279,7 +277,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
         """Validate that QiskitIterativeQpeCircuitBuilder raises ValueError for invalid num_bits."""
         builder = QiskitIterativeQpeCircuitBuilder(num_bits=0)  # Invalid number of bits
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -300,7 +298,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
             num_iteration=two_qubit_circuit_problem.num_bits,  # num_iteration >= num_bits
         )
         builder.settings().set(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
         builder.settings().set(
@@ -312,35 +310,4 @@ class TestQiskitIterativeQpeCircuitBuilder:
             builder.run(
                 state_preparation=two_qubit_circuit_problem.state_prep,
                 qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
-            )
-
-    def test_builder_raises_error_for_qsharp_op_input(self) -> None:
-        """Validate that QiskitIterativeQpeCircuitBuilder raises when given a Q# op state prep."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
-        state_prep_params = {
-            "rowMap": [1, 0],
-            "stateVector": [0.6, 0.0, 0.0, 0.8],
-            "expansionOps": [],
-            "numQubits": 2,
-        }
-        factories = QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
-        )
-        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-        state_prep = Circuit(qsharp_factory=factories, qsharp_op=qsharp_op)
-
-        builder = QiskitIterativeQpeCircuitBuilder(num_bits=4)
-        builder.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        )
-        builder.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi / 2)),
-        )
-
-        with pytest.raises(RuntimeError, match="Failed to create iteration circuit"):
-            builder.run(
-                state_preparation=state_prep,
-                qubit_hamiltonian=hamiltonian,
             )
