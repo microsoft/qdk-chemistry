@@ -18,6 +18,7 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
+#include <variant>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -266,9 +267,9 @@ class SymmetryBlockedTensor
       // producer/symmetry-dependent (permutational packing), so only require a
       // non-empty single-column vector here.
       if (block.cols() != 1 || block.size() == 0) {
-        throw std::invalid_argument(
-            "SymmetryBlockedTensor rank-" + std::to_string(Rank) +
-            " block must be a non-empty flat vector.");
+        throw std::invalid_argument("SymmetryBlockedTensor rank-" +
+                                    std::to_string(Rank) +
+                                    " block must be a non-empty flat vector.");
       }
     }
   }
@@ -331,5 +332,22 @@ extern template class SymmetryBlockedTensor<1, std::complex<double>>;
 extern template class SymmetryBlockedTensor<2, std::complex<double>>;
 extern template class SymmetryBlockedTensor<3, std::complex<double>>;
 extern template class SymmetryBlockedTensor<4, std::complex<double>>;
+
+/**
+ * @brief Variant of real- and complex-valued @ref SymmetryBlockedTensor at a
+ * fixed rank.
+ *
+ * Mirrors the @ref ContainerTypes::MatrixVariant / @ref
+ * ContainerTypes::VectorVariant pattern: API surfaces that need to expose
+ * either a real or a complex symmetry-blocked tensor (e.g. spin-dependent
+ * RDMs from a complex wavefunction) return this alias and let consumers
+ * dispatch with @c std::visit or @c std::holds_alternative.
+ *
+ * @tparam Rank Tensor rank (1, 2, 3, or 4 are instantiated).
+ */
+template <std::size_t Rank>
+using SymmetryBlockedTensorVariant =
+    std::variant<SymmetryBlockedTensor<Rank, double>,
+                 SymmetryBlockedTensor<Rank, std::complex<double>>>;
 
 }  // namespace qdk::chemistry::data

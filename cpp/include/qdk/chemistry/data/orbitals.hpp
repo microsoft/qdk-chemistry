@@ -84,7 +84,8 @@ class Orbitals : public SingleParticleBasis,
            const std::optional<UnrestrictedCASIndices>& indices = std::nullopt);
 
   /**
-   * @brief Constructor from symmetry-blocked storage primitives (SymmetryBlockedTensor).
+   * @brief Constructor from symmetry-blocked storage primitives
+   * (SymmetryBlockedTensor).
    *
    * This is the preferred construction path: it builds an Orbitals object
    * directly from the symmetry-blocked containers, without going through the

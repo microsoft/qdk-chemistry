@@ -424,20 +424,20 @@ bool WavefunctionContainer::has_two_rdm_spin_traced() const {
 
 // ---- SBT-native RDM builders and accessors --------------------------------
 
-void WavefunctionContainer::_build_one_rdm_sbt() const {
-  if (_one_rdm_sbt) return;
-  if (!has_one_rdm_spin_dependent()) return;
+namespace {
 
-  const auto& [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
+// Helper: build a rank-2 SymmetryBlockedTensor<Scalar> active 1-RDM from two
+// dense blocks (aa, bb) using the given symmetry, alpha/beta labels, and
+// per-label extent. Aliases beta to alpha when restricted.
+template <class Scalar>
+SymmetryBlockedTensor<2, Scalar> _make_active_one_rdm_sbt_block(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& aa,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& bb,
+    bool restricted) {
+  using SBT = SymmetryBlockedTensor<2, Scalar>;
+  using Block = Tensor<2, Scalar>;
 
-  // Only build SBT for real-valued RDMs
-  if (!std::holds_alternative<Eigen::MatrixXd>(aa_var)) return;
-
-  const auto& aa = std::get<Eigen::MatrixXd>(aa_var);
-  const auto& bb = std::get<Eigen::MatrixXd>(bb_var);
   std::size_t n = static_cast<std::size_t>(aa.rows());
-
-  bool restricted = get_orbitals()->is_restricted();
   auto sym = std::make_shared<const Symmetries>(
       Symmetries({axes::spin(0, restricted)}));
 
@@ -448,41 +448,35 @@ void WavefunctionContainer::_build_one_rdm_sbt() const {
   ext[alpha_label] = n;
   ext[beta_label] = n;
 
-  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {sym, sym};
-  SymmetryBlockedTensor<2>::ExtentsArray extents = {ext, ext};
+  typename SBT::SymmetriesArray symmetries = {sym, sym};
+  typename SBT::ExtentsArray extents = {ext, ext};
 
-  auto aa_block = std::make_shared<const Eigen::MatrixXd>(aa);
-  SymmetryBlockedTensor<2>::BlockMap blocks;
+  auto aa_block = std::make_shared<const Block>(aa);
+  typename SBT::BlockMap blocks;
   blocks[{alpha_label, alpha_label}] = aa_block;
 
   if (!restricted) {
-    blocks[{beta_label, beta_label}] =
-        std::make_shared<const Eigen::MatrixXd>(bb);
+    blocks[{beta_label, beta_label}] = std::make_shared<const Block>(bb);
   }
 
-  _one_rdm_sbt = std::make_shared<const SymmetryBlockedTensor<2>>(
-      std::move(symmetries), std::move(extents), std::move(blocks));
+  return SBT(std::move(symmetries), std::move(extents), std::move(blocks));
 }
 
-void WavefunctionContainer::_build_two_rdm_sbt() const {
-  if (_two_rdm_sbt) return;
-  if (!has_two_rdm_spin_dependent()) return;
+// Helper: build a rank-4 SymmetryBlockedTensor<Scalar> active 2-RDM from the
+// flat (aaaa, aabb, bbbb) spin-dependent channels.
+template <class Scalar>
+SymmetryBlockedTensor<4, Scalar> _make_active_two_rdm_sbt_block(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& aaaa,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& aabb,
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, 1>& bbbb, bool restricted) {
+  using SBT = SymmetryBlockedTensor<4, Scalar>;
+  using Block = Tensor<4, Scalar>;
 
-  const auto& [aabb_var, aaaa_var, bbbb_var] =
-      get_active_two_rdm_spin_dependent();
-
-  if (!std::holds_alternative<Eigen::VectorXd>(aaaa_var)) return;
-
-  const auto& aaaa = std::get<Eigen::VectorXd>(aaaa_var);
-  const auto& aabb = std::get<Eigen::VectorXd>(aabb_var);
-  const auto& bbbb = std::get<Eigen::VectorXd>(bbbb_var);
-
-  // Infer n_active from aaaa size (norb^4)
+  // Infer n_active from aaaa size (norb^4).
   std::size_t n4 = static_cast<std::size_t>(aaaa.size());
   std::size_t n = 1;
   while (n * n * n * n < n4) ++n;
 
-  bool restricted = get_orbitals()->is_restricted();
   auto sym = std::make_shared<const Symmetries>(
       Symmetries({axes::spin(0, restricted)}));
 
@@ -493,70 +487,131 @@ void WavefunctionContainer::_build_two_rdm_sbt() const {
   ext[a] = n;
   ext[b] = n;
 
-  SymmetryBlockedTensor<4>::SymmetriesArray symmetries = {sym, sym, sym, sym};
-  SymmetryBlockedTensor<4>::ExtentsArray extents = {ext, ext, ext, ext};
+  typename SBT::SymmetriesArray symmetries = {sym, sym, sym, sym};
+  typename SBT::ExtentsArray extents = {ext, ext, ext, ext};
 
-  auto aaaa_block = std::make_shared<const Eigen::VectorXd>(aaaa);
-  auto aabb_block = std::make_shared<const Eigen::VectorXd>(aabb);
-
-  SymmetryBlockedTensor<4>::BlockMap blocks;
-  blocks[{a, a, a, a}] = aaaa_block;
-  blocks[{a, a, b, b}] = aabb_block;
+  typename SBT::BlockMap blocks;
+  blocks[{a, a, a, a}] = std::make_shared<const Block>(aaaa);
+  blocks[{a, a, b, b}] = std::make_shared<const Block>(aabb);
 
   if (!restricted) {
-    blocks[{b, b, b, b}] = std::make_shared<const Eigen::VectorXd>(bbbb);
+    blocks[{b, b, b, b}] = std::make_shared<const Block>(bbbb);
   }
 
-  _two_rdm_sbt = std::make_shared<const SymmetryBlockedTensor<4>>(
-      std::move(symmetries), std::move(extents), std::move(blocks));
+  return SBT(std::move(symmetries), std::move(extents), std::move(blocks));
 }
 
-const SymmetryBlockedTensor<2>& WavefunctionContainer::one_rdm() const {
+}  // namespace
+
+void WavefunctionContainer::_build_active_one_rdm_sbt() const {
+  if (_active_one_rdm_sbt) return;
+  if (!has_one_rdm_spin_dependent()) return;
+
+  const auto& [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
+  bool restricted = get_orbitals()->is_restricted();
+
+  // Dispatch on the scalar type held by the spin-dependent variant and build
+  // the matching real or complex SymmetryBlockedTensor inside the variant.
+  if (std::holds_alternative<Eigen::MatrixXd>(aa_var)) {
+    const auto& aa = std::get<Eigen::MatrixXd>(aa_var);
+    const auto& bb = std::get<Eigen::MatrixXd>(bb_var);
+    _active_one_rdm_sbt =
+        std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+            std::in_place_type<SymmetryBlockedTensor<2, double>>,
+            _make_active_one_rdm_sbt_block<double>(aa, bb, restricted));
+  } else {
+    const auto& aa = std::get<Eigen::MatrixXcd>(aa_var);
+    const auto& bb = std::get<Eigen::MatrixXcd>(bb_var);
+    _active_one_rdm_sbt =
+        std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+            std::in_place_type<SymmetryBlockedTensor<2, std::complex<double>>>,
+            _make_active_one_rdm_sbt_block<std::complex<double>>(aa, bb,
+                                                                 restricted));
+  }
+}
+
+void WavefunctionContainer::_build_active_two_rdm_sbt() const {
+  if (_active_two_rdm_sbt) return;
+  if (!has_two_rdm_spin_dependent()) return;
+
+  const auto& [aabb_var, aaaa_var, bbbb_var] =
+      get_active_two_rdm_spin_dependent();
+  bool restricted = get_orbitals()->is_restricted();
+
+  if (std::holds_alternative<Eigen::VectorXd>(aaaa_var)) {
+    const auto& aaaa = std::get<Eigen::VectorXd>(aaaa_var);
+    const auto& aabb = std::get<Eigen::VectorXd>(aabb_var);
+    const auto& bbbb = std::get<Eigen::VectorXd>(bbbb_var);
+    _active_two_rdm_sbt =
+        std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+            std::in_place_type<SymmetryBlockedTensor<4, double>>,
+            _make_active_two_rdm_sbt_block<double>(aaaa, aabb, bbbb,
+                                                   restricted));
+  } else {
+    const auto& aaaa = std::get<Eigen::VectorXcd>(aaaa_var);
+    const auto& aabb = std::get<Eigen::VectorXcd>(aabb_var);
+    const auto& bbbb = std::get<Eigen::VectorXcd>(bbbb_var);
+    _active_two_rdm_sbt =
+        std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+            std::in_place_type<SymmetryBlockedTensor<4, std::complex<double>>>,
+            _make_active_two_rdm_sbt_block<std::complex<double>>(
+                aaaa, aabb, bbbb, restricted));
+  }
+}
+
+const SymmetryBlockedTensorVariant<2>& WavefunctionContainer::active_one_rdm()
+    const {
   QDK_LOG_TRACE_ENTERING();
-  _build_one_rdm_sbt();
-  if (!_one_rdm_sbt) {
-    throw std::runtime_error("1-RDM SBT is not available.");
+  _build_active_one_rdm_sbt();
+  if (!_active_one_rdm_sbt) {
+    throw std::runtime_error(
+        "Active 1-RDM symmetry-blocked tensor is not available.");
   }
-  return *_one_rdm_sbt;
+  return *_active_one_rdm_sbt;
 }
 
-const Eigen::MatrixXd& WavefunctionContainer::one_rdm_block(
+ContainerTypes::MatrixVariant WavefunctionContainer::active_one_rdm_block(
     const SymmetryLabel& row, const SymmetryLabel& col) const {
-  return one_rdm().block({row, col});
+  return std::visit(
+      [&](const auto& sbt) -> ContainerTypes::MatrixVariant {
+        // sbt.block({row,col}) returns const Eigen::MatrixX{d,cd}&; the
+        // variant constructor picks the matching alternative.
+        return ContainerTypes::MatrixVariant{sbt.block({row, col})};
+      },
+      active_one_rdm());
 }
 
-bool WavefunctionContainer::has_one_rdm() const {
-  if (_one_rdm_sbt) return true;
-  if (!has_one_rdm_spin_dependent()) return false;
-  // Only available for real-valued RDMs.
-  auto [aa_var, bb_var] = get_active_one_rdm_spin_dependent();
-  (void)bb_var;
-  return std::holds_alternative<Eigen::MatrixXd>(aa_var);
+bool WavefunctionContainer::has_active_one_rdm() const {
+  if (_active_one_rdm_sbt) return true;
+  // Available whenever spin-dependent RDMs exist (real or complex).
+  return has_one_rdm_spin_dependent();
 }
 
-const SymmetryBlockedTensor<4>& WavefunctionContainer::two_rdm() const {
+const SymmetryBlockedTensorVariant<4>& WavefunctionContainer::active_two_rdm()
+    const {
   QDK_LOG_TRACE_ENTERING();
-  _build_two_rdm_sbt();
-  if (!_two_rdm_sbt) {
-    throw std::runtime_error("2-RDM SBT is not available.");
+  _build_active_two_rdm_sbt();
+  if (!_active_two_rdm_sbt) {
+    throw std::runtime_error(
+        "Active 2-RDM symmetry-blocked tensor is not available.");
   }
-  return *_two_rdm_sbt;
+  return *_active_two_rdm_sbt;
 }
 
-const Eigen::VectorXd& WavefunctionContainer::two_rdm_block(
+ContainerTypes::VectorVariant WavefunctionContainer::active_two_rdm_block(
     const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
     const SymmetryLabel& s) const {
-  return two_rdm().block({p, q, r, s});
+  return std::visit(
+      [&](const auto& sbt) -> ContainerTypes::VectorVariant {
+        return ContainerTypes::VectorVariant{sbt.block({p, q, r, s})};
+      },
+      active_two_rdm());
 }
 
-bool WavefunctionContainer::has_two_rdm() const {
-  if (_two_rdm_sbt) return true;
-  if (!has_two_rdm_spin_dependent()) return false;
-  // Only available for real-valued RDMs.
-  auto [aaaa_var, aabb_var, bbbb_var] = get_active_two_rdm_spin_dependent();
-  (void)aabb_var;
-  (void)bbbb_var;
-  return std::holds_alternative<Eigen::VectorXd>(aaaa_var);
+bool WavefunctionContainer::has_active_two_rdm() const {
+  if (_active_two_rdm_sbt) return true;
+  // Available whenever spin-dependent RDMs exist (real or complex).
+  return has_two_rdm_spin_dependent();
 }
 
 // entropies
@@ -723,8 +778,8 @@ void WavefunctionContainer::_clear_rdms() const {
   _two_rdm_spin_dependent_aabb.reset();
   _two_rdm_spin_dependent_aaaa.reset();
   _two_rdm_spin_dependent_bbbb.reset();
-  _one_rdm_sbt.reset();
-  _two_rdm_sbt.reset();
+  _active_one_rdm_sbt.reset();
+  _active_two_rdm_sbt.reset();
 }
 
 void WavefunctionContainer::_serialize_rdms_to_hdf5(H5::Group& group) const {
@@ -1539,6 +1594,39 @@ const Wavefunction::VectorVariant&
 Wavefunction::get_active_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_active_two_rdm_spin_traced();
+}
+
+const SymmetryBlockedTensorVariant<2>& Wavefunction::active_one_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_one_rdm();
+}
+
+Wavefunction::MatrixVariant Wavefunction::active_one_rdm_block(
+    const SymmetryLabel& row, const SymmetryLabel& col) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_one_rdm_block(row, col);
+}
+
+bool Wavefunction::has_active_one_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_active_one_rdm();
+}
+
+const SymmetryBlockedTensorVariant<4>& Wavefunction::active_two_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_two_rdm();
+}
+
+Wavefunction::VectorVariant Wavefunction::active_two_rdm_block(
+    const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
+    const SymmetryLabel& s) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_two_rdm_block(p, q, r, s);
+}
+
+bool Wavefunction::has_active_two_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_active_two_rdm();
 }
 
 bool Wavefunction::has_single_orbital_entropies() const {

@@ -2,11 +2,10 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
-
 #include <H5Cpp.h>
 
 #include <fstream>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -38,8 +37,8 @@ SymmetryBlockedIndexSet::BlockMap SymmetryBlockedIndexSet::_build_block_map(
       }
     }
     if (!aliased) {
-      auto ptr = std::make_shared<const std::vector<std::uint32_t>>(
-          std::move(list));
+      auto ptr =
+          std::make_shared<const std::vector<std::uint32_t>>(std::move(list));
       blocks.emplace(key, ptr);
       built.emplace(key, ptr);
     }
@@ -52,8 +51,7 @@ SymmetryBlockedIndexSet::SymmetryBlockedIndexSet(
     std::unordered_map<SymmetryLabel, std::size_t> extents,
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices)
     : Base(SymmetriesArray{std::move(symmetries)},
-           ExtentsArray{std::move(extents)},
-           _build_block_map(indices)) {
+           ExtentsArray{std::move(extents)}, _build_block_map(indices)) {
   _validate_indices();
 }
 
@@ -128,8 +126,8 @@ void SymmetryBlockedIndexSet::to_json_file(const std::string& filename) const {
 void SymmetryBlockedIndexSet::to_hdf5(H5::Group& group) const {
   H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
   H5::DataSpace scalar_space(H5S_SCALAR);
-  auto dataset = group.createDataSet(detail::k_sbis_hdf5_json_dataset,
-                                      str_type, scalar_space);
+  auto dataset = group.createDataSet(detail::k_sbis_hdf5_json_dataset, str_type,
+                                     scalar_space);
   dataset.write(to_json().dump(), str_type);
 }
 
@@ -152,8 +150,8 @@ void SymmetryBlockedIndexSet::to_file(const std::string& filename,
 
 std::shared_ptr<SymmetryBlockedIndexSet> SymmetryBlockedIndexSet::from_json(
     const nlohmann::json& j) {
-  auto symmetries =
-      std::make_shared<const Symmetries>(Symmetries::from_json(j.at("symmetries")));
+  auto symmetries = std::make_shared<const Symmetries>(
+      Symmetries::from_json(j.at("symmetries")));
 
   std::unordered_map<SymmetryLabel, std::size_t> extents;
   for (const auto& entry : j.at("extents")) {

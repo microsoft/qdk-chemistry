@@ -47,6 +47,15 @@ class SymmetryAxisValue {
 
   /** @brief Serialize this value (subclass payload only). */
   virtual nlohmann::json to_json() const = 0;
+
+  /** @brief Convenience wrapper around @ref equals for symmetry with
+   * sibling types (@ref SymmetryAxis, @ref Symmetries, @ref SymmetryLabel). */
+  bool operator==(const SymmetryAxisValue& other) const {
+    return equals(other);
+  }
+  bool operator!=(const SymmetryAxisValue& other) const {
+    return !equals(other);
+  }
 };
 
 /**

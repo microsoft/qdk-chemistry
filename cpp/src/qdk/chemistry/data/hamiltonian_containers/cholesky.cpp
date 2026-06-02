@@ -343,8 +343,7 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
   SymmetryBlockedTensor<3>::ExtentsArray extents = {mo_ext, mo_ext, aux_ext};
 
   // Validate dimensions before flattening.
-  if (static_cast<std::size_t>(aa.rows()) !=
-      n_active_alpha * n_active_alpha) {
+  if (static_cast<std::size_t>(aa.rows()) != n_active_alpha * n_active_alpha) {
     throw std::invalid_argument(
         "Alpha three-center rows does not match n_active_alpha^2");
   }
@@ -355,8 +354,7 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
   blocks[{alpha_label, alpha_label, aux_label}] = aa_flat;
 
   if (bb != nullptr) {
-    if (static_cast<std::size_t>(bb->rows()) !=
-        n_active_beta * n_active_beta) {
+    if (static_cast<std::size_t>(bb->rows()) != n_active_beta * n_active_beta) {
       throw std::invalid_argument(
           "Beta three-center rows does not match n_active_beta^2");
     }
@@ -405,7 +403,8 @@ const SymmetryBlockedTensor<3>& CholeskyHamiltonianContainer::three_center()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_three_center_sbt) {
-    throw std::runtime_error("Three-center SBT is not set.");
+    throw std::runtime_error(
+        "Three-center symmetry-blocked tensor is not set.");
   }
   return *_three_center_sbt;
 }

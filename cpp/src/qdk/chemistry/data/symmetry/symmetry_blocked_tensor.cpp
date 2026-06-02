@@ -2,9 +2,9 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
-
 #include <H5Cpp.h>
+
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 
 namespace qdk::chemistry::data {
 
@@ -38,7 +38,8 @@ void write_double_dataset(H5::Group& group, const std::string& name,
   auto dataset =
       group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, dataspace);
 
-  std::vector<double> buffer(static_cast<std::size_t>(block.rows() * block.cols()));
+  std::vector<double> buffer(
+      static_cast<std::size_t>(block.rows() * block.cols()));
   std::size_t k = 0;
   for (Eigen::Index r = 0; r < block.rows(); ++r) {
     for (Eigen::Index c = 0; c < block.cols(); ++c) {
@@ -67,7 +68,8 @@ Tensor<Rank, Scalar> make_block_storage(Eigen::Index rows, Eigen::Index cols) {
   }
 }
 
-DoubleDatasetBuffer read_double_dataset(H5::Group& group, const std::string& name) {
+DoubleDatasetBuffer read_double_dataset(H5::Group& group,
+                                        const std::string& name) {
   auto dataset = group.openDataSet(name);
   auto dataspace = dataset.getSpace();
 
@@ -104,15 +106,18 @@ Tensor<Rank, Scalar> block_from_real_buffer(const DoubleDatasetBuffer& buffer) {
 
 template <std::size_t Rank>
 Tensor<Rank, std::complex<double>> block_from_complex_buffers(
-    const DoubleDatasetBuffer& real_buffer, const DoubleDatasetBuffer& imag_buffer,
-    const std::string& real_name, const std::string& imag_name) {
-  if (real_buffer.rows != imag_buffer.rows || real_buffer.cols != imag_buffer.cols) {
-    throw std::runtime_error("SymmetryBlockedTensor complex datasets '" + real_name +
-                             "' and '" + imag_name + "' have mismatched shapes.");
+    const DoubleDatasetBuffer& real_buffer,
+    const DoubleDatasetBuffer& imag_buffer, const std::string& real_name,
+    const std::string& imag_name) {
+  if (real_buffer.rows != imag_buffer.rows ||
+      real_buffer.cols != imag_buffer.cols) {
+    throw std::runtime_error("SymmetryBlockedTensor complex datasets '" +
+                             real_name + "' and '" + imag_name +
+                             "' have mismatched shapes.");
   }
 
-  auto block = make_block_storage<Rank, std::complex<double>>(
-      real_buffer.rows, real_buffer.cols);
+  auto block = make_block_storage<Rank, std::complex<double>>(real_buffer.rows,
+                                                              real_buffer.cols);
   std::size_t k = 0;
   for (Eigen::Index r = 0; r < real_buffer.rows; ++r) {
     for (Eigen::Index c = 0; c < real_buffer.cols; ++c) {
@@ -160,10 +165,9 @@ void SymmetryBlockedTensor<Rank, Scalar>::to_hdf5(H5::Group& group) const {
       block_metadata["real_dataset"] = real_name;
       block_metadata["imag_dataset"] = imag_name;
     } else {
-      write_double_dataset(group, block_name, *pointer_group.ptr,
-                           [](const Scalar& value) {
-                             return static_cast<double>(value);
-                           });
+      write_double_dataset(
+          group, block_name, *pointer_group.ptr,
+          [](const Scalar& value) { return static_cast<double>(value); });
       block_metadata["dataset"] = block_name;
     }
     metadata["blocks"].push_back(std::move(block_metadata));
@@ -184,8 +188,8 @@ std::shared_ptr<SymmetryBlockedTensor<Rank, Scalar>>
 SymmetryBlockedTensor<Rank, Scalar>::from_hdf5(H5::Group& group) {
   if (!group.nameExists(kHdf5MetadataDataset)) {
     if (group.nameExists(kLegacyJsonDataset)) {
-      return from_json(
-          nlohmann::json::parse(read_string_dataset(group, kLegacyJsonDataset)));
+      return from_json(nlohmann::json::parse(
+          read_string_dataset(group, kLegacyJsonDataset)));
     }
     throw std::runtime_error(
         "SymmetryBlockedTensor HDF5 metadata dataset not found.");
@@ -202,7 +206,8 @@ SymmetryBlockedTensor<Rank, Scalar>::from_hdf5(H5::Group& group) {
       utils::is_complex_scalar_v<Scalar> ? "complex" : "real";
   if (metadata.at("scalar").get<std::string>() != expected_scalar) {
     throw std::invalid_argument(
-        "SymmetryBlockedTensor HDF5 scalar type does not match the requested type.");
+        "SymmetryBlockedTensor HDF5 scalar type does not match the requested "
+        "type.");
   }
 
   auto symmetries = Base::_symmetries_from_json(metadata);

@@ -5,9 +5,9 @@
 #include <gtest/gtest.h>
 
 #include <memory>
-#include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <stdexcept>
 
 using namespace qdk::chemistry::data;
 

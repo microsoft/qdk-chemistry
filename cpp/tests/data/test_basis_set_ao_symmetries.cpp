@@ -6,10 +6,10 @@
 
 #include <Eigen/Dense>
 #include <memory>
-#include <stdexcept>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <vector>

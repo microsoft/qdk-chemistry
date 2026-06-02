@@ -75,7 +75,8 @@ CanonicalFourCenterHamiltonianContainer::
         SymmetryBlockedTensor<2> inactive_fock, HamiltonianType type)
     : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
                            std::move(inactive_fock), type),
-      _h2(std::make_shared<const SymmetryBlockedTensor<4>>(std::move(two_body))) {
+      _h2(std::make_shared<const SymmetryBlockedTensor<4>>(
+          std::move(two_body))) {
   QDK_LOG_TRACE_ENTERING();
 
   _init_h2_views();
@@ -296,16 +297,17 @@ void CanonicalFourCenterHamiltonianContainer::_init_h2_views() {
                                         _h2->block_ptr({b, b, b, b}));
 }
 
-const SymmetryBlockedTensor<4>& CanonicalFourCenterHamiltonianContainer::two_body_integrals()
-    const {
+const SymmetryBlockedTensor<4>&
+CanonicalFourCenterHamiltonianContainer::two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_h2) {
-    throw std::runtime_error("Two-body SBT (h2) is not set.");
+    throw std::runtime_error("Two-body symmetry-blocked tensor is not set.");
   }
   return *_h2;
 }
 
-const Eigen::VectorXd& CanonicalFourCenterHamiltonianContainer::two_body_integrals_block(
+const Eigen::VectorXd&
+CanonicalFourCenterHamiltonianContainer::two_body_integrals_block(
     const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
     const SymmetryLabel& s) const {
   return two_body_integrals().block({p, q, r, s});

@@ -149,8 +149,8 @@ class HamiltonianContainer {
    * @brief One-body integral block for the given row/column symmetry labels.
    * @return Const reference to the matrix block.
    */
-  const Eigen::MatrixXd& one_body_integrals_block(const SymmetryLabel& row,
-                                  const SymmetryLabel& col) const;
+  const Eigen::MatrixXd& one_body_integrals_block(
+      const SymmetryLabel& row, const SymmetryLabel& col) const;
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
@@ -341,14 +341,15 @@ class HamiltonianContainer {
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
 
-  /// Build an SymmetryBlockedTensor<2> from dense matrices + symmetries and set non-owning views.
-  void _set_h1_container(const Eigen::MatrixXd& alpha,
-                         const Eigen::MatrixXd* beta);
+  /// Build an SymmetryBlockedTensor<2> from dense matrices + symmetries and set
+  /// non-owning views.
+  void _set_one_body_integrals_container(const Eigen::MatrixXd& alpha,
+                                         const Eigen::MatrixXd* beta);
   void _set_inactive_fock_container(const Eigen::MatrixXd& alpha,
                                     const Eigen::MatrixXd* beta);
 
   /// Derive non-owning views from an existing SymmetryBlockedTensor container.
-  void _init_h1_views();
+  void _init_one_body_integrals_views();
   void _init_inactive_fock_views();
 };
 

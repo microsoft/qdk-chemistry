@@ -4,8 +4,8 @@
 
 #include <gtest/gtest.h>
 
-#include <stdexcept>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <stdexcept>
 
 using namespace qdk::chemistry::data;
 

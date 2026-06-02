@@ -667,10 +667,12 @@ void SparseHamiltonianContainer::_set_h2_sparse_container(TwoBodyMap map) {
       std::move(symmetries), std::move(extents), std::move(blocks));
 }
 
-const SymmetryBlockedSparseMap<4>& SparseHamiltonianContainer::two_body_integrals_sparse()
-    const {
+const SymmetryBlockedSparseMap<4>&
+SparseHamiltonianContainer::two_body_integrals_sparse() const {
   if (!_h2_sparse) {
-    throw std::runtime_error("Sparse two-body SBT (two_body_integrals_sparse) is not set.");
+    throw std::runtime_error(
+        "Sparse two-body symmetry-blocked tensor (two_body_integrals_sparse) "
+        "is not set.");
   }
   return *_h2_sparse;
 }

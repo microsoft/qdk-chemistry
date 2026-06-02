@@ -38,7 +38,7 @@ HamiltonianContainer::HamiltonianContainer(
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
-  _set_h1_container(one_body_integrals, nullptr);
+  _set_one_body_integrals_container(one_body_integrals, nullptr);
   _set_inactive_fock_container(inactive_fock_matrix, nullptr);
 }
 
@@ -57,7 +57,8 @@ HamiltonianContainer::HamiltonianContainer(
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
-  _set_h1_container(one_body_integrals_alpha, &one_body_integrals_beta);
+  _set_one_body_integrals_container(one_body_integrals_alpha,
+                                    &one_body_integrals_beta);
   _set_inactive_fock_container(inactive_fock_matrix_alpha,
                                &inactive_fock_matrix_beta);
 }
@@ -81,7 +82,7 @@ HamiltonianContainer::HamiltonianContainer(
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
-  _init_h1_views();
+  _init_one_body_integrals_views();
   _init_inactive_fock_views();
 }
 
@@ -309,8 +310,8 @@ HamiltonianContainer::make_restricted_inactive_fock_matrix(
 
 // ---- SBT-canonical container builders and view initialisers ----------------
 
-void HamiltonianContainer::_set_h1_container(const Eigen::MatrixXd& alpha,
-                                             const Eigen::MatrixXd* beta) {
+void HamiltonianContainer::_set_one_body_integrals_container(
+    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd* beta) {
   if (alpha.size() == 0) {
     // Empty h1 — set views to empty matrices (no SBT).
     auto empty = std::make_shared<const Eigen::MatrixXd>(alpha);
@@ -345,7 +346,7 @@ void HamiltonianContainer::_set_h1_container(const Eigen::MatrixXd& alpha,
 
   _h1 = std::make_shared<const SymmetryBlockedTensor<2>>(
       std::move(symmetries), std::move(extents), std::move(blocks));
-  _init_h1_views();
+  _init_one_body_integrals_views();
 }
 
 void HamiltonianContainer::_set_inactive_fock_container(
@@ -385,7 +386,7 @@ void HamiltonianContainer::_set_inactive_fock_container(
   _init_inactive_fock_views();
 }
 
-void HamiltonianContainer::_init_h1_views() {
+void HamiltonianContainer::_init_one_body_integrals_views() {
   SymmetryLabel alpha_label({axes::alpha()});
   SymmetryLabel beta_label({axes::beta()});
 
@@ -413,10 +414,11 @@ void HamiltonianContainer::_init_inactive_fock_views() {
 
 // ---- SBT-native accessors --------------------------------------------------
 
-const SymmetryBlockedTensor<2>& HamiltonianContainer::one_body_integrals() const {
+const SymmetryBlockedTensor<2>& HamiltonianContainer::one_body_integrals()
+    const {
   QDK_LOG_TRACE_ENTERING();
   if (!_h1) {
-    throw std::runtime_error("One-body SBT (h1) is not set.");
+    throw std::runtime_error("One-body symmetry-blocked tensor is not set.");
   }
   return *_h1;
 }
@@ -429,7 +431,8 @@ const Eigen::MatrixXd& HamiltonianContainer::one_body_integrals_block(
 const SymmetryBlockedTensor<2>& HamiltonianContainer::inactive_fock() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_inactive_fock_sbt) {
-    throw std::runtime_error("Inactive Fock SBT is not set.");
+    throw std::runtime_error(
+        "Inactive Fock symmetry-blocked tensor is not set.");
   }
   return *_inactive_fock_sbt;
 }

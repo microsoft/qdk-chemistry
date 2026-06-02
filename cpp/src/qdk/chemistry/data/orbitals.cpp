@@ -503,7 +503,8 @@ Orbitals::get_virtual_space_indices() const {
   return {virtual_alpha, virtual_beta};
 }
 
-std::shared_ptr<const SymmetryBlockedIndexSet> Orbitals::active_indices() const {
+std::shared_ptr<const SymmetryBlockedIndexSet> Orbitals::active_indices()
+    const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_indices_sbt && has_active_space()) {
     _build_active_indices_sbt();
@@ -511,8 +512,8 @@ std::shared_ptr<const SymmetryBlockedIndexSet> Orbitals::active_indices() const 
   return _active_indices_sbt;
 }
 
-std::shared_ptr<const SymmetryBlockedIndexSet>
-Orbitals::inactive_indices() const {
+std::shared_ptr<const SymmetryBlockedIndexSet> Orbitals::inactive_indices()
+    const {
   QDK_LOG_TRACE_ENTERING();
   if (!_inactive_indices_sbt && has_inactive_space()) {
     _build_inactive_indices_sbt();
@@ -724,8 +725,8 @@ void Orbitals::_set_coefficient_containers(
       blocks.emplace(SBT2::Labels{b, b}, std::move(coefficients_beta));
     }
     _coefficients_sbt = std::make_shared<const SBT2>(
-        SBT2::SymmetriesArray{ao_sym, sym},
-        SBT2::ExtentsArray{ao_ext, mo_ext}, std::move(blocks));
+        SBT2::SymmetriesArray{ao_sym, sym}, SBT2::ExtentsArray{ao_ext, mo_ext},
+        std::move(blocks));
   }
 
   if (energies_alpha) {
@@ -735,9 +736,9 @@ void Orbitals::_set_coefficient_containers(
     if (!restricted) {
       blocks.emplace(SBT1::Labels{b}, std::move(energies_beta));
     }
-    _energies_sbt = std::make_shared<const SBT1>(
-        SBT1::SymmetriesArray{sym}, SBT1::ExtentsArray{mo_ext},
-        std::move(blocks));
+    _energies_sbt = std::make_shared<const SBT1>(SBT1::SymmetriesArray{sym},
+                                                 SBT1::ExtentsArray{mo_ext},
+                                                 std::move(blocks));
   } else {
     _energies_sbt = nullptr;
   }
@@ -1311,7 +1312,8 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     std::shared_ptr<const SymmetryBlockedTensor<1>> energies_sbt;
     if (group.nameExists("coefficients")) {
       H5::Group coefficients_group = group.openGroup("coefficients");
-      coefficients_sbt = SymmetryBlockedTensor<2>::from_hdf5(coefficients_group);
+      coefficients_sbt =
+          SymmetryBlockedTensor<2>::from_hdf5(coefficients_group);
     }
     if (group.nameExists("energies")) {
       H5::Group energies_group = group.openGroup("energies");
@@ -1378,8 +1380,8 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
       auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
                                                  ao_overlap, basis_set);
       if (has_active_indices) {
-        orbitals->_active_space_indices =
-            {std::move(active_indices_alpha), std::move(active_indices_beta)};
+        orbitals->_active_space_indices = {std::move(active_indices_alpha),
+                                           std::move(active_indices_beta)};
       }
       if (has_inactive_indices) {
         orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
@@ -1567,8 +1569,8 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
       auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
                                                  ao_overlap, basis_set);
       if (has_active_indices) {
-        orbitals->_active_space_indices =
-            {std::move(active_indices_alpha), std::move(active_indices_beta)};
+        orbitals->_active_space_indices = {std::move(active_indices_alpha),
+                                           std::move(active_indices_beta)};
       }
       if (has_inactive_indices) {
         orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),

@@ -84,13 +84,13 @@ class TestSymmetryBlockedTensorRank2:
             [{alpha: 2, beta: 2}, {alpha: 2, beta: 2}],
             [((alpha, alpha), np.zeros((2, 2)))],
         )
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="no block for the requested labels"):
             sbt.block((beta, beta))
 
     def test_extent_mismatch_raises(self, unrestricted_spin):
         """A block whose shape disagrees with extents raises ValueError."""
         syms, alpha, beta = unrestricted_spin
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="block shape does not match extents"):
             sym.SymmetryBlockedTensorRank2(
                 [syms, syms],
                 [{alpha: 3, beta: 3}, {alpha: 3, beta: 3}],
@@ -145,7 +145,7 @@ class TestSymmetryBlockedIndexSet:
     def test_not_sorted_unique_raises(self, restricted_spin):
         """A non-increasing index list raises ValueError."""
         syms, alpha, beta = restricted_spin
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="must be strictly increasing"):
             sym.SymmetryBlockedIndexSet(syms, {alpha: 5, beta: 5}, {alpha: [2, 1]})
 
 

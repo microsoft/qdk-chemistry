@@ -290,30 +290,50 @@ class WavefunctionContainer {
 
   /**
    * @brief Get spin-dependent one-particle RDMs for active orbitals only
+   *
+   * @deprecated Use @ref active_one_rdm() (variant-typed
+   * @ref SymmetryBlockedTensorVariant) instead.
+   *
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active
    * orbitals
    */
+  [[deprecated("Use active_one_rdm() instead")]]
   virtual std::tuple<const MatrixVariant&, const MatrixVariant&>
   get_active_one_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
+   *
+   * @deprecated Use @ref active_two_rdm() (variant-typed
+   * @ref SymmetryBlockedTensorVariant) instead.
+   *
    * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals
    */
+  [[deprecated("Use active_two_rdm() instead")]]
   virtual std::tuple<const VectorVariant&, const VectorVariant&,
-                     const VectorVariant&>
-  get_active_two_rdm_spin_dependent() const;
+                     const VectorVariant&> get_active_two_rdm_spin_dependent()
+      const;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
+   *
+   * @deprecated Use @ref active_one_rdm() and trace over the spin variant
+   * instead.
+   *
    * @return Spin-traced one-particle RDM for active orbitals
    */
+  [[deprecated("Use active_one_rdm() instead")]]
   virtual const MatrixVariant& get_active_one_rdm_spin_traced() const;
 
   /**
    * @brief Get spin-traced two-particle RDM for active orbitals only
+   *
+   * @deprecated Use @ref active_two_rdm() and trace over the spin variant
+   * instead.
+   *
    * @return Spin-traced two-particle RDM for active orbitals
    */
+  [[deprecated("Use active_two_rdm() instead")]]
   virtual const VectorVariant& get_active_two_rdm_spin_traced() const;
 
   /**
@@ -424,47 +444,70 @@ class WavefunctionContainer {
    */
   virtual bool has_two_rdm_spin_traced() const;
 
-  // ---- SymmetryBlockedTensor RDM accessors -------------------------------------------
+  // ---- SymmetryBlockedTensor RDM accessors
+  // -------------------------------------------
 
   /**
-   * @brief Spin-dependent 1-RDM as a rank-2 symmetry-blocked tensor.
-   * Blocks: (αα), (ββ). Restricted aliases β to α.
-   * @return Const reference to the 1-RDM SymmetryBlockedTensor.
+   * @brief Active-space 1-RDM as a rank-2 symmetry-blocked tensor.
+   *
+   * The block structure (label set, per-slot extents, equivalence aliasing) is
+   * determined by the symmetries carried on the associated @ref Orbitals. The
+   * returned @ref SymmetryBlockedTensorVariant holds either the real
+   * (@c SymmetryBlockedTensor<2, double>) or complex
+   * (@c SymmetryBlockedTensor<2, std::complex<double>>) alternative depending
+   * on the scalar type of the underlying RDM.
+   *
+   * @return Const reference to the 1-RDM symmetry-blocked tensor variant.
    * @throws std::runtime_error if not available.
    */
-  const SymmetryBlockedTensor<2>& one_rdm() const;
+  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
 
   /**
-   * @brief 1-RDM block for the given row/column symmetry labels.
+   * @brief Active-space 1-RDM block for the given row/column symmetry labels.
+   *
+   * @return @ref MatrixVariant holding the requested block as either an
+   * @c Eigen::MatrixXd or an @c Eigen::MatrixXcd, matching the scalar type of
+   * the underlying RDM.
    */
-  const Eigen::MatrixXd& one_rdm_block(const SymmetryLabel& row,
-                                       const SymmetryLabel& col) const;
+  MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
+                                     const SymmetryLabel& col) const;
 
   /**
-   * @brief True if spin-dependent 1-RDM SymmetryBlockedTensor is available.
+   * @brief True if the active-space 1-RDM symmetry-blocked tensor is
+   * available (real or complex).
    */
-  bool has_one_rdm() const;
+  bool has_active_one_rdm() const;
 
   /**
-   * @brief Spin-dependent 2-RDM as a rank-4 symmetry-blocked tensor.
-   * Blocks: (αααα), (ααββ), (ββββ) + orbit aliases.
-   * @return Const reference to the 2-RDM SymmetryBlockedTensor.
+   * @brief Active-space 2-RDM as a rank-4 symmetry-blocked tensor.
+   *
+   * The block structure is determined by the symmetries carried on the
+   * associated @ref Orbitals. The returned @ref SymmetryBlockedTensorVariant
+   * holds either the real or complex alternative depending on the scalar
+   * type of the underlying RDM.
+   *
+   * @return Const reference to the 2-RDM symmetry-blocked tensor variant.
    * @throws std::runtime_error if not available.
    */
-  const SymmetryBlockedTensor<4>& two_rdm() const;
+  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
 
   /**
-   * @brief 2-RDM block for the given symmetry labels.
+   * @brief Active-space 2-RDM block for the given symmetry labels.
+   *
+   * @return @ref VectorVariant holding the requested block as either an
+   * @c Eigen::VectorXd or an @c Eigen::VectorXcd, matching the scalar type of
+   * the underlying RDM.
    */
-  const Eigen::VectorXd& two_rdm_block(const SymmetryLabel& p,
-                                       const SymmetryLabel& q,
-                                       const SymmetryLabel& r,
-                                       const SymmetryLabel& s) const;
+  VectorVariant active_two_rdm_block(const SymmetryLabel& p,
+                                     const SymmetryLabel& q,
+                                     const SymmetryLabel& r,
+                                     const SymmetryLabel& s) const;
 
   /**
-   * @brief True if spin-dependent 2-RDM SymmetryBlockedTensor is available.
+   * @brief True if the active-space 2-RDM symmetry-blocked tensor is
+   * available (real or complex).
    */
-  bool has_two_rdm() const;
+  bool has_active_two_rdm() const;
 
   /**
    * @brief Clear cached data to release memory
@@ -580,14 +623,19 @@ class WavefunctionContainer {
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
 
-  // SymmetryBlockedTensor-canonical RDM containers (built eagerly from spin-dependent channels)
-  mutable std::shared_ptr<const SymmetryBlockedTensor<2>> _one_rdm_sbt;
-  mutable std::shared_ptr<const SymmetryBlockedTensor<4>> _two_rdm_sbt;
+  // SymmetryBlockedTensor-canonical active-space RDM containers (built
+  // eagerly from spin-dependent channels).
+  mutable std::shared_ptr<const SymmetryBlockedTensorVariant<2>>
+      _active_one_rdm_sbt;
+  mutable std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
+      _active_two_rdm_sbt;
 
-  /// Build 1-RDM SymmetryBlockedTensor from spin-dependent channels if available.
-  void _build_one_rdm_sbt() const;
-  /// Build 2-RDM SymmetryBlockedTensor from spin-dependent channels if available.
-  void _build_two_rdm_sbt() const;
+  /// Build the active-space 1-RDM SymmetryBlockedTensorVariant from
+  /// spin-dependent channels if available.
+  void _build_active_one_rdm_sbt() const;
+  /// Build the active-space 2-RDM SymmetryBlockedTensorVariant from
+  /// spin-dependent channels if available.
+  void _build_active_two_rdm_sbt() const;
 
   // Orbital entropies
   mutable OrbitalEntropies _entropies;
@@ -896,6 +944,54 @@ class Wavefunction : public DataClass,
    * @return Spin-traced two-particle RDM
    */
   const VectorVariant& get_active_two_rdm_spin_traced() const;
+
+  // ---- SymmetryBlockedTensor RDM accessors --------------------------------
+
+  /**
+   * @brief Active-space 1-RDM as a rank-2 symmetry-blocked tensor variant
+   * (real or complex).
+   *
+   * @see WavefunctionContainer::active_one_rdm
+   */
+  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
+
+  /**
+   * @brief Active-space 1-RDM block for the given row/column symmetry labels.
+   *
+   * @see WavefunctionContainer::active_one_rdm_block
+   */
+  MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
+                                     const SymmetryLabel& col) const;
+
+  /**
+   * @brief True if the active-space 1-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   */
+  bool has_active_one_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM as a rank-4 symmetry-blocked tensor variant
+   * (real or complex).
+   *
+   * @see WavefunctionContainer::active_two_rdm
+   */
+  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM block for the given symmetry labels.
+   *
+   * @see WavefunctionContainer::active_two_rdm_block
+   */
+  VectorVariant active_two_rdm_block(const SymmetryLabel& p,
+                                     const SymmetryLabel& q,
+                                     const SymmetryLabel& r,
+                                     const SymmetryLabel& s) const;
+
+  /**
+   * @brief True if the active-space 2-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   */
+  bool has_active_two_rdm() const;
 
   /**
    * @brief Checks if single-orbital entropies for active orbitals are available

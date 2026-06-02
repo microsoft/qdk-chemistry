@@ -123,9 +123,9 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
    * @return Const reference to the flat-packed vector block.
    */
   const Eigen::VectorXd& two_body_integrals_block(const SymmetryLabel& p,
-                                  const SymmetryLabel& q,
-                                  const SymmetryLabel& r,
-                                  const SymmetryLabel& s) const;
+                                                  const SymmetryLabel& q,
+                                                  const SymmetryLabel& r,
+                                                  const SymmetryLabel& s) const;
 
   /**
    * @brief Get specific two-electron integral element
@@ -211,11 +211,13 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
                     std::shared_ptr<Eigen::VectorXd>>
   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
 
-  /// Build SymmetryBlockedTensor<4> from dense vectors and set non-owning views.
+  /// Build SymmetryBlockedTensor<4> from dense vectors and set non-owning
+  /// views.
   void _set_h2_container(const Eigen::VectorXd& aaaa,
                          const Eigen::VectorXd* aabb,
                          const Eigen::VectorXd* bbbb);
-  /// Derive non-owning views from an existing SymmetryBlockedTensor<4> container.
+  /// Derive non-owning views from an existing SymmetryBlockedTensor<4>
+  /// container.
   void _init_h2_views();
 
   /// Serialization version

@@ -94,9 +94,9 @@ TEST(OrbitalsSbtTest, ActiveInactiveIndexSetsAreBuiltLazilyFromDenseVectors) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(5, 5);
   Orbitals::UnrestrictedCASIndices indices({1, 3}, {0, 4}, {0}, {2});
   auto basis = testing::create_random_basis_set(c.rows());
-  auto orbitals = std::make_shared<Orbitals>(c, c, std::nullopt, std::nullopt,
-                                             std::nullopt, basis,
-                                             std::make_optional(indices));
+  auto orbitals =
+      std::make_shared<Orbitals>(c, c, std::nullopt, std::nullopt, std::nullopt,
+                                 basis, std::make_optional(indices));
 
   auto active = orbitals->active_indices();
   auto inactive = orbitals->inactive_indices();

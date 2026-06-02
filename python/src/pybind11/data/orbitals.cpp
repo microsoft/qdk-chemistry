@@ -859,8 +859,7 @@ Examples:
       "ao_symmetries",
       [](const std::shared_ptr<const SingleParticleBasis> &basis)
           -> std::shared_ptr<const Symmetries> {
-        auto orbitals =
-            std::dynamic_pointer_cast<const Orbitals>(basis);
+        auto orbitals = std::dynamic_pointer_cast<const Orbitals>(basis);
         if (!orbitals || !orbitals->has_basis_set()) {
           return nullptr;
         }

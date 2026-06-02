@@ -2,11 +2,10 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <qdk/chemistry/data/symmetry/symmetry.hpp>
-
 #include <algorithm>
-#include <stdexcept>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/utils/hash.hpp>
+#include <stdexcept>
 #include <utility>
 
 namespace qdk::chemistry::data {
@@ -32,8 +31,8 @@ bool SpinValue::equals(const SymmetryAxisValue& other) const {
 }
 
 std::size_t SpinValue::hash() const {
-  return utils::hash_combine(
-      std::hash<int>{}(static_cast<int>(AxisName::Spin)), _two_ms);
+  return utils::hash_combine(std::hash<int>{}(static_cast<int>(AxisName::Spin)),
+                             _two_ms);
 }
 
 nlohmann::json SpinValue::to_json() const {
@@ -55,8 +54,7 @@ std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
   if (kind == "spin") {
     return SpinValue::from_json(j);
   }
-  throw std::runtime_error(
-      "Unknown symmetry axis value kind '" + kind + "'.");
+  throw std::runtime_error("Unknown symmetry axis value kind '" + kind + "'.");
 }
 
 // ---------------------------------------------------------------------------
@@ -111,8 +109,8 @@ bool SymmetryAxis::operator==(const SymmetryAxis& other) const {
 }
 
 std::size_t SymmetryAxis::hash() const {
-  std::size_t seed =
-      utils::hash_combine(std::hash<int>{}(static_cast<int>(_name)), _equivalent);
+  std::size_t seed = utils::hash_combine(
+      std::hash<int>{}(static_cast<int>(_name)), _equivalent);
   for (const auto& label : _labels) {
     seed = utils::hash_combine(seed, label->hash());
   }
@@ -132,15 +130,14 @@ nlohmann::json SymmetryAxis::to_json() const {
 SymmetryAxis SymmetryAxis::from_json(const nlohmann::json& j) {
   const auto name_str = j.at("name").get<std::string>();
   if (name_str != to_string(AxisName::Spin)) {
-    throw std::runtime_error("Unknown symmetry axis name '" + name_str +
-                                 "'.");
+    throw std::runtime_error("Unknown symmetry axis name '" + name_str + "'.");
   }
   std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
   for (const auto& label_json : j.at("labels")) {
     labels.push_back(symmetry_axis_value_from_json(label_json));
   }
   return SymmetryAxis(AxisName::Spin, std::move(labels),
-                     j.at("equivalent").get<bool>());
+                      j.at("equivalent").get<bool>());
 }
 
 // ---------------------------------------------------------------------------
@@ -173,8 +170,7 @@ const SymmetryAxis& Symmetries::axis(AxisName name) const {
       return axis;
     }
   }
-  throw std::runtime_error("Symmetries has no axis '" + to_string(name) +
-                               "'.");
+  throw std::runtime_error("Symmetries has no axis '" + to_string(name) + "'.");
 }
 
 bool Symmetries::operator==(const Symmetries& other) const {
@@ -210,7 +206,8 @@ Symmetries Symmetries::from_json(const nlohmann::json& j) {
 // ---------------------------------------------------------------------------
 
 std::size_t SymmetryLabel::_compute_hash(
-    const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>& values) {
+    const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>&
+        values) {
   std::size_t seed = 0;
   for (const auto& [axis, value] : values) {
     if (value == nullptr) {
@@ -218,16 +215,16 @@ std::size_t SymmetryLabel::_compute_hash(
           "SymmetryLabel values must not be null pointers.");
     }
     seed = utils::hash_combine(
-        seed, utils::hash_combine(
-                  std::hash<int>{}(static_cast<int>(axis)), value->hash()));
+        seed, utils::hash_combine(std::hash<int>{}(static_cast<int>(axis)),
+                                  value->hash()));
   }
   return seed;
 }
 
 SymmetryLabel::SymmetryLabel(
     std::initializer_list<std::shared_ptr<const SymmetryAxisValue>> values)
-    : SymmetryLabel(std::vector<std::shared_ptr<const SymmetryAxisValue>>(
-          values)) {}
+    : SymmetryLabel(
+          std::vector<std::shared_ptr<const SymmetryAxisValue>>(values)) {}
 
 SymmetryLabel::SymmetryLabel(
     std::vector<std::shared_ptr<const SymmetryAxisValue>> values)
@@ -253,7 +250,7 @@ std::shared_ptr<const SymmetryAxisValue> SymmetryLabel::get(
   auto it = _values.find(axis);
   if (it == _values.end()) {
     throw std::runtime_error("SymmetryLabel carries no value for axis '" +
-                                 to_string(axis) + "'.");
+                             to_string(axis) + "'.");
   }
   return it->second;
 }

@@ -43,9 +43,9 @@ template <std::size_t Rank>
 std::array<SymmetryLabel, Rank> make_labels(
     const std::vector<SymmetryLabel>& values) {
   if (values.size() != Rank) {
-    throw std::invalid_argument(
-        "make_labels: expected " + std::to_string(Rank) + " labels, got " +
-        std::to_string(values.size()));
+    throw std::invalid_argument("make_labels: expected " +
+                                std::to_string(Rank) + " labels, got " +
+                                std::to_string(values.size()));
   }
   return [&]<std::size_t... I>(std::index_sequence<I...>) {
     return std::array<SymmetryLabel, Rank>{values[I]...};
@@ -128,8 +128,7 @@ class SymmetryBlocked : public DataClass {
    */
   bool has_block(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
-      return _blocks.size() == 1 ||
-             _group_by_pointer().size() == 1;
+      return _blocks.size() == 1 || _group_by_pointer().size() == 1;
     }
     return _blocks.find(labels) != _blocks.end();
   }
@@ -155,8 +154,7 @@ class SymmetryBlocked : public DataClass {
   BlockPtr block_ptr(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
       if (_blocks.empty()) {
-        throw std::invalid_argument(
-            "SymmetryBlocked has no blocks.");
+        throw std::invalid_argument("SymmetryBlocked has no blocks.");
       }
       if (_blocks.size() == 1) {
         return _blocks.begin()->second;

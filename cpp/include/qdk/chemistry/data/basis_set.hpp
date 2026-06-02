@@ -553,6 +553,14 @@ class BasisSet : public DataClass,
   /**
    * @brief Symmetry definitions the atomic-orbital basis is blocked under
    *
+   * Returns the AO-basis symmetries. This is distinct from
+   * @ref Orbitals::symmetries(), which returns the MO-basis symmetries — AOs
+   * and MOs live in different single-particle bases and may carry different
+   * symmetry vocabularies (e.g. an intertwiner stored on @ref Orbitals carries
+   * AO symmetries on one slot and MO symmetries on the other). The @c ao_
+   * prefix exists to keep this distinction explicit on classes that touch
+   * both bases.
+   *
    * Defaults to a restricted spin axis (@c axes::spin(1, true)). Override at
    * construction with the AO-symmetries constructor overload.
    *

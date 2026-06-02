@@ -697,7 +697,7 @@ class WavefunctionRealRDMsTest : public ::testing::Test {
  public:
   // helper function to extract spin-dependent one-particle RDM from
   Eigen::MatrixXd extract_one_rdm_spin_from_mixed_two(
-      const Eigen::VectorXd &two_rdm, int norb, int nele_spin) {
+      const Eigen::VectorXd& two_rdm, int norb, int nele_spin) {
     Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Zero(norb, norb);
     for (int p = 0; p < norb; ++p) {
       for (int q = 0; q < norb; ++q) {
@@ -714,7 +714,7 @@ class WavefunctionRealRDMsTest : public ::testing::Test {
 
   // helper function to extract spin-traced one-particle RDM from two-particle
   // RDM
-  Eigen::MatrixXd extract_one_rdm_from_two(const Eigen::VectorXd &two_rdm,
+  Eigen::MatrixXd extract_one_rdm_from_two(const Eigen::VectorXd& two_rdm,
                                            int norb, int nele) {
     Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Zero(norb, norb);
     for (int p = 0; p < norb; ++p) {
@@ -732,8 +732,8 @@ class WavefunctionRealRDMsTest : public ::testing::Test {
 
   // helper function to transpose two-rdm indices
   Eigen::VectorXd transpose_two_rdm_indices(
-      const Eigen::VectorXd &two_rdm, int norb,
-      const std::array<int, 4> &new_order) {
+      const Eigen::VectorXd& two_rdm, int norb,
+      const std::array<int, 4>& new_order) {
     Eigen::VectorXd transposed = Eigen::VectorXd::Zero(two_rdm.size());
     for (int p = 0; p < norb; ++p) {
       for (int q = 0; q < norb; ++q) {
@@ -837,4 +837,163 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
                   std::get<Eigen::MatrixXd>(bb)(i, j), testing::rdm_tolerance);
     }
   }
+}
+
+// ============================================================================
+// Active SymmetryBlockedTensor RDM accessors — variant dispatch (real/complex)
+// ============================================================================
+
+TEST_F(WavefunctionRDMTest, ActiveOneRdmSbtRealVariant) {
+  // Spin-dependent real RDMs -> active_one_rdm() yields the real SBT variant.
+  // base_orbitals is restricted, so both alpha and beta channels share
+  // one_rdm_aa; the SBT auto-aliases beta to alpha.
+  Eigen::VectorXcd coeffs(10);
+  coeffs.setZero();
+  coeffs(0) = std::complex<double>(1.0, 0.0);
+  Wavefunction::DeterminantVector dets(10);
+  for (int i = 0; i < 10; ++i) {
+    dets[i] = Configuration("ud0");
+  }
+
+  auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, base_orbitals, std::nullopt, std::make_optional(one_rdm_aa),
+      std::make_optional(one_rdm_aa), std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt));
+
+  EXPECT_TRUE(wf.has_active_one_rdm());
+  const auto& sbt_var = wf.active_one_rdm();
+  using Sbt2Real = SymmetryBlockedTensor<2, double>;
+  ASSERT_TRUE(std::holds_alternative<Sbt2Real>(sbt_var));
+
+  const auto& sbt = std::get<Sbt2Real>(sbt_var);
+  SymmetryLabel a({axes::alpha()});
+  SymmetryLabel b({axes::beta()});
+  EXPECT_TRUE(sbt.block({a, a}).isApprox(one_rdm_aa));
+  // Restricted: beta block aliases to alpha.
+  EXPECT_TRUE(sbt.block({b, b}).isApprox(one_rdm_aa));
+
+  // active_one_rdm_block() returns MatrixVariant carrying the real block.
+  auto blk_aa = wf.active_one_rdm_block(a, a);
+  ASSERT_TRUE(std::holds_alternative<Eigen::MatrixXd>(blk_aa));
+  EXPECT_TRUE(std::get<Eigen::MatrixXd>(blk_aa).isApprox(one_rdm_aa));
+}
+
+TEST_F(WavefunctionRDMTest, ActiveOneRdmSbtComplexVariant) {
+  // Spin-dependent complex RDMs -> active_one_rdm() yields the complex SBT
+  // variant; block accessor returns Eigen::MatrixXcd through MatrixVariant.
+  // Use unrestricted orbitals so distinct alpha/beta blocks round-trip
+  // separately.
+  auto unrestricted_orbitals =
+      testing::create_test_orbitals(norbs, norbs, false);
+  Eigen::VectorXcd coeffs(10);
+  coeffs.setZero();
+  coeffs(0) = std::complex<double>(1.0, 0.0);
+  Wavefunction::DeterminantVector dets(10);
+  for (int i = 0; i < 10; ++i) {
+    dets[i] = Configuration("ud0");
+  }
+
+  // Build complex spin-dependent 1-RDMs: real diagonal + small imaginary
+  // off-diagonals (Hermitian).
+  Eigen::MatrixXcd one_rdm_aa_c(norbs, norbs);
+  Eigen::MatrixXcd one_rdm_bb_c(norbs, norbs);
+  for (int i = 0; i < norbs; ++i) {
+    for (int j = 0; j < norbs; ++j) {
+      double re = 0.1 * (i + 1) * (j + 1);
+      double im = (i == j) ? 0.0 : 0.01 * (i - j);
+      one_rdm_aa_c(i, j) = std::complex<double>(re, im);
+      one_rdm_bb_c(i, j) = std::complex<double>(0.05 * (i + 1) * (j + 1), -im);
+    }
+  }
+
+  auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, unrestricted_orbitals, std::nullopt,
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant{one_rdm_aa_c}),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant{one_rdm_bb_c}),
+      std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+
+  EXPECT_TRUE(wf.has_active_one_rdm());
+  const auto& sbt_var = wf.active_one_rdm();
+  using Sbt2Cx = SymmetryBlockedTensor<2, std::complex<double>>;
+  ASSERT_TRUE(std::holds_alternative<Sbt2Cx>(sbt_var));
+
+  const auto& sbt = std::get<Sbt2Cx>(sbt_var);
+  SymmetryLabel a({axes::alpha()});
+  SymmetryLabel b({axes::beta()});
+  EXPECT_TRUE(sbt.block({a, a}).isApprox(one_rdm_aa_c));
+  EXPECT_TRUE(sbt.block({b, b}).isApprox(one_rdm_bb_c));
+
+  auto blk_aa = wf.active_one_rdm_block(a, a);
+  ASSERT_TRUE(std::holds_alternative<Eigen::MatrixXcd>(blk_aa));
+  EXPECT_TRUE(std::get<Eigen::MatrixXcd>(blk_aa).isApprox(one_rdm_aa_c));
+}
+
+TEST_F(WavefunctionRDMTest, ActiveTwoRdmSbtComplexVariant) {
+  // Spin-dependent complex 2-RDMs -> active_two_rdm() yields the complex SBT
+  // variant; block accessor returns Eigen::VectorXcd through VectorVariant.
+  // Use unrestricted orbitals so all three blocks (aaaa, aabb, bbbb) round-
+  // trip distinctly.
+  auto unrestricted_orbitals =
+      testing::create_test_orbitals(norbs, norbs, false);
+  Eigen::VectorXcd coeffs(10);
+  coeffs.setZero();
+  coeffs(0) = std::complex<double>(1.0, 0.0);
+  Wavefunction::DeterminantVector dets(10);
+  for (int i = 0; i < 10; ++i) {
+    dets[i] = Configuration("ud0");
+  }
+
+  // Complex 1-RDMs (required so the spin-dependent path is populated).
+  Eigen::MatrixXcd one_aa_c(norbs, norbs);
+  Eigen::MatrixXcd one_bb_c(norbs, norbs);
+  for (int i = 0; i < norbs; ++i) {
+    for (int j = 0; j < norbs; ++j) {
+      one_aa_c(i, j) =
+          std::complex<double>(0.1 * (i + 1) * (j + 1), 0.005 * (i - j));
+      one_bb_c(i, j) =
+          std::complex<double>(0.05 * (i + 1) * (j + 1), -0.005 * (i - j));
+    }
+  }
+  // Complex 2-RDM channels of consistent shape (norbs^4).
+  int n4 = norbs * norbs * norbs * norbs;
+  Eigen::VectorXcd two_aaaa_c(n4);
+  Eigen::VectorXcd two_aabb_c(n4);
+  Eigen::VectorXcd two_bbbb_c(n4);
+  for (int i = 0; i < n4; ++i) {
+    two_aaaa_c(i) = std::complex<double>(0.005 * (i + 1), 0.001 * (i - 1));
+    two_aabb_c(i) = std::complex<double>(0.01 * (i + 1), -0.001 * (i + 1));
+    two_bbbb_c(i) = std::complex<double>(0.002 * (i + 1), 0.0005 * (i + 1));
+  }
+
+  auto wf = Wavefunction(std::make_unique<CasWavefunctionContainer>(
+      coeffs, dets, unrestricted_orbitals, std::nullopt,
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant{one_aa_c}),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant{one_bb_c}),
+      std::nullopt,
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant{two_aabb_c}),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant{two_aaaa_c}),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant{two_bbbb_c})));
+
+  EXPECT_TRUE(wf.has_active_two_rdm());
+  const auto& sbt_var = wf.active_two_rdm();
+  using Sbt4Cx = SymmetryBlockedTensor<4, std::complex<double>>;
+  ASSERT_TRUE(std::holds_alternative<Sbt4Cx>(sbt_var));
+
+  const auto& sbt = std::get<Sbt4Cx>(sbt_var);
+  SymmetryLabel a({axes::alpha()});
+  SymmetryLabel b({axes::beta()});
+  EXPECT_TRUE(sbt.block({a, a, a, a}).isApprox(two_aaaa_c));
+  EXPECT_TRUE(sbt.block({a, a, b, b}).isApprox(two_aabb_c));
+  EXPECT_TRUE(sbt.block({b, b, b, b}).isApprox(two_bbbb_c));
+
+  auto blk_aaaa = wf.active_two_rdm_block(a, a, a, a);
+  ASSERT_TRUE(std::holds_alternative<Eigen::VectorXcd>(blk_aaaa));
+  EXPECT_TRUE(std::get<Eigen::VectorXcd>(blk_aaaa).isApprox(two_aaaa_c));
 }

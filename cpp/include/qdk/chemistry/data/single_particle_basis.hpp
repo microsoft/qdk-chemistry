@@ -17,9 +17,10 @@ namespace qdk::chemistry::data {
  * @brief Abstract base for objects describing a single-particle (orbital)
  * basis.
  *
- * A single-particle basis exposes the symmetry definitions its modes are blocked
- * under, the per-label mode extents, and the total number of modes. Concrete
- * subclasses (e.g. @ref Orbitals) supply the actual coefficient/energy data.
+ * A single-particle basis exposes the symmetry definitions its modes are
+ * blocked under, the per-label mode extents, and the total number of modes.
+ * Concrete subclasses (e.g. @ref Orbitals) supply the actual coefficient/energy
+ * data.
  *
  * This abstraction lets consumers that only need the symmetry-blocked layout of
  * a one-particle space operate on any such space without depending on a

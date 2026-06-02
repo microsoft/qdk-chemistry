@@ -123,10 +123,10 @@ Note:
 )");
 
   // HamiltonianContainer methods (read-only accessors)
-  hamiltonian_container.def(
-      "get_one_body_integrals", &HamiltonianContainer::get_one_body_integrals,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("get_one_body_integrals",
+                            &HamiltonianContainer::get_one_body_integrals,
+                            py::return_value_policy::reference_internal,
+                            R"(
 Deprecated: use one_body_integrals() instead.
 
 Returns:
@@ -158,11 +158,10 @@ Returns:
 )",
       py::arg("i"), py::arg("j"), py::arg("channel") = SpinChannel::aa);
 
-  hamiltonian_container.def(
-      "get_inactive_fock_matrix",
-      &HamiltonianContainer::get_inactive_fock_matrix,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("get_inactive_fock_matrix",
+                            &HamiltonianContainer::get_inactive_fock_matrix,
+                            py::return_value_policy::reference_internal,
+                            R"(
 Deprecated: use inactive_fock() instead.
 
 Returns:
@@ -179,19 +178,20 @@ Returns:
 )");
 
   // SBT-native accessors
-  hamiltonian_container.def(
-      "one_body_integrals", &HamiltonianContainer::one_body_integrals, py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("one_body_integrals",
+                            &HamiltonianContainer::one_body_integrals,
+                            py::return_value_policy::reference_internal,
+                            R"(
 One-body integrals as a rank-2 symmetry-blocked tensor.
 
 Returns:
     SymmetryBlockedTensorRank2Real: The h1 SBT.
 )");
 
-  hamiltonian_container.def(
-      "one_body_integrals_block", &HamiltonianContainer::one_body_integrals_block,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("one_body_integrals_block",
+                            &HamiltonianContainer::one_body_integrals_block,
+                            py::return_value_policy::reference_internal,
+                            R"(
 One-body integral block for the given row/column symmetry labels.
 
 Args:
@@ -201,22 +201,22 @@ Args:
 Returns:
     numpy.ndarray: The matrix block.
 )",
-      py::arg("row"), py::arg("col"));
+                            py::arg("row"), py::arg("col"));
 
-  hamiltonian_container.def(
-      "inactive_fock", &HamiltonianContainer::inactive_fock,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("inactive_fock",
+                            &HamiltonianContainer::inactive_fock,
+                            py::return_value_policy::reference_internal,
+                            R"(
 Inactive Fock matrix as a rank-2 symmetry-blocked tensor.
 
 Returns:
     SymmetryBlockedTensorRank2Real: The inactive Fock SBT.
 )");
 
-  hamiltonian_container.def(
-      "inactive_fock_block", &HamiltonianContainer::inactive_fock_block,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian_container.def("inactive_fock_block",
+                            &HamiltonianContainer::inactive_fock_block,
+                            py::return_value_policy::reference_internal,
+                            R"(
 Inactive Fock block for the given row/column symmetry labels.
 
 Args:
@@ -226,7 +226,7 @@ Args:
 Returns:
     numpy.ndarray: The matrix block.
 )",
-      py::arg("row"), py::arg("col"));
+                            py::arg("row"), py::arg("col"));
 
   bind_getter_as_property(hamiltonian_container, "get_orbitals",
                           &HamiltonianContainer::get_orbitals,
@@ -448,11 +448,10 @@ Returns:
 )");
 
   // Two-body integral access (lazily computed from three-center integrals)
-  cholesky_container.def(
-      "get_two_body_integrals",
-      &CholeskyHamiltonianContainer::get_two_body_integrals,
-      py::return_value_policy::reference_internal,
-      R"(
+  cholesky_container.def("get_two_body_integrals",
+                         &CholeskyHamiltonianContainer::get_two_body_integrals,
+                         py::return_value_policy::reference_internal,
+                         R"(
 Deprecated: use three_center() instead.
 
 Returns:
@@ -498,10 +497,10 @@ Returns:
 )");
 
   // SBT-native three-center accessor
-  cholesky_container.def(
-      "three_center", &CholeskyHamiltonianContainer::three_center,
-      py::return_value_policy::reference_internal,
-      R"(
+  cholesky_container.def("three_center",
+                         &CholeskyHamiltonianContainer::three_center,
+                         py::return_value_policy::reference_internal,
+                         R"(
 Three-center integrals as a rank-2 symmetry-blocked tensor.
 
 Row axis keyed by MO spin symmetries (extent = norb^2 per spin),
@@ -704,7 +703,8 @@ Returns:
 
   // SBT-native h2 accessors
   canonical_four_center.def(
-      "two_body_integrals", &CanonicalFourCenterHamiltonianContainer::two_body_integrals,
+      "two_body_integrals",
+      &CanonicalFourCenterHamiltonianContainer::two_body_integrals,
       py::return_value_policy::reference_internal,
       R"(
 Two-body integrals as a rank-4 symmetry-blocked tensor.
@@ -714,7 +714,8 @@ Returns:
 )");
 
   canonical_four_center.def(
-      "two_body_integrals_block", &CanonicalFourCenterHamiltonianContainer::two_body_integrals_block,
+      "two_body_integrals_block",
+      &CanonicalFourCenterHamiltonianContainer::two_body_integrals_block,
       py::return_value_policy::reference_internal,
       R"(
 Two-body integral block for the given symmetry labels.
@@ -853,10 +854,10 @@ Args:
       py::arg("type") = HamiltonianType::Hermitian);
 
   // -- Base-class overrides --
-  sparse_container.def(
-      "get_two_body_integrals", &SparseHamiltonianContainer::get_two_body_integrals,
-      py::return_value_policy::reference_internal,
-      R"(
+  sparse_container.def("get_two_body_integrals",
+                       &SparseHamiltonianContainer::get_two_body_integrals,
+                       py::return_value_policy::reference_internal,
+                       R"(
 Deprecated: use h2_sparse() instead.
 
 Get two-electron integrals as dense vectors for all spin channels.
@@ -1018,10 +1019,10 @@ Examples:
                   py::arg("container"));
 
   // One-body integral access
-  hamiltonian.def(
-      "get_one_body_integrals", &Hamiltonian::get_one_body_integrals,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian.def("get_one_body_integrals",
+                  &Hamiltonian::get_one_body_integrals,
+                  py::return_value_policy::reference_internal,
+                  R"(
 Deprecated: use the underlying container's one_body_integrals() instead.
 
 Returns:
@@ -1061,10 +1062,10 @@ Returns:
                   py::arg("channel") = SpinChannel::aa);
 
   // Two-body integral access
-  hamiltonian.def(
-      "get_two_body_integrals", &Hamiltonian::get_two_body_integrals,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian.def("get_two_body_integrals",
+                  &Hamiltonian::get_two_body_integrals,
+                  py::return_value_policy::reference_internal,
+                  R"(
 Deprecated: use the underlying container's two_body_integrals() instead when available.
 
 Returns:
@@ -1142,10 +1143,10 @@ Returns:
     bool: True if inactive Fock matrix has been set
 )");
 
-  hamiltonian.def(
-      "get_inactive_fock_matrix", &Hamiltonian::get_inactive_fock_matrix,
-      py::return_value_policy::reference_internal,
-      R"(
+  hamiltonian.def("get_inactive_fock_matrix",
+                  &Hamiltonian::get_inactive_fock_matrix,
+                  py::return_value_policy::reference_internal,
+                  R"(
 Deprecated: use the underlying container's inactive_fock() instead.
 
 Returns:

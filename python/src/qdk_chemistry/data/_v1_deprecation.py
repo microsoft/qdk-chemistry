@@ -5,6 +5,11 @@ Python DeprecationWarning at call time.  It is imported by data/__init__.py
 so the warnings fire regardless of how users import the classes.
 """
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import warnings
 from typing import Any
 
@@ -51,15 +56,19 @@ def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
         prop_name = None
 
     if prop_name:
+        # Narrow prop_name to a non-Optional local so the default-argument
+        # binding below has a concrete `str` type for mypy.
+        prop_name_str: str = prop_name
         # Properties live on the base class and propagate via Python MRO
         # (unlike pybind11 methods). Check the class itself AND its bases.
         for klass in cls.__mro__:
-            existing = klass.__dict__.get(prop_name)
+            existing = klass.__dict__.get(prop_name_str)
             if existing is not None and isinstance(existing, property):
+
                 def prop_wrapper(
                     self: Any,
                     _orig: Any = original,
-                    _pn: str = prop_name,
+                    _pn: str = prop_name_str,
                     _cls: type = cls,
                     _repl: str = replacement,
                 ) -> Any:
@@ -71,13 +80,12 @@ def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
                     bound = _orig.__get__(self, type(self)) if hasattr(_orig, "__get__") else _orig
                     return bound()
 
-                setattr(klass, prop_name, property(prop_wrapper, doc=existing.__doc__))
+                setattr(klass, prop_name_str, property(prop_wrapper, doc=existing.__doc__))
                 break
 
 
 def _install_deprecation_warnings() -> None:
     """Patch all deprecated v1 accessors to emit DeprecationWarning."""
-
     # -- HamiltonianContainer base methods --
     _wrap_deprecated(HamiltonianContainer, "get_one_body_integrals", "one_body_integrals()")
     _wrap_deprecated(HamiltonianContainer, "get_inactive_fock_matrix", "inactive_fock()")
@@ -94,9 +102,7 @@ def _install_deprecation_warnings() -> None:
     _wrap_deprecated(SparseHamiltonianContainer, "get_two_body_integrals", "two_body_integrals_sparse()")
 
     # -- Hamiltonian wrapper --
-    _wrap_deprecated(
-        Hamiltonian, "get_one_body_integrals", "get_container().one_body_integrals()"
-    )
+    _wrap_deprecated(Hamiltonian, "get_one_body_integrals", "get_container().one_body_integrals()")
     _wrap_deprecated(
         Hamiltonian,
         "get_two_body_integrals",
@@ -105,7 +111,7 @@ def _install_deprecation_warnings() -> None:
     _wrap_deprecated(Hamiltonian, "get_inactive_fock_matrix", "get_container().inactive_fock()")
 
     # -- WavefunctionContainer (abstract, but used via Wavefunction.get_container()) --
-    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_dependent", "one_rdm()")
-    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_dependent", "two_rdm()")
-    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_traced", "one_rdm()")
-    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_traced", "two_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_dependent", "active_one_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_dependent", "active_two_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_traced", "active_one_rdm()")
+    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_traced", "active_two_rdm()")
