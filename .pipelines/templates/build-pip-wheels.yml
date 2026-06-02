@@ -43,6 +43,11 @@ parameters:
   default: 'None'
 
 steps:
+- script: |
+    set -x
+    uname -a
+  displayName: Display system information
+
 - checkout: self
   persistCredentials: true
   path: qdk-chemistry
