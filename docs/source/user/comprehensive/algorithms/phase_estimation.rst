@@ -186,7 +186,7 @@ See :doc:`qpe_circuit_builder` for configuring:
 Standard QFT-based phase estimation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"qiskit_standard"``
+.. rubric:: Factory name: ``"standard"``
 
 The standard :term:`QPE` algorithm :cite:`Nielsen-Chuang2010-QPE` uses a register of :math:`n` ancilla qubits to extract all phase bits simultaneously.
 The circuit structure consists of:

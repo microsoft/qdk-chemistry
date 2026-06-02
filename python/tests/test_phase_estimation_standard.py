@@ -219,6 +219,7 @@ def test_standard_phase_estimation_four_qubit(
     )
 
 
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_standard_qpe_initialization() -> None:
     """Test StandardPhaseEstimation initialization with qiskit_standard circuit builder."""
     shots = 100
@@ -238,3 +239,34 @@ def test_standard_qpe_initialization() -> None:
     circuit_builder_ref = qpe.settings().get("qpe_circuit_builder")
     assert circuit_builder_ref is not None
     assert isinstance(circuit_builder_ref, AlgorithmRef)
+
+
+def test_standard_qpe_rejects_iterative_circuit_builder(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Verify standard phase estimation raises TypeError when configured with iterative circuit builder."""
+    qpe_circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",  # Iterative circuit builder - should fail with Standard QPE
+        num_bits=two_qubit_phase_problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time
+        ),
+    )
+    qpe = StandardPhaseEstimation(shots=two_qubit_phase_problem.shots)
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
+
+    # Should raise TypeError when trying to run with iterative circuit builder
+    with pytest.raises(
+        TypeError,
+        match="Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder",
+    ):
+        qpe.run(
+            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+            state_preparation=two_qubit_phase_problem.state_prep,
+        )
