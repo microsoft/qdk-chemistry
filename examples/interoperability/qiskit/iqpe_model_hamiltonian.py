@@ -81,7 +81,9 @@ iqpe_1.settings().set(
         "qpe_circuit_builder",
         "qiskit_iterative",
         num_bits=PHASE_BITS_1,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
         unitary_builder=AlgorithmRef(
             "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_1
         ),
@@ -162,7 +164,9 @@ iqpe_2.settings().set(
         "qpe_circuit_builder",
         "qiskit_iterative",
         num_bits=PHASE_BITS_2,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
         unitary_builder=AlgorithmRef(
             "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_2
         ),

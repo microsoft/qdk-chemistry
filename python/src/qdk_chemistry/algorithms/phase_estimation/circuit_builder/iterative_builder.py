@@ -50,8 +50,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         num_bits: int = -1,
         phase_correction: float = 0.0,
         num_iteration: int = -1,
-        circuit_mapper: AlgorithmRef | None = None,
         unitary_builder: AlgorithmRef | None = None,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
     ):
         """Initialize the IterativeQpeCircuitBuilder.
 
@@ -59,12 +59,14 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
-            circuit_mapper: Optional algorithm reference for the circuit mapper.
             unitary_builder: Optional algorithm reference for the unitary builder.
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, circuit_mapper=circuit_mapper, unitary_builder=unitary_builder)
+        super().__init__(
+            num_bits=num_bits, controlled_circuit_mapper=controlled_circuit_mapper, unitary_builder=unitary_builder
+        )
         self._settings = QdkIterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)

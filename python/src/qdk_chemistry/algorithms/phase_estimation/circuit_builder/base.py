@@ -43,7 +43,7 @@ class QpeCircuitBuilderSettings(Settings):
             AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
         )
         self._set_default(
-            "circuit_mapper",
+            "controlled_circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
@@ -56,14 +56,14 @@ class QpeCircuitBuilder(Algorithm):
         self,
         num_bits: int = -1,
         unitary_builder: AlgorithmRef | None = None,
-        circuit_mapper: AlgorithmRef | None = None,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
     ):
         """Initialize the QpeCircuitBuilder with default settings.
 
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             unitary_builder: Optional algorithm reference for the unitary builder.
-            circuit_mapper: Optional algorithm reference for the circuit mapper.
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
 
         """
         super().__init__()
@@ -71,8 +71,8 @@ class QpeCircuitBuilder(Algorithm):
         self._settings.set("num_bits", num_bits)
         if unitary_builder is not None:
             self._settings.set("unitary_builder", unitary_builder)
-        if circuit_mapper is not None:
-            self._settings.set("circuit_mapper", circuit_mapper)
+        if controlled_circuit_mapper is not None:
+            self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def type_name(self) -> str:
         """Return the algorithm type name as qpe_circuit_builder."""
@@ -117,7 +117,7 @@ class QpeCircuitBuilder(Algorithm):
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("circuit_mapper")
+        circuit_mapper = self._create_nested("controlled_circuit_mapper")
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 

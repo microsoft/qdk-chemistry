@@ -34,7 +34,7 @@ class PhaseEstimationSettings(Settings):
         self._set_default(
             "qpe_circuit_builder",
             "algorithm_ref",
-            AlgorithmRef("qpe_circuit_builder", "iterative"),
+            AlgorithmRef("qpe_circuit_builder", "qdk_iterative"),
         )
         self._set_default(
             "circuit_executor",

@@ -49,7 +49,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         self,
         num_bits: int = -1,
         qft_do_swaps: bool = True,
-        circuit_mapper: AlgorithmRef | None = None,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
         unitary_builder: AlgorithmRef | None = None,
     ):
         """Initialize QiskitStandardQpeCircuitBuilder with the given settings.
@@ -57,12 +57,14 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         Args:
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             qft_do_swaps: Whether to apply swap gates in the QFT. Defaults to True.
-            circuit_mapper: Optional algorithm reference for the circuit mapper.
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             unitary_builder: Optional algorithm reference for the unitary builder.
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits, circuit_mapper=circuit_mapper, unitary_builder=unitary_builder)
+        super().__init__(
+            num_bits=num_bits, controlled_circuit_mapper=controlled_circuit_mapper, unitary_builder=unitary_builder
+        )
         self._settings = QiskitStandardQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("qft_do_swaps", qft_do_swaps)
@@ -197,6 +199,8 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         num_bits: int = -1,
         phase_correction: float = 0.0,
         num_iteration: int = -1,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
+        unitary_builder: AlgorithmRef | None = None,
     ):
         """Initialize QiskitIterativeQpeCircuitBuilder with the given settings.
 
@@ -204,10 +208,14 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             phase_correction: The accumulated phase feedback from prior iterations. Default to 0.0.
             num_iteration: The specific iteration to build. Default to -1 (build all iterations).
+            controlled_circuit_mapper: AlgorithmRef | None = None,
+            unitary_builder: AlgorithmRef | None = None,
 
         """
         Logger.trace_entering()
-        super().__init__(num_bits=num_bits)
+        super().__init__(
+            num_bits=num_bits, controlled_circuit_mapper=controlled_circuit_mapper, unitary_builder=unitary_builder
+        )
         self._settings = QiskitIterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
@@ -285,21 +293,13 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
-        num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
         ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power)
-
-        if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
-            return self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
-            )
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
             return self._create_circuit_from_qiskit(state_preparation, ctrl_unitary_circuit, phase_correction)
 
-        raise RuntimeError(
-            "Failed to create iteration circuit: Q# operations or Qiskit dependencies are not available."
-        )
+        raise RuntimeError("Failed to create iteration circuit without circuit interoperable Qiskit circuits.")
 
     def _create_circuit_from_qiskit(
         self, state_preparation: Circuit, controlled_unitary_circuit: Circuit, phase_correction: float

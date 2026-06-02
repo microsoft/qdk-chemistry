@@ -57,7 +57,6 @@ class StandardPhaseEstimation(PhaseEstimation):
         """Initialize the standard phase estimation routine.
 
         Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
             shots: The number of shots to execute the circuit.
 
         """
@@ -86,14 +85,14 @@ class StandardPhaseEstimation(PhaseEstimation):
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
-        builder = self._create_nested("qpe_circuit_builder")
-        if not isinstance(builder, StandardQpeCircuitBuilder):
+        circuit_builder = self._create_nested("qpe_circuit_builder")
+        if not isinstance(circuit_builder, StandardQpeCircuitBuilder):
             raise TypeError(
                 f"Expected qpe_circuit_builder to be an instance of StandardQpeCircuitBuilder, "
-                f"but got {type(builder)} instead."
+                f"but got {type(circuit_builder)} instead."
             )
-        num_bits = builder.settings().get("num_bits")
-        circuits = builder.run(
+        num_bits = circuit_builder.settings().get("num_bits")
+        circuits = circuit_builder.run(
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
         )
@@ -105,7 +104,7 @@ class StandardPhaseEstimation(PhaseEstimation):
         dominant_bitstring = max(counts, key=counts.get)
         raw_phase = int(dominant_bitstring, 2) / (2**num_bits)
 
-        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         if isinstance(unitary_builder, TimeEvolutionBuilder):
             evolution_time = unitary_builder.settings().get("time")
             return QpeResult.from_phase_fraction(

@@ -22,41 +22,37 @@ qpe = create("phase_estimation", "standard")
 # Configure iterative phase estimation
 from qdk_chemistry.data import AlgorithmRef
 
-iqpe = create("phase_estimation", "iterative")
-iqpe.settings().set("shots_per_bit", 10)
-iqpe.settings().set(
+# Create iterative qpe circuit builder
+iqpe_circuit_builder = AlgorithmRef(
     "qpe_circuit_builder",
-    AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_iterative",
-        num_bits=10,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder", "trotter", time=0.1
-        ),
+    "qdk_iterative",
+    num_bits=10,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
     ),
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
 )
+iqpe = create("phase_estimation", "iterative", shots_per_bit=10)
+iqpe.settings().set("qpe_circuit_builder", iqpe_circuit_builder)
 # end-cell-configure-iqpe
 ################################################################################
 
 ################################################################################
 # start-cell-configure-standard
 # Configure standard QFT-based phase estimation
+qpe_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qiskit_standard",
+    num_bits=10,
+    qft_do_swaps=True,
+    controlled_circuit_mapper=AlgorithmRef(
+        "controlled_circuit_mapper", "pauli_sequence"
+    ),
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
+)
 qpe = create("phase_estimation", "standard")
 qpe.settings().set("shots", 100)
-qpe.settings().set(
-    "qpe_circuit_builder",
-    AlgorithmRef(
-        "qpe_circuit_builder",
-        "qiskit_standard",
-        num_bits=10,
-        qft_do_swaps=True,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder", "trotter", time=0.1
-        ),
-    ),
-)
+qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
 ################################################################################
 

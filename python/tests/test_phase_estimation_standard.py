@@ -1,4 +1,4 @@
-"""Tests for iterative phase estimation algorithms."""
+"""Tests for standard phase estimation algorithms."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,24 +12,16 @@ from dataclasses import dataclass
 import numpy as np
 import pytest
 
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder
-from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     QpeResult,
-    QuantumErrorProfile,
     QubitHamiltonian,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.phase import (
-    accumulated_phase_from_bits,
-    energy_from_phase,
-    iterative_phase_feedback_update,
-    phase_fraction_from_feedback,
-)
+from qdk_chemistry.utils.phase import energy_from_phase
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -54,33 +46,36 @@ class PhaseEstimationProblem:
     expected_phase: float
     expected_energy: float
     expected_bitstring: str
-    shots_iterative: int
-    shots_traditional: int
+    shots: int
 
 
 @pytest.fixture
 def two_qubit_phase_problem() -> PhaseEstimationProblem:
     """Return the two-qubit phase estimation scenario used in documentation."""
     hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
-    state_vector = [0.6, 0.0, 0.0, 0.8]
-    state_prep_params = {"rowMap": [1, 0], "stateVector": state_vector, "expansionOps": [], "numQubits": 2}
+    state_prep_params = {
+        "rowMap": [1, 0],
+        "stateVector": [0.6, 0.0, 0.0, 0.8],
+        "expansionOps": [],
+        "numQubits": 2,
+    }
     factories = QsharpFactoryData(
         program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
     )
     qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+    state_prep = Circuit(qsharp_factory=factories, qsharp_op=qsharp_op)
 
     return PhaseEstimationProblem(
         label="two_qubit_reference",
         hamiltonian=hamiltonian,
-        state_prep=Circuit(qsharp_factory=factories, qsharp_op=qsharp_op),
+        state_prep=state_prep,
         evolution_time=float(np.pi / 2.0),
         num_bits=4,
         expected_bits=[1, 1, 0, 0],
         expected_phase=0.1875,
         expected_energy=0.75,
         expected_bitstring="1101",
-        shots_iterative=3,
-        shots_traditional=3,
+        shots=3,
     )
 
 
@@ -112,135 +107,41 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
         expected_phase=45 / 64,
         expected_energy=-4.75,
         expected_bitstring="010011",
-        shots_iterative=3,
-        shots_traditional=3,
+        shots=3,
     )
 
 
-def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
-    """Execute iterative phase estimation and return structured results.
+def _run_standard(problem: PhaseEstimationProblem) -> QpeResult:
+    """Execute standard QPE and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
 
     Returns:
-        :class:`QpeResult` instance summarizing the iterative run.
+        :class:`QpeResult` instance summarizing the standard run.
 
     """
-    state_prep_circuit = problem.state_prep
-    iqpe = IterativePhaseEstimation(num_bits=problem.num_bits, shots_per_bit=problem.shots_iterative)
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    qpe_circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_standard",
+        num_bits=problem.num_bits,
+        qft_do_swaps=True,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
     )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
-    )
-
-    return iqpe.run(
-        qubit_hamiltonian=problem.hamiltonian,
-        state_preparation=state_prep_circuit,
-    )
-
-
-def _run_traditional(problem: PhaseEstimationProblem) -> QpeResult:
-    """Execute traditional QPE and return structured results.
-
-    Args:
-        problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
-
-    Returns:
-        :class:`QpeResult` instance summarizing the traditional run.
-
-    """
-    qpe = StandardPhaseEstimation(num_bits=problem.num_bits, shots=problem.shots_traditional)
+    qpe = StandardPhaseEstimation(shots=problem.shots)
     qpe.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
     )
     qpe.settings().set(
         "qpe_circuit_builder",
-        AlgorithmRef("qpe_circuit_builder", "qiskit_standard"),
-    )
-    qpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    qpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
+        qpe_circuit_builder,
     )
 
     return qpe.run(
         qubit_hamiltonian=problem.hamiltonian,
         state_preparation=problem.state_prep,
-    )
-
-
-def _run_iterative_with_parameters(
-    pauli_strings: list[str],
-    coefficients: list[float],
-    state_vector: np.ndarray,
-    *,
-    evolution_time: float,
-    num_bits: int,
-    shots_per_bit: int,
-    seed: int,
-) -> QpeResult:
-    """Execute iterative phase estimation for a custom Hamiltonian/state pair.
-
-    Args:
-        pauli_strings: List of Pauli strings defining the Hamiltonian.
-        coefficients: List of coefficients defining the Hamiltonian.
-        state_vector: Initial state amplitudes for the system register.
-        evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
-        num_bits: Number of iterative QPE rounds executed.
-        shots_per_bit: Number of simulator shots per iteration circuit.
-        seed: PRNG seed for the simulator.
-        reference_energy: Optional reference energy used to resolve alias branches.
-
-    Returns:
-        :class:`QpeResult` capturing the iterative estimation outcome.
-
-    """
-    assert len(pauli_strings) == len(coefficients)
-
-    hamiltonian = QubitHamiltonian(pauli_strings=pauli_strings, coefficients=coefficients)
-    num_qubits = int(np.log2(len(state_vector)))
-
-    state_prep_params = {
-        "rowMap": list(range(num_qubits - 1, -1, -1)),
-        "stateVector": state_vector.tolist(),
-        "expansionOps": [],
-        "numQubits": num_qubits,
-    }
-    qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
-    qsharp_factories = QsharpFactoryData(
-        program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_prep_params
-    )
-
-    iqpe = IterativePhaseEstimation(num_bits=num_bits, shots_per_bit=shots_per_bit)
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=seed),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
-    )
-
-    return iqpe.run(
-        qubit_hamiltonian=hamiltonian,
-        state_preparation=Circuit(qsharp_factory=qsharp_factories, qsharp_op=qsharp_op),
     )
 
 
@@ -268,14 +169,17 @@ def _resolve_phase_ambiguity(
     return phase_fraction_candidates[index], energies[index]
 
 
-def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Verify the iterative algorithm recovers the expected phase and energy."""
-    result = _run_iterative(two_qubit_phase_problem)
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+def test_standard_phase_estimation_extracts_phase_and_energy(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Verify standard phase estimation recovers expected phase and energy."""
+    result = _run_standard(two_qubit_phase_problem)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
     )
 
-    assert list(result.bits_msb_first or []) == two_qubit_phase_problem.expected_bits
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
     assert np.isclose(
         resolved_phase,
         two_qubit_phase_problem.expected_phase,
@@ -291,57 +195,16 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Confirm iterative and traditional algorithms produce consistent estimates."""
-    iterative_result = _run_iterative(two_qubit_phase_problem)
-    traditional_result = _run_traditional(two_qubit_phase_problem)
-
-    iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
-        iterative_result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
-    )
-    qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
-        two_qubit_phase_problem.evolution_time,
-        two_qubit_phase_problem.expected_energy,
-    )
-
-    assert traditional_result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
-    assert np.isclose(
-        iqpe_resolved_phase,
-        two_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        two_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_phase,
-        qpe_resolved_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        qpe_resolved_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-
-def test_iterative_phase_estimation_four_qubit_phase_and_energy(
+def test_standard_phase_estimation_four_qubit(
     four_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
-    """Validate phase and energy estimates on the documented four-qubit case."""
-    result = _run_iterative(four_qubit_phase_problem)
+    """Validate standard phase estimation on the four-qubit benchmark."""
+    result = _run_standard(four_qubit_phase_problem)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
     )
 
-    assert list(result.bits_msb_first or []) == four_qubit_phase_problem.expected_bits
+    assert result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
     assert np.isclose(
         resolved_phase,
         four_qubit_phase_problem.expected_phase,
@@ -356,309 +219,22 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Ensure iterative and traditional approaches agree for four qubits."""
-    iterative_result = _run_iterative(four_qubit_phase_problem)
-    traditional_result = _run_traditional(four_qubit_phase_problem)
+def test_standard_qpe_initialization() -> None:
+    """Test StandardPhaseEstimation initialization with qiskit_standard circuit builder."""
+    shots = 100
+    num_bits = 10
+    qpe = StandardPhaseEstimation(shots=shots)
 
-    iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
-        iterative_result.phase_fraction,
-        four_qubit_phase_problem.evolution_time,
-        four_qubit_phase_problem.expected_energy,
-    )
-    qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
-        four_qubit_phase_problem.evolution_time,
-        four_qubit_phase_problem.expected_energy,
+    # Verify basic settings
+    assert qpe._settings.get("shots") == shots
+
+    # Configure with qiskit_standard circuit builder
+    qpe.settings().set(
+        "qpe_circuit_builder",
+        AlgorithmRef("qpe_circuit_builder", "qiskit_standard", num_bits=num_bits, qft_do_swaps=True),
     )
 
-    assert traditional_result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
-    assert np.isclose(
-        iqpe_resolved_phase,
-        four_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        four_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_phase,
-        qpe_resolved_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        qpe_resolved_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-
-def test_iterative_phase_estimation_non_commuting_xi_plus_zz() -> None:
-    """Validate IQPE for H = 0.519 XI + ZZ with Hartree-Fock-like trial state."""
-    pauli_strings = ["XI", "ZZ"]
-    coefficients = [0.519, 1.0]
-    state_vector = np.array([0.97, 0.0, np.sqrt(1 - 0.97**2), 0.0], dtype=float)
-
-    result = _run_iterative_with_parameters(
-        pauli_strings,
-        coefficients,
-        state_vector,
-        evolution_time=np.pi / 4,
-        num_bits=6,
-        shots_per_bit=3,
-        seed=_SEED,
-    )
-
-    assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 0]
-    assert np.isclose(
-        result.phase_fraction, 0.140625, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
-    )
-    assert np.isclose(result.raw_energy, 1.125, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance)
-
-
-def test_iterative_phase_estimation_second_non_commuting_example() -> None:
-    """Validate IQPE for H = -0.0289(X1+X2) + 0.0541(Z1+Z2) + 0.0150 XX + 0.0590 ZZ."""
-    pauli_strings = ["XI", "IX", "ZI", "IZ", "XX", "ZZ"]
-    coefficients = [-0.0289, -0.0289, 0.0541, 0.0541, 0.0150, 0.059]
-    state_vector = np.array([0.0, 0.47, 0.47, 0.75], dtype=float)
-    state_vector /= np.linalg.norm(state_vector)
-
-    result = _run_iterative_with_parameters(
-        pauli_strings,
-        coefficients,
-        state_vector,
-        evolution_time=np.pi / 4,
-        num_bits=11,
-        shots_per_bit=3,
-        seed=_SEED,
-    )
-
-    assert list(result.bits_msb_first or []) == [1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1]
-    assert np.isclose(
-        result.phase_fraction, 0.988770, rtol=float_comparison_relative_tolerance, atol=qpe_phase_fraction_tolerance
-    )
-    assert np.isclose(
-        result.raw_energy, -0.08984375, rtol=float_comparison_relative_tolerance, atol=qpe_energy_tolerance
-    )
-
-
-def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Integration test showing NoiseModel impact on iterative phase estimation accuracy."""
-    # Run noiseless QPE
-    noiseless_result = _run_iterative(two_qubit_phase_problem)
-
-    # Verify noiseless case matches expected values
-    assert noiseless_result.bits_msb_first is not None
-    assert list(noiseless_result.bits_msb_first) == two_qubit_phase_problem.expected_bits
-    assert np.isclose(
-        noiseless_result.phase_fraction,
-        two_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        noiseless_result.raw_energy,
-        two_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-    # Create noise model with depolarizing error
-    error_rate = 0.05
-    error_profile = QuantumErrorProfile(
-        name="qpe_noise_test",
-        description="Depolarizing noise for QPE integration test",
-        errors={
-            "cx": {"depolarizing_error": error_rate},
-            "rz": {"depolarizing_error": error_rate},
-            "h": {"depolarizing_error": error_rate},
-            "s": {"depolarizing_error": error_rate},
-        },
-    )
-    iqpe = IterativePhaseEstimation(
-        num_bits=two_qubit_phase_problem.num_bits,
-        shots_per_bit=two_qubit_phase_problem.shots_iterative,
-    )
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
-    noisy_result = iqpe.run(
-        state_preparation=two_qubit_phase_problem.state_prep,
-        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        noise=error_profile,
-    )
-
-    # Verify that noisy results deviate from expected values and noiseless results
-    assert noisy_result.bits_msb_first is not None
-    assert not np.isclose(
-        noisy_result.phase_fraction,
-        two_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert not np.isclose(
-        noisy_result.raw_energy,
-        two_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert not np.isclose(
-        noisy_result.phase_fraction,
-        noiseless_result.phase_fraction,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert not np.isclose(
-        noisy_result.raw_energy,
-        noiseless_result.raw_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-
-def test_update_phase_feedback_with_bit_zero() -> None:
-    """Test phase feedback update when measured bit is 0."""
-    current_phase = np.pi / 4
-    new_phase = iterative_phase_feedback_update(current_phase, 0)
-
-    # When bit is 0, phase should be halved
-    assert np.isclose(new_phase, current_phase / 2, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_zero() -> None:
-    """Test phase fraction calculation from zero feedback."""
-    phase_fraction = phase_fraction_from_feedback(0.0)
-    assert np.isclose(phase_fraction, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_fraction_from_feedback_in_valid_range() -> None:
-    """Test phase fraction calculation from feedback in valid range."""
-    feedback = np.pi / 2
-    phase_fraction = phase_fraction_from_feedback(feedback)
-
-    # Should be in range [0, 1)
-    assert 0.0 <= phase_fraction < 1.0
-
-
-def test_phase_feedback_from_bits_empty() -> None:
-    """Test phase feedback calculation from empty bit sequence."""
-    phase_feedback = accumulated_phase_from_bits([])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_single_zero() -> None:
-    """Test phase feedback calculation from single zero bit."""
-    phase_feedback = accumulated_phase_from_bits([0])
-    assert np.isclose(phase_feedback, 0.0, rtol=float_comparison_relative_tolerance)
-
-
-def test_phase_feedback_from_bits_multiple() -> None:
-    """Test phase feedback calculation from multiple bits."""
-    bits = [1, 0, 1, 1]
-    phase_feedback = accumulated_phase_from_bits(bits)
-
-    # Verify it's equivalent to accumulated phase
-    expected = accumulated_phase_from_bits(bits)
-    assert np.isclose(phase_feedback, expected, rtol=float_comparison_relative_tolerance)
-
-
-def test_iterative_qpe_initialization() -> None:
-    """Test IterativePhaseEstimation initialization."""
-    num_bits = 6
-    shots_per_bit = 10
-
-    iqpe = IterativePhaseEstimation(num_bits=num_bits, shots_per_bit=shots_per_bit)
-
-    assert iqpe._settings.get("num_bits") == num_bits
-    assert iqpe._settings.get("shots_per_bit") == shots_per_bit
-
-
-def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Test that IQPE raises ValueError when num_bits is negative."""
-    iqpe = IterativePhaseEstimation(num_bits=-1, shots_per_bit=3)
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
-    )
-
-    with pytest.raises(ValueError, match="Number of bits to estimate must be positive"):
-        iqpe.run(
-            state_preparation=two_qubit_phase_problem.state_prep,
-            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        )
-
-
-def test_raises_not_implemented_for_non_time_evolution_builder(
-    two_qubit_phase_problem: PhaseEstimationProblem,
-) -> None:
-    """IQPE raises NotImplementedError when unitary_builder is not a TimeEvolutionBuilder."""
-
-    class _MockBuilder(HamiltonianUnitaryBuilder):
-        """A non-TimeEvolutionBuilder for testing the unsupported path."""
-
-        def _run_impl(self, qubit_hamiltonian: QubitHamiltonian):  # noqa: ARG002
-            return None
-
-        def name(self):
-            return "mock"
-
-        def type_name(self):
-            return "mock_unitary_builder"
-
-    iqpe = IterativePhaseEstimation(
-        num_bits=two_qubit_phase_problem.num_bits,
-        shots_per_bit=two_qubit_phase_problem.shots_iterative,
-    )
-    iqpe.settings().set(
-        "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_phase_problem.evolution_time),
-    )
-
-    # Patch _create_nested to return the mock builder for "unitary_builder"
-    mock_builder = _MockBuilder()
-    original_create_nested = iqpe._create_nested
-
-    def _patched_create_nested(key, **kwargs):
-        if key == "unitary_builder":
-            return mock_builder
-        return original_create_nested(key, **kwargs)
-
-    iqpe._create_nested = _patched_create_nested
-
-    with pytest.raises(NotImplementedError, match="only supports post-processing from time evolution"):
-        iqpe.run(
-            state_preparation=two_qubit_phase_problem.state_prep,
-            qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
-        )
+    # Verify circuit builder is set
+    circuit_builder_ref = qpe.settings().get("qpe_circuit_builder")
+    assert circuit_builder_ref is not None
+    assert isinstance(circuit_builder_ref, AlgorithmRef)

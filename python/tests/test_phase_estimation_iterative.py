@@ -8,7 +8,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -36,10 +35,6 @@ from .reference_tolerances import (
     qpe_phase_fraction_tolerance,
 )
 
-if TYPE_CHECKING:
-    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
-        QdkIterativeQpeCircuitBuilder,
-    )
 _SEED = 42
 
 
@@ -57,7 +52,6 @@ class PhaseEstimationProblem:
     expected_energy: float
     expected_bitstring: str
     shots_iterative: int
-    shots_traditional: int
 
 
 @pytest.fixture
@@ -82,7 +76,6 @@ def two_qubit_phase_problem() -> PhaseEstimationProblem:
         expected_energy=0.75,
         expected_bitstring="1101",
         shots_iterative=3,
-        shots_traditional=3,
     )
 
 
@@ -115,19 +108,16 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
         expected_energy=-4.75,
         expected_bitstring="010011",
         shots_iterative=3,
-        shots_traditional=3,
     )
 
 
-def create_iterative_circuit_builder_algorithm_ref(
-    num_bits: int, evolution_time: float
-) -> QdkIterativeQpeCircuitBuilder:
+def create_iterative_circuit_builder_algorithm_ref(num_bits: int, evolution_time: float) -> AlgorithmRef:
     """Return the default iterative circuit builder instance."""
     return AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_iterative",
         num_bits=num_bits,
-        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
     )
 
@@ -475,7 +465,7 @@ def test_iterative_qpe_raises_on_negative_num_bits(two_qubit_phase_problem: Phas
             "qpe_circuit_builder",
             "qdk_iterative",
             num_bits=-1,
-            circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
         ),
     )

@@ -339,7 +339,7 @@ class TestQiskitIterativeQpeCircuitBuilder:
             AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi / 2)),
         )
 
-        with pytest.raises(AttributeError):
+        with pytest.raises(RuntimeError, match="Failed to create iteration circuit"):
             builder.run(
                 state_preparation=state_prep,
                 qubit_hamiltonian=hamiltonian,
