@@ -99,10 +99,23 @@ echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report "$PYTHON_DIR/manifest/testenv.component-detection-pip-report.json" \
     -r "$PYTHON_DIR/manifest/requirements.txt"
-echo "------------------ testenv pip report (CG input) ------------------"
-cat "$PYTHON_DIR/manifest/testenv.component-detection-pip-report.json"
+
+# Snapshot the conda side of testenv into a CG-detectable lockfile. The
+# CondaLockComponentDetector only ingests `conda-lock.json` / `*.conda-lock.json`
+# produced by `conda-lock`, so we first export the live env to a YAML spec and
+# then re-resolve it into the JSON lockfile format. We don't pass --platform:
+# each pipeline pool tests a single platform. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/conda.md
+python3 -m pip install conda-lock
+conda env export --name testenv --from-history --no-builds \
+    > "$PYTHON_DIR/manifest/testenv.environment.yml"
+conda-lock lock \
+    --file "$PYTHON_DIR/manifest/testenv.environment.yml" \
+    --lockfile "$PYTHON_DIR/manifest/testenv.conda-lock.json"
+echo "------------------ testenv conda lock (CG input) ------------------"
+cat "$PYTHON_DIR/manifest/testenv.conda-lock.json"
 echo
-echo "--------------------------------------------------------------------"
+echo "-------------------------------------------------------------------"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false

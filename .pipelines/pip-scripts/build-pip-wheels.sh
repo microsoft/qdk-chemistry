@@ -133,10 +133,24 @@ echo "--------------------------------------------------------------------------
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report python/manifest/buildenv.component-detection-pip-report.json \
     -r python/manifest/requirements.txt
-echo "------------------ buildenv pip report (CG input) ------------------"
-cat python/manifest/buildenv.component-detection-pip-report.json
+
+# Snapshot the conda side of buildenv into a CG-detectable lockfile. The
+# CondaLockComponentDetector only ingests `conda-lock.json` / `*.conda-lock.json`
+# produced by `conda-lock`, so we first export the live env to a YAML spec and
+# then re-resolve it into the JSON lockfile format. We don't pass --platform:
+# each pipeline pool builds a single platform, so locking only the current one
+# is exactly what we want. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/conda.md
+python3 -m pip install conda-lock
+conda env export --name buildenv --from-history --no-builds \
+    > python/manifest/buildenv.environment.yml
+conda-lock lock \
+    --file python/manifest/buildenv.environment.yml \
+    --lockfile python/manifest/buildenv.conda-lock.json
+echo "------------------ buildenv conda lock (CG input) ------------------"
+cat python/manifest/buildenv.conda-lock.json
 echo
-echo "---------------------------------------------------------------------"
+echo "--------------------------------------------------------------------"
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
