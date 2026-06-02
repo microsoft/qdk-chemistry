@@ -18,13 +18,30 @@
 namespace qdk::chemistry::data {
 
 /**
- * @brief Set of symmetry-blocked, sorted-unique integer indices.
+ * @brief Sorted-unique integer index subset, blocked by symmetry.
  *
  * A @ref SymmetryBlockedIndexSet describes, for each admissible
  * @ref SymmetryLabel of a single @ref Symmetries, a sorted set of
- * unique indices drawn from @c [0, extent) for that label. It is used to carve
- * out symmetry-respecting subspaces (for example core / active / virtual
- * orbital partitions) of a @ref SymmetryBlockedTensor.
+ * unique indices drawn from @c [0, extent) for that label. The
+ * @em extent is the universe size for that label (e.g. the total number
+ * of α MOs) and is stored separately from the @em indices subset, so
+ * the universe boundary survives serialization even when the subset is
+ * sparse or empty.
+ *
+ * Typical use: carving out symmetry-respecting subspaces
+ * (core / active / virtual orbital partitions) of a
+ * @ref SymmetryBlockedTensor.
+ *
+ * Example — active α = @c {2,3,4} drawn from 10 α MOs:
+ * @code
+ * std::unordered_map<SymmetryLabel, std::size_t> extents;
+ * extents[SymmetryLabel({axes::alpha()})] = 10;           // universe size
+ *
+ * std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices;
+ * indices[SymmetryLabel({axes::alpha()})] = {2u, 3u, 4u}; // chosen subset
+ *
+ * SymmetryBlockedIndexSet active(symmetries, extents, indices);
+ * @endcode
  */
 class SymmetryBlockedIndexSet
     : public SymmetryBlocked<1, std::vector<std::uint32_t>> {
@@ -34,6 +51,19 @@ class SymmetryBlockedIndexSet
   /**
    * @brief Construct from symmetry definitions, per-label extents, and
    * per-label index lists.
+   *
+   * @param symmetries The symmetry definitions this index set is blocked
+   *        under. Determines the admissible @ref SymmetryLabel keys for
+   *        @p extents and @p indices.
+   * @param extents Per-label universe size. @c extents[label] is the
+   *        upper bound (exclusive) of the index range from which the
+   *        @p indices entries for that label are drawn. The extent is
+   *        @b not derived from @c indices[label].size() because the
+   *        subset may be strictly smaller than (or sparser than, or
+   *        empty within) its universe, and the universe boundary must
+   *        survive serialization independently of the chosen subset.
+   * @param indices Per-label chosen subset, sorted strictly increasing.
+   *        Every index must satisfy @c 0 <= idx < extents[label].
    *
    * @throws std::invalid_argument if a label is not admissible under
    *         @p symmetries, lacks a declared extent, or an index list is not
