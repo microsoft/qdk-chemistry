@@ -90,7 +90,7 @@ python3 -m pip install "${WHEEL[0]}[test]"
 # placed next to a setup.py or requirements.txt. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
 echo "------------------ Installed Python packages (testenv) ------------------"
-python3 -m pip freeze --all --exclude qdk_chemistry | tee /tmp/testenv-freeze.txt
+python3 -m pip list --format=freeze --exclude qdk_chemistry | tee /tmp/testenv-freeze.txt
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report "$REPO_ROOT/.pipelines/testenv.component-detection-pip-report.json" \

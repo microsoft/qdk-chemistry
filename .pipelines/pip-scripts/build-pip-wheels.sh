@@ -126,7 +126,7 @@ python3 -m pip install -r .pipelines/requirements.txt
 # placed next to a setup.py or requirements.txt. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
 echo "------------------ Installed Python packages (buildenv) ------------------"
-python3 -m pip freeze --all | tee /tmp/buildenv-freeze.txt
+python3 -m pip list --format=freeze | tee /tmp/buildenv-freeze.txt
 echo "---------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report .pipelines/buildenv.component-detection-pip-report.json \
