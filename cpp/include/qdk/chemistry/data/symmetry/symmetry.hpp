@@ -97,22 +97,49 @@ class SymmetryAxis {
   bool _equivalent;
 
  public:
+  /**
+   * @brief Construct a symmetry axis with the given name, admissible
+   * labels, and equivalence flag.
+   *
+   * @param name        Identifier of the axis (see @ref AxisName).
+   * @param labels      Ordered set of admissible @ref SymmetryAxisValue
+   *                    labels carried by this axis.
+   * @param equivalent  @c true if the labels under this axis share storage
+   *                    (e.g. restricted spin where @f$\alpha@f$ and
+   *                    @f$\beta@f$ alias the same MO coefficients).
+   */
   SymmetryAxis(AxisName name,
                std::vector<std::shared_ptr<const SymmetryAxisValue>> labels,
                bool equivalent);
 
+  /** @brief The identifier of this axis. */
   AxisName name() const;
+
+  /** @brief The ordered list of admissible labels for this axis. */
   const std::vector<std::shared_ptr<const SymmetryAxisValue>>& labels() const;
+
+  /**
+   * @brief Whether labels under this axis share storage (i.e. the
+   * restricted-spin alias).
+   */
   bool equivalent() const;
 
   /** @brief True iff @p value is one of this axis's admissible labels. */
   bool admits(const SymmetryAxisValue& value) const;
 
+  /** @brief Value-equality against another axis (same name, labels, and
+   * equivalence flag). */
   bool operator==(const SymmetryAxis& other) const;
   bool operator!=(const SymmetryAxis& other) const { return !(*this == other); }
+
+  /** @brief Hash consistent with @ref operator==. */
   std::size_t hash() const;
 
+  /** @brief Serialize this axis to JSON. */
   nlohmann::json to_json() const;
+
+  /** @brief Reconstruct a @ref SymmetryAxis from JSON produced by
+   * @ref to_json. */
   static SymmetryAxis from_json(const nlohmann::json& j);
 };
 
@@ -124,11 +151,19 @@ class Symmetries {
   std::vector<SymmetryAxis> _axes;
 
  public:
+  /**
+   * @brief Construct from an ordered list of symmetry axes.
+   *
+   * @param axes The axes this symmetry set is composed of. The order is
+   *             preserved and observable via @ref axes(); axis names must
+   *             be unique.
+   */
   explicit Symmetries(std::vector<SymmetryAxis> axes);
 
   /** @brief Construct a trivial symmetry set with no axes. */
   static Symmetries trivial() { return Symmetries({}); }
 
+  /** @brief The ordered list of axes carried by this symmetry set. */
   const std::vector<SymmetryAxis>& axes() const;
 
   /** @brief True iff an axis with name @p name exists in this set. */
@@ -140,11 +175,19 @@ class Symmetries {
    */
   const SymmetryAxis& axis(AxisName name) const;
 
+  /** @brief Value-equality against another symmetry set (same axes in the
+   * same order). */
   bool operator==(const Symmetries& other) const;
   bool operator!=(const Symmetries& other) const { return !(*this == other); }
+
+  /** @brief Hash consistent with @ref operator==. */
   std::size_t hash() const;
 
+  /** @brief Serialize this symmetry set to JSON. */
   nlohmann::json to_json() const;
+
+  /** @brief Reconstruct a @ref Symmetries from JSON produced by
+   * @ref to_json. */
   static Symmetries from_json(const nlohmann::json& j);
 };
 
@@ -167,6 +210,17 @@ class SymmetryLabel {
   /** @brief Construct a trivial (empty) label with no axis values. */
   SymmetryLabel() : _hash(0) {}
 
+  /**
+   * @brief Construct from a brace-enclosed list of axis values.
+   *
+   * Convenience overload for the common interned-shared-ptr pattern:
+   * @code
+   *   SymmetryLabel alpha({axes::alpha()});
+   * @endcode
+   *
+   * @param values Axis values carried by this label; each axis name must
+   *               appear at most once.
+   */
   SymmetryLabel(
       std::initializer_list<std::shared_ptr<const SymmetryAxisValue>> values);
 
@@ -192,13 +246,25 @@ class SymmetryLabel {
     return _values;
   }
 
+  /** @brief Value-equality (same axes carrying equal-valued axis values). */
   bool operator==(const SymmetryLabel& other) const;
   bool operator!=(const SymmetryLabel& other) const {
     return !(*this == other);
   }
+
+  /**
+   * @brief Hash consistent with @ref operator==.
+   *
+   * Precomputed in the constructor so the label can be used as an
+   * @c unordered_map key without recomputing the hash on each lookup.
+   */
   std::size_t hash() const { return _hash; }
 
+  /** @brief Serialize this label to JSON. */
   nlohmann::json to_json() const;
+
+  /** @brief Reconstruct a @ref SymmetryLabel from JSON produced by
+   * @ref to_json. */
   static SymmetryLabel from_json(const nlohmann::json& j);
 };
 
@@ -234,6 +300,11 @@ std::shared_ptr<const SpinValue> spin_value(int two_ms);
 }  // namespace qdk::chemistry::data
 
 namespace std {
+/**
+ * @brief Specialization of @c std::hash for @ref qdk::chemistry::data::
+ * SymmetryLabel, so labels can be used as keys in unordered associative
+ * containers.
+ */
 template <>
 struct hash<qdk::chemistry::data::SymmetryLabel> {
   std::size_t operator()(

@@ -191,6 +191,15 @@ class SymmetryBlocked : public DataClass {
   ExtentsArray _extents;
   BlockMap _blocks;
 
+  /**
+   * @brief True iff every label slot in @p labels is the trivial (empty)
+   * label.
+   *
+   * Trivial keys are special-cased by @ref has_block / @ref block_ptr so
+   * that callers that do not care about symmetry can address the unique
+   * block of a single-block container without constructing a matching
+   * label.
+   */
   static bool _is_trivial_key(const Labels& labels) {
     for (const auto& label : labels) {
       if (!label.empty()) {
@@ -200,13 +209,24 @@ class SymmetryBlocked : public DataClass {
     return true;
   }
 
-  /** @brief Internal grouping for canonical-block enumeration. */
+  /**
+   * @brief Internal grouping of blocks by underlying storage pointer, used
+   * for canonical-key enumeration during serialization and aliasing
+   * detection.
+   */
   struct PointerGroup {
+    /// One canonical key chosen as the group representative.
     Labels representative;
+    /// All keys whose blocks alias this group's pointer.
     std::vector<Labels> keys;
+    /// The shared block storage backing every key in @ref keys.
     BlockPtr ptr;
   };
 
+  /**
+   * @brief True iff @p label is admissible under @p sym (same axes carrying
+   * values that @p sym 's axes admit).
+   */
   static bool _label_admissible(const Symmetries& sym,
                                 const SymmetryLabel& label) {
     if (label.values().size() != sym.axes().size()) {
@@ -223,6 +243,11 @@ class SymmetryBlocked : public DataClass {
     return true;
   }
 
+  /**
+   * @brief Validate that every slot's @ref Symmetries is non-null and every
+   * declared extent label is admissible under its slot's symmetries.
+   * @throws std::invalid_argument on failure.
+   */
   void _validate_symmetries_and_extents() const {
     for (std::size_t i = 0; i < Rank; ++i) {
       if (_symmetries[i] == nullptr) {
@@ -240,6 +265,11 @@ class SymmetryBlocked : public DataClass {
     }
   }
 
+  /**
+   * @brief Validate that every block pointer is non-null and every block
+   * key carries labels admissible under their slot's symmetries.
+   * @throws std::invalid_argument on failure.
+   */
   void _validate_block_labels() const {
     for (const auto& [labels, ptr] : _blocks) {
       if (ptr == nullptr) {
@@ -256,6 +286,10 @@ class SymmetryBlocked : public DataClass {
     }
   }
 
+  /**
+   * @brief Look up the declared extent for @p label on slot @p slot.
+   * @throws std::invalid_argument if @p label is not in the slot's extents.
+   */
   std::size_t _extent_for(std::size_t slot, const SymmetryLabel& label) const {
     auto it = _extents[slot].find(label);
     if (it == _extents[slot].end()) {
@@ -265,6 +299,12 @@ class SymmetryBlocked : public DataClass {
     return it->second;
   }
 
+  /**
+   * @brief True iff every slot carries a spin axis marked
+   * @ref SymmetryAxis::equivalent (restricted-spin storage), in which case
+   * the constructor auto-aliases each block's spin partner to the same
+   * storage.
+   */
   bool _spin_aliasing_active() const {
     for (std::size_t i = 0; i < Rank; ++i) {
       if (_symmetries[i] == nullptr ||
@@ -276,6 +316,10 @@ class SymmetryBlocked : public DataClass {
     return true;
   }
 
+  /**
+   * @brief Return a copy of @p label with its spin value flipped
+   * (@f$\alpha \leftrightarrow \beta@f$). Non-spin values are unchanged.
+   */
   static SymmetryLabel _swap_spin(const SymmetryLabel& label) {
     std::vector<std::shared_ptr<const SymmetryAxisValue>> values;
     for (const auto& [axis, value] : label.values()) {
@@ -291,6 +335,10 @@ class SymmetryBlocked : public DataClass {
     return SymmetryLabel(std::move(values));
   }
 
+  /**
+   * @brief Apply @ref _swap_spin to every slot of @p labels to obtain the
+   * spin-partner key.
+   */
   static Labels _swap_spin_labels(const Labels& labels) {
     Labels swapped = labels;
     for (std::size_t i = 0; i < Rank; ++i) {
@@ -299,6 +347,10 @@ class SymmetryBlocked : public DataClass {
     return swapped;
   }
 
+  /**
+   * @brief Extract the per-slot @f$2 M_s@f$ values of @p labels (0 if a
+   * slot carries no spin axis).
+   */
   static std::array<int, Rank> _spin_sequence(const Labels& labels) {
     std::array<int, Rank> seq{};
     for (std::size_t i = 0; i < Rank; ++i) {
@@ -311,6 +363,10 @@ class SymmetryBlocked : public DataClass {
     return seq;
   }
 
+  /**
+   * @brief True iff @p labels is the canonical representative of its
+   * spin-partner pair (positive @f$2 M_s@f$ on the first spinful slot).
+   */
   static bool _is_spin_canonical(const Labels& labels) {
     auto seq = _spin_sequence(labels);
     for (std::size_t i = 0; i < Rank; ++i) {
@@ -321,6 +377,18 @@ class SymmetryBlocked : public DataClass {
     return true;
   }
 
+  /**
+   * @brief Materialize the implicit spin-partner aliases produced by
+   * restricted-spin storage.
+   *
+   * If @ref _spin_aliasing_active is true, inserts a block at every
+   * @ref _swap_spin_labels key whose partner exists but whose key does
+   * not, sharing the partner's storage. Validates that explicitly supplied
+   * partners share both extents and storage pointers.
+   *
+   * @throws std::invalid_argument if restricted spin partners have unequal
+   *         extents or are supplied with distinct backing storage.
+   */
   void _apply_orbit_aliasing() {
     if (!_spin_aliasing_active()) {
       return;
@@ -357,6 +425,13 @@ class SymmetryBlocked : public DataClass {
     }
   }
 
+  /**
+   * @brief Group block keys by their underlying storage pointer.
+   *
+   * Used by serialization to enumerate canonical (non-aliased) blocks
+   * exactly once; the @ref PointerGroup::representative is chosen so that
+   * a spin-canonical key is preferred when available.
+   */
   std::vector<PointerGroup> _group_by_pointer() const {
     std::vector<PointerGroup> groups;
     std::unordered_map<const Block*, std::size_t> index;
@@ -380,6 +455,7 @@ class SymmetryBlocked : public DataClass {
 
   // ---- JSON helpers for symmetries/extents (shared by all derived types) ---
 
+  /** @brief Serialize the per-slot @ref Symmetries to a JSON array. */
   nlohmann::json _symmetries_to_json() const {
     nlohmann::json symmetries = nlohmann::json::array();
     for (const auto& sym : _symmetries) {
@@ -388,6 +464,7 @@ class SymmetryBlocked : public DataClass {
     return symmetries;
   }
 
+  /** @brief Serialize the per-slot extents (label → size) to a JSON array. */
   nlohmann::json _extents_to_json() const {
     nlohmann::json extents = nlohmann::json::array();
     for (const auto& slot : _extents) {
@@ -401,6 +478,10 @@ class SymmetryBlocked : public DataClass {
     return extents;
   }
 
+  /**
+   * @brief Reconstruct a @ref SymmetriesArray from the @c "symmetries" entry
+   * of a JSON document produced by @ref _symmetries_to_json.
+   */
   static SymmetriesArray _symmetries_from_json(const nlohmann::json& j) {
     SymmetriesArray symmetries;
     const auto& sym_json = j.at("symmetries");
@@ -411,6 +492,10 @@ class SymmetryBlocked : public DataClass {
     return symmetries;
   }
 
+  /**
+   * @brief Reconstruct an @ref ExtentsArray from the @c "extents" entry of a
+   * JSON document produced by @ref _extents_to_json.
+   */
   static ExtentsArray _extents_from_json(const nlohmann::json& j) {
     ExtentsArray extents;
     const auto& ext_json = j.at("extents");
@@ -423,6 +508,11 @@ class SymmetryBlocked : public DataClass {
     return extents;
   }
 
+  /**
+   * @brief Serialize the block key groups (canonical key + aliases per
+   * group) as a JSON array. Derived classes append per-block payload to each
+   * entry before writing.
+   */
   nlohmann::json _block_keys_to_json() const {
     nlohmann::json blocks = nlohmann::json::array();
     for (const auto& group : _group_by_pointer()) {
@@ -439,6 +529,10 @@ class SymmetryBlocked : public DataClass {
     return blocks;
   }
 
+  /**
+   * @brief Reconstruct the per-group block keys from the @c "blocks" entry
+   * of a JSON document produced by @ref _block_keys_to_json.
+   */
   static std::vector<std::vector<Labels>> _block_keys_from_json(
       const nlohmann::json& j) {
     std::vector<std::vector<Labels>> result;

@@ -26,24 +26,30 @@ namespace qdk::chemistry::data {
 /**
  * @brief Maps a tensor rank to the Eigen storage type used for one block.
  *
- * Rank-1 and rank-4 blocks are stored as (flat) column vectors; rank-2 blocks
- * are stored as dense matrices.
+ * Rank-1, rank-3, and rank-4 blocks are stored as (flat) column vectors;
+ * rank-2 blocks are stored as dense matrices. Partial specializations are
+ * provided for ranks 1–4; higher ranks have no specialization and will
+ * produce a compilation error.
  */
 template <std::size_t Rank, class Scalar>
 struct TensorType;
 
+/** @brief Rank-1 block storage: a dense column vector. */
 template <class S>
 struct TensorType<1, S> {
   using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
 };
+/** @brief Rank-2 block storage: a dense matrix. */
 template <class S>
 struct TensorType<2, S> {
   using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
 };
+/** @brief Rank-3 block storage: a flat-packed column vector. */
 template <class S>
 struct TensorType<3, S> {
   using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
 };
+/** @brief Rank-4 block storage: a flat-packed column vector. */
 template <class S>
 struct TensorType<4, S> {
   using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
@@ -129,10 +135,15 @@ class SymmetryBlockedTensor
 
   // ---- DataClass interface ------------------------------------------------
 
+  /** @brief @ref DataClass type identifier: @c "symmetry_blocked_tensor". */
   std::string get_data_type_name() const override {
     return "symmetry_blocked_tensor";
   }
 
+  /**
+   * @brief Single-line summary including rank, scalar type, number of
+   * stored blocks, and number of independent (non-aliased) blocks.
+   */
   std::string get_summary() const override {
     std::ostringstream oss;
     oss << "SymmetryBlockedTensor(rank=" << Rank << ", scalar="
@@ -142,6 +153,11 @@ class SymmetryBlockedTensor
     return oss.str();
   }
 
+  /**
+   * @brief Serialize this tensor to JSON, with one entry per group of
+   * pointer-equivalent blocks (a canonical key, the aliased keys, and the
+   * block payload).
+   */
   nlohmann::json to_json() const override {
     nlohmann::json j;
     j["type"] = "SymmetryBlockedTensor";
@@ -167,6 +183,7 @@ class SymmetryBlockedTensor
     return j;
   }
 
+  /** @brief Serialize this tensor to a JSON file at @p filename. */
   void to_json_file(const std::string& filename) const override {
     std::ofstream out(filename);
     if (!out) {
@@ -175,10 +192,18 @@ class SymmetryBlockedTensor
     out << to_json().dump(2);
   }
 
+  /** @brief Serialize this tensor into an HDF5 group. */
   void to_hdf5(H5::Group& group) const override;
 
+  /** @brief Serialize this tensor to an HDF5 file at @p filename. */
   void to_hdf5_file(const std::string& filename) const override;
 
+  /**
+   * @brief Dispatch to JSON or HDF5 serialization based on @p type.
+   * @param filename Target file path.
+   * @param type Either @c "json" or @c "hdf5".
+   * @throws std::invalid_argument if @p type is not supported.
+   */
   void to_file(const std::string& filename,
                const std::string& type) const override {
     if (type == "json") {
@@ -213,6 +238,10 @@ class SymmetryBlockedTensor
         std::move(symmetries), std::move(extents), std::move(blocks));
   }
 
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedTensor from a JSON file
+   * produced by @ref to_json_file.
+   */
   static std::shared_ptr<SymmetryBlockedTensor> from_json_file(
       const std::string& filename) {
     std::ifstream in(filename);
@@ -224,9 +253,17 @@ class SymmetryBlockedTensor
     return from_json(j);
   }
 
+  /** @brief Reconstruct from an HDF5 group produced by @ref to_hdf5. */
   static std::shared_ptr<SymmetryBlockedTensor> from_hdf5(H5::Group& group);
+  /** @brief Reconstruct from an HDF5 file produced by @ref to_hdf5_file. */
   static std::shared_ptr<SymmetryBlockedTensor> from_hdf5_file(
       const std::string& filename);
+  /**
+   * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
+   * @param filename Source file path.
+   * @param type Either @c "json" or @c "hdf5".
+   * @throws std::invalid_argument if @p type is not supported.
+   */
   static std::shared_ptr<SymmetryBlockedTensor> from_file(
       const std::string& filename, const std::string& type) {
     if (type == "json") {
