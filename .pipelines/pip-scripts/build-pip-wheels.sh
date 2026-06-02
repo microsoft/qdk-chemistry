@@ -129,7 +129,7 @@ echo "------------------ Installed Python packages (buildenv) ------------------
 python3 -m pip list --format=freeze | tee /tmp/buildenv-freeze.txt
 echo "---------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report .pipelines/buildenv.component-detection-pip-report.json \
+    --report python/buildenv.component-detection-pip-report.json \
     -r /tmp/buildenv-freeze.txt
 
 # Prepare README for PyPI

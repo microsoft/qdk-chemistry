@@ -93,7 +93,7 @@ echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry | tee /tmp/testenv-freeze.txt
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report "$REPO_ROOT/.pipelines/testenv.component-detection-pip-report.json" \
+    --report "$PYTHON_DIR/testenv.component-detection-pip-report.json" \
     -r /tmp/testenv-freeze.txt
 
 # Disable telemetry during testing
