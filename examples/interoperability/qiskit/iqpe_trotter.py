@@ -120,7 +120,7 @@ iqpe.settings().set(
     "qpe_circuit_builder",
     AlgorithmRef(
         "qpe_circuit_builder",
-        "qdk_iterative",
+        "qiskit_iterative",
         num_bits=M_PRECISION,
         circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         unitary_builder=AlgorithmRef(

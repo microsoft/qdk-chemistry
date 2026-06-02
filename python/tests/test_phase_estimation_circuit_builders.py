@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
-    IterativeQpeCircuitBuilder,
+    QdkIterativeQpeCircuitBuilder,
     _validate_iteration_inputs,
 )
 from qdk_chemistry.data import (
@@ -95,7 +95,7 @@ class TestIterativeQpeCircuitBuilder:
         two_qubit_circuit_problem: CircuitBuilderProblem,
     ) -> None:
         """Test that the builder generates the correct number of iteration circuits."""
-        iqpe_circuit_builder = IterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        iqpe_circuit_builder = QdkIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
 
         circuits = iqpe_circuit_builder.run(
             qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
@@ -122,7 +122,7 @@ class TestIterativeQpeCircuitBuilder:
 
     def test_run_returns_circuits(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate that IterativeQpeCircuitBuilder.run produces one circuit per phase bit."""
-        builder = IterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
         builder.settings().set(
             "circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
@@ -150,7 +150,7 @@ class TestIterativeQpeCircuitBuilder:
 
     def test_run_returns_circuits_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
-        builder = IterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
         builder.settings().set(
             "circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
@@ -176,7 +176,7 @@ class TestIterativeQpeCircuitBuilder:
     @pytest.mark.parametrize("iteration", [0, 1, 3])
     def test_run_specific_iteration(self, two_qubit_circuit_problem: CircuitBuilderProblem, iteration: int) -> None:
         """Validate that specifying num_iteration returns only that single circuit."""
-        builder = IterativeQpeCircuitBuilder(
+        builder = QdkIterativeQpeCircuitBuilder(
             num_bits=two_qubit_circuit_problem.num_bits,
             num_iteration=iteration,
         )
@@ -201,7 +201,7 @@ class TestIterativeQpeCircuitBuilder:
 
     def test_run_specific_iteration_out_of_range(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate that num_iteration >= num_bits raises ValueError."""
-        builder = IterativeQpeCircuitBuilder(
+        builder = QdkIterativeQpeCircuitBuilder(
             num_bits=two_qubit_circuit_problem.num_bits,
             num_iteration=two_qubit_circuit_problem.num_bits,  # equal to num_bits, out of range
         )
@@ -218,7 +218,7 @@ class TestIterativeQpeCircuitBuilder:
         qasm_str = 'OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nry(1.2870) q[0];\ncx q[0], q[1];\n'
         state_prep = Circuit(qasm=qasm_str)
 
-        builder = IterativeQpeCircuitBuilder(num_bits=4)
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=4)
         builder.settings().set(
             "circuit_mapper",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),

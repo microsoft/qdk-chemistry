@@ -56,12 +56,11 @@ def qiskit_load():
     """Load the Qiskit plugins into QDK/Chemistry."""
     Logger.trace_entering()
 
-    from python.src.qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
+    from qdk_chemistry.algorithms import register  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
         QiskitIterativeQpeCircuitBuilder,
         QiskitStandardQpeCircuitBuilder,
     )
-
-    from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
 
     register(lambda: RegularIsometryStatePreparation())

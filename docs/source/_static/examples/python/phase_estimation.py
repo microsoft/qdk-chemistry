@@ -12,8 +12,8 @@ from qdk_chemistry.algorithms import create
 # Create the default (iterative) phase estimation algorithm
 iqpe = create("phase_estimation", "iterative")
 
-# Or create the standard QFT-based variant (requires Qiskit)
-qpe = create("phase_estimation", "qiskit_standard")
+# Or create the standard QFT-based variant
+qpe = create("phase_estimation", "standard")
 # end-cell-create
 ################################################################################
 
@@ -42,7 +42,7 @@ iqpe.settings().set(
 ################################################################################
 # start-cell-configure-standard
 # Configure standard QFT-based phase estimation
-qpe = create("phase_estimation", "qiskit_standard")
+qpe = create("phase_estimation", "standard")
 qpe.settings().set("shots", 100)
 qpe.settings().set(
     "qpe_circuit_builder",
@@ -51,15 +51,11 @@ qpe.settings().set(
         "qiskit_standard",
         num_bits=10,
         qft_do_swaps=True,
+        circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=0.1
+        ),
     ),
-)
-qpe.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-)
-qpe.settings().set(
-    "unitary_builder",
-    AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
 )
 # end-cell-configure-standard
 ################################################################################
@@ -136,6 +132,6 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['iterative', 'qiskit_standard']
+print(implementations)  # e.g. ['iterative', 'standard']
 # end-cell-list-implementations
 ################################################################################
