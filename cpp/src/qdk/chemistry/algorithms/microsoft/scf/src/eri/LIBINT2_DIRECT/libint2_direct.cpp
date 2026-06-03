@@ -447,13 +447,7 @@ class ERI {
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const size_t bf4 = bf4_st + l;
 
-                          const auto coulomb_value =
-                              buf_1234 ? buf_1234[ijkl] : 0.0;
-                          const auto erf_value =
-                              buf_erf_1234 ? buf_erf_1234[ijkl] : 0.0;
-                          const auto value = (exchange_scale * coulomb_value -
-                                              beta * erf_value) *
-                                             s1234_deg;
+                          const auto value = buf_1234[ijkl] * s1234_deg;
 
                           // J contractions
                           J_ij +=
@@ -510,7 +504,13 @@ class ERI {
                         for (size_t l = 0; l < n4; ++l, ++ijkl) {
                           const size_t bf4 = bf4_st + l;
 
-                          const auto value = buf_1234[ijkl] * s1234_deg;
+                          const auto coulomb_value =
+                              buf_1234 ? buf_1234[ijkl] : 0.0;
+                          const auto erf_value =
+                              buf_erf_1234 ? buf_erf_1234[ijkl] : 0.0;
+                          const auto value = (exchange_scale * coulomb_value -
+                                              beta * erf_value) *
+                                             s1234_deg;
 
                           // K contractions
                           K_ik += 0.25 *
@@ -807,9 +807,9 @@ class ERI {
                   }
                 }
 
-                if (need_J) dJ_out[coord] -= 0.25 * dJ_coord;
+                if (need_J) dJ_out[coord] += 0.5 * dJ_coord;
                 if (need_K) {
-                  dK_out[coord] += 0.5 * dK_coord;
+                  dK_out[coord] -= 0.25 * dK_coord;
                 }
               }
             }
