@@ -6,18 +6,14 @@
 
 #include <fstream>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
 
+#include "../json_serialization.hpp"
+
 namespace qdk::chemistry::data {
-
-namespace detail {
-
-static constexpr const char* k_sbis_hdf5_json_dataset =
-    "symmetry_blocked_index_set_json";
-
-}  // namespace detail
 
 SymmetryBlockedIndexSet::BlockMap SymmetryBlockedIndexSet::_build_block_map(
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>& indices) {
@@ -95,8 +91,9 @@ std::string SymmetryBlockedIndexSet::get_summary() const {
 }
 
 nlohmann::json SymmetryBlockedIndexSet::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
-  j["type"] = "SymmetryBlockedIndexSet";
+  j["version"] = SERIALIZATION_VERSION;
   j["symmetries"] = symmetries()->to_json();
 
   nlohmann::json extents_json = nlohmann::json::array();
@@ -116,6 +113,7 @@ nlohmann::json SymmetryBlockedIndexSet::to_json() const {
 }
 
 void SymmetryBlockedIndexSet::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   std::ofstream out(filename);
   if (!out) {
     throw std::runtime_error("Failed to open file for writing: " + filename);
@@ -124,20 +122,33 @@ void SymmetryBlockedIndexSet::to_json_file(const std::string& filename) const {
 }
 
 void SymmetryBlockedIndexSet::to_hdf5(H5::Group& group) const {
-  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  H5::DataSpace scalar_space(H5S_SCALAR);
-  auto dataset = group.createDataSet(detail::k_sbis_hdf5_json_dataset, str_type,
-                                     scalar_space);
-  dataset.write(to_json().dump(), str_type);
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Add version attribute
+    H5::Attribute version_attr =
+        group.createAttribute("version", str_type, H5::DataSpace(H5S_SCALAR));
+    std::string version_str(SERIALIZATION_VERSION);
+    version_attr.write(str_type, version_str);
+
+    auto dataset =
+        group.createDataSet("data", str_type, H5::DataSpace(H5S_SCALAR));
+    dataset.write(to_json().dump(), str_type);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 void SymmetryBlockedIndexSet::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
   H5::H5File file(filename, H5F_ACC_TRUNC);
   to_hdf5(file);
 }
 
 void SymmetryBlockedIndexSet::to_file(const std::string& filename,
                                       const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     to_json_file(filename);
   } else if (type == "hdf5") {
@@ -150,26 +161,40 @@ void SymmetryBlockedIndexSet::to_file(const std::string& filename,
 
 std::shared_ptr<SymmetryBlockedIndexSet> SymmetryBlockedIndexSet::from_json(
     const nlohmann::json& j) {
-  auto symmetries = std::make_shared<const Symmetries>(
-      Symmetries::from_json(j.at("symmetries")));
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    if (!j.contains("version")) {
+      throw std::runtime_error("Invalid JSON: missing version field");
+    }
+    validate_serialization_version(SERIALIZATION_VERSION,
+                                   j["version"].get<std::string>());
 
-  std::unordered_map<SymmetryLabel, std::size_t> extents;
-  for (const auto& entry : j.at("extents")) {
-    extents.emplace(SymmetryLabel::from_json(entry.at("label")),
-                    entry.at("extent").get<std::size_t>());
-  }
+    std::shared_ptr<const Symmetries> symmetries =
+        Symmetries::from_json(j.at("symmetries"));
 
-  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices;
-  for (const auto& entry : j.at("indices")) {
-    indices.emplace(SymmetryLabel::from_json(entry.at("label")),
-                    entry.at("indices").get<std::vector<std::uint32_t>>());
+    std::unordered_map<SymmetryLabel, std::size_t> extents;
+    for (const auto& entry : j.at("extents")) {
+      extents.emplace(SymmetryLabel::from_json(entry.at("label")),
+                      entry.at("extent").get<std::size_t>());
+    }
+
+    std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices;
+    for (const auto& entry : j.at("indices")) {
+      indices.emplace(SymmetryLabel::from_json(entry.at("label")),
+                      entry.at("indices").get<std::vector<std::uint32_t>>());
+    }
+    return std::make_shared<SymmetryBlockedIndexSet>(
+        std::move(symmetries), std::move(extents), std::move(indices));
+  } catch (const std::exception& e) {
+    throw std::runtime_error(
+        "Failed to parse SymmetryBlockedIndexSet from JSON: " +
+        std::string(e.what()));
   }
-  return std::make_shared<SymmetryBlockedIndexSet>(
-      std::move(symmetries), std::move(extents), std::move(indices));
 }
 
 std::shared_ptr<SymmetryBlockedIndexSet>
 SymmetryBlockedIndexSet::from_json_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   std::ifstream in(filename);
   if (!in) {
     throw std::runtime_error("Failed to open file for reading: " + filename);
@@ -181,15 +206,27 @@ SymmetryBlockedIndexSet::from_json_file(const std::string& filename) {
 
 std::shared_ptr<SymmetryBlockedIndexSet> SymmetryBlockedIndexSet::from_hdf5(
     H5::Group& group) {
-  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  auto dataset = group.openDataSet(detail::k_sbis_hdf5_json_dataset);
-  std::string payload;
-  dataset.read(payload, str_type);
-  return from_json(nlohmann::json::parse(payload));
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Check version first
+    H5::Attribute version_attr = group.openAttribute("version");
+    std::string version;
+    version_attr.read(str_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
+
+    std::string payload;
+    group.openDataSet("data").read(payload, str_type);
+    return from_json(nlohmann::json::parse(payload));
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 std::shared_ptr<SymmetryBlockedIndexSet>
 SymmetryBlockedIndexSet::from_hdf5_file(const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
   H5::H5File file(filename, H5F_ACC_RDONLY);
   return from_hdf5(file);
 }

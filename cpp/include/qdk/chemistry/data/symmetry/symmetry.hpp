@@ -9,6 +9,8 @@
 #include <map>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/data_class.hpp>
+#include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <vector>
 
@@ -91,7 +93,7 @@ class SpinValue : public SymmetryAxisValue {
  * @c equivalent flag indicating whether the labels under this axis
  * share storage or are stored independently.
  */
-class SymmetryAxis {
+class SymmetryAxis : public DataClass {
   AxisName _name;
   std::vector<std::shared_ptr<const SymmetryAxisValue>> _labels;
   bool _equivalent;
@@ -112,42 +114,177 @@ class SymmetryAxis {
                std::vector<std::shared_ptr<const SymmetryAxisValue>> labels,
                bool equivalent);
 
-  /** @brief The identifier of this axis. */
+  /**
+   * @brief The identifier of this axis.
+   * @return The axis name (see @ref AxisName).
+   */
   AxisName name() const;
 
-  /** @brief The ordered list of admissible labels for this axis. */
+  /**
+   * @brief The ordered list of admissible labels for this axis.
+   * @return Reference to the labels supplied at construction.
+   */
   const std::vector<std::shared_ptr<const SymmetryAxisValue>>& labels() const;
 
   /**
    * @brief Whether labels under this axis share storage (i.e. the
    * restricted-spin alias).
+   * @return @c true if labels alias the same storage; @c false otherwise.
    */
   bool equivalent() const;
 
-  /** @brief True iff @p value is one of this axis's admissible labels. */
+  /**
+   * @brief True iff @p value is one of this axis's admissible labels.
+   * @param value Candidate axis value to test.
+   * @return @c true if @p value is admissible under this axis.
+   */
   bool admits(const SymmetryAxisValue& value) const;
 
-  /** @brief Value-equality against another axis (same name, labels, and
-   * equivalence flag). */
+  /**
+   * @brief Value-equality against another axis.
+   * @param other Right-hand axis to compare against.
+   * @return @c true if name, labels, and equivalence flag all match.
+   */
   bool operator==(const SymmetryAxis& other) const;
+
+  /**
+   * @brief Inverse of @ref operator==.
+   * @param other Right-hand axis to compare against.
+   * @return @c true if any of name, labels, or equivalence flag differs.
+   */
   bool operator!=(const SymmetryAxis& other) const { return !(*this == other); }
 
-  /** @brief Hash consistent with @ref operator==. */
+  /**
+   * @brief Hash consistent with @ref operator==.
+   * @return Hash value suitable for use with @c std::hash.
+   */
   std::size_t hash() const;
 
-  /** @brief Serialize this axis to JSON. */
-  nlohmann::json to_json() const;
+  /**
+   * @brief @ref DataClass type identifier.
+   * @return The string @c "symmetry_axis".
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(SymmetryAxis);
+  }
 
-  /** @brief Reconstruct a @ref SymmetryAxis from JSON produced by
-   * @ref to_json. */
-  static SymmetryAxis from_json(const nlohmann::json& j);
+  /**
+   * @brief Single-line human-readable summary.
+   * @return A string of the form
+   *         <tt>SymmetryAxis(name=..., equivalent=..., labels=...)</tt>.
+   */
+  std::string get_summary() const override;
+
+  /**
+   * @brief Serialize this axis to JSON.
+   * @return JSON object with @c "name", @c "equivalent", and @c "labels"
+   *         fields. Each label is the verbatim @c to_json fragment of a
+   *         @ref SymmetryAxisValue (whose polymorphic @c "kind" tag is
+   *         preserved).
+   */
+  nlohmann::json to_json() const override;
+
+  /**
+   * @brief Serialize this axis to a JSON file.
+   * @param filename Path to the output JSON file.
+   * @throws std::runtime_error if @p filename cannot be opened for writing.
+   */
+  void to_json_file(const std::string& filename) const override;
+
+  /**
+   * @brief Serialize this axis into an HDF5 group.
+   *
+   * The implementation writes the JSON form (see @ref to_json) as a single
+   * string dataset within @p group, mirroring the HDF5 layout used by
+   * @ref SymmetryBlockedIndexSet.
+   *
+   * @param group HDF5 group to write data to.
+   * @throws std::runtime_error if an HDF5 I/O error occurs.
+   */
+  void to_hdf5(H5::Group& group) const override;
+
+  /**
+   * @brief Serialize this axis to an HDF5 file.
+   * @param filename Path to the output HDF5 file (created or truncated).
+   * @throws std::runtime_error if an HDF5 I/O error occurs.
+   */
+  void to_hdf5_file(const std::string& filename) const override;
+
+  /**
+   * @brief Dispatch to JSON or HDF5 serialization based on @p type.
+   * @param filename Path to the output file.
+   * @param type Either @c "json" or @c "hdf5".
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if an I/O error occurs.
+   */
+  void to_file(const std::string& filename,
+               const std::string& type) const override;
+
+  /**
+   * @brief Reconstruct a @ref SymmetryAxis from JSON produced by
+   * @ref to_json.
+   * @param j JSON object containing axis data.
+   * @return Shared pointer to the deserialized @ref SymmetryAxis.
+   * @throws std::runtime_error if @p j is missing required fields or
+   *         contains an unknown axis name.
+   */
+  static std::shared_ptr<SymmetryAxis> from_json(const nlohmann::json& j);
+
+  /**
+   * @brief Load a @ref SymmetryAxis from a JSON file produced by
+   * @ref to_json_file.
+   * @param filename Path to the input JSON file.
+   * @return Shared pointer to the deserialized @ref SymmetryAxis.
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<SymmetryAxis> from_json_file(
+      const std::string& filename);
+
+  /**
+   * @brief Load a @ref SymmetryAxis from an HDF5 group produced by
+   * @ref to_hdf5.
+   * @param group HDF5 group to read data from.
+   * @return Shared pointer to the deserialized @ref SymmetryAxis.
+   * @throws std::runtime_error if the expected dataset is missing or the
+   *         payload is malformed.
+   */
+  static std::shared_ptr<SymmetryAxis> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Load a @ref SymmetryAxis from an HDF5 file produced by
+   * @ref to_hdf5_file.
+   * @param filename Path to the input HDF5 file.
+   * @return Shared pointer to the deserialized @ref SymmetryAxis.
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<SymmetryAxis> from_hdf5_file(
+      const std::string& filename);
+
+  /**
+   * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
+   * @param filename Path to the input file.
+   * @param type Either @c "json" or @c "hdf5".
+   * @return Shared pointer to the deserialized @ref SymmetryAxis.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<SymmetryAxis> from_file(const std::string& filename,
+                                                 const std::string& type);
+
+ private:
+  /// On-disk serialization format version. Bump on any change to the JSON
+  /// or HDF5 shape produced by @ref to_json / @ref to_hdf5.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 /**
  * @brief The ordered set of symmetry axes a tensor is blocked under,
  * together with their admissible labels and equivalence flags.
  */
-class Symmetries {
+class Symmetries : public DataClass {
   std::vector<SymmetryAxis> _axes;
 
  public:
@@ -160,35 +297,169 @@ class Symmetries {
    */
   explicit Symmetries(std::vector<SymmetryAxis> axes);
 
-  /** @brief Construct a trivial symmetry set with no axes. */
+  /**
+   * @brief Construct a trivial symmetry set with no axes.
+   * @return An empty @ref Symmetries instance.
+   */
   static Symmetries trivial() { return Symmetries({}); }
 
-  /** @brief The ordered list of axes carried by this symmetry set. */
+  /**
+   * @brief The ordered list of axes carried by this symmetry set.
+   * @return Reference to the axes supplied at construction.
+   */
   const std::vector<SymmetryAxis>& axes() const;
 
-  /** @brief True iff an axis with name @p name exists in this set. */
+  /**
+   * @brief Look up whether an axis with the given name exists.
+   * @param name Axis name to look for.
+   * @return @c true if an axis with name @p name exists in this set.
+   */
   bool has_axis(AxisName name) const;
 
   /**
    * @brief Access the axis with name @p name.
-   * @throws std::runtime_error if no such axis exists.
+   * @param name Axis name to look up.
+   * @return Reference to the matching @ref SymmetryAxis.
+   * @throws std::runtime_error if no such axis exists in this set.
    */
   const SymmetryAxis& axis(AxisName name) const;
 
-  /** @brief Value-equality against another symmetry set (same axes in the
-   * same order). */
+  /**
+   * @brief Value-equality against another symmetry set.
+   * @param other Right-hand symmetry set to compare against.
+   * @return @c true if both sets contain the same axes in the same order.
+   */
   bool operator==(const Symmetries& other) const;
+
+  /**
+   * @brief Inverse of @ref operator==.
+   * @param other Right-hand symmetry set to compare against.
+   * @return @c true if the axis sequences differ.
+   */
   bool operator!=(const Symmetries& other) const { return !(*this == other); }
 
-  /** @brief Hash consistent with @ref operator==. */
+  /**
+   * @brief Hash consistent with @ref operator==.
+   * @return Hash value suitable for use with @c std::hash.
+   */
   std::size_t hash() const;
 
-  /** @brief Serialize this symmetry set to JSON. */
-  nlohmann::json to_json() const;
+  /**
+   * @brief @ref DataClass type identifier.
+   * @return The string @c "symmetries".
+   */
+  std::string get_data_type_name() const override {
+    return DATACLASS_TO_SNAKE_CASE(Symmetries);
+  }
 
-  /** @brief Reconstruct a @ref Symmetries from JSON produced by
-   * @ref to_json. */
-  static Symmetries from_json(const nlohmann::json& j);
+  /**
+   * @brief Single-line human-readable summary.
+   * @return A string of the form <tt>Symmetries(axes=N; [name0, name1,
+   * ...])</tt>.
+   */
+  std::string get_summary() const override;
+
+  /**
+   * @brief Serialize this symmetry set to JSON.
+   * @return JSON object with an @c "axes" array; each entry is the
+   *         @ref SymmetryAxis::to_json output of the corresponding axis.
+   */
+  nlohmann::json to_json() const override;
+
+  /**
+   * @brief Serialize this symmetry set to a JSON file.
+   * @param filename Path to the output JSON file.
+   * @throws std::runtime_error if @p filename cannot be opened for writing.
+   */
+  void to_json_file(const std::string& filename) const override;
+
+  /**
+   * @brief Serialize this symmetry set into an HDF5 group.
+   *
+   * The implementation writes the JSON form (see @ref to_json) as a single
+   * string dataset within @p group, mirroring the HDF5 layout used by
+   * @ref SymmetryBlockedIndexSet.
+   *
+   * @param group HDF5 group to write data to.
+   * @throws std::runtime_error if an HDF5 I/O error occurs.
+   */
+  void to_hdf5(H5::Group& group) const override;
+
+  /**
+   * @brief Serialize this symmetry set to an HDF5 file.
+   * @param filename Path to the output HDF5 file (created or truncated).
+   * @throws std::runtime_error if an HDF5 I/O error occurs.
+   */
+  void to_hdf5_file(const std::string& filename) const override;
+
+  /**
+   * @brief Dispatch to JSON or HDF5 serialization based on @p type.
+   * @param filename Path to the output file.
+   * @param type Either @c "json" or @c "hdf5".
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if an I/O error occurs.
+   */
+  void to_file(const std::string& filename,
+               const std::string& type) const override;
+
+  /**
+   * @brief Reconstruct a @ref Symmetries from JSON produced by
+   * @ref to_json.
+   * @param j JSON object containing symmetry-set data.
+   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @throws std::runtime_error if @p j is missing required fields or an
+   *         embedded axis is malformed.
+   */
+  static std::shared_ptr<Symmetries> from_json(const nlohmann::json& j);
+
+  /**
+   * @brief Load a @ref Symmetries from a JSON file produced by
+   * @ref to_json_file.
+   * @param filename Path to the input JSON file.
+   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<Symmetries> from_json_file(
+      const std::string& filename);
+
+  /**
+   * @brief Load a @ref Symmetries from an HDF5 group produced by
+   * @ref to_hdf5.
+   * @param group HDF5 group to read data from.
+   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @throws std::runtime_error if the expected dataset is missing or the
+   *         payload is malformed.
+   */
+  static std::shared_ptr<Symmetries> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Load a @ref Symmetries from an HDF5 file produced by
+   * @ref to_hdf5_file.
+   * @param filename Path to the input HDF5 file.
+   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<Symmetries> from_hdf5_file(
+      const std::string& filename);
+
+  /**
+   * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
+   * @param filename Path to the input file.
+   * @param type Either @c "json" or @c "hdf5".
+   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if @p filename cannot be read or its
+   *         contents are malformed.
+   */
+  static std::shared_ptr<Symmetries> from_file(const std::string& filename,
+                                               const std::string& type);
+
+ private:
+  /// On-disk serialization format version. Bump on any change to the JSON
+  /// or HDF5 shape produced by @ref to_json / @ref to_hdf5.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 /**

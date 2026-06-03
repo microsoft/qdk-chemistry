@@ -102,7 +102,7 @@ class SymmetryBlockedIndexSet
   // ---- DataClass interface ------------------------------------------------
 
   std::string get_data_type_name() const override {
-    return "symmetry_blocked_index_set";
+    return DATACLASS_TO_SNAKE_CASE(SymmetryBlockedIndexSet);
   }
   std::string get_summary() const override;
   void to_file(const std::string& filename,
@@ -126,6 +126,10 @@ class SymmetryBlockedIndexSet
   static Base::BlockMap _build_block_map(
       std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>& indices);
   void _validate_indices() const;
+
+  /// On-disk serialization format version. Bump on any change to the JSON
+  /// or HDF5 shape produced by @ref to_json / @ref to_hdf5.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 }  // namespace qdk::chemistry::data

@@ -2,11 +2,18 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
+
 #include <algorithm>
+#include <fstream>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/utils/hash.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
+
+#include "../json_serialization.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -118,26 +125,148 @@ std::size_t SymmetryAxis::hash() const {
 }
 
 nlohmann::json SymmetryAxis::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j;
+  j["version"] = SERIALIZATION_VERSION;
   nlohmann::json labels = nlohmann::json::array();
   for (const auto& label : _labels) {
     labels.push_back(label->to_json());
   }
-  return nlohmann::json{{"name", to_string(_name)},
-                        {"equivalent", _equivalent},
-                        {"labels", labels}};
+  j["name"] = to_string(_name);
+  j["equivalent"] = _equivalent;
+  j["labels"] = std::move(labels);
+  return j;
 }
 
-SymmetryAxis SymmetryAxis::from_json(const nlohmann::json& j) {
-  const auto name_str = j.at("name").get<std::string>();
-  if (name_str != to_string(AxisName::Spin)) {
-    throw std::runtime_error("Unknown symmetry axis name '" + name_str + "'.");
+std::string SymmetryAxis::get_summary() const {
+  std::ostringstream oss;
+  oss << "SymmetryAxis(name=" << to_string(_name)
+      << ", equivalent=" << (_equivalent ? "true" : "false")
+      << ", labels=" << _labels.size() << ")";
+  return oss.str();
+}
+
+void SymmetryAxis::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ofstream out(filename);
+  if (!out) {
+    throw std::runtime_error("Failed to open file for writing: " + filename);
   }
-  std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
-  for (const auto& label_json : j.at("labels")) {
-    labels.push_back(symmetry_axis_value_from_json(label_json));
+  out << to_json().dump(2);
+}
+
+void SymmetryAxis::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Add version attribute
+    H5::Attribute version_attr =
+        group.createAttribute("version", str_type, H5::DataSpace(H5S_SCALAR));
+    std::string version_str(SERIALIZATION_VERSION);
+    version_attr.write(str_type, version_str);
+
+    auto dataset =
+        group.createDataSet("data", str_type, H5::DataSpace(H5S_SCALAR));
+    dataset.write(to_json().dump(), str_type);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
-  return SymmetryAxis(AxisName::Spin, std::move(labels),
-                      j.at("equivalent").get<bool>());
+}
+
+void SymmetryAxis::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+  H5::H5File file(filename, H5F_ACC_TRUNC);
+  to_hdf5(file);
+}
+
+void SymmetryAxis::to_file(const std::string& filename,
+                           const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+  if (type == "json") {
+    to_json_file(filename);
+  } else if (type == "hdf5") {
+    to_hdf5_file(filename);
+  } else {
+    throw std::invalid_argument("Unsupported file type: " + type +
+                                ". Supported types are: json, hdf5");
+  }
+}
+
+std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    if (!j.contains("version")) {
+      throw std::runtime_error("Invalid JSON: missing version field");
+    }
+    validate_serialization_version(SERIALIZATION_VERSION,
+                                   j["version"].get<std::string>());
+
+    const auto name_str = j.at("name").get<std::string>();
+    if (name_str != to_string(AxisName::Spin)) {
+      throw std::runtime_error("Unknown symmetry axis name '" + name_str +
+                               "'.");
+    }
+    std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
+    for (const auto& label_json : j.at("labels")) {
+      labels.push_back(symmetry_axis_value_from_json(label_json));
+    }
+    return std::make_shared<SymmetryAxis>(AxisName::Spin, std::move(labels),
+                                          j.at("equivalent").get<bool>());
+  } catch (const std::exception& e) {
+    throw std::runtime_error("Failed to parse SymmetryAxis from JSON: " +
+                             std::string(e.what()));
+  }
+}
+
+std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json_file(
+    const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  std::ifstream in(filename);
+  if (!in) {
+    throw std::runtime_error("Failed to open file for reading: " + filename);
+  }
+  nlohmann::json j;
+  in >> j;
+  return from_json(j);
+}
+
+std::shared_ptr<SymmetryAxis> SymmetryAxis::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Check version first
+    H5::Attribute version_attr = group.openAttribute("version");
+    std::string version;
+    version_attr.read(str_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
+
+    std::string payload;
+    group.openDataSet("data").read(payload, str_type);
+    return from_json(nlohmann::json::parse(payload));
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+std::shared_ptr<SymmetryAxis> SymmetryAxis::from_hdf5_file(
+    const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  H5::H5File file(filename, H5F_ACC_RDONLY);
+  return from_hdf5(file);
+}
+
+std::shared_ptr<SymmetryAxis> SymmetryAxis::from_file(
+    const std::string& filename, const std::string& type) {
+  if (type == "json") {
+    return from_json_file(filename);
+  }
+  if (type == "hdf5") {
+    return from_hdf5_file(filename);
+  }
+  throw std::invalid_argument("Unsupported file type: " + type +
+                              ". Supported types are: json, hdf5");
 }
 
 // ---------------------------------------------------------------------------
@@ -186,19 +315,144 @@ std::size_t Symmetries::hash() const {
 }
 
 nlohmann::json Symmetries::to_json() const {
+  QDK_LOG_TRACE_ENTERING();
+  nlohmann::json j;
+  j["version"] = SERIALIZATION_VERSION;
   nlohmann::json axes = nlohmann::json::array();
   for (const auto& axis : _axes) {
     axes.push_back(axis.to_json());
   }
-  return nlohmann::json{{"axes", axes}};
+  j["axes"] = std::move(axes);
+  return j;
 }
 
-Symmetries Symmetries::from_json(const nlohmann::json& j) {
-  std::vector<SymmetryAxis> axes;
-  for (const auto& axis_json : j.at("axes")) {
-    axes.push_back(SymmetryAxis::from_json(axis_json));
+std::string Symmetries::get_summary() const {
+  std::ostringstream oss;
+  oss << "Symmetries(axes=" << _axes.size() << "; [";
+  for (std::size_t i = 0; i < _axes.size(); ++i) {
+    if (i > 0) oss << ", ";
+    oss << to_string(_axes[i].name());
   }
-  return Symmetries(std::move(axes));
+  oss << "])";
+  return oss.str();
+}
+
+void Symmetries::to_json_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+  std::ofstream out(filename);
+  if (!out) {
+    throw std::runtime_error("Failed to open file for writing: " + filename);
+  }
+  out << to_json().dump(2);
+}
+
+void Symmetries::to_hdf5(H5::Group& group) const {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Add version attribute
+    H5::Attribute version_attr =
+        group.createAttribute("version", str_type, H5::DataSpace(H5S_SCALAR));
+    std::string version_str(SERIALIZATION_VERSION);
+    version_attr.write(str_type, version_str);
+
+    auto dataset =
+        group.createDataSet("data", str_type, H5::DataSpace(H5S_SCALAR));
+    dataset.write(to_json().dump(), str_type);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+void Symmetries::to_hdf5_file(const std::string& filename) const {
+  QDK_LOG_TRACE_ENTERING();
+  H5::H5File file(filename, H5F_ACC_TRUNC);
+  to_hdf5(file);
+}
+
+void Symmetries::to_file(const std::string& filename,
+                         const std::string& type) const {
+  QDK_LOG_TRACE_ENTERING();
+  if (type == "json") {
+    to_json_file(filename);
+  } else if (type == "hdf5") {
+    to_hdf5_file(filename);
+  } else {
+    throw std::invalid_argument("Unsupported file type: " + type +
+                                ". Supported types are: json, hdf5");
+  }
+}
+
+std::shared_ptr<Symmetries> Symmetries::from_json(const nlohmann::json& j) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    if (!j.contains("version")) {
+      throw std::runtime_error("Invalid JSON: missing version field");
+    }
+    validate_serialization_version(SERIALIZATION_VERSION,
+                                   j["version"].get<std::string>());
+
+    std::vector<SymmetryAxis> axes;
+    for (const auto& axis_json : j.at("axes")) {
+      axes.push_back(*SymmetryAxis::from_json(axis_json));
+    }
+    return std::make_shared<Symmetries>(std::move(axes));
+  } catch (const std::exception& e) {
+    throw std::runtime_error("Failed to parse Symmetries from JSON: " +
+                             std::string(e.what()));
+  }
+}
+
+std::shared_ptr<Symmetries> Symmetries::from_json_file(
+    const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  std::ifstream in(filename);
+  if (!in) {
+    throw std::runtime_error("Failed to open file for reading: " + filename);
+  }
+  nlohmann::json j;
+  in >> j;
+  return from_json(j);
+}
+
+std::shared_ptr<Symmetries> Symmetries::from_hdf5(H5::Group& group) {
+  QDK_LOG_TRACE_ENTERING();
+  try {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+
+    // Check version first
+    H5::Attribute version_attr = group.openAttribute("version");
+    std::string version;
+    version_attr.read(str_type, version);
+    validate_serialization_version(SERIALIZATION_VERSION, version);
+
+    std::string payload;
+    group.openDataSet("data").read(payload, str_type);
+    return from_json(nlohmann::json::parse(payload));
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
+}
+
+std::shared_ptr<Symmetries> Symmetries::from_hdf5_file(
+    const std::string& filename) {
+  QDK_LOG_TRACE_ENTERING();
+  H5::H5File file(filename, H5F_ACC_RDONLY);
+  return from_hdf5(file);
+}
+
+std::shared_ptr<Symmetries> Symmetries::from_file(const std::string& filename,
+                                                  const std::string& type) {
+  QDK_LOG_TRACE_ENTERING();
+  if (type == "json") {
+    return from_json_file(filename);
+  }
+  if (type == "hdf5") {
+    return from_hdf5_file(filename);
+  }
+  throw std::invalid_argument("Unsupported file type: " + type +
+                              ". Supported types are: json, hdf5");
 }
 
 // ---------------------------------------------------------------------------

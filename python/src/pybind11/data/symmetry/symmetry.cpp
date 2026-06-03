@@ -7,12 +7,17 @@
 #include <pybind11/stl.h>
 
 #include <memory>
+#include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
+#include <string>
 #include <vector>
+
+#include "../path_utils.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::data;
+using qdk::chemistry::python::utils::to_string_path;
 
 void bind_symmetry_errors(py::module&) {
   py::register_exception_translator([](std::exception_ptr p) {
@@ -60,7 +65,7 @@ void bind_symmetry(py::module& symmetry) {
            "Construct from 2*Ms (e.g. +1 for alpha, -1 for beta).")
       .def("value", &SpinValue::value, "The stored 2*Ms value.");
 
-  py::class_<SymmetryAxis>(
+  py::class_<SymmetryAxis, DataClass, py::smart_holder>(
       symmetry, "SymmetryAxis",
       "One named symmetry partition the basis is blocked under.")
       .def(py::init<AxisName,
@@ -82,9 +87,49 @@ void bind_symmetry(py::module& symmetry) {
            "True iff value is one of this axis's admissible labels.")
       .def(py::self == py::self)
       .def(py::self != py::self)
-      .def("__hash__", &SymmetryAxis::hash);
+      .def("__hash__", &SymmetryAxis::hash)
+      .def("get_data_type_name", &SymmetryAxis::get_data_type_name)
+      .def("get_summary", &SymmetryAxis::get_summary)
+      .def("__repr__", &SymmetryAxis::get_summary)
+      .def(
+          "to_file",
+          [](const SymmetryAxis& self, const py::object& filename,
+             const std::string& type) {
+            self.to_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def(
+          "to_json_file",
+          [](const SymmetryAxis& self, const py::object& filename) {
+            self.to_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def(
+          "to_hdf5_file",
+          [](const SymmetryAxis& self, const py::object& filename) {
+            self.to_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_file",
+          [](const py::object& filename, const std::string& type) {
+            return SymmetryAxis::from_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def_static(
+          "from_json_file",
+          [](const py::object& filename) {
+            return SymmetryAxis::from_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_hdf5_file",
+          [](const py::object& filename) {
+            return SymmetryAxis::from_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"));
 
-  py::class_<Symmetries, std::shared_ptr<Symmetries>>(
+  py::class_<Symmetries, DataClass, py::smart_holder>(
       symmetry, "Symmetries",
       "A symmetry vocabulary: the ordered set of axes a basis is blocked "
       "under, together with their admissible labels and equivalence flags.")
@@ -97,7 +142,47 @@ void bind_symmetry(py::module& symmetry) {
            "Access the axis with the given name.")
       .def(py::self == py::self)
       .def(py::self != py::self)
-      .def("__hash__", &Symmetries::hash);
+      .def("__hash__", &Symmetries::hash)
+      .def("get_data_type_name", &Symmetries::get_data_type_name)
+      .def("get_summary", &Symmetries::get_summary)
+      .def("__repr__", &Symmetries::get_summary)
+      .def(
+          "to_file",
+          [](const Symmetries& self, const py::object& filename,
+             const std::string& type) {
+            self.to_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def(
+          "to_json_file",
+          [](const Symmetries& self, const py::object& filename) {
+            self.to_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def(
+          "to_hdf5_file",
+          [](const Symmetries& self, const py::object& filename) {
+            self.to_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_file",
+          [](const py::object& filename, const std::string& type) {
+            return Symmetries::from_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def_static(
+          "from_json_file",
+          [](const py::object& filename) {
+            return Symmetries::from_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_hdf5_file",
+          [](const py::object& filename) {
+            return Symmetries::from_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"));
 
   py::class_<SymmetryLabel>(
       symmetry, "SymmetryLabel",

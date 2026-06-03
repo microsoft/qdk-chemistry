@@ -486,8 +486,7 @@ class SymmetryBlocked : public DataClass {
     SymmetriesArray symmetries;
     const auto& sym_json = j.at("symmetries");
     for (std::size_t i = 0; i < Rank; ++i) {
-      symmetries[i] = std::make_shared<const Symmetries>(
-          Symmetries::from_json(sym_json[i]));
+      symmetries[i] = Symmetries::from_json(sym_json[i]);
     }
     return symmetries;
   }
