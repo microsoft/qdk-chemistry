@@ -84,8 +84,6 @@ extends:
     sdl:
       autobaseline:
         enableForGitHub: true
-      componentgovernance:
-        useAgentBuildDirectory: true
       codeql:
         compiled:
           enabled: true
@@ -230,7 +228,6 @@ extends:
               sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
             displayName: Fix wheel directory ownership
 
-
           - task: TwineAuthenticate@1
             inputs:
               artifactFeed: $(artifactProject)/$(artifactFeed)
@@ -257,19 +254,6 @@ extends:
                 publishLinuxSymbols: true
 
 
-          - script: |
-              set -x
-              echo "Check repository state after build and test steps"
-              cd $(AgentBuildDirectory)/qdk-chemistry
-              pwd
-              ls -la .
-              ls -la .pipelines
-              ls -la python
-              ls -la python/build
-              ls -la python/build/*manifest
-              ls -la python/repaired_wheelhouse
-            displayName: Check repository state
-
     - stage: Approval
       displayName: Approval
       dependsOn: Build
@@ -285,6 +269,7 @@ extends:
             notifyUsers: ''
             instructions: Please verify artifacts and approve the release
             onTimeout: reject
+
 
     - stage: Release
       displayName: Release
