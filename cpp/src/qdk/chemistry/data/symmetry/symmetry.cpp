@@ -270,43 +270,44 @@ std::shared_ptr<SymmetryAxis> SymmetryAxis::from_file(
 }
 
 // ---------------------------------------------------------------------------
-// Symmetries
+// SymmetryProduct
 // ---------------------------------------------------------------------------
 
-Symmetries::Symmetries(std::vector<SymmetryAxis> axes)
+SymmetryProduct::SymmetryProduct(std::vector<SymmetryAxis> axes)
     : _axes(std::move(axes)) {
   for (std::size_t i = 0; i < _axes.size(); ++i) {
     for (std::size_t k = i + 1; k < _axes.size(); ++k) {
       if (_axes[i].name() == _axes[k].name()) {
         throw std::runtime_error(
-            "Symmetries must not contain duplicate axis '" +
+            "SymmetryProduct must not contain duplicate axis '" +
             to_string(_axes[i].name()) + "'.");
       }
     }
   }
 }
 
-const std::vector<SymmetryAxis>& Symmetries::axes() const { return _axes; }
+const std::vector<SymmetryAxis>& SymmetryProduct::axes() const { return _axes; }
 
-bool Symmetries::has_axis(AxisName name) const {
+bool SymmetryProduct::has_axis(AxisName name) const {
   return std::any_of(_axes.begin(), _axes.end(),
                      [&](const auto& axis) { return axis.name() == name; });
 }
 
-const SymmetryAxis& Symmetries::axis(AxisName name) const {
+const SymmetryAxis& SymmetryProduct::axis(AxisName name) const {
   for (const auto& axis : _axes) {
     if (axis.name() == name) {
       return axis;
     }
   }
-  throw std::runtime_error("Symmetries has no axis '" + to_string(name) + "'.");
+  throw std::runtime_error("SymmetryProduct has no axis '" + to_string(name) +
+                           "'.");
 }
 
-bool Symmetries::operator==(const Symmetries& other) const {
+bool SymmetryProduct::operator==(const SymmetryProduct& other) const {
   return _axes == other._axes;
 }
 
-std::size_t Symmetries::hash() const {
+std::size_t SymmetryProduct::hash() const {
   std::size_t seed = 0xC0FFEEULL;
   for (const auto& axis : _axes) {
     seed = utils::hash_combine(seed, axis.hash());
@@ -314,7 +315,7 @@ std::size_t Symmetries::hash() const {
   return seed;
 }
 
-nlohmann::json Symmetries::to_json() const {
+nlohmann::json SymmetryProduct::to_json() const {
   QDK_LOG_TRACE_ENTERING();
   nlohmann::json j;
   j["version"] = SERIALIZATION_VERSION;
@@ -326,9 +327,9 @@ nlohmann::json Symmetries::to_json() const {
   return j;
 }
 
-std::string Symmetries::get_summary() const {
+std::string SymmetryProduct::get_summary() const {
   std::ostringstream oss;
-  oss << "Symmetries(axes=" << _axes.size() << "; [";
+  oss << "SymmetryProduct(axes=" << _axes.size() << "; [";
   for (std::size_t i = 0; i < _axes.size(); ++i) {
     if (i > 0) oss << ", ";
     oss << to_string(_axes[i].name());
@@ -337,7 +338,7 @@ std::string Symmetries::get_summary() const {
   return oss.str();
 }
 
-void Symmetries::to_json_file(const std::string& filename) const {
+void SymmetryProduct::to_json_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
   std::ofstream out(filename);
   if (!out) {
@@ -346,7 +347,7 @@ void Symmetries::to_json_file(const std::string& filename) const {
   out << to_json().dump(2);
 }
 
-void Symmetries::to_hdf5(H5::Group& group) const {
+void SymmetryProduct::to_hdf5(H5::Group& group) const {
   QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -365,14 +366,14 @@ void Symmetries::to_hdf5(H5::Group& group) const {
   }
 }
 
-void Symmetries::to_hdf5_file(const std::string& filename) const {
+void SymmetryProduct::to_hdf5_file(const std::string& filename) const {
   QDK_LOG_TRACE_ENTERING();
   H5::H5File file(filename, H5F_ACC_TRUNC);
   to_hdf5(file);
 }
 
-void Symmetries::to_file(const std::string& filename,
-                         const std::string& type) const {
+void SymmetryProduct::to_file(const std::string& filename,
+                              const std::string& type) const {
   QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     to_json_file(filename);
@@ -384,7 +385,8 @@ void Symmetries::to_file(const std::string& filename,
   }
 }
 
-std::shared_ptr<Symmetries> Symmetries::from_json(const nlohmann::json& j) {
+std::shared_ptr<SymmetryProduct> SymmetryProduct::from_json(
+    const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
   try {
     if (!j.contains("version")) {
@@ -397,14 +399,14 @@ std::shared_ptr<Symmetries> Symmetries::from_json(const nlohmann::json& j) {
     for (const auto& axis_json : j.at("axes")) {
       axes.push_back(*SymmetryAxis::from_json(axis_json));
     }
-    return std::make_shared<Symmetries>(std::move(axes));
+    return std::make_shared<SymmetryProduct>(std::move(axes));
   } catch (const std::exception& e) {
-    throw std::runtime_error("Failed to parse Symmetries from JSON: " +
+    throw std::runtime_error("Failed to parse SymmetryProduct from JSON: " +
                              std::string(e.what()));
   }
 }
 
-std::shared_ptr<Symmetries> Symmetries::from_json_file(
+std::shared_ptr<SymmetryProduct> SymmetryProduct::from_json_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
   std::ifstream in(filename);
@@ -416,7 +418,7 @@ std::shared_ptr<Symmetries> Symmetries::from_json_file(
   return from_json(j);
 }
 
-std::shared_ptr<Symmetries> Symmetries::from_hdf5(H5::Group& group) {
+std::shared_ptr<SymmetryProduct> SymmetryProduct::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
     H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
@@ -435,15 +437,15 @@ std::shared_ptr<Symmetries> Symmetries::from_hdf5(H5::Group& group) {
   }
 }
 
-std::shared_ptr<Symmetries> Symmetries::from_hdf5_file(
+std::shared_ptr<SymmetryProduct> SymmetryProduct::from_hdf5_file(
     const std::string& filename) {
   QDK_LOG_TRACE_ENTERING();
   H5::H5File file(filename, H5F_ACC_RDONLY);
   return from_hdf5(file);
 }
 
-std::shared_ptr<Symmetries> Symmetries::from_file(const std::string& filename,
-                                                  const std::string& type) {
+std::shared_ptr<SymmetryProduct> SymmetryProduct::from_file(
+    const std::string& filename, const std::string& type) {
   QDK_LOG_TRACE_ENTERING();
   if (type == "json") {
     return from_json_file(filename);

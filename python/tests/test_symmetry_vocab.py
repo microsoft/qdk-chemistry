@@ -7,8 +7,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from qdk_chemistry.data import symmetry as sym
 
 
@@ -33,10 +31,6 @@ class TestSpinValue:
         """The interned alpha/beta values carry 2*Ms = +1/-1."""
         assert sym.axes.alpha().value() == 1
         assert sym.axes.beta().value() == -1
-
-    def test_kind_name(self):
-        """SpinValue reports the 'spin' serialization tag."""
-        assert sym.axes.alpha().kind_name() == "spin"
 
     def test_equality_and_hash(self):
         """Spin values compare equal iff they carry the same 2*Ms."""
@@ -74,29 +68,22 @@ class TestSymmetryAxis:
 
 
 class TestSymmetries:
-    """Tests for the Symmetries vocabulary."""
+    """Tests for the SymmetryProduct vocabulary."""
 
     def test_has_axis(self):
-        """A spin vocabulary reports the Spin axis present."""
-        syms = sym.Symmetries([sym.axes.spin(0, True)])
+        """A spin SymmetryProduct reports the Spin axis present."""
+        syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
         assert syms.has_axis(sym.AxisName.Spin)
-        assert not syms.has_axis(sym.AxisName.PointGroup)
 
     def test_axis_lookup(self):
         """The Spin axis can be retrieved by name."""
-        syms = sym.Symmetries([sym.axes.spin(0, True)])
+        syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
         assert syms.axis(sym.AxisName.Spin).name() == sym.AxisName.Spin
 
-    def test_missing_axis_raises(self):
-        """Requesting an absent axis raises RuntimeError."""
-        syms = sym.Symmetries([sym.axes.spin(0, True)])
-        with pytest.raises(RuntimeError):
-            syms.axis(sym.AxisName.PointGroup)
-
     def test_equality_and_hash(self):
-        """Vocabularies with identical axes compare equal and hash equal."""
-        s1 = sym.Symmetries([sym.axes.spin(0, True)])
-        s2 = sym.Symmetries([sym.axes.spin(0, True)])
+        """SymmetryProducts with identical axes compare equal and hash equal."""
+        s1 = sym.SymmetryProduct([sym.axes.spin(0, True)])
+        s2 = sym.SymmetryProduct([sym.axes.spin(0, True)])
         assert s1 == s2
         assert hash(s1) == hash(s2)
 

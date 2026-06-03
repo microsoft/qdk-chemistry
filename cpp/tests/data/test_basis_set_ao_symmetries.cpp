@@ -51,7 +51,7 @@ TEST(BasisSetAoSymmetries, DefaultIsRestrictedSpin) {
 }
 
 TEST(BasisSetAoSymmetries, ExplicitDefaultedExtents) {
-  auto sym = std::make_shared<const Symmetries>(
+  auto sym = std::make_shared<const SymmetryProduct>(
       std::vector<SymmetryAxis>{axes::spin(1, true)});
   BasisSet basis("custom", make_shells(), make_structure(), sym);
 
@@ -61,7 +61,7 @@ TEST(BasisSetAoSymmetries, ExplicitDefaultedExtents) {
 }
 
 TEST(BasisSetAoSymmetries, RestrictedExtentMismatchThrows) {
-  auto sym = std::make_shared<const Symmetries>(
+  auto sym = std::make_shared<const SymmetryProduct>(
       std::vector<SymmetryAxis>{axes::spin(1, true)});
   std::unordered_map<SymmetryLabel, std::size_t> extents{
       {SymmetryLabel{axes::alpha()}, 4},
@@ -73,7 +73,7 @@ TEST(BasisSetAoSymmetries, RestrictedExtentMismatchThrows) {
 }
 
 TEST(BasisSetAoSymmetries, UnrestrictedAllowsDistinctExtents) {
-  auto sym = std::make_shared<const Symmetries>(
+  auto sym = std::make_shared<const SymmetryProduct>(
       std::vector<SymmetryAxis>{axes::spin(1, false)});
   std::unordered_map<SymmetryLabel, std::size_t> extents{
       {SymmetryLabel{axes::alpha()}, 4},
@@ -86,7 +86,7 @@ TEST(BasisSetAoSymmetries, UnrestrictedAllowsDistinctExtents) {
 }
 
 TEST(BasisSetAoSymmetries, CopyPreservesAoSymmetries) {
-  auto sym = std::make_shared<const Symmetries>(
+  auto sym = std::make_shared<const SymmetryProduct>(
       std::vector<SymmetryAxis>{axes::spin(1, false)});
   std::unordered_map<SymmetryLabel, std::size_t> extents{
       {SymmetryLabel{axes::alpha()}, 4},

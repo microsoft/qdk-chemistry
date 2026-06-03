@@ -22,7 +22,7 @@ from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, SymmetriesV1
+    from qdk_chemistry.data import Hamiltonian, Symmetries
 
 # Type alias for sparse Pauli word: list of (qubit_index, op_type)
 # op_type: 1=X, 2=Y, 3=Z (identity is implicit/omitted)
@@ -267,7 +267,7 @@ class QdkQubitMapper(QubitMapper):
         """Return the algorithm name."""
         return "qdk"
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: SymmetriesV1 | None = None) -> QubitHamiltonian:  # noqa: ARG002
+    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:  # noqa: ARG002
         """Transform a fermionic Hamiltonian to a qubit Hamiltonian.
 
         Args:

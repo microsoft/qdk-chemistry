@@ -24,7 +24,7 @@ if OPENFERMION_AVAILABLE:
     import openfermion as of
 
     from qdk_chemistry.algorithms import QubitMapper, available, create
-    from qdk_chemistry.data import SymmetriesV1
+    from qdk_chemistry.data import Symmetries
     from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
     from qdk_chemistry.plugins.openfermion.conversion import (
         hamiltonian_to_fermion_operator,
@@ -129,7 +129,7 @@ def test_openfermion_scbk_encoding():
         "openfermion",
         encoding="symmetry-conserving-bravyi-kitaev",
     )
-    symmetries = SymmetriesV1(n_alpha=1, n_beta=1)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
     qh = mapper.run(hamiltonian, symmetries)
 
     # Reference: apply SCBK directly
@@ -157,16 +157,16 @@ def test_openfermion_scbk_requires_symmetries():
         "openfermion",
         encoding="symmetry-conserving-bravyi-kitaev",
     )
-    with pytest.raises(ValueError, match="SymmetriesV1"):
+    with pytest.raises(ValueError, match="Symmetries"):
         mapper.run(hamiltonian)
 
 
 def test_openfermion_scbk_from_wavefunction():
-    """SCBK encoding works with SymmetriesV1 constructed from a Wavefunction."""
+    """SCBK encoding works with Symmetries constructed from a Wavefunction."""
     hamiltonian = create_nontrivial_test_hamiltonian()
 
     wfn = create_test_wavefunction(num_orbitals=2)
-    symmetries = SymmetriesV1.from_wavefunction(wfn)
+    symmetries = Symmetries.from_wavefunction(wfn)
 
     mapper = create(
         "qubit_mapper",
@@ -180,11 +180,11 @@ def test_openfermion_scbk_from_wavefunction():
 
 
 def test_openfermion_scbk_from_ansatz():
-    """SCBK encoding works with SymmetriesV1 constructed from an Ansatz."""
+    """SCBK encoding works with Symmetries constructed from an Ansatz."""
     hamiltonian = create_nontrivial_test_hamiltonian()
 
     ansatz = create_test_ansatz(num_orbitals=2)
-    symmetries = SymmetriesV1.from_ansatz(ansatz)
+    symmetries = Symmetries.from_ansatz(ansatz)
 
     mapper = create(
         "qubit_mapper",
@@ -198,9 +198,9 @@ def test_openfermion_scbk_from_ansatz():
 
 
 def test_openfermion_scbk_symmetries_ignored_for_jw():
-    """SymmetriesV1 parameter is accepted but ignored for non-SCBK encodings."""
+    """Symmetries parameter is accepted but ignored for non-SCBK encodings."""
     hamiltonian = create_nontrivial_test_hamiltonian()
-    symmetries = SymmetriesV1(n_alpha=1, n_beta=1)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
 
     # Should work without error - symmetries is simply ignored
     qh_with = create("qubit_mapper", "openfermion", encoding="jordan-wigner").run(hamiltonian, symmetries)
@@ -337,7 +337,7 @@ def test_openfermion_standard_sets_blocked_order(encoding):
 def test_openfermion_scbk_sets_interleaved_order():
     """SCBK encoding sets fermion_mode_order to INTERLEAVED."""
     hamiltonian = create_nontrivial_test_hamiltonian()
-    symmetries = SymmetriesV1(n_alpha=1, n_beta=1)
+    symmetries = Symmetries(n_alpha=1, n_beta=1)
     qh = create("qubit_mapper", "openfermion", encoding="symmetry-conserving-bravyi-kitaev").run(
         hamiltonian,
         symmetries,

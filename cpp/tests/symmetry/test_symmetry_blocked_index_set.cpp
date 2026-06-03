@@ -14,8 +14,9 @@ using namespace qdk::chemistry::data;
 
 namespace {
 
-std::shared_ptr<const Symmetries> spin_symmetries() {
-  return std::make_shared<const Symmetries>(Symmetries({axes::spin(0, false)}));
+std::shared_ptr<const SymmetryProduct> spin_symmetries() {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, false)}));
 }
 
 }  // namespace

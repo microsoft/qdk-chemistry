@@ -140,7 +140,7 @@ class Orbitals : public SingleParticleBasis,
    * @brief Single-particle symmetries over the molecular-orbital modes.
    * @return Shared pointer to the molecular-orbital symmetries
    */
-  std::shared_ptr<const Symmetries> symmetries() const override;
+  std::shared_ptr<const SymmetryProduct> symmetries() const override;
 
   /**
    * @brief Molecular-orbital extents keyed by symmetry label.
@@ -535,7 +535,7 @@ class Orbitals : public SingleParticleBasis,
    * @brief Build molecular-orbital symmetries from the current
    * restricted/unrestricted state (fallback when no SBT is set).
    */
-  std::shared_ptr<const Symmetries> _build_mo_symmetries() const;
+  std::shared_ptr<const SymmetryProduct> _build_mo_symmetries() const;
 
   /**
    * @brief Build the canonical symmetry-blocked tensors from dense spin blocks,

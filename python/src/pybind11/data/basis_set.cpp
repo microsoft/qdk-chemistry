@@ -226,7 +226,7 @@ Examples:
   basis_set.def(
       py::init([](const std::string& name, const py::list& shells,
                   const Structure& structure,
-                  std::shared_ptr<const Symmetries> ao_symmetries,
+                  std::shared_ptr<const SymmetryProduct> ao_symmetries,
                   std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
                   AOType atomic_orbital_type) {
         return std::make_shared<BasisSet>(name, shells_from_py_list(shells),
@@ -238,19 +238,19 @@ Examples:
 Constructor with explicit AO symmetries.
 
 Creates a basis set whose atomic orbitals are blocked under a caller-provided
-single-particle symmetry vocabulary.
+single-particle SymmetryProduct.
 
 Args:
     name (str): Name of the basis set
     shells (list[Shell]): Vector of shell objects defining the atomic orbitals
     structure (Structure): Molecular structure to associate with this basis set
-    ao_symmetries (Symmetries): Symmetry vocabulary the AO basis is blocked under
+    ao_symmetries (SymmetryProduct): SymmetryProduct the AO basis is blocked under
     ao_extents (dict[SymmetryLabel, int] | None): Per-label AO extents; if empty, each admissible label defaults to the total atomic-orbital count
     atomic_orbital_type (AOType | None): Whether to use spherical or Cartesian atomic orbitals. Default is Spherical
 
 Examples:
-    >>> from qdk_chemistry.data.symmetry import Symmetries, axes
-    >>> sym = Symmetries([axes.spin(1, True)])
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> sym = SymmetryProduct([axes.spin(1, True)])
     >>> basis = BasisSet("custom", shells, structure, sym)
 )",
       py::arg("name"), py::arg("shells"), py::arg("structure"),
@@ -584,10 +584,10 @@ Examples:
 
   basis_set.def("ao_symmetries", &BasisSet::ao_symmetries,
                 R"(
-Get the single-particle symmetry vocabulary the AO basis is blocked under.
+Get the single-particle SymmetryProduct the AO basis is blocked under.
 
 Returns:
-    Symmetries: The AO :class:`~qdk_chemistry.data.symmetry.Symmetries`. Defaults to a
+    SymmetryProduct: The AO :class:`~qdk_chemistry.data.symmetry.SymmetryProduct`. Defaults to a
         restricted spin axis when not specified at construction.
 
 Examples:

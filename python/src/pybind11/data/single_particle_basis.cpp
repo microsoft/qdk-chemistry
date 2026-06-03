@@ -17,12 +17,12 @@ void bind_single_particle_basis(py::module &data) {
       R"(
 Abstract base for objects that expose a symmetry-blocked single-particle layout.
 
-A single-particle basis exposes the symmetry vocabulary its modes are blocked
+A single-particle basis exposes the SymmetryProduct its modes are blocked
 under, the per-label mode extents, and the total number of modes. Concrete
 subclasses (e.g. :class:`Orbitals`) provide the actual storage.
 )")
       .def("symmetries", &SingleParticleBasis::symmetries,
-           "Symmetry vocabulary the single-particle modes are blocked under.")
+           "SymmetryProduct the single-particle modes are blocked under.")
       .def("mo_extents", &SingleParticleBasis::mo_extents,
            "Per-label mode extents (number of modes carrying each label).")
       .def("num_modes", &SingleParticleBasis::num_modes,

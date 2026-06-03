@@ -59,13 +59,13 @@ std::array<SymmetryLabel, Rank> make_labels(
  *
  * A @ref SymmetryBlocked stores a sparse map from per-slot
  * @ref SymmetryLabel arrays to opaque block values of type @p Block.
- * Each slot carries its own @ref Symmetries and a per-label extent.
+ * Each slot carries its own @ref SymmetryProduct and a per-label extent.
  * Blocks are held via @c shared_ptr<const Block> so that symmetry-equivalent
  * sectors can alias the same storage.
  *
  * Symmetry aliasing is defined on the spin axis: a simultaneous
  * @f$\alpha \leftrightarrow \beta@f$ swap across all slots. When every slot
- * shares the same @ref Symmetries instance and the spin axis is marked
+ * shares the same @ref SymmetryProduct instance and the spin axis is marked
  * @c equivalent, the constructor auto-aliases each partner block to the
  * supplied representative. Aliasing can also be achieved by the producer
  * supplying the same @c shared_ptr for both spin partners (e.g. restricted
@@ -86,7 +86,8 @@ class SymmetryBlocked : public DataClass {
   using Labels = std::array<SymmetryLabel, Rank>;
   using BlockPtr = std::shared_ptr<const Block>;
   using BlockMap = std::unordered_map<Labels, BlockPtr, LabelsHash<Rank>>;
-  using SymmetriesArray = std::array<std::shared_ptr<const Symmetries>, Rank>;
+  using SymmetriesArray =
+      std::array<std::shared_ptr<const SymmetryProduct>, Rank>;
   using ExtentsArray =
       std::array<std::unordered_map<SymmetryLabel, std::size_t>, Rank>;
 
@@ -99,10 +100,9 @@ class SymmetryBlocked : public DataClass {
    * their own block-shape validation after this constructor returns.
    *
    * @throws std::invalid_argument if a block or extent label is not
-   *         admissible under the matching slot's @ref Symmetries, if a block
-   *         pointer is null, if restricted orbit partners have unequal
-   *         extents, or if both orbit partners are supplied but do not share
-   *         storage.
+   *         admissible under the matching slot's @ref SymmetryProduct, if a
+   * block pointer is null, if restricted orbit partners have unequal extents,
+   * or if both orbit partners are supplied but do not share storage.
    */
   SymmetryBlocked(SymmetriesArray symmetries, ExtentsArray extents,
                   BlockMap blocks)
@@ -227,7 +227,7 @@ class SymmetryBlocked : public DataClass {
    * @brief True iff @p label is admissible under @p sym (same axes carrying
    * values that @p sym 's axes admit).
    */
-  static bool _label_admissible(const Symmetries& sym,
+  static bool _label_admissible(const SymmetryProduct& sym,
                                 const SymmetryLabel& label) {
     if (label.values().size() != sym.axes().size()) {
       return false;
@@ -244,8 +244,8 @@ class SymmetryBlocked : public DataClass {
   }
 
   /**
-   * @brief Validate that every slot's @ref Symmetries is non-null and every
-   * declared extent label is admissible under its slot's symmetries.
+   * @brief Validate that every slot's @ref SymmetryProduct is non-null and
+   * every declared extent label is admissible under its slot's symmetries.
    * @throws std::invalid_argument on failure.
    */
   void _validate_symmetries_and_extents() const {
@@ -455,7 +455,7 @@ class SymmetryBlocked : public DataClass {
 
   // ---- JSON helpers for symmetries/extents (shared by all derived types) ---
 
-  /** @brief Serialize the per-slot @ref Symmetries to a JSON array. */
+  /** @brief Serialize the per-slot @ref SymmetryProduct to a JSON array. */
   nlohmann::json _symmetries_to_json() const {
     nlohmann::json symmetries = nlohmann::json::array();
     for (const auto& sym : _symmetries) {
@@ -486,7 +486,7 @@ class SymmetryBlocked : public DataClass {
     SymmetriesArray symmetries;
     const auto& sym_json = j.at("symmetries");
     for (std::size_t i = 0; i < Rank; ++i) {
-      symmetries[i] = Symmetries::from_json(sym_json[i]);
+      symmetries[i] = SymmetryProduct::from_json(sym_json[i]);
     }
     return symmetries;
   }

@@ -51,7 +51,8 @@ class SymmetryAxisValue {
   virtual nlohmann::json to_json() const = 0;
 
   /** @brief Convenience wrapper around @ref equals for symmetry with
-   * sibling types (@ref SymmetryAxis, @ref Symmetries, @ref SymmetryLabel). */
+   * sibling types (@ref SymmetryAxis, @ref SymmetryProduct, @ref
+   * SymmetryLabel). */
   bool operator==(const SymmetryAxisValue& other) const {
     return equals(other);
   }
@@ -284,7 +285,7 @@ class SymmetryAxis : public DataClass {
  * @brief The ordered set of symmetry axes a tensor is blocked under,
  * together with their admissible labels and equivalence flags.
  */
-class Symmetries : public DataClass {
+class SymmetryProduct : public DataClass {
   std::vector<SymmetryAxis> _axes;
 
  public:
@@ -295,13 +296,13 @@ class Symmetries : public DataClass {
    *             preserved and observable via @ref axes(); axis names must
    *             be unique.
    */
-  explicit Symmetries(std::vector<SymmetryAxis> axes);
+  explicit SymmetryProduct(std::vector<SymmetryAxis> axes);
 
   /**
    * @brief Construct a trivial symmetry set with no axes.
-   * @return An empty @ref Symmetries instance.
+   * @return An empty @ref SymmetryProduct instance.
    */
-  static Symmetries trivial() { return Symmetries({}); }
+  static SymmetryProduct trivial() { return SymmetryProduct({}); }
 
   /**
    * @brief The ordered list of axes carried by this symmetry set.
@@ -329,14 +330,16 @@ class Symmetries : public DataClass {
    * @param other Right-hand symmetry set to compare against.
    * @return @c true if both sets contain the same axes in the same order.
    */
-  bool operator==(const Symmetries& other) const;
+  bool operator==(const SymmetryProduct& other) const;
 
   /**
    * @brief Inverse of @ref operator==.
    * @param other Right-hand symmetry set to compare against.
    * @return @c true if the axis sequences differ.
    */
-  bool operator!=(const Symmetries& other) const { return !(*this == other); }
+  bool operator!=(const SymmetryProduct& other) const {
+    return !(*this == other);
+  }
 
   /**
    * @brief Hash consistent with @ref operator==.
@@ -349,12 +352,12 @@ class Symmetries : public DataClass {
    * @return The string @c "symmetries".
    */
   std::string get_data_type_name() const override {
-    return DATACLASS_TO_SNAKE_CASE(Symmetries);
+    return DATACLASS_TO_SNAKE_CASE(SymmetryProduct);
   }
 
   /**
    * @brief Single-line human-readable summary.
-   * @return A string of the form <tt>Symmetries(axes=N; [name0, name1,
+   * @return A string of the form <tt>SymmetryProduct(axes=N; [name0, name1,
    * ...])</tt>.
    */
   std::string get_summary() const override;
@@ -403,58 +406,58 @@ class Symmetries : public DataClass {
                const std::string& type) const override;
 
   /**
-   * @brief Reconstruct a @ref Symmetries from JSON produced by
+   * @brief Reconstruct a @ref SymmetryProduct from JSON produced by
    * @ref to_json.
    * @param j JSON object containing symmetry-set data.
-   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @return Shared pointer to the deserialized @ref SymmetryProduct.
    * @throws std::runtime_error if @p j is missing required fields or an
    *         embedded axis is malformed.
    */
-  static std::shared_ptr<Symmetries> from_json(const nlohmann::json& j);
+  static std::shared_ptr<SymmetryProduct> from_json(const nlohmann::json& j);
 
   /**
-   * @brief Load a @ref Symmetries from a JSON file produced by
+   * @brief Load a @ref SymmetryProduct from a JSON file produced by
    * @ref to_json_file.
    * @param filename Path to the input JSON file.
-   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @return Shared pointer to the deserialized @ref SymmetryProduct.
    * @throws std::runtime_error if @p filename cannot be read or its
    *         contents are malformed.
    */
-  static std::shared_ptr<Symmetries> from_json_file(
+  static std::shared_ptr<SymmetryProduct> from_json_file(
       const std::string& filename);
 
   /**
-   * @brief Load a @ref Symmetries from an HDF5 group produced by
+   * @brief Load a @ref SymmetryProduct from an HDF5 group produced by
    * @ref to_hdf5.
    * @param group HDF5 group to read data from.
-   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @return Shared pointer to the deserialized @ref SymmetryProduct.
    * @throws std::runtime_error if the expected dataset is missing or the
    *         payload is malformed.
    */
-  static std::shared_ptr<Symmetries> from_hdf5(H5::Group& group);
+  static std::shared_ptr<SymmetryProduct> from_hdf5(H5::Group& group);
 
   /**
-   * @brief Load a @ref Symmetries from an HDF5 file produced by
+   * @brief Load a @ref SymmetryProduct from an HDF5 file produced by
    * @ref to_hdf5_file.
    * @param filename Path to the input HDF5 file.
-   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @return Shared pointer to the deserialized @ref SymmetryProduct.
    * @throws std::runtime_error if @p filename cannot be read or its
    *         contents are malformed.
    */
-  static std::shared_ptr<Symmetries> from_hdf5_file(
+  static std::shared_ptr<SymmetryProduct> from_hdf5_file(
       const std::string& filename);
 
   /**
    * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
    * @param filename Path to the input file.
    * @param type Either @c "json" or @c "hdf5".
-   * @return Shared pointer to the deserialized @ref Symmetries.
+   * @return Shared pointer to the deserialized @ref SymmetryProduct.
    * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
    * @throws std::runtime_error if @p filename cannot be read or its
    *         contents are malformed.
    */
-  static std::shared_ptr<Symmetries> from_file(const std::string& filename,
-                                               const std::string& type);
+  static std::shared_ptr<SymmetryProduct> from_file(const std::string& filename,
+                                                    const std::string& type);
 
  private:
   /// On-disk serialization format version. Bump on any change to the JSON

@@ -306,10 +306,11 @@ class BasisSet : public DataClass,
   /**
    * @brief Constructor with explicit atomic-orbital (AO) symmetries
    *
-   * Use this overload to block the AO basis under a non-default symmetry
-   * vocabulary. The default (used by every other constructor) is a restricted
-   * spin axis (@c axes::spin(1, true)) whose @f$\alpha@f$/@f$\beta@f$ labels
-   * each carry an extent equal to @ref get_num_atomic_orbitals().
+   * Use this overload to block the AO basis under a non-default
+   * @ref SymmetryProduct. The default (used by every other constructor) is a
+   * restricted spin axis (@c axes::spin(1, true)) whose
+   * @f$\alpha@f$/@f$\beta@f$ labels each carry an extent equal to
+   * @ref get_num_atomic_orbitals().
    *
    * @param name Name of the basis set
    * @param shells Vector of shells to initialize the basis set with
@@ -324,7 +325,7 @@ class BasisSet : public DataClass,
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
            const Structure& structure,
-           std::shared_ptr<const Symmetries> ao_symmetries,
+           std::shared_ptr<const SymmetryProduct> ao_symmetries,
            std::unordered_map<SymmetryLabel, std::size_t> ao_extents = {},
            AOType atomic_orbital_type = AOType::Spherical);
 
@@ -556,17 +557,17 @@ class BasisSet : public DataClass,
    * Returns the AO-basis symmetries. This is distinct from
    * @ref Orbitals::symmetries(), which returns the MO-basis symmetries — AOs
    * and MOs live in different single-particle bases and may carry different
-   * symmetry vocabularies (e.g. an intertwiner stored on @ref Orbitals carries
-   * AO symmetries on one slot and MO symmetries on the other). The @c ao_
-   * prefix exists to keep this distinction explicit on classes that touch
+   * SymmetryProduct instances (e.g. an intertwiner stored on @ref Orbitals
+   * carries AO symmetries on one slot and MO symmetries on the other). The @c
+   * ao_ prefix exists to keep this distinction explicit on classes that touch
    * both bases.
    *
    * Defaults to a restricted spin axis (@c axes::spin(1, true)). Override at
    * construction with the AO-symmetries constructor overload.
    *
-   * @return Shared pointer to the AO @ref Symmetries
+   * @return Shared pointer to the AO @ref SymmetryProduct
    */
-  std::shared_ptr<const Symmetries> ao_symmetries() const;
+  std::shared_ptr<const SymmetryProduct> ao_symmetries() const;
 
   /**
    * @brief Per-label extents of the atomic-orbital basis.
@@ -874,7 +875,7 @@ class BasisSet : public DataClass,
   std::vector<size_t> _ecp_electrons;
 
   /// Symmetry definitions the AO basis is blocked under (lazily defaulted)
-  mutable std::shared_ptr<const Symmetries> _ao_symmetries;
+  mutable std::shared_ptr<const SymmetryProduct> _ao_symmetries;
 
   /// Per-label AO extents (lazily defaulted alongside @ref _ao_symmetries)
   mutable std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;

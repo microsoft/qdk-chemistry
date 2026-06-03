@@ -438,8 +438,8 @@ SymmetryBlockedTensor<2, Scalar> _make_active_one_rdm_sbt_block(
   using Block = Tensor<2, Scalar>;
 
   std::size_t n = static_cast<std::size_t>(aa.rows());
-  auto sym = std::make_shared<const Symmetries>(
-      Symmetries({axes::spin(0, restricted)}));
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, restricted)}));
 
   SymmetryLabel alpha_label({axes::alpha()});
   SymmetryLabel beta_label({axes::beta()});
@@ -477,8 +477,8 @@ SymmetryBlockedTensor<4, Scalar> _make_active_two_rdm_sbt_block(
   std::size_t n = 1;
   while (n * n * n * n < n4) ++n;
 
-  auto sym = std::make_shared<const Symmetries>(
-      Symmetries({axes::spin(0, restricted)}));
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, restricted)}));
 
   SymmetryLabel a({axes::alpha()});
   SymmetryLabel b({axes::beta()});

@@ -24,20 +24,20 @@ void bind_symmetry_blocked_index_set(py::module& m) {
   py::class_<SymmetryBlockedIndexSet, DataClass, py::smart_holder>(
       m, "SymmetryBlockedIndexSet",
       "Immutable set of symmetry-blocked, sorted-unique integer indices, one "
-      "list per admissible SymmetryLabel of a single Symmetries vocabulary.")
+      "list per admissible SymmetryLabel of a single SymmetryProduct.")
       .def(py::init<
-               std::shared_ptr<const Symmetries>,
+               std::shared_ptr<const SymmetryProduct>,
                std::unordered_map<SymmetryLabel, std::size_t>,
                std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>>(),
            py::arg("symmetries"), py::arg("extents"), py::arg("indices"),
-           "Construct from a symmetry vocabulary, per-label extents, and "
+           "Construct from a SymmetryProduct, per-label extents, and "
            "per-label index lists (each must be sorted, unique, and in range).")
       .def(
           "symmetries",
           [](const SymmetryBlockedIndexSet& self) {
-            return std::const_pointer_cast<Symmetries>(self.symmetries());
+            return std::const_pointer_cast<SymmetryProduct>(self.symmetries());
           },
-          "The symmetry vocabulary this index set is blocked under.")
+          "The SymmetryProduct this index set is blocked under.")
       .def("extents", &SymmetryBlockedIndexSet::extents, "Per-label extents.")
       .def(
           "indices",

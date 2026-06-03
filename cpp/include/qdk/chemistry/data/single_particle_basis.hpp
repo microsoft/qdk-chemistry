@@ -36,9 +36,9 @@ class SingleParticleBasis : public DataClass {
 
   /**
    * @brief Symmetry definitions the single-particle modes are blocked under.
-   * @return Shared pointer to the mode @ref Symmetries
+   * @return Shared pointer to the mode @ref SymmetryProduct
    */
-  virtual std::shared_ptr<const Symmetries> symmetries() const = 0;
+  virtual std::shared_ptr<const SymmetryProduct> symmetries() const = 0;
 
   /**
    * @brief Per-label mode extents.

@@ -88,15 +88,15 @@ S scalar_from_json(const nlohmann::json& j) {
  *
  * A @ref SymmetryBlockedTensor stores the non-zero symmetry sectors of a
  * rank-@p Rank tensor as a sparse map from per-slot @ref SymmetryLabel arrays
- * to dense Eigen blocks. Each slot carries its own @ref Symmetries
+ * to dense Eigen blocks. Each slot carries its own @ref SymmetryProduct
  * and a per-label extent. Blocks are held via @c shared_ptr<const Tensor> so
  * that symmetry-equivalent sectors can alias the same storage.
  *
  * Symmetry aliasing is defined on the spin axis: a simultaneous
  * @f$\alpha \leftrightarrow \beta@f$ swap across all slots. When every slot
- * shares the same @ref Symmetries instance and the spin axis is marked
+ * shares the same @ref SymmetryProduct instance and the spin axis is marked
  * @c equivalent, the constructor auto-aliases each partner block to the
- * supplied representative. When the slots carry distinct @ref Symmetries
+ * supplied representative. When the slots carry distinct @ref SymmetryProduct
  * (intertwiner storage such as basis coefficients), no auto-aliasing is
  * performed.
  *
@@ -122,7 +122,7 @@ class SymmetryBlockedTensor
    * map. See the class description for the validation rules.
    *
    * @throws std::invalid_argument if a block or extent label is not
-   *         admissible under the matching slot's @ref Symmetries, if a
+   *         admissible under the matching slot's @ref SymmetryProduct, if a
    *         block's shape does not match the declared extents, if restricted
    *         orbit partners have unequal extents, or if both orbit partners
    *         are supplied but do not share storage.

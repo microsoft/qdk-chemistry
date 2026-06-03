@@ -858,7 +858,7 @@ Examples:
   data.def(
       "ao_symmetries",
       [](const std::shared_ptr<const SingleParticleBasis> &basis)
-          -> std::shared_ptr<const Symmetries> {
+          -> std::shared_ptr<const SymmetryProduct> {
         auto orbitals = std::dynamic_pointer_cast<const Orbitals>(basis);
         if (!orbitals || !orbitals->has_basis_set()) {
           return nullptr;
@@ -867,7 +867,7 @@ Examples:
       },
       py::arg("basis"),
       R"(
-Return the AO-basis symmetry vocabulary backing a single-particle basis.
+Return the AO-basis SymmetryProduct backing a single-particle basis.
 
 For :class:`Orbitals` carrying a basis set, this returns the AO symmetries of
 that basis set. For :class:`ModelOrbitals` (or any single-particle basis
@@ -877,7 +877,7 @@ Args:
     basis: Single-particle basis to inspect (may be ``None``).
 
 Returns:
-    The AO Symmetries, or ``None`` if the basis has no underlying AO basis set.
+    The AO SymmetryProduct, or ``None`` if the basis has no underlying AO basis set.
 )");
 
   // Bind ModelOrbitals

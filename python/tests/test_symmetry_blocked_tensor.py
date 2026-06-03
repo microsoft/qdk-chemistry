@@ -16,7 +16,7 @@ from qdk_chemistry.data import symmetry as sym
 @pytest.fixture
 def restricted_spin():
     """A restricted (equivalent) spin vocabulary with alpha/beta labels."""
-    syms = sym.Symmetries([sym.axes.spin(0, True)])
+    syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
     alpha = sym.SymmetryLabel([sym.axes.alpha()])
     beta = sym.SymmetryLabel([sym.axes.beta()])
     return syms, alpha, beta
@@ -25,7 +25,7 @@ def restricted_spin():
 @pytest.fixture
 def unrestricted_spin():
     """An unrestricted (non-equivalent) spin vocabulary with alpha/beta labels."""
-    syms = sym.Symmetries([sym.axes.spin(0, False)])
+    syms = sym.SymmetryProduct([sym.axes.spin(0, False)])
     alpha = sym.SymmetryLabel([sym.axes.alpha()])
     beta = sym.SymmetryLabel([sym.axes.beta()])
     return syms, alpha, beta
@@ -45,9 +45,11 @@ class TestSymmetryBlockedTensorRank2:
         )
         assert sbt.has_block((alpha, alpha))
         assert sbt.has_block((beta, beta))
-        assert sbt.is_restricted()
+        # Both spin sectors exist (num_blocks counts aliases) but storage is
+        # shared, so block((alpha, alpha)) and block((beta, beta)) return the
+        # same data.
         assert sbt.num_blocks() == 2
-        assert len(sbt.canonical_block_labels()) == 1
+        assert np.allclose(sbt.block((alpha, alpha)), sbt.block((beta, beta)))
 
     def test_block_roundtrip(self, restricted_spin):
         """Stored numpy data is returned unchanged from block()."""
@@ -71,10 +73,10 @@ class TestSymmetryBlockedTensorRank2:
             [{alpha: 2, beta: 2}, {alpha: 2, beta: 2}],
             [((alpha, alpha), a_block), ((beta, beta), b_block)],
         )
-        assert not sbt.is_restricted()
         assert np.allclose(sbt.block((alpha, alpha)), a_block)
         assert np.allclose(sbt.block((beta, beta)), b_block)
-        assert len(sbt.canonical_block_labels()) == 2
+        # Independent storage: alpha and beta blocks differ.
+        assert not np.allclose(sbt.block((alpha, alpha)), sbt.block((beta, beta)))
 
     def test_missing_block_raises(self, unrestricted_spin):
         """Requesting an absent block raises ValueError."""
@@ -127,9 +129,9 @@ class TestSymmetryBlockedTensorRank1:
 class TestSymmetryBlockedIndexSet:
     """Tests for the symmetry-blocked index set."""
 
-    def test_indices_returns_immutable_tuple(self, restricted_spin):
+    def test_indices_returns_immutable_tuple(self, unrestricted_spin):
         """indices() returns a tuple of the sorted, unique indices."""
-        syms, alpha, beta = restricted_spin
+        syms, alpha, beta = unrestricted_spin
         sbis = sym.SymmetryBlockedIndexSet(syms, {alpha: 5, beta: 5}, {alpha: [0, 2, 4], beta: [1, 3]})
         assert sbis.indices(alpha) == (0, 2, 4)
         assert isinstance(sbis.indices(alpha), tuple)
@@ -165,11 +167,12 @@ class TestSerialization:
         sbt.to_json_file(str(path))
         loaded = sym.SymmetryBlockedTensorRank2.from_json_file(str(path))
         assert np.allclose(loaded.block((alpha, alpha)), block)
-        assert loaded.is_restricted()
+        # Restricted-spin aliasing survives the round-trip.
+        assert np.allclose(loaded.block((beta, beta)), block)
 
-    def test_index_set_json_roundtrip(self, restricted_spin, tmp_path):
+    def test_index_set_json_roundtrip(self, unrestricted_spin, tmp_path):
         """An index set survives a JSON round-trip."""
-        syms, alpha, beta = restricted_spin
+        syms, alpha, beta = unrestricted_spin
         sbis = sym.SymmetryBlockedIndexSet(syms, {alpha: 5, beta: 5}, {alpha: [0, 2, 4], beta: [1, 3]})
         path = tmp_path / "sbis.json"
         sbis.to_json_file(str(path))

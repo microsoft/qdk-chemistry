@@ -21,7 +21,7 @@ namespace qdk::chemistry::data {
  * @brief Sorted-unique integer index subset, blocked by symmetry.
  *
  * A @ref SymmetryBlockedIndexSet describes, for each admissible
- * @ref SymmetryLabel of a single @ref Symmetries, a sorted set of
+ * @ref SymmetryLabel of a single @ref SymmetryProduct, a sorted set of
  * unique indices drawn from @c [0, extent) for that label. The
  * @em extent is the universe size for that label (e.g. the total number
  * of α MOs) and is stored separately from the @em indices subset, so
@@ -71,12 +71,12 @@ class SymmetryBlockedIndexSet
    * @throws std::out_of_range if an index is >= its label's extent.
    */
   SymmetryBlockedIndexSet(
-      std::shared_ptr<const Symmetries> symmetries,
+      std::shared_ptr<const SymmetryProduct> symmetries,
       std::unordered_map<SymmetryLabel, std::size_t> extents,
       std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices);
 
   /** @brief The symmetry definitions this index set is blocked under. */
-  std::shared_ptr<const Symmetries> symmetries() const {
+  std::shared_ptr<const SymmetryProduct> symmetries() const {
     return Base::symmetries()[0];
   }
 

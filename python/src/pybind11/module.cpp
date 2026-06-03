@@ -59,12 +59,12 @@ PYBIND11_MODULE(_core, m) {
 
   auto symmetry = data.def_submodule("symmetry");
   symmetry.doc() =
-      R"(Single-particle symmetry vocabulary and symmetry-blocked storage)";
+      R"(Single-particle SymmetryProduct and symmetry-blocked storage)";
 
   // Ordering is important!
 
   bind_base_class(data);
-  bind_symmetry(symmetry);  // vocab + SBT/SBIS before orbital containers
+  bind_symmetry(symmetry);  // axis types + SBT/SBIS before orbital containers
   bind_symmetry_blocked_tensor(symmetry);
   bind_symmetry_blocked_index_set(symmetry);
   bind_element_data(data);  // Element enums must be bound before Structure

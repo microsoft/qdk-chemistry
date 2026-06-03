@@ -333,7 +333,8 @@ void CholeskyHamiltonianContainer::_set_three_center_container(
   mo_ext[beta_label] = n_active_beta;
 
   // Auxiliary axis: trivial symmetry.
-  auto aux_sym = std::make_shared<const Symmetries>(Symmetries::trivial());
+  auto aux_sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
   SymmetryLabel aux_label;
   std::unordered_map<SymmetryLabel, std::size_t> aux_ext;
   aux_ext[aux_label] = naux;

@@ -638,7 +638,7 @@ std::vector<size_t> Orbitals::get_all_mo_indices() const {
 
 // === Symmetry-blocked (SBT-native) interface ===
 
-std::shared_ptr<const Symmetries> Orbitals::_build_mo_symmetries() const {
+std::shared_ptr<const SymmetryProduct> Orbitals::_build_mo_symmetries() const {
   if (_coefficients_sbt) {
     return _coefficients_sbt->symmetries()[1];
   }
@@ -646,11 +646,11 @@ std::shared_ptr<const Symmetries> Orbitals::_build_mo_symmetries() const {
   // are equivalent (restricted); the total spin (two_s) is a many-body quantity
   // and is not tracked here.
   const bool equivalent = is_restricted();
-  return std::make_shared<const Symmetries>(
-      Symmetries({axes::spin(0, equivalent)}));
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, equivalent)}));
 }
 
-std::shared_ptr<const Symmetries> Orbitals::symmetries() const {
+std::shared_ptr<const SymmetryProduct> Orbitals::symmetries() const {
   QDK_LOG_TRACE_ENTERING();
   if (_coefficients_sbt) {
     return _coefficients_sbt->symmetries()[1];
@@ -700,8 +700,8 @@ void Orbitals::_set_coefficient_containers(
     std::shared_ptr<const Eigen::VectorXd> energies_beta, bool restricted) {
   const SymmetryLabel a({axes::alpha()});
   const SymmetryLabel b({axes::beta()});
-  auto sym = std::make_shared<const Symmetries>(
-      Symmetries({axes::spin(0, restricted)}));
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, restricted)}));
 
   // Use the BasisSet's AO symmetries when available.
   auto ao_sym = (_basis_set && _basis_set->ao_symmetries())

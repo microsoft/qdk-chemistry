@@ -43,7 +43,7 @@ SymmetryBlockedIndexSet::BlockMap SymmetryBlockedIndexSet::_build_block_map(
 }
 
 SymmetryBlockedIndexSet::SymmetryBlockedIndexSet(
-    std::shared_ptr<const Symmetries> symmetries,
+    std::shared_ptr<const SymmetryProduct> symmetries,
     std::unordered_map<SymmetryLabel, std::size_t> extents,
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices)
     : Base(SymmetriesArray{std::move(symmetries)},
@@ -169,8 +169,8 @@ std::shared_ptr<SymmetryBlockedIndexSet> SymmetryBlockedIndexSet::from_json(
     validate_serialization_version(SERIALIZATION_VERSION,
                                    j["version"].get<std::string>());
 
-    std::shared_ptr<const Symmetries> symmetries =
-        Symmetries::from_json(j.at("symmetries"));
+    std::shared_ptr<const SymmetryProduct> symmetries =
+        SymmetryProduct::from_json(j.at("symmetries"));
 
     std::unordered_map<SymmetryLabel, std::size_t> extents;
     for (const auto& entry : j.at("extents")) {

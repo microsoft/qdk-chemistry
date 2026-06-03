@@ -475,7 +475,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    const Structure& structure,
-                   std::shared_ptr<const Symmetries> ao_symmetries,
+                   std::shared_ptr<const SymmetryProduct> ao_symmetries,
                    std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
                    AOType atomic_orbital_type)
     : _name(name),
@@ -903,7 +903,7 @@ size_t BasisSet::get_num_atomic_orbitals() const {
   return _cached_num_atomic_orbitals;
 }
 
-std::shared_ptr<const Symmetries> BasisSet::ao_symmetries() const {
+std::shared_ptr<const SymmetryProduct> BasisSet::ao_symmetries() const {
   QDK_LOG_TRACE_ENTERING();
   _ensure_ao_symmetries();
   return _ao_symmetries;
@@ -920,7 +920,7 @@ void BasisSet::_ensure_ao_symmetries() const {
   if (_ao_symmetries) {
     return;
   }
-  _ao_symmetries = std::make_shared<const Symmetries>(
+  _ao_symmetries = std::make_shared<const SymmetryProduct>(
       std::vector<SymmetryAxis>{axes::spin(1, true)});
   const std::size_t num_ao = get_num_atomic_orbitals();
   _ao_extents.clear();
@@ -929,7 +929,7 @@ void BasisSet::_ensure_ao_symmetries() const {
 }
 
 void BasisSet::_validate_ao_symmetries() const {
-  // Every extent key must be admissible under the AO symmetry vocabulary.
+  // Every extent key must be admissible under the AO SymmetryProduct.
   for (const auto& [label, extent] : _ao_extents) {
     (void)extent;
     for (const auto& axis : _ao_symmetries->axes()) {

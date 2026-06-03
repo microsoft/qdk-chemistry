@@ -39,7 +39,7 @@ using SparseMapBlock = std::map<std::array<unsigned, Rank>, Scalar>;
  * A @ref SymmetryBlockedSparseMap stores the non-zero symmetry sectors of a
  * rank-@p Rank sparse index-value map.  Each block is a
  * @ref SparseMapBlock — a sorted map from per-slot local-index tuples to
- * scalar values.  The block map, symmetry vocabularies, and orbit aliasing
+ * scalar values.  The block map, SymmetryProduct instances, and orbit aliasing
  * are inherited from @ref SymmetryBlocked.
  *
  * @tparam Rank   Number of label slots (typically 4 for two-body integrals).

@@ -57,14 +57,14 @@ void bind_sbt_instance(py::module& m, const char* name) {
       .def(
           "symmetries",
           [](const SBT& self) {
-            std::vector<std::shared_ptr<Symmetries>> out;
+            std::vector<std::shared_ptr<SymmetryProduct>> out;
             out.reserve(self.symmetries().size());
             for (const auto& sym : self.symmetries()) {
-              out.push_back(std::const_pointer_cast<Symmetries>(sym));
+              out.push_back(std::const_pointer_cast<SymmetryProduct>(sym));
             }
             return out;
           },
-          "Per-slot symmetry vocabularies.")
+          "Per-slot SymmetryProduct instances.")
       .def("extents", &SBT::extents, "Per-slot per-label extents.")
       .def("has_block", &SBT::has_block, py::arg("labels"),
            "True iff a block is stored for the given per-slot labels.")

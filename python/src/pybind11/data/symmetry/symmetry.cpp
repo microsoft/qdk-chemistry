@@ -129,58 +129,59 @@ void bind_symmetry(py::module& symmetry) {
           },
           py::arg("filename"));
 
-  py::class_<Symmetries, DataClass, py::smart_holder>(
-      symmetry, "Symmetries",
-      "A symmetry vocabulary: the ordered set of axes a basis is blocked "
+  py::class_<SymmetryProduct, DataClass, py::smart_holder>(
+      symmetry, "SymmetryProduct",
+      "A SymmetryProduct: the ordered set of axes a basis is blocked "
       "under, together with their admissible labels and equivalence flags.")
       .def(py::init<std::vector<SymmetryAxis>>(), py::arg("axes"))
-      .def("axes", &Symmetries::axes)
-      .def("has_axis", &Symmetries::has_axis, py::arg("name"),
-           "True iff an axis with the given name exists in this vocabulary.")
-      .def("axis", &Symmetries::axis, py::arg("name"),
+      .def("axes", &SymmetryProduct::axes)
+      .def("has_axis", &SymmetryProduct::has_axis, py::arg("name"),
+           "True iff an axis with the given name exists in this "
+           "SymmetryProduct.")
+      .def("axis", &SymmetryProduct::axis, py::arg("name"),
            py::return_value_policy::reference_internal,
            "Access the axis with the given name.")
       .def(py::self == py::self)
       .def(py::self != py::self)
-      .def("__hash__", &Symmetries::hash)
-      .def("get_data_type_name", &Symmetries::get_data_type_name)
-      .def("get_summary", &Symmetries::get_summary)
-      .def("__repr__", &Symmetries::get_summary)
+      .def("__hash__", &SymmetryProduct::hash)
+      .def("get_data_type_name", &SymmetryProduct::get_data_type_name)
+      .def("get_summary", &SymmetryProduct::get_summary)
+      .def("__repr__", &SymmetryProduct::get_summary)
       .def(
           "to_file",
-          [](const Symmetries& self, const py::object& filename,
+          [](const SymmetryProduct& self, const py::object& filename,
              const std::string& type) {
             self.to_file(to_string_path(filename), type);
           },
           py::arg("filename"), py::arg("type"))
       .def(
           "to_json_file",
-          [](const Symmetries& self, const py::object& filename) {
+          [](const SymmetryProduct& self, const py::object& filename) {
             self.to_json_file(to_string_path(filename));
           },
           py::arg("filename"))
       .def(
           "to_hdf5_file",
-          [](const Symmetries& self, const py::object& filename) {
+          [](const SymmetryProduct& self, const py::object& filename) {
             self.to_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"))
       .def_static(
           "from_file",
           [](const py::object& filename, const std::string& type) {
-            return Symmetries::from_file(to_string_path(filename), type);
+            return SymmetryProduct::from_file(to_string_path(filename), type);
           },
           py::arg("filename"), py::arg("type"))
       .def_static(
           "from_json_file",
           [](const py::object& filename) {
-            return Symmetries::from_json_file(to_string_path(filename));
+            return SymmetryProduct::from_json_file(to_string_path(filename));
           },
           py::arg("filename"))
       .def_static(
           "from_hdf5_file",
           [](const py::object& filename) {
-            return Symmetries::from_hdf5_file(to_string_path(filename));
+            return SymmetryProduct::from_hdf5_file(to_string_path(filename));
           },
           py::arg("filename"));
 
