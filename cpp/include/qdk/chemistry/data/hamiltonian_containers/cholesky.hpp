@@ -250,11 +250,21 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
 
-  /// Build SymmetryBlockedTensor<3> from dense three-center matrices and set
-  /// views.
+  /**
+   * @brief Build the canonical three-center @ref SymmetryBlockedTensor from
+   * dense spin channels and refresh the v1 dense views.
+   *
+   * @param aa Dense alpha-alpha three-center matrix.
+   * @param bb Dense beta-beta three-center matrix, or @c nullptr for
+   *           restricted (re-uses @p aa).
+   */
   void _set_three_center_container(const Eigen::MatrixXd& aa,
                                    const Eigen::MatrixXd* bb);
-  /// Derive non-owning views from existing SymmetryBlockedTensor<3>.
+  /**
+   * @brief Refresh @ref _three_center_integrals dense views from the
+   * canonical @ref _three_center_sbt container (no data copy). Leaves the
+   * views null when the container is null.
+   */
   void _init_three_center_views();
 
   /** Serialization version */

@@ -19,11 +19,17 @@ namespace qdk::chemistry::data {
 /**
  * @brief Symmetry axis identifier.
  */
-enum class AxisName { Spin };
+enum class AxisName {
+  /** @brief The spin (@f$S_z@f$) axis carrying @ref SpinValue labels. */
+  Spin
+};
 
 /**
  * @brief Human-readable name for an @ref AxisName (used in messages and
  * serialization metadata).
+ *
+ * @param axis Axis identifier to render.
+ * @return A stable lower-case string (e.g. @c "spin" for @ref AxisName::Spin).
  */
 std::string to_string(AxisName axis);
 
@@ -36,26 +42,62 @@ std::string to_string(AxisName axis);
  */
 class SymmetryAxisValue {
  public:
+  /**
+   * @brief Defaulted virtual destructor.
+   *
+   * Declared virtual so that derived axis values can be safely deleted
+   * through a @ref SymmetryAxisValue pointer.
+   */
   virtual ~SymmetryAxisValue() = default;
 
-  /** @brief The axis this value belongs to. */
+  /**
+   * @brief The axis this value belongs to.
+   * @return The @ref AxisName identifying the owning axis.
+   */
   virtual AxisName axis() const = 0;
 
-  /** @brief Value-equality against another axis value. */
+  /**
+   * @brief Value-equality against another axis value.
+   *
+   * @param other Right-hand axis value to compare against.
+   * @return @c true iff @p other is the same concrete subclass and carries
+   *         the same payload.
+   */
   virtual bool equals(const SymmetryAxisValue& other) const = 0;
 
-  /** @brief Hash consistent with @ref equals. */
+  /**
+   * @brief Hash consistent with @ref equals.
+   * @return Hash value derived from the subclass payload.
+   */
   virtual std::size_t hash() const = 0;
 
-  /** @brief Serialize this value (subclass payload only). */
+  /**
+   * @brief Serialize this value (subclass payload only).
+   *
+   * The polymorphic @c "kind" tag is written by the enclosing
+   * @ref SymmetryLabel / @ref SymmetryAxis so subclasses need only emit
+   * their own state.
+   *
+   * @return JSON object carrying the subclass payload.
+   */
   virtual nlohmann::json to_json() const = 0;
 
   /** @brief Convenience wrapper around @ref equals for symmetry with
    * sibling types (@ref SymmetryAxis, @ref SymmetryProduct, @ref
-   * SymmetryLabel). */
+   * SymmetryLabel).
+   *
+   * @param other Axis value to compare against.
+   * @return @c true iff @ref equals returns @c true for @p other.
+   */
   bool operator==(const SymmetryAxisValue& other) const {
     return equals(other);
   }
+  /**
+   * @brief Negation of @ref operator==.
+   *
+   * @param other Axis value to compare against.
+   * @return @c true iff @ref equals returns @c false for @p other.
+   */
   bool operator!=(const SymmetryAxisValue& other) const {
     return !equals(other);
   }
@@ -71,18 +113,51 @@ class SpinValue : public SymmetryAxisValue {
   int _two_ms;
 
  public:
-  /** @brief Construct from @f$2 M_s@f$ (e.g. +1 for alpha, -1 for beta). */
+  /**
+   * @brief Construct from @f$2 M_s@f$ (e.g. +1 for alpha, -1 for beta).
+   * @param two_ms Twice the spin projection of the represented label.
+   */
   constexpr explicit SpinValue(int two_ms) : _two_ms(two_ms) {}
 
-  /** @brief The stored @f$2 M_s@f$ value. */
+  /**
+   * @brief The stored @f$2 M_s@f$ value.
+   * @return @c +1 for @f$\alpha@f$, @c -1 for @f$\beta@f$, or any other
+   *         value carried at construction.
+   */
   constexpr int value() const { return _two_ms; }
 
+  /**
+   * @brief The axis this value belongs to.
+   * @return Always @ref AxisName::Spin.
+   */
   AxisName axis() const override { return AxisName::Spin; }
+  /**
+   * @brief Value-equality against another axis value.
+   * @param other Axis value to compare against.
+   * @return @c true iff @p other is a @ref SpinValue carrying the same
+   *         @f$2 M_s@f$ value.
+   */
   bool equals(const SymmetryAxisValue& other) const override;
+  /**
+   * @brief Hash consistent with @ref equals.
+   * @return Hash value derived from the stored @f$2 M_s@f$.
+   */
   std::size_t hash() const override;
+  /**
+   * @brief Serialize this value (subclass payload only).
+   * @return JSON object carrying the @f$2 M_s@f$ value under a stable key.
+   */
   nlohmann::json to_json() const override;
 
-  /** @brief Reconstruct a @ref SpinValue from its JSON payload. */
+  /**
+   * @brief Reconstruct a @ref SpinValue from its JSON payload.
+   *
+   * @param j JSON object produced by a prior @ref SpinValue::to_json call.
+   * @return Shared pointer to the deserialized value typed as the
+   *         polymorphic @ref SymmetryAxisValue base.
+   * @throws std::runtime_error if @p j is missing the @f$2 M_s@f$ payload
+   *         or it is of the wrong type.
+   */
   static std::shared_ptr<const SymmetryAxisValue> from_json(
       const nlohmann::json& j);
 };
@@ -498,30 +573,58 @@ class SymmetryLabel {
   SymmetryLabel(
       std::initializer_list<std::shared_ptr<const SymmetryAxisValue>> values);
 
-  /** @brief Construct from an explicit vector of axis values. */
+  /**
+   * @brief Construct from an explicit vector of axis values.
+   * @param values Axis values carried by this label; each axis name must
+   *               appear at most once.
+   */
   explicit SymmetryLabel(
       std::vector<std::shared_ptr<const SymmetryAxisValue>> values);
 
   /**
    * @brief The value carried for axis @p axis.
+   * @param axis Axis identifier to look up.
+   * @return Shared pointer to the value carried for @p axis.
    * @throws std::runtime_error if the label carries no value for @p axis.
    */
   std::shared_ptr<const SymmetryAxisValue> get(AxisName axis) const;
 
-  /** @brief True iff this label carries a value for @p axis. */
+  /**
+   * @brief True iff this label carries a value for @p axis.
+   * @param axis Axis identifier to look up.
+   * @return @c true if @c get(@p axis) would succeed.
+   */
   bool has(AxisName axis) const;
 
-  /** @brief True iff this label carries no axis values (trivial label). */
+  /**
+   * @brief True iff this label carries no axis values (trivial label).
+   * @return @c true iff @ref values() is empty.
+   */
   bool empty() const { return _values.empty(); }
 
-  /** @brief The axes addressed by this label. */
+  /**
+   * @brief The axes addressed by this label.
+   * @return Reference to the underlying ordered map from axis name to value.
+   */
   const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>& values()
       const {
     return _values;
   }
 
-  /** @brief Value-equality (same axes carrying equal-valued axis values). */
+  /**
+   * @brief Value-equality (same axes carrying equal-valued axis values).
+   *
+   * @param other Label to compare against.
+   * @return @c true iff @p other carries the same set of axes and each
+   *         per-axis value compares equal via @ref SymmetryAxisValue::equals.
+   */
   bool operator==(const SymmetryLabel& other) const;
+  /**
+   * @brief Negation of @ref operator==.
+   *
+   * @param other Label to compare against.
+   * @return @c true iff @p other differs from @c *this on any axis.
+   */
   bool operator!=(const SymmetryLabel& other) const {
     return !(*this == other);
   }
@@ -531,21 +634,39 @@ class SymmetryLabel {
    *
    * Precomputed in the constructor so the label can be used as an
    * @c unordered_map key without recomputing the hash on each lookup.
+   *
+   * @return Cached hash value of this label.
    */
   std::size_t hash() const { return _hash; }
 
-  /** @brief Serialize this label to JSON. */
+  /**
+   * @brief Serialize this label to JSON.
+   * @return JSON object enumerating each per-axis value (with its
+   *         polymorphic @c "kind" tag).
+   */
   nlohmann::json to_json() const;
 
-  /** @brief Reconstruct a @ref SymmetryLabel from JSON produced by
-   * @ref to_json. */
+  /**
+   * @brief Reconstruct a @ref SymmetryLabel from JSON produced by
+   * @ref to_json.
+   * @param j JSON object produced by a prior @ref to_json call.
+   * @return The deserialized label.
+   * @throws std::runtime_error if @p j is malformed or names an unknown
+   *         axis kind.
+   */
   static SymmetryLabel from_json(const nlohmann::json& j);
 };
 
 /**
  * @brief Reconstruct a @ref SymmetryAxisValue from JSON by dispatching on its
  * @c kind tag.
- * @throws std::runtime_error if the kind tag is not recognized.
+ *
+ * @param j JSON object produced by a prior @c to_json call on a concrete
+ *          @ref SymmetryAxisValue subclass.
+ * @return Shared pointer to the deserialized value typed as the polymorphic
+ *         base.
+ * @throws std::runtime_error if the @c kind tag is missing or not
+ *         recognized.
  */
 std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
     const nlohmann::json& j);
@@ -555,18 +676,39 @@ namespace axes {
 /**
  * @brief Build a spin-½ axis carrying two labels (@f$2M_s = +1@f$ and
  * @f$2M_s = -1@f$).
- * @param two_s Twice the total spin (reserved for forward compatibility).
- * @param equivalent Whether labels under this axis share storage.
+ *
+ * @param two_s Twice the total spin (reserved for forward compatibility;
+ *              currently ignored — the returned axis always carries the
+ *              two spin-½ labels).
+ * @param equivalent Whether labels under this axis share storage (i.e.
+ *                   restricted-spin storage).
+ * @return A fully populated @ref SymmetryAxis for the spin degree of
+ *         freedom.
  */
 SymmetryAxis spin(int two_s, bool equivalent = true);
 
-/** @brief Interned shared spin-½ value with @f$2 M_s = +1@f$. */
+/**
+ * @brief Interned shared spin-½ value with @f$2 M_s = +1@f$.
+ * @return Reference to the global @f$\alpha@f$ instance; safe to capture
+ *         by @c shared_ptr.
+ */
 const std::shared_ptr<const SpinValue>& alpha();
 
-/** @brief Interned shared spin-½ value with @f$2 M_s = -1@f$. */
+/**
+ * @brief Interned shared spin-½ value with @f$2 M_s = -1@f$.
+ * @return Reference to the global @f$\beta@f$ instance; safe to capture
+ *         by @c shared_ptr.
+ */
 const std::shared_ptr<const SpinValue>& beta();
 
-/** @brief Construct a spin value carrying @f$2 M_s = @f$ @p two_ms. */
+/**
+ * @brief Construct a spin value carrying @f$2 M_s = @f$ @p two_ms.
+ *
+ * @param two_ms Twice the spin projection. The standard interned values
+ *               (@ref alpha and @ref beta) are returned when @p two_ms is
+ *               @c +1 or @c -1 respectively.
+ * @return Shared pointer to the (possibly interned) spin value.
+ */
 std::shared_ptr<const SpinValue> spin_value(int two_ms);
 
 }  // namespace axes
@@ -581,6 +723,11 @@ namespace std {
  */
 template <>
 struct hash<qdk::chemistry::data::SymmetryLabel> {
+  /**
+   * @brief Forward to @ref qdk::chemistry::data::SymmetryLabel::hash.
+   * @param label Label to hash.
+   * @return The precomputed hash value carried by @p label.
+   */
   std::size_t operator()(
       const qdk::chemistry::data::SymmetryLabel& label) const noexcept {
     return label.hash();

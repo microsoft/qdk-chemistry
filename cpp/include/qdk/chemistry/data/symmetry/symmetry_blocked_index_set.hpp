@@ -75,50 +75,153 @@ class SymmetryBlockedIndexSet
       std::unordered_map<SymmetryLabel, std::size_t> extents,
       std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices);
 
-  /** @brief The symmetry definitions this index set is blocked under. */
+  /**
+   * @brief The symmetry definitions this index set is blocked under.
+   * @return Shared pointer to the single-slot @ref SymmetryProduct.
+   */
   std::shared_ptr<const SymmetryProduct> symmetries() const {
     return Base::symmetries()[0];
   }
 
-  /** @brief Per-label extents. */
+  /**
+   * @brief Per-label extents.
+   * @return Reference to the map from admissible @ref SymmetryLabel to
+   *         its universe size.
+   */
   const std::unordered_map<SymmetryLabel, std::size_t>& extents() const {
     return Base::SymmetryBlocked::extents()[0];
   }
 
   /**
    * @brief View of the (sorted, unique) indices stored for @p label.
+   * @param label Symmetry label whose index list is requested.
+   * @return Non-owning span over the stored indices for @p label.
    * @throws std::invalid_argument if no indices are stored for @p label.
    */
   std::span<const std::uint32_t> indices(const SymmetryLabel& label) const;
 
-  /** @brief True iff indices are stored for @p label. */
+  /**
+   * @brief True iff indices are stored for @p label.
+   * @param label Symmetry label to look up.
+   * @return @c true iff @ref indices(@p label) would succeed.
+   */
   bool has(const SymmetryLabel& label) const {
     return Base::has_block(Labels{label});
   }
 
-  /** @brief The labels for which indices are stored. */
+  /**
+   * @brief The labels for which indices are stored.
+   * @return Vector of every @ref SymmetryLabel keyed in this index set.
+   */
   std::vector<SymmetryLabel> labels() const;
 
   // ---- DataClass interface ------------------------------------------------
 
+  /**
+   * @brief @ref DataClass type identifier.
+   * @return The stable string @c "symmetry_blocked_index_set".
+   */
   std::string get_data_type_name() const override {
     return DATACLASS_TO_SNAKE_CASE(SymmetryBlockedIndexSet);
   }
+  /**
+   * @brief Single-line human-readable summary of the contained labels.
+   * @return A short diagnostic string suitable for logging.
+   */
   std::string get_summary() const override;
+  /**
+   * @brief Dispatch to JSON or HDF5 serialization based on @p type.
+   * @param filename Target file path.
+   * @param type Either @c "json" or @c "hdf5".
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if the underlying I/O operation fails.
+   */
   void to_file(const std::string& filename,
                const std::string& type) const override;
+  /**
+   * @brief Serialize this index set to JSON.
+   * @return JSON object carrying the serialization version, the per-label
+   *         extents, and the per-label indices.
+   */
   nlohmann::json to_json() const override;
+  /**
+   * @brief Serialize this index set to a JSON file.
+   * @param filename Path to the JSON file to create or overwrite.
+   * @throws std::runtime_error if the file cannot be opened for writing.
+   */
   void to_json_file(const std::string& filename) const override;
+  /**
+   * @brief Serialize this index set into an HDF5 group.
+   * @param group HDF5 group to write into; receives a @c version attribute
+   *        and a string @c data dataset carrying the JSON payload.
+   * @throws std::runtime_error on HDF5 I/O failure.
+   */
   void to_hdf5(H5::Group& group) const override;
+  /**
+   * @brief Serialize this index set to an HDF5 file.
+   * @param filename Path to the HDF5 file to create or overwrite.
+   * @throws std::runtime_error on HDF5 I/O failure.
+   */
   void to_hdf5_file(const std::string& filename) const override;
 
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedIndexSet from a JSON object
+   * produced by @ref to_json.
+   *
+   * Validates the serialization version recorded in @p j against
+   * @ref SERIALIZATION_VERSION before reconstructing.
+   *
+   * @param j JSON object produced by a prior @ref to_json call.
+   * @return Shared pointer to the reconstructed index set.
+   * @throws std::runtime_error if the @c "version" field is missing or
+   *         incompatible, or if @p j is otherwise malformed.
+   */
   static std::shared_ptr<SymmetryBlockedIndexSet> from_json(
       const nlohmann::json& j);
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedIndexSet from a JSON file
+   * produced by @ref to_json_file.
+   *
+   * @param filename Path to the JSON file to read.
+   * @return Shared pointer to the reconstructed index set.
+   * @throws std::runtime_error if the file cannot be opened, parsed, or the
+   *         serialization version is incompatible.
+   */
   static std::shared_ptr<SymmetryBlockedIndexSet> from_json_file(
       const std::string& filename);
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedIndexSet from an HDF5 group
+   * produced by @ref to_hdf5.
+   *
+   * Validates the @c version attribute against @ref SERIALIZATION_VERSION
+   * before reconstructing.
+   *
+   * @param group HDF5 group to read from.
+   * @return Shared pointer to the reconstructed index set.
+   * @throws std::runtime_error if the @c version attribute is missing or
+   *         incompatible, or on HDF5 I/O failure.
+   */
   static std::shared_ptr<SymmetryBlockedIndexSet> from_hdf5(H5::Group& group);
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedIndexSet from an HDF5 file
+   * produced by @ref to_hdf5_file.
+   *
+   * @param filename Path to the HDF5 file to read.
+   * @return Shared pointer to the reconstructed index set.
+   * @throws std::runtime_error if the file cannot be opened, or the
+   *         serialization version is incompatible.
+   */
   static std::shared_ptr<SymmetryBlockedIndexSet> from_hdf5_file(
       const std::string& filename);
+  /**
+   * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
+   * @param filename Source file path.
+   * @param type Either @c "json" or @c "hdf5".
+   * @return Shared pointer to the reconstructed index set.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if the underlying I/O operation fails or the
+   *         serialization version is incompatible.
+   */
   static std::shared_ptr<SymmetryBlockedIndexSet> from_file(
       const std::string& filename, const std::string& type);
 

@@ -23,9 +23,19 @@ namespace qdk::chemistry::data {
 /**
  * @brief Hash of an array of @ref SymmetryLabel used to key blocks by their
  * per-slot symmetry labels.
+ *
+ * @tparam Rank Number of label slots.
  */
 template <std::size_t Rank>
 struct LabelsHash {
+  /**
+   * @brief Combine the per-slot @ref SymmetryLabel hashes into a single
+   * hash suitable for use as an @c unordered_map key.
+   *
+   * @param labels Per-slot symmetry labels keying one block.
+   * @return Hash value derived from the concatenation of per-slot label
+   *         hashes via @ref qdk::chemistry::utils::hash_combine.
+   */
   std::size_t operator()(
       const std::array<SymmetryLabel, Rank>& labels) const noexcept {
     std::size_t seed = 0;
@@ -83,11 +93,41 @@ std::array<SymmetryLabel, Rank> make_labels(
 template <std::size_t Rank, typename Block>
 class SymmetryBlocked : public DataClass {
  public:
+  /**
+   * @brief Per-slot block label tuple: one @ref SymmetryLabel per index slot.
+   *
+   * Used as the key type of @ref BlockMap so that blocks are addressed by the
+   * full tuple of per-slot symmetry labels.
+   */
   using Labels = std::array<SymmetryLabel, Rank>;
+  /**
+   * @brief Shared pointer to immutable per-block storage.
+   *
+   * Held as @c shared_ptr<const Block> so that symmetry-equivalent sectors
+   * can alias the same underlying storage.
+   */
   using BlockPtr = std::shared_ptr<const Block>;
+  /**
+   * @brief Sparse map from per-slot label tuples to block storage.
+   *
+   * Aliased sectors (e.g. restricted-spin partners) map to the same
+   * @ref BlockPtr. Keys are hashed via @ref LabelsHash.
+   */
   using BlockMap = std::unordered_map<Labels, BlockPtr, LabelsHash<Rank>>;
+  /**
+   * @brief Per-slot symmetry definitions.
+   *
+   * One @ref SymmetryProduct per index slot; supplied at construction and
+   * used to validate block labels and apply orbit aliasing.
+   */
   using SymmetriesArray =
       std::array<std::shared_ptr<const SymmetryProduct>, Rank>;
+  /**
+   * @brief Per-slot per-label extents.
+   *
+   * For each index slot, maps every admissible @ref SymmetryLabel to the
+   * universe size (number of basis vectors) carried under that label.
+   */
   using ExtentsArray =
       std::array<std::unordered_map<SymmetryLabel, std::size_t>, Rank>;
 
@@ -99,10 +139,18 @@ class SymmetryBlocked : public DataClass {
    * null pointers, then applies orbit aliasing.  Derived classes should call
    * their own block-shape validation after this constructor returns.
    *
+   * @param symmetries Per-slot @ref SymmetryProduct definitions. None of the
+   *                   pointers may be null.
+   * @param extents Per-slot per-label universe sizes; every declared label
+   *                must be admissible under its slot's symmetries.
+   * @param blocks Block storage keyed by per-slot @ref SymmetryLabel
+   *               tuples; pointers must be non-null and labels admissible.
+   *
    * @throws std::invalid_argument if a block or extent label is not
    *         admissible under the matching slot's @ref SymmetryProduct, if a
-   * block pointer is null, if restricted orbit partners have unequal extents,
-   * or if both orbit partners are supplied but do not share storage.
+   *         block pointer is null, if restricted orbit partners have
+   *         unequal extents, or if both orbit partners are supplied but do
+   *         not share storage.
    */
   SymmetryBlocked(SymmetriesArray symmetries, ExtentsArray extents,
                   BlockMap blocks)
@@ -114,17 +162,27 @@ class SymmetryBlocked : public DataClass {
     _apply_orbit_aliasing();
   }
 
-  /** @brief Per-slot symmetry definitions. */
+  /**
+   * @brief Per-slot symmetry definitions.
+   * @return Reference to the @ref SymmetriesArray supplied at construction.
+   */
   const SymmetriesArray& symmetries() const { return _symmetries; }
 
-  /** @brief Per-slot per-label extents. */
+  /**
+   * @brief Per-slot per-label extents.
+   * @return Reference to the @ref ExtentsArray supplied at construction.
+   */
   const ExtentsArray& extents() const { return _extents; }
 
   /**
    * @brief True iff a block is stored for @p labels.
    *
-   * If all labels in the key are trivial (empty), returns true when exactly
-   * one unique block exists.
+   * If all labels in the key are trivial (empty), returns @c true when
+   * exactly one unique block exists.
+   *
+   * @param labels Per-slot label tuple to look up.
+   * @return @c true if @p labels (or the unambiguous trivial-key shortcut)
+   *         maps to a stored block.
    */
   bool has_block(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
@@ -138,8 +196,11 @@ class SymmetryBlocked : public DataClass {
    *
    * If all labels in the key are trivial (empty), returns the sole block
    * when exactly one unique block exists.
-   * @throws std::invalid_argument if no such block exists or the trivial key
-   *         is ambiguous.
+   *
+   * @param labels Per-slot label tuple identifying the block.
+   * @return Const reference to the requested block storage.
+   * @throws std::invalid_argument if no such block exists or the trivial
+   *         key is ambiguous.
    */
   const Block& block(const Labels& labels) const { return *block_ptr(labels); }
 
@@ -148,8 +209,12 @@ class SymmetryBlocked : public DataClass {
    *
    * If all labels in the key are trivial (empty), returns the sole block
    * when exactly one unique block exists.
-   * @throws std::invalid_argument if no such block exists or the trivial key
-   *         is ambiguous.
+   *
+   * @param labels Per-slot label tuple identifying the block.
+   * @return Shared pointer to the requested block storage; same instance is
+   *         returned for every key that aliases the same storage.
+   * @throws std::invalid_argument if no such block exists or the trivial
+   *         key is ambiguous.
    */
   BlockPtr block_ptr(const Labels& labels) const {
     if (_is_trivial_key(labels)) {
@@ -183,7 +248,11 @@ class SymmetryBlocked : public DataClass {
     return it->second;
   }
 
-  /** @brief Total number of stored blocks (including aliases). */
+  /**
+   * @brief Total number of stored blocks (including aliases).
+   * @return Size of the underlying @ref BlockMap; counts each key
+   *         independently even if multiple keys alias the same storage.
+   */
   std::size_t num_blocks() const { return _blocks.size(); }
 
  protected:
@@ -199,6 +268,9 @@ class SymmetryBlocked : public DataClass {
    * that callers that do not care about symmetry can address the unique
    * block of a single-block container without constructing a matching
    * label.
+   *
+   * @param labels Per-slot label tuple to inspect.
+   * @return @c true iff every slot's label is empty.
    */
   static bool _is_trivial_key(const Labels& labels) {
     for (const auto& label : labels) {
@@ -226,6 +298,11 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief True iff @p label is admissible under @p sym (same axes carrying
    * values that @p sym 's axes admit).
+   *
+   * @param sym Per-slot symmetries to validate against.
+   * @param label Candidate label to test.
+   * @return @c true iff @p label carries exactly one value per axis of
+   *         @p sym and each value is admissible under the matching axis.
    */
   static bool _label_admissible(const SymmetryProduct& sym,
                                 const SymmetryLabel& label) {
@@ -288,7 +365,11 @@ class SymmetryBlocked : public DataClass {
 
   /**
    * @brief Look up the declared extent for @p label on slot @p slot.
-   * @throws std::invalid_argument if @p label is not in the slot's extents.
+   *
+   * @param slot Index slot to look up (must be < @p Rank).
+   * @param label Candidate label whose extent is requested.
+   * @return The declared universe size for @p label on @p slot.
+   * @throws std::invalid_argument if @p label is not in @p slot's extents.
    */
   std::size_t _extent_for(std::size_t slot, const SymmetryLabel& label) const {
     auto it = _extents[slot].find(label);
@@ -304,6 +385,8 @@ class SymmetryBlocked : public DataClass {
    * @ref SymmetryAxis::equivalent (restricted-spin storage), in which case
    * the constructor auto-aliases each block's spin partner to the same
    * storage.
+   *
+   * @return @c true iff every slot is restricted-spin.
    */
   bool _spin_aliasing_active() const {
     for (std::size_t i = 0; i < Rank; ++i) {
@@ -319,6 +402,9 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Return a copy of @p label with its spin value flipped
    * (@f$\alpha \leftrightarrow \beta@f$). Non-spin values are unchanged.
+   *
+   * @param label Source label.
+   * @return Spin-flipped copy of @p label.
    */
   static SymmetryLabel _swap_spin(const SymmetryLabel& label) {
     std::vector<std::shared_ptr<const SymmetryAxisValue>> values;
@@ -338,6 +424,10 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Apply @ref _swap_spin to every slot of @p labels to obtain the
    * spin-partner key.
+   *
+   * @param labels Source per-slot label tuple.
+   * @return Per-slot spin-flipped tuple suitable for indexing the partner
+   *         block.
    */
   static Labels _swap_spin_labels(const Labels& labels) {
     Labels swapped = labels;
@@ -350,6 +440,9 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Extract the per-slot @f$2 M_s@f$ values of @p labels (0 if a
    * slot carries no spin axis).
+   *
+   * @param labels Per-slot label tuple.
+   * @return Per-slot integer array of @f$2 M_s@f$ values.
    */
   static std::array<int, Rank> _spin_sequence(const Labels& labels) {
     std::array<int, Rank> seq{};
@@ -366,6 +459,10 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief True iff @p labels is the canonical representative of its
    * spin-partner pair (positive @f$2 M_s@f$ on the first spinful slot).
+   *
+   * @param labels Per-slot label tuple.
+   * @return @c true iff @p labels is the canonical (positive-leading-spin)
+   *         representative.
    */
   static bool _is_spin_canonical(const Labels& labels) {
     auto seq = _spin_sequence(labels);
@@ -431,6 +528,9 @@ class SymmetryBlocked : public DataClass {
    * Used by serialization to enumerate canonical (non-aliased) blocks
    * exactly once; the @ref PointerGroup::representative is chosen so that
    * a spin-canonical key is preferred when available.
+   *
+   * @return Vector of @ref PointerGroup entries, one per unique block
+   *         pointer in the container.
    */
   std::vector<PointerGroup> _group_by_pointer() const {
     std::vector<PointerGroup> groups;
@@ -455,7 +555,12 @@ class SymmetryBlocked : public DataClass {
 
   // ---- JSON helpers for symmetries/extents (shared by all derived types) ---
 
-  /** @brief Serialize the per-slot @ref SymmetryProduct to a JSON array. */
+  /**
+   * @brief Serialize the per-slot @ref SymmetryProduct to a JSON array.
+   * @return JSON array of length @p Rank; each entry is either the
+   *         @ref SymmetryProduct::to_json output or @c null for an unset
+   *         slot.
+   */
   nlohmann::json _symmetries_to_json() const {
     nlohmann::json symmetries = nlohmann::json::array();
     for (const auto& sym : _symmetries) {
@@ -464,7 +569,11 @@ class SymmetryBlocked : public DataClass {
     return symmetries;
   }
 
-  /** @brief Serialize the per-slot extents (label → size) to a JSON array. */
+  /**
+   * @brief Serialize the per-slot extents (label → size) to a JSON array.
+   * @return JSON array of length @p Rank; each entry is a list of
+   *         <tt>{"label": ..., "extent": ...}</tt> objects.
+   */
   nlohmann::json _extents_to_json() const {
     nlohmann::json extents = nlohmann::json::array();
     for (const auto& slot : _extents) {
@@ -481,6 +590,11 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Reconstruct a @ref SymmetriesArray from the @c "symmetries" entry
    * of a JSON document produced by @ref _symmetries_to_json.
+   *
+   * @param j JSON document containing a top-level @c "symmetries" array.
+   * @return The reconstructed per-slot @ref SymmetriesArray.
+   * @throws nlohmann::json::exception if @p j lacks the @c "symmetries"
+   *         field or its entries are malformed.
    */
   static SymmetriesArray _symmetries_from_json(const nlohmann::json& j) {
     SymmetriesArray symmetries;
@@ -494,6 +608,11 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Reconstruct an @ref ExtentsArray from the @c "extents" entry of a
    * JSON document produced by @ref _extents_to_json.
+   *
+   * @param j JSON document containing a top-level @c "extents" array.
+   * @return The reconstructed per-slot @ref ExtentsArray.
+   * @throws nlohmann::json::exception if @p j lacks the @c "extents" field
+   *         or its entries are malformed.
    */
   static ExtentsArray _extents_from_json(const nlohmann::json& j) {
     ExtentsArray extents;
@@ -509,8 +628,12 @@ class SymmetryBlocked : public DataClass {
 
   /**
    * @brief Serialize the block key groups (canonical key + aliases per
-   * group) as a JSON array. Derived classes append per-block payload to each
-   * entry before writing.
+   * group) as a JSON array. Derived classes append per-block payload to
+   * each entry before writing.
+   *
+   * @return JSON array; one entry per unique storage pointer with a
+   *         @c "keys" field enumerating the per-slot label tuples that
+   *         alias that storage.
    */
   nlohmann::json _block_keys_to_json() const {
     nlohmann::json blocks = nlohmann::json::array();
@@ -531,6 +654,13 @@ class SymmetryBlocked : public DataClass {
   /**
    * @brief Reconstruct the per-group block keys from the @c "blocks" entry
    * of a JSON document produced by @ref _block_keys_to_json.
+   *
+   * @param j JSON document containing a top-level @c "blocks" array.
+   * @return Outer vector: one entry per stored block group. Inner vector:
+   *         the per-slot label tuples that alias the same block.
+   * @throws nlohmann::json::exception if @p j lacks the @c "blocks" field
+   *         or any entry is malformed.
+   * @throws std::invalid_argument if a key tuple has the wrong arity.
    */
   static std::vector<std::vector<Labels>> _block_keys_from_json(
       const nlohmann::json& j) {

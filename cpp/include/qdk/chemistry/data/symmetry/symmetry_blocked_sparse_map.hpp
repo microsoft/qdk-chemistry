@@ -51,17 +51,56 @@ class SymmetryBlockedSparseMap
   using Base = SymmetryBlocked<Rank, SparseMapBlock<Rank, Scalar>>;
 
  public:
+  /**
+   * @brief Sparse map from per-slot label tuples to sparse block storage.
+   *
+   * Inherited from @ref SymmetryBlocked. Aliased sectors map to the same
+   * @ref BlockPtr; keys are hashed via @ref LabelsHash.
+   */
   using typename Base::BlockMap;
+  /**
+   * @brief Shared pointer to immutable per-block sparse storage.
+   *
+   * Inherited from @ref SymmetryBlocked. Held as @c shared_ptr<const Block>
+   * so that symmetry-equivalent sectors can alias the same storage.
+   */
   using typename Base::BlockPtr;
+  /**
+   * @brief Per-slot per-label extents.
+   *
+   * Inherited from @ref SymmetryBlocked. For each index slot, maps every
+   * admissible @ref SymmetryLabel to its universe size.
+   */
   using typename Base::ExtentsArray;
+  /**
+   * @brief Per-slot block label tuple: one @ref SymmetryLabel per index slot.
+   *
+   * Inherited from @ref SymmetryBlocked. Used as the key type of
+   * @ref BlockMap.
+   */
   using typename Base::Labels;
+  /**
+   * @brief Per-slot symmetry definitions.
+   *
+   * Inherited from @ref SymmetryBlocked. One @ref SymmetryProduct per index
+   * slot, supplied at construction.
+   */
   using typename Base::SymmetriesArray;
+  /** @brief Per-slot local-index tuple keying a single sparse entry within
+   *  one block. */
   using IndexTuple = std::array<unsigned, Rank>;
+  /** @brief Per-block sparse storage: a sorted map from per-slot local-index
+   *  tuples to scalar values. */
   using SparseBlock = SparseMapBlock<Rank, Scalar>;
 
   /**
    * @brief Construct from per-slot symmetries, per-slot extents, and a block
    * map of sparse blocks.
+   *
+   * @param symmetries Per-slot @ref SymmetryProduct definitions.
+   * @param extents Per-slot per-label universe sizes.
+   * @param blocks Block storage keyed by per-slot label tuples; entries of
+   *               each block carry per-slot local indices.
    *
    * @throws std::invalid_argument if a label is not admissible, if restricted
    *         orbit partners have unequal extents, if a sparse entry index
@@ -73,7 +112,10 @@ class SymmetryBlockedSparseMap
     _validate_sparse_blocks();
   }
 
-  /** @brief Total number of stored (non-zero) entries across all blocks. */
+  /**
+   * @brief Total number of stored (non-zero) entries across all blocks.
+   * @return Sum of the sparse-entry counts of every stored block.
+   */
   std::size_t num_entries() const {
     std::size_t count = 0;
     for (const auto& [labels, ptr] : this->_blocks) {
@@ -82,8 +124,12 @@ class SymmetryBlockedSparseMap
     return count;
   }
 
-  /** @brief Look up a single entry by labels and index tuple.
-   *  @return The value if present, or zero. */
+  /**
+   * @brief Look up a single entry by labels and index tuple.
+   * @param labels Per-slot symmetry label tuple identifying the block.
+   * @param idx Per-slot local index tuple within the block.
+   * @return The stored value if present, or @c Scalar{} (zero) otherwise.
+   */
   Scalar get(const Labels& labels, const IndexTuple& idx) const {
     auto it = this->_blocks.find(labels);
     if (it == this->_blocks.end()) {
@@ -98,8 +144,10 @@ class SymmetryBlockedSparseMap
 
   // ---- DataClass interface ------------------------------------------------
 
-  /** @brief @ref DataClass type identifier:
-   * @c "symmetry_blocked_sparse_map". */
+  /**
+   * @brief @ref DataClass type identifier.
+   * @return The stable string @c "symmetry_blocked_sparse_map".
+   */
   std::string get_data_type_name() const override {
     return "symmetry_blocked_sparse_map";
   }
@@ -107,6 +155,7 @@ class SymmetryBlockedSparseMap
   /**
    * @brief Single-line summary including rank, number of stored blocks, and
    * total number of non-zero entries.
+   * @return A short diagnostic string suitable for logging.
    */
   std::string get_summary() const override {
     std::ostringstream oss;
@@ -121,6 +170,9 @@ class SymmetryBlockedSparseMap
    * pointer-equivalent blocks; each entry lists the canonical key, the
    * aliased keys, and the sparse-entry payload as
    * @c [idx0, idx1, ..., value] tuples.
+   *
+   * @return JSON object carrying rank, scalar type, per-slot symmetries and
+   *         extents, and the sparse-entry payload.
    */
   nlohmann::json to_json() const override {
     nlohmann::json j;
@@ -155,7 +207,11 @@ class SymmetryBlockedSparseMap
     return j;
   }
 
-  /** @brief Serialize this sparse map to a JSON file at @p filename. */
+  /**
+   * @brief Serialize this sparse map to a JSON file.
+   * @param filename Path to the JSON file to create or overwrite.
+   * @throws std::runtime_error if the file cannot be opened for writing.
+   */
   void to_json_file(const std::string& filename) const override {
     std::ofstream out(filename);
     if (!out) {
@@ -164,15 +220,23 @@ class SymmetryBlockedSparseMap
     out << to_json().dump(2);
   }
 
-  /** @brief HDF5 serialization is not yet implemented for sparse maps;
-   * always throws. */
+  /**
+   * @brief HDF5 serialization is not yet implemented for sparse maps;
+   * always throws.
+   * @param group Unused HDF5 group target.
+   * @throws std::runtime_error unconditionally.
+   */
   void to_hdf5(H5::Group& /*group*/) const override {
     throw std::runtime_error(
         "SymmetryBlockedSparseMap HDF5 serialization not yet implemented.");
   }
 
-  /** @brief HDF5 serialization is not yet implemented for sparse maps;
-   * always throws. */
+  /**
+   * @brief HDF5 serialization is not yet implemented for sparse maps;
+   * always throws.
+   * @param filename Unused HDF5 target path.
+   * @throws std::runtime_error unconditionally.
+   */
   void to_hdf5_file(const std::string& /*filename*/) const override {
     throw std::runtime_error(
         "SymmetryBlockedSparseMap HDF5 serialization not yet implemented.");
@@ -183,8 +247,9 @@ class SymmetryBlockedSparseMap
    * sparse maps and will throw.
    * @param filename Target file path.
    * @param type Either @c "json" (supported) or @c "hdf5" (throws).
-   * @throws std::invalid_argument if @p type is not supported.
-   * @throws std::runtime_error if @p type is @c "hdf5".
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if @p type is @c "hdf5" (HDF5 not
+   *         implemented) or if the JSON I/O fails.
    */
   void to_file(const std::string& filename,
                const std::string& type) const override {
@@ -198,8 +263,16 @@ class SymmetryBlockedSparseMap
     }
   }
 
-  /** @brief Reconstruct a @ref SymmetryBlockedSparseMap from a JSON object
-   * produced by @ref to_json. */
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedSparseMap from a JSON object
+   * produced by @ref to_json.
+   *
+   * @param j JSON object produced by a prior @ref to_json call.
+   * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::invalid_argument if a block label is not admissible or a
+   *         sparse entry index exceeds the declared extent.
+   * @throws nlohmann::json::exception if @p j is otherwise malformed.
+   */
   static std::shared_ptr<SymmetryBlockedSparseMap> from_json(
       const nlohmann::json& j) {
     auto symmetries = Base::_symmetries_from_json(j);

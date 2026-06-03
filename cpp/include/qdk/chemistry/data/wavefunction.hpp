@@ -465,9 +465,14 @@ class WavefunctionContainer {
   /**
    * @brief Active-space 1-RDM block for the given row/column symmetry labels.
    *
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
    * @return @ref MatrixVariant holding the requested block as either an
    * @c Eigen::MatrixXd or an @c Eigen::MatrixXcd, matching the scalar type of
    * the underlying RDM.
+   * @throws std::runtime_error if the 1-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
    */
   MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
                                      const SymmetryLabel& col) const;
@@ -475,6 +480,7 @@ class WavefunctionContainer {
   /**
    * @brief True if the active-space 1-RDM symmetry-blocked tensor is
    * available (real or complex).
+   * @return @c true iff @ref active_one_rdm would succeed without throwing.
    */
   bool has_active_one_rdm() const;
 
@@ -494,9 +500,16 @@ class WavefunctionContainer {
   /**
    * @brief Active-space 2-RDM block for the given symmetry labels.
    *
+   * @param p First slot's symmetry label.
+   * @param q Second slot's symmetry label.
+   * @param r Third slot's symmetry label.
+   * @param s Fourth slot's symmetry label.
    * @return @ref VectorVariant holding the requested block as either an
    * @c Eigen::VectorXd or an @c Eigen::VectorXcd, matching the scalar type of
    * the underlying RDM.
+   * @throws std::runtime_error if the 2-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label tuple.
    */
   VectorVariant active_two_rdm_block(const SymmetryLabel& p,
                                      const SymmetryLabel& q,
@@ -506,6 +519,7 @@ class WavefunctionContainer {
   /**
    * @brief True if the active-space 2-RDM symmetry-blocked tensor is
    * available (real or complex).
+   * @return @c true iff @ref active_two_rdm would succeed without throwing.
    */
   bool has_active_two_rdm() const;
 
@@ -630,11 +644,15 @@ class WavefunctionContainer {
   mutable std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
       _active_two_rdm_sbt;
 
-  /// Build the active-space 1-RDM SymmetryBlockedTensorVariant from
-  /// spin-dependent channels if available.
+  /**
+   * @brief Build @ref _active_one_rdm_sbt eagerly from the spin-dependent
+   * 1-RDM channels (no-op if the channels are unavailable).
+   */
   void _build_active_one_rdm_sbt() const;
-  /// Build the active-space 2-RDM SymmetryBlockedTensorVariant from
-  /// spin-dependent channels if available.
+  /**
+   * @brief Build @ref _active_two_rdm_sbt eagerly from the spin-dependent
+   * 2-RDM channels (no-op if the channels are unavailable).
+   */
   void _build_active_two_rdm_sbt() const;
 
   // Orbital entropies
@@ -951,14 +969,26 @@ class Wavefunction : public DataClass,
    * @brief Active-space 1-RDM as a rank-2 symmetry-blocked tensor variant
    * (real or complex).
    *
-   * @see WavefunctionContainer::active_one_rdm
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_one_rdm.
+   *
+   * @return Const reference to the 1-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if the 1-RDM is not available.
    */
   const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
 
   /**
    * @brief Active-space 1-RDM block for the given row/column symmetry labels.
    *
-   * @see WavefunctionContainer::active_one_rdm_block
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_one_rdm_block.
+   *
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
+   * @return @ref MatrixVariant holding the requested block.
+   * @throws std::runtime_error if the 1-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
    */
   MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
                                      const SymmetryLabel& col) const;
@@ -966,6 +996,7 @@ class Wavefunction : public DataClass,
   /**
    * @brief True if the active-space 1-RDM symmetry-blocked tensor is
    * available (real or complex).
+   * @return @c true iff @ref active_one_rdm would succeed without throwing.
    */
   bool has_active_one_rdm() const;
 
@@ -973,14 +1004,28 @@ class Wavefunction : public DataClass,
    * @brief Active-space 2-RDM as a rank-4 symmetry-blocked tensor variant
    * (real or complex).
    *
-   * @see WavefunctionContainer::active_two_rdm
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_two_rdm.
+   *
+   * @return Const reference to the 2-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if the 2-RDM is not available.
    */
   const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
 
   /**
    * @brief Active-space 2-RDM block for the given symmetry labels.
    *
-   * @see WavefunctionContainer::active_two_rdm_block
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_two_rdm_block.
+   *
+   * @param p First slot's symmetry label.
+   * @param q Second slot's symmetry label.
+   * @param r Third slot's symmetry label.
+   * @param s Fourth slot's symmetry label.
+   * @return @ref VectorVariant holding the requested block.
+   * @throws std::runtime_error if the 2-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label tuple.
    */
   VectorVariant active_two_rdm_block(const SymmetryLabel& p,
                                      const SymmetryLabel& q,
@@ -990,6 +1035,7 @@ class Wavefunction : public DataClass,
   /**
    * @brief True if the active-space 2-RDM symmetry-blocked tensor is
    * available (real or complex).
+   * @return @c true iff @ref active_two_rdm would succeed without throwing.
    */
   bool has_active_two_rdm() const;
 

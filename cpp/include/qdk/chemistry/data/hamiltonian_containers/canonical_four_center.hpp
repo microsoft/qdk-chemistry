@@ -120,7 +120,15 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Two-body integral block for the given symmetry labels.
-   * @return Const reference to the flat-packed vector block.
+   * @param p First slot's symmetry label.
+   * @param q Second slot's symmetry label.
+   * @param r Third slot's symmetry label.
+   * @param s Fourth slot's symmetry label.
+   * @return Const reference to the flat-packed vector block stored for
+   *         <tt>{p, q, r, s}</tt>.
+   * @throws std::runtime_error if two-body integrals are not set.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label tuple.
    */
   const Eigen::VectorXd& two_body_integrals_block(const SymmetryLabel& p,
                                                   const SymmetryLabel& q,
@@ -211,13 +219,24 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
                     std::shared_ptr<Eigen::VectorXd>>
   make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
 
-  /// Build SymmetryBlockedTensor<4> from dense vectors and set non-owning
-  /// views.
+  /**
+   * @brief Build the canonical two-body @ref SymmetryBlockedTensor from dense
+   * spin channels and refresh the v1 dense views.
+   *
+   * @param aaaa Dense alpha-alpha-alpha-alpha channel.
+   * @param aabb Dense alpha-alpha-beta-beta channel, or @c nullptr for
+   *             restricted (re-uses @p aaaa).
+   * @param bbbb Dense beta-beta-beta-beta channel, or @c nullptr for
+   *             restricted (re-uses @p aaaa).
+   */
   void _set_h2_container(const Eigen::VectorXd& aaaa,
                          const Eigen::VectorXd* aabb,
                          const Eigen::VectorXd* bbbb);
-  /// Derive non-owning views from an existing SymmetryBlockedTensor<4>
-  /// container.
+  /**
+   * @brief Refresh @ref _two_body_integrals dense views from the canonical
+   * @ref _h2 container (no data copy). Leaves the views null when @ref _h2
+   * is null.
+   */
   void _init_h2_views();
 
   /// Serialization version

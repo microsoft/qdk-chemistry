@@ -14,18 +14,16 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
-
 using SBT2 = SymmetryBlockedTensor<2, double>;
 
-SBT2::Labels aa() {
+static SBT2::Labels aa() {
   return {SymmetryLabel({axes::alpha()}), SymmetryLabel({axes::alpha()})};
 }
-SBT2::Labels bb() {
+static SBT2::Labels bb() {
   return {SymmetryLabel({axes::beta()}), SymmetryLabel({axes::beta()})};
 }
 
-std::array<std::unordered_map<SymmetryLabel, std::size_t>, 2> extents2(
+static std::array<std::unordered_map<SymmetryLabel, std::size_t>, 2> extents2(
     std::size_t n) {
   std::unordered_map<SymmetryLabel, std::size_t> slot;
   slot.emplace(SymmetryLabel({axes::alpha()}), n);
@@ -33,7 +31,16 @@ std::array<std::unordered_map<SymmetryLabel, std::size_t>, 2> extents2(
   return {slot, slot};
 }
 
-}  // namespace
+static SBT2 make_simple_tensor() {
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(0, true)}));
+  Eigen::MatrixXd data(2, 2);
+  data << 1.0, 2.0, 3.0, 4.0;
+  auto block = std::make_shared<const Eigen::MatrixXd>(data);
+  SBT2::BlockMap blocks;
+  blocks.emplace(aa(), block);
+  return SBT2({sym, sym}, extents2(2), blocks);
+}
 
 TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   auto sym = std::make_shared<const SymmetryProduct>(
@@ -220,7 +227,7 @@ TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresNativeDoubleBlocks) {
 }
 
 TEST(SymmetryBlockedTensorTest,
-     Hdf5RoundTripStoresComplexBlocksAsNativeDoubles) {
+     Hdf5RoundTripStoresComplexBlocksAsCompoundDataset) {
   using SBT1c = SymmetryBlockedTensor<1, std::complex<double>>;
   const std::filesystem::path filename =
       "symmetry_blocked_tensor_native_complex.h5";
@@ -244,8 +251,95 @@ TEST(SymmetryBlockedTensorTest,
                   .isApprox(v));
 
   H5::H5File file(filename.string(), H5F_ACC_RDONLY);
-  EXPECT_EQ(file.openDataSet("block_0_real").getTypeClass(), H5T_FLOAT);
-  EXPECT_EQ(file.openDataSet("block_0_imag").getTypeClass(), H5T_FLOAT);
+  auto block_dataset = file.openDataSet("block_0");
+  EXPECT_EQ(block_dataset.getTypeClass(), H5T_COMPOUND);
+  EXPECT_FALSE(file.nameExists("block_0_real"));
+  EXPECT_FALSE(file.nameExists("block_0_imag"));
 
+  std::filesystem::remove(filename);
+}
+
+TEST(SymmetryBlockedTensorTest, JsonRoundTripStampsSerializationVersion) {
+  auto j = make_simple_tensor().to_json();
+  ASSERT_TRUE(j.contains("version"));
+  EXPECT_TRUE(j["version"].is_string());
+  EXPECT_FALSE(j["version"].get<std::string>().empty());
+  EXPECT_NO_THROW(SBT2::from_json(j));
+}
+
+TEST(SymmetryBlockedTensorTest, JsonFromJsonRejectsMissingVersion) {
+  auto j = make_simple_tensor().to_json();
+  j.erase("version");
+  EXPECT_THROW(SBT2::from_json(j), std::runtime_error);
+}
+
+TEST(SymmetryBlockedTensorTest, JsonFromJsonRejectsMismatchedVersion) {
+  auto j = make_simple_tensor().to_json();
+  j["version"] = "99.0.0";
+  EXPECT_THROW(SBT2::from_json(j), std::runtime_error);
+}
+
+TEST(SymmetryBlockedTensorTest, Hdf5MetadataCarriesSerializationVersion) {
+  const std::filesystem::path filename = "symmetry_blocked_tensor_version.h5";
+  std::filesystem::remove(filename);
+
+  make_simple_tensor().to_hdf5_file(filename.string());
+
+  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+  auto dataset = file.openDataSet("symmetry_blocked_tensor_metadata");
+  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+  std::string metadata_str;
+  dataset.read(metadata_str, str_type);
+  auto metadata = nlohmann::json::parse(metadata_str);
+  ASSERT_TRUE(metadata.contains("version"));
+  EXPECT_TRUE(metadata["version"].is_string());
+  EXPECT_FALSE(metadata["version"].get<std::string>().empty());
+
+  std::filesystem::remove(filename);
+}
+
+TEST(SymmetryBlockedTensorTest, Hdf5FromHdf5RejectsMissingVersion) {
+  const std::filesystem::path filename =
+      "symmetry_blocked_tensor_missing_version.h5";
+  std::filesystem::remove(filename);
+
+  make_simple_tensor().to_hdf5_file(filename.string());
+
+  // Strip the version field from the metadata payload in-place.
+  {
+    H5::H5File file(filename.string(), H5F_ACC_RDWR);
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    auto dataset = file.openDataSet("symmetry_blocked_tensor_metadata");
+    std::string metadata_str;
+    dataset.read(metadata_str, str_type);
+    auto metadata = nlohmann::json::parse(metadata_str);
+    metadata.erase("version");
+    dataset.write(metadata.dump(), str_type);
+  }
+
+  EXPECT_THROW(SBT2::from_hdf5_file(filename.string()), std::runtime_error);
+  std::filesystem::remove(filename);
+}
+
+TEST(SymmetryBlockedTensorTest, Hdf5FromHdf5RejectsMismatchedVersion) {
+  const std::filesystem::path filename =
+      "symmetry_blocked_tensor_bad_version.h5";
+  std::filesystem::remove(filename);
+
+  make_simple_tensor().to_hdf5_file(filename.string());
+
+  // Inject an incompatible version into the metadata payload in-place.
+  {
+    H5::H5File file(filename.string(), H5F_ACC_RDWR);
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    auto dataset = file.openDataSet("symmetry_blocked_tensor_metadata");
+    std::string metadata_str;
+    dataset.read(metadata_str, str_type);
+    auto metadata = nlohmann::json::parse(metadata_str);
+    metadata["version"] = "99.0.0";
+    dataset.write(metadata.dump(), str_type);
+  }
+
+  EXPECT_THROW(SBT2::from_hdf5_file(filename.string()), std::runtime_error);
   std::filesystem::remove(filename);
 }

@@ -147,7 +147,13 @@ class HamiltonianContainer {
 
   /**
    * @brief One-body integral block for the given row/column symmetry labels.
-   * @return Const reference to the matrix block.
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
+   * @return Const reference to the matrix block stored for
+   *         <tt>{row, col}</tt>.
+   * @throws std::runtime_error if one-body integrals are not set.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
    */
   const Eigen::MatrixXd& one_body_integrals_block(
       const SymmetryLabel& row, const SymmetryLabel& col) const;
@@ -206,7 +212,13 @@ class HamiltonianContainer {
 
   /**
    * @brief Inactive Fock block for the given row/column symmetry labels.
-   * @return Const reference to the matrix block.
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
+   * @return Const reference to the matrix block stored for
+   *         <tt>{row, col}</tt>.
+   * @throws std::runtime_error if the inactive Fock matrix is not set.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
    */
   const Eigen::MatrixXd& inactive_fock_block(const SymmetryLabel& row,
                                              const SymmetryLabel& col) const;
@@ -341,15 +353,38 @@ class HamiltonianContainer {
                    std::shared_ptr<Eigen::MatrixXd>>
   make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
 
-  /// Build an SymmetryBlockedTensor<2> from dense matrices + symmetries and set
-  /// non-owning views.
+  /**
+   * @brief Build the canonical one-body @ref SymmetryBlockedTensor from dense
+   * alpha (and optional beta) blocks and refresh the v1 dense views.
+   *
+   * @param alpha Dense alpha one-body integral matrix.
+   * @param beta Dense beta one-body integral matrix, or @c nullptr for
+   *             restricted (alpha is reused for beta).
+   */
   void _set_one_body_integrals_container(const Eigen::MatrixXd& alpha,
                                          const Eigen::MatrixXd* beta);
+  /**
+   * @brief Build the canonical inactive Fock @ref SymmetryBlockedTensor from
+   * dense alpha (and optional beta) blocks and refresh the v1 dense views.
+   *
+   * @param alpha Dense alpha inactive Fock matrix.
+   * @param beta Dense beta inactive Fock matrix, or @c nullptr for
+   *             restricted (alpha is reused for beta).
+   */
   void _set_inactive_fock_container(const Eigen::MatrixXd& alpha,
                                     const Eigen::MatrixXd* beta);
 
-  /// Derive non-owning views from an existing SymmetryBlockedTensor container.
+  /**
+   * @brief Refresh @ref _one_body_integrals dense views from the canonical
+   * @ref _h1 container (no data copy). Leaves the views null when @ref _h1
+   * is null.
+   */
   void _init_one_body_integrals_views();
+  /**
+   * @brief Refresh @ref _inactive_fock_matrix dense views from the canonical
+   * @ref _inactive_fock_sbt container (no data copy). Leaves the views null
+   * when @ref _inactive_fock_sbt is null.
+   */
   void _init_inactive_fock_views();
 };
 

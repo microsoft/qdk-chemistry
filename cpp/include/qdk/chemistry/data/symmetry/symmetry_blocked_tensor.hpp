@@ -111,15 +111,50 @@ class SymmetryBlockedTensor
   using Base = SymmetryBlocked<Rank, Tensor<Rank, Scalar>>;
 
  public:
+  /**
+   * @brief Sparse map from per-slot label tuples to dense block storage.
+   *
+   * Inherited from @ref SymmetryBlocked. Aliased sectors map to the same
+   * @ref BlockPtr; keys are hashed via @ref LabelsHash.
+   */
   using typename Base::BlockMap;
+  /**
+   * @brief Shared pointer to immutable per-block dense storage.
+   *
+   * Inherited from @ref SymmetryBlocked. Held as @c shared_ptr<const Block>
+   * so that symmetry-equivalent sectors can alias the same storage.
+   */
   using typename Base::BlockPtr;
+  /**
+   * @brief Per-slot per-label extents.
+   *
+   * Inherited from @ref SymmetryBlocked. For each index slot, maps every
+   * admissible @ref SymmetryLabel to its universe size.
+   */
   using typename Base::ExtentsArray;
+  /**
+   * @brief Per-slot block label tuple: one @ref SymmetryLabel per index slot.
+   *
+   * Inherited from @ref SymmetryBlocked. Used as the key type of
+   * @ref BlockMap.
+   */
   using typename Base::Labels;
+  /**
+   * @brief Per-slot symmetry definitions.
+   *
+   * Inherited from @ref SymmetryBlocked. One @ref SymmetryProduct per index
+   * slot, supplied at construction.
+   */
   using typename Base::SymmetriesArray;
 
   /**
    * @brief Construct from per-slot symmetries, per-slot extents, and a block
    * map. See the class description for the validation rules.
+   *
+   * @param symmetries Per-slot @ref SymmetryProduct definitions.
+   * @param extents Per-slot per-label universe sizes.
+   * @param blocks Block storage keyed by per-slot label tuples; block
+   *               shapes must match the declared extents per slot.
    *
    * @throws std::invalid_argument if a block or extent label is not
    *         admissible under the matching slot's @ref SymmetryProduct, if a
@@ -135,7 +170,10 @@ class SymmetryBlockedTensor
 
   // ---- DataClass interface ------------------------------------------------
 
-  /** @brief @ref DataClass type identifier: @c "symmetry_blocked_tensor". */
+  /**
+   * @brief @ref DataClass type identifier.
+   * @return The stable string @c "symmetry_blocked_tensor".
+   */
   std::string get_data_type_name() const override {
     return "symmetry_blocked_tensor";
   }
@@ -143,6 +181,7 @@ class SymmetryBlockedTensor
   /**
    * @brief Single-line summary including rank, scalar type, number of
    * stored blocks, and number of independent (non-aliased) blocks.
+   * @return A short diagnostic string suitable for logging.
    */
   std::string get_summary() const override {
     std::ostringstream oss;
@@ -157,9 +196,14 @@ class SymmetryBlockedTensor
    * @brief Serialize this tensor to JSON, with one entry per group of
    * pointer-equivalent blocks (a canonical key, the aliased keys, and the
    * block payload).
+   *
+   * @return JSON object carrying the serialization version, rank, scalar
+   *         type, per-slot symmetries and extents, and the per-block
+   *         payload.
    */
   nlohmann::json to_json() const override {
     nlohmann::json j;
+    j["version"] = SERIALIZATION_VERSION;
     j["type"] = "SymmetryBlockedTensor";
     j["rank"] = Rank;
     j["scalar"] = utils::is_complex_scalar_v<Scalar> ? "complex" : "real";
@@ -183,7 +227,11 @@ class SymmetryBlockedTensor
     return j;
   }
 
-  /** @brief Serialize this tensor to a JSON file at @p filename. */
+  /**
+   * @brief Serialize this tensor to a JSON file.
+   * @param filename Path to the JSON file to create or overwrite.
+   * @throws std::runtime_error if the file cannot be opened for writing.
+   */
   void to_json_file(const std::string& filename) const override {
     std::ofstream out(filename);
     if (!out) {
@@ -192,17 +240,31 @@ class SymmetryBlockedTensor
     out << to_json().dump(2);
   }
 
-  /** @brief Serialize this tensor into an HDF5 group. */
+  /**
+   * @brief Serialize this tensor into an HDF5 group.
+   *
+   * Writes one numeric dataset per independent block plus a JSON metadata
+   * payload (carrying the serialization version, per-slot symmetries and
+   * extents, and the block keys).
+   *
+   * @param group HDF5 group to write into.
+   * @throws std::runtime_error on HDF5 I/O failure.
+   */
   void to_hdf5(H5::Group& group) const override;
 
-  /** @brief Serialize this tensor to an HDF5 file at @p filename. */
+  /**
+   * @brief Serialize this tensor to an HDF5 file.
+   * @param filename Path to the HDF5 file to create or overwrite.
+   * @throws std::runtime_error on HDF5 I/O failure.
+   */
   void to_hdf5_file(const std::string& filename) const override;
 
   /**
    * @brief Dispatch to JSON or HDF5 serialization based on @p type.
    * @param filename Target file path.
    * @param type Either @c "json" or @c "hdf5".
-   * @throws std::invalid_argument if @p type is not supported.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if the underlying I/O operation fails.
    */
   void to_file(const std::string& filename,
                const std::string& type) const override {
@@ -216,31 +278,29 @@ class SymmetryBlockedTensor
     }
   }
 
-  /** @brief Reconstruct from a JSON object produced by @ref to_json. */
+  /**
+   * @brief Reconstruct from a JSON object produced by @ref to_json.
+   *
+   * Validates the serialization version recorded in @p j against
+   * @ref SERIALIZATION_VERSION before reconstructing.
+   *
+   * @param j JSON object produced by a prior @ref to_json call.
+   * @return Shared pointer to the reconstructed tensor.
+   * @throws std::runtime_error if @p j is missing the @c "version" field or
+   *         its version is incompatible with @ref SERIALIZATION_VERSION.
+   * @throws nlohmann::json::exception if @p j is otherwise malformed.
+   */
   static std::shared_ptr<SymmetryBlockedTensor> from_json(
-      const nlohmann::json& j) {
-    auto symmetries = Base::_symmetries_from_json(j);
-    auto extents = Base::_extents_from_json(j);
-
-    BlockMap blocks;
-    for (const auto& entry : j.at("blocks")) {
-      auto blk = std::make_shared<const Tensor<Rank, Scalar>>(
-          _block_from_json(entry.at("block")));
-      for (const auto& key_json : entry.at("keys")) {
-        std::vector<SymmetryLabel> labels;
-        for (const auto& label_json : key_json) {
-          labels.push_back(SymmetryLabel::from_json(label_json));
-        }
-        blocks.emplace(detail::make_labels<Rank>(labels), blk);
-      }
-    }
-    return std::make_shared<SymmetryBlockedTensor>(
-        std::move(symmetries), std::move(extents), std::move(blocks));
-  }
+      const nlohmann::json& j);
 
   /**
    * @brief Reconstruct a @ref SymmetryBlockedTensor from a JSON file
    * produced by @ref to_json_file.
+   *
+   * @param filename Path to the JSON file to read.
+   * @return Shared pointer to the reconstructed tensor.
+   * @throws std::runtime_error if the file cannot be opened, parsed, or
+   *         carries an incompatible serialization version.
    */
   static std::shared_ptr<SymmetryBlockedTensor> from_json_file(
       const std::string& filename) {
@@ -253,16 +313,38 @@ class SymmetryBlockedTensor
     return from_json(j);
   }
 
-  /** @brief Reconstruct from an HDF5 group produced by @ref to_hdf5. */
+  /**
+   * @brief Reconstruct from an HDF5 group produced by @ref to_hdf5.
+   *
+   * Validates the @c "version" field in the HDF5 metadata payload against
+   * @ref SERIALIZATION_VERSION before reconstructing.
+   *
+   * @param group HDF5 group to read from.
+   * @return Shared pointer to the reconstructed tensor.
+   * @throws std::runtime_error if the metadata dataset or its @c "version"
+   *         field is missing or the version is incompatible, or on HDF5
+   *         I/O failure.
+   * @throws std::invalid_argument if the encoded rank or scalar type does
+   *         not match the requested instantiation.
+   */
   static std::shared_ptr<SymmetryBlockedTensor> from_hdf5(H5::Group& group);
-  /** @brief Reconstruct from an HDF5 file produced by @ref to_hdf5_file. */
+  /**
+   * @brief Reconstruct from an HDF5 file produced by @ref to_hdf5_file.
+   * @param filename Path to the HDF5 file to read.
+   * @return Shared pointer to the reconstructed tensor.
+   * @throws std::runtime_error if the file cannot be opened or carries an
+   *         incompatible serialization version.
+   */
   static std::shared_ptr<SymmetryBlockedTensor> from_hdf5_file(
       const std::string& filename);
   /**
    * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
    * @param filename Source file path.
    * @param type Either @c "json" or @c "hdf5".
-   * @throws std::invalid_argument if @p type is not supported.
+   * @return Shared pointer to the reconstructed tensor.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if the underlying I/O operation fails or
+   *         the serialization version is incompatible.
    */
   static std::shared_ptr<SymmetryBlockedTensor> from_file(
       const std::string& filename, const std::string& type) {
@@ -276,6 +358,10 @@ class SymmetryBlockedTensor
   }
 
  private:
+  /// On-disk serialization format version. Bump on any change to the JSON or
+  /// HDF5 shape produced by @ref to_json / @ref to_hdf5.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
   void _validate_tensor_blocks() const {
     for (const auto& [labels, ptr] : this->_blocks) {
       std::array<std::size_t, Rank> dims{};

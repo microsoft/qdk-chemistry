@@ -258,7 +258,12 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   /// Convert a dense two-body vector to sparse map.
   static TwoBodyMap _to_map(const Eigen::VectorXd& v, size_t n);
 
-  /// Build SymmetryBlockedSparseMap<4> from a TwoBodyMap and set view.
+  /**
+   * @brief Build the canonical sparse two-body container from a v1
+   * @ref TwoBodyMap and store it as @ref _h2_sparse.
+   *
+   * @param map V1 two-body integral map keyed by @c (p,q,r,s).
+   */
   void _set_h2_sparse_container(TwoBodyMap map);
 };
 

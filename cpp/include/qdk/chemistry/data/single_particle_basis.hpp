@@ -32,6 +32,12 @@ namespace qdk::chemistry::data {
  */
 class SingleParticleBasis : public DataClass {
  public:
+  /**
+   * @brief Defaulted virtual destructor.
+   *
+   * Declared virtual so that derived single-particle bases can be safely
+   * deleted through a @c SingleParticleBasis pointer.
+   */
   ~SingleParticleBasis() override = default;
 
   /**
