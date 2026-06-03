@@ -18,6 +18,8 @@ grpcio==1.80.0 ; sys_platform == 'linux'
     # via opentelemetry-exporter-otlp-proto-grpc
 macholib==1.16.4 ; sys_platform == 'darwin'
     # via delocate
+numpy==2.3.5
+    # via -r requirements.in
 opentelemetry-api==1.42.1 ; sys_platform == 'linux'
     # via
     #   -r requirements.in
@@ -43,14 +45,21 @@ packaging==26.2
     #   auditwheel
     #   build
     #   delocate
+    #   scikit-build-core
+pathspec==1.1.1
+    # via scikit-build-core
 protobuf==5.29.6 ; sys_platform == 'linux'
     # via
     #   googleapis-common-protos
     #   opentelemetry-proto
+pybind11==3.0.4
+    # via -r requirements.in
 pyelftools==0.32 ; sys_platform == 'linux'
     # via auditwheel
 pyproject-hooks==1.2.0
     # via build
+scikit-build-core==0.12.2
+    # via -r requirements.in
 typing-extensions==4.15.0 ; sys_platform == 'darwin' or sys_platform == 'linux'
     # via
     #   delocate
