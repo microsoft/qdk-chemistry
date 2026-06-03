@@ -40,7 +40,7 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/wavefunction91/linalg-cmake-modules.git",
-                    "commitHash": "28ceaa9738f14935aa544289fa2fe4c4cc955d0e"
+                    "commitHash": "222364df5e7639f371bf2f37ceb0f476301101a1"
                 }
             },
             "developmentDependency": false
@@ -51,8 +51,7 @@
                 "other": {
                     "downloadUrl": "https://src.fedoraproject.org/lookaside/pkgs/metis/metis-5.1.0.tar.gz/5465e67079419a69e0116de24fce58fe/metis-5.1.0.tar.gz",
                     "name": "metis",
-                    "version": "5.1.0",
-                    "hash": "deea47749d13bd06fbeaf98a53c6c0b61603ddc17a43dae81d72c8015576f6495fd83c11b0ef68d024879ed5415c14ebdbd87ce49c181bdac680573bea8bdb25"
+                    "version": "5.1.0"
                 }
             },
             "developmentDependency": false
@@ -62,7 +61,8 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/catchorg/Catch2.git",
-                    "tag": "v2.13.2"
+                    "commitHash": "20192da44883d602e0365c14b778f47b2deb15aa",
+                    "tag": "v3.3.2"
                 }
             },
             "developmentDependency": true
@@ -71,7 +71,8 @@
             "component": {
                 "type": "git",
                 "git": {
-                    "repositoryUrl": "https://github.com/ericniebler/range-v3.git"
+                    "repositoryUrl": "https://github.com/ericniebler/range-v3.git",
+                    "commitHash": "108f93c279c8f9cec175dac361084983d0176e99"
                 }
             },
             "developmentDependency": true
@@ -81,7 +82,8 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/blaspp.git",
-                    "commitHash": "13622021629f5fd27591bb7da60bae5b19561f01"
+                    "commitHash": "c544fa5ad8e78997e9406eb723d9435e6153cd91",
+                    "tag": "v2025.05.28"
                 }
             },
             "developmentDependency": false
@@ -91,7 +93,18 @@
                 "type": "git",
                 "git": {
                     "repositoryUrl": "https://github.com/icl-utk-edu/lapackpp.git",
-                    "commitHash": "5bc9c85201ace48213df5ac7d1ef026c9668dfbd"
+                    "commitHash": "b7991ec3cf3e404083d9ac09f146a5ac86397cc8",
+                    "tag": "v2025.05.28"
+                }
+            },
+            "developmentDependency": false
+        },
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/kokkos/mdspan.git",
+                    "commitHash": "80fc772eb812b45097c28fc0a46d8ff006138d69"
                 }
             },
             "developmentDependency": false

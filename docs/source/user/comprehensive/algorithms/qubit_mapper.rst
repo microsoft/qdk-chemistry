@@ -45,7 +45,7 @@ Parity :cite:`Seeley2012`
 .. _encoding-scbk:
 
 Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
-   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Requires a :class:`~qdk_chemistry.data.Symmetries` object.
+   Exploits particle-number and spin-parity symmetries to reduce the qubit count by 2. Use :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev` with a :class:`~qdk_chemistry.data.Symmetries` object.
 
 .. _encoding-bk-tree:
 
@@ -60,12 +60,13 @@ Using the QubitMapper
    This algorithm is currently available only in the Python API.
 
 This section demonstrates how to create, configure, and run a qubit mapping.
-The ``run`` method returns a :class:`~qdk_chemistry.data.QubitHamiltonian` object containing the Pauli-string representation.
+The ``run`` method requires a :class:`~qdk_chemistry.data.MajoranaMapping` as its second argument, which specifies the fermion-to-qubit encoding to use.
+It returns a :class:`~qdk_chemistry.data.QubitHamiltonian` object containing the Pauli-string representation.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following input:
+The :class:`~qdk_chemistry.algorithms.QubitMapper` requires the following inputs:
 
 Hamiltonian
    A :doc:`Hamiltonian <../data/hamiltonian>` instance containing the fermionic one- and
@@ -74,6 +75,12 @@ Hamiltonian
 
    The Hamiltonian defines the fermionic operators that will be transformed into
    qubit (Pauli) operators using the selected encoding strategy.
+
+MajoranaMapping
+   A :doc:`MajoranaMapping <../data/majorana_mapping>` instance specifying the
+   fermion-to-qubit encoding. Built-in factory methods are available for standard
+   encodings (e.g., ``MajoranaMapping.jordan_wigner(num_modes=n)``), or a custom
+   encoding can be constructed from a Pauli-string table.
 
 .. note::
 
@@ -125,6 +132,50 @@ You can discover available implementations programmatically:
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
 
+.. _extending-implementations:
+
+Details for extending implementations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Implementations fall into two groups.  They use the
+:class:`~qdk_chemistry.data.MajoranaMapping` argument differently:
+
+**Table-driven backends** (QDK native)
+   Read the Pauli-string table from the ``MajoranaMapping`` directly and
+   pass it to the C++ mapping engine.  Any valid table works, including
+   custom encodings that have no standard name.
+
+**Third-party backends** (OpenFermion, Qiskit)
+   **Ignore the Pauli table.**  They read
+   :attr:`~qdk_chemistry.data.MajoranaMapping.base_encoding` — a string
+   like ``"jordan-wigner"`` or ``"bravyi-kitaev-tree"`` — and pass it to
+   their own library to select the matching transform.  The qubit
+   operator is then built from scratch using the third-party library's
+   own fermion-to-qubit code.
+
+This distinction has practical consequences:
+
+- **Custom mappings** (user-defined Pauli tables) work with the QDK
+  backend but **cannot** be used with third-party backends, which have
+  no way to interpret an arbitrary table.
+
+- **Consistency is assumed, not verified.**  Factory-produced mappings
+  (e.g. ``MajoranaMapping.jordan_wigner()``) guarantee that the Pauli
+  table and the ``base_encoding`` name describe the same encoding.
+  Cross-backend eigenvalue tests in the test suite verify this for every
+  supported factory × backend combination.  However, if a
+  ``MajoranaMapping`` is manually built with a table that does not
+  match its name, a third-party backend will silently use the wrong
+  transform.
+
+- **Tapering** is each backend's responsibility.  The base class provides
+  a ``_taper_result()`` helper that applies tapering and qubit relabeling
+  to an *already mapped* ``QubitHamiltonian``.  Backends must first run
+  the base transform (typically using ``mapping.without_tapering()``) and
+  then call ``_taper_result()`` on the output.  All shipped backends use
+  this helper, but third-party backends are free to handle tapering
+  however they choose.
+
 .. _qdk-qubit-mapper:
 
 QDK
@@ -133,12 +184,18 @@ QDK
 .. rubric:: Factory name: ``"qdk"``
 
 Native QDK/Chemistry qubit mapping implementation built on the :doc:`PauliOperator <../data/pauli_operator>` expression layer.
-This implementation provides high-performance fermion-to-qubit transformations without external dependencies.
+This is a **table-driven** backend: it reads the Pauli-string table from the :class:`~qdk_chemistry.data.MajoranaMapping` and passes it directly to the C++ mapping engine.
+Any valid ``MajoranaMapping`` works — factory-produced or custom user-defined tables.
+The mapping's ``name`` and ``base_encoding`` are used only for metadata on the output, not to select a transform.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
+
+Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+
+Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
 .. rubric:: Settings
 
@@ -149,9 +206,6 @@ Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if nee
    * - Setting
      - Type
      - Description
-   * - ``encoding``
-     - string
-     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``). Default: ``jordan-wigner``
    * - ``threshold``
      - double
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
@@ -176,21 +230,15 @@ Qiskit
 .. rubric:: Factory name: ``"qiskit"``
 
 Qubit mapping implementation integrated through the Qiskit plugin.
+This is a **third-party** backend: it reads ``mapping.base_encoding`` to select a Qiskit Nature mapper class and **ignores the Pauli table** (see :ref:`extending-implementations`).
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
+Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Parity <encoding-parity>`
+
+Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 .. rubric:: Settings
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
-   * - ``encoding``
-     - string
-     - Qubit mapping strategy (``jordan-wigner``, ``bravyi-kitaev``, ``parity``)
+This implementation has no configurable settings.
 
 .. _openfermion-qubit-mapper:
 
@@ -200,45 +248,26 @@ OpenFermion
 .. rubric:: Factory name: ``"openfermion"``
 
 Qubit mapping implementation integrated through the OpenFermion plugin.
+This is a **third-party** backend: it reads ``mapping.base_encoding`` to select an OpenFermion transform function and **ignores the Pauli table** (see :ref:`extending-implementations`).
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Symmetry-conserving Bravyi-Kitaev <encoding-scbk>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
+Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
+
+Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 .. rubric:: Settings
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 25 50
-
-   * - Setting
-     - Type
-     - Description
-   * - ``encoding``
-     - string
-     - Fermion-to-qubit encoding (``jordan-wigner``, ``bravyi-kitaev``, ``symmetry-conserving-bravyi-kitaev``, ``bravyi-kitaev-tree``)
-
-.. note::
-
-   The ``symmetry-conserving-bravyi-kitaev`` encoding requires a
-   :class:`~qdk_chemistry.data.Symmetries` object passed as the second argument
-   to ``run()``.  This object specifies the number of active alpha and beta
-   electrons so that the transform can exploit particle-number and spin-parity
-   symmetries to reduce the qubit count by 2.
-   See :doc:`Symmetries <../data/symmetries>` for full details and factory methods.
-
-   .. tab:: Python API
-
-      .. literalinclude:: ../../../_static/examples/python/qubit_mapper.py
-         :language: python
-         :start-after: # start-cell-scbk-mapper
-         :end-before: # end-cell-scbk-mapper
+This implementation has no configurable settings. The encoding strategy is
+determined entirely by the :class:`~qdk_chemistry.data.MajoranaMapping` provided
+to ``run()``.
 
 
 Related classes
 ---------------
 
 - :doc:`Hamiltonian <../data/hamiltonian>`: Input Hamiltonian for mapping
+- :doc:`MajoranaMapping <../data/majorana_mapping>`: Fermion-to-qubit encoding passed to ``run()``
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Output qubit operator representation
-- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for symmetry-exploiting algorithms
+- :doc:`Symmetries <../data/symmetries>`: Physical symmetries (e.g., conserved quantum numbers) for :meth:`~qdk_chemistry.data.MajoranaMapping.symmetry_conserving_bravyi_kitaev`
 
 Further reading
 ---------------

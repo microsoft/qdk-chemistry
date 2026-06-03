@@ -19,6 +19,7 @@ Each of the links below leads to a detailed description of the data class, inclu
    hamiltonian
    orbitals
    lattice_graph
+   majorana_mapping
    pauli_operator
    structure
    symmetries
@@ -62,6 +63,9 @@ The following table summarizes the available data classes in QDK/Chemistry and t
      - Factory methods, User input
    * - :doc:`LatticeGraph <lattice_graph>`
      - Lattice topology for model Hamiltonians
+     - Factory methods, User input
+   * - :doc:`MajoranaMapping <majorana_mapping>`
+     - Fermion-to-qubit encoding (Majorana-to-Pauli table)
      - Factory methods, User input
    * - :doc:`PauliOperator <pauli_operator>`
      - Pauli operator expressions with arithmetic

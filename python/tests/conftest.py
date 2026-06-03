@@ -24,6 +24,7 @@ from qdk_chemistry.data import (
     CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
+    MajoranaMapping,
     Orbitals,
     QuantumErrorProfile,
     Wavefunction,
@@ -110,17 +111,21 @@ def test_data_files_path():
 @pytest.fixture
 def hamiltonian_4e4o(test_data_files_path):
     """Fixture to create the Qubit Hamiltonian for 4e4o ethylene 2det problem."""
-    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
+    mapper = create("qubit_mapper", "qdk")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "ethylene_4e4o_2det.hamiltonian.json")
-    return mapper.run(classical_hamiltonian)
+    n_spatial = classical_hamiltonian.get_one_body_integrals()[0].shape[0]
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
+    return mapper.run(classical_hamiltonian, mapping)
 
 
 @pytest.fixture
 def hamiltonian_10e6o(test_data_files_path):
     """Fixture to create the Qubit Hamiltonian for 10e6o f2 problem."""
-    mapper = create("qubit_mapper", "qdk", encoding="jordan-wigner")
+    mapper = create("qubit_mapper", "qdk")
     classical_hamiltonian = Hamiltonian.from_json_file(test_data_files_path / "f2_10e6o.hamiltonian.json")
-    return mapper.run(classical_hamiltonian)
+    n_spatial = classical_hamiltonian.get_one_body_integrals()[0].shape[0]
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
+    return mapper.run(classical_hamiltonian, mapping)
 
 
 @pytest.fixture

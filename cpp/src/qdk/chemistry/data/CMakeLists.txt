@@ -11,6 +11,9 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
+    majorana_map_engine.cpp
+    majorana_mapping.cpp
+    majorana_mapping_factories.cpp
     orbitals.cpp
     pauli_operator.cpp
     settings.cpp
@@ -19,6 +22,7 @@ target_sources(chemistry PRIVATE
     symmetry/symmetry.cpp
     symmetry/symmetry_blocked_tensor.cpp
     symmetry/symmetry_blocked_index_set.cpp
+    tapering.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
     wavefunction_containers/cc.cpp

@@ -37,6 +37,7 @@ void bind_configuration(py::module& m);
 void bind_qdk_chemistry_config(py::module& m);
 void bind_pauli_operator(py::module& m);
 void bind_valence_space(py::module& m);
+void bind_majorana_mapping(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
 void bind_logger(py::module& m);
@@ -81,6 +82,8 @@ PYBIND11_MODULE(_core, m) {
   bind_ansatz(data);
   bind_stability_result(data);
   bind_pauli_operator(data);
+  bind_majorana_mapping(
+      data);  // Depends on SparsePauliWord from pauli_operator
   bind_serialization(data);
 
   bind_localizer(algorithms);
