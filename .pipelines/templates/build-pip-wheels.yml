@@ -109,8 +109,8 @@ steps:
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
     env:
-      # Required by the conda bootstrap on linux/amd64 to authenticate to
-      # the Azure Artifacts feed that proxies ms-ensureconda + conda channels.
+      # Required by the conda bootstrap to authenticate to the Azure Artifacts
+      # feed that proxies ms-ensureconda + conda channels.
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
@@ -120,6 +120,7 @@ steps:
         --platform ${{ parameters.imageTag }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
         -e PIP_INDEX_URL \
+        -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
@@ -135,6 +136,8 @@ steps:
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
@@ -153,3 +156,5 @@ steps:
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
     retryCountOnTaskFailure: 2
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)

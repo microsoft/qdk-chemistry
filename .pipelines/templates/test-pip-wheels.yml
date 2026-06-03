@@ -43,6 +43,7 @@ steps:
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -e PIP_INDEX_URL \
+        -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
         -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
@@ -51,6 +52,8 @@ steps:
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
     displayName: Test wheel (Docker ${{ parameters.imageTag }})
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
@@ -60,3 +63,5 @@ steps:
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
     displayName: Test wheel (native)
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
