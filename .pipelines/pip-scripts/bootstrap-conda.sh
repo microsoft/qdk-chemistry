@@ -43,24 +43,33 @@
 #
 # Prereq: the AzureQuantum/quantum-apps-dependencies feed must have
 # azure-feed://mseng/Anaconda@Published configured as an upstream so that
-# ms-ensureconda resolves on Linux x86_64. PIP_INDEX_URL is set by
-# PipAuthenticate@1 at job level; on Linux it's forwarded into the docker
-# container via -e PIP_INDEX_URL.
+# ms-ensureconda resolves. PIP_INDEX_URL is set by PipAuthenticate@1 at job
+# level; on Linux it's forwarded into the docker container via -e PIP_INDEX_URL.
 
 CONDA_ENV_NAME="${1:?bootstrap-conda.sh: missing CONDA_ENV_NAME (positional arg \$1)}"
 : "${PYTHON_VERSION:?bootstrap-conda.sh: PYTHON_VERSION must be set before sourcing}"
 
-case "$(uname -s):$(uname -m)" in
-    Linux:x86_64)
-        ENSURECONDA_PKG="ms-ensureconda==2026.2.1"
-        USE_MS_ENSURECONDA=1
-        ;;
-    *)
-        # macOS (arm64) and Linux aarch64 — see HEADS UP block above.
-        ENSURECONDA_PKG="ensureconda==1.6.0"
-        USE_MS_ENSURECONDA=0
-        ;;
-esac
+# case "$(uname -s):$(uname -m)" in
+#     Linux:x86_64)
+#         ENSURECONDA_PKG="ms-ensureconda==2026.6.1"
+#         USE_MS_ENSURECONDA=1
+#         ;;
+#     *)
+#         # macOS (arm64) and Linux aarch64 — see HEADS UP block above.
+#         ENSURECONDA_PKG="ensureconda==1.6.0"
+#         USE_MS_ENSURECONDA=0
+#         ;;
+# esac
+# https://dev.azure.com/mseng/Python/_artifacts/feed/Anaconda/PyPI/ms-ensureconda/overview/2026.6.1
+# The platforms now include:
+# win_amd64
+# manylinux_2_35_x86_64 (created/tested on Azure Linux 3)
+# manylinux_2_35_aarch64 (also on AL3)
+# macos_15_0_x86_64 (using the standard macos-15 image)
+# macos_15_0_arm64 (using the macos-15-arm image)
+ENSURECONDA_PKG="ms-ensureconda==2026.6.1"
+USE_MS_ENSURECONDA=1
+
 
 echo "Installing ${ENSURECONDA_PKG} (on $(uname -s):$(uname -m)) and bootstrapping conda..."
 # Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS
