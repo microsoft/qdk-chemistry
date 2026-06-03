@@ -145,4 +145,4 @@ class IterativePhaseEstimation(PhaseEstimation):
 
     def name(self) -> str:
         """Return the name of the phase estimation algorithm."""
-        return "iterative"
+        return "qdk_iterative"

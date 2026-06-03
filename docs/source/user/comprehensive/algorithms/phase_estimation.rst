@@ -138,7 +138,7 @@ You can discover available implementations programmatically:
 Iterative phase estimation (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"iterative"``
+.. rubric:: Factory name: ``"qdk_iterative"``
 
 Kitaev's iterative algorithm :cite:`Kitaev1995` uses a single ancilla qubit to extract phase bits sequentially, from the most significant bit (MSB) to the least significant bit (LSB).
 At each iteration :math:`k` (from :math:`0` to :math:`n-1`, where :math:`n` is the total number of bits):
@@ -186,7 +186,7 @@ See :doc:`qpe_circuit_builder` for configuring:
 Standard QFT-based phase estimation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Factory name: ``"standard"``
+.. rubric:: Factory name: ``"qdk_standard"``
 
 The standard :term:`QPE` algorithm :cite:`Nielsen-Chuang2010-QPE` uses a register of :math:`n` ancilla qubits to extract all phase bits simultaneously.
 The circuit structure consists of:

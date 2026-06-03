@@ -10,10 +10,10 @@
 from qdk_chemistry.algorithms import create
 
 # Create the default (iterative) phase estimation algorithm
-iqpe = create("phase_estimation", "iterative")
+iqpe = create("phase_estimation", "qdk_iterative")
 
 # Or create the standard QFT-based variant
-qpe = create("phase_estimation", "standard")
+qpe = create("phase_estimation", "qdk_standard")
 # end-cell-create
 ################################################################################
 
@@ -32,7 +32,7 @@ iqpe_circuit_builder = AlgorithmRef(
     ),
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
 )
-iqpe = create("phase_estimation", "iterative", shots_per_bit=10)
+iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=10)
 iqpe.settings().set("qpe_circuit_builder", iqpe_circuit_builder)
 # end-cell-configure-iqpe
 ################################################################################
@@ -50,7 +50,7 @@ qpe_circuit_builder = AlgorithmRef(
     ),
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=0.1),
 )
-qpe = create("phase_estimation", "standard")
+qpe = create("phase_estimation", "qdk_standard")
 qpe.settings().set("shots", 100)
 qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
@@ -97,7 +97,7 @@ circuit = state_prep.run(wfn_cas)
 # 7. Create and run IQPE with nested algorithm settings
 from qdk_chemistry.data import AlgorithmRef
 
-iqpe = create("phase_estimation", "iterative", shots_per_bit=3)
+iqpe = create("phase_estimation", "qdk_iterative", shots_per_bit=3)
 
 # 8. Configure nested algorithms — the circuit builder holds num_bits, unitary_builder, and circuit_mapper
 iqpe_circuit_builder = AlgorithmRef(
@@ -136,6 +136,6 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['iterative', 'standard']
+print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
 # end-cell-list-implementations
 ################################################################################

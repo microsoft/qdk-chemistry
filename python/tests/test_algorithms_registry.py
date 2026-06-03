@@ -100,7 +100,7 @@ class TestRegistryShowDefault:
         # Test for phase estimation
         default_phase_estimation = registry.show_default("phase_estimation")
         assert isinstance(default_phase_estimation, str)
-        assert default_phase_estimation == "iterative"
+        assert default_phase_estimation == "qdk_iterative"
 
         # Test for time evolution builder
         default_unitary_builder = registry.show_default("hamiltonian_unitary_builder")

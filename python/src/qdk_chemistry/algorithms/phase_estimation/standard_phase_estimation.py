@@ -119,5 +119,5 @@ class StandardPhaseEstimation(PhaseEstimation):
         )
 
     def name(self) -> str:
-        """Return the algorithm name as standard."""
-        return "standard"
+        """Return the algorithm name as qdk_standard."""
+        return "qdk_standard"

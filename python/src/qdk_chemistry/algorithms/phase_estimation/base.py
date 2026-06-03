@@ -96,5 +96,5 @@ class PhaseEstimationFactory(AlgorithmFactory):
         return "phase_estimation"
 
     def default_algorithm_name(self) -> str:
-        """Return the iterative as default algorithm name."""
-        return "iterative"
+        """Return the qdk_iterative as default algorithm name."""
+        return "qdk_iterative"

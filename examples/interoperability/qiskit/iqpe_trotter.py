@@ -25,8 +25,7 @@ except ImportError as ex:
 from qdk_chemistry.algorithms import (
     create,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, Structure
-from qdk_chemistry.data import MajoranaMapping
+from qdk_chemistry.data import AlgorithmRef, Circuit, MajoranaMapping, Structure
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -117,7 +116,7 @@ Logger.info(
 ########################################################################################
 iqpe = create(
     "phase_estimation",
-    "iterative",
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT,
 )
 iqpe.settings().set(

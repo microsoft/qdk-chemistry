@@ -72,7 +72,7 @@ state_prep_circuit_1 = Circuit(qasm3.dumps(state_prep_1))
 # 2. Run iterative QPE
 iqpe_1 = create(
     "phase_estimation",
-    "iterative",
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_1,
 )
 iqpe_1.settings().set(
@@ -155,7 +155,7 @@ state_prep_circuit_2 = Circuit(qasm3.dumps(state_prep_2))
 # 2. Run iterative QPE
 iqpe_2 = create(
     "phase_estimation",
-    "iterative",
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_2,
 )
 iqpe_2.settings().set(
