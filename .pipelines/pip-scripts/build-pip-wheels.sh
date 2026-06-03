@@ -128,11 +128,11 @@ python3 -m pip install -r .pipelines/requirements.txt
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
 mkdir -p python/manifest
 echo "------------------ Installed Python packages (buildenv) ------------------"
-python3 -m pip list --format=freeze | tee python/manifest/requirements.txt
+python3 -m pip list --format=freeze | tee python/manifest/build.requirements.txt
 echo "---------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report python/manifest/buildenv.component-detection-pip-report.json \
-    -r python/manifest/requirements.txt
+    -r python/manifest/build.requirements.txt
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh

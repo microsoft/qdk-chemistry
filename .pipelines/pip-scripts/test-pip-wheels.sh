@@ -94,11 +94,11 @@ python3 -m pip install "${WHEEL[0]}[test]"
 mkdir -p "$PYTHON_DIR/manifest"
 echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry \
-    | tee "$PYTHON_DIR/manifest/requirements.txt"
+    | tee "$PYTHON_DIR/manifest/test.requirements.txt"
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
     --report "$PYTHON_DIR/manifest/testenv.component-detection-pip-report.json" \
-    -r "$PYTHON_DIR/manifest/requirements.txt"
+    -r "$PYTHON_DIR/manifest/test.requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
