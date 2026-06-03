@@ -126,6 +126,7 @@ python3 -m pip install -r .pipelines/requirements.txt
 # requirements.txt in a non-hidden directory (the detector skips dotdirs
 # like .pipelines/). See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
 mkdir -p python/build/build-manifest
 echo "------------------ Installed Python packages (buildenv) ------------------"
 python3 -m pip list --format=freeze | tee python/build/build-manifest/requirements.txt

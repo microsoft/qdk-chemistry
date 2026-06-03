@@ -91,6 +91,7 @@ python3 -m pip install "${WHEEL[0]}[test]"
 # like .pipelines/). The locally-built qdk_chemistry wheel is excluded
 # because it is not resolvable from any index. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
 mkdir -p "$PYTHON_DIR/build/test-manifest"
 echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry \
