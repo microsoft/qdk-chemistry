@@ -14,6 +14,9 @@ parameters:
 - name: macBuild
   type: string
   default: OFF
+- name: runSlowTests
+  type: boolean
+  default: true
 
 steps:
 - ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
@@ -24,6 +27,7 @@ steps:
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
@@ -41,6 +45,7 @@ steps:
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
@@ -54,6 +59,7 @@ steps:
   - script: |
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
+      export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
     displayName: Test wheel (native)

@@ -155,5 +155,6 @@ steps:
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (macOS native)
+    retryCountOnTaskFailure: 2
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)

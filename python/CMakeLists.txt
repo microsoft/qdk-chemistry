@@ -129,6 +129,7 @@ pybind11_add_module(_core
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
+    src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
     src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp
