@@ -64,13 +64,15 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         Logger.trace_entering()
-        super().__init__(
-            num_bits=num_bits, controlled_circuit_mapper=controlled_circuit_mapper, unitary_builder=unitary_builder
-        )
+        super().__init__(num_bits=num_bits)
         self._settings = QdkIterativeQpeCircuitBuilderSettings()
         self._settings.set("num_bits", num_bits)
         self._settings.set("phase_correction", phase_correction)
         self._settings.set("num_iteration", num_iteration)
+        if unitary_builder is not None:
+            self._settings.set("unitary_builder", unitary_builder)
+        if controlled_circuit_mapper is not None:
+            self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def _run_impl(
         self,
