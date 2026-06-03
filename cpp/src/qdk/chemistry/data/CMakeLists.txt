@@ -11,6 +11,9 @@ target_sources(chemistry PRIVATE
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/cholesky.cpp
     hamiltonian_containers/sparse.cpp
+    majorana_map_engine.cpp
+    majorana_mapping.cpp
+    majorana_mapping_factories.cpp
     orbitals.cpp
     nuclear_gradients.cpp
     nuclear_hessian.cpp
@@ -18,6 +21,7 @@ target_sources(chemistry PRIVATE
     settings.cpp
     stability_result.cpp
     structure.cpp
+    tapering.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
     wavefunction_containers/cc.cpp

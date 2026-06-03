@@ -25,6 +25,7 @@ Exposed classes are:
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
+- :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
@@ -85,6 +86,7 @@ from qdk_chemistry._core.data import (
     HamiltonianContainer,
     HamiltonianType,
     LatticeGraph,
+    MajoranaMapping,
     ModelOrbitals,
     MP2Container,
     NuclearGradients,
@@ -105,6 +107,7 @@ from qdk_chemistry._core.data import (
     SpinChannel,
     StabilityResult,
     Structure,
+    TaperingSpecification,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -114,7 +117,6 @@ from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
@@ -155,7 +157,6 @@ __all__ = [
     "DrivenQubitHamiltonian",
     "ElectronicStructureSettings",
     "Element",
-    "EncodingMismatchError",
     "EnergyExpectationResult",
     "FermionModeOrder",
     "FlatPartition",
@@ -165,6 +166,7 @@ __all__ = [
     "LatticeGraph",
     "LayeredPartition",
     "MP2Container",
+    "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
     "NuclearGradients",
@@ -193,6 +195,7 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
+    "TaperingSpecification",
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
@@ -202,5 +205,4 @@ __all__ = [
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
-    "validate_encoding_compatibility",
 ]

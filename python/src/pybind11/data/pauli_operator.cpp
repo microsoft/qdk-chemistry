@@ -13,6 +13,14 @@ namespace py = pybind11;
 void bind_pauli_operator(pybind11::module& data) {
   using namespace qdk::chemistry::data;
 
+  data.def("sparse_pauli_word_to_label", &sparse_pauli_word_to_label,
+           py::arg("word"), py::arg("num_qubits"),
+           "Convert a sparse Pauli word to a QubitHamiltonian Pauli label.");
+
+  data.def("label_to_sparse_pauli_word", &label_to_sparse_pauli_word,
+           py::arg("label"),
+           "Convert a QubitHamiltonian Pauli label to a sparse Pauli word.");
+
   // Base class PauliOperatorExpression
   py::class_<PauliOperatorExpression, std::unique_ptr<PauliOperatorExpression>>
       pauli_expr(data, "PauliOperatorExpression", R"(
