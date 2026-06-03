@@ -2,11 +2,14 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
@@ -43,6 +46,11 @@ class ScopedLogLevel {
 struct EnergyEvaluation {
   double energy = 0.0;
   std::optional<std::shared_ptr<data::Wavefunction>> wavefunction;
+};
+
+struct ReferenceOrbitals {
+  std::shared_ptr<data::Orbitals> orbitals;
+  std::shared_ptr<data::Wavefunction> wavefunction;
 };
 
 std::shared_ptr<data::Structure> copy_structure(
@@ -115,6 +123,192 @@ BasisOrGuessType seed_to_scf_input(const NuclearDerivativeSeedType& seed,
 }
 
 template <typename Factory>
+typename Factory::return_type create_from_ref(const data::AlgorithmRef& ref);
+
+unsigned int active_electrons(const data::Settings& settings,
+                              const std::string& key);
+
+std::shared_ptr<data::Orbitals> seed_to_orbitals(
+    const NuclearDerivativeSeedType& seed) {
+  std::shared_ptr<data::Orbitals> orbitals;
+  if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(seed)) {
+    orbitals = std::get<std::shared_ptr<data::Orbitals>>(seed);
+    if (!orbitals) {
+      throw std::invalid_argument("Orbital seed must not be null");
+    }
+  } else if (std::holds_alternative<std::shared_ptr<data::Wavefunction>>(
+                 seed)) {
+    auto wavefunction = std::get<std::shared_ptr<data::Wavefunction>>(seed);
+    if (!wavefunction) {
+      throw std::invalid_argument("Wavefunction seed must not be null");
+    }
+    orbitals = wavefunction->get_orbitals();
+  }
+
+  if (!orbitals) {
+    return nullptr;
+  }
+  if (!orbitals->get_basis_set()) {
+    throw std::invalid_argument(
+        "Orbital or wavefunction seed must include orbitals with a basis set");
+  }
+  return orbitals;
+}
+
+std::shared_ptr<data::Wavefunction> seed_to_wavefunction(
+    const NuclearDerivativeSeedType& seed) {
+  if (!std::holds_alternative<std::shared_ptr<data::Wavefunction>>(seed)) {
+    return nullptr;
+  }
+  auto wavefunction = std::get<std::shared_ptr<data::Wavefunction>>(seed);
+  if (!wavefunction) {
+    throw std::invalid_argument("Wavefunction seed must not be null");
+  }
+  return wavefunction;
+}
+
+std::shared_ptr<data::Orbitals> copy_active_space_metadata(
+    const std::shared_ptr<data::Orbitals>& orbitals,
+    const std::shared_ptr<data::Orbitals>& metadata_source) {
+  if (!orbitals || !metadata_source) {
+    return orbitals;
+  }
+
+  const auto& [active_a, active_b] =
+      metadata_source->get_active_space_indices();
+  const auto& [inactive_a, inactive_b] =
+      metadata_source->get_inactive_space_indices();
+  std::optional<Eigen::MatrixXd> ao_overlap;
+  if (orbitals->has_overlap_matrix()) {
+    ao_overlap = orbitals->get_overlap_matrix();
+  }
+  std::shared_ptr<data::BasisSet> basis_set = orbitals->get_basis_set();
+
+  if (orbitals->is_restricted()) {
+    std::optional<Eigen::VectorXd> energies;
+    if (orbitals->has_energies()) {
+      energies = orbitals->get_energies().first;
+    }
+    return std::make_shared<data::Orbitals>(
+        orbitals->get_coefficients().first, energies, ao_overlap, basis_set,
+        std::make_tuple(
+            std::vector<size_t>(active_a.begin(), active_a.end()),
+            std::vector<size_t>(inactive_a.begin(), inactive_a.end())));
+  }
+
+  std::optional<Eigen::VectorXd> energies_a;
+  std::optional<Eigen::VectorXd> energies_b;
+  if (orbitals->has_energies()) {
+    auto [source_energies_a, source_energies_b] = orbitals->get_energies();
+    energies_a = source_energies_a;
+    energies_b = source_energies_b;
+  }
+  return std::make_shared<data::Orbitals>(
+      orbitals->get_coefficients().first, orbitals->get_coefficients().second,
+      energies_a, energies_b, ao_overlap, basis_set,
+      std::make_tuple(
+          std::vector<size_t>(active_a.begin(), active_a.end()),
+          std::vector<size_t>(active_b.begin(), active_b.end()),
+          std::vector<size_t>(inactive_a.begin(), inactive_a.end()),
+          std::vector<size_t>(inactive_b.begin(), inactive_b.end())));
+}
+
+std::string active_determinant_string(size_t n_active_orbitals,
+                                      unsigned int n_alpha,
+                                      unsigned int n_beta) {
+  if (n_alpha > n_active_orbitals || n_beta > n_active_orbitals) {
+    throw std::invalid_argument(
+        "Active electron count exceeds the number of active orbitals");
+  }
+
+  std::string determinant(n_active_orbitals, '0');
+  size_t alpha_remaining = n_alpha;
+  size_t beta_remaining = n_beta;
+  for (auto& occupation : determinant) {
+    if (alpha_remaining > 0 && beta_remaining > 0) {
+      occupation = '2';
+      --alpha_remaining;
+      --beta_remaining;
+    } else if (alpha_remaining > 0) {
+      occupation = 'u';
+      --alpha_remaining;
+    } else if (beta_remaining > 0) {
+      occupation = 'd';
+      --beta_remaining;
+    }
+  }
+  return determinant;
+}
+
+std::shared_ptr<data::Wavefunction> wavefunction_from_orbitals(
+    std::shared_ptr<data::Orbitals> orbitals, unsigned int n_active_alpha,
+    unsigned int n_active_beta) {
+  const auto& [active_a, active_b] = orbitals->get_active_space_indices();
+  if (active_a.size() != active_b.size()) {
+    throw std::invalid_argument(
+        "Reference orbital localization requires matching alpha and beta "
+        "active spaces");
+  }
+  auto determinant = data::Configuration(active_determinant_string(
+      active_a.size(), n_active_alpha, n_active_beta));
+  auto container =
+      std::make_unique<data::SlaterDeterminantContainer>(determinant, orbitals);
+  return std::make_shared<data::Wavefunction>(std::move(container));
+}
+
+ReferenceOrbitals localize_reference_orbitals(const data::Settings& settings,
+                                              ReferenceOrbitals reference) {
+  if (!settings.get<bool>("localize_reference_orbitals")) {
+    return reference;
+  }
+
+  if (!reference.wavefunction) {
+    reference.wavefunction = wavefunction_from_orbitals(
+        reference.orbitals,
+        active_electrons(settings, "n_active_alpha_electrons"),
+        active_electrons(settings, "n_active_beta_electrons"));
+  }
+
+  auto localizer = create_from_ref<LocalizerFactory>(
+      settings.get<data::AlgorithmRef>("orbital_localizer"));
+  auto [loc_indices_a, loc_indices_b] =
+      reference.orbitals->get_active_space_indices();
+  reference.wavefunction =
+      localizer->run(reference.wavefunction, loc_indices_a, loc_indices_b);
+  reference.orbitals = reference.wavefunction->get_orbitals();
+  return reference;
+}
+
+ReferenceOrbitals reference_orbitals_for_mr_energy(
+    const data::Settings& settings, std::shared_ptr<data::Structure> structure,
+    int charge, int spin_multiplicity, const NuclearDerivativeSeedType& seed,
+    bool allow_orbital_seed) {
+  auto seed_orbitals = seed_to_orbitals(seed);
+  if (allow_orbital_seed && seed_orbitals) {
+    return localize_reference_orbitals(
+        settings, {seed_orbitals, seed_to_wavefunction(seed)});
+  }
+
+  auto orbital_solver = create_from_ref<ScfSolverFactory>(
+      settings.get<data::AlgorithmRef>("orbital_solver"));
+  auto [_, reference_wavefunction] =
+      orbital_solver->run(structure, charge, spin_multiplicity,
+                          seed_to_scf_input(seed, allow_orbital_seed));
+  auto reference_orbitals = reference_wavefunction->get_orbitals();
+  if (settings.get<bool>("reuse_seed_active_space")) {
+    reference_orbitals =
+        copy_active_space_metadata(reference_orbitals, seed_orbitals);
+    if (reference_orbitals != reference_wavefunction->get_orbitals()) {
+      reference_wavefunction =
+          detail::new_wavefunction(reference_wavefunction, reference_orbitals);
+    }
+  }
+
+  return localize_reference_orbitals(
+      settings, {reference_orbitals, reference_wavefunction});
+}
+
+template <typename Factory>
 typename Factory::return_type create_from_ref(const data::AlgorithmRef& ref) {
   auto instance = Factory::create(ref.get_algorithm_name());
   if (ref.get_settings()) {
@@ -150,14 +344,12 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
   }
 
   if (algorithm_type == MultiConfigurationScfFactory::algorithm_type_name()) {
-    auto orbital_solver = create_from_ref<ScfSolverFactory>(
-        settings.get<data::AlgorithmRef>("orbital_solver"));
-    auto [_, reference_wavefunction] =
-        orbital_solver->run(structure, charge, spin_multiplicity,
-                            seed_to_scf_input(seed, allow_wavefunction_seed));
+    auto reference = reference_orbitals_for_mr_energy(
+        settings, structure, charge, spin_multiplicity, seed,
+        allow_wavefunction_seed);
     auto calculator = create_from_ref<MultiConfigurationScfFactory>(ref);
     auto [energy, wavefunction] =
-        calculator->run(reference_wavefunction->get_orbitals(),
+        calculator->run(reference.orbitals,
                         active_electrons(settings, "n_active_alpha_electrons"),
                         active_electrons(settings, "n_active_beta_electrons"));
     return {energy, wavefunction};
@@ -165,16 +357,13 @@ EnergyEvaluation evaluate_energy(const data::Settings& settings,
 
   if (algorithm_type ==
       MultiConfigurationCalculatorFactory::algorithm_type_name()) {
-    auto orbital_solver = create_from_ref<ScfSolverFactory>(
-        settings.get<data::AlgorithmRef>("orbital_solver"));
-    auto [_, reference_wavefunction] =
-        orbital_solver->run(structure, charge, spin_multiplicity,
-                            seed_to_scf_input(seed, allow_wavefunction_seed));
+    auto reference = reference_orbitals_for_mr_energy(
+        settings, structure, charge, spin_multiplicity, seed,
+        allow_wavefunction_seed);
     auto hamiltonian_constructor =
         create_from_ref<HamiltonianConstructorFactory>(
             settings.get<data::AlgorithmRef>("hamiltonian_constructor"));
-    auto hamiltonian =
-        hamiltonian_constructor->run(reference_wavefunction->get_orbitals());
+    auto hamiltonian = hamiltonian_constructor->run(reference.orbitals);
     auto calculator = create_from_ref<MultiConfigurationCalculatorFactory>(ref);
     auto [energy, wavefunction] = calculator->run(
         hamiltonian, active_electrons(settings, "n_active_alpha_electrons"),

@@ -6,15 +6,67 @@
 
 #include <cmath>
 #include <memory>
+#include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
+#include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <vector>
+
+#include "ut_common.hpp"
 
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
 namespace {
+
+std::vector<std::vector<size_t>> recorded_active_spaces;
+std::vector<std::vector<size_t>> recorded_inactive_spaces;
+
+std::string determinant_string(size_t n_active_orbitals, unsigned int n_alpha,
+                               unsigned int n_beta) {
+  std::string determinant(n_active_orbitals, '0');
+  for (auto& occupation : determinant) {
+    if (n_alpha > 0 && n_beta > 0) {
+      occupation = '2';
+      --n_alpha;
+      --n_beta;
+    } else if (n_alpha > 0) {
+      occupation = 'u';
+      --n_alpha;
+    } else if (n_beta > 0) {
+      occupation = 'd';
+      --n_beta;
+    }
+  }
+  return determinant;
+}
+
+class RecordingMultiConfigurationCalculator
+    : public MultiConfigurationCalculator {
+ public:
+  std::string name() const override {
+    return "_test_nuclear_derivative_recording_mc";
+  }
+
+ protected:
+  std::pair<double, std::shared_ptr<Wavefunction>> _run_impl(
+      std::shared_ptr<Hamiltonian> hamiltonian, unsigned int n_alpha,
+      unsigned int n_beta) const override {
+    auto orbitals = hamiltonian->get_orbitals();
+    recorded_active_spaces.push_back(
+        orbitals->get_active_space_indices().first);
+    recorded_inactive_spaces.push_back(
+        orbitals->get_inactive_space_indices().first);
+
+    auto determinant = Configuration(determinant_string(
+        orbitals->get_active_space_indices().first.size(), n_alpha, n_beta));
+    auto container =
+        std::make_unique<SlaterDeterminantContainer>(determinant, orbitals);
+    return {0.0, std::make_shared<Wavefunction>(std::move(container))};
+  }
+};
 
 std::shared_ptr<Structure> create_h2_structure() {
   std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
@@ -98,6 +150,19 @@ void expect_qdk_analytic_gradient_matches_numeric(
 
 }  // namespace
 
+TEST(NuclearDerivativeSettingsTest, SettingsHaveUserFacingDescriptions) {
+  NuclearDerivativeSettings settings;
+  for (const auto& key :
+       {"energy_calculator", "orbital_solver", "hamiltonian_constructor",
+        "compute_hessian", "finite_difference_step", "symmetrize_hessian",
+        "reuse_seed_active_space", "localize_reference_orbitals",
+        "orbital_localizer", "n_active_alpha_electrons",
+        "n_active_beta_electrons"}) {
+    EXPECT_TRUE(settings.has_description(key)) << key;
+    EXPECT_FALSE(settings.get_description(key).empty()) << key;
+  }
+}
+
 TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
   auto structure = create_h2_structure();
   Eigen::VectorXd values(6);
@@ -162,6 +227,52 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForH2) {
 
   ASSERT_TRUE(wavefunction.has_value());
   EXPECT_NE(*wavefunction, nullptr);
+}
+
+TEST(NuclearDerivativeCalculatorTest,
+     MultiReferenceFiniteDifferenceReusesSeedActiveSpace) {
+  recorded_active_spaces.clear();
+  recorded_inactive_spaces.clear();
+  MultiConfigurationCalculatorFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_mc");
+  MultiConfigurationCalculatorFactory::register_instance(
+      []() -> MultiConfigurationCalculatorFactory::return_type {
+        return std::make_unique<RecordingMultiConfigurationCalculator>();
+      });
+
+  auto structure = create_h2_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [_, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
+  auto seed_orbitals =
+      testing::with_active_space(wavefunction->get_orbitals(),
+                                 std::vector<size_t>{0}, std::vector<size_t>{});
+
+  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  calculator->settings().set(
+      "energy_calculator",
+      AlgorithmRef("multi_configuration_calculator",
+                   "_test_nuclear_derivative_recording_mc"));
+  calculator->settings().set("n_active_alpha_electrons", 1);
+  calculator->settings().set("n_active_beta_electrons", 1);
+  calculator->settings().set("finite_difference_step", 1.0e-2);
+
+  auto [energy, gradients, hessian, result_wavefunction] =
+      calculator->run(structure, 0, 1, seed_orbitals);
+
+  EXPECT_TRUE(std::isfinite(energy));
+  ASSERT_NE(gradients, nullptr);
+  EXPECT_FALSE(hessian.has_value());
+  ASSERT_TRUE(result_wavefunction.has_value());
+  ASSERT_FALSE(recorded_active_spaces.empty());
+  for (const auto& active_space : recorded_active_spaces) {
+    EXPECT_EQ(active_space, std::vector<size_t>{0});
+  }
+  for (const auto& inactive_space : recorded_inactive_spaces) {
+    EXPECT_TRUE(inactive_space.empty());
+  }
+
+  MultiConfigurationCalculatorFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_mc");
 }
 
 TEST(NuclearDerivativeCalculatorTest,

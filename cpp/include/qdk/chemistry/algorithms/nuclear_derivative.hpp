@@ -45,22 +45,65 @@ class NuclearDerivativeSettings : public data::Settings {
    * @brief Construct settings with finite-difference defaults.
    */
   NuclearDerivativeSettings() {
-    set_default("energy_calculator", data::AlgorithmRef("scf_solver", "qdk"));
-    set_default("orbital_solver", data::AlgorithmRef("scf_solver", "qdk"));
+    set_default(
+        "energy_calculator", data::AlgorithmRef("scf_solver", "qdk"),
+        "Algorithm used for each energy evaluation. Use an scf_solver for "
+        "direct SCF finite differences, a multi_configuration_scf solver for "
+        "MCSCF energies, or a multi_configuration_calculator such as CASCI or "
+        "ASCI for Hamiltonian-based multi-reference energies.");
+    allow_algorithm_ref_type_change("energy_calculator");
+    set_default(
+        "orbital_solver", data::AlgorithmRef("scf_solver", "qdk"),
+        "SCF solver used to generate reference orbitals for multi-reference "
+        "energy paths. This setting is ignored for direct SCF energy paths and "
+        "is skipped when the derivative input seed already provides usable "
+        "orbitals for the current geometry.");
     set_default("hamiltonian_constructor",
-                data::AlgorithmRef("hamiltonian_constructor", "qdk"));
-    set_default("compute_hessian", false);
+                data::AlgorithmRef("hamiltonian_constructor", "qdk"),
+                "Hamiltonian constructor used when energy_calculator is a "
+                "multi_configuration_calculator. It builds the active-space "
+                "Hamiltonian from the reference orbitals before the MR energy "
+                "calculation.");
+    set_default("compute_hessian", false,
+                "Whether to compute a nuclear Hessian in addition to energy "
+                "and gradients. Currently supported by the finite_difference "
+                "implementation only.");
     set_default("finite_difference_step", 1.0e-3,
-                "Nuclear displacement step in Bohr",
+                "Central finite-difference nuclear displacement step in Bohr. "
+                "Used by the finite_difference implementation for numeric "
+                "gradients and Hessians.",
                 data::BoundConstraint<double>{1.0e-8, 1.0});
-    set_default("symmetrize_hessian", true);
+    set_default("symmetrize_hessian", true,
+                "Whether to replace the finite-difference Hessian by the "
+                "average of itself and its transpose before returning it.");
+    set_default(
+        "reuse_seed_active_space", true,
+        "For multi-reference energy paths, reuse active and inactive orbital "
+        "indices from an Orbitals or Wavefunction seed when fresh reference "
+        "orbitals are generated for another geometry. Orbital coefficients are "
+        "not reused for displaced finite-difference geometries.");
+    set_default(
+        "localize_reference_orbitals", false,
+        "Whether to localize reference orbitals before multi-reference energy "
+        "evaluations. Localization is applied only to MR energy paths and uses "
+        "the current active-space orbital indices as the localization subset.");
+    set_default(
+        "orbital_localizer",
+        data::AlgorithmRef("orbital_localizer", "qdk_pipek_mezey"),
+        "Orbital localizer used when localize_reference_orbitals is true. The "
+        "localizer runs after reference orbitals are obtained and active-space "
+        "metadata from the seed has been reapplied.");
     set_default(
         "n_active_alpha_electrons", static_cast<int64_t>(0),
-        "Active alpha electrons for multi-configuration energy paths",
+        "Number of alpha electrons in the active space for "
+        "multi_configuration_scf and multi_configuration_calculator energy "
+        "paths. Must be positive when those energy paths are selected.",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default(
         "n_active_beta_electrons", static_cast<int64_t>(0),
-        "Active beta electrons for multi-configuration energy paths",
+        "Number of beta electrons in the active space for "
+        "multi_configuration_scf and multi_configuration_calculator energy "
+        "paths. Must be positive when those energy paths are selected.",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
   }
 };
