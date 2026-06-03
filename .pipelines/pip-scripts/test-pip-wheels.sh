@@ -91,14 +91,14 @@ python3 -m pip install "${WHEEL[0]}[test]"
 # like .pipelines/). The locally-built qdk_chemistry wheel is excluded
 # because it is not resolvable from any index. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
-mkdir -p "$PYTHON_DIR/manifest"
+mkdir -p "$PYTHON_DIR/build/test-manifest"
 echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry \
-    | tee "$PYTHON_DIR/manifest/test.requirements.txt"
+    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report "$PYTHON_DIR/manifest/testenv.component-detection-pip-report.json" \
-    -r "$PYTHON_DIR/manifest/test.requirements.txt"
+    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
+    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false

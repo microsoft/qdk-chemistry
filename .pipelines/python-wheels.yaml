@@ -266,6 +266,7 @@ extends:
               ls -la .pipelines
               ls -la python
               ls -la python/build
+              ls -la python/build/*manifest
               ls -la python/repaired_wheelhouse
             displayName: Check repository state
 

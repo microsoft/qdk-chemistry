@@ -124,15 +124,15 @@ python3 -m pip install -r .pipelines/requirements.txt
 # Component Governance's PipReportDetector sees every package in buildenv.
 # The report is auto-discovered when it sits next to a setup.py or
 # requirements.txt in a non-hidden directory (the detector skips dotdirs
-# like .pipelines/). We write both under python/manifest/. See:
+# like .pipelines/). See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
-mkdir -p python/manifest
+mkdir -p python/build/build-manifest
 echo "------------------ Installed Python packages (buildenv) ------------------"
-python3 -m pip list --format=freeze | tee python/manifest/build.requirements.txt
+python3 -m pip list --format=freeze | tee python/build/build-manifest/requirements.txt
 echo "---------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report python/manifest/buildenv.component-detection-pip-report.json \
-    -r python/manifest/build.requirements.txt
+    --report python/build/build-manifest/component-detection-pip-report.json \
+    -r python/build/build-manifest/requirements.txt
 
 # Prepare README for PyPI
 bash .pipelines/pip-scripts/prepare-readme.sh
