@@ -253,11 +253,12 @@ extends:
           - script: |
               set -x
               echo "Check repository state after build and test steps"
-              cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
+              cd $(AgentBuildDirectory)/qdk-chemistry
               pwd
               ls -la .
               ls -la .pipelines
               ls -la python
+              ls -la python/build
               ls -la python/repaired_wheelhouse
             displayName: Check repository state
 
