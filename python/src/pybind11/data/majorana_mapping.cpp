@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -145,6 +146,8 @@ bilinear(j, k) is available on both forms.
       .def_property_readonly("num_qubits", &MajoranaMapping::num_qubits)
       .def_property_readonly("name", &MajoranaMapping::name)
       .def_property_readonly("base_encoding", &MajoranaMapping::base_encoding)
+      .def_property_readonly("grid_nx", &MajoranaMapping::grid_nx)
+      .def_property_readonly("grid_ny", &MajoranaMapping::grid_ny)
       .def_property_readonly("table", &MajoranaMapping::table)
       .def_property_readonly("tapering",
                              [](const MajoranaMapping& self)
@@ -198,6 +201,9 @@ bilinear(j, k) is available on both forms.
       });
 
   mapping
+      .def_static("verstraete_cirac", &MajoranaMapping::verstraete_cirac,
+                  py::arg("lattice"), py::arg("num_spin_species") = 2,
+                  "Construct a Verstraete-Cirac encoding.")
       .def_static("jordan_wigner", &MajoranaMapping::jordan_wigner,
                   py::arg("num_modes"), "Construct a Jordan-Wigner encoding.")
       .def_static("bravyi_kitaev", &MajoranaMapping::bravyi_kitaev,
