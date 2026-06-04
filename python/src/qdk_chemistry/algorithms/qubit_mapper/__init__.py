@@ -19,9 +19,13 @@ from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import (
     QubitMapperFactory,
     QubitMapperSettings,
 )
+from qdk_chemistry.algorithms.qubit_mapper.verstraete_cirac import (
+    verstraete_cirac,
+)
 
 __all__ = [
     "QdkQubitMapperSettings",
     "QubitMapperFactory",
     "QubitMapperSettings",
+    "verstraete_cirac",
 ]

@@ -52,6 +52,11 @@ Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
 Bravyi-Kitaev tree :cite:`Havlicek2017`
    A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
 
+.. _encoding-verstraete-cirac:
+
+Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017`
+   An auxiliary-fermion encoding for 2D lattice models. Places one auxiliary qubit on each lattice edge (plus phantom boundary edges) so that all nearest-neighbour interaction terms have constant Pauli weight independent of system size. Uses more qubits than Jordan-Wigner but avoids the long Z-strings that make JW costly on 2D problems. **Note:** the encoding enlarges the Hilbert space; physical states live in the +1 sector of per-edge stabilisers. Algorithms must prepare or project into this codespace (e.g. via stabiliser penalties or post-selection). Construct via :func:`~qdk_chemistry.algorithms.qubit_mapper.verstraete_cirac.verstraete_cirac`.
+
 
 Using the QubitMapper
 ---------------------
@@ -188,7 +193,7 @@ This is a **table-driven** backend: it reads the Pauli-string table from the :cl
 Any valid ``MajoranaMapping`` works — factory-produced or custom user-defined tables.
 The mapping's ``name`` and ``base_encoding`` are used only for metadata on the output, not to select a transform.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, and any custom encoding
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, :ref:`Verstraete-Cirac <encoding-verstraete-cirac>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.
