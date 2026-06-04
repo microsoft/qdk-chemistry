@@ -52,6 +52,14 @@ Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
 Bravyi-Kitaev tree :cite:`Havlicek2017`
    A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
 
+.. _encoding-verstraete-cirac:
+
+Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017b`
+   Introduces one auxiliary qubit per fermionic mode, doubling the register size, so that every
+   nearest-neighbor hopping term maps to a constant-weight Pauli string independent of system size.
+   Designed for 2D-local problems such as Fermi-Hubbard models, lattice gauge theories, and
+   fermionic tensor-network ansatze where Jordan-Wigner Z-strings inflate Trotter circuit depth.
+
 
 Using the QubitMapper
 ---------------------

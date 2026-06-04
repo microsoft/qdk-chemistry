@@ -322,6 +322,58 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
                          std::move(tapering));
 }
 
+// ── Factory: Verstraete-Cirac ────────────────────────────────────────
+
+// The VC encoding (Verstraete & Cirac, J. Stat. Mech. 2005 P09012) doubles
+// the qubit register by pairing each physical mode j with an auxiliary qubit
+// a_j.  The 2N Majorana operators are assigned weight-2 Pauli strings on the
+// (j, a_j) pair, and the vertex operators V_j = X_j ⊗ X_{a_j} serve as
+// stabilizers of the codespace.  Concretely, for mode j we set:
+//   gamma_{2j}   = Z_j ⊗ X_{a_j}
+//   gamma_{2j+1} = Y_j ⊗ I
+// which satisfies {gamma_k, gamma_l} = 2δ_{kl} I on the full 2N-qubit space.
+// Physical qubits occupy indices 0..N-1; auxiliary qubits occupy N..2N-1.
+
+MajoranaMapping MajoranaMapping::verstraete_cirac(std::size_t num_modes) {
+  using namespace detail;
+  if (num_modes < 2) {
+    throw std::invalid_argument("verstraete_cirac requires num_modes >= 2");
+  }
+
+  // 2*num_modes qubits: physical qubit j at index j,
+  // auxiliary qubit for mode j at index num_modes + j.
+  std::vector<SparsePauliWord> table;
+  table.reserve(2 * num_modes);
+
+  for (std::size_t j = 0; j < num_modes; ++j) {
+    std::size_t aux = num_modes + j;
+
+    // gamma_{2j}   = Z_{N+0} ... Z_{N+j-1} * X_j * X_{N+j}
+    // gamma_{2j+1} = Z_{N+0} ... Z_{N+j-1} * Y_j
+    // The Z string on auxiliary qubits ensures cross-mode anticommutation.
+    // gamma_{2j}   = (prod_{k<j} Z_k) * X_j * X_{N+j}
+    // gamma_{2j+1} = (prod_{k<j} Z_k) * Y_j * X_{N+j}
+    // Z string runs only on physical qubits 0..j-1.
+    // Both entries share X on auxiliary qubit N+j; this gives the single
+    // shared qubit needed for anticommutation across different modes.
+    std::vector<std::pair<std::uint64_t, std::uint8_t>> even_entries;
+    std::vector<std::pair<std::uint64_t, std::uint8_t>> odd_entries;
+    for (std::size_t k = 0; k < j; ++k) {
+      even_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
+      odd_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
+    }
+    even_entries.emplace_back(static_cast<std::uint64_t>(j), op_x);
+    even_entries.emplace_back(static_cast<std::uint64_t>(aux), op_x);
+    odd_entries.emplace_back(static_cast<std::uint64_t>(j), op_y);
+    odd_entries.emplace_back(static_cast<std::uint64_t>(aux), op_x);
+
+    table.push_back(build_sorted_word(std::move(even_entries)));
+    table.push_back(build_sorted_word(std::move(odd_entries)));
+  }
+
+  return MajoranaMapping::from_table(std::move(table), "verstraete-cirac");
+}
+
 MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
     std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta) {
   auto base = MajoranaMapping::bravyi_kitaev_tree(num_modes);

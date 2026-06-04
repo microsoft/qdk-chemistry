@@ -244,6 +244,20 @@ class MajoranaMapping : public DataClass {
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
+  /**
+   * @brief Verstraete-Cirac encoding for 2D-local fermionic problems.
+   *
+   * Introduces N auxiliary qubits so that every nearest-neighbor hopping
+   * term maps to a constant-weight (weight-4) Pauli string, independent
+   * of system size.  Requires num_modes >= 2.
+   *
+   * @param num_modes Number of fermionic modes (physical + auxiliary =
+   * 2*num_modes qubits).
+   * @return MajoranaMapping with name ``"verstraete-cirac"``.
+   * @throws std::invalid_argument If num_modes < 2.
+   */
+  static MajoranaMapping verstraete_cirac(std::size_t num_modes);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
