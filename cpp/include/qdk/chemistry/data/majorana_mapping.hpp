@@ -20,6 +20,8 @@ namespace qdk::chemistry::data {
 
 class Hamiltonian;
 
+class LatticeGraph;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -103,6 +105,12 @@ class MajoranaMapping : public DataClass {
     return tapering_;
   }
 
+  /// Grid X dimension (for Verstraete-Cirac mapping).
+  std::size_t grid_nx() const { return grid_nx_; }
+
+  /// Grid Y dimension (for Verstraete-Cirac mapping).
+  std::size_t grid_ny() const { return grid_ny_; }
+
   /**
    * @brief Return a copy with tapering removed and the base encoding name
    *        restored.
@@ -162,6 +170,19 @@ class MajoranaMapping : public DataClass {
                                    const std::string& type);
 
   // --- Factory methods for standard encodings ---
+
+  /**
+   * @brief Verstraete-Cirac encoding.
+   *
+   * Maps fermionic modes on a 2D square lattice to qubits.
+   *
+   * @param lattice The 2D square lattice connectivity.
+   * @param num_spin_species Number of spin species (usually 2 for spinful, 1
+   * for spinless). Default: 2.
+   * @return MajoranaMapping with name ``"verstraete-cirac"``.
+   */
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice,
+                                          std::size_t num_spin_species = 2);
 
   /**
    * @brief Jordan-Wigner encoding.
@@ -252,7 +273,8 @@ class MajoranaMapping : public DataClass {
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
-      std::optional<TaperingSpecification> tapering = std::nullopt);
+      std::optional<TaperingSpecification> tapering = std::nullopt,
+      std::size_t grid_nx = 0, std::size_t grid_ny = 0);
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;

@@ -3,7 +3,9 @@
 // license information.
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
@@ -331,6 +333,163 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
                          "symmetry-conserving-bravyi-kitaev", base.num_modes_,
                          base.num_qubits_, "bravyi-kitaev-tree",
                          std::move(tapering));
+}
+
+namespace detail {
+
+std::pair<std::uint64_t, std::uint64_t> snake_coordinates(std::uint64_t index,
+                                                          std::uint64_t nx,
+                                                          std::uint64_t ny) {
+  std::uint64_t row = index / nx;
+  std::uint64_t col;
+  if (row % 2 == 0) {
+    col = index % nx;
+  } else {
+    col = nx - 1 - (index % nx);
+  }
+  return {col, row};
+}
+
+bool is_vertical_edge(std::uint64_t i, std::uint64_t j, std::uint64_t nx,
+                      std::uint64_t ny) {
+  auto [ix, iy] = snake_coordinates(i, nx, ny);
+  auto [jx, jy] = snake_coordinates(j, nx, ny);
+  return (ix == jx && (iy + 1 == jy || jy + 1 == iy));
+}
+
+}  // namespace detail
+
+MajoranaMapping MajoranaMapping::verstraete_cirac(
+    const LatticeGraph& lattice, std::size_t num_spin_species) {
+  if (num_spin_species == 0) {
+    throw std::invalid_argument(
+        "verstraete_cirac requires num_spin_species > 0");
+  }
+
+  std::uint64_t V = lattice.num_sites();
+  std::uint64_t E = lattice.num_edges();
+
+  // Solve: nx * ny = V, nx + ny = 2V - E
+  double b = double(2 * V - E);
+  double c = double(V);
+  double disc = b * b - 4.0 * c;
+  if (disc < 0) {
+    throw std::invalid_argument(
+        "Lattice graph is not a 2D square lattice with open boundaries");
+  }
+  double r1 = 0.5 * (b - std::sqrt(disc));
+  double r2 = 0.5 * (b + std::sqrt(disc));
+  std::uint64_t nx1 = std::round(r1);
+  std::uint64_t nx2 = std::round(r2);
+
+  auto check_nx = [&](std::uint64_t nx) -> bool {
+    if (nx == 0 || V % nx != 0) return false;
+    std::uint64_t ny = V / nx;
+    std::uint64_t count = 0;
+    const auto& adj = lattice.sparse_adjacency_matrix();
+    for (int k = 0; k < adj.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+        std::uint64_t i = it.row();
+        std::uint64_t j = it.col();
+        if (i >= j) continue;
+        if (std::abs(int(i - j)) == 1) {
+          if (std::min(i, j) % nx == nx - 1) return false;
+          count++;
+        } else if (std::abs(int(i - j)) == nx) {
+          count++;
+        } else {
+          return false;
+        }
+      }
+    }
+    return count == E;
+  };
+
+  std::uint64_t nx = 0, ny = 0;
+  if (check_nx(nx1)) {
+    nx = nx1;
+    ny = V / nx1;
+  } else if (check_nx(nx2)) {
+    nx = nx2;
+    ny = V / nx2;
+  } else {
+    throw std::invalid_argument(
+        "Lattice graph is not a 2D square lattice with open boundaries");
+  }
+
+  if (nx < 2 || ny < 2) {
+    throw std::invalid_argument(
+        "verstraete_cirac requires a 2D grid of size at least 2x2");
+  }
+
+  std::size_t num_modes = num_spin_species * V;
+  // Combined system has 2 * num_modes modes.
+  std::size_t base_modes = 2 * num_modes;
+  auto jw_base = MajoranaMapping::jordan_wigner(base_modes);
+
+  // Construct upper triangle of bilinears: M * (M - 1) / 2 entries, where M = 2
+  // * num_modes.
+  std::size_t M = 2 * num_modes;
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
+  upper_triangle.reserve(M * (M - 1) / 2);
+
+  for (std::size_t u = 0; u < M; ++u) {
+    for (std::size_t v = u + 1; v < M; ++v) {
+      std::size_t u_mode = u / 2;
+      std::size_t v_mode = v / 2;
+      std::size_t s_u = u_mode / V;
+      std::size_t s_v = v_mode / V;
+      std::size_t i = u_mode % V;
+      std::size_t j = v_mode % V;
+      std::size_t a = u % 2;
+      std::size_t b_idx = v % 2;
+
+      if (s_u == s_v && detail::is_vertical_edge(i, j, nx, ny)) {
+        // Vertical edge: multiply by stabilizer
+        std::uint64_t top = std::min(i, j);
+        std::uint64_t bot = std::max(i, j);
+        auto coord_top = detail::snake_coordinates(top, nx, ny);
+        std::uint64_t col = coord_top.first;
+
+        std::size_t top_aux_mode = 2 * s_u * V + 2 * top + 1;
+        std::size_t bot_aux_mode = 2 * s_u * V + 2 * bot + 1;
+
+        std::size_t p, q;
+        if (col % 2 == 0) {
+          p = 2 * top_aux_mode;
+          q = 2 * bot_aux_mode + 1;
+        } else {
+          p = 2 * bot_aux_mode;
+          q = 2 * top_aux_mode + 1;
+        }
+
+        // Stabilizer S = i * gamma_p * gamma_q
+        auto [coeff_stab, word_stab] = jw_base.bilinear(p, q);
+
+        // System modes:
+        std::size_t r = 2 * (2 * s_u * V + 2 * i) + a;
+        std::size_t s_jw = 2 * (2 * s_v * V + 2 * j) + b_idx;
+        auto [coeff_sys, word_sys] = jw_base.bilinear(r, s_jw);
+
+        auto [phase, word_final] =
+            PauliTermAccumulator::multiply_uncached(word_sys, word_stab);
+        std::complex<double> coeff_final = coeff_sys * coeff_stab * phase;
+
+        upper_triangle.emplace_back(coeff_final, std::move(word_final));
+      } else {
+        // Not a vertical edge
+        std::size_t r = 2 * (2 * s_u * V + 2 * i) + a;
+        std::size_t s_jw = 2 * (2 * s_v * V + 2 * j) + b_idx;
+        auto [coeff, word] = jw_base.bilinear(r, s_jw);
+        upper_triangle.emplace_back(coeff, word);
+      }
+    }
+  }
+
+  return MajoranaMapping(std::vector<SparsePauliWord>{},
+                         std::move(upper_triangle), "verstraete-cirac",
+                         num_modes, 2 * num_modes, "verstraete-cirac",
+                         std::nullopt, nx, ny);
 }
 
 }  // namespace qdk::chemistry::data

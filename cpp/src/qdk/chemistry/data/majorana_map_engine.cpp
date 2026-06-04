@@ -432,8 +432,15 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     return cache;
   };
 
+  const std::size_t num_spin_species =
+      (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
+  const bool use_spin_symmetric = spin_symmetric && (num_spin_species == 2);
+
   auto ppair_alpha = build_pair_cache(alpha_offset);
-  auto ppair_beta = build_pair_cache(beta_offset);
+  std::vector<PackedPairProduct> ppair_beta;
+  if (num_spin_species == 2) {
+    ppair_beta = build_pair_cache(beta_offset);
+  }
 
   auto alpha_pair = [&](std::size_t i,
                         std::size_t j) -> const PackedPairProduct& {
@@ -476,8 +483,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t s = 0; s < n_spatial; ++s) {
       double h_a = h1_alpha[p * n_spatial + s];
-      double h_b = spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
-      if (spin_symmetric) {
+      double h_b = use_spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
+      if (use_spin_symmetric) {
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
           delta_corr += eri_provider.aaaa(p, q, q, s);
@@ -496,16 +503,18 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       if (std::abs(h_pq_a) > integral_threshold) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
-      double h_pq_b = h1_eff_beta[p * n_spatial + q];
-      if (std::abs(h_pq_b) > integral_threshold) {
-        accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
+      if (num_spin_species == 2) {
+        double h_pq_b = h1_eff_beta[p * n_spatial + q];
+        if (std::abs(h_pq_b) > integral_threshold) {
+          accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
+        }
       }
     }
   }
 
   // ─── Two-body terms ───────────────────────────────────────────────
 
-  if (spin_symmetric) {
+  if (use_spin_symmetric) {
     struct SpinSummedE {
       std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };

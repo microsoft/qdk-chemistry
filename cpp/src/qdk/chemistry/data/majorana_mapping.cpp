@@ -39,7 +39,8 @@ MajoranaMapping::MajoranaMapping(
     std::vector<SparsePauliWord> table,
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
     std::string name, std::size_t num_modes, std::size_t num_qubits,
-    std::string base_encoding, std::optional<TaperingSpecification> tapering)
+    std::string base_encoding, std::optional<TaperingSpecification> tapering,
+    std::size_t grid_nx, std::size_t grid_ny)
     : table_(std::move(table)),
       bilinears_(std::move(bilinears)),
       name_(std::move(name)),
@@ -47,7 +48,9 @@ MajoranaMapping::MajoranaMapping(
       num_modes_(num_modes),
       num_qubits_(num_qubits),
       majorana_atomic_(!table_.empty()),
-      tapering_(std::move(tapering)) {
+      tapering_(std::move(tapering)),
+      grid_nx_(grid_nx),
+      grid_ny_(grid_ny) {
   if (base_encoding_.empty()) {
     base_encoding_ = name_;
   }
@@ -165,7 +168,8 @@ MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
 
 MajoranaMapping MajoranaMapping::without_tapering() const {
   return MajoranaMapping(table_, bilinears_, base_encoding_, num_modes_,
-                         num_qubits_, base_encoding_);
+                         num_qubits_, base_encoding_, std::nullopt, grid_nx_,
+                         grid_ny_);
 }
 
 std::string MajoranaMapping::get_summary() const {
@@ -175,6 +179,9 @@ std::string MajoranaMapping::get_summary() const {
     ss << " '" << name_ << "'";
   }
   ss << "\n  Modes: " << num_modes_ << "\n  Qubits: " << num_qubits_;
+  if (grid_nx_ > 0 || grid_ny_ > 0) {
+    ss << "\n  Grid: " << grid_nx_ << "x" << grid_ny_;
+  }
   if (tapering_) {
     ss << "\n  Tapered qubits: " << tapering_->num_tapered();
   }
@@ -188,6 +195,10 @@ nlohmann::json MajoranaMapping::to_json() const {
                       {"base_encoding", base_encoding_}};
   if (tapering_) {
     data["tapering"] = tapering_->to_json();
+  }
+  if (grid_nx_ > 0 || grid_ny_ > 0) {
+    data["grid_nx"] = grid_nx_;
+    data["grid_ny"] = grid_ny_;
   }
   // Bilinear-only mappings: persist the bilinear entries so the mapping can
   // round-trip even when the Majorana table is empty.
@@ -222,6 +233,8 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   if (data.contains("tapering") && !data.at("tapering").is_null()) {
     tapering = TaperingSpecification::from_json(data.at("tapering"));
   }
+  std::size_t grid_nx = data.value("grid_nx", 0);
+  std::size_t grid_ny = data.value("grid_ny", 0);
 
   // Bilinear-only mapping: table is empty, bilinears stored explicitly.
   if (table.empty() && data.contains("bilinears")) {
@@ -235,21 +248,17 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     }
     auto mapping = MajoranaMapping::from_bilinears(
         num_modes, std::move(bilinears), base_encoding);
-    if (name == base_encoding && !tapering) {
-      return mapping;
-    }
     return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
                            mapping.num_modes_, mapping.num_qubits_,
-                           std::move(base_encoding), std::move(tapering));
+                           std::move(base_encoding), std::move(tapering),
+                           grid_nx, grid_ny);
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
-  if (name == base_encoding && !tapering) {
-    return mapping;
-  }
   return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
                          mapping.num_modes_, mapping.num_qubits_,
-                         std::move(base_encoding), std::move(tapering));
+                         std::move(base_encoding), std::move(tapering), grid_nx,
+                         grid_ny);
 }
 
 void MajoranaMapping::to_json_file(const std::string& filename) const {
