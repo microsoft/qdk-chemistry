@@ -304,6 +304,51 @@ uses whichever requires more divisions.
      - float
      - Coefficient threshold below which Pauli terms and commutator corrections are discarded. Default is 1e-12.
 
+Example::
+
+    from qdk_chemistry.algorithms import registry
+    from qdk_chemistry.data import FlatPartition, QubitHamiltonian
+
+    # Two noncommuting groups, each internally commuting:
+    #   H_A = 0.7 XI - 0.2 IX
+    #   H_B = 0.3 ZZ + 0.11 YY
+    hamiltonian = QubitHamiltonian(
+        pauli_strings=["XI", "IX", "ZZ", "YY"],
+        coefficients=[0.7, -0.2, 0.3, 0.11],
+        term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
+    )
+
+    zassenhaus = registry.create("hamiltonian_unitary_builder", "zassenhaus")
+    zassenhaus.settings().update({"order": 4, "num_divisions": 1, "time": 0.1})
+    evolution = zassenhaus.run(hamiltonian)
+    container = evolution.get_container()
+
+    # The grouped Zassenhaus schedule starts from the ordered product
+    # exp(-i H_A t) exp(-i H_B t), then appends explicit commutator
+    # correction exponentials through C_4.
+    print(f"{len(container.step_terms)} terms per Zassenhaus step")
+    for term in container.step_terms:
+        label = ["I"] * container.num_qubits
+        for q, p in term.pauli_term.items():
+            label[q] = p
+        print(f"  exp(-i * {term.angle:+.8f} * {''.join(reversed(label))})")
+   
+    # Output:
+    #   exp(-i * -0.00000327 * YZ)
+    #   exp(-i * +0.00000293 * ZY)
+    #   exp(-i * -0.00000538 * YZ)
+    #   exp(-i * +0.00000459 * ZY)
+    #   exp(-i * -0.00008883 * IX)
+    #   exp(-i * +0.00011289 * XI)
+    #   exp(-i * -0.00009487 * YY)
+    #   exp(-i * -0.00012653 * ZZ)
+    #   exp(-i * +0.00232000 * YZ)
+    #   exp(-i * -0.00137000 * ZY)
+    #   exp(-i * +0.01100000 * YY)
+    #   exp(-i * +0.03000000 * ZZ)
+    #   exp(-i * -0.02000000 * IX)
+    #   exp(-i * +0.07000000 * XI)
+
 Related classes
 ---------------
 
