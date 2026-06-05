@@ -76,12 +76,16 @@ parameters:
 
 variables:
 - group: QdkChemistry
+- name: ComponentDetection.MaxDetectionThreads
+  value: '16'
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     sdl:
       autobaseline:
         enableForGitHub: true
+      componentgovernance:
+        useAgentBuildDirectory: true
       codeql:
         compiled:
           enabled: true
@@ -115,6 +119,7 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+              hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: $(CPU_POOL_ARM)
@@ -225,7 +230,6 @@ extends:
               sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
             displayName: Fix wheel directory ownership
 
-
           - task: TwineAuthenticate@1
             inputs:
               artifactFeed: $(artifactProject)/$(artifactFeed)
@@ -251,6 +255,7 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
@@ -266,6 +271,7 @@ extends:
             notifyUsers: ''
             instructions: Please verify artifacts and approve the release
             onTimeout: reject
+
 
     - stage: Release
       displayName: Release

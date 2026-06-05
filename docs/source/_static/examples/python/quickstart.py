@@ -105,10 +105,11 @@ sparse_isometry_circuit = state_prep.run(wfn_sparse)
 # Prepare qubit Hamiltonian
 from qdk_chemistry.data import MajoranaMapping
 
-n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+active_alpha, active_beta = active_orbitals.get_active_space_indices()
+n_active_spin_orbitals = len(active_alpha) + len(active_beta)
 qubit_mapper = create("qubit_mapper", algorithm_name="qdk")
 qubit_hamiltonian = qubit_mapper.run(
-    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+    hamiltonian, MajoranaMapping.jordan_wigner(num_modes=n_active_spin_orbitals)
 )
 
 # Print the number of Pauli strings in the full Hamiltonian
