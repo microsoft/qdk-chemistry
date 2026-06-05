@@ -32,7 +32,7 @@ def _pauli_matrix(label: str) -> np.ndarray:
 
 
 def _pauli_product_matrix(label: str) -> np.ndarray:
-    """Helper to build a two-qubit Pauli matrix from a label string."""
+    """Helper to build a Pauli product matrix from a label string."""
     mapping = {
         "I": np.eye(2, dtype=complex),
         "X": _pauli_matrix("X"),
@@ -95,8 +95,8 @@ def _fit_zassenhaus_error_slope(hamiltonian: QubitHamiltonian, *, order: int) ->
         ]
     )
 
-    # Fourth-order H2 errors at the smallest times are near machine precision;
-    # dropping those points keeps the fitted asymptotic slope meaningful.
+    # Some high-order errors at the smallest times are near machine precision;
+    # dropping unresolved points keeps the fitted asymptotic slope meaningful.
     resolved = errors > 1e-13
     assert np.count_nonzero(resolved) >= 3
     return float(np.polyfit(np.log(times[resolved]), np.log(errors[resolved]), deg=1)[0])
@@ -288,8 +288,9 @@ class TestZassenhaus:
         unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
-        # Expected first-order expansion:
-        #   exp(-i t (1.5 X + 0.5 Z)) ≈ exp(-i 1.5 t X) exp(-i 0.5 t Z)
+        # Expected first-order expansion.  The container emits terms in application order,
+        # and the dense-matrix reconstruction left-multiplies each emitted exponential:
+        #   exp(-i t (1.5 X + 0.5 Z)) ≈ exp(-i 0.5 t Z) exp(-i 1.5 t X)
         u_zassenhaus = np.eye(2, dtype=complex)
         for term in container.step_terms:
             pauli_label = next(iter(term.pauli_term.values()))
@@ -330,7 +331,9 @@ class TestZassenhaus:
         container = unitary.get_container()
 
         # Expected second-order Zassenhaus expansion:
-        #   exp(A + B) => exp(A) exp(B) exp(-[A, B]/2), emitted in execution order.
+        #   exp(A + B) => exp(A) exp(B) exp(-[A, B]/2).
+        # The container emits the corresponding Pauli rotations in application order
+        # for the left-multiplying dense-matrix reconstruction below.
         u_zassenhaus = np.eye(2, dtype=complex)
         for term in container.step_terms:
             pauli_label = next(iter(term.pauli_term.values()))
@@ -366,9 +369,11 @@ class TestZassenhaus:
         container = unitary.get_container()
 
         # Expected fourth-order Zassenhaus expansion:
-        #   exp(A + B) => exp(A) exp(B) exp(C2) exp(C3) exp(C4),
-        # emitted in execution order. This two-term Pauli algebra closes on
-        # XI, ZZ, and YZ, so the fourth-order product emits seven exponentials.
+        #   exp(A + B) => exp(A) exp(B) exp(C2) exp(C3) exp(C4).
+        # The container emits the corresponding Pauli rotations in application order
+        # for the left-multiplying dense-matrix reconstruction below. This two-term
+        # Pauli algebra closes on XI, ZZ, and YZ, so the fourth-order product emits
+        # seven exponentials.
         u_zassenhaus = np.eye(4, dtype=complex)
         for term in container.step_terms:
             pauli_label = _pauli_label_from_map(term.pauli_term, num_qubits=2)
