@@ -86,7 +86,7 @@ jobs:
           python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
-          build-parallel: 3
+          build-parallel: 5
           uarch: native
           python-version: '3.13'
           cpp-test-threads: 16
@@ -100,6 +100,16 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
     steps:
+    - name: Quick CPU summary
+      if: matrix.os-name == 'macOS'
+      run: |
+        set -x
+        # Quick CPU summary
+        sysctl -n machdep.cpu.brand_string
+        sysctl -n hw.physicalcpu hw.logicalcpu
+        system_profiler SPHardwareDataType
+        sysctl -a | grep -i machdep.cpu
+
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'
       run: |
