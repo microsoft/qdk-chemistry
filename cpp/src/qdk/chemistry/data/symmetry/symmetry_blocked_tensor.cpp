@@ -11,9 +11,7 @@
 
 namespace qdk::chemistry::data {
 
-namespace sbt_io_detail {
-
-constexpr const char* kHdf5MetadataDataset = "symmetry_blocked_tensor_metadata";
+namespace detail {
 
 void write_string_dataset(H5::Group& group, const std::string& name,
                           const std::string& payload) {
@@ -31,9 +29,7 @@ std::string read_string_dataset(H5::Group& group, const std::string& name) {
   return payload;
 }
 
-}  // namespace sbt_io_detail
-
-using namespace sbt_io_detail;
+}  // namespace detail
 
 template <std::size_t Rank, class Scalar>
 std::shared_ptr<SymmetryBlockedTensor<Rank, Scalar>>
@@ -89,7 +85,7 @@ void SymmetryBlockedTensor<Rank, Scalar>::to_hdf5(H5::Group& group) const {
     }
 
     if constexpr (utils::is_complex_scalar_v<Scalar>) {
-      if constexpr (Rank == 2) {
+      if constexpr (Rank == 2 || Rank == 3) {
         auto variant = std::make_shared<MatrixVariant>(*pointer_group.ptr);
         save_matrix_variant_to_group(/*is_complex=*/true, variant, group,
                                      block_name);
@@ -99,7 +95,7 @@ void SymmetryBlockedTensor<Rank, Scalar>::to_hdf5(H5::Group& group) const {
                                      block_name);
       }
     } else {
-      if constexpr (Rank == 2) {
+      if constexpr (Rank == 2 || Rank == 3) {
         save_matrix_to_group(group, block_name, *pointer_group.ptr);
       } else {
         save_vector_to_group(group, block_name, *pointer_group.ptr);
@@ -109,7 +105,8 @@ void SymmetryBlockedTensor<Rank, Scalar>::to_hdf5(H5::Group& group) const {
         nlohmann::json{{"keys", std::move(keys)}, {"dataset", block_name}});
   }
 
-  write_string_dataset(group, kHdf5MetadataDataset, metadata.dump());
+  detail::write_string_dataset(group, "symmetry_blocked_tensor_metadata",
+                               metadata.dump());
 }
 
 template <std::size_t Rank, class Scalar>
@@ -122,13 +119,13 @@ void SymmetryBlockedTensor<Rank, Scalar>::to_hdf5_file(
 template <std::size_t Rank, class Scalar>
 std::shared_ptr<SymmetryBlockedTensor<Rank, Scalar>>
 SymmetryBlockedTensor<Rank, Scalar>::from_hdf5(H5::Group& group) {
-  if (!group.nameExists(kHdf5MetadataDataset)) {
+  if (!group.nameExists("symmetry_blocked_tensor_metadata")) {
     throw std::runtime_error(
         "SymmetryBlockedTensor HDF5 metadata dataset not found.");
   }
 
-  auto metadata =
-      nlohmann::json::parse(read_string_dataset(group, kHdf5MetadataDataset));
+  auto metadata = nlohmann::json::parse(
+      detail::read_string_dataset(group, "symmetry_blocked_tensor_metadata"));
   if (!metadata.contains("version")) {
     throw std::runtime_error(
         "SymmetryBlockedTensor HDF5 metadata missing required 'version' "
@@ -164,7 +161,7 @@ SymmetryBlockedTensor<Rank, Scalar>::from_hdf5(H5::Group& group) {
     if (cache_it == block_cache.end()) {
       Tensor<Rank, Scalar> block;
       if constexpr (utils::is_complex_scalar_v<Scalar>) {
-        if constexpr (Rank == 2) {
+        if constexpr (Rank == 2 || Rank == 3) {
           auto variant =
               load_matrix_variant_from_group(group, dataset_name, true);
           block = std::get<Eigen::MatrixXcd>(variant);
@@ -174,7 +171,7 @@ SymmetryBlockedTensor<Rank, Scalar>::from_hdf5(H5::Group& group) {
           block = std::get<Eigen::VectorXcd>(variant);
         }
       } else {
-        if constexpr (Rank == 2) {
+        if constexpr (Rank == 2 || Rank == 3) {
           block = load_matrix_from_group(group, dataset_name);
         } else {
           block = load_vector_from_group(group, dataset_name);

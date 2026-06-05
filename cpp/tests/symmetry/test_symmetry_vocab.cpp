@@ -26,7 +26,7 @@ TEST(SymmetryVocabTest, InternedAlphaBeta) {
 }
 
 TEST(SymmetryVocabTest, SpinAxisAdmits) {
-  SymmetryAxis spin = axes::spin(/*two_s=*/0, /*equivalent=*/true);
+  SymmetryAxis spin = axes::spin(/*two_s=*/1, /*equivalent=*/true);
   EXPECT_EQ(spin.name(), AxisName::Spin);
   EXPECT_TRUE(spin.equivalent());
   EXPECT_TRUE(spin.admits(*axes::alpha()));
@@ -35,13 +35,13 @@ TEST(SymmetryVocabTest, SpinAxisAdmits) {
 }
 
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {
-  SymmetryProduct sym({axes::spin(0, true)});
+  SymmetryProduct sym({axes::spin(1, true)});
   EXPECT_TRUE(sym.has_axis(AxisName::Spin));
   EXPECT_EQ(sym.axis(AxisName::Spin).name(), AxisName::Spin);
 }
 
 TEST(SymmetryVocabTest, DuplicateAxisRejected) {
-  EXPECT_THROW(SymmetryProduct({axes::spin(0, true), axes::spin(0, false)}),
+  EXPECT_THROW(SymmetryProduct({axes::spin(1, true), axes::spin(1, false)}),
                std::runtime_error);
 }
 
@@ -64,9 +64,9 @@ TEST(SymmetryVocabTest, SymmetryLabelEqualityAndHash) {
 }
 
 TEST(SymmetryVocabTest, SymmetriesEquality) {
-  SymmetryProduct a({axes::spin(0, true)});
-  SymmetryProduct b({axes::spin(0, true)});
-  SymmetryProduct c({axes::spin(0, false)});
+  SymmetryProduct a({axes::spin(1, true)});
+  SymmetryProduct b({axes::spin(1, true)});
+  SymmetryProduct c({axes::spin(1, false)});
   EXPECT_EQ(a, b);
   EXPECT_NE(a, c);
 }
@@ -78,7 +78,7 @@ TEST(SymmetryVocabTest, RoundTripSpinValueJson) {
 }
 
 TEST(SymmetryVocabTest, RoundTripSymmetriesJson) {
-  SymmetryProduct sym({axes::spin(0, true)});
+  SymmetryProduct sym({axes::spin(1, true)});
   auto restored = SymmetryProduct::from_json(sym.to_json());
   EXPECT_EQ(sym, *restored);
 }
@@ -95,27 +95,27 @@ TEST(SymmetryVocabTest, UnknownKindThrows) {
 }
 
 TEST(SymmetryVocabTest, SymmetryAxisDataClassMetadata) {
-  SymmetryAxis spin = axes::spin(0, true);
+  SymmetryAxis spin = axes::spin(1, true);
   EXPECT_EQ(spin.get_data_type_name(), "symmetry_axis");
   EXPECT_NE(spin.get_summary().find("SymmetryAxis"), std::string::npos);
   EXPECT_NE(spin.get_summary().find("spin"), std::string::npos);
 }
 
 TEST(SymmetryVocabTest, SymmetriesDataClassMetadata) {
-  SymmetryProduct sym({axes::spin(0, true)});
+  SymmetryProduct sym({axes::spin(1, true)});
   EXPECT_EQ(sym.get_data_type_name(), "symmetry_product");
   EXPECT_NE(sym.get_summary().find("SymmetryProduct"), std::string::npos);
 }
 
 TEST(SymmetryVocabTest, SymmetryAxisRoundTripJson) {
-  SymmetryAxis original = axes::spin(0, true);
+  SymmetryAxis original = axes::spin(1, true);
   auto restored = SymmetryAxis::from_json(original.to_json());
   ASSERT_NE(restored, nullptr);
   EXPECT_EQ(original, *restored);
 }
 
 TEST(SymmetryVocabTest, SymmetriesRoundTripJson) {
-  SymmetryProduct original({axes::spin(0, true)});
+  SymmetryProduct original({axes::spin(1, true)});
   auto restored = SymmetryProduct::from_json(original.to_json());
   ASSERT_NE(restored, nullptr);
   EXPECT_EQ(original, *restored);
@@ -124,7 +124,7 @@ TEST(SymmetryVocabTest, SymmetriesRoundTripJson) {
 TEST(SymmetryVocabTest, SymmetryAxisRoundTripJsonFile) {
   const std::filesystem::path filename = "test.symmetry_axis.json";
   std::filesystem::remove(filename);
-  SymmetryAxis original = axes::spin(0, true);
+  SymmetryAxis original = axes::spin(1, true);
   original.to_json_file(filename.string());
   auto restored = SymmetryAxis::from_json_file(filename.string());
   std::filesystem::remove(filename);
@@ -135,7 +135,7 @@ TEST(SymmetryVocabTest, SymmetryAxisRoundTripJsonFile) {
 TEST(SymmetryVocabTest, SymmetryAxisRoundTripHdf5File) {
   const std::filesystem::path filename = "test.symmetry_axis.h5";
   std::filesystem::remove(filename);
-  SymmetryAxis original = axes::spin(0, true);
+  SymmetryAxis original = axes::spin(1, true);
   original.to_hdf5_file(filename.string());
   auto restored = SymmetryAxis::from_hdf5_file(filename.string());
   std::filesystem::remove(filename);
@@ -146,7 +146,7 @@ TEST(SymmetryVocabTest, SymmetryAxisRoundTripHdf5File) {
 TEST(SymmetryVocabTest, SymmetriesRoundTripJsonFile) {
   const std::filesystem::path filename = "test.symmetries.json";
   std::filesystem::remove(filename);
-  SymmetryProduct original({axes::spin(0, true)});
+  SymmetryProduct original({axes::spin(1, true)});
   original.to_json_file(filename.string());
   auto restored = SymmetryProduct::from_json_file(filename.string());
   std::filesystem::remove(filename);
@@ -157,7 +157,7 @@ TEST(SymmetryVocabTest, SymmetriesRoundTripJsonFile) {
 TEST(SymmetryVocabTest, SymmetriesRoundTripHdf5File) {
   const std::filesystem::path filename = "test.symmetries.h5";
   std::filesystem::remove(filename);
-  SymmetryProduct original({axes::spin(0, true)});
+  SymmetryProduct original({axes::spin(1, true)});
   original.to_hdf5_file(filename.string());
   auto restored = SymmetryProduct::from_hdf5_file(filename.string());
   std::filesystem::remove(filename);
@@ -171,7 +171,7 @@ TEST(SymmetryVocabTest, SymmetryAxisToFileDispatch) {
   const std::filesystem::path h5_filename = "test.dispatch.symmetry_axis.h5";
   std::filesystem::remove(json_filename);
   std::filesystem::remove(h5_filename);
-  SymmetryAxis original = axes::spin(0, true);
+  SymmetryAxis original = axes::spin(1, true);
 
   original.to_file(json_filename.string(), "json");
   original.to_file(h5_filename.string(), "hdf5");
@@ -191,26 +191,26 @@ TEST(SymmetryVocabTest, SymmetryAxisToFileDispatch) {
 }
 
 TEST(SymmetryVocabTest, SymmetryAxisFromJsonRejectsMissingVersion) {
-  auto j = axes::spin(0, true).to_json();
+  auto j = axes::spin(1, true).to_json();
   j.erase("version");
   EXPECT_THROW(SymmetryAxis::from_json(j), std::runtime_error);
 }
 
 TEST(SymmetryVocabTest, SymmetryAxisFromJsonRejectsMismatchedVersion) {
-  auto j = axes::spin(0, true).to_json();
+  auto j = axes::spin(1, true).to_json();
   j["version"] = "99.0.0";
   EXPECT_THROW(SymmetryAxis::from_json(j), std::runtime_error);
 }
 
 TEST(SymmetryVocabTest, SymmetriesFromJsonRejectsMissingVersion) {
-  SymmetryProduct sym({axes::spin(0, true)});
+  SymmetryProduct sym({axes::spin(1, true)});
   auto j = sym.to_json();
   j.erase("version");
   EXPECT_THROW(SymmetryProduct::from_json(j), std::runtime_error);
 }
 
 TEST(SymmetryVocabTest, SymmetriesFromJsonRejectsMismatchedVersion) {
-  SymmetryProduct sym({axes::spin(0, true)});
+  SymmetryProduct sym({axes::spin(1, true)});
   auto j = sym.to_json();
   j["version"] = "99.0.0";
   EXPECT_THROW(SymmetryProduct::from_json(j), std::runtime_error);

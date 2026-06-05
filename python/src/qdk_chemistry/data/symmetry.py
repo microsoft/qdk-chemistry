@@ -23,7 +23,9 @@ Exposed storage types are:
 
 - :class:`SymmetryBlockedTensorRank1` / :class:`SymmetryBlockedTensorRank1Complex`
 - :class:`SymmetryBlockedTensorRank2` / :class:`SymmetryBlockedTensorRank2Complex`
+- :class:`SymmetryBlockedTensorRank3` / :class:`SymmetryBlockedTensorRank3Complex`
 - :class:`SymmetryBlockedTensorRank4` / :class:`SymmetryBlockedTensorRank4Complex`
+- :class:`SymmetryBlockedSparseMapRank4`
 - :class:`SymmetryBlockedIndexSet`
 
 Errors are surfaced as standard Python exceptions mapped from the underlying
@@ -41,10 +43,13 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryAxis,
     SymmetryAxisValue,
     SymmetryBlockedIndexSet,
+    SymmetryBlockedSparseMapRank4,
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank1Complex,
     SymmetryBlockedTensorRank2,
     SymmetryBlockedTensorRank2Complex,
+    SymmetryBlockedTensorRank3,
+    SymmetryBlockedTensorRank3Complex,
     SymmetryBlockedTensorRank4,
     SymmetryBlockedTensorRank4Complex,
     SymmetryLabel,
@@ -59,10 +64,13 @@ __all__ = [
     "SymmetryAxis",
     "SymmetryAxisValue",
     "SymmetryBlockedIndexSet",
+    "SymmetryBlockedSparseMapRank4",
     "SymmetryBlockedTensorRank1",
     "SymmetryBlockedTensorRank1Complex",
     "SymmetryBlockedTensorRank2",
     "SymmetryBlockedTensorRank2Complex",
+    "SymmetryBlockedTensorRank3",
+    "SymmetryBlockedTensorRank3Complex",
     "SymmetryBlockedTensorRank4",
     "SymmetryBlockedTensorRank4Complex",
     "SymmetryLabel",

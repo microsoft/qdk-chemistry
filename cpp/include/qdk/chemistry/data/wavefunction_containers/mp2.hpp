@@ -288,8 +288,8 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override;
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const override;
 
   /**
    * @brief Get spin-traced one-particle RDM
@@ -309,7 +309,7 @@ class MP2Container : public WavefunctionContainer {
    *
    * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const override;
 
   /**

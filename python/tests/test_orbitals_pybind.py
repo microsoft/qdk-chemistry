@@ -23,7 +23,7 @@ from .test_helpers import create_test_basis_set
 @pytest.fixture
 def restricted_spin():
     """A restricted (equivalent) spin vocabulary with alpha/beta labels."""
-    syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
+    syms = sym.SymmetryProduct([sym.axes.spin(1, True)])
     alpha = sym.SymmetryLabel([sym.axes.alpha()])
     beta = sym.SymmetryLabel([sym.axes.beta()])
     return syms, alpha, beta

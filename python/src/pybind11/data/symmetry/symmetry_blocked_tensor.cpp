@@ -128,6 +128,9 @@ void bind_symmetry_blocked_tensor(py::module& m) {
   bind_sbt_instance<2, double>(m, "SymmetryBlockedTensorRank2");
   bind_sbt_instance<2, std::complex<double>>(
       m, "SymmetryBlockedTensorRank2Complex");
+  bind_sbt_instance<3, double>(m, "SymmetryBlockedTensorRank3");
+  bind_sbt_instance<3, std::complex<double>>(
+      m, "SymmetryBlockedTensorRank3Complex");
   bind_sbt_instance<4, double>(m, "SymmetryBlockedTensorRank4");
   bind_sbt_instance<4, std::complex<double>>(
       m, "SymmetryBlockedTensorRank4Complex");

@@ -12,6 +12,7 @@ void bind_base_class(py::module& m);
 void bind_symmetry(py::module& m);
 void bind_symmetry_blocked_tensor(py::module& m);
 void bind_symmetry_blocked_index_set(py::module& m);
+void bind_symmetry_blocked_sparse_map(py::module& m);
 void bind_element_data(py::module& m);
 void bind_single_particle_basis(py::module& m);
 void bind_orbitals(py::module& m);
@@ -68,6 +69,7 @@ PYBIND11_MODULE(_core, m) {
   bind_symmetry(symmetry);  // axis types + SBT/SBIS before orbital containers
   bind_symmetry_blocked_tensor(symmetry);
   bind_symmetry_blocked_index_set(symmetry);
+  bind_symmetry_blocked_sparse_map(symmetry);
   bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);

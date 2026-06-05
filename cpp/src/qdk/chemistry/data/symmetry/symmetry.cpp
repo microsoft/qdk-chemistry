@@ -22,7 +22,7 @@ std::string to_string(AxisName axis) {
     case AxisName::Spin:
       return "spin";
   }
-  return "unknown";
+  throw std::logic_error("Unknown AxisName value");
 }
 
 // ---------------------------------------------------------------------------
@@ -575,8 +575,15 @@ std::shared_ptr<const SpinValue> spin_value(int two_ms) {
   return std::make_shared<const SpinValue>(two_ms);
 }
 
-SymmetryAxis spin(int /*two_s*/, bool equivalent) {
-  return SymmetryAxis(AxisName::Spin, {alpha(), beta()}, equivalent);
+SymmetryAxis spin(unsigned two_s, bool equivalent) {
+  // Generate the 2S+1 labels at 2*M_s values {-two_s, -two_s+2, ..., +two_s}.
+  std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
+  labels.reserve(static_cast<std::size_t>(two_s) + 1);
+  const int signed_two_s = static_cast<int>(two_s);
+  for (int two_ms = -signed_two_s; two_ms <= signed_two_s; two_ms += 2) {
+    labels.push_back(spin_value(two_ms));
+  }
+  return SymmetryAxis(AxisName::Spin, std::move(labels), equivalent);
 }
 
 }  // namespace axes

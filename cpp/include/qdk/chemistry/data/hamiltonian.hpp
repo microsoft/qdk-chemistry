@@ -90,10 +90,11 @@ class HamiltonianContainer {
    * @param type Type of Hamiltonian (Hermitian by default).
    * @throws std::invalid_argument if orbitals pointer is nullptr
    */
-  HamiltonianContainer(SymmetryBlockedTensor<2> one_body,
-                       std::shared_ptr<Orbitals> orbitals, double core_energy,
-                       SymmetryBlockedTensor<2> inactive_fock,
-                       HamiltonianType type = HamiltonianType::Hermitian);
+  HamiltonianContainer(
+      SymmetryBlockedTensor<2> one_body, std::shared_ptr<Orbitals> orbitals,
+      double core_energy,
+      std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
+      HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
    * @brief Destructor
@@ -314,21 +315,11 @@ class HamiltonianContainer {
   virtual bool is_valid() const = 0;
 
  protected:
-  /// SymmetryBlockedTensor-canonical one-body integrals (source of truth)
-  std::shared_ptr<const SymmetryBlockedTensor<2>> _h1;
+  /// one-body integrals.
+  std::shared_ptr<const SymmetryBlockedTensor<2>> _one_body;
 
-  /// SymmetryBlockedTensor-canonical inactive Fock matrix (source of truth)
-  std::shared_ptr<const SymmetryBlockedTensor<2>> _inactive_fock_sbt;
-
-  /// Non-owning views into _h1 blocks (for v1 dense access)
-  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
-            std::shared_ptr<const Eigen::MatrixXd>>
-      _one_body_integrals;
-
-  /// Non-owning views into _inactive_fock_sbt blocks (for v1 dense access)
-  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
-            std::shared_ptr<const Eigen::MatrixXd>>
-      _inactive_fock_matrix;
+  /// inactive Fock matrix.
+  std::shared_ptr<const SymmetryBlockedTensor<2>> _inactive_fock;
 
   /// Molecular orbital data (coefficients, energies, occupations)
   const std::shared_ptr<Orbitals> _orbitals;
@@ -343,49 +334,6 @@ class HamiltonianContainer {
   virtual void validate_integral_dimensions() const;
   void validate_restrictedness_consistency() const;
   void validate_active_space_dimensions() const;
-
-  /// Helper functions for constructor initialization
-  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
-  make_restricted_one_body_integrals(const Eigen::MatrixXd& integrals);
-
-  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
-  make_restricted_inactive_fock_matrix(const Eigen::MatrixXd& matrix);
-
-  /**
-   * @brief Build the canonical one-body @ref SymmetryBlockedTensor from dense
-   * alpha (and optional beta) blocks and refresh the v1 dense views.
-   *
-   * @param alpha Dense alpha one-body integral matrix.
-   * @param beta Dense beta one-body integral matrix, or @c nullptr for
-   *             restricted (alpha is reused for beta).
-   */
-  void _set_one_body_integrals_container(const Eigen::MatrixXd& alpha,
-                                         const Eigen::MatrixXd* beta);
-  /**
-   * @brief Build the canonical inactive Fock @ref SymmetryBlockedTensor from
-   * dense alpha (and optional beta) blocks and refresh the v1 dense views.
-   *
-   * @param alpha Dense alpha inactive Fock matrix.
-   * @param beta Dense beta inactive Fock matrix, or @c nullptr for
-   *             restricted (alpha is reused for beta).
-   */
-  void _set_inactive_fock_container(const Eigen::MatrixXd& alpha,
-                                    const Eigen::MatrixXd* beta);
-
-  /**
-   * @brief Refresh @ref _one_body_integrals dense views from the canonical
-   * @ref _h1 container (no data copy). Leaves the views null when @ref _h1
-   * is null.
-   */
-  void _init_one_body_integrals_views();
-  /**
-   * @brief Refresh @ref _inactive_fock_matrix dense views from the canonical
-   * @ref _inactive_fock_sbt container (no data copy). Leaves the views null
-   * when @ref _inactive_fock_sbt is null.
-   */
-  void _init_inactive_fock_views();
 };
 
 /**

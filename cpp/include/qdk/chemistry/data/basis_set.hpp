@@ -324,7 +324,7 @@ class BasisSet : public DataClass,
    *         symmetry aliasing
    */
   BasisSet(const std::string& name, const std::vector<Shell>& shells,
-           const Structure& structure,
+           std::shared_ptr<Structure> structure,
            std::shared_ptr<const SymmetryProduct> ao_symmetries,
            std::unordered_map<SymmetryLabel, std::size_t> ao_extents = {},
            AOType atomic_orbital_type = AOType::Spherical);
@@ -874,11 +874,11 @@ class BasisSet : public DataClass,
   /// Number of ECP electrons replaced for each atom
   std::vector<size_t> _ecp_electrons;
 
-  /// Symmetry definitions the AO basis is blocked under (lazily defaulted)
-  mutable std::shared_ptr<const SymmetryProduct> _ao_symmetries;
+  /// Symmetry definitions the AO basis is blocked under.
+  std::shared_ptr<const SymmetryProduct> _ao_symmetries;
 
-  /// Per-label AO extents (lazily defaulted alongside @ref _ao_symmetries)
-  mutable std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;
+  /// Per-label AO extents.
+  std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;
 
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
@@ -905,10 +905,18 @@ class BasisSet : public DataClass,
   bool _is_valid() const;
 
   /**
-   * @brief Populate @ref _ao_symmetries / @ref _ao_extents with the default
-   * restricted-spin definitions if they have not been set.
+   * @brief Populate @ref _ao_symmetries and @ref _ao_extents from the
+   * supplied values, defaulting to a restricted-spin axis with
+   * @ref get_num_atomic_orbitals() extent per label when @p ao_symmetries
+   * is null.
+   * @param ao_symmetries Override AO symmetries, or null for default.
+   * @param ao_extents Per-label extents, or empty to default from
+   *        @ref get_num_atomic_orbitals().
+   * @throws std::invalid_argument on validation failure.
    */
-  void _ensure_ao_symmetries() const;
+  void _init_ao_symmetries(
+      std::shared_ptr<const SymmetryProduct> ao_symmetries,
+      std::unordered_map<SymmetryLabel, std::size_t> ao_extents);
 
   /**
    * @brief Validate that @ref _ao_extents keys are admissible and satisfy

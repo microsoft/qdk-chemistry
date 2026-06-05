@@ -33,7 +33,7 @@ static std::array<std::unordered_map<SymmetryLabel, std::size_t>, 2> extents2(
 
 static SBT2 make_simple_tensor() {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, true)}));
+      SymmetryProduct({axes::spin(1, true)}));
   Eigen::MatrixXd data(2, 2);
   data << 1.0, 2.0, 3.0, 4.0;
   auto block = std::make_shared<const Eigen::MatrixXd>(data);
@@ -44,7 +44,7 @@ static SBT2 make_simple_tensor() {
 
 TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, /*equivalent=*/true)}));
+      SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));
   auto block =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Identity(3, 3));
 
@@ -62,7 +62,7 @@ TEST(SymmetryBlockedTensorTest, RestrictedAutoAliasesPartner) {
 
 TEST(SymmetryBlockedTensorTest, UnrestrictedKeepsDistinctBlocks) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, /*equivalent=*/false)}));
+      SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
   auto block_aa = std::make_shared<const Eigen::MatrixXd>(
       Eigen::MatrixXd::Constant(2, 2, 1.0));
   auto block_bb = std::make_shared<const Eigen::MatrixXd>(
@@ -80,7 +80,7 @@ TEST(SymmetryBlockedTensorTest, UnrestrictedKeepsDistinctBlocks) {
 
 TEST(SymmetryBlockedTensorTest, ExtentMismatchRejected) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, true)}));
+      SymmetryProduct({axes::spin(1, true)}));
   auto block =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Zero(3, 2));
 
@@ -92,7 +92,7 @@ TEST(SymmetryBlockedTensorTest, ExtentMismatchRejected) {
 
 TEST(SymmetryBlockedTensorTest, InvalidLabelRejected) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, true)}));
+      SymmetryProduct({axes::spin(1, true)}));
   auto block =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Zero(1, 1));
 
@@ -111,7 +111,7 @@ TEST(SymmetryBlockedTensorTest, InvalidLabelRejected) {
 
 TEST(SymmetryBlockedTensorTest, AliasMismatchRejected) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, /*equivalent=*/true)}));
+      SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));
   auto block_aa =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Zero(2, 2));
   auto block_bb =
@@ -126,7 +126,7 @@ TEST(SymmetryBlockedTensorTest, AliasMismatchRejected) {
 
 TEST(SymmetryBlockedTensorTest, MissingBlockThrows) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, false)}));
+      SymmetryProduct({axes::spin(1, false)}));
   auto block =
       std::make_shared<const Eigen::MatrixXd>(Eigen::MatrixXd::Zero(2, 2));
   SBT2::BlockMap blocks;
@@ -139,7 +139,7 @@ TEST(SymmetryBlockedTensorTest, MissingBlockThrows) {
 
 TEST(SymmetryBlockedTensorTest, JsonRoundTripRestricted) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, true)}));
+      SymmetryProduct({axes::spin(1, true)}));
   Eigen::MatrixXd data(2, 2);
   data << 1.0, 2.0, 3.0, 4.0;
   auto block = std::make_shared<const Eigen::MatrixXd>(data);
@@ -154,7 +154,7 @@ TEST(SymmetryBlockedTensorTest, JsonRoundTripRestricted) {
 
 TEST(SymmetryBlockedTensorTest, JsonRoundTripUnrestricted) {
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, false)}));
+      SymmetryProduct({axes::spin(1, false)}));
   auto block_aa = std::make_shared<const Eigen::MatrixXd>(
       Eigen::MatrixXd::Constant(2, 2, 1.0));
   auto block_bb = std::make_shared<const Eigen::MatrixXd>(
@@ -173,7 +173,7 @@ TEST(SymmetryBlockedTensorTest, JsonRoundTripUnrestricted) {
 TEST(SymmetryBlockedTensorTest, ComplexRank1) {
   using SBT1c = SymmetryBlockedTensor<1, std::complex<double>>;
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, false)}));
+      SymmetryProduct({axes::spin(1, false)}));
   Eigen::VectorXcd v(2);
   v << std::complex<double>(1.0, -1.0), std::complex<double>(2.0, 3.0);
   auto block = std::make_shared<const Eigen::VectorXcd>(v);
@@ -194,7 +194,7 @@ TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresNativeDoubleBlocks) {
   std::filesystem::remove(filename);
 
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, true)}));
+      SymmetryProduct({axes::spin(1, true)}));
   Eigen::MatrixXd data(2, 2);
   data << 1.0, 2.0, 3.0, 4.0;
   auto block = std::make_shared<const Eigen::MatrixXd>(data);
@@ -234,7 +234,7 @@ TEST(SymmetryBlockedTensorTest,
   std::filesystem::remove(filename);
 
   auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(0, false)}));
+      SymmetryProduct({axes::spin(1, false)}));
   Eigen::VectorXcd v(2);
   v << std::complex<double>(1.0, -1.0), std::complex<double>(2.0, 3.0);
   auto block = std::make_shared<const Eigen::VectorXcd>(v);

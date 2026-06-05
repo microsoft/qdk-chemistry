@@ -51,20 +51,20 @@ class TestSymmetryAxis:
 
     def test_spin_axis_factory(self):
         """axes.spin builds a Spin axis carrying alpha and beta labels."""
-        axis = sym.axes.spin(0, True)
+        axis = sym.axes.spin(1, True)
         assert axis.name() == sym.AxisName.Spin
         assert axis.equivalent() is True
         assert len(axis.labels()) == 2
 
     def test_admits(self):
         """The spin axis admits its alpha and beta labels."""
-        axis = sym.axes.spin(0, True)
+        axis = sym.axes.spin(1, True)
         assert axis.admits(sym.axes.alpha())
         assert axis.admits(sym.axes.beta())
 
     def test_equivalent_flag(self):
         """The equivalent flag round-trips through the factory."""
-        assert sym.axes.spin(0, False).equivalent() is False
+        assert sym.axes.spin(1, False).equivalent() is False
 
 
 class TestSymmetries:
@@ -72,18 +72,18 @@ class TestSymmetries:
 
     def test_has_axis(self):
         """A spin SymmetryProduct reports the Spin axis present."""
-        syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
+        syms = sym.SymmetryProduct([sym.axes.spin(1, True)])
         assert syms.has_axis(sym.AxisName.Spin)
 
     def test_axis_lookup(self):
         """The Spin axis can be retrieved by name."""
-        syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
+        syms = sym.SymmetryProduct([sym.axes.spin(1, True)])
         assert syms.axis(sym.AxisName.Spin).name() == sym.AxisName.Spin
 
     def test_equality_and_hash(self):
         """SymmetryProducts with identical axes compare equal and hash equal."""
-        s1 = sym.SymmetryProduct([sym.axes.spin(0, True)])
-        s2 = sym.SymmetryProduct([sym.axes.spin(0, True)])
+        s1 = sym.SymmetryProduct([sym.axes.spin(1, True)])
+        s2 = sym.SymmetryProduct([sym.axes.spin(1, True)])
         assert s1 == s2
         assert hash(s1) == hash(s2)
 

@@ -111,13 +111,13 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   /**
    * @brief Get spin-dependent one-particle RDMs for active orbitals only
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override;
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const override;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const override;
 
   /**

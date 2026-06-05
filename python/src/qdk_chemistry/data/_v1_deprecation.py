@@ -113,5 +113,13 @@ def _install_deprecation_warnings() -> None:
     # -- WavefunctionContainer (abstract, but used via Wavefunction.get_container()) --
     _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_dependent", "active_one_rdm()")
     _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_dependent", "active_two_rdm()")
-    _wrap_deprecated(WavefunctionContainer, "get_active_one_rdm_spin_traced", "active_one_rdm()")
-    _wrap_deprecated(WavefunctionContainer, "get_active_two_rdm_spin_traced", "active_two_rdm()")
+    _wrap_deprecated(
+        WavefunctionContainer,
+        "get_active_one_rdm_spin_traced",
+        "active_one_rdm() and trace over the spin variant",
+    )
+    _wrap_deprecated(
+        WavefunctionContainer,
+        "get_active_two_rdm_spin_traced",
+        "active_two_rdm() and trace over the spin variant",
+    )

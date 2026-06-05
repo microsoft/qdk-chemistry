@@ -5,11 +5,13 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <cmath>
 #include <complex>
 #include <cstddef>
 #include <fstream>
 #include <memory>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked.hpp>
 #include <qdk/chemistry/utils/scalar_traits.hpp>
@@ -44,10 +46,14 @@ template <class S>
 struct TensorType<2, S> {
   using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
 };
-/** @brief Rank-3 block storage: a flat-packed column vector. */
+/** @brief Rank-3 block storage: a dense matrix (typically packed as
+ *  @c [outer*outer, inner] for two paired index slots plus one trailing
+ *  index, e.g. Cholesky three-center @f$L^{Q}_{ij}@f$ stored as
+ *  @f$[ij,\,Q]@f$). The size is validated against the product of the
+ *  per-slot extents; the precise row/column split is producer-chosen. */
 template <class S>
 struct TensorType<3, S> {
-  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
+  using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
 };
 /** @brief Rank-4 block storage: a flat-packed column vector. */
 template <class S>
@@ -385,10 +391,21 @@ class SymmetryBlockedTensor
         throw std::invalid_argument(
             "SymmetryBlockedTensor rank-2 block shape does not match extents.");
       }
+    } else if constexpr (Rank == 3) {
+      // Rank-3 blocks are stored as a dense matrix; only the total size is
+      // checked against the product of per-slot extents (the row/column
+      // split is producer-chosen, e.g. [ij, Q] vs [i, jQ]).
+      std::size_t expected = dims[0] * dims[1] * dims[2];
+      if (static_cast<std::size_t>(block.size()) != expected ||
+          block.size() == 0) {
+        throw std::invalid_argument(
+            "SymmetryBlockedTensor rank-3 block size does not match product "
+            "of per-slot extents.");
+      }
     } else {
-      // Rank-3 and rank-4 blocks are stored flat-packed; the exact length is
-      // producer/symmetry-dependent (permutational packing), so only require a
-      // non-empty single-column vector here.
+      // Rank-4 blocks are stored flat-packed; the exact length is
+      // producer/symmetry-dependent (permutational packing), so only require
+      // a non-empty single-column vector here.
       if (block.cols() != 1 || block.size() == 0) {
         throw std::invalid_argument("SymmetryBlockedTensor rank-" +
                                     std::to_string(Rank) +
@@ -472,5 +489,398 @@ template <std::size_t Rank>
 using SymmetryBlockedTensorVariant =
     std::variant<SymmetryBlockedTensor<Rank, double>,
                  SymmetryBlockedTensor<Rank, std::complex<double>>>;
+
+/**
+ * @brief Build a rank-2 spin-diagonal @ref SymmetryBlockedTensor whose two
+ * slots both carry a single-particle spin axis.
+ *
+ * Used by one-body integrals, inactive Fock matrices, and rank-2 1-RDMs;
+ * those all have @c [n,n] alpha and beta blocks indexed by an MO axis.
+ *
+ * @tparam Derived Any @c Eigen::MatrixBase expression; the block scalar
+ *           is taken from @c Derived::Scalar.
+ * @param aa Alpha-alpha block (square @c [n,n] matrix expression).
+ * @param bb Beta-beta block; ignored when @p restricted is @c true (the
+ *           restricted axis aliases the beta partner to @p aa).
+ * @param restricted Whether the spin axis is restricted (alpha and beta
+ *           share storage).
+ * @return Constructed rank-2 SBT.
+ */
+template <class Derived>
+SymmetryBlockedTensor<2, typename Derived::Scalar> make_spin_diagonal_rank2_sbt(
+    const Eigen::MatrixBase<Derived>& aa, const Eigen::MatrixBase<Derived>& bb,
+    bool restricted) {
+  using Scalar = typename Derived::Scalar;
+  using SBT = SymmetryBlockedTensor<2, Scalar>;
+  std::size_t n = static_cast<std::size_t>(aa.rows());
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, restricted)}));
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[axes::alpha()] = n;
+  ext[axes::beta()] = n;
+  typename SBT::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha()}] =
+      std::make_shared<const Tensor<2, Scalar>>(aa);
+  if (!restricted) {
+    blocks[{axes::beta(), axes::beta()}] =
+        std::make_shared<const Tensor<2, Scalar>>(bb);
+  }
+  return SBT(typename SBT::SymmetriesArray{sym, sym},
+             typename SBT::ExtentsArray{ext, ext}, std::move(blocks));
+}
+
+/**
+ * @brief Build a rank-4 spin-diagonal @ref SymmetryBlockedTensor.
+ *
+ * Used by two-body integrals and 2-RDMs that store @c n_active^4 flat
+ * vectors per independent spin sector (@c aaaa, @c aabb, @c bbbb).
+ *
+ * @tparam Derived Any @c Eigen::MatrixBase expression (a flat
+ *           @c n_active^4 column-vector-like block); the block scalar is
+ *           taken from @c Derived::Scalar.
+ * @param aaaa Alpha-alpha-alpha-alpha channel (flat @c n_active^4 vector).
+ * @param aabb Alpha-alpha-beta-beta channel.
+ * @param bbbb Beta-beta-beta-beta channel; ignored when @p restricted is
+ *           @c true.
+ * @param restricted Whether the spin axis is restricted.
+ * @return Constructed rank-4 SBT.
+ * @throws std::invalid_argument if @c aaaa.size() is not a perfect fourth
+ *         power.
+ */
+template <class Derived>
+SymmetryBlockedTensor<4, typename Derived::Scalar> make_spin_diagonal_rank4_sbt(
+    const Eigen::MatrixBase<Derived>& aaaa,
+    const Eigen::MatrixBase<Derived>& aabb,
+    const Eigen::MatrixBase<Derived>& bbbb, bool restricted) {
+  using Scalar = typename Derived::Scalar;
+  using SBT = SymmetryBlockedTensor<4, Scalar>;
+  std::size_t size = static_cast<std::size_t>(aaaa.size());
+  std::size_t n_active = static_cast<std::size_t>(
+      std::llround(std::pow(static_cast<double>(size), 0.25)));
+  if (n_active * n_active * n_active * n_active != size) {
+    throw std::invalid_argument("Spin-diagonal rank-4 block size " +
+                                std::to_string(size) +
+                                " is not a perfect fourth power.");
+  }
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, restricted)}));
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[axes::alpha()] = n_active;
+  ext[axes::beta()] = n_active;
+  typename SBT::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()}] =
+      std::make_shared<const Tensor<4, Scalar>>(aaaa);
+  blocks[{axes::alpha(), axes::alpha(), axes::beta(), axes::beta()}] =
+      std::make_shared<const Tensor<4, Scalar>>(aabb);
+  if (!restricted) {
+    blocks[{axes::beta(), axes::beta(), axes::beta(), axes::beta()}] =
+        std::make_shared<const Tensor<4, Scalar>>(bbbb);
+  }
+  return SBT(typename SBT::SymmetriesArray{sym, sym, sym, sym},
+             typename SBT::ExtentsArray{ext, ext, ext, ext}, std::move(blocks));
+}
+
+/**
+ * @brief Single-channel restricted overload of @ref
+ * make_spin_diagonal_rank4_sbt.
+ *
+ * Use when only one channel of rank-4 data is supplied and all four
+ * equivalent spin patterns (@c aaaa, @c aabb, @c bbbb, @c bbaa) share
+ * that single block. This applies to spin-restricted two-electron
+ * integrals where @f$(\alpha\alpha|\alpha\alpha) =
+ * (\alpha\alpha|\beta\beta) = (\beta\beta|\beta\beta)@f$ holds
+ * physically, but does @b not apply to 2-RDMs (whose spin channels are
+ * independent quantities even in restricted spin states).
+ *
+ * The alpha-alpha-alpha-alpha and alpha-alpha-beta-beta keys are both
+ * pointed at the single supplied block; orbit aliasing on the restricted
+ * spin axis then fills @c bbbb (from @c aaaa) and @c bbaa (from @c aabb)
+ * with the same block pointer.
+ *
+ * @tparam Derived Any @c Eigen::MatrixBase expression; the block scalar
+ *           is taken from @c Derived::Scalar.
+ * @param aaaa The single channel of rank-4 data (flat @c n_active^4
+ *           vector). Validated to be a perfect fourth power in size.
+ * @return Constructed rank-4 SBT with one underlying block, aliased to
+ *         four spin keys.
+ * @throws std::invalid_argument if @c aaaa.size() is not a perfect fourth
+ *         power.
+ */
+template <class Derived>
+SymmetryBlockedTensor<4, typename Derived::Scalar> make_spin_diagonal_rank4_sbt(
+    const Eigen::MatrixBase<Derived>& aaaa) {
+  using Scalar = typename Derived::Scalar;
+  using SBT = SymmetryBlockedTensor<4, Scalar>;
+  std::size_t size = static_cast<std::size_t>(aaaa.size());
+  std::size_t n_active = static_cast<std::size_t>(
+      std::llround(std::pow(static_cast<double>(size), 0.25)));
+  if (n_active * n_active * n_active * n_active != size) {
+    throw std::invalid_argument("Spin-diagonal rank-4 block size " +
+                                std::to_string(size) +
+                                " is not a perfect fourth power.");
+  }
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[axes::alpha()] = n_active;
+  ext[axes::beta()] = n_active;
+  typename SBT::BlockMap blocks;
+  auto aaaa_block = std::make_shared<const Tensor<4, Scalar>>(aaaa);
+  blocks[{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()}] =
+      aaaa_block;
+  blocks[{axes::alpha(), axes::alpha(), axes::beta(), axes::beta()}] =
+      aaaa_block;
+  return SBT(typename SBT::SymmetriesArray{sym, sym, sym, sym},
+             typename SBT::ExtentsArray{ext, ext, ext, ext}, std::move(blocks));
+}
+
+/**
+ * @brief Optional overload of @ref make_spin_diagonal_rank2_sbt.
+ *
+ * Returns @c nullptr when @p aa is empty (no data supplied); otherwise
+ * builds the rank-2 spin-diagonal SBT and returns a shared pointer. The
+ * spin axis is restricted iff @p bb is @c nullopt.
+ *
+ * @tparam Scalar Block scalar type.
+ * @param aa Alpha-alpha block (or empty optional to indicate no data).
+ * @param bb Beta-beta block (or empty optional for restricted).
+ * @return Shared pointer to the SBT, or @c nullptr if @p aa is unset.
+ */
+template <class Scalar>
+std::shared_ptr<const SymmetryBlockedTensor<2, Scalar>>
+make_spin_diagonal_rank2_sbt(
+    const std::optional<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>&
+        aa,
+    const std::optional<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>&
+        bb) {
+  if (!aa.has_value()) {
+    return nullptr;
+  }
+  const bool restricted = !bb.has_value();
+  const auto& bb_block = bb.has_value() ? bb.value() : aa.value();
+  return std::make_shared<const SymmetryBlockedTensor<2, Scalar>>(
+      make_spin_diagonal_rank2_sbt(aa.value(), bb_block, restricted));
+}
+
+/**
+ * @brief Dense-matrix overload of @ref make_spin_diagonal_rank2_sbt that
+ * treats an empty matrix as "absent" (the @c std::optional analog).
+ *
+ * Returns @c nullptr when @p aa has zero size; otherwise builds the rank-2
+ * spin-diagonal SBT. The spin axis is restricted iff @p bb has zero size.
+ * Use this overload to lift v1 dense APIs (which encode absence as an
+ * empty matrix) into the SBT-native construction path without optional
+ * boilerplate at the call site.
+ *
+ * @tparam Derived Any @c Eigen::MatrixBase expression; the block scalar
+ *           is taken from @c Derived::Scalar.
+ * @param aa Alpha-alpha block (empty matrix means "no data supplied").
+ * @param bb Beta-beta block (empty matrix means restricted).
+ * @return Shared pointer to the SBT, or @c nullptr if @p aa is empty.
+ */
+template <class Derived>
+std::shared_ptr<const SymmetryBlockedTensor<2, typename Derived::Scalar>>
+make_spin_diagonal_rank2_sbt(const Eigen::MatrixBase<Derived>& aa,
+                             const Eigen::MatrixBase<Derived>& bb) {
+  using Scalar = typename Derived::Scalar;
+  if (aa.size() == 0) {
+    return nullptr;
+  }
+  const bool restricted = (bb.size() == 0);
+  return std::make_shared<const SymmetryBlockedTensor<2, Scalar>>(
+      make_spin_diagonal_rank2_sbt(aa, restricted ? aa : bb, restricted));
+}
+
+/**
+ * @brief Optional overload of @ref make_spin_diagonal_rank4_sbt.
+ *
+ * Returns @c nullptr when all three channels are unset. Builds the rank-4
+ * spin-diagonal SBT from whichever channels are supplied, with the
+ * restrictedness of the resulting spin axis determined by whether @p bbbb
+ * is supplied: when @c nullopt, the axis is restricted and unspecified
+ * channels are aliased to @p aaaa.
+ *
+ * @tparam Scalar Block scalar type.
+ * @param aaaa Alpha-alpha-alpha-alpha channel (or empty optional).
+ * @param aabb Alpha-alpha-beta-beta channel (or empty optional).
+ * @param bbbb Beta-beta-beta-beta channel (or empty optional). When unset
+ *           the spin axis is restricted.
+ * @return Shared pointer to the SBT, or @c nullptr if all three channels
+ *         are unset.
+ */
+template <class Scalar>
+std::shared_ptr<const SymmetryBlockedTensor<4, Scalar>>
+make_spin_diagonal_rank4_sbt(
+    const std::optional<Eigen::Matrix<Scalar, Eigen::Dynamic, 1>>& aaaa,
+    const std::optional<Eigen::Matrix<Scalar, Eigen::Dynamic, 1>>& aabb,
+    const std::optional<Eigen::Matrix<Scalar, Eigen::Dynamic, 1>>& bbbb) {
+  if (!aaaa.has_value() && !aabb.has_value() && !bbbb.has_value()) {
+    return nullptr;
+  }
+  const bool restricted = !bbbb.has_value();
+  const auto& aaaa_block =
+      aaaa.has_value() ? aaaa.value()
+                       : (bbbb.has_value() ? bbbb.value() : aabb.value());
+  const auto& aabb_block = aabb.has_value() ? aabb.value() : aaaa_block;
+  const auto& bbbb_block = bbbb.has_value() ? bbbb.value() : aaaa_block;
+  return std::make_shared<const SymmetryBlockedTensor<4, Scalar>>(
+      make_spin_diagonal_rank4_sbt(aaaa_block, aabb_block, bbbb_block,
+                                   restricted));
+}
+
+/**
+ * @brief Dense-vector overload of @ref make_spin_diagonal_rank4_sbt that
+ * treats an empty vector as "absent" (the @c std::optional analog).
+ *
+ * Returns @c nullptr when all three channels are empty; otherwise builds
+ * the rank-4 spin-diagonal SBT from whichever channels are supplied. The
+ * spin axis is restricted iff @p bbbb is empty, in which case unspecified
+ * channels are aliased to @p aaaa.
+ *
+ * @tparam Derived Any @c Eigen::MatrixBase expression; the block scalar
+ *           is taken from @c Derived::Scalar.
+ * @param aaaa Alpha-alpha-alpha-alpha channel (empty means "absent").
+ * @param aabb Alpha-alpha-beta-beta channel (empty means "absent").
+ * @param bbbb Beta-beta-beta-beta channel (empty means restricted).
+ * @return Shared pointer to the SBT, or @c nullptr if all three channels
+ *         are empty.
+ */
+template <class Derived>
+std::shared_ptr<const SymmetryBlockedTensor<4, typename Derived::Scalar>>
+make_spin_diagonal_rank4_sbt(const Eigen::MatrixBase<Derived>& aaaa,
+                             const Eigen::MatrixBase<Derived>& aabb,
+                             const Eigen::MatrixBase<Derived>& bbbb) {
+  using Scalar = typename Derived::Scalar;
+  if (aaaa.size() == 0 && aabb.size() == 0 && bbbb.size() == 0) {
+    return nullptr;
+  }
+  const bool restricted = (bbbb.size() == 0);
+  const auto& aaaa_block =
+      aaaa.size() != 0 ? aaaa : (bbbb.size() != 0 ? bbbb : aabb);
+  const auto& aabb_block = aabb.size() != 0 ? aabb : aaaa_block;
+  const auto& bbbb_block = bbbb.size() != 0 ? bbbb : aaaa_block;
+  return std::make_shared<const SymmetryBlockedTensor<4, Scalar>>(
+      make_spin_diagonal_rank4_sbt(aaaa_block, aabb_block, bbbb_block,
+                                   restricted));
+}
+
+/**
+ * @brief Variant overload of @ref make_spin_diagonal_rank2_sbt — dispatches
+ * to the scalar-typed builder by visiting @p aa.
+ *
+ * @param aa Alpha-alpha block as a real/complex matrix variant.
+ * @param bb Beta-beta block (must hold the same scalar alternative as
+ *           @p aa); ignored when @p restricted is @c true.
+ * @param restricted Whether the spin axis is restricted.
+ * @return Shared pointer to the constructed variant tensor.
+ */
+inline std::shared_ptr<const SymmetryBlockedTensorVariant<2>>
+make_spin_diagonal_rank2_sbt_variant(
+    const std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>& aa,
+    const std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>& bb,
+    bool restricted) {
+  return std::visit(
+      [&](const auto& aa_block)
+          -> std::shared_ptr<const SymmetryBlockedTensorVariant<2>> {
+        using Scalar = typename std::decay_t<decltype(aa_block)>::Scalar;
+        const auto& bb_block =
+            std::get<Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>(bb);
+        return std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+            std::in_place_type<SymmetryBlockedTensor<2, Scalar>>,
+            make_spin_diagonal_rank2_sbt(aa_block, bb_block, restricted));
+      },
+      aa);
+}
+
+/**
+ * @brief Variant overload of @ref make_spin_diagonal_rank4_sbt — dispatches
+ * to the scalar-typed builder by visiting @p aaaa.
+ *
+ * @param aaaa Alpha-alpha-alpha-alpha block as a real/complex vector
+ *           variant.
+ * @param aabb Alpha-alpha-beta-beta block (same scalar alternative).
+ * @param bbbb Beta-beta-beta-beta block (same scalar alternative); ignored
+ *           when @p restricted is @c true.
+ * @param restricted Whether the spin axis is restricted.
+ * @return Shared pointer to the constructed variant tensor.
+ */
+inline std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
+make_spin_diagonal_rank4_sbt_variant(
+    const std::variant<Eigen::VectorXd, Eigen::VectorXcd>& aaaa,
+    const std::variant<Eigen::VectorXd, Eigen::VectorXcd>& aabb,
+    const std::variant<Eigen::VectorXd, Eigen::VectorXcd>& bbbb,
+    bool restricted) {
+  return std::visit(
+      [&](const auto& aaaa_block)
+          -> std::shared_ptr<const SymmetryBlockedTensorVariant<4>> {
+        using Scalar = typename std::decay_t<decltype(aaaa_block)>::Scalar;
+        const auto& aabb_block =
+            std::get<Eigen::Matrix<Scalar, Eigen::Dynamic, 1>>(aabb);
+        const auto& bbbb_block =
+            std::get<Eigen::Matrix<Scalar, Eigen::Dynamic, 1>>(bbbb);
+        return std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+            std::in_place_type<SymmetryBlockedTensor<4, Scalar>>,
+            make_spin_diagonal_rank4_sbt(aaaa_block, aabb_block, bbbb_block,
+                                         restricted));
+      },
+      aaaa);
+}
+
+/**
+ * @brief Optional overload of @ref make_spin_diagonal_rank2_sbt_variant.
+ *
+ * Returns @c nullptr when neither spin channel is supplied. Restrictedness
+ * is inferred from whether @p bb is supplied (restricted iff @p bb is unset
+ * and the resulting axis aliases the alpha block).
+ *
+ * @param aa Alpha-alpha block as an optional matrix variant.
+ * @param bb Beta-beta block as an optional matrix variant.
+ * @return Shared pointer to the constructed variant tensor, or @c nullptr
+ *         when both channels are unset.
+ */
+inline std::shared_ptr<const SymmetryBlockedTensorVariant<2>>
+make_spin_diagonal_rank2_sbt_variant(
+    const std::optional<std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>>& aa,
+    const std::optional<std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>>& bb) {
+  if (!aa.has_value() && !bb.has_value()) {
+    return nullptr;
+  }
+  const auto& aa_block = aa.has_value() ? aa.value() : bb.value();
+  const auto& bb_block = bb.has_value() ? bb.value() : aa.value();
+  const bool restricted = !(aa.has_value() && bb.has_value());
+  return make_spin_diagonal_rank2_sbt_variant(aa_block, bb_block, restricted);
+}
+
+/**
+ * @brief Optional overload of @ref make_spin_diagonal_rank4_sbt_variant.
+ *
+ * Returns @c nullptr when none of the three spin channels are supplied.
+ * The spin axis is restricted iff @p bbbb is unset; in that case
+ * unspecified channels alias the supplied alpha-like block.
+ *
+ * @param aaaa Alpha-alpha-alpha-alpha channel as an optional vector variant.
+ * @param aabb Alpha-alpha-beta-beta channel as an optional vector variant.
+ * @param bbbb Beta-beta-beta-beta channel as an optional vector variant.
+ * @return Shared pointer to the constructed variant tensor, or @c nullptr
+ *         when all three channels are unset.
+ */
+inline std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
+make_spin_diagonal_rank4_sbt_variant(
+    const std::optional<std::variant<Eigen::VectorXd, Eigen::VectorXcd>>& aaaa,
+    const std::optional<std::variant<Eigen::VectorXd, Eigen::VectorXcd>>& aabb,
+    const std::optional<std::variant<Eigen::VectorXd, Eigen::VectorXcd>>&
+        bbbb) {
+  if (!aaaa.has_value() && !aabb.has_value() && !bbbb.has_value()) {
+    return nullptr;
+  }
+  const auto& aaaa_block =
+      aaaa.has_value() ? aaaa.value()
+                       : (bbbb.has_value() ? bbbb.value() : aabb.value());
+  const auto& aabb_block = aabb.has_value() ? aabb.value() : aaaa_block;
+  const auto& bbbb_block = bbbb.has_value() ? bbbb.value() : aaaa_block;
+  const bool restricted = !bbbb.has_value();
+  return make_spin_diagonal_rank4_sbt_variant(aaaa_block, aabb_block,
+                                              bbbb_block, restricted);
+}
 
 }  // namespace qdk::chemistry::data

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <concepts>
 #include <cstddef>
 #include <initializer_list>
 #include <map>
@@ -12,6 +13,7 @@
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -574,6 +576,23 @@ class SymmetryLabel {
       std::initializer_list<std::shared_ptr<const SymmetryAxisValue>> values);
 
   /**
+   * @brief Construct from a single axis value (implicit conversion).
+   *
+   * Lets call sites write @c block({axes::alpha(), axes::beta()}) without
+   * naming @ref SymmetryLabel explicitly — each axis-value shared pointer
+   * is wrapped into a label carrying just that one value. Accepts a shared
+   * pointer to any @ref SymmetryAxisValue subclass (e.g. @ref SpinValue).
+   *
+   * @tparam Derived Any @ref SymmetryAxisValue subclass.
+   * @param value Axis value carried by this label.
+   */
+  template <std::derived_from<SymmetryAxisValue> Derived>
+  SymmetryLabel(std::shared_ptr<const Derived> value)
+      : SymmetryLabel(
+            std::initializer_list<std::shared_ptr<const SymmetryAxisValue>>{
+                std::shared_ptr<const SymmetryAxisValue>(std::move(value))}) {}
+
+  /**
    * @brief Construct from an explicit vector of axis values.
    * @param values Axis values carried by this label; each axis name must
    *               appear at most once.
@@ -674,18 +693,20 @@ std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
 namespace axes {
 
 /**
- * @brief Build a spin-½ axis carrying two labels (@f$2M_s = +1@f$ and
- * @f$2M_s = -1@f$).
+ * @brief Build a spin axis carrying @c 2s+1 labels at @f$2 M_s \in
+ * \{-2s, -2s+2, \ldots, +2s\}@f$.
  *
- * @param two_s Twice the total spin (reserved for forward compatibility;
- *              currently ignored — the returned axis always carries the
- *              two spin-½ labels).
+ * For the standard single-particle (@p two_s = 1) case, this is the
+ * spin-1/2 axis with the two labels @f$\alpha@f$ (@c 2 M_s = +1) and
+ * @f$\beta@f$ (@c 2 M_s = -1).
+ *
+ * @param two_s Twice the total spin.
  * @param equivalent Whether labels under this axis share storage (i.e.
  *                   restricted-spin storage).
  * @return A fully populated @ref SymmetryAxis for the spin degree of
  *         freedom.
  */
-SymmetryAxis spin(int two_s, bool equivalent = true);
+SymmetryAxis spin(unsigned two_s, bool equivalent = true);
 
 /**
  * @brief Interned shared spin-½ value with @f$2 M_s = +1@f$.

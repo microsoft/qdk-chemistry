@@ -255,6 +255,31 @@ class SymmetryBlocked : public DataClass {
    */
   std::size_t num_blocks() const { return _blocks.size(); }
 
+  /**
+   * @brief Whether every stored key in @p keys aliases the same block.
+   *
+   * Keys absent from the container are skipped (they do not break aliasing).
+   * Returns @c true when zero or one of @p keys is stored, or when all
+   * stored keys map to the same underlying block pointer.
+   *
+   * @param keys Per-slot label tuples to compare.
+   * @return @c true iff the stored keys all share storage; @c false if any
+   *         two stored keys point at different blocks.
+   */
+  bool all_aliased(const std::vector<Labels>& keys) const {
+    const Block* first = nullptr;
+    for (const auto& k : keys) {
+      if (!has_block(k)) continue;
+      const Block* p = block_ptr(k).get();
+      if (first == nullptr) {
+        first = p;
+      } else if (p != first) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  protected:
   SymmetriesArray _symmetries;
   ExtentsArray _extents;

@@ -33,24 +33,6 @@ namespace qdk::chemistry::data {
 class CholeskyHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
-   * @brief Constructor for active space Hamiltonian with three center integrals
-   * (ij|Q)
-   *
-   * @param one_body_integrals One-electron integrals in MO basis [norb x norb]
-   * @param three_center_integrals Three-center two-electron integrals in MO
-   * basis [(norb x norb) x naux]
-   * @param orbitals Shared pointer to molecular orbital data for the system
-   * @param core_energy Core energy (nuclear repulsion + inactive orbital
-   * energy)
-   * @param inactive_fock_matrix Inactive Fock matrix for the selected active
-   * space
-   * @param ao_cholesky_vectors Optional AO Cholesky vectors for potential reuse
-   * (default: std::nullopt)
-   * @param type Type of Hamiltonian (Hermitian by default)
-   *
-   * @throws std::invalid_argument if orbitals pointer is nullptr
-   */
-  /**
    * @brief Constructor for restricted Cholesky Hamiltonian.
    * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
@@ -82,8 +64,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief SymmetryBlockedTensor constructor for Cholesky Hamiltonian.
    * @param one_body One-body integrals as rank-2 SymmetryBlockedTensor.
-   * @param three_center Three-center integrals as rank-3
-   *   SymmetryBlockedTensor. Slots are [MO_row, MO_col, auxiliary].
+   * @param three_center Three-center integrals as a rank-3
+   *   SymmetryBlockedTensor with slots @c [MO_row, MO_col, auxiliary]. Each
+   *   block is a dense @c [norb_row*norb_col, naux] @c MatrixXd.
    * @param orbitals Shared pointer to molecular orbital data.
    * @param core_energy Core energy.
    * @param inactive_fock Inactive Fock matrix as rank-2 SymmetryBlockedTensor.
@@ -93,7 +76,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   CholeskyHamiltonianContainer(
       SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
-      SymmetryBlockedTensor<2> inactive_fock,
+      std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
       std::optional<Eigen::MatrixXd> ao_cholesky_vectors = std::nullopt,
       HamiltonianType type = HamiltonianType::Hermitian);
 
@@ -129,6 +112,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
    * @deprecated Use three_center() for SymmetryBlockedTensor access.
+   * @return Pair of dense @c [norb^2, naux] @c MatrixXd for (alpha, beta).
    */
   [[deprecated("Use three_center() for SymmetryBlockedTensor access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
@@ -136,9 +120,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Three-center integrals as a rank-3 symmetry-blocked tensor.
-   * Slots are [MO_row, MO_col, auxiliary].
-   * @return Const reference to the three-center SymmetryBlockedTensor.
-   * @throws std::runtime_error if not set.
+   * Slots are @c [MO_row, MO_col, auxiliary]; each block is a dense
+   * @c [norb_row*norb_col, naux] @c MatrixXd.
    */
   const SymmetryBlockedTensor<3>& three_center() const;
 
@@ -217,14 +200,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  private:
-  /// SymmetryBlockedTensor-canonical three-center integrals (source of truth).
-  /// Rank-3: slots are [MO_row, MO_col, auxiliary].
-  std::shared_ptr<const SymmetryBlockedTensor<3>> _three_center_sbt;
-
-  /// Non-owning views into _three_center_sbt blocks (for v1 dense access)
-  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
-            std::shared_ptr<const Eigen::MatrixXd>>
-      _three_center_integrals;
+  /// Three-center integrals (rank-3, slots @c [MO_row, MO_col, auxiliary];
+  /// blocks are dense @c [orb_pair, naux] @c MatrixXd).
+  std::shared_ptr<const SymmetryBlockedTensor<3>> _three_center;
 
   /**
    * Lazily computed four-center integrals cache (built on first access).
@@ -246,29 +224,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /** Optional AO Cholesky vectors for potential reuse */
   const std::optional<Eigen::MatrixXd> _ao_cholesky_vectors;
 
-  static std::pair<std::shared_ptr<Eigen::MatrixXd>,
-                   std::shared_ptr<Eigen::MatrixXd>>
-  make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
-
-  /**
-   * @brief Build the canonical three-center @ref SymmetryBlockedTensor from
-   * dense spin channels and refresh the v1 dense views.
-   *
-   * @param aa Dense alpha-alpha three-center matrix.
-   * @param bb Dense beta-beta three-center matrix, or @c nullptr for
-   *           restricted (re-uses @p aa).
-   */
-  void _set_three_center_container(const Eigen::MatrixXd& aa,
-                                   const Eigen::MatrixXd* bb);
-  /**
-   * @brief Refresh @ref _three_center_integrals dense views from the
-   * canonical @ref _three_center_sbt container (no data copy). Leaves the
-   * views null when the container is null.
-   */
-  void _init_three_center_views();
-
   /** Serialization version */
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 };
 
 }  // namespace qdk::chemistry::data

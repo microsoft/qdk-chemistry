@@ -159,6 +159,7 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
 void consolidate_determinants(std::vector<Configuration>& determinants,
                               ContainerTypes::VectorVariant& coefficients,
                               double threshold = 1e-9);
+
 }  // namespace detail
 
 /**
@@ -242,6 +243,34 @@ class WavefunctionContainer {
                         const OrbitalEntropies& entropies = OrbitalEntropies{},
                         WavefunctionType type = WavefunctionType::SelfDual);
 
+  /**
+   * @brief Constructs a wavefunction container directly from preconstructed
+   *        symmetry-blocked storage for the spin-dependent active-space RDMs.
+   *
+   * Used by the serialization layer to hand reconstructed @ref
+   * SymmetryBlockedTensorVariant objects to the container without going
+   * through the per-block construction path. Any of the four shared pointers
+   * may be @c nullptr to indicate that the corresponding RDM is not stored.
+   *
+   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (may be
+   *        @c nullptr).
+   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (may be
+   *        @c nullptr).
+   * @param active_one_rdm Spin-dependent active-space 1-RDM (may be
+   *        @c nullptr).
+   * @param active_two_rdm Spin-dependent active-space 2-RDM (may be
+   *        @c nullptr).
+   * @param entropies Orbital entropy data.
+   * @param type The type of wavefunction.
+   */
+  WavefunctionContainer(
+      std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
+      std::shared_ptr<VectorVariant> two_rdm_spin_traced,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
+      const OrbitalEntropies& entropies = OrbitalEntropies{},
+      WavefunctionType type = WavefunctionType::SelfDual);
+
   virtual ~WavefunctionContainer() = default;
 
   /**
@@ -295,10 +324,10 @@ class WavefunctionContainer {
    * @ref SymmetryBlockedTensorVariant) instead.
    *
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active
-   * orbitals
+   * orbitals, constructed from the canonical symmetry-blocked tensor.
    */
   [[deprecated("Use active_one_rdm() instead")]]
-  virtual std::tuple<const MatrixVariant&, const MatrixVariant&>
+  virtual std::tuple<MatrixVariant, MatrixVariant>
   get_active_one_rdm_spin_dependent() const;
 
   /**
@@ -307,12 +336,12 @@ class WavefunctionContainer {
    * @deprecated Use @ref active_two_rdm() (variant-typed
    * @ref SymmetryBlockedTensorVariant) instead.
    *
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals
+   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals,
+   * constructed from the canonical symmetry-blocked tensor.
    */
   [[deprecated("Use active_two_rdm() instead")]]
-  virtual std::tuple<const VectorVariant&, const VectorVariant&,
-                     const VectorVariant&> get_active_two_rdm_spin_dependent()
-      const;
+  virtual std::tuple<VectorVariant, VectorVariant, VectorVariant>
+  get_active_two_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
@@ -616,7 +645,7 @@ class WavefunctionContainer {
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * @brief Check if the system uses restricted orbitals with a closed-shell
@@ -630,30 +659,13 @@ class WavefunctionContainer {
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
-  // spin-dependent RDMs
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_aa = nullptr;
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_bb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aaaa = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
 
-  // SymmetryBlockedTensor-canonical active-space RDM containers (built
-  // eagerly from spin-dependent channels).
+  // SymmetryBlockedTensor-canonical active-space RDM containers (sole storage
+  // for the spin-dependent active-space RDMs).
   mutable std::shared_ptr<const SymmetryBlockedTensorVariant<2>>
-      _active_one_rdm_sbt;
+      _active_one_rdm;
   mutable std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
-      _active_two_rdm_sbt;
-
-  /**
-   * @brief Build @ref _active_one_rdm_sbt eagerly from the spin-dependent
-   * 1-RDM channels (no-op if the channels are unavailable).
-   */
-  void _build_active_one_rdm_sbt() const;
-  /**
-   * @brief Build @ref _active_two_rdm_sbt eagerly from the spin-dependent
-   * 2-RDM channels (no-op if the channels are unavailable).
-   */
-  void _build_active_two_rdm_sbt() const;
+      _active_two_rdm;
 
   // Orbital entropies
   mutable OrbitalEntropies _entropies;
@@ -662,48 +674,10 @@ class WavefunctionContainer {
   void _clear_rdms() const;
 
   /**
-   * @brief Serialize RDMs to HDF5 group if they are available
-   * @param group HDF5 group to write RDM data to
-   */
-  void _serialize_rdms_to_hdf5(H5::Group& group) const;
-
-  /**
-   * @brief Deserialize RDMs from HDF5 group
-   * @param rdm_group HDF5 group containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
-   * two_rdm_spin_traced)
-   */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5(H5::Group& rdm_group);
-
-  /**
-   * @brief Serialize RDMs to JSON if they are available
-   * @param j JSON object to add RDM data to
-   */
-  void _serialize_rdms_to_json(nlohmann::json& j) const;
-
-  /**
    * @brief Serialize single-orbital entropies and mutual information to JSON
    * @param j JSON object to add entropy data to
    */
   void _serialize_entropies_to_json(nlohmann::json& j) const;
-
-  /**
-   * @brief Deserialize RDMs from JSON
-   * @param j JSON object containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
-   * two_rdm_spin_traced)
-   */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_json(const nlohmann::json& j);
 };
 
 /**
@@ -941,14 +915,14 @@ class Wavefunction : public DataClass,
    * @brief Get spin-dependent one-particle RDMs
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const;
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs
    * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const;
 
   /**
@@ -1202,7 +1176,7 @@ class Wavefunction : public DataClass,
   std::unique_ptr<const WavefunctionContainer> _container;
 
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * @brief Clear cached data to release memory

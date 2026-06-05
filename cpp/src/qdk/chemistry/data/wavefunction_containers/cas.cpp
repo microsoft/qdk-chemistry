@@ -73,32 +73,30 @@ CasWavefunctionContainer::CasWavefunctionContainer(
   QDK_LOG_TRACE_ENTERING();
 }
 
+CasWavefunctionContainer::CasWavefunctionContainer(
+    const VectorVariant& coeffs, const DeterminantVector& dets,
+    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
+    std::shared_ptr<VectorVariant> two_rdm_spin_traced,
+    std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
+    std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
+    const OrbitalEntropies& entropies, WavefunctionType type)
+    : WavefunctionContainer(std::move(one_rdm_spin_traced),
+                            std::move(two_rdm_spin_traced),
+                            std::move(active_one_rdm),
+                            std::move(active_two_rdm), entropies, type),
+      _coefficients(coeffs),
+      _configuration_set(dets, orbitals) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
 std::unique_ptr<WavefunctionContainer> CasWavefunctionContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
 
   return std::make_unique<CasWavefunctionContainer>(
       _coefficients, _configuration_set.get_configurations(),
-      this->get_orbitals(),
-      _one_rdm_spin_traced ? std::optional<MatrixVariant>(*_one_rdm_spin_traced)
-                           : std::nullopt,
-      _one_rdm_spin_dependent_aa
-          ? std::optional<MatrixVariant>(*_one_rdm_spin_dependent_aa)
-          : std::nullopt,
-      _one_rdm_spin_dependent_bb
-          ? std::optional<MatrixVariant>(*_one_rdm_spin_dependent_bb)
-          : std::nullopt,
-      _two_rdm_spin_traced ? std::optional<VectorVariant>(*_two_rdm_spin_traced)
-                           : std::nullopt,
-      _two_rdm_spin_dependent_aabb
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aabb)
-          : std::nullopt,
-      _two_rdm_spin_dependent_aaaa
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_aaaa)
-          : std::nullopt,
-      _two_rdm_spin_dependent_bbbb
-          ? std::optional<VectorVariant>(*_two_rdm_spin_dependent_bbbb)
-          : std::nullopt,
-      _entropies, this->get_type());
+      this->get_orbitals(), _one_rdm_spin_traced, _two_rdm_spin_traced,
+      _active_one_rdm, _active_two_rdm, _entropies, this->get_type());
 }
 
 ScalarVariant CasWavefunctionContainer::get_coefficient(
@@ -473,8 +471,39 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
   // Store configuration set (delegates to ConfigurationSet serialization)
   j["configuration_set"] = _configuration_set.to_json();
 
-  // Serialize RDMs if available
-  _serialize_rdms_to_json(j);
+  // Serialize RDMs (if any) — spin-traced via Eigen helpers, active-space
+  // via the canonical SBT serializer.
+  {
+    bool has_any_rdm = _one_rdm_spin_traced != nullptr ||
+                       _two_rdm_spin_traced != nullptr ||
+                       _active_one_rdm != nullptr || _active_two_rdm != nullptr;
+    if (has_any_rdm) {
+      nlohmann::json rdm_json;
+      if (_one_rdm_spin_traced != nullptr) {
+        bool is_complex =
+            detail::is_matrix_variant_complex(*_one_rdm_spin_traced);
+        rdm_json["is_one_rdm_spin_traced_complex"] = is_complex;
+        rdm_json["one_rdm_spin_traced"] =
+            matrix_variant_to_json(*_one_rdm_spin_traced, is_complex);
+      }
+      if (_two_rdm_spin_traced != nullptr) {
+        bool is_complex =
+            detail::is_vector_variant_complex(*_two_rdm_spin_traced);
+        rdm_json["is_two_rdm_spin_traced_complex"] = is_complex;
+        rdm_json["two_rdm_spin_traced"] =
+            vector_variant_to_json(*_two_rdm_spin_traced, is_complex);
+      }
+      if (_active_one_rdm != nullptr) {
+        rdm_json["active_one_rdm"] = std::visit(
+            [](const auto& t) { return t.to_json(); }, *_active_one_rdm);
+      }
+      if (_active_two_rdm != nullptr) {
+        rdm_json["active_two_rdm"] = std::visit(
+            [](const auto& t) { return t.to_json(); }, *_active_two_rdm);
+      }
+      j["rdms"] = std::move(rdm_json);
+    }
+  }
 
   // Serialize entropies if available
   _serialize_entropies_to_json(j);

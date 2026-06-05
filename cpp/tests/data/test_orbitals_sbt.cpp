@@ -16,13 +16,6 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
-
-SymmetryLabel alpha() { return SymmetryLabel({axes::alpha()}); }
-SymmetryLabel beta() { return SymmetryLabel({axes::beta()}); }
-
-}  // namespace
-
 TEST(OrbitalsSbtTest, IsSingleParticleBasis) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(3, 3);
   auto basis = testing::create_random_basis_set(c.rows());
@@ -30,8 +23,8 @@ TEST(OrbitalsSbtTest, IsSingleParticleBasis) {
       std::make_shared<Orbitals>(c, std::nullopt, std::nullopt, basis);
   std::shared_ptr<const SingleParticleBasis> spb = orbitals;
   EXPECT_EQ(spb->num_modes(), 3u);
-  EXPECT_EQ(spb->mo_extents().at(alpha()), 3u);
-  EXPECT_EQ(spb->mo_extents().at(beta()), 3u);
+  EXPECT_EQ(spb->mo_extents().at(axes::alpha()), 3u);
+  EXPECT_EQ(spb->mo_extents().at(axes::beta()), 3u);
   EXPECT_NE(spb->symmetries(), nullptr);
 }
 
@@ -42,16 +35,16 @@ TEST(OrbitalsSbtTest, RestrictedCoefficientsAlias) {
   auto orbitals = std::make_shared<Orbitals>(c, e, std::nullopt, basis);
 
   auto coefficients = orbitals->coefficients();
-  EXPECT_TRUE(coefficients->has_block({alpha(), alpha()}));
-  EXPECT_TRUE(coefficients->has_block({beta(), beta()}));
+  EXPECT_TRUE(coefficients->has_block({axes::alpha(), axes::alpha()}));
+  EXPECT_TRUE(coefficients->has_block({axes::beta(), axes::beta()}));
   // Restricted: alpha and beta blocks share storage.
-  EXPECT_EQ(coefficients->block_ptr({alpha(), alpha()}).get(),
-            coefficients->block_ptr({beta(), beta()}).get());
-  EXPECT_TRUE(coefficients->block({alpha(), alpha()}).isApprox(c));
+  EXPECT_EQ(coefficients->block_ptr({axes::alpha(), axes::alpha()}).get(),
+            coefficients->block_ptr({axes::beta(), axes::beta()}).get());
+  EXPECT_TRUE(coefficients->block({axes::alpha(), axes::alpha()}).isApprox(c));
 
   auto energies = orbitals->energies();
-  EXPECT_TRUE(energies->block({alpha()}).isApprox(e));
-  EXPECT_TRUE(energies->block({beta()}).isApprox(e));
+  EXPECT_TRUE(energies->block({axes::alpha()}).isApprox(e));
+  EXPECT_TRUE(energies->block({axes::beta()}).isApprox(e));
 }
 
 TEST(OrbitalsSbtTest, UnrestrictedCoefficientsDistinct) {
@@ -65,10 +58,10 @@ TEST(OrbitalsSbtTest, UnrestrictedCoefficientsDistinct) {
 
   auto coefficients = orbitals->coefficients();
   // Unrestricted: alpha and beta blocks should be distinct.
-  EXPECT_NE(coefficients->block_ptr({alpha(), alpha()}).get(),
-            coefficients->block_ptr({beta(), beta()}).get());
-  EXPECT_TRUE(coefficients->block({alpha(), alpha()}).isApprox(ca));
-  EXPECT_TRUE(coefficients->block({beta(), beta()}).isApprox(cb));
+  EXPECT_NE(coefficients->block_ptr({axes::alpha(), axes::alpha()}).get(),
+            coefficients->block_ptr({axes::beta(), axes::beta()}).get());
+  EXPECT_TRUE(coefficients->block({axes::alpha(), axes::alpha()}).isApprox(ca));
+  EXPECT_TRUE(coefficients->block({axes::beta(), axes::beta()}).isApprox(cb));
 }
 
 TEST(OrbitalsSbtTest, ActiveInactiveVectorsReflectIndices) {
@@ -105,19 +98,19 @@ TEST(OrbitalsSbtTest, ActiveInactiveIndexSetsAreBuiltLazilyFromDenseVectors) {
   EXPECT_EQ(active.get(), orbitals->active_indices().get());
   EXPECT_EQ(inactive.get(), orbitals->inactive_indices().get());
 
-  auto active_alpha = active->indices(alpha());
-  auto active_beta = active->indices(beta());
+  auto active_alpha = active->indices(axes::alpha());
+  auto active_beta = active->indices(axes::beta());
   ASSERT_EQ(active_alpha.size(), 2u);
   ASSERT_EQ(active_beta.size(), 2u);
   EXPECT_EQ(active_alpha[0], 1u);
   EXPECT_EQ(active_alpha[1], 3u);
   EXPECT_EQ(active_beta[0], 0u);
   EXPECT_EQ(active_beta[1], 4u);
-  EXPECT_EQ(active->extents().at(alpha()), 5u);
-  EXPECT_EQ(active->extents().at(beta()), 5u);
+  EXPECT_EQ(active->extents().at(axes::alpha()), 5u);
+  EXPECT_EQ(active->extents().at(axes::beta()), 5u);
 
-  auto inactive_alpha = inactive->indices(alpha());
-  auto inactive_beta = inactive->indices(beta());
+  auto inactive_alpha = inactive->indices(axes::alpha());
+  auto inactive_beta = inactive->indices(axes::beta());
   ASSERT_EQ(inactive_alpha.size(), 1u);
   ASSERT_EQ(inactive_beta.size(), 1u);
   EXPECT_EQ(inactive_alpha[0], 0u);
@@ -136,10 +129,10 @@ TEST(OrbitalsSbtTest, IndexSetsRebuildFromSerializedDenseIndices) {
   auto inactive_from_json = restored_from_json->inactive_indices();
   ASSERT_NE(active_from_json, nullptr);
   ASSERT_NE(inactive_from_json, nullptr);
-  EXPECT_EQ(active_from_json->indices(alpha()).size(), 2u);
-  EXPECT_EQ(active_from_json->indices(beta()).size(), 2u);
-  EXPECT_EQ(inactive_from_json->indices(alpha()).size(), 1u);
-  EXPECT_EQ(inactive_from_json->indices(beta()).size(), 1u);
+  EXPECT_EQ(active_from_json->indices(axes::alpha()).size(), 2u);
+  EXPECT_EQ(active_from_json->indices(axes::beta()).size(), 2u);
+  EXPECT_EQ(inactive_from_json->indices(axes::alpha()).size(), 1u);
+  EXPECT_EQ(inactive_from_json->indices(axes::beta()).size(), 1u);
 
   const auto filename = "orbitals_sbt_index_sets.orbitals.h5";
   orbitals->to_hdf5_file(filename);
@@ -152,12 +145,12 @@ TEST(OrbitalsSbtTest, IndexSetsRebuildFromSerializedDenseIndices) {
   auto inactive_from_hdf5 = restored_from_hdf5->inactive_indices();
   ASSERT_NE(active_from_hdf5, nullptr);
   ASSERT_NE(inactive_from_hdf5, nullptr);
-  EXPECT_EQ(active_from_hdf5->indices(alpha())[0], 1u);
-  EXPECT_EQ(active_from_hdf5->indices(alpha())[1], 2u);
-  EXPECT_EQ(active_from_hdf5->indices(beta())[0], 1u);
-  EXPECT_EQ(active_from_hdf5->indices(beta())[1], 2u);
-  EXPECT_EQ(inactive_from_hdf5->indices(alpha())[0], 0u);
-  EXPECT_EQ(inactive_from_hdf5->indices(beta())[0], 0u);
+  EXPECT_EQ(active_from_hdf5->indices(axes::alpha())[0], 1u);
+  EXPECT_EQ(active_from_hdf5->indices(axes::alpha())[1], 2u);
+  EXPECT_EQ(active_from_hdf5->indices(axes::beta())[0], 1u);
+  EXPECT_EQ(active_from_hdf5->indices(axes::beta())[1], 2u);
+  EXPECT_EQ(inactive_from_hdf5->indices(axes::alpha())[0], 0u);
+  EXPECT_EQ(inactive_from_hdf5->indices(axes::beta())[0], 0u);
 }
 
 TEST(OrbitalsSbtTest, SbtNativeConstructorRoundTrips) {
@@ -172,6 +165,8 @@ TEST(OrbitalsSbtTest, SbtNativeConstructorRoundTrips) {
 
   EXPECT_TRUE(rebuilt->is_restricted());
   EXPECT_EQ(rebuilt->get_num_molecular_orbitals(), 4u);
-  EXPECT_TRUE(rebuilt->coefficients()->block({alpha(), alpha()}).isApprox(c));
-  EXPECT_TRUE(rebuilt->energies()->block({alpha()}).isApprox(e));
+  EXPECT_TRUE(rebuilt->coefficients()
+                  ->block({axes::alpha(), axes::alpha()})
+                  .isApprox(c));
+  EXPECT_TRUE(rebuilt->energies()->block({axes::alpha()}).isApprox(e));
 }

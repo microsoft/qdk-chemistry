@@ -29,17 +29,13 @@ HamiltonianContainer::HamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
-    : _orbitals(orbitals), _core_energy(core_energy), _type(type) {
+    : HamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals, one_body_integrals,
+                                       /*restricted=*/true),
+          orbitals, core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix, Eigen::MatrixXd{}),
+          type) {
   QDK_LOG_TRACE_ENTERING();
-  if (!orbitals) {
-    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
-  }
-  if (!orbitals->has_active_space()) {
-    throw std::runtime_error(
-        "Orbitals must have an active space set for HamiltonianContainer");
-  }
-  _set_one_body_integrals_container(one_body_integrals, nullptr);
-  _set_inactive_fock_container(inactive_fock_matrix, nullptr);
 }
 
 HamiltonianContainer::HamiltonianContainer(
@@ -48,29 +44,25 @@ HamiltonianContainer::HamiltonianContainer(
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
-    : _orbitals(orbitals), _core_energy(core_energy), _type(type) {
+    : HamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals_alpha,
+                                       one_body_integrals_beta,
+                                       /*restricted=*/false),
+          orbitals, core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix_alpha,
+                                       inactive_fock_matrix_beta),
+          type) {
   QDK_LOG_TRACE_ENTERING();
-  if (!orbitals) {
-    throw std::invalid_argument("Orbitals pointer cannot be nullptr");
-  }
-  if (!orbitals->has_active_space()) {
-    throw std::runtime_error(
-        "Orbitals must have an active space set for HamiltonianContainer");
-  }
-  _set_one_body_integrals_container(one_body_integrals_alpha,
-                                    &one_body_integrals_beta);
-  _set_inactive_fock_container(inactive_fock_matrix_alpha,
-                               &inactive_fock_matrix_beta);
 }
 
 HamiltonianContainer::HamiltonianContainer(
     SymmetryBlockedTensor<2> one_body, std::shared_ptr<Orbitals> orbitals,
-    double core_energy, SymmetryBlockedTensor<2> inactive_fock,
+    double core_energy,
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
     HamiltonianType type)
-    : _h1(std::make_shared<const SymmetryBlockedTensor<2>>(
+    : _one_body(std::make_shared<const SymmetryBlockedTensor<2>>(
           std::move(one_body))),
-      _inactive_fock_sbt(std::make_shared<const SymmetryBlockedTensor<2>>(
-          std::move(inactive_fock))),
+      _inactive_fock(std::move(inactive_fock)),
       _orbitals(orbitals),
       _core_energy(core_energy),
       _type(type) {
@@ -82,8 +74,6 @@ HamiltonianContainer::HamiltonianContainer(
     throw std::runtime_error(
         "Orbitals must have an active space set for HamiltonianContainer");
   }
-  _init_one_body_integrals_views();
-  _init_inactive_fock_views();
 }
 
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
@@ -92,15 +82,14 @@ HamiltonianContainer::get_one_body_integrals() const {
   if (!has_one_body_integrals()) {
     throw std::runtime_error("One-body integrals are not set");
   }
-  return std::make_tuple(std::cref(*_one_body_integrals.first),
-                         std::cref(*_one_body_integrals.second));
+  return std::make_tuple(
+      std::cref(_one_body->block({axes::alpha(), axes::alpha()})),
+      std::cref(_one_body->block({axes::beta(), axes::beta()})));
 }
 
 bool HamiltonianContainer::has_one_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return _one_body_integrals.first != nullptr &&
-         _one_body_integrals.first->rows() > 0 &&
-         _one_body_integrals.first->cols() > 0;
+  return _one_body != nullptr;
 }
 
 double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
@@ -115,12 +104,11 @@ double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
     throw std::out_of_range("Orbital index out of range");
   }
 
-  // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aa:
-      return (*_one_body_integrals.first)(i, j);
+      return _one_body->block({axes::alpha(), axes::alpha()})(i, j);
     case SpinChannel::bb:
-      return (*_one_body_integrals.second)(i, j);
+      return _one_body->block({axes::beta(), axes::beta()})(i, j);
     default:
       throw std::invalid_argument(
           "Invalid spin channel for one-body integrals");
@@ -129,11 +117,7 @@ double HamiltonianContainer::get_one_body_element(unsigned i, unsigned j,
 
 bool HamiltonianContainer::has_inactive_fock_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  bool has_alpha = _inactive_fock_matrix.first != nullptr &&
-                   _inactive_fock_matrix.first->size() > 0;
-  bool has_beta = _inactive_fock_matrix.second != nullptr &&
-                  _inactive_fock_matrix.second->size() > 0;
-  return has_alpha && has_beta;
+  return _inactive_fock != nullptr;
 }
 
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
@@ -142,7 +126,9 @@ HamiltonianContainer::get_inactive_fock_matrix() const {
   if (!has_inactive_fock_matrix()) {
     throw std::runtime_error("Inactive Fock matrix is not set");
   }
-  return {*_inactive_fock_matrix.first, *_inactive_fock_matrix.second};
+
+  return {_inactive_fock->block({axes::alpha(), axes::alpha()}),
+          _inactive_fock->block({axes::beta(), axes::beta()})};
 }
 
 const std::shared_ptr<Orbitals> HamiltonianContainer::get_orbitals() const {
@@ -187,26 +173,21 @@ void HamiltonianContainer::validate_integral_dimensions() const {
     return;
   }
 
-  // Check alpha one-body integrals
-  size_t norb_alpha = _one_body_integrals.first->rows();
-  size_t norb_alpha_cols = _one_body_integrals.first->cols();
-
-  if (norb_alpha != norb_alpha_cols) {
+  const auto& alpha_block = _one_body->block({axes::alpha(), axes::alpha()});
+  if (alpha_block.rows() != alpha_block.cols()) {
     throw std::invalid_argument(
         "Alpha one-body integrals matrix must be square");
   }
 
   // Check beta one-body integrals (if different from alpha)
-  if (_one_body_integrals.second != _one_body_integrals.first) {
-    size_t norb_beta = _one_body_integrals.second->rows();
-    size_t norb_beta_cols = _one_body_integrals.second->cols();
-
-    if (norb_beta != norb_beta_cols) {
+  if (!_one_body->all_aliased(
+          {{{axes::alpha(), axes::alpha()}, {axes::beta(), axes::beta()}}})) {
+    const auto& beta_block = _one_body->block({axes::beta(), axes::beta()});
+    if (beta_block.rows() != beta_block.cols()) {
       throw std::invalid_argument(
           "Beta one-body integrals matrix must be square");
     }
-
-    if (norb_beta != norb_alpha) {
+    if (beta_block.rows() != alpha_block.rows()) {
       throw std::invalid_argument(
           "Alpha and beta one-body integrals must have same dimensions");
     }
@@ -239,16 +220,20 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
 
   // Check one-body integrals dimensions match active space
   if (has_one_body_integrals()) {
-    if (_one_body_integrals.first->rows() != n_active_alpha) {
+    const auto& alpha_block = _one_body->block({axes::alpha(), axes::alpha()});
+    if (static_cast<size_t>(alpha_block.rows()) != n_active_alpha) {
       throw std::invalid_argument(
           "Alpha one-body integrals dimension (" +
-          std::to_string(_one_body_integrals.first->rows()) +
+          std::to_string(alpha_block.rows()) +
           ") does not match number of alpha active orbitals (" +
           std::to_string(n_active_alpha) + ")");
     }
 
-    if (_one_body_integrals.second != _one_body_integrals.first &&
-        _one_body_integrals.second->rows() != n_active_beta) {
+    if (!_one_body->all_aliased(
+            {{{axes::alpha(), axes::alpha()}, {axes::beta(), axes::beta()}}}) &&
+        static_cast<size_t>(
+            _one_body->block({axes::beta(), axes::beta()}).rows()) !=
+            n_active_beta) {
       throw std::invalid_argument(
           "Beta one-body integrals dimension does not match number of beta "
           "active orbitals");
@@ -264,151 +249,31 @@ void HamiltonianContainer::validate_active_space_dimensions() const {
 
   if (has_inactive_fock_matrix()) {
     auto nmo = _orbitals->get_num_molecular_orbitals();
-    if (_inactive_fock_matrix.first->rows() != nmo ||
-        _inactive_fock_matrix.first->cols() != nmo) {
+    const auto& alpha_fock =
+        _inactive_fock->block({axes::alpha(), axes::alpha()});
+    if (static_cast<size_t>(alpha_fock.rows()) != nmo ||
+        static_cast<size_t>(alpha_fock.cols()) != nmo) {
       throw std::invalid_argument(
           "Alpha inactive Fock matrix dimension mismatch: expected full-space "
           "(" +
           std::to_string(nmo) + " x " + std::to_string(nmo) + "), got " +
-          std::to_string(_inactive_fock_matrix.first->rows()) + " x " +
-          std::to_string(_inactive_fock_matrix.first->cols()) + ".");
+          std::to_string(alpha_fock.rows()) + " x " +
+          std::to_string(alpha_fock.cols()) + ".");
     }
 
     if (is_unrestricted()) {
-      if (_inactive_fock_matrix.second->rows() != nmo ||
-          _inactive_fock_matrix.second->cols() != nmo) {
+      const auto& beta_fock =
+          _inactive_fock->block({axes::beta(), axes::beta()});
+      if (static_cast<size_t>(beta_fock.rows()) != nmo ||
+          static_cast<size_t>(beta_fock.cols()) != nmo) {
         throw std::invalid_argument(
             "Beta inactive Fock matrix dimension mismatch: expected full-space "
             "(" +
             std::to_string(nmo) + " x " + std::to_string(nmo) + "), got " +
-            std::to_string(_inactive_fock_matrix.second->rows()) + " x " +
-            std::to_string(_inactive_fock_matrix.second->cols()) + ".");
+            std::to_string(beta_fock.rows()) + " x " +
+            std::to_string(beta_fock.cols()) + ".");
       }
     }
-  }
-}
-
-std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-HamiltonianContainer::make_restricted_one_body_integrals(
-    const Eigen::MatrixXd& integrals) {
-  QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
-  return std::make_pair(
-      shared_integrals,
-      shared_integrals);  // Both alpha and beta point to same data
-}
-
-std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-HamiltonianContainer::make_restricted_inactive_fock_matrix(
-    const Eigen::MatrixXd& matrix) {
-  QDK_LOG_TRACE_ENTERING();
-  auto shared_matrix = std::make_shared<Eigen::MatrixXd>(matrix);
-  return std::make_pair(
-      shared_matrix,
-      shared_matrix);  // Both alpha and beta point to same data
-}
-
-// ---- SBT-canonical container builders and view initialisers ----------------
-
-void HamiltonianContainer::_set_one_body_integrals_container(
-    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd* beta) {
-  if (alpha.size() == 0) {
-    // Empty h1 — set views to empty matrices (no SBT).
-    auto empty = std::make_shared<const Eigen::MatrixXd>(alpha);
-    _one_body_integrals = {
-        empty, beta ? std::make_shared<const Eigen::MatrixXd>(*beta) : empty};
-    return;
-  }
-
-  auto sym = _orbitals->symmetries();
-  auto active_indices = _orbitals->get_active_space_indices();
-  std::size_t n_active_alpha = active_indices.first.size();
-  std::size_t n_active_beta = active_indices.second.size();
-
-  SymmetryLabel alpha_label({axes::alpha()});
-  SymmetryLabel beta_label({axes::beta()});
-
-  std::unordered_map<SymmetryLabel, std::size_t> ext;
-  ext[alpha_label] = n_active_alpha;
-  ext[beta_label] = n_active_beta;
-
-  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {sym, sym};
-  SymmetryBlockedTensor<2>::ExtentsArray extents = {ext, ext};
-
-  auto alpha_block = std::make_shared<const Eigen::MatrixXd>(alpha);
-  SymmetryBlockedTensor<2>::BlockMap blocks;
-  blocks[{alpha_label, alpha_label}] = alpha_block;
-
-  if (beta != nullptr) {
-    auto beta_block = std::make_shared<const Eigen::MatrixXd>(*beta);
-    blocks[{beta_label, beta_label}] = beta_block;
-  }
-
-  _h1 = std::make_shared<const SymmetryBlockedTensor<2>>(
-      std::move(symmetries), std::move(extents), std::move(blocks));
-  _init_one_body_integrals_views();
-}
-
-void HamiltonianContainer::_set_inactive_fock_container(
-    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd* beta) {
-  if (alpha.size() == 0) {
-    // Empty inactive Fock — set views to empty matrices (no SBT).
-    auto empty = std::make_shared<const Eigen::MatrixXd>(alpha);
-    _inactive_fock_matrix = {
-        empty, beta ? std::make_shared<const Eigen::MatrixXd>(*beta) : empty};
-    return;
-  }
-
-  auto sym = _orbitals->symmetries();
-  std::size_t nmo = _orbitals->get_num_molecular_orbitals();
-
-  SymmetryLabel alpha_label({axes::alpha()});
-  SymmetryLabel beta_label({axes::beta()});
-
-  std::unordered_map<SymmetryLabel, std::size_t> ext;
-  ext[alpha_label] = nmo;
-  ext[beta_label] = nmo;
-
-  SymmetryBlockedTensor<2>::SymmetriesArray symmetries = {sym, sym};
-  SymmetryBlockedTensor<2>::ExtentsArray extents = {ext, ext};
-
-  auto alpha_block = std::make_shared<const Eigen::MatrixXd>(alpha);
-  SymmetryBlockedTensor<2>::BlockMap blocks;
-  blocks[{alpha_label, alpha_label}] = alpha_block;
-
-  if (beta != nullptr) {
-    auto beta_block = std::make_shared<const Eigen::MatrixXd>(*beta);
-    blocks[{beta_label, beta_label}] = beta_block;
-  }
-
-  _inactive_fock_sbt = std::make_shared<const SymmetryBlockedTensor<2>>(
-      std::move(symmetries), std::move(extents), std::move(blocks));
-  _init_inactive_fock_views();
-}
-
-void HamiltonianContainer::_init_one_body_integrals_views() {
-  SymmetryLabel alpha_label({axes::alpha()});
-  SymmetryLabel beta_label({axes::beta()});
-
-  _one_body_integrals.first = _h1->block_ptr({alpha_label, alpha_label});
-  if (_h1->has_block({beta_label, beta_label})) {
-    _one_body_integrals.second = _h1->block_ptr({beta_label, beta_label});
-  } else {
-    _one_body_integrals.second = _one_body_integrals.first;
-  }
-}
-
-void HamiltonianContainer::_init_inactive_fock_views() {
-  SymmetryLabel alpha_label({axes::alpha()});
-  SymmetryLabel beta_label({axes::beta()});
-
-  _inactive_fock_matrix.first =
-      _inactive_fock_sbt->block_ptr({alpha_label, alpha_label});
-  if (_inactive_fock_sbt->has_block({beta_label, beta_label})) {
-    _inactive_fock_matrix.second =
-        _inactive_fock_sbt->block_ptr({beta_label, beta_label});
-  } else {
-    _inactive_fock_matrix.second = _inactive_fock_matrix.first;
   }
 }
 
@@ -417,10 +282,10 @@ void HamiltonianContainer::_init_inactive_fock_views() {
 const SymmetryBlockedTensor<2>& HamiltonianContainer::one_body_integrals()
     const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_h1) {
+  if (!_one_body) {
     throw std::runtime_error("One-body symmetry-blocked tensor is not set.");
   }
-  return *_h1;
+  return *_one_body;
 }
 
 const Eigen::MatrixXd& HamiltonianContainer::one_body_integrals_block(
@@ -430,11 +295,11 @@ const Eigen::MatrixXd& HamiltonianContainer::one_body_integrals_block(
 
 const SymmetryBlockedTensor<2>& HamiltonianContainer::inactive_fock() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_inactive_fock_sbt) {
+  if (!_inactive_fock) {
     throw std::runtime_error(
         "Inactive Fock symmetry-blocked tensor is not set.");
   }
-  return *_inactive_fock_sbt;
+  return *_inactive_fock;
 }
 
 const Eigen::MatrixXd& HamiltonianContainer::inactive_fock_block(
@@ -524,7 +389,7 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
   };
 
   auto write_1body = [&](size_t i, size_t j) {
-    auto hel = (*_one_body_integrals.first)(i, j);
+    auto hel = _one_body->block({axes::alpha(), axes::alpha()})(i, j);
 
     formatted_line(i + 1, j + 1, 0, 0, hel);
     file << "\n";

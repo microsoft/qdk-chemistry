@@ -16,9 +16,7 @@
 
 using namespace qdk::chemistry::data;
 
-namespace {
-
-std::vector<Shell> make_shells() {
+static std::vector<Shell> make_shells() {
   std::vector<Shell> shells;
   shells.emplace_back(
       Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0}));
@@ -27,13 +25,11 @@ std::vector<Shell> make_shells() {
   return shells;
 }
 
-Structure make_structure() {
+static std::shared_ptr<Structure> make_structure() {
   Eigen::MatrixXd coords(1, 3);
   coords << 0.0, 0.0, 0.0;
-  return Structure(coords, std::vector<std::string>{"H"});
+  return std::make_shared<Structure>(coords, std::vector<std::string>{"H"});
 }
-
-}  // namespace
 
 TEST(BasisSetAoSymmetries, DefaultIsRestrictedSpin) {
   BasisSet basis("custom", make_shells());

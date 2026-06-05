@@ -1469,8 +1469,8 @@ bool CoupledClusterContainer::has_two_rdm_spin_traced() const {
   return false;
 }
 
-std::tuple<const CoupledClusterContainer::MatrixVariant&,
-           const CoupledClusterContainer::MatrixVariant&>
+std::tuple<CoupledClusterContainer::MatrixVariant,
+           CoupledClusterContainer::MatrixVariant>
 CoupledClusterContainer::get_active_one_rdm_spin_dependent() const {
   // Cannot compute RDMs from ket amplitudes alone
   throw std::runtime_error(
@@ -1479,9 +1479,9 @@ CoupledClusterContainer::get_active_one_rdm_spin_dependent() const {
       "amplitudes.");
 }
 
-std::tuple<const CoupledClusterContainer::VectorVariant&,
-           const CoupledClusterContainer::VectorVariant&,
-           const CoupledClusterContainer::VectorVariant&>
+std::tuple<CoupledClusterContainer::VectorVariant,
+           CoupledClusterContainer::VectorVariant,
+           CoupledClusterContainer::VectorVariant>
 CoupledClusterContainer::get_active_two_rdm_spin_dependent() const {
   // Cannot compute RDMs from ket amplitudes alone
   throw std::runtime_error(

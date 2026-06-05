@@ -286,8 +286,7 @@ class SymmetryBlockedSparseMap
         for (std::size_t i = 0; i < Rank; ++i) {
           idx[i] = e.at(i).template get<unsigned>();
         }
-        (*const_cast<SparseBlock*>(sparse_block.get()))[idx] =
-            e.at(Rank).template get<Scalar>();
+        (*sparse_block)[idx] = e.at(Rank).template get<Scalar>();
       }
       auto const_block =
           std::const_pointer_cast<const SparseBlock>(sparse_block);
@@ -319,5 +318,58 @@ class SymmetryBlockedSparseMap
     }
   }
 };
+
+/**
+ * @brief Build a single-channel restricted rank-4
+ * @ref SymmetryBlockedSparseMap whose @c alpha-alpha-alpha-alpha block is
+ * aliased into the @c alpha-alpha-beta-beta key (orbit aliasing on the
+ * restricted spin axis fills @c bbbb from @c aaaa and @c bbaa from @c aabb,
+ * so all four equivalent spin patterns share a single underlying block).
+ *
+ * Use for spin-restricted sparse two-electron integrals where
+ * @f$(\alpha\alpha|\alpha\alpha) = (\alpha\alpha|\beta\beta) =
+ * (\beta\beta|\beta\beta)@f$ holds physically. Mirrors the single-channel
+ * dense overload @ref make_spin_diagonal_rank4_sbt(const
+ * Eigen::MatrixBase<Derived>&).
+ *
+ * @tparam Scalar Map value type.
+ * @param block Sparse entries for the single channel; keys are per-slot
+ *           local indices, values are the integral magnitudes. Moved into
+ *           the resulting map.
+ * @param n_active Per-spin extent. The alpha and beta extents both equal
+ *           @p n_active on every slot.
+ * @return Shared pointer to the constructed sparse map, or @c nullptr when
+ *         @p block is empty.
+ */
+template <class Scalar>
+std::shared_ptr<const SymmetryBlockedSparseMap<4, Scalar>>
+make_spin_diagonal_rank4_sbsm(SparseMapBlock<4, Scalar> block,
+                              std::size_t n_active) {
+  if (block.empty()) {
+    return nullptr;
+  }
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, /*equivalent=*/true)}));
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[axes::alpha()] = n_active;
+  ext[axes::beta()] = n_active;
+
+  typename SymmetryBlockedSparseMap<4, Scalar>::SymmetriesArray symmetries = {
+      sym, sym, sym, sym};
+  typename SymmetryBlockedSparseMap<4, Scalar>::ExtentsArray extents = {
+      ext, ext, ext, ext};
+
+  auto shared_block =
+      std::make_shared<SparseMapBlock<4, Scalar>>(std::move(block));
+
+  typename SymmetryBlockedSparseMap<4, Scalar>::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()}] =
+      shared_block;
+  blocks[{axes::alpha(), axes::alpha(), axes::beta(), axes::beta()}] =
+      shared_block;
+
+  return std::make_shared<const SymmetryBlockedSparseMap<4, Scalar>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+}
 
 }  // namespace qdk::chemistry::data

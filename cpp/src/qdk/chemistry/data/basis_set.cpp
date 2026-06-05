@@ -310,6 +310,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
@@ -347,16 +348,14 @@ BasisSet::BasisSet(const std::string& name,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    std::shared_ptr<Structure> structure,
                    AOType atomic_orbital_type)
-    : BasisSet(name, shells,
-               structure ? *structure
-                         : throw std::invalid_argument(
-                               "Structure shared_ptr cannot be nullptr"),
-               nullptr, {}, atomic_orbital_type) {
+    : BasisSet(name, shells, std::move(structure), nullptr, {},
+               atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -411,6 +410,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
@@ -471,18 +471,22 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
   if (!_is_valid()) {
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
+  _init_ao_symmetries(nullptr, {});
 }
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
-                   const Structure& structure,
+                   std::shared_ptr<Structure> structure,
                    std::shared_ptr<const SymmetryProduct> ao_symmetries,
                    std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
                    AOType atomic_orbital_type)
     : _name(name),
       _atomic_orbital_type(atomic_orbital_type),
-      _structure(std::make_shared<Structure>(structure)),
+      _structure(structure),
       _ecp_name("none") {
   QDK_LOG_TRACE_ENTERING();
+  if (!structure) {
+    throw std::invalid_argument("Structure shared_ptr cannot be nullptr");
+  }
 
   // Organize shells by atom index.
   for (const auto& shell : shells) {
@@ -500,23 +504,7 @@ BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
     throw std::invalid_argument("Tried to generate invalid BasisSet");
   }
 
-  // Populate AO symmetries.
-  _ao_symmetries = std::move(ao_symmetries);
-  if (!_ao_symmetries) {
-    _ensure_ao_symmetries();
-    return;
-  }
-  if (ao_extents.empty()) {
-    const std::size_t num_ao = get_num_atomic_orbitals();
-    for (const auto& axis : _ao_symmetries->axes()) {
-      for (const auto& label : axis.labels()) {
-        _ao_extents.emplace(SymmetryLabel{label}, num_ao);
-      }
-    }
-  } else {
-    _ao_extents = std::move(ao_extents);
-  }
-  _validate_ao_symmetries();
+  _init_ao_symmetries(std::move(ao_symmetries), std::move(ao_extents));
 }
 
 std::vector<Element> BasisSet::get_supported_elements_for_basis_set(
@@ -905,27 +893,38 @@ size_t BasisSet::get_num_atomic_orbitals() const {
 
 std::shared_ptr<const SymmetryProduct> BasisSet::ao_symmetries() const {
   QDK_LOG_TRACE_ENTERING();
-  _ensure_ao_symmetries();
   return _ao_symmetries;
 }
 
 const std::unordered_map<SymmetryLabel, std::size_t>& BasisSet::ao_extents()
     const {
   QDK_LOG_TRACE_ENTERING();
-  _ensure_ao_symmetries();
   return _ao_extents;
 }
 
-void BasisSet::_ensure_ao_symmetries() const {
-  if (_ao_symmetries) {
-    return;
+void BasisSet::_init_ao_symmetries(
+    std::shared_ptr<const SymmetryProduct> ao_symmetries,
+    std::unordered_map<SymmetryLabel, std::size_t> ao_extents) {
+  if (ao_symmetries) {
+    _ao_symmetries = std::move(ao_symmetries);
+  } else {
+    _ao_symmetries = std::make_shared<const SymmetryProduct>(
+        std::vector<SymmetryAxis>{axes::spin(1, true)});
   }
-  _ao_symmetries = std::make_shared<const SymmetryProduct>(
-      std::vector<SymmetryAxis>{axes::spin(1, true)});
-  const std::size_t num_ao = get_num_atomic_orbitals();
-  _ao_extents.clear();
-  _ao_extents.emplace(SymmetryLabel{axes::alpha()}, num_ao);
-  _ao_extents.emplace(SymmetryLabel{axes::beta()}, num_ao);
+
+  if (!ao_extents.empty()) {
+    _ao_extents = std::move(ao_extents);
+  } else {
+    const std::size_t num_ao = get_num_atomic_orbitals();
+    _ao_extents.clear();
+    for (const auto& axis : _ao_symmetries->axes()) {
+      for (const auto& label : axis.labels()) {
+        _ao_extents.emplace(SymmetryLabel{label}, num_ao);
+      }
+    }
+  }
+
+  _validate_ao_symmetries();
 }
 
 void BasisSet::_validate_ao_symmetries() const {

@@ -122,7 +122,7 @@ class Orbitals : public SingleParticleBasis,
 
   /**
    * @brief Get the molecular-orbital basis coefficients as a symmetry-blocked
-   * container (SymmetryBlockedTensor accessor).
+   * container.
    * @return Shared pointer to the basis-coefficient tensor
    * @throws std::runtime_error if coefficients are not set
    */
@@ -130,7 +130,7 @@ class Orbitals : public SingleParticleBasis,
 
   /**
    * @brief Get the orbital energies as a symmetry-blocked container
-   * (SymmetryBlockedTensor accessor).
+   *.
    * @return Shared pointer to the orbital-energy tensor
    * @throws std::runtime_error if energies are not set
    */
@@ -522,24 +522,14 @@ class Orbitals : public SingleParticleBasis,
 
  protected:
   /**
-   * Canonical symmetry-blocked coefficient/energy storage (the source of
-   * truth). The dense @ref _coefficients / @ref _energies pairs below are
-   * non-owning views aliasing the blocks owned by these tensors; they hold no
-   * orbital data of their own. Both are null for @ref ModelOrbitals, which
-   * carries no basis.
+   * Canonical symmetry-blocked coefficient/energy storage. Both are null for
+   * @ref ModelOrbitals, which carries no basis.
    */
-  std::shared_ptr<const SymmetryBlockedTensor<2>> _coefficients_sbt = nullptr;
-  std::shared_ptr<const SymmetryBlockedTensor<1>> _energies_sbt = nullptr;
+  std::shared_ptr<const SymmetryBlockedTensor<2>> _coefficients = nullptr;
+  std::shared_ptr<const SymmetryBlockedTensor<1>> _energies = nullptr;
 
   /**
-   * @brief Build molecular-orbital symmetries from the current
-   * restricted/unrestricted state (fallback when no SBT is set).
-   */
-  std::shared_ptr<const SymmetryProduct> _build_mo_symmetries() const;
-
-  /**
-   * @brief Build the canonical symmetry-blocked tensors from dense spin blocks,
-   * then point the dense views at them.
+   * @brief Build the canonical symmetry-blocked tensors from dense spin blocks.
    * @param coefficients_alpha Alpha coefficient block [AO x MO] (required)
    * @param coefficients_beta Beta coefficient block [AO x MO] (ignored when
    *        @p restricted)
@@ -554,39 +544,6 @@ class Orbitals : public SingleParticleBasis,
       std::shared_ptr<const Eigen::VectorXd> energies_beta, bool restricted);
 
   /**
-   * @brief Point the dense @ref _coefficients / @ref _energies views at the
-   * blocks owned by the canonical containers (no data is copied). Leaves the
-   * views null when the corresponding container is null.
-   */
-  void _init_coefficient_views();
-
-  /**
-   * @brief Lazily build the active-space symmetry-blocked index set cache.
-   */
-  void _build_active_indices_sbt() const;
-
-  /**
-   * @brief Lazily build the inactive-space symmetry-blocked index set cache.
-   */
-  void _build_inactive_indices_sbt() const;
-
-  /**
-   * Dense views over the (alpha, beta) coefficient blocks [AO x MO], aliasing
-   * into @ref _coefficients_sbt (no independent ownership).
-   */
-  std::pair<std::shared_ptr<const Eigen::MatrixXd>,
-            std::shared_ptr<const Eigen::MatrixXd>>
-      _coefficients = {nullptr, nullptr};
-
-  /**
-   * Dense views over the (alpha, beta) orbital-energy blocks, aliasing into
-   * @ref _energies_sbt (no independent ownership).
-   */
-  std::pair<std::shared_ptr<const Eigen::VectorXd>,
-            std::shared_ptr<const Eigen::VectorXd>>
-      _energies = {nullptr, nullptr};
-
-  /**
    * Active space indices for (alpha, beta) spin channels
    */
   std::pair<std::vector<size_t>, std::vector<size_t>> _active_space_indices = {
@@ -595,8 +552,7 @@ class Orbitals : public SingleParticleBasis,
   /**
    * Active-space indices as a derived symmetry-blocked index-set view.
    */
-  mutable std::shared_ptr<const SymmetryBlockedIndexSet> _active_indices_sbt =
-      nullptr;
+  std::shared_ptr<const SymmetryBlockedIndexSet> _active_indices = nullptr;
 
   /**
    * Inactive space indices for (alpha, beta) spin channels
@@ -607,8 +563,7 @@ class Orbitals : public SingleParticleBasis,
   /**
    * Inactive-space indices as a derived symmetry-blocked index-set view.
    */
-  mutable std::shared_ptr<const SymmetryBlockedIndexSet> _inactive_indices_sbt =
-      nullptr;
+  std::shared_ptr<const SymmetryBlockedIndexSet> _inactive_indices = nullptr;
 
   /**
    * Atomic orbital overlap matrix [AO x AO]
@@ -686,7 +641,17 @@ class Orbitals : public SingleParticleBasis,
   /**
    * @brief Invalidate cached symmetry-blocked active/inactive index views.
    */
-  void _invalidate_space_index_sets();
+  /**
+   * @brief Build @ref _active_indices and @ref _inactive_indices from the
+   *        current @ref _active_space_indices and @ref _inactive_space_indices.
+   *
+   * Called by every Orbitals construction path (ctors, @c from_json,
+   * @c from_hdf5, and the @ref ModelOrbitals copy ctor / assignment operator)
+   * once @ref _active_space_indices and @ref _inactive_space_indices have
+   * been populated. The two derived containers are immutable after this
+   * helper returns.
+   */
+  void _build_space_index_sets();
 
   // Protected default constructor for use by subclasses
   Orbitals() = default;

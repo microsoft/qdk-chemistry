@@ -16,7 +16,7 @@ from qdk_chemistry.data import symmetry as sym
 @pytest.fixture
 def restricted_spin():
     """A restricted (equivalent) spin vocabulary with alpha/beta labels."""
-    syms = sym.SymmetryProduct([sym.axes.spin(0, True)])
+    syms = sym.SymmetryProduct([sym.axes.spin(1, True)])
     alpha = sym.SymmetryLabel([sym.axes.alpha()])
     beta = sym.SymmetryLabel([sym.axes.beta()])
     return syms, alpha, beta
@@ -25,7 +25,7 @@ def restricted_spin():
 @pytest.fixture
 def unrestricted_spin():
     """An unrestricted (non-equivalent) spin vocabulary with alpha/beta labels."""
-    syms = sym.SymmetryProduct([sym.axes.spin(0, False)])
+    syms = sym.SymmetryProduct([sym.axes.spin(1, False)])
     alpha = sym.SymmetryLabel([sym.axes.alpha()])
     beta = sym.SymmetryLabel([sym.axes.beta()])
     return syms, alpha, beta

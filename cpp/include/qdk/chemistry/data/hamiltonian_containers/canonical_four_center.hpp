@@ -81,7 +81,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   CanonicalFourCenterHamiltonianContainer(
       SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<4> two_body,
       std::shared_ptr<Orbitals> orbitals, double core_energy,
-      SymmetryBlockedTensor<2> inactive_fock,
+      std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -200,47 +200,16 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  protected:
-  /// SymmetryBlockedTensor-canonical two-body integrals (source of truth)
-  std::shared_ptr<const SymmetryBlockedTensor<4>> _h2;
-
-  /// Non-owning views into _h2 blocks (for v1 dense access: aaaa, aabb, bbbb)
-  std::tuple<std::shared_ptr<const Eigen::VectorXd>,
-             std::shared_ptr<const Eigen::VectorXd>,
-             std::shared_ptr<const Eigen::VectorXd>>
-      _two_body_integrals;
+  /// two-body integrals
+  std::shared_ptr<const SymmetryBlockedTensor<4>> _two_body;
 
   /// Validation helpers
   void validate_integral_dimensions() const override final;
 
   size_t get_two_body_index(size_t i, size_t j, size_t k, size_t l) const;
 
-  static std::tuple<std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>,
-                    std::shared_ptr<Eigen::VectorXd>>
-  make_restricted_two_body_integrals(const Eigen::VectorXd& integrals);
-
-  /**
-   * @brief Build the canonical two-body @ref SymmetryBlockedTensor from dense
-   * spin channels and refresh the v1 dense views.
-   *
-   * @param aaaa Dense alpha-alpha-alpha-alpha channel.
-   * @param aabb Dense alpha-alpha-beta-beta channel, or @c nullptr for
-   *             restricted (re-uses @p aaaa).
-   * @param bbbb Dense beta-beta-beta-beta channel, or @c nullptr for
-   *             restricted (re-uses @p aaaa).
-   */
-  void _set_h2_container(const Eigen::VectorXd& aaaa,
-                         const Eigen::VectorXd* aabb,
-                         const Eigen::VectorXd* bbbb);
-  /**
-   * @brief Refresh @ref _two_body_integrals dense views from the canonical
-   * @ref _h2 container (no data copy). Leaves the views null when @ref _h2
-   * is null.
-   */
-  void _init_h2_views();
-
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 };
 
 }  // namespace qdk::chemistry::data

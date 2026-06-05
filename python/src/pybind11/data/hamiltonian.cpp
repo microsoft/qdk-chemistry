@@ -926,12 +926,25 @@ Returns:
   sparse_container.def("sparse_two_body_integrals",
                        &SparseHamiltonianContainer::sparse_two_body_integrals,
                        R"(
-Direct access to the sparse two-body integral map.
+Deprecated: use two_body_integrals_sparse() for SymmetryBlockedSparseMap access.
 
 Returns:
-    dict[tuple[int,int,int,int], float]: Sparse two-body integral map.
-)",
-                       py::return_value_policy::reference_internal);
+    dict[tuple[int,int,int,int], float]: Sparse two-body integral map,
+    reconstructed from the canonical SymmetryBlockedSparseMap block.
+)");
+
+  sparse_container.def("two_body_integrals_sparse",
+                       &SparseHamiltonianContainer::two_body_integrals_sparse,
+                       py::return_value_policy::reference_internal,
+                       R"(
+Two-body integrals as a rank-4 symmetry-blocked sparse map.
+
+Returns:
+    SymmetryBlockedSparseMapRank4: The two-body sparse SBT.
+
+Raises:
+    RuntimeError: If two-body integrals are not set.
+)");
 
   sparse_container.def("one_body_element",
                        &SparseHamiltonianContainer::one_body_element, R"(
