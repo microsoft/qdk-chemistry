@@ -233,8 +233,8 @@ the Zassenhaus formula is
    e^{A_1} e^{A_2} \cdots e^{A_\Gamma}
    e^{C_2} e^{C_3} \cdots,
 
-where each :math:`C_n` is a homogeneous nested-commutator polynomial of degree
-:math:`n`.  For two groups,
+where each :math:`C_n` is a homogeneous nested-commutator Lie polynomial of degree
+:math:`n`, which can be computed recursively (see :cite:`Wilcox1967` and :cite:`Casas2012`). For two groups,
 
 .. math::
 
