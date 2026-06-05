@@ -4,14 +4,12 @@ References:
     Childs, A. M., et al. "Theory of Trotter Error with Commutator
     Scaling." *Physical Review X* 11.1 (2021): 011020.
 
-    Strang, G. "On the construction and comparison of difference
-    schemes." SIAM Journal on Numerical Analysis 5.3 (1968): 506-517.
-
-    Suzuki, M. "General theory of higher-order decomposition of
-    exponential operators and symplectic integrators."
-    Physics Letters A 165.5-6 (1992): 387-395.
-
 """
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -47,18 +45,18 @@ class ZassenhausSettings(TimeEvolutionSettings):
     """Settings for the Zassenhaus decomposition builder."""
 
     def __init__(self):
-        """Initialize TrotterSettings with default values.
+        """Initialize ZassenhausSettings with default values.
 
         Attributes:
             order: The order of the Zassenhaus decomposition.
             target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).
-            num_divisions: Explicit number of divisions used for the Zassenhaus expansion (0 means automatic).
+            num_divisions: Explicit number of repeated Zassenhaus time slices (0 means automatic).
             error_bound: Strategy for computing the Zassenhaus error bound ("commutator" or "naive").
             weight_threshold: The absolute threshold for filtering small coefficients.
 
         """
         super().__init__()
-        self._set_default("order", "int", 1, "The order of the Trotter decomposition.")
+        self._set_default("order", "int", 1, "The order of the Zassenhaus decomposition.")
         self._set_default(
             "target_accuracy",
             "double",
@@ -69,13 +67,13 @@ class ZassenhausSettings(TimeEvolutionSettings):
             "num_divisions",
             "int",
             0,
-            "Explicit number of divisions within a Trotter step (0 means automatic).",
+            "Explicit number of repeated Zassenhaus time slices (0 means automatic).",
         )
         self._set_default(
             "error_bound",
             "string",
             "commutator",
-            "Strategy for computing the Trotter error bound ('commutator' or 'naive').",
+            "Strategy for computing the Zassenhaus error bound ('commutator' or 'naive').",
             ["commutator", "naive"],
         )
         self._set_default(
@@ -100,7 +98,54 @@ class Zassenhaus(TimeEvolutionBuilder):
     ):
         r"""Initialize Zassenhaus builder with specified Zassenhaus decomposition settings.
 
-        TODO: populate docstring
+        The Zassenhaus decomposition approximates the time evolution operator :math:`e^{-iHt}`
+        when the Hamiltonian :math:`H` can be expressed as a sum of terms :math:`H = \sum_j \alpha_j P_j`
+        where :math:`P_j` are Pauli strings and :math:`\alpha_j` are scalar coefficients. Rather than
+        exponentiating the full Hamiltonian at once, the Zassenhaus method constructs an approximation by
+        exponentiating ordered Hamiltonian groups and then adding nested-commutator correction exponentials.
+        For example, the first-order Zassenhaus formula approximates the time evolution operator as
+
+        :math:`e^{-iHt} \approx Z_1^N(t) = \left[\prod_j e^{-i\alpha_j P_j t/N}\right]^N`, where :math:`N` is the
+        number of divisions.
+
+        Higher-order Zassenhaus formulas include correction exponents :math:`C_2, \ldots, C_k`, so that the
+        order-:math:`k` single-step formula keeps generated nested-commutator terms through :math:`C_k`.
+
+        The number of divisions *N* can be determined automatically from
+        *target_accuracy*, fixed explicitly via *num_divisions*, or both
+        (in which case the larger value is used).
+
+        The error associated with the Zassenhaus decomposition, :math:`Z_k^N(t)`, can be expressed in terms of the
+        spectral norm of the difference between the exact and approximate time evolution operators:
+
+        :math:`\lVert e^{-iHt} - Z_k^N(t) \rVert \leq \epsilon`
+
+        However, the cost of computing this norm is equivalent to computing the exact exponential itself. For this
+        reason, we provide two approximate error-bound strategies to determine the number of divisions required to
+        achieve a target accuracy at a particular Zassenhaus order (used only when *target_accuracy* is set):
+
+        * ``"commutator"`` (default, tighter): evaluates the first omitted
+          Zassenhaus exponent on the actual Pauli terms.
+          :math:`N = \lceil \beta_{k+1}^{1/k}|t|^{1+1/k}/\epsilon^{1/k} \rceil`
+        * ``"naive"``: uses the triangle-inequality bound based on the symbolic
+          coefficient sum of the first omitted exponent and the Hamiltonian coefficient 1-norm.
+          :math:`N = \lceil (\kappa_{k+1}2^k\lVert H\rVert_1^{k+1})^{1/k}|t|^{1+1/k}/\epsilon^{1/k} \rceil`
+
+        When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated
+        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the builder consumes it
+        directly for schedule-level grouping.  When no partition is present, each Pauli term
+        is exponentiated as its own group.
+
+        Args:
+            order: Zassenhaus decomposition order. Defaults to 1.
+            time: The evolution time. Defaults to 0.0.
+            target_accuracy: Target accuracy for auto step computation. Use 0.0 (default) to disable.
+            num_divisions: Repeated Zassenhaus time slices. Max of this and auto value is used. Defaults to 0.
+            error_bound: Error bound strategy: ``"commutator"`` (default) or ``"naive"``.
+            weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
+            power: The power to raise the unitary to. Defaults to 1.
+            power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
+
         """
         super().__init__()
         self._settings = ZassenhausSettings()
@@ -114,13 +159,13 @@ class Zassenhaus(TimeEvolutionBuilder):
         self._settings.set("weight_threshold", weight_threshold)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
-        """Construct the unitary representation using Trotter decomposition.
+        """Construct the unitary representation using Zassenhaus decomposition.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
 
         Returns:
-            UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
+            UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
 
         """
         effective_time, power_repetitions = self._resolve_power()
@@ -134,9 +179,25 @@ class Zassenhaus(TimeEvolutionBuilder):
     def _zassenhaus(
         self, qubit_hamiltonian: QubitHamiltonian, time: float, power_repetitions: int = 1
     ) -> UnitaryRepresentation:
-        r"""Construct the unitary representation using the Trotter decomposition.
+        r"""Construct the unitary representation using the Zassenhaus decomposition.
 
-        TODO: populate docstring
+        The First Order Zassenhaus method approximates the time evolution operator :math:`e^{-iHt}`
+        by decomposing the Hamiltonian H into ordered groups and using the product formula:
+        :math:`e^{-iHt} \approx \left[\prod_i e^{-iH_i t/n}\right]^n`, where n is the number of divisions.
+
+        Higher order Zassenhaus methods include generated correction exponents
+        :math:`C_2, \ldots, C_k` built from nested commutators of the ordered Hamiltonian groups.  The
+        order-:math:`k` single-step formula is compiled for :math:`t/n` and repeated n times.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian to be used in the construction.
+            time: The total evolution time.
+            power_repetitions: Number of times the full Zassenhaus product is repeated
+                (used by the "repeat" power strategy). Defaults to 1.
+
+        Returns:
+            UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
+
         """
         weight_threshold = self._settings.get("weight_threshold")
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time)
@@ -439,13 +500,12 @@ class Zassenhaus(TimeEvolutionBuilder):
         qubit_hamiltonian: QubitHamiltonian,
         partition: TermPartition,
     ) -> list[list[QubitHamiltonian]]:
-        """Materialise a :class:`TermPartition` into Trotter sub-groups.
+        """Materialise a :class:`TermPartition` into Zassenhaus sub-groups.
 
         Both :class:`~qdk_chemistry.data.LayeredPartition` and
-        :class:`~qdk_chemistry.data.FlatPartition` are supported. A flat
-        partition's groups are treated as single layers. Groups are sorted by
-        ascending layer count to be consistent with the Suzuki-Trotter decomposition.
-        
+        :class:`~qdk_chemistry.data.FlatPartition` are supported, similar to
+        `Trotter`.
+
         Args:
             qubit_hamiltonian: Source Hamiltonian whose Pauli terms the partition indexes into.
             partition: Index-based partition carried on ``qubit_hamiltonian``.
@@ -485,19 +545,9 @@ class Zassenhaus(TimeEvolutionBuilder):
         # Drop empty groups (no layers / all layers empty).
         groups = [g for g in groups if g]
 
-        # Sort groups by ascending layer count (to be consistent with Suzuki-Trotter groupings)
+        # Sort groups by ascending layer count for deterministic product-formula ordering.
         groups.sort(key=len)
         return groups
-
-    # def _sum_group(self, group: list[QubitHamiltonian]) -> QubitHamiltonian:
-    #     """Return one Hamiltonian containing all layers in a Zassenhaus group."""
-    #     if not group:
-    #         raise ValueError("Cannot build a Zassenhaus group from an empty list of Hamiltonians.")
-
-    #     total = group[0]
-    #     for subgroup in group[1:]:
-    #         total = total + subgroup
-    #     return total
 
     def _exponentiate_commuting(
         self,

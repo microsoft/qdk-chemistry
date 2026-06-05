@@ -3,9 +3,14 @@ r"""Zassenhaus error bound estimation for accuracy-aware parameterization.
 This module provides functions to compute the number of Zassenhaus steps
 required to achieve a target accuracy for product-formula decompositions.
 
-The naive triangle-inequality bound is implemented first. A tighter
-commutator-aware bound will be added separately once the generated
-Zassenhaus commutator terms are evaluated for error estimation.
+Two bounds are offered:
+
+* **naive** - uses the Hamiltonian coefficient 1-norm and the absolute
+  symbolic coefficient sum of the first omitted Zassenhaus exponent.
+
+* **commutator** (tighter) - evaluates the first omitted Zassenhaus exponent
+  as an explicit nested-commutator expression over the Hamiltonian Pauli
+  terms, so commuting terms and cancellations reduce the estimated step count.
 
 References:
     Childs, A. M., et al. "Theory of Trotter Error with Commutator
@@ -17,15 +22,19 @@ References:
 from __future__ import annotations
 
 import math
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
+import numpy as np
+
+from qdk_chemistry.utils.pauli_commutation import commutator
 from qdk_chemistry.utils.zassenhaus_generation import zassenhaus_commutator_plan
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
     from qdk_chemistry.data import QubitHamiltonian
-    from qdk_chemistry.utils.zassenhaus_generation import PlanExpr
+    from qdk_chemistry.utils.zassenhaus_generation import PlanExpr, PlanTerm
 
 __all__: list[str] = [
     "zassenhaus_steps_commutator",
@@ -63,6 +72,88 @@ def _zassenhaus_coefficient_sum(
         )
 
     return float(sum(abs(coeff) for coeff in commutator_exponents[omitted_order].values()))
+
+
+def _combine_hamiltonian_terms(
+    terms: Mapping[str, complex],
+    *,
+    num_qubits: int,
+    weight_threshold: float,
+) -> QubitHamiltonian:
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    filtered = [(label, coeff) for label, coeff in terms.items() if abs(coeff) > weight_threshold]
+    if not filtered:
+        return QubitHamiltonian(["I" * num_qubits], np.array([0.0], dtype=complex))
+
+    labels, coefficients = zip(*filtered, strict=True)
+    return QubitHamiltonian(list(labels), np.asarray(coefficients, dtype=complex))
+
+
+def _hamiltonian_one_norm(hamiltonian: QubitHamiltonian, *, weight_threshold: float) -> float:
+    terms: dict[str, complex] = defaultdict(complex)
+    for label, coeff in zip(hamiltonian.pauli_strings, hamiltonian.coefficients, strict=True):
+        terms[label] += complex(coeff)
+    return float(sum(abs(coeff) for coeff in terms.values() if abs(coeff) > weight_threshold))
+
+
+def _zassenhaus_omitted_commutator_norm(
+    hamiltonian: QubitHamiltonian,
+    *,
+    order: int,
+    weight_threshold: float,
+) -> float:
+    r"""Return a Pauli 1-norm bound for the first omitted Zassenhaus exponent.
+
+    The returned value bounds ``||C_{order + 1}(-i H_1, ..., -i H_m)||``.
+    Multiplication by powers of ``-i`` does not change the norm, so the
+    Hamiltonian commutator DAG can be evaluated directly and scaled by the
+    symbolic Zassenhaus coefficients.
+    """
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    if len(real_terms) < 2:
+        return 0.0
+
+    omitted_order = order + 1
+    leaves = tuple(range(len(real_terms)))
+    commutator_exponents, plan = zassenhaus_commutator_plan(leaves, max_order=omitted_order)
+
+    exponent = commutator_exponents[omitted_order]
+    if not exponent:
+        return 0.0
+
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    leaf_hamiltonians: dict[int, QubitHamiltonian] = {
+        idx: QubitHamiltonian([label], np.asarray([coeff], dtype=complex))
+        for idx, (label, coeff) in enumerate(real_terms)
+    }
+    cache: dict[PlanTerm, QubitHamiltonian] = {}
+
+    def evaluate(ref: PlanTerm) -> QubitHamiltonian:
+        if isinstance(ref, int):
+            return leaf_hamiltonians[ref]
+
+        if ref not in plan:
+            raise TypeError(f"Unexpected Zassenhaus plan reference: {ref!r}.")
+
+        if ref not in cache:
+            left, right = plan[ref]
+            cache[ref] = commutator(evaluate(left), evaluate(right))
+        return cache[ref]
+
+    combined_terms: dict[str, complex] = defaultdict(complex)
+    for ref, symbolic_coeff in exponent.items():
+        contribution = evaluate(ref)
+        for label, coeff in zip(contribution.pauli_strings, contribution.coefficients, strict=True):
+            combined_terms[label] += complex(symbolic_coeff) * complex(coeff)
+
+    omitted_hamiltonian = _combine_hamiltonian_terms(
+        combined_terms,
+        num_qubits=hamiltonian.num_qubits,
+        weight_threshold=weight_threshold,
+    )
+    return _hamiltonian_one_norm(omitted_hamiltonian, weight_threshold=weight_threshold)
 
 
 def zassenhaus_steps_naive(
@@ -151,9 +242,53 @@ def zassenhaus_steps_commutator(
     order: int = 1,
     weight_threshold: float = 1e-12,
 ) -> int:
-    """Compute Zassenhaus steps using a commutator bound.
+    r"""Compute Zassenhaus steps using a commutator-aware bound.
 
-    This tighter bound is intentionally left for the commutator-aware
-    implementation. Use :func:`zassenhaus_steps_naive` for now.
+    An order-``p`` Zassenhaus formula keeps exponents through ``C_p``.  The
+    leading local remainder is the omitted exponent ``C_{p+1}``.  This bound
+    evaluates that omitted exponent as an actual nested-commutator expression
+    over the Hamiltonian's Pauli terms, rather than replacing every commutator
+    by a worst-case triangle-inequality estimate.  If
+    ``beta = ||C_{p+1}(-iH_1, ..., -iH_m)||`` is bounded by the Pauli
+    coefficient 1-norm, then ``N`` time slices give
+
+    .. math::
+
+        \epsilon \le \frac{\beta |t|^{p+1}}{N^p}.
+
+    Args:
+        hamiltonian: The qubit Hamiltonian to simulate.
+        time: The total evolution time *t*.
+        target_accuracy: The target accuracy :math:`\epsilon > 0`.
+        order: The order of the Zassenhaus formula.
+        weight_threshold: Absolute threshold below which coefficients are discarded.
+
+    Returns:
+        The minimum number of Zassenhaus steps (at least 1).
+
+    Raises:
+        ValueError: If ``target_accuracy`` is not positive or ``order`` is not positive.
+
     """
-    raise NotImplementedError("Zassenhaus commutator step estimation is not implemented yet.")
+    if target_accuracy <= 0:
+        raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
+    if order < 1:
+        raise ValueError(f"Zassenhaus order must be positive, got {order}.")
+
+    omitted_norm = _zassenhaus_omitted_commutator_norm(
+        hamiltonian,
+        order=order,
+        weight_threshold=weight_threshold,
+    )
+
+    if omitted_norm == 0.0 or time == 0.0:
+        return 1
+
+    return max(
+        1,
+        math.ceil(
+            omitted_norm ** (1 / order)
+            * abs(time) ** (1 + 1 / order)
+            / (target_accuracy ** (1 / order))
+        ),
+    )
