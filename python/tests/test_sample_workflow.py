@@ -23,6 +23,8 @@ from pathlib import Path
 
 import pytest
 
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+
 # Optional dependencies for notebook execution
 try:
     import nbformat
@@ -245,6 +247,10 @@ def test_factory_list():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT,
+    reason="Qiskit dependencies not available",
+)
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
@@ -268,6 +274,10 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT,
+    reason="Qiskit dependencies not available",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""

@@ -52,7 +52,23 @@ class QiskitAerSimulatorSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("seed", "int", 42)
-        self._set_default("method", "string", "statevector")
+        self._set_default(
+            "method",
+            "string",
+            "statevector",
+            "Aer simulation method",
+            [
+                "automatic",
+                "statevector",
+                "density_matrix",
+                "stabilizer",
+                "extended_stabilizer",
+                "matrix_product_state",
+                "unitary",
+                "superop",
+                "tensor_network",
+            ],
+        )
         self._set_default("transpile_optimization_level", "int", 0)
         self._set_default("device_backend_name", "string", "", "Name of a fake device backend for noise modeling.")
         self._set_default(

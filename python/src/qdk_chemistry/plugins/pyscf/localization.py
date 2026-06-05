@@ -69,9 +69,21 @@ class PyscfLocalizerSettings(Settings):
         """Initialize the localization object with default parameters."""
         Logger.trace_entering()
         super().__init__()
-        self._set_default("method", "string", "pipek-mezey")
+        self._set_default(
+            "method",
+            "string",
+            "pipek-mezey",
+            "Localization algorithm",
+            ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"],
+        )
         self._set_default("occupation_threshold", "double", 1e-10)
-        self._set_default("population_method", "string", "mulliken")
+        self._set_default(
+            "population_method",
+            "string",
+            "mulliken",
+            "Population analysis for Pipek-Mezey localization",
+            ["mulliken", "lowdin", "meta_lowdin", "becke"],
+        )
 
 
 class PyscfLocalizer(OrbitalLocalizer):
