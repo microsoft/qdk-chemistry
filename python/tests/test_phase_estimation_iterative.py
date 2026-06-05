@@ -21,6 +21,7 @@ from qdk_chemistry.data import (
     QubitHamiltonian,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.phase import (
     accumulated_phase_from_bits,
     energy_from_phase,
@@ -111,29 +112,35 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     )
 
 
-def create_iterative_circuit_builder_algorithm_ref(num_bits: int, evolution_time: float) -> AlgorithmRef:
-    """Return the default iterative circuit builder instance."""
+def _make_iterative_circuit_builder_ref(builder_name: str, num_bits: int, evolution_time: float) -> AlgorithmRef:
+    """Return an iterative circuit builder AlgorithmRef for the given builder name."""
     return AlgorithmRef(
         "qpe_circuit_builder",
-        "qdk_iterative",
+        builder_name,
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
     )
 
 
-def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
+def create_iterative_circuit_builder_algorithm_ref(num_bits: int, evolution_time: float) -> AlgorithmRef:
+    """Return the default iterative circuit builder instance."""
+    return _make_iterative_circuit_builder_ref("qdk_iterative", num_bits, evolution_time)
+
+
+def _run_iterative(problem: PhaseEstimationProblem, builder_name: str = "qdk_iterative") -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
+        builder_name: The circuit builder to use ("qdk_iterative" or "qiskit_iterative").
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
 
     """
     state_prep_circuit = problem.state_prep
-    circuit_builder = create_iterative_circuit_builder_algorithm_ref(problem.num_bits, problem.evolution_time)
+    circuit_builder = _make_iterative_circuit_builder_ref(builder_name, problem.num_bits, problem.evolution_time)
     iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
     iqpe.settings().set(
@@ -224,9 +231,24 @@ def _resolve_phase_ambiguity(
     return phase_fraction_candidates[index], energies[index]
 
 
-def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
+# Parametrize over both qdk_iterative and qiskit_iterative builders
+_builder_params = [
+    pytest.param("qdk_iterative", id="qdk_iterative"),
+    pytest.param(
+        "qiskit_iterative",
+        id="qiskit_iterative",
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+    ),
+]
+
+
+@pytest.mark.parametrize("builder_name", _builder_params)
+def test_iterative_phase_estimation_extracts_phase_and_energy(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+    builder_name: str,
+) -> None:
     """Verify the iterative algorithm recovers the expected phase and energy."""
-    result = _run_iterative(two_qubit_phase_problem)
+    result = _run_iterative(two_qubit_phase_problem, builder_name)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
     )
@@ -246,11 +268,13 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
     )
 
 
+@pytest.mark.parametrize("builder_name", _builder_params)
 def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     four_qubit_phase_problem: PhaseEstimationProblem,
+    builder_name: str,
 ) -> None:
     """Validate phase and energy estimates on the documented four-qubit case."""
-    result = _run_iterative(four_qubit_phase_problem)
+    result = _run_iterative(four_qubit_phase_problem, builder_name)
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
     )
