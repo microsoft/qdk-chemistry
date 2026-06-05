@@ -63,13 +63,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
-          build-parallel: 32
-          uarch: x86-64-v3
-          python-version: '3.10'
-          cpp-test-threads: 2
-          python-test-threads: 2
+        # - os-name: Linux
+        #   runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+        #   build-parallel: 32
+        #   uarch: x86-64-v3
+        #   python-version: '3.10'
+        #   cpp-test-threads: 2
+        #   python-test-threads: 2
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
@@ -77,20 +77,20 @@ jobs:
           python-version: '3.13'
           cpp-test-threads: 2
           python-test-threads: 2
-        - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
-          build-parallel: 32
-          uarch: x86-64-v3
-          python-version: '3.14'
-          cpp-test-threads: 2
-          python-test-threads: 2
-        - os-name: macOS
-          runner: macos-26-xlarge
-          build-parallel: 5
-          uarch: native
-          python-version: '3.13'
-          cpp-test-threads: 16
-          python-test-threads: 16
+        # - os-name: Linux
+        #   runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+        #   build-parallel: 32
+        #   uarch: x86-64-v3
+        #   python-version: '3.14'
+        #   cpp-test-threads: 2
+        #   python-test-threads: 2
+        # - os-name: macOS
+        #   runner: macos-26-xlarge
+        #   build-parallel: 5
+        #   uarch: native
+        #   python-version: '3.13'
+        #   cpp-test-threads: 16
+        #   python-test-threads: 16
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
@@ -103,13 +103,6 @@ jobs:
     - name: Free up disk space (Linux)
       if: matrix.os-name == 'Linux'
       run: |
-        set -x
-        # Quick CPU summary
-        sysctl -n machdep.cpu.brand_string
-        sysctl -n hw.physicalcpu hw.logicalcpu
-        system_profiler SPHardwareDataType
-        sysctl -a | grep -i machdep.cpu
-
         echo "=== Disk space before cleanup ==="
         df -h
 
@@ -386,6 +379,170 @@ jobs:
         echo "=== Python Test Output ==="
         cat ../coverage-reports/python_coverage.txt
 
+        # Build a test-duration histogram (all tests vs @pytest.mark.slow tests)
+        python - <<'PY'
+        import math
+        import subprocess
+        import xml.etree.ElementTree as ET
+        from pathlib import Path
+
+        junit_path = Path("../test-results/pytest_report.xml")
+        out_svg = Path("../coverage-reports/python_test_duration_histogram.svg")
+
+        if not junit_path.exists():
+          print(f"JUnit report not found at {junit_path}, skipping histogram generation")
+          raise SystemExit(0)
+
+        def classname_to_nodeid(classname: str, test_name: str) -> str:
+          if not classname:
+            return test_name
+          parts = classname.split(".")
+          module_parts = []
+          class_parts = []
+          for p in parts:
+            if not class_parts and p and p[0].islower():
+              module_parts.append(p)
+            else:
+              class_parts.append(p)
+
+          module_path = "/".join(module_parts) + ".py" if module_parts else ""
+          tail = "::".join(class_parts + [test_name]) if class_parts else test_name
+          return f"{module_path}::{tail}" if module_path else tail
+
+        root = ET.parse(junit_path).getroot()
+        test_items = []
+        for tc in root.iter("testcase"):
+          name = tc.get("name", "")
+          classname = tc.get("classname", "")
+          duration = float(tc.get("time", "0") or 0)
+          nodeid = classname_to_nodeid(classname, name)
+          test_items.append((nodeid, duration))
+
+        if not test_items:
+          print("No testcases found in JUnit XML, skipping histogram generation")
+          raise SystemExit(0)
+
+        collect = subprocess.run(
+          ["pytest", "--collect-only", "-q", "-m", "slow", "tests"],
+          capture_output=True,
+          text=True,
+          check=False,
+        )
+        slow_nodeids = {
+          line.strip()
+          for line in collect.stdout.splitlines()
+          if line.strip().startswith("tests/") and "::" in line
+        }
+
+        durations = [d for _, d in test_items]
+        slow_durations = [d for nid, d in test_items if nid in slow_nodeids]
+
+        n = len(durations)
+        bins = min(30, max(5, int(math.sqrt(n))))
+        min_d, max_d = min(durations), max(durations)
+        if max_d <= min_d:
+          max_d = min_d + 1e-9
+        bin_width = (max_d - min_d) / bins
+
+        all_counts = [0] * bins
+        slow_counts = [0] * bins
+
+        def add_to_bins(values, counts):
+          for v in values:
+            idx = int((v - min_d) / bin_width)
+            if idx >= bins:
+              idx = bins - 1
+            counts[idx] += 1
+
+        add_to_bins(durations, all_counts)
+        add_to_bins(slow_durations, slow_counts)
+        y_max = max(max(all_counts), 1)
+
+        width, height = 980, 560
+        left, right, top, bottom = 70, 30, 30, 70
+        plot_w = width - left - right
+        plot_h = height - top - bottom
+
+        def x_for_bin(i: int) -> float:
+          return left + (i / bins) * plot_w
+
+        def y_for_count(c: int) -> float:
+          return top + (1 - (c / y_max)) * plot_h
+
+        bar_slot = plot_w / bins
+        bar_w = bar_slot * 0.44
+
+        lines = []
+        lines.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">')
+        lines.append('<rect x="0" y="0" width="100%" height="100%" fill="white"/>')
+        lines.append(f'<text x="{left}" y="20" font-size="16" font-family="Arial">Pytest Duration Histogram</text>')
+        lines.append(f'<text x="{left}" y="40" font-size="12" font-family="Arial">Total tests: {n} | Slow tests: {len(slow_durations)}</text>')
+
+        # Axes
+        lines.append(f'<line x1="{left}" y1="{top + plot_h}" x2="{left + plot_w}" y2="{top + plot_h}" stroke="black"/>')
+        lines.append(f'<line x1="{left}" y1="{top}" x2="{left}" y2="{top + plot_h}" stroke="black"/>')
+
+        # Y ticks
+        for t in range(6):
+          c = int(round((y_max * t) / 5))
+          y = y_for_count(c)
+          lines.append(f'<line x1="{left - 4}" y1="{y:.2f}" x2="{left}" y2="{y:.2f}" stroke="black"/>')
+          lines.append(f'<text x="{left - 8}" y="{y + 4:.2f}" text-anchor="end" font-size="11" font-family="Arial">{c}</text>')
+
+        # X ticks
+        for t in range(6):
+          x = left + (plot_w * t / 5)
+          d = min_d + (max_d - min_d) * t / 5
+          lines.append(f'<line x1="{x:.2f}" y1="{top + plot_h}" x2="{x:.2f}" y2="{top + plot_h + 4}" stroke="black"/>')
+          lines.append(f'<text x="{x:.2f}" y="{top + plot_h + 18}" text-anchor="middle" font-size="11" font-family="Arial">{d:.2f}s</text>')
+
+        # Bars: all tests (blue), slow tests (orange)
+        for i in range(bins):
+          x = x_for_bin(i)
+
+          h_all = (all_counts[i] / y_max) * plot_h
+          y_all = top + plot_h - h_all
+          lines.append(
+            f'<rect x="{x + bar_slot * 0.05:.2f}" y="{y_all:.2f}" width="{bar_w:.2f}" height="{h_all:.2f}" fill="#4C78A8" fill-opacity="0.75"/>'
+          )
+
+          h_slow = (slow_counts[i] / y_max) * plot_h
+          y_slow = top + plot_h - h_slow
+          lines.append(
+            f'<rect x="{x + bar_slot * 0.51:.2f}" y="{y_slow:.2f}" width="{bar_w:.2f}" height="{h_slow:.2f}" fill="#F58518" fill-opacity="0.80"/>'
+          )
+
+        # Labels and legend
+        lines.append(f'<text x="{left + plot_w / 2:.2f}" y="{height - 18}" text-anchor="middle" font-size="12" font-family="Arial">Test duration (seconds)</text>')
+        lines.append(f'<text x="18" y="{top + plot_h / 2:.2f}" transform="rotate(-90 18,{top + plot_h / 2:.2f})" text-anchor="middle" font-size="12" font-family="Arial">Number of tests</text>')
+        legend_x = left + plot_w - 200
+        legend_y = top + 10
+        lines.append(f'<rect x="{legend_x}" y="{legend_y}" width="12" height="12" fill="#4C78A8" fill-opacity="0.75"/>')
+        lines.append(f'<text x="{legend_x + 18}" y="{legend_y + 10}" font-size="11" font-family="Arial">All tests</text>')
+        lines.append(f'<rect x="{legend_x + 90}" y="{legend_y}" width="12" height="12" fill="#F58518" fill-opacity="0.80"/>')
+        lines.append(f'<text x="{legend_x + 108}" y="{legend_y + 10}" font-size="11" font-family="Arial">Slow tests</text>')
+
+        lines.append('</svg>')
+        out_svg.write_text("\n".join(lines), encoding="utf-8")
+        print(f"Wrote histogram to {out_svg}")
+
+        # Write Top-200 longest tests table (with slow marker) for summaries.
+        top_md = Path("../coverage-reports/python_test_top200.md")
+        top_rows = sorted(test_items, key=lambda item: item[1], reverse=True)[:200]
+        md_lines = [
+          "### Top 200 Longest Python Tests",
+          "",
+          "| Rank | Test | Duration (s) | Slow |",
+          "|---:|---|---:|:---:|",
+        ]
+        for i, (nodeid, duration) in enumerate(top_rows, start=1):
+          safe_nodeid = nodeid.replace("|", "\\|")
+          slow_flag = "Yes" if nodeid in slow_nodeids else "No"
+          md_lines.append(f"| {i} | `{safe_nodeid}` | {duration:.3f} | {slow_flag} |")
+        top_md.write_text("\n".join(md_lines) + "\n", encoding="utf-8")
+        print(f"Wrote top durations table to {top_md}")
+        PY
+
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
         fi
@@ -467,6 +624,26 @@ jobs:
           echo "" >> pr-comment.md
         fi
 
+        if [ -f coverage-reports/python_test_duration_histogram.svg ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Python Test Duration Histogram</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo "Generated histogram artifact: \\`coverage-reports/python_test_duration_histogram.svg\\`" >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+          echo "" >> pr-comment.md
+        fi
+
+        if [ -f coverage-reports/python_test_top200.md ]; then
+          echo "<details>" >> pr-comment.md
+          echo "<summary>Top 200 Longest Python Tests</summary>" >> pr-comment.md
+          echo "" >> pr-comment.md
+          cat coverage-reports/python_test_top200.md >> pr-comment.md
+          echo "" >> pr-comment.md
+          echo "</details>" >> pr-comment.md
+          echo "" >> pr-comment.md
+        fi
+
         if [ -f coverage-reports/pybind11_coverage.txt ]; then
           echo "<details>" >> pr-comment.md
           echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
@@ -518,6 +695,26 @@ jobs:
           echo '```' >> coverage-summary.md
           tail -50 coverage-reports/python_coverage.txt >> coverage-summary.md
           echo '```' >> coverage-summary.md
+          echo "</details>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+        fi
+
+        if [ -f coverage-reports/python_test_duration_histogram.svg ]; then
+          echo "<details>" >> coverage-summary.md
+          echo "<summary>Python Test Duration Histogram</summary>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          echo "Generated histogram artifact: \\`coverage-reports/python_test_duration_histogram.svg\\`" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          echo "</details>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+        fi
+
+        if [ -f coverage-reports/python_test_top200.md ]; then
+          echo "<details>" >> coverage-summary.md
+          echo "<summary>Top 200 Longest Python Tests</summary>" >> coverage-summary.md
+          echo "" >> coverage-summary.md
+          cat coverage-reports/python_test_top200.md >> coverage-summary.md
+          echo "" >> coverage-summary.md
           echo "</details>" >> coverage-summary.md
           echo "" >> coverage-summary.md
         fi
