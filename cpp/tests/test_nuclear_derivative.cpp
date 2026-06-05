@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <memory>
+#include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -24,6 +25,8 @@ namespace {
 
 std::vector<std::vector<size_t>> recorded_active_spaces;
 std::vector<std::vector<size_t>> recorded_inactive_spaces;
+std::vector<std::vector<size_t>> recorded_localized_alpha_spaces;
+std::vector<std::vector<size_t>> recorded_localized_beta_spaces;
 
 std::string determinant_string(size_t n_active_orbitals, unsigned int n_alpha,
                                unsigned int n_beta) {
@@ -66,6 +69,23 @@ class RecordingMultiConfigurationCalculator
     auto container =
         std::make_unique<SlaterDeterminantContainer>(determinant, orbitals);
     return {0.0, std::make_shared<Wavefunction>(std::move(container))};
+  }
+};
+
+class RecordingLocalizer : public Localizer {
+ public:
+  std::string name() const override {
+    return "_test_nuclear_derivative_recording_localizer";
+  }
+
+ protected:
+  std::shared_ptr<Wavefunction> _run_impl(
+      std::shared_ptr<Wavefunction> wavefunction,
+      const std::vector<size_t>& loc_indices_a,
+      const std::vector<size_t>& loc_indices_b) const override {
+    recorded_localized_alpha_spaces.push_back(loc_indices_a);
+    recorded_localized_beta_spaces.push_back(loc_indices_b);
+    return wavefunction;
   }
 };
 
@@ -302,6 +322,68 @@ TEST(NuclearDerivativeCalculatorTest,
     EXPECT_TRUE(inactive_space.empty());
   }
 
+  MultiConfigurationCalculatorFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_mc");
+}
+
+TEST(NuclearDerivativeCalculatorTest,
+     MultiReferenceFiniteDifferenceLocalizesReferenceOrbitals) {
+  recorded_active_spaces.clear();
+  recorded_inactive_spaces.clear();
+  recorded_localized_alpha_spaces.clear();
+  recorded_localized_beta_spaces.clear();
+  MultiConfigurationCalculatorFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_mc");
+  MultiConfigurationCalculatorFactory::register_instance(
+      []() -> MultiConfigurationCalculatorFactory::return_type {
+        return std::make_unique<RecordingMultiConfigurationCalculator>();
+      });
+  LocalizerFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_localizer");
+  LocalizerFactory::register_instance([]() -> LocalizerFactory::return_type {
+    return std::make_unique<RecordingLocalizer>();
+  });
+
+  auto structure = testing::create_hydrogen_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [_, wavefunction] = scf_solver->run(structure, 0, 2, "sto-3g");
+  auto seed_orbitals =
+      testing::with_active_space(wavefunction->get_orbitals(),
+                                 std::vector<size_t>{0}, std::vector<size_t>{});
+
+  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  calculator->settings().set(
+      "energy_calculator",
+      AlgorithmRef("multi_configuration_calculator",
+                   "_test_nuclear_derivative_recording_mc"));
+  calculator->settings().set(
+      "orbital_localizer",
+      AlgorithmRef("orbital_localizer",
+                   "_test_nuclear_derivative_recording_localizer"));
+  calculator->settings().set("localize_reference_orbitals", true);
+  calculator->settings().set("n_active_alpha_electrons", 1);
+  calculator->settings().set("n_active_beta_electrons", 1);
+  calculator->settings().set("finite_difference_step", 1.0e-2);
+
+  auto [energy, gradients, hessian, result_wavefunction] =
+      calculator->run(structure, 0, 2, seed_orbitals);
+
+  EXPECT_TRUE(std::isfinite(energy));
+  ASSERT_NE(gradients, nullptr);
+  EXPECT_FALSE(hessian.has_value());
+  ASSERT_TRUE(result_wavefunction.has_value());
+  ASSERT_FALSE(recorded_localized_alpha_spaces.empty());
+  ASSERT_EQ(recorded_localized_alpha_spaces.size(),
+            recorded_localized_beta_spaces.size());
+  for (const auto& localized_space : recorded_localized_alpha_spaces) {
+    EXPECT_EQ(localized_space, std::vector<size_t>{0});
+  }
+  for (const auto& localized_space : recorded_localized_beta_spaces) {
+    EXPECT_EQ(localized_space, std::vector<size_t>{0});
+  }
+
+  LocalizerFactory::unregister_instance(
+      "_test_nuclear_derivative_recording_localizer");
   MultiConfigurationCalculatorFactory::unregister_instance(
       "_test_nuclear_derivative_recording_mc");
 }

@@ -213,9 +213,9 @@ std::shared_ptr<data::Orbitals> copy_active_space_metadata(
           std::vector<size_t>(inactive_b.begin(), inactive_b.end())));
 }
 
-std::string active_determinant_string(size_t n_active_orbitals,
-                                      unsigned int n_alpha,
-                                      unsigned int n_beta) {
+std::string hartree_fock_determinant_string(size_t n_active_orbitals,
+                                            unsigned int n_alpha,
+                                            unsigned int n_beta) {
   if (n_alpha > n_active_orbitals || n_beta > n_active_orbitals) {
     throw std::invalid_argument(
         "Active electron count exceeds the number of active orbitals");
@@ -249,7 +249,7 @@ std::shared_ptr<data::Wavefunction> wavefunction_from_orbitals(
         "Reference orbital localization requires matching alpha and beta "
         "active spaces");
   }
-  auto determinant = data::Configuration(active_determinant_string(
+  auto determinant = data::Configuration(hartree_fock_determinant_string(
       active_a.size(), n_active_alpha, n_active_beta));
   auto container =
       std::make_unique<data::SlaterDeterminantContainer>(determinant, orbitals);

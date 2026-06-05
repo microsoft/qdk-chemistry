@@ -28,12 +28,12 @@ class NuclearHessian : public DataClass,
    * @brief Construct a nuclear Hessian for a structure.
    *
    * @param structure Molecular structure used to compute the Hessian.
-   * @param matrix Square 3N by 3N Hessian matrix in Hartree/Bohr^2.
+   * @param hessian_matrix Square 3N by 3N Hessian matrix in Hartree/Bohr^2.
    * @throws std::invalid_argument If the structure is null or the matrix shape
    * does not match the structure.
    */
   NuclearHessian(std::shared_ptr<Structure> structure,
-                 const Eigen::MatrixXd& matrix);
+                 const Eigen::MatrixXd& hessian_matrix);
 
   /**
    * @brief Get the molecular structure associated with this Hessian.

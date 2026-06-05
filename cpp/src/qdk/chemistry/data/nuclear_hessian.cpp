@@ -18,8 +18,8 @@
 namespace qdk::chemistry::data {
 
 NuclearHessian::NuclearHessian(std::shared_ptr<Structure> structure,
-                               const Eigen::MatrixXd& matrix)
-    : structure_(std::move(structure)), matrix_(matrix) {
+                               const Eigen::MatrixXd& hessian_matrix)
+    : structure_(std::move(structure)), matrix_(hessian_matrix) {
   if (!_is_valid()) {
     throw std::invalid_argument(
         "NuclearHessian requires a non-null structure and a 3*N by 3*N matrix");
