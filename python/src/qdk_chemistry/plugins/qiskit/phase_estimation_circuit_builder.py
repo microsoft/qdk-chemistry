@@ -283,7 +283,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         total_iterations: int,
         phase_correction: float = 0.0,
     ) -> Circuit:
-        """Construct a single IQPE iteration circuit using Q# or Qiskit.
+        """Construct a single IQPE iteration circuit using Qiskit.
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
