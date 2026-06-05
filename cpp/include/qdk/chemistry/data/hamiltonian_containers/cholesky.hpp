@@ -244,7 +244,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   make_restricted_three_center_integrals(const Eigen::MatrixXd& integrals);
 
   /** Serialization version */
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 };
 
 }  // namespace qdk::chemistry::data
