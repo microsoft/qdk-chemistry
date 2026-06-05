@@ -84,7 +84,7 @@ jobs:
           python-test-threads: 2
         - os-name: macOS
           runner: macos-26-xlarge
-          build-parallel: 3
+          build-parallel: 5
           uarch: native
           python-version: '3.13'
           cpp-test-threads: 16
