@@ -92,16 +92,6 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   const size_t max_rank = num_aos * (num_aos + 1) / 2;
   QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
 
-  // Precompute upper bound for shell-pair block columns: n_cols = n1 * n2.
-  // This enables reusing ERI column buffers across iterations.
-  const size_t max_shell_size =
-      num_shells == 0 ? 0
-                      : std::max_element(obs.begin(), obs.end(),
-                                         [](const auto& a, const auto& b) {
-                                           return a.size() < b.size();
-                                         })
-                            ->size();
-
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
   const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
                                std::numeric_limits<double>::epsilon();
@@ -222,7 +212,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // Amortizes memory-bandwidth cost of reading L_data by combining multiple
   // shell pairs into one GEMM. Auto-adapts to basis set: small shells (s,p)
   // batch many; large shells (d,f) batch few.
-  if (target_gemm_cols <= 0) {
+  if (target_gemm_cols == 0) {
     throw std::invalid_argument(
         "target_gemm_cols must be positive, check setting "
         "cholesky_gemm_batch_cols!");

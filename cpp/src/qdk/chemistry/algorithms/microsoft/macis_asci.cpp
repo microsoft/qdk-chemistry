@@ -25,6 +25,10 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @brief Helper struct for CASCI calculation dispatch
  */
 struct asci_helper {
+  /// Maximum total electron count for which the residue arrays algorithm is
+  /// feasible.  Beyond this limit the O(n_e^2) per-determinant memory cost
+  /// becomes prohibitive and the code falls back to sorted_double_loop.
+  static constexpr size_t residual_array_electron_num_limit = 60;
   using return_type = std::pair<double, data::Wavefunction>;
 
   /**
@@ -89,7 +93,7 @@ struct asci_helper {
       // Guard: residue arrays require O(n_e^2) residues per det and become
       // infeasible for large active spaces.  Fall back to SDL with a warning.
       const size_t total_elec = nalpha + nbeta;
-      if (total_elec > 60) {
+      if (total_elec > residual_array_electron_num_limit) {
         QDK_LOGGER().warn(
             "residue_arrays infeasible with {} electrons (O(n_e^2) memory). "
             "Falling back to sorted_double_loop.",
@@ -127,7 +131,8 @@ struct asci_helper {
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
       // Dispatch FCI with the same generator type as the ASCI path
-      if (algo == "residue_arrays" && (nalpha + nbeta) <= 60) {
+      if (algo == "residue_arrays" &&
+          (nalpha + nbeta) <= residual_array_electron_num_limit) {
         E_casci = macis::CASRDMFunctor<ra_gen_t>::rdms(
             mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
             nbeta, const_cast<double*>(T_a.data()),

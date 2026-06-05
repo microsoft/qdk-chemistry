@@ -154,6 +154,7 @@ class ResidueArrayHamiltonianGenerator
 
     const size_t ndets = std::distance(dets_begin, dets_end);
     detail::SpinCache<WfnType> cache;
+    if (ndets == 0) return {std::vector<uint64_t>{}, std::move(cache)};
     cache.build({&*dets_begin, ndets});
 
     const size_t n_elec = dets_begin->count();

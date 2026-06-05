@@ -69,7 +69,7 @@ void HamiltonianGeneratorBase<Scalar>::generate_integral_intermediates_(
       G2_red_(i, j) = 0.5 * (V(i, i, j, j) - V(i, j, j, i));
       V2_red_(i, j) = V(i, i, j, j);
     }
-  spdlog::info("Finished generating doubly reduced integral intermediates.");
+  spdlog::debug("Finished generating doubly reduced integral intermediates.");
 }
 
 template <typename Scalar>

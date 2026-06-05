@@ -186,6 +186,9 @@ double selected_ci_diag(WfnIterator dets_begin, WfnIterator dets_end,
   if (!spdlog::get("h_build_inc")) spdlog::stdout_color_mt("h_build_inc");
 
   const size_t ndets = std::distance(dets_begin, dets_end);
+  if (ndets == 0) {
+    throw std::invalid_argument("selected_ci_diag: determinant list is empty");
+  }
   const bool incremental = cache != nullptr;
 
 #ifdef MACIS_ENABLE_MPI
