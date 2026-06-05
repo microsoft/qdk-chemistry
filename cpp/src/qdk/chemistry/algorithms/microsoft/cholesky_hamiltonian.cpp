@@ -101,7 +101,6 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
                                            return a.size() < b.size();
                                          })
                             ->size();
-  const size_t max_n_cols = max_shell_size * max_shell_size;
 
   // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
   const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
@@ -223,6 +222,11 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // Amortizes memory-bandwidth cost of reading L_data by combining multiple
   // shell pairs into one GEMM. Auto-adapts to basis set: small shells (s,p)
   // batch many; large shells (d,f) batch few.
+  if (target_gemm_cols <= 0) {
+    throw std::invalid_argument(
+        "target_gemm_cols must be positive, check setting "
+        "cholesky_gemm_batch_cols!");
+  }
   const size_t TARGET_GEMM_COLS = target_gemm_cols;
 
   QDK_LOGGER().debug("Cholesky Rank | Max Diagonal Element");
@@ -233,7 +237,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       break;
     }
 
-    // === Step 1: Select top-B shell pairs by max diagonal ===
+    // === Step 1: Sort active shell pairs by max diagonal ===
     struct SPInfo {
       size_t sp_index, s1, s2;
       double max_diag;
@@ -442,9 +446,6 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
         }
       }
 
-      // Block cross-batch Gram-Schmidt: orthogonalize all remaining ERI
-      // columns against the new vectors formed in this batch entry via
-      // one GEMM instead of per-vector axpy loops.
       // Block cross-batch Gram-Schmidt: orthogonalize all remaining ERI
       // columns against the new vectors formed in this batch entry via
       // one GEMM instead of per-vector axpy loops.
