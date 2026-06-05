@@ -130,7 +130,6 @@ class Orbitals : public DataClass,
 
   /**
    * @brief Get the orbital energies as a symmetry-blocked container
-   *.
    * @return Shared pointer to the orbital-energy tensor
    * @throws std::runtime_error if energies are not set
    */
@@ -638,9 +637,6 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> _from_hdf5_file(const std::string& filename);
 
  protected:
-  /**
-   * @brief Invalidate cached symmetry-blocked active/inactive index views.
-   */
   /**
    * @brief Build @ref _active_indices and @ref _inactive_indices from the
    *        current @ref _active_space_indices and @ref _inactive_space_indices.

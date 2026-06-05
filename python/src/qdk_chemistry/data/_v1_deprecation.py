@@ -48,12 +48,7 @@ def _wrap_deprecated(cls: type, method_name: str, replacement: str) -> None:
 
     # Patch a matching legacy property if one is still present
     # (e.g. "get_one_body_integrals" → "one_body_integrals").
-    if method_name.startswith("get_"):
-        prop_name = method_name[4:]
-    elif method_name.startswith("sparse_"):
-        prop_name = None
-    else:
-        prop_name = None
+    prop_name = method_name[4:] if method_name.startswith("get_") else None
 
     if prop_name:
         # Narrow prop_name to a non-Optional local so the default-argument

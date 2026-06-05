@@ -28,8 +28,8 @@ namespace qdk::chemistry::data {
 /**
  * @brief Maps a tensor rank to the Eigen storage type used for one block.
  *
- * Rank-1, rank-3, and rank-4 blocks are stored as (flat) column vectors;
- * rank-2 blocks are stored as dense matrices. Partial specializations are
+ * Rank-1 and rank-4 blocks are stored as (flat) column vectors; rank-2 and
+ * rank-3 blocks are stored as dense matrices. Partial specializations are
  * provided for ranks 1–4; higher ranks have no specialization and will
  * produce a compilation error.
  */
