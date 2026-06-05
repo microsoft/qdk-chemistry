@@ -279,7 +279,9 @@ class QDrift(TimeEvolutionBuilder):
         *num_samples* is used.
         """
         num_samples = self._settings.get("num_samples")
-        manual = num_samples if num_samples > 0 else 1
+        if num_samples <= 0:
+            raise ValueError(f"num_samples must be a positive integer, got {num_samples}.")
+        manual = num_samples
 
         target_accuracy = self._settings.get("target_accuracy")
         if target_accuracy <= 0.0:
