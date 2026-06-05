@@ -10,7 +10,7 @@ import pytest
 import scipy
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import FlatPartition, QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -23,6 +23,8 @@ def _pauli_matrix(label: str) -> np.ndarray:
     """Helper to get Pauli matrix from label."""
     if label == "X":
         return np.array([[0, 1], [1, 0]], dtype=complex)
+    if label == "Y":
+        return np.array([[0, -1j], [1j, 0]], dtype=complex)
     if label == "Z":
         return np.array([[1, 0], [0, -1]], dtype=complex)
     raise ValueError(f"Unsupported Pauli label: {label}")
@@ -33,13 +35,18 @@ def _pauli_product_matrix(label: str) -> np.ndarray:
     mapping = {
         "I": np.eye(2, dtype=complex),
         "X": _pauli_matrix("X"),
-        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+        "Y": _pauli_matrix("Y"),
         "Z": _pauli_matrix("Z"),
     }
     result = np.array([[1]], dtype=complex)
     for char in label:
         result = np.kron(result, mapping[char])
     return result
+
+
+def _pauli_label_from_map(pauli_term: dict[int, str], num_qubits: int) -> str:
+    """Helper to convert sparse qubit-index maps to QubitHamiltonian label order."""
+    return "".join(pauli_term.get(i, "I") for i in reversed(range(num_qubits)))
 
 
 class TestZassenhaus:
@@ -176,8 +183,8 @@ class TestZassenhaus:
         unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
-        # Expected second-order expansion:
-        #   exp(-i t (1.5 X + 0.5 Z)) => exp(-i 0.75 t X) exp(-i 0.5 t Z) exp(-i 0.75 t X)
+        # Expected second-order Zassenhaus expansion:
+        #   exp(A + B) => exp(A) exp(B) exp(-[A, B]/2), emitted in execution order.
         u_zassenhaus = np.eye(2, dtype=complex)
         for term in container.step_terms:
             pauli_label = next(iter(term.pauli_term.values()))
@@ -187,12 +194,17 @@ class TestZassenhaus:
         hamiltonian_matrix = 1.5 * _pauli_matrix("X") + 0.5 * _pauli_matrix("Z")
         u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
 
-        assert container.step_terms[0].pauli_term == {0: "X"}
+        assert container.step_terms[0].pauli_term == {0: "Y"}
         assert container.step_terms[1].pauli_term == {0: "Z"}
         assert container.step_terms[2].pauli_term == {0: "X"}
-        assert container.step_terms[0].angle == 0.75 * t
+        assert np.isclose(
+            container.step_terms[0].angle,
+            1.5 * 0.5 * t**2,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
         assert container.step_terms[1].angle == 0.5 * t
-        assert container.step_terms[2].angle == 0.75 * t
+        assert container.step_terms[2].angle == 1.5 * t
         error_actual = np.linalg.norm(u_zassenhaus - u_exact, ord=2)
         assert error_actual < 0.01
 
@@ -207,12 +219,13 @@ class TestZassenhaus:
         unitary = builder.run(hamiltonian)
         container = unitary.get_container()
 
-        # Expected fourth-order expansion:
-        #   exp(-i t (0.75 XI + 0.25 ZZ)) => product of 11 exponentials
-        #   with nested commutator corrections through O(t^4).
+        # Expected fourth-order Zassenhaus expansion:
+        #   exp(A + B) => exp(A) exp(B) exp(C2) exp(C3) exp(C4),
+        # emitted in execution order. This two-term Pauli algebra closes on
+        # XI, ZZ, and YZ, so the fourth-order product emits seven exponentials.
         u_zassenhaus = np.eye(4, dtype=complex)
         for term in container.step_terms:
-            pauli_label = "".join(term.pauli_term.get(i, "I") for i in range(2))
+            pauli_label = _pauli_label_from_map(term.pauli_term, num_qubits=2)
             pauli_matrix = _pauli_product_matrix(pauli_label)
             u_zassenhaus = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ u_zassenhaus
 
@@ -220,8 +233,79 @@ class TestZassenhaus:
         u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
 
         assert container.step_reps == 1
-        assert len(container.step_terms) == 11
-        assert container.step_terms[0].pauli_term == {1: "X"}
-        assert container.step_terms[1].pauli_term == {1: "Z", 0: "Z"}
+        assert len(container.step_terms) == 7
+        expected_terms = [
+            ({0: "Z", 1: "Y"}, -(3 / 256) * t**4),
+            ({0: "Z", 1: "Y"}, -(9 / 256) * t**4),
+            ({1: "X"}, (1 / 16) * t**3),
+            ({0: "Z", 1: "Z"}, -(3 / 32) * t**3),
+            ({0: "Z", 1: "Y"}, (3 / 16) * t**2),
+            ({0: "Z", 1: "Z"}, 0.25 * t),
+            ({1: "X"}, 0.75 * t),
+        ]
+        for term, (expected_pauli_term, expected_angle) in zip(container.step_terms, expected_terms, strict=True):
+            assert term.pauli_term == expected_pauli_term
+            assert np.isclose(
+                term.angle,
+                expected_angle,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            )
         error_actual = np.linalg.norm(u_zassenhaus - u_exact, ord=2)
         assert error_actual < 0.02
+
+    def test_zassenhaus_four_term_two_group_fourth_order_example(self):
+        """Correctness check for fourth-order Zassenhaus decomposition with two commuting groups."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "IX", "ZZ", "YY"],
+            coefficients=[0.7, -0.2, 0.3, 0.11],
+            term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
+        )
+
+        t = 0.1
+        builder = Zassenhaus(num_divisions=1, order=4, time=t)
+        unitary = builder.run(hamiltonian)
+        container = unitary.get_container()
+
+        u_zassenhaus = np.eye(4, dtype=complex)
+        for term in container.step_terms:
+            pauli_label = _pauli_label_from_map(term.pauli_term, num_qubits=2)
+            pauli_matrix = _pauli_product_matrix(pauli_label)
+            u_zassenhaus = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ u_zassenhaus
+
+        hamiltonian_matrix = (
+            0.7 * _pauli_product_matrix("XI")
+            - 0.2 * _pauli_product_matrix("IX")
+            + 0.3 * _pauli_product_matrix("ZZ")
+            + 0.11 * _pauli_product_matrix("YY")
+        )
+        u_exact = scipy.linalg.expm(-1j * t * hamiltonian_matrix)
+
+        assert container.step_reps == 1
+        assert len(container.step_terms) == 14
+        expected_terms = [
+            ({0: "Z", 1: "Y"}, -(81823 / 2500000) * t**4),
+            ({0: "Y", 1: "Z"}, (292997 / 10000000) * t**4),
+            ({0: "Z", 1: "Y"}, -(4033 / 75_000) * t**4),
+            ({0: "Y", 1: "Z"}, (13757 / 300_000) * t**4),
+            ({0: "X"}, -(3331 / 37_500) * t**3),
+            ({1: "X"}, (8467 / 75_000) * t**3),
+            ({0: "Y", 1: "Y"}, -(1423 / 15_000) * t**3),
+            ({0: "Z", 1: "Z"}, -(949 / 7_500) * t**3),
+            ({0: "Z", 1: "Y"}, (29 / 125) * t**2),
+            ({0: "Y", 1: "Z"}, -(137 / 1000) * t**2),
+            ({0: "Y", 1: "Y"}, 0.11 * t),
+            ({0: "Z", 1: "Z"}, 0.3 * t),
+            ({0: "X"}, -0.2 * t),
+            ({1: "X"}, 0.7 * t),
+        ]
+        for term, (expected_pauli_term, expected_angle) in zip(container.step_terms, expected_terms, strict=True):
+            assert term.pauli_term == expected_pauli_term
+            assert np.isclose(
+                term.angle,
+                expected_angle,
+                atol=float_comparison_absolute_tolerance,
+                rtol=float_comparison_relative_tolerance,
+            )
+        error_actual = np.linalg.norm(u_zassenhaus - u_exact, ord=2)
+        assert error_actual < 1e-5
