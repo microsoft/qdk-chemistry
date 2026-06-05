@@ -84,10 +84,22 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
 fi
 python3 -m pip install "${WHEEL[0]}[test]"
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in testenv.
+# The report is auto-discovered when it sits next to a setup.py or
+# requirements.txt in a non-hidden directory (the detector skips dotdirs
+# like .pipelines/). The locally-built qdk_chemistry wheel is excluded
+# because it is not resolvable from any index. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
+mkdir -p "$PYTHON_DIR/build/test-manifest"
+echo "------------------ Installed Python packages (testenv) ------------------"
+python3 -m pip list --format=freeze --exclude qdk_chemistry \
+    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
+echo "-------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
+    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
