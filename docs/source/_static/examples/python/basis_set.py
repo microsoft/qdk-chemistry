@@ -30,6 +30,16 @@ basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
 ################################################################################
 
 ################################################################################
+# start-cell-loading-with-aux
+# Load a primary basis set with an auxiliary basis set for density fitting
+basis_with_aux = BasisSet.from_basis_name("def2-svp", "def2-universal-jfit", structure)
+print(f"Primary shells: {basis_with_aux.get_num_shells()}")
+print(f"Auxiliary shells: {basis_with_aux.get_num_aux_shells()}")
+print(f"Auxiliary name: {basis_with_aux.get_aux_name()}")
+# end-cell-loading-with-aux
+################################################################################
+
+################################################################################
 # start-cell-create
 # Create a shell with multiple primitives
 atom_index = 0  # First atom
@@ -118,6 +128,54 @@ basis_set = BasisSet.from_hdf5_file("molecule.basis_set.h5")
 # end-cell-serialization
 Path("molecule.basis_set.json").unlink()
 Path("molecule.basis_set.h5").unlink()
+################################################################################
+
+################################################################################
+# start-cell-ecp
+# Create an ECP shell with radial powers (r^n terms)
+ecp_exponents = np.array([10.0, 5.0])
+ecp_coefficients = np.array([50.0, 20.0])
+ecp_rpowers = np.array([0, 2], dtype=np.int32)
+ecp_shell = Shell(0, OrbitalType.S, ecp_exponents, ecp_coefficients, ecp_rpowers)
+
+# Create a basis set with ECP data
+ecp_shells = [ecp_shell]
+ecp_electrons = [28, 0, 0]  # 28 core electrons replaced on the first atom
+basis_with_ecp = BasisSet(
+    "my-basis", [shell1, shell2], "my-ecp", ecp_shells, ecp_electrons, structure
+)
+
+# Query ECP data
+print(f"Has ECP shells: {basis_with_ecp.has_ecp_shells()}")
+print(f"ECP name: {basis_with_ecp.get_ecp_name()}")
+print(f"ECP electrons: {list(basis_with_ecp.get_ecp_electrons())}")
+print(f"Num ECP shells: {basis_with_ecp.get_num_ecp_shells()}")
+# end-cell-ecp
+################################################################################
+
+################################################################################
+# start-cell-auxiliary
+# Create auxiliary shells for density fitting
+aux_shells = [
+    Shell(0, OrbitalType.S, np.array([5.0]), np.array([2.0])),
+    Shell(1, OrbitalType.S, np.array([4.0]), np.array([1.5])),
+]
+
+# Construct a basis set with a named auxiliary basis
+basis_with_aux_manual = BasisSet(
+    "my-basis", [shell1, shell2], "my-aux-fit", aux_shells, structure
+)
+
+# Query auxiliary data
+print(f"Has auxiliary: {basis_with_aux_manual.has_aux_basis()}")
+print(f"Auxiliary name: {basis_with_aux_manual.get_aux_name()}")
+print(f"Num aux shells: {basis_with_aux_manual.get_num_aux_shells()}")
+
+# Retrieve auxiliary shell data
+for i in range(basis_with_aux_manual.get_num_aux_shells()):
+    s = basis_with_aux_manual.get_aux_shell(i)
+    print(f"  Aux shell {i}: atom={s.atom_index}, type={s.orbital_type}")
+# end-cell-auxiliary
 ################################################################################
 
 ################################################################################

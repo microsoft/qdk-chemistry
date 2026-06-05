@@ -31,6 +31,14 @@ int main() {
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
+  // start-cell-loading-with-aux
+  // Load a primary basis set with an auxiliary basis set for density fitting
+  auto basis_with_aux =
+      BasisSet::from_basis_name("def2-svp", "def2-universal-jfit", structure);
+  // end-cell-loading-with-aux
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
   // start-cell-create
   // Create a shell with multiple primitives
   size_t atom_index = 0;                      // First atom
@@ -161,6 +169,54 @@ int main() {
   auto supported_elements =
       BasisSet::get_supported_elements_for_basis_set("sto-3g");
   // end-cell-library
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-ecp
+  // Create an ECP shell with radial powers (r^n terms)
+  Eigen::VectorXd ecp_exp(2), ecp_coeff(2);
+  Eigen::VectorXi ecp_rpow(2);
+  ecp_exp << 10.0, 5.0;
+  ecp_coeff << 50.0, 20.0;
+  ecp_rpow << 0, 2;
+  Shell ecp_shell(0, OrbitalType::S, ecp_exp, ecp_coeff, ecp_rpow);
+
+  // Create a basis set with ECP data
+  std::vector<Shell> ecp_shells = {ecp_shell};
+  std::vector<size_t> ecp_electrons = {28, 0, 0};
+  BasisSet basis_with_ecp("my-basis", shells, "my-ecp", ecp_shells,
+                          ecp_electrons, structure);
+
+  // Query ECP data
+  bool has_ecp = basis_with_ecp.has_ecp_shells();
+  std::string ecp_name = basis_with_ecp.get_ecp_name();
+  size_t num_ecp_shells = basis_with_ecp.get_num_ecp_shells();
+  // end-cell-ecp
+  // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-auxiliary
+  // Create auxiliary shells for density fitting
+  std::vector<Shell> aux_shells;
+  aux_shells.emplace_back(0, OrbitalType::S, std::vector{5.0},
+                          std::vector{2.0});
+  aux_shells.emplace_back(1, OrbitalType::S, std::vector{4.0},
+                          std::vector{1.5});
+
+  // Construct a basis set with a named auxiliary basis
+  BasisSet basis_with_aux_manual("my-basis", shells, "my-aux-fit", aux_shells,
+                                 structure);
+
+  // Query auxiliary data
+  bool has_aux = basis_with_aux_manual.has_aux_basis();
+  std::string aux_name = basis_with_aux_manual.get_aux_name();
+  size_t num_aux = basis_with_aux_manual.get_num_aux_shells();
+
+  // Retrieve auxiliary shell data
+  auto all_aux_shells = basis_with_aux_manual.get_aux_shells();
+  const Shell& aux_s = basis_with_aux_manual.get_aux_shell(0);
+  const auto& atom0_aux = basis_with_aux_manual.get_aux_shells_for_atom(0);
+  // end-cell-auxiliary
   // --------------------------------------------------------------------------------------------
 
   return 0;
