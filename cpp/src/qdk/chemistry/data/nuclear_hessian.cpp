@@ -33,14 +33,10 @@ const std::shared_ptr<Structure> NuclearHessian::get_structure() const {
   return structure_;
 }
 
-size_t NuclearHessian::get_num_atoms() const {
-  return get_structure()->get_num_atoms();
-}
-
 std::string NuclearHessian::get_summary() const {
   std::ostringstream oss;
-  oss << "NuclearHessian(" << get_num_atoms() << " atoms, " << matrix_.rows()
-      << "x" << matrix_.cols() << ")";
+  oss << "NuclearHessian(" << get_structure()->get_num_atoms() << " atoms, "
+      << matrix_.rows() << "x" << matrix_.cols() << ")";
   return oss.str();
 }
 

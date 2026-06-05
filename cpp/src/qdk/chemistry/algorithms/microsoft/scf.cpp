@@ -503,7 +503,7 @@ ScfCalculationResult ScfSolver::_run_with_options(
   double total_energy = context.result.scf_total_energy;
 
   std::optional<Eigen::VectorXd> gradient;
-  if (require_gradient) {
+  if (require_gradient && ms_scf_config->mpi.world_rank == 0) {
     const auto& raw_gradient = context.result.scf_total_gradient;
     const auto expected_size = 3 * structure->get_num_atoms();
     if (raw_gradient.size() != expected_size) {

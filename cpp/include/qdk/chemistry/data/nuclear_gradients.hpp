@@ -28,12 +28,13 @@ class NuclearGradients : public DataClass,
    * @brief Construct nuclear gradients for a structure.
    *
    * @param structure Molecular structure used to compute the gradients.
-   * @param values Atom-major gradient vector with length 3 * number of atoms.
+   * @param gradient_values Atom-major gradient vector with length 3 * number of
+   * atoms.
    * @throws std::invalid_argument If the structure is null or the vector size
    * does not match the structure.
    */
   NuclearGradients(std::shared_ptr<Structure> structure,
-                   const Eigen::VectorXd& values);
+                   const Eigen::VectorXd& gradient_values);
 
   /**
    * @brief Get the molecular structure associated with these gradients.
@@ -49,11 +50,6 @@ class NuclearGradients : public DataClass,
    * @brief Return gradients as a num_atoms by 3 matrix.
    */
   Eigen::MatrixXd as_matrix() const;
-
-  /**
-   * @brief Get the number of atoms in the associated structure.
-   */
-  size_t get_num_atoms() const;
 
   /**
    * @brief Return the serialized data type name.

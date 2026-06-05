@@ -383,6 +383,9 @@ NuclearDerivativeResult FiniteDifferenceNuclearDerivativeCalculator::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge,
     int spin_multiplicity, NuclearDerivativeSeedType seed) const {
   const ScopedLogLevel scoped_log_level(utils::LogLevel::error);
+  if (!structure) {
+    throw std::invalid_argument("Structure must not be null");
+  }
   const double step = _settings->get<double>("finite_difference_step");
   const bool compute_hessian = _settings->get<bool>("compute_hessian");
   const auto dimension =
@@ -474,6 +477,9 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
     std::shared_ptr<data::Structure> structure, int charge,
     int spin_multiplicity, NuclearDerivativeSeedType seed) const {
   const ScopedLogLevel scoped_log_level(utils::LogLevel::error);
+  if (!structure) {
+    throw std::invalid_argument("Structure must not be null");
+  }
   if (_settings->get<bool>("compute_hessian")) {
     throw std::invalid_argument(
         "The QDK analytic nuclear derivative calculator does not currently "
@@ -496,15 +502,13 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
 
   auto scf_result = solver.run_with_analytic_gradient(
       structure, charge, spin_multiplicity, seed_to_scf_input(seed, true));
-  if (!scf_result.nuclear_gradient.has_value()) {
-    throw std::runtime_error(
-        "Internal SCF did not return an analytic nuclear gradient");
+  std::shared_ptr<data::NuclearGradients> gradients;
+  if (scf_result.nuclear_gradient.has_value()) {
+    gradients = std::make_shared<data::NuclearGradients>(
+        copy_structure(structure), *scf_result.nuclear_gradient);
   }
 
-  return {scf_result.energy,
-          std::make_shared<data::NuclearGradients>(
-              copy_structure(structure), *scf_result.nuclear_gradient),
-          std::nullopt, scf_result.wavefunction};
+  return {scf_result.energy, gradients, std::nullopt, scf_result.wavefunction};
 }
 
 void NuclearDerivativeCalculatorFactory::register_default_instances() {

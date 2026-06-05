@@ -18,11 +18,11 @@
 namespace qdk::chemistry::data {
 
 NuclearGradients::NuclearGradients(std::shared_ptr<Structure> structure,
-                                   const Eigen::VectorXd& values)
-    : structure_(std::move(structure)), values_(values) {
+                                   const Eigen::VectorXd& gradient_values)
+    : structure_(std::move(structure)), values_(gradient_values) {
   if (!_is_valid()) {
     throw std::invalid_argument(
-        "NuclearGradients require a non-null structure and 3*N values");
+        "NuclearGradients requires a non-null structure and 3*N values");
   }
 }
 
@@ -34,8 +34,9 @@ const std::shared_ptr<Structure> NuclearGradients::get_structure() const {
 }
 
 Eigen::MatrixXd NuclearGradients::as_matrix() const {
-  Eigen::MatrixXd matrix(get_num_atoms(), 3);
-  for (Eigen::Index atom = 0; atom < static_cast<Eigen::Index>(get_num_atoms());
+  const auto num_atoms = get_structure()->get_num_atoms();
+  Eigen::MatrixXd matrix(num_atoms, 3);
+  for (Eigen::Index atom = 0; atom < static_cast<Eigen::Index>(num_atoms);
        ++atom) {
     matrix(atom, 0) = values_(3 * atom);
     matrix(atom, 1) = values_(3 * atom + 1);
@@ -44,13 +45,9 @@ Eigen::MatrixXd NuclearGradients::as_matrix() const {
   return matrix;
 }
 
-size_t NuclearGradients::get_num_atoms() const {
-  return get_structure()->get_num_atoms();
-}
-
 std::string NuclearGradients::get_summary() const {
   std::ostringstream oss;
-  oss << "NuclearGradients(" << get_num_atoms()
+  oss << "NuclearGradients(" << get_structure()->get_num_atoms()
       << " atoms, norm=" << values_.norm() << ")";
   return oss.str();
 }

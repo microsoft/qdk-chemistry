@@ -46,11 +46,6 @@ class NuclearHessian : public DataClass,
   const Eigen::MatrixXd& get_matrix() const { return matrix_; }
 
   /**
-   * @brief Get the number of atoms in the associated structure.
-   */
-  size_t get_num_atoms() const;
-
-  /**
    * @brief Return the serialized data type name.
    */
   std::string get_data_type_name() const override {

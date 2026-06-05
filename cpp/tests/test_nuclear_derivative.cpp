@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/nuclear_gradients.hpp>
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <stdexcept>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -68,12 +69,6 @@ class RecordingMultiConfigurationCalculator
   }
 };
 
-std::shared_ptr<Structure> create_h2_structure() {
-  std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}};
-  std::vector<Element> elements = {Element::H, Element::H};
-  return std::make_shared<Structure>(coordinates, elements);
-}
-
 void expect_same_structure(const std::shared_ptr<Structure>& left,
                            const std::shared_ptr<Structure>& right) {
   ASSERT_NE(left, nullptr);
@@ -91,14 +86,14 @@ void expect_qdk_analytic_gradient_runs_for_functional(
   scf_ref.get_settings()->set("method", functional);
   calculator->settings().set("energy_calculator", scf_ref);
 
-  auto [energy, gradients, hessian, wavefunction] =
-      calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+  auto [energy, gradients, hessian, wavefunction] = calculator->run(
+      testing::create_water_structure(), 0, 1, std::string("sto-3g"));
 
   ASSERT_TRUE(std::isfinite(energy));
   EXPECT_LT(energy, 0.0);
   ASSERT_NE(gradients, nullptr);
-  EXPECT_EQ(gradients->get_num_atoms(), 2);
-  EXPECT_EQ(gradients->get_values().size(), 6);
+  EXPECT_EQ(gradients->get_structure()->get_num_atoms(), 3);
+  EXPECT_EQ(gradients->get_values().size(), 9);
   EXPECT_TRUE(gradients->get_values().allFinite());
 
   auto gradient_matrix = gradients->as_matrix();
@@ -117,9 +112,12 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
   AlgorithmRef scf_ref("scf_solver", "qdk");
   scf_ref.get_settings()->set("method", functional);
   calculator->settings().set("energy_calculator", scf_ref);
-  calculator->settings().set("finite_difference_step", 1.0e-2);
+  if (calculator->settings().has("finite_difference_step")) {
+    calculator->settings().set("finite_difference_step", 1.0e-2);
+  }
 
-  return calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+  return calculator->run(testing::create_water_structure(), 0, 1,
+                         std::string("sto-3g"));
 }
 
 void expect_qdk_analytic_gradient_matches_numeric(
@@ -154,25 +152,45 @@ TEST(NuclearDerivativeSettingsTest, SettingsHaveUserFacingDescriptions) {
   NuclearDerivativeSettings settings;
   for (const auto& key :
        {"energy_calculator", "orbital_solver", "hamiltonian_constructor",
-        "compute_hessian", "finite_difference_step", "symmetrize_hessian",
-        "reuse_seed_active_space", "localize_reference_orbitals",
-        "orbital_localizer", "n_active_alpha_electrons",
-        "n_active_beta_electrons"}) {
+        "compute_hessian", "reuse_seed_active_space",
+        "localize_reference_orbitals", "orbital_localizer",
+        "n_active_alpha_electrons", "n_active_beta_electrons"}) {
+    EXPECT_TRUE(settings.has_description(key)) << key;
+    EXPECT_FALSE(settings.get_description(key).empty()) << key;
+  }
+  EXPECT_FALSE(settings.has("finite_difference_step"));
+  EXPECT_FALSE(settings.has("symmetrize_hessian"));
+}
+
+TEST(NuclearDerivativeSettingsTest,
+     FiniteDifferenceSettingsHaveUserFacingDescriptions) {
+  FiniteDifferenceNuclearDerivativeSettings settings;
+  for (const auto& key : {"finite_difference_step", "symmetrize_hessian"}) {
     EXPECT_TRUE(settings.has_description(key)) << key;
     EXPECT_FALSE(settings.get_description(key).empty()) << key;
   }
 }
 
+TEST(NuclearDerivativeSettingsTest, NumericStepBelongsToFiniteDifferenceOnly) {
+  auto finite_difference = NuclearDerivativeCalculatorFactory::create();
+  auto analytic = NuclearDerivativeCalculatorFactory::create("qdk");
+
+  EXPECT_TRUE(finite_difference->settings().has("finite_difference_step"));
+  EXPECT_TRUE(finite_difference->settings().has("symmetrize_hessian"));
+  EXPECT_FALSE(analytic->settings().has("finite_difference_step"));
+  EXPECT_FALSE(analytic->settings().has("symmetrize_hessian"));
+}
+
 TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
-  auto structure = create_h2_structure();
-  Eigen::VectorXd values(6);
-  values << 0.0, 0.1, 0.2, 0.3, 0.4, 0.5;
+  auto structure = testing::create_water_structure();
+  Eigen::VectorXd values(9);
+  values << 0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8;
 
   NuclearGradients gradients(structure, values);
 
-  EXPECT_EQ(gradients.get_num_atoms(), 2);
+  EXPECT_EQ(gradients.get_structure()->get_num_atoms(), 3);
   EXPECT_TRUE(gradients.get_values().isApprox(values));
-  EXPECT_EQ(gradients.as_matrix().rows(), 2);
+  EXPECT_EQ(gradients.as_matrix().rows(), 3);
   EXPECT_EQ(gradients.as_matrix().cols(), 3);
   expect_same_structure(structure, gradients.get_structure());
 
@@ -182,12 +200,12 @@ TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
 }
 
 TEST(NuclearDerivativeDataTest, HessianReferencesStructureAndRoundTripsJson) {
-  auto structure = create_h2_structure();
-  Eigen::MatrixXd matrix = Eigen::MatrixXd::Identity(6, 6);
+  auto structure = testing::create_water_structure();
+  Eigen::MatrixXd matrix = Eigen::MatrixXd::Identity(9, 9);
 
   NuclearHessian hessian(structure, matrix);
 
-  EXPECT_EQ(hessian.get_num_atoms(), 2);
+  EXPECT_EQ(hessian.get_structure()->get_num_atoms(), 3);
   EXPECT_TRUE(hessian.get_matrix().isApprox(matrix));
   expect_same_structure(structure, hessian.get_structure());
 
@@ -196,19 +214,19 @@ TEST(NuclearDerivativeDataTest, HessianReferencesStructureAndRoundTripsJson) {
   expect_same_structure(structure, loaded->get_structure());
 }
 
-TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForH2) {
+TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
   auto calculator = NuclearDerivativeCalculatorFactory::create();
   calculator->settings().set("compute_hessian", true);
   calculator->settings().set("finite_difference_step", 1.0e-3);
 
-  auto [energy, gradients, hessian, wavefunction] =
-      calculator->run(create_h2_structure(), 0, 1, std::string("sto-3g"));
+  auto [energy, gradients, hessian, wavefunction] = calculator->run(
+      testing::create_water_structure(), 0, 1, std::string("sto-3g"));
 
   ASSERT_TRUE(std::isfinite(energy));
   EXPECT_LT(energy, 0.0);
   ASSERT_NE(gradients, nullptr);
-  EXPECT_EQ(gradients->get_num_atoms(), 2);
-  EXPECT_EQ(gradients->get_values().size(), 6);
+  EXPECT_EQ(gradients->get_structure()->get_num_atoms(), 3);
+  EXPECT_EQ(gradients->get_values().size(), 9);
   EXPECT_TRUE(gradients->get_values().allFinite());
 
   auto gradient_matrix = gradients->as_matrix();
@@ -218,15 +236,28 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForH2) {
 
   ASSERT_TRUE(hessian.has_value());
   ASSERT_NE(*hessian, nullptr);
-  EXPECT_EQ((*hessian)->get_num_atoms(), 2);
-  EXPECT_EQ((*hessian)->get_matrix().rows(), 6);
-  EXPECT_EQ((*hessian)->get_matrix().cols(), 6);
+  EXPECT_EQ((*hessian)->get_structure()->get_num_atoms(), 3);
+  EXPECT_EQ((*hessian)->get_matrix().rows(), 9);
+  EXPECT_EQ((*hessian)->get_matrix().cols(), 9);
   EXPECT_TRUE((*hessian)->get_matrix().allFinite());
   EXPECT_TRUE((*hessian)->get_matrix().isApprox(
       (*hessian)->get_matrix().transpose(), 1.0e-8));
 
   ASSERT_TRUE(wavefunction.has_value());
   EXPECT_NE(*wavefunction, nullptr);
+}
+
+TEST(NuclearDerivativeCalculatorTest, NullStructureThrowsInvalidArgument) {
+  for (const auto& calculator_name : {"finite_difference", "qdk"}) {
+    auto calculator =
+        NuclearDerivativeCalculatorFactory::create(calculator_name);
+    try {
+      calculator->run(nullptr, 0, 1, std::string("sto-3g"));
+      FAIL() << calculator_name << " accepted a null structure";
+    } catch (const std::invalid_argument& ex) {
+      EXPECT_STREQ(ex.what(), "Structure must not be null");
+    }
+  }
 }
 
 TEST(NuclearDerivativeCalculatorTest,
@@ -240,7 +271,7 @@ TEST(NuclearDerivativeCalculatorTest,
         return std::make_unique<RecordingMultiConfigurationCalculator>();
       });
 
-  auto structure = create_h2_structure();
+  auto structure = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   auto [_, wavefunction] = scf_solver->run(structure, 0, 1, "sto-3g");
   auto seed_orbitals =
@@ -276,31 +307,31 @@ TEST(NuclearDerivativeCalculatorTest,
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealNonHybridDftForH2) {
+     QdkAnalyticGradientRunsRealNonHybridDftForWater) {
   expect_qdk_analytic_gradient_runs_for_functional("pbe");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealHybridDftForH2) {
+     QdkAnalyticGradientRunsRealHybridDftForWater) {
   expect_qdk_analytic_gradient_runs_for_functional("b3lyp");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealRangeSeparatedHybridDftForH2) {
+     QdkAnalyticGradientRunsRealRangeSeparatedHybridDftForWater) {
   expect_qdk_analytic_gradient_runs_for_functional("wB97x");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericHybridGgaDftForH2) {
+     QdkAnalyticGradientMatchesNumericHybridGgaDftForWater) {
   expect_qdk_analytic_gradient_matches_numeric("b3lyp");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericGgaDftForH2) {
+     QdkAnalyticGradientMatchesNumericGgaDftForWater) {
   expect_qdk_analytic_gradient_matches_numeric("pbe");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForH2) {
+     QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForWater) {
   expect_qdk_analytic_gradient_matches_numeric("wB97x");
 }

@@ -20,7 +20,11 @@
 namespace qdk::chemistry::algorithms {
 
 /**
- * @brief Initial basis, orbitals, or wavefunction seed for a derivative run.
+ * @brief Initial basis-set name, basis, orbitals, or wavefunction seed for a
+ * derivative run.
+ *
+ * A string seed is interpreted as the basis-set name, such as "sto-3g", to use
+ * for SCF calculations.
  */
 using NuclearDerivativeSeedType =
     std::variant<std::shared_ptr<data::Orbitals>,
@@ -42,7 +46,7 @@ using NuclearDerivativeResult =
 class NuclearDerivativeSettings : public data::Settings {
  public:
   /**
-   * @brief Construct settings with finite-difference defaults.
+   * @brief Construct settings with shared nuclear derivative defaults.
    */
   NuclearDerivativeSettings() {
     set_default(
@@ -66,16 +70,7 @@ class NuclearDerivativeSettings : public data::Settings {
                 "calculation.");
     set_default("compute_hessian", false,
                 "Whether to compute a nuclear Hessian in addition to energy "
-                "and gradients. Currently supported by the finite_difference "
-                "implementation only.");
-    set_default("finite_difference_step", 1.0e-3,
-                "Central finite-difference nuclear displacement step in Bohr. "
-                "Used by the finite_difference implementation for numeric "
-                "gradients and Hessians.",
-                data::BoundConstraint<double>{1.0e-8, 1.0});
-    set_default("symmetrize_hessian", true,
-                "Whether to replace the finite-difference Hessian by the "
-                "average of itself and its transpose before returning it.");
+                "and gradients.");
     set_default(
         "reuse_seed_active_space", true,
         "For multi-reference energy paths, reuse active and inactive orbital "
@@ -105,6 +100,27 @@ class NuclearDerivativeSettings : public data::Settings {
         "multi_configuration_scf and multi_configuration_calculator energy "
         "paths. Must be positive when those energy paths are selected.",
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+  }
+};
+
+/**
+ * @class FiniteDifferenceNuclearDerivativeSettings
+ * @brief Settings for finite-difference nuclear derivative calculations.
+ */
+class FiniteDifferenceNuclearDerivativeSettings
+    : public NuclearDerivativeSettings {
+ public:
+  /**
+   * @brief Construct settings with finite-difference defaults.
+   */
+  FiniteDifferenceNuclearDerivativeSettings() : NuclearDerivativeSettings() {
+    set_default("finite_difference_step", 1.0e-3,
+                "Central finite-difference nuclear displacement step in Bohr. "
+                "Used for numeric gradients and Hessians.",
+                data::BoundConstraint<double>{1.0e-8, 1.0});
+    set_default("symmetrize_hessian", true,
+                "Whether to replace the finite-difference Hessian by the "
+                "average of itself and its transpose before returning it.");
   }
 };
 
@@ -182,6 +198,13 @@ struct NuclearDerivativeCalculatorFactory
 class FiniteDifferenceNuclearDerivativeCalculator
     : public NuclearDerivativeCalculator {
  public:
+  /**
+   * @brief Construct a calculator with finite-difference settings.
+   */
+  FiniteDifferenceNuclearDerivativeCalculator() {
+    _settings = std::make_unique<FiniteDifferenceNuclearDerivativeSettings>();
+  }
+
   /**
    * @brief Return the implementation name.
    */
