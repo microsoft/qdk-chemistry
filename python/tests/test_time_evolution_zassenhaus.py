@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 import scipy
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.data import FlatPartition, QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -56,6 +57,49 @@ class TestZassenhaus:
         """Test the name method of Zassenhaus."""
         builder = Zassenhaus()
         assert builder.name() == "zassenhaus"
+
+    def test_type_name(self):
+        """Test the type_name method of Zassenhaus."""
+        builder = Zassenhaus()
+        assert builder.type_name() == "hamiltonian_unitary_builder"
+
+    def test_can_create_via_registry(self):
+        """Test that Zassenhaus can be created via the algorithm registry."""
+        builder = create("hamiltonian_unitary_builder", "zassenhaus")
+        assert isinstance(builder, Zassenhaus)
+
+    def test_can_create_with_settings(self):
+        """Test that Zassenhaus can be created with custom settings."""
+        builder = create(
+            "hamiltonian_unitary_builder",
+            "zassenhaus",
+            order=4,
+            num_divisions=3,
+            time=0.2,
+            weight_threshold=1e-10,
+        )
+
+        assert builder.settings().get("order") == 4
+        assert builder.settings().get("num_divisions") == 3
+        assert builder.settings().get("time") == 0.2
+        assert builder.settings().get("weight_threshold") == 1e-10
+
+    def test_registry_builder_returns_pauli_product_formula_container(self):
+        """Test registry-created Zassenhaus returns the standard product-formula container shape."""
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "ZZ"],
+            coefficients=[2.0, 1.0],
+        )
+
+        builder = create("hamiltonian_unitary_builder", "zassenhaus", order=2, num_divisions=4, time=0.2)
+        unitary = builder.run(hamiltonian)
+
+        assert isinstance(unitary, UnitaryRepresentation)
+        container = unitary.get_container()
+        assert isinstance(container, PauliProductFormulaContainer)
+        assert container.num_qubits == hamiltonian.num_qubits
+        assert container.step_reps == 4
+        assert len(container.step_terms) > 0
 
     def test_single_step_construction(self):
         """Test construction of time evolution unitary with a single Zassenhaus step."""
