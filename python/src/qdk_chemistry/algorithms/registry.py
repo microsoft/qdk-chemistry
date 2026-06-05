@@ -510,6 +510,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
@@ -529,6 +530,7 @@ def _register_python_factories():
     register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
+    register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
     register_factory(PropagatorFactory())
 
@@ -594,6 +596,9 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
+        QdkIterativeQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
@@ -628,6 +633,7 @@ def _register_python_algorithms():
     register(lambda: MagnusPropagator())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
+    register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
     register(lambda: StandardPhaseEstimation())
 

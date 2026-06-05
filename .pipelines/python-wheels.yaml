@@ -69,15 +69,23 @@ parameters:
   type: string
   default: None
   displayName: PyPI Development Tag (e.g. 'dev1', 'rc1', etc.)
+- name: runSlowTests
+  type: boolean
+  default: true
+  displayName: Run slow tests
 
 variables:
 - group: QdkChemistry
+- name: ComponentDetection.MaxDetectionThreads
+  value: '16'
 extends:
   template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     sdl:
       autobaseline:
         enableForGitHub: true
+      componentgovernance:
+        useAgentBuildDirectory: true
       codeql:
         compiled:
           enabled: true
@@ -111,6 +119,7 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
+              hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:
             pool:
               name: $(CPU_POOL_ARM)
@@ -169,6 +178,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # Build - Linux ARM64
           - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
@@ -191,6 +201,7 @@ extends:
                 dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # Build - macOS ARM64
           - ${{ if eq(target.os, 'macOS') }}:
@@ -211,13 +222,13 @@ extends:
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
+                runSlowTests: ${{ parameters.runSlowTests }}
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user
           - script: |
               sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
             displayName: Fix wheel directory ownership
-
 
           - task: TwineAuthenticate@1
             inputs:
@@ -244,6 +255,7 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
+
     - stage: Approval
       displayName: Approval
       dependsOn: Build
@@ -259,6 +271,7 @@ extends:
             notifyUsers: ''
             instructions: Please verify artifacts and approve the release
             onTimeout: reject
+
 
     - stage: Release
       displayName: Release
