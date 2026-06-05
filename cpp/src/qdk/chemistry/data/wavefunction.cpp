@@ -233,31 +233,6 @@ WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
   if (!has_one_rdm_spin_dependent()) {
     throw std::runtime_error("Spin-dependent one-body RDM not set");
   }
-  // Derive missing SBT from spin-traced (restricted closed-shell) on demand.
-  if (!_active_one_rdm && _is_restricted_closed_shell() &&
-      _one_rdm_spin_traced != nullptr) {
-    auto half = detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
-    _active_one_rdm = std::visit(
-        [](const auto& half_block)
-            -> std::shared_ptr<const SymmetryBlockedTensorVariant<2>> {
-          using Scalar = typename std::decay_t<decltype(half_block)>::Scalar;
-          using SBT = SymmetryBlockedTensor<2, Scalar>;
-          std::size_t n = static_cast<std::size_t>(half_block.rows());
-          auto sym = std::make_shared<const SymmetryProduct>(
-              SymmetryProduct({axes::spin(1, /*restricted=*/true)}));
-          std::unordered_map<SymmetryLabel, std::size_t> ext;
-          ext[axes::alpha()] = n;
-          ext[axes::beta()] = n;
-          typename SBT::BlockMap blocks;
-          blocks[{axes::alpha(), axes::alpha()}] =
-              std::make_shared<const Tensor<2, Scalar>>(half_block);
-          return std::make_shared<const SymmetryBlockedTensorVariant<2>>(
-              std::in_place_type<SBT>,
-              SBT(typename SBT::SymmetriesArray{sym, sym},
-                  typename SBT::ExtentsArray{ext, ext}, std::move(blocks)));
-        },
-        *half);
-  }
   return std::visit(
       [&](const auto& sbt) -> std::tuple<ContainerTypes::MatrixVariant,
                                          ContainerTypes::MatrixVariant> {
@@ -266,7 +241,7 @@ WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
                                ContainerTypes::MatrixVariant{
                                    sbt.block({axes::beta(), axes::beta()})});
       },
-      *_active_one_rdm);
+      active_one_rdm());
 }
 
 const ContainerTypes::MatrixVariant&
@@ -318,7 +293,7 @@ WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
             ContainerTypes::VectorVariant{sbt.block(
                 {axes::beta(), axes::beta(), axes::beta(), axes::beta()})});
       },
-      *_active_two_rdm);
+      active_two_rdm());
 }
 
 const ContainerTypes::VectorVariant&
@@ -401,6 +376,32 @@ bool WavefunctionContainer::has_two_rdm_spin_traced() const {
 const SymmetryBlockedTensorVariant<2>& WavefunctionContainer::active_one_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
+  // Derive the spin-dependent SBT from the spin-traced 1-RDM on demand
+  // (restricted closed-shell), caching the result.
+  if (!_active_one_rdm && _is_restricted_closed_shell() &&
+      _one_rdm_spin_traced != nullptr) {
+    auto half = detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
+    _active_one_rdm = std::visit(
+        [](const auto& half_block)
+            -> std::shared_ptr<const SymmetryBlockedTensorVariant<2>> {
+          using Scalar = typename std::decay_t<decltype(half_block)>::Scalar;
+          using SBT = SymmetryBlockedTensor<2, Scalar>;
+          std::size_t n = static_cast<std::size_t>(half_block.rows());
+          auto sym = std::make_shared<const SymmetryProduct>(
+              SymmetryProduct({axes::spin(1, /*restricted=*/true)}));
+          std::unordered_map<SymmetryLabel, std::size_t> ext;
+          ext[axes::alpha()] = n;
+          ext[axes::beta()] = n;
+          typename SBT::BlockMap blocks;
+          blocks[{axes::alpha(), axes::alpha()}] =
+              std::make_shared<const Tensor<2, Scalar>>(half_block);
+          return std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+              std::in_place_type<SBT>,
+              SBT(typename SBT::SymmetriesArray{sym, sym},
+                  typename SBT::ExtentsArray{ext, ext}, std::move(blocks)));
+        },
+        *half);
+  }
   if (!_active_one_rdm) {
     throw std::runtime_error(
         "Active 1-RDM symmetry-blocked tensor is not available.");

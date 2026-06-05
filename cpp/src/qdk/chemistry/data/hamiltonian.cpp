@@ -830,7 +830,9 @@ Hamiltonian& Hamiltonian::operator=(const Hamiltonian& other) {
 std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_one_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->get_one_body_integrals();
+  const auto& sbt = _container->one_body_integrals();
+  return std::make_tuple(std::cref(sbt.block({axes::alpha(), axes::alpha()})),
+                         std::cref(sbt.block({axes::beta(), axes::beta()})));
 }
 
 double Hamiltonian::get_one_body_element(unsigned i, unsigned j,
@@ -866,7 +868,9 @@ bool Hamiltonian::has_two_body_integrals() const {
 std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
 Hamiltonian::get_inactive_fock_matrix() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->get_inactive_fock_matrix();
+  const auto& sbt = _container->inactive_fock();
+  return {sbt.block({axes::alpha(), axes::alpha()}),
+          sbt.block({axes::beta(), axes::beta()})};
 }
 
 bool Hamiltonian::has_inactive_fock_matrix() const {

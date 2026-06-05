@@ -234,10 +234,15 @@ Orbitals::Orbitals(
 
 Orbitals::~Orbitals() = default;
 
-Orbitals::Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
-                   std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
-                   const std::optional<Eigen::MatrixXd>& ao_overlap,
-                   std::shared_ptr<BasisSet> basis_set) {
+Orbitals::Orbitals(
+    std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
+    std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
+    const std::optional<Eigen::MatrixXd>& ao_overlap,
+    std::shared_ptr<BasisSet> basis_set,
+    std::optional<std::pair<std::vector<size_t>, std::vector<size_t>>>
+        active_space_indices,
+    std::optional<std::pair<std::vector<size_t>, std::vector<size_t>>>
+        inactive_space_indices) {
   QDK_LOG_TRACE_ENTERING();
   if (!coefficients) {
     throw std::invalid_argument(
@@ -247,10 +252,16 @@ Orbitals::Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
   _coefficients = std::move(coefficients);
   _energies = std::move(energies);
 
-  std::vector<size_t> all_indices(get_num_molecular_orbitals());
-  std::iota(all_indices.begin(), all_indices.end(), 0);
-  _active_space_indices.first = all_indices;
-  _active_space_indices.second = all_indices;
+  if (active_space_indices) {
+    _active_space_indices = std::move(*active_space_indices);
+  } else {
+    std::vector<size_t> all_indices(get_num_molecular_orbitals());
+    std::iota(all_indices.begin(), all_indices.end(), 0);
+    _active_space_indices = {all_indices, all_indices};
+  }
+  if (inactive_space_indices) {
+    _inactive_space_indices = std::move(*inactive_space_indices);
+  }
   _build_space_index_sets();
 
   if (ao_overlap) {
@@ -1552,22 +1563,22 @@ void Orbitals::_post_construction_validate() {
 
 const Eigen::MatrixXd& Orbitals::get_coefficients_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  return get_coefficients().first;
+  return coefficients()->block({axes::alpha(), axes::alpha()});
 }
 
 const Eigen::MatrixXd& Orbitals::get_coefficients_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  return get_coefficients().second;
+  return coefficients()->block({axes::beta(), axes::beta()});
 }
 
 const Eigen::VectorXd& Orbitals::get_energies_alpha() const {
   QDK_LOG_TRACE_ENTERING();
-  return get_energies().first;
+  return energies()->block({axes::alpha()});
 }
 
 const Eigen::VectorXd& Orbitals::get_energies_beta() const {
   QDK_LOG_TRACE_ENTERING();
-  return get_energies().second;
+  return energies()->block({axes::beta()});
 }
 
 // === ModelOrbitals Implementation ===

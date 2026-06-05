@@ -146,7 +146,11 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
     return four_center;
   };
 
-  auto [aa, bb] = get_three_center_integrals();
+  const auto& tc = three_center();
+  const auto& aa = tc.block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+  const auto& bb = tc.has_block({axes::beta(), axes::beta(), SymmetryLabel{}})
+                       ? tc.block({axes::beta(), axes::beta(), SymmetryLabel{}})
+                       : aa;
   auto aaaa = build_four_center(aa, aa);
 
   if (is_restricted()) {

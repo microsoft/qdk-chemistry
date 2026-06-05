@@ -95,12 +95,20 @@ class Orbitals : public DataClass,
    * @param energies Orbital energy tensor (may be nullptr if unavailable)
    * @param ao_overlap The atomic orbital overlap matrix (optional)
    * @param basis_set The basis set as shared pointer (may be nullptr)
+   * @param active_space_indices Optional (alpha, beta) active-space index
+   *        vectors; defaults to all molecular orbitals.
+   * @param inactive_space_indices Optional (alpha, beta) inactive-space index
+   *        vectors; defaults to empty.
    * @throws std::runtime_error if the containers are inconsistent
    */
   Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
            std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
            const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set);
+           std::shared_ptr<BasisSet> basis_set,
+           std::optional<std::pair<std::vector<size_t>, std::vector<size_t>>>
+               active_space_indices = std::nullopt,
+           std::optional<std::pair<std::vector<size_t>, std::vector<size_t>>>
+               inactive_space_indices = std::nullopt);
 
   /**
    * @brief Destructor

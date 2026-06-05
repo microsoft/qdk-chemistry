@@ -161,7 +161,8 @@ void MP2Container::_compute_t2_amplitudes() const {
 
   if (use_unrestricted) {
     // Unrestricted MP2
-    const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+    const auto& eps_alpha = get_orbitals()->energies()->block({axes::alpha()});
+    const auto& eps_beta = get_orbitals()->energies()->block({axes::beta()});
     Eigen::VectorXd eps_active_alpha(active_space_size);
     Eigen::VectorXd eps_active_beta(active_space_size);
     Eigen::Index active_size_idx = static_cast<Eigen::Index>(active_space_size);
@@ -228,7 +229,8 @@ void MP2Container::_compute_t2_amplitudes() const {
           "Restricted MP2 requires equal alpha and beta electrons");
     }
 
-    const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+    const auto& eps_alpha = get_orbitals()->energies()->block({axes::alpha()});
+    const auto& eps_beta = get_orbitals()->energies()->block({axes::beta()});
 
     Eigen::VectorXd eps_active_alpha(active_space_size);
 

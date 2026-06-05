@@ -383,10 +383,14 @@ void Ansatz::validate_orbital_consistency() const {
 
   // Compare orbital coefficients numerically
 
-  const auto& [ham_coeffs_alpha, ham_coeffs_beta] =
-      ham_orbitals.get_coefficients();
-  const auto& [wf_coeffs_alpha, wf_coeffs_beta] =
-      wf_orbitals.get_coefficients();
+  const auto& ham_coeffs_alpha =
+      ham_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& ham_coeffs_beta =
+      ham_orbitals.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& wf_coeffs_alpha =
+      wf_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& wf_coeffs_beta =
+      wf_orbitals.coefficients()->block({axes::beta(), axes::beta()});
 
   // Check alpha coefficients
   if (ham_coeffs_alpha.rows() != wf_coeffs_alpha.rows() ||
@@ -424,10 +428,14 @@ void Ansatz::validate_orbital_consistency() const {
   if (ham_orbitals.has_energies() && wf_orbitals.has_energies()) {
     constexpr double energy_tolerance = 1e-12;
 
-    const auto& [ham_energies_alpha, ham_energies_beta] =
-        ham_orbitals.get_energies();
-    const auto& [wf_energies_alpha, wf_energies_beta] =
-        wf_orbitals.get_energies();
+    const auto& ham_energies_alpha =
+        ham_orbitals.energies()->block({axes::alpha()});
+    const auto& ham_energies_beta =
+        ham_orbitals.energies()->block({axes::beta()});
+    const auto& wf_energies_alpha =
+        wf_orbitals.energies()->block({axes::alpha()});
+    const auto& wf_energies_beta =
+        wf_orbitals.energies()->block({axes::beta()});
 
     // Check alpha energies
     if (ham_energies_alpha.size() != wf_energies_alpha.size()) {

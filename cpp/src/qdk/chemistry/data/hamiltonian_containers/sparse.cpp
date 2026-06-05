@@ -110,11 +110,14 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
     double core_energy, HamiltonianType type)
     : HamiltonianContainer(
-          Eigen::MatrixXd(one_body_integrals),
+          make_spin_diagonal_rank2_sbt(Eigen::MatrixXd(one_body_integrals),
+                                       Eigen::MatrixXd{}, /*restricted=*/true),
           _make_orbitals(static_cast<int>(one_body_integrals.rows())),
           core_energy,
-          Eigen::MatrixXd::Zero(one_body_integrals.rows(),
-                                one_body_integrals.cols()),
+          make_spin_diagonal_rank2_sbt(
+              Eigen::MatrixXd(Eigen::MatrixXd::Zero(one_body_integrals.rows(),
+                                                    one_body_integrals.cols())),
+              Eigen::MatrixXd{}),
           type),
       _one_body_sparse(std::move(one_body_integrals)),
       _two_body_sparse(std::move(two_body)) {}
@@ -122,7 +125,7 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
 std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
     const {
   return std::make_unique<SparseHamiltonianContainer>(
-      _one_body_sparse, sparse_two_body_integrals(), _core_energy, _type);
+      _one_body_sparse, _two_body_sparse, _core_energy, _type);
 }
 
 std::string SparseHamiltonianContainer::get_container_type() const {
