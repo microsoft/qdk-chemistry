@@ -125,10 +125,8 @@ def test_qdk_iqpe_zassenhaus_h2_sto3g_ground_state_energy() -> None:
     )
 
     # Use second-order Zassenhaus with enough divisions to keep the finite-step
-    # error below chemical accuracy.  A single second-order step improves the
-    # full unitary approximation but can still land on a worse 12-bit QPE phase
-    # grid point; splitting the same evolution into two smaller steps removes
-    # that accidental grid-level regression.
+    # error below chemical accuracy (simulating a method deployable on near-term
+    # hardware).
     evolution_time = 1.0
     zassenhaus_order = 2
     zassenhaus_num_divisions = 2
