@@ -1187,18 +1187,7 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version_str;
     version_attr.read(string_type, version_str);
-    if (version_str == "0.1.0") {
-      // Deprecated v0.1.0 format — accepted for backward compatibility.
-      // Re-save the file via to_hdf5() to upgrade to the current format.
-      QDK_LOGGER().warn(
-          "Loading deprecated Orbitals HDF5 format v0.1.0; the current "
-          "format is v{}. Backward compatibility for v0.1.0 will be "
-          "removed in a future release — re-save the file with to_hdf5() "
-          "to upgrade.",
-          SERIALIZATION_VERSION);
-    } else {
-      validate_serialization_version(SERIALIZATION_VERSION, version_str);
-    }
+    validate_serialization_version(SERIALIZATION_VERSION, version_str);
 
     // Check type information in metadata (if present) to handle ModelOrbitals
     std::string type_name = "Orbitals";  // Default
@@ -1411,19 +1400,8 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
     }
-    const auto version_str = j["version"].get<std::string>();
-    if (version_str == "0.1.0") {
-      // Deprecated v0.1.0 format — accepted for backward compatibility.
-      // Re-save the file via to_json() to upgrade to the current format.
-      QDK_LOGGER().warn(
-          "Loading deprecated Orbitals JSON format v0.1.0; the current "
-          "format is v{}. Backward compatibility for v0.1.0 will be "
-          "removed in a future release — re-save the file with to_json() "
-          "to upgrade.",
-          SERIALIZATION_VERSION);
-    } else {
-      validate_serialization_version(SERIALIZATION_VERSION, version_str);
-    }
+    validate_serialization_version(SERIALIZATION_VERSION,
+                                   j["version"].get<std::string>());
 
     // Check if this is a ModelOrbitals type (both new and old formats)
     if (j.contains("type") && j["type"] == "ModelOrbitals") {
@@ -1490,58 +1468,23 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
       has_inactive_indices = true;
     }
 
-    if (coefficients_sbt) {
-      auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
-                                                 ao_overlap, basis_set);
-      if (has_active_indices) {
-        orbitals->_active_space_indices = {std::move(active_indices_alpha),
-                                           std::move(active_indices_beta)};
-      }
-      if (has_inactive_indices) {
-        orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
-                                             std::move(inactive_indices_beta)};
-      }
-      orbitals->_build_space_index_sets();
-      orbitals->_post_construction_validate();
-      return orbitals;
-    }
-
-    if (!j["coefficients"].contains("alpha") ||
-        !j["coefficients"].contains("beta")) {
-      throw std::invalid_argument("JSON missing required coefficient data");
-    }
-    if (!j.contains("is_restricted")) {
+    if (!coefficients_sbt) {
       throw std::invalid_argument(
-          "JSON missing required 'is_restricted' field");
+          "JSON missing required SymmetryBlockedTensor coefficient data");
     }
-    const auto is_restricted = j["is_restricted"].get<bool>();
-    auto coeffs_alpha = json_to_matrix(j["coefficients"]["alpha"]);
-
-    std::optional<Eigen::VectorXd> energies_alpha, energies_beta;
-    if (j.contains("energies")) {
-      if (j["energies"].contains("alpha")) {
-        energies_alpha = json_to_vector(j["energies"]["alpha"]);
-      }
-      if (j["energies"].contains("beta")) {
-        energies_beta = json_to_vector(j["energies"]["beta"]);
-      }
+    auto orbitals = std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
+                                               ao_overlap, basis_set);
+    if (has_active_indices) {
+      orbitals->_active_space_indices = {std::move(active_indices_alpha),
+                                         std::move(active_indices_beta)};
     }
-
-    if (is_restricted) {
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, energies_alpha, ao_overlap, basis_set,
-          std::make_tuple(std::move(active_indices_alpha),
-                          std::move(inactive_indices_alpha)));
+    if (has_inactive_indices) {
+      orbitals->_inactive_space_indices = {std::move(inactive_indices_alpha),
+                                           std::move(inactive_indices_beta)};
     }
-
-    auto coeffs_beta = json_to_matrix(j["coefficients"]["beta"]);
-    return std::make_shared<Orbitals>(
-        coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, ao_overlap,
-        basis_set,
-        std::make_tuple(std::move(active_indices_alpha),
-                        std::move(active_indices_beta),
-                        std::move(inactive_indices_alpha),
-                        std::move(inactive_indices_beta)));
+    orbitals->_build_space_index_sets();
+    orbitals->_post_construction_validate();
+    return orbitals;
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Error parsing JSON: " + std::string(e.what()));
@@ -2036,19 +1979,8 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     // Validate version first (only if version field exists, for backward
     // compatibility)
     if (j.contains("version")) {
-      const auto ver = j["version"].get<std::string>();
-      if (ver == "0.1.0") {
-        // Deprecated v0.1.0 format — accepted for backward compatibility.
-        // Re-save the file via to_json() to upgrade to the current format.
-        QDK_LOGGER().warn(
-            "Loading deprecated ModelOrbitals JSON format v0.1.0; the "
-            "current format is v{}. Backward compatibility for v0.1.0 will "
-            "be removed in a future release — re-save the file with "
-            "to_json() to upgrade.",
-            SERIALIZATION_VERSION);
-      } else {
-        validate_serialization_version(SERIALIZATION_VERSION, ver);
-      }
+      validate_serialization_version(SERIALIZATION_VERSION,
+                                     j["version"].get<std::string>());
     }
 
     // Load required data
@@ -2168,18 +2100,7 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version;
     version_attr.read(string_type, version);
-    if (version == "0.1.0") {
-      // Deprecated v0.1.0 format — accepted for backward compatibility.
-      // Re-save the file via to_hdf5() to upgrade to the current format.
-      QDK_LOGGER().warn(
-          "Loading deprecated ModelOrbitals HDF5 format v0.1.0; the "
-          "current format is v{}. Backward compatibility for v0.1.0 will "
-          "be removed in a future release — re-save the file with "
-          "to_hdf5() to upgrade.",
-          SERIALIZATION_VERSION);
-    } else {
-      validate_serialization_version(SERIALIZATION_VERSION, version);
-    }
+    validate_serialization_version(SERIALIZATION_VERSION, version);
 
     // Load metadata
     H5::Group metadata_group = group.openGroup("metadata");

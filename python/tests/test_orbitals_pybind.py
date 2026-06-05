@@ -1,4 +1,4 @@
-"""Tests for the SBT-native Orbitals / SingleParticleBasis pybind surface."""
+"""Tests for the SBT-native Orbitals pybind surface."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -12,8 +12,6 @@ import pytest
 
 from qdk_chemistry.data import (
     Orbitals,
-    SingleParticleBasis,
-    ao_symmetries,
 )
 from qdk_chemistry.data import symmetry as sym
 
@@ -29,18 +27,12 @@ def restricted_spin():
     return syms, alpha, beta
 
 
-def test_orbitals_is_single_particle_basis():
-    """Orbitals is a subclass of the SingleParticleBasis abstraction."""
-    assert issubclass(Orbitals, SingleParticleBasis)
-
-
 def test_v1_restricted_orbitals_expose_sbt_accessors():
     """An RHF Orbitals built from dense data exposes SBT-native containers."""
     coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 1.0]])
     basis_set = create_test_basis_set(3, "test-sbt-restricted")
     orb = Orbitals(coeffs, None, None, basis_set)
 
-    assert isinstance(orb, SingleParticleBasis)
     assert orb.num_modes() == orb.get_num_molecular_orbitals()
 
     coeff_sbt = orb.coefficients()
@@ -90,19 +82,3 @@ def test_sbt_native_constructor_round_trips(restricted_spin):
     assert orb.num_modes() == nmo
     assert np.allclose(orb.coefficients().block((alpha, alpha)), coeffs)
     assert np.allclose(orb.energies().block((alpha,)), energies)
-
-
-def test_ao_symmetries_helper_returns_basis_symmetries():
-    """ao_symmetries() returns the basis set's AO symmetries for Orbitals."""
-    coeffs = np.array([[0.9, 0.1], [0.1, -0.9], [0.0, 1.0]])
-    basis_set = create_test_basis_set(3, "test-ao-sym")
-    orb = Orbitals(coeffs, None, None, basis_set)
-
-    syms = ao_symmetries(orb)
-    assert syms is not None
-    assert syms == basis_set.ao_symmetries()
-
-
-def test_ao_symmetries_helper_returns_none_for_none():
-    """ao_symmetries(None) returns None."""
-    assert ao_symmetries(None) is None

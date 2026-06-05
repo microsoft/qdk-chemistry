@@ -9,23 +9,21 @@
 #include <memory>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/single_particle_basis.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 
 #include "../ut_common.hpp"
 
 using namespace qdk::chemistry::data;
 
-TEST(OrbitalsSbtTest, IsSingleParticleBasis) {
+TEST(OrbitalsSbtTest, ExposesModeSymmetryLayout) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(3, 3);
   auto basis = testing::create_random_basis_set(c.rows());
   auto orbitals =
       std::make_shared<Orbitals>(c, std::nullopt, std::nullopt, basis);
-  std::shared_ptr<const SingleParticleBasis> spb = orbitals;
-  EXPECT_EQ(spb->num_modes(), 3u);
-  EXPECT_EQ(spb->mo_extents().at(axes::alpha()), 3u);
-  EXPECT_EQ(spb->mo_extents().at(axes::beta()), 3u);
-  EXPECT_NE(spb->symmetries(), nullptr);
+  EXPECT_EQ(orbitals->num_modes(), 3u);
+  EXPECT_EQ(orbitals->mo_extents().at(axes::alpha()), 3u);
+  EXPECT_EQ(orbitals->mo_extents().at(axes::beta()), 3u);
+  EXPECT_NE(orbitals->symmetries(), nullptr);
 }
 
 TEST(OrbitalsSbtTest, RestrictedCoefficientsAlias) {

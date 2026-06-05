@@ -106,9 +106,9 @@ class TestHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2
@@ -327,9 +327,9 @@ class TestHamiltonian:
         h = create_test_hamiltonian(1)
         data = json.loads(h.to_json())
         assert data["container"]["core_energy"] == 0.0
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "two_body_integrals" in data["container"]
+        assert "orbitals" in data["container"]
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 1
         assert h2.get_core_energy() == 0.0
@@ -694,9 +694,9 @@ class TestCholeskyHamiltonian:
         data = json.loads(h.to_json())
         assert isinstance(data, dict)
         assert data["container"]["core_energy"] == 1.5
-        assert data["container"]["has_one_body_integrals"] is True
-        assert data["container"]["has_two_body_integrals"] is True
-        assert data["container"]["has_orbitals"] is True
+        assert "one_body_integrals" in data["container"]
+        assert "three_center_integrals" in data["container"]
+        assert "orbitals" in data["container"]
 
         h2 = Hamiltonian.from_json(json.dumps(data))
         assert h2.get_orbitals().get_num_molecular_orbitals() == 2

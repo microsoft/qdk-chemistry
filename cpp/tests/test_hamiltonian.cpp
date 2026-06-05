@@ -664,7 +664,7 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there is an index out of bounds
   EXPECT_THROW(
@@ -678,7 +678,7 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there are repeated indices in the active space
   EXPECT_THROW(

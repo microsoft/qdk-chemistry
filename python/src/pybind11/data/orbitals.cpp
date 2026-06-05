@@ -11,7 +11,6 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/single_particle_basis.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
@@ -64,9 +63,8 @@ void bind_orbitals(py::module &data) {
   using namespace qdk::chemistry::data;
   using qdk::chemistry::python::utils::bind_getter_as_property;
 
-  py::class_<Orbitals, SingleParticleBasis, py::smart_holder> orbitals(
-      data, "Orbitals",
-      R"(
+  py::class_<Orbitals, DataClass, py::smart_holder> orbitals(data, "Orbitals",
+                                                             R"(
 Represents molecular orbitals with coefficients and energies.
 
 This class stores and manipulates molecular orbital data including:
@@ -221,6 +219,15 @@ Args:
   orbitals.def("energies", &Orbitals::energies,
                "The orbital energies as a rank-1 "
                "SymmetryBlockedTensor.");
+  orbitals.def(
+      "symmetries", &Orbitals::symmetries,
+      "SymmetryProduct the molecular-orbital modes are blocked under.");
+  orbitals.def("mo_extents", &Orbitals::mo_extents,
+               "Per-label mode extents (number of molecular orbitals carrying "
+               "each label).");
+  orbitals.def("num_modes", &Orbitals::num_modes,
+               "Total number of molecular-orbital modes across all symmetry "
+               "blocks.");
   orbitals.def("get_coefficients", &Orbitals::get_coefficients,
                R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.
@@ -852,33 +859,6 @@ Examples:
 
   // Data type name class attribute
   orbitals.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Orbitals);
-
-  // Free helper: AO symmetries backing a single-particle basis (nullptr/None
-  // for model systems without an underlying AO basis set).
-  data.def(
-      "ao_symmetries",
-      [](const std::shared_ptr<const SingleParticleBasis> &basis)
-          -> std::shared_ptr<const SymmetryProduct> {
-        auto orbitals = std::dynamic_pointer_cast<const Orbitals>(basis);
-        if (!orbitals || !orbitals->has_basis_set()) {
-          return nullptr;
-        }
-        return orbitals->get_basis_set()->ao_symmetries();
-      },
-      py::arg("basis"),
-      R"(
-Return the AO-basis SymmetryProduct backing a single-particle basis.
-
-For :class:`Orbitals` carrying a basis set, this returns the AO symmetries of
-that basis set. For :class:`ModelOrbitals` (or any single-particle basis
-without an underlying AO basis set), it returns ``None``.
-
-Args:
-    basis: Single-particle basis to inspect (may be ``None``).
-
-Returns:
-    The AO SymmetryProduct, or ``None`` if the basis has no underlying AO basis set.
-)");
 
   // Bind ModelOrbitals
   bind_model_orbitals(data);

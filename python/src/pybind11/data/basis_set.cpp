@@ -225,14 +225,14 @@ Examples:
 
   basis_set.def(
       py::init([](const std::string& name, const py::list& shells,
-                  const Structure& structure,
+                  std::shared_ptr<Structure> structure,
                   std::shared_ptr<const SymmetryProduct> ao_symmetries,
                   std::unordered_map<SymmetryLabel, std::size_t> ao_extents,
                   AOType atomic_orbital_type) {
-        return std::make_shared<BasisSet>(name, shells_from_py_list(shells),
-                                          structure, std::move(ao_symmetries),
-                                          std::move(ao_extents),
-                                          atomic_orbital_type);
+        return std::make_shared<BasisSet>(
+            name, shells_from_py_list(shells), std::move(structure),
+            std::move(ao_symmetries), std::move(ao_extents),
+            atomic_orbital_type);
       }),
       R"(
 Constructor with explicit AO symmetries.

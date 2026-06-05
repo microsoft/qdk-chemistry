@@ -57,7 +57,7 @@ void SymmetryBlockedIndexSet::_validate_indices() const {
     const auto& list = *ptr;
     for (std::size_t i = 0; i < list.size(); ++i) {
       if (list[i] >= extent) {
-        throw std::invalid_argument(
+        throw std::out_of_range(
             "SymmetryBlockedIndexSet index exceeds the declared extent.");
       }
       if (i > 0 && list[i] <= list[i - 1]) {

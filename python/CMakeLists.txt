@@ -122,7 +122,6 @@ pybind11_add_module(_core
     src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
     src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
     src/pybind11/data/element_data.cpp
-    src/pybind11/data/single_particle_basis.cpp
     src/pybind11/data/orbitals.cpp
     src/pybind11/data/wavefunction.cpp
     src/pybind11/data/hamiltonian.cpp

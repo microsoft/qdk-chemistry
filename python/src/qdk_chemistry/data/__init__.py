@@ -98,7 +98,6 @@ from qdk_chemistry._core.data import (
     SettingTypeMismatch,
     SettingValue,
     Shell,
-    SingleParticleBasis,
     SlaterDeterminantContainer,
     SparseHamiltonianContainer,
     SpinChannel,
@@ -108,7 +107,6 @@ from qdk_chemistry._core.data import (
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
-    ao_symmetries,
     get_current_ciaaw_version,
 )
 from qdk_chemistry.data.base import DataClass
@@ -192,7 +190,6 @@ __all__ = [
     "SettingsAreLocked",
     "SettingsAreLockedError",
     "Shell",
-    "SingleParticleBasis",
     "SlaterDeterminantContainer",
     "SparseHamiltonianContainer",
     "SpinChannel",
@@ -208,6 +205,5 @@ __all__ = [
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
-    "ao_symmetries",
     "get_current_ciaaw_version",
 ]

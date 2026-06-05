@@ -42,7 +42,7 @@ TEST(SymmetryBlockedIndexSetTest, OutOfRangeRejected) {
                   std::vector<std::uint32_t>{0, 3});
 
   EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-               std::invalid_argument);
+               std::out_of_range);
 }
 
 TEST(SymmetryBlockedIndexSetTest, UnsortedRejected) {
@@ -166,7 +166,7 @@ TEST(SymmetryBlockedIndexSetTest, AsymmetricExtentsEnforcedPerLabel) {
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
         {alpha, {0u, 8u}}, {beta, {1u}}};
     EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-                 std::invalid_argument);
+                 std::out_of_range);
   }
   {
     // 6 is out of range for beta's universe of size 6 (valid range [0,6))
@@ -176,6 +176,6 @@ TEST(SymmetryBlockedIndexSetTest, AsymmetricExtentsEnforcedPerLabel) {
     std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
         {alpha, {0u, 5u}}, {beta, {0u, 6u}}};
     EXPECT_THROW(SymmetryBlockedIndexSet(spin_symmetries(), extents, indices),
-                 std::invalid_argument);
+                 std::out_of_range);
   }
 }

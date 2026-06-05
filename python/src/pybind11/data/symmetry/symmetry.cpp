@@ -9,7 +9,6 @@
 #include <memory>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -19,27 +18,7 @@ namespace py = pybind11;
 using namespace qdk::chemistry::data;
 using qdk::chemistry::python::utils::to_string_path;
 
-void bind_symmetry_errors(py::module&) {
-  py::register_exception_translator([](std::exception_ptr p) {
-    try {
-      if (p) {
-        std::rethrow_exception(p);
-      }
-    } catch (const std::invalid_argument& e) {
-      PyErr_SetString(PyExc_ValueError, e.what());
-    } catch (const std::out_of_range& e) {
-      PyErr_SetString(PyExc_IndexError, e.what());
-    } catch (const std::runtime_error& e) {
-      PyErr_SetString(PyExc_RuntimeError, e.what());
-    } catch (const std::exception& e) {
-      PyErr_SetString(PyExc_Exception, e.what());
-    }
-  });
-}
-
 void bind_symmetry(py::module& symmetry) {
-  bind_symmetry_errors(symmetry);
-
   py::enum_<AxisName>(symmetry, "AxisName", "Symmetry axis identifier.")
       .value("Spin", AxisName::Spin);
 

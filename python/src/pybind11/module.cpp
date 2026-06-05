@@ -14,7 +14,6 @@ void bind_symmetry_blocked_tensor(py::module& m);
 void bind_symmetry_blocked_index_set(py::module& m);
 void bind_symmetry_blocked_sparse_map(py::module& m);
 void bind_element_data(py::module& m);
-void bind_single_particle_basis(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
@@ -74,7 +73,6 @@ PYBIND11_MODULE(_core, m) {
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
-  bind_single_particle_basis(data);  // abstract base before Orbitals
   bind_orbitals(data);
   bind_lattice_graph(data);
   bind_hamiltonian(data);

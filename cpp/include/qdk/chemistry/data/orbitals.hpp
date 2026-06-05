@@ -11,7 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/single_particle_basis.hpp>
+#include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -37,7 +37,7 @@ namespace qdk::chemistry::data {
  * This class is immutable after construction - all data must be provided
  * during construction and cannot be modified afterward.
  */
-class Orbitals : public SingleParticleBasis,
+class Orbitals : public DataClass,
                  public std::enable_shared_from_this<Orbitals> {
  public:
   typedef std::tuple<std::vector<size_t>, std::vector<size_t>>
@@ -140,19 +140,19 @@ class Orbitals : public SingleParticleBasis,
    * @brief Single-particle symmetries over the molecular-orbital modes.
    * @return Shared pointer to the molecular-orbital symmetries
    */
-  std::shared_ptr<const SymmetryProduct> symmetries() const override;
+  std::shared_ptr<const SymmetryProduct> symmetries() const;
 
   /**
    * @brief Molecular-orbital extents keyed by symmetry label.
    * @return Map from symmetry label to number of molecular orbitals
    */
-  std::unordered_map<SymmetryLabel, std::size_t> mo_extents() const override;
+  std::unordered_map<SymmetryLabel, std::size_t> mo_extents() const;
 
   /**
    * @brief Number of single-particle modes (molecular orbitals).
    * @return Number of molecular orbitals
    */
-  std::size_t num_modes() const override;
+  std::size_t num_modes() const;
 
   /**
    * @brief Get orbital coefficients
