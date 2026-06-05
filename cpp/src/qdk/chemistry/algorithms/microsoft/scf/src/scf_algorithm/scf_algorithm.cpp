@@ -394,6 +394,8 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
 
   effective_fock = temp_rhs.transpose();
   if (!effective_fock.isApprox(effective_fock.transpose())) {
+    QDK_LOGGER().warn(
+        "Effective Fock matrix in AO is far from symmetric. Symmetrizing...");
     effective_fock = 0.5 * (effective_fock + effective_fock.transpose().eval());
   }
 }

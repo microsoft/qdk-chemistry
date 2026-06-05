@@ -1050,12 +1050,12 @@ SCFImpl::evaluate_trial_density_energy_and_fock(
     const std::source_location& loc) const {
   QDK_LOG_TRACE_ENTERING();
 
-  // TODO: This function is called within iterate_ which runs only on rank 0,
-  // but build_jk_matrices requires participation from all MPI ranks.
   if (ctx_.cfg->mpi.world_size > 1) {
     throw std::runtime_error(
         "Temporary limitation: evaluate_trial_density_energy_and_fock is not "
-        "supported with MPI world_size > 1.");
+        "supported with MPI world_size > 1. This function is called within "
+        "iterate_ which runs only on rank 0, but build_jk_matrices requires "
+        "all MPI ranks.");
   }
 
   QDK_LOGGER().debug(
