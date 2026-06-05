@@ -6,13 +6,11 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from functools import cached_property
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    ControlledUnitary,
     QpeResult,
     QuantumErrorProfile,
     QubitHamiltonian,
@@ -28,21 +26,15 @@ class PhaseEstimationSettings(Settings):
     def __init__(self):
         """Initialize the settings for Phase Estimation.
 
-        Includes nested algorithm references for the evolution builder,
-        circuit mapper, and circuit executor.
+        Includes nested algorithm references for the circuit builder
+        and circuit executor.
 
         """
         super().__init__()
-        self._set_default("num_bits", "int", -1, "The number of phase bits to estimate.")
         self._set_default(
-            "unitary_builder",
+            "qpe_circuit_builder",
             "algorithm_ref",
-            AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
-        )
-        self._set_default(
-            "circuit_mapper",
-            "algorithm_ref",
-            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            AlgorithmRef("qpe_circuit_builder", "qdk_iterative"),
         )
         self._set_default(
             "circuit_executor",
@@ -54,16 +46,10 @@ class PhaseEstimationSettings(Settings):
 class PhaseEstimation(Algorithm):
     """Abstract base class for phase estimation algorithms."""
 
-    def __init__(self, num_bits: int = -1):
-        """Initialize the PhaseEstimation with default settings.
-
-        Args:
-            num_bits: The number of phase bits to estimate. Default to -1; user needs to set a valid value.
-
-        """
+    def __init__(self):
+        """Initialize the PhaseEstimation with default settings."""
         super().__init__()
         self._settings = PhaseEstimationSettings()
-        self._settings.set("num_bits", num_bits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as phase_estimation."""
@@ -97,36 +83,6 @@ class PhaseEstimation(Algorithm):
 
         """
 
-    @cached_property
-    def unitary_builder(self):
-        """The nested unitary builder algorithm instance."""
-        return self._create_nested("unitary_builder")
-
-    def _create_controlled_circuit(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-        power: int,
-    ) -> Circuit:
-        r"""Create the controlled circuit for the given Hamiltonian and power.
-
-        Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
-        according to its ``power_strategy``, then maps the result to a controlled circuit.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
-            power: The power to which the unitary should be raised.
-
-        Returns:
-            The controlled circuit implementing controlled-:math:`U^{\\text{power}}`.
-
-        """
-        unitary_builder = self._create_nested("unitary_builder")
-        unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
-        circuit_mapper = self._create_nested("circuit_mapper")
-        return circuit_mapper.run(controlled_unitary=controlled_unitary)
-
 
 class PhaseEstimationFactory(AlgorithmFactory):
     """Factory class for creating PhaseEstimation instances."""
@@ -140,5 +96,5 @@ class PhaseEstimationFactory(AlgorithmFactory):
         return "phase_estimation"
 
     def default_algorithm_name(self) -> str:
-        """Return the iterative as default algorithm name."""
-        return "iterative"
+        """Return the qdk_iterative as default algorithm name."""
+        return "qdk_iterative"
