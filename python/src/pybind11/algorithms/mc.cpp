@@ -158,7 +158,9 @@ Returns:
 
 )");
 
-  qdk::chemistry::python::add_hash_method(mc_calculator);
+  mc_calculator.def("hash", &MultiConfigurationCalculator::hash,
+                    py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
+                    py::arg("n_active_beta_electrons"));
 
   // Factory class binding - creates MultiConfigurationCalculatorFactory class
   // with static methods

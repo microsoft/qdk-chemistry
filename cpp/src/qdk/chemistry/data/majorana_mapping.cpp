@@ -17,6 +17,27 @@
 
 namespace qdk::chemistry::data {
 
+namespace {
+
+void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
+                            const SparsePauliWord& word) {
+  ctx.update(static_cast<std::uint64_t>(word.size()));
+  for (const auto& [qubit, op] : word) {
+    ctx.update(static_cast<std::uint64_t>(qubit));
+    ctx.update(op);
+  }
+}
+
+void hash_bilinear_entry(
+    qdk::chemistry::utils::HashContext& ctx,
+    const std::pair<std::complex<double>, SparsePauliWord>& entry) {
+  ctx.update(entry.first.real());
+  ctx.update(entry.first.imag());
+  hash_sparse_pauli_word(ctx, entry.second);
+}
+
+}  // namespace
+
 // ── MajoranaMapping implementation ───────────────────────────────────
 
 MajoranaMapping::MajoranaMapping(
@@ -302,6 +323,33 @@ std::size_t MajoranaMapping::compute_num_qubits(
     }
   }
   return has_any ? static_cast<std::size_t>(max_idx + 1) : 0;
+}
+
+void MajoranaMapping::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(name_);
+  ctx.update(base_encoding_);
+  ctx.update(static_cast<std::uint64_t>(num_modes_));
+  ctx.update(static_cast<std::uint64_t>(num_qubits_));
+  ctx.update(majorana_atomic_);
+
+  ctx.update(static_cast<std::uint64_t>(table_.size()));
+  for (const auto& word : table_) {
+    hash_sparse_pauli_word(ctx, word);
+  }
+
+  ctx.update(static_cast<std::uint64_t>(bilinears_.size()));
+  for (const auto& entry : bilinears_) {
+    hash_bilinear_entry(ctx, entry);
+  }
+
+  if (tapering_) {
+    ctx.update(std::uint8_t{1});
+    ctx.update(tapering_->content_hash());
+  } else {
+    ctx.update(std::uint8_t{0});
+  }
 }
 
 }  // namespace qdk::chemistry::data

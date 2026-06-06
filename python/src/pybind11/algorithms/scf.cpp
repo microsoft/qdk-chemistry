@@ -163,7 +163,16 @@ Returns:
 
 )");
 
-  qdk::chemistry::python::add_hash_method(scf_solver);
+  scf_solver.def(
+      "hash",
+      [](const ScfSolver &solver,
+         std::shared_ptr<qdk::chemistry::data::Structure> structure, int charge,
+         int spin_multiplicity, BasisOrGuessType basis_or_guess) {
+        return solver.hash(structure, charge, spin_multiplicity,
+                           basis_or_guess);
+      },
+      py::arg("structure"), py::arg("charge"), py::arg("spin_multiplicity"),
+      py::arg("basis_or_guess"));
 
   // Factory class binding - creates ScfSolverFactory class with static methods
   bind_algorithm_factory<ScfSolverFactory, ScfSolver, ScfSolverBase>(

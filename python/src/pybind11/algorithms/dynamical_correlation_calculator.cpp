@@ -121,7 +121,8 @@ Returns:
   str: The type name of the algorithm
         )");
 
-  qdk::chemistry::python::add_hash_method(ref_calc);
+  ref_calc.def("hash", &DynamicalCorrelationCalculator::hash,
+               py::arg("ansatz"));
 
   ref_calc.def("settings", &DynamicalCorrelationCalculator::settings,
                R"(

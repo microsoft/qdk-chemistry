@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -192,6 +193,16 @@ TaperingSpecification TaperingSpecification::from_file(
     return from_hdf5_file(filename);
   }
   throw std::invalid_argument("Unsupported format type: " + type);
+}
+
+void TaperingSpecification::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  ctx.update(get_data_type_name());
+  ctx.update(qubit_indices_);
+  ctx.update(static_cast<std::uint64_t>(eigenvalues_.size()));
+  for (auto eigenvalue : eigenvalues_) {
+    ctx.update(static_cast<std::int64_t>(eigenvalue));
+  }
 }
 
 }  // namespace qdk::chemistry::data

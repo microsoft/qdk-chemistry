@@ -131,6 +131,9 @@ class TaperingSpecification : public DataClass {
   std::vector<std::size_t> qubit_indices_;
   std::vector<int> eigenvalues_;
 
+  /// Feed the tapering specification's identifying data into a content hash.
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Serialization schema version.
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };

@@ -159,7 +159,9 @@ Returns:
 
 )");
 
-  qdk::chemistry::python::add_hash_method(multi_configuration_scf);
+  multi_configuration_scf.def(
+      "hash", &MultiConfigurationScf::hash, py::arg("orbitals"),
+      py::arg("n_active_alpha_electrons"), py::arg("n_active_beta_electrons"));
 
   multi_configuration_scf.def("__repr__", [](const MultiConfigurationScf&) {
     return "<qdk_chemistry.algorithms.MultiConfigurationScf>";

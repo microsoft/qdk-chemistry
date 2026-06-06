@@ -1996,6 +1996,16 @@ void Settings::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
             ctx.update(uint8_t(6));
             ctx.update(static_cast<uint64_t>(v.size()));
             for (const auto& val : v) ctx.update(val);
+          } else if constexpr (std::is_same_v<T, AlgorithmRef>) {
+            ctx.update(uint8_t(7));
+            ctx.update(v.get_algorithm_type());
+            ctx.update(v.get_algorithm_name());
+            if (v.get_settings()) {
+              ctx.update(true);
+              ctx.update(v.get_settings()->content_hash());
+            } else {
+              ctx.update(false);
+            }
           }
         },
         value);

@@ -85,9 +85,11 @@ class DataClass {
    * @brief Compute a deterministic content hash of this object's identifying
    * data.
    *
-   * Returns a truncated SHA-256 hex digest (16 hex chars = 64 bits by default).
-   * Two objects with identical defining data will produce identical hashes.
-   * Lazy/cached data is excluded; only constructor-supplied data participates.
+   * Returns a truncated hex digest (16 hex chars = 64 bits by default). Two
+   * objects with identical defining data will produce identical hashes within a
+   * compatible build. Lazy/cached data is excluded; only constructor-supplied
+   * data participates. Content hashes are cache keys for checkpoint/restart
+   * workflows, not stable archival identifiers across releases.
    *
    * @param truncate_chars Number of hex characters in the result (default 16)
    * @return Hex string content hash

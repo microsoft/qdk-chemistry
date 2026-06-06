@@ -22,12 +22,16 @@ namespace qdk::chemistry::utils {
 
 /**
  * @class HashContext
- * @brief Streaming SHA-256 hash context for computing content hashes.
+ * @brief Streaming context for deterministic content hashes.
  *
- * Provides an incremental/streaming interface for feeding data into a SHA-256
- * digest. Supports Eigen matrices, vectors, sparse matrices, and primitive
- * types. The SHA-256 implementation is self-contained (FIPS 180-4) with no
- * external dependencies.
+ * Provides an incremental interface for feeding data into a content digest.
+ * Producers must add fields in a deterministic order; this is a sequential
+ * streaming hash interface, not a tree hash suitable for parallel producers.
+ * Supports Eigen matrices, vectors, sparse matrices, and primitive types.
+ *
+ * Content hashes are intended for cache keys and checkpoint/restart workflows
+ * among compatible builds. They are not a data preservation format, and the
+ * exact digest values are not guaranteed to remain stable across releases.
  *
  * Usage:
  * @code

@@ -147,7 +147,8 @@ Returns:
     str: The type name of the algorithm
 )");
 
-  qdk::chemistry::python::add_hash_method(stability_checker);
+  stability_checker.def("hash", &StabilityChecker::hash,
+                        py::arg("wavefunction"));
 
   // Factory class binding - creates StabilityCheckerFactory class with static
   // methods

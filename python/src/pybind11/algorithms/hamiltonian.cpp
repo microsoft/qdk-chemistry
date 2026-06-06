@@ -156,7 +156,8 @@ Returns:
 
 )");
 
-  qdk::chemistry::python::add_hash_method(hamiltonian_constructor);
+  hamiltonian_constructor.def("hash", &HamiltonianConstructor::hash,
+                              py::arg("orbitals"));
 
   // Factory class binding - creates HamiltonianConstructorFactory class with
   // static methods

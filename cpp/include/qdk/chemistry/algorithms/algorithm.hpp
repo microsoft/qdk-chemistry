@@ -4,16 +4,18 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "qdk/chemistry/algorithms/detail/algorithm_hash.hpp"
 #include "qdk/chemistry/data/settings.hpp"
+#include "qdk/chemistry/utils/hash_context.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -59,6 +61,27 @@ class Algorithm {
   virtual ReturnType run(Args... args) const {
     this->lock_settings();
     return this->_run_impl(std::forward<Args>(args)...);
+  }
+
+  /**
+   * @brief Compute a deterministic content hash for a run with these inputs.
+   *
+   * Hashes the algorithm type, algorithm name, current settings, and arguments
+   * that would be passed to run(). The result identifies a run for cache and
+   * checkpoint/restart workflows among compatible builds.
+   *
+   * @param args Arguments that would be forwarded to run()
+   * @return 16-character hex content hash
+   */
+  virtual std::string hash(Args... args) const {
+    qdk::chemistry::utils::HashContext ctx;
+    ctx.update(std::string("qdk-chemistry.algorithm-run.v1"));
+    ctx.update(this->type_name());
+    ctx.update(this->name());
+    ctx.update(this->_settings->content_hash());
+    ctx.update(static_cast<uint64_t>(sizeof...(Args)));
+    (detail::hash_algorithm_arg(ctx, args), ...);
+    return ctx.hexdigest();
   }
 
   /**
