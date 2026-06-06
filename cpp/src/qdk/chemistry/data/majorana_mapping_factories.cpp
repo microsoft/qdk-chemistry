@@ -407,8 +407,15 @@ std::vector<std::pair<int, int>> vc_recover_coords(
   std::vector<std::pair<int, int>> coord(n, {-1, -1});
   std::map<std::pair<int, int>, std::size_t> pos;
   auto assign = [&](std::size_t v, int x, int y) {
-    coord[v] = {x, y};
-    pos[{x, y}] = v;
+    const auto key = std::make_pair(x, y);
+    const auto existing = pos.find(key);
+    if (existing != pos.end() && existing->second != v) {
+      throw std::invalid_argument(
+          "MajoranaMapping::verstraete_cirac: coordinate recovery assigned "
+          "multiple vertices to the same grid position");
+    }
+    coord[v] = key;
+    pos[key] = v;
   };
   assign(corner, 0, 0);
   assign(a0, 1, 0);

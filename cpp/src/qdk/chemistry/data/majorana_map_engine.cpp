@@ -8,13 +8,13 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -563,10 +563,23 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
   const double lambda = one_norm + 1.0;
 
-  std::map<SparsePauliWord, std::complex<double>> merged;
+  std::unordered_map<SparsePauliWord, std::complex<double>, SparsePauliWordHash>
+      merged;
+  merged.reserve(result.words.size() + stabilizers.size() + 1);
   for (std::size_t i = 0; i < result.words.size(); ++i) {
     merged[result.words[i]] += result.coefficients[i];
   }
+
+  // Penalty words must survive thresholding even when they partially cancel
+  // with existing Hamiltonian terms; otherwise codespace lifting is lost.
+  std::unordered_set<SparsePauliWord, SparsePauliWordHash> protected_words;
+  protected_words.reserve(stabilizers.size() + 1);
+  protected_words.insert(SparsePauliWord{});
+  for (const auto& [coeff, word] : stabilizers) {
+    (void)coeff;
+    protected_words.insert(word);
+  }
+
   merged[SparsePauliWord{}] += std::complex<double>(
       lambda * static_cast<double>(stabilizers.size()), 0.0);
   for (const auto& [coeff, word] : stabilizers) {
@@ -577,7 +590,7 @@ MajoranaMapResult majorana_map_hamiltonian(
   penalized.words.reserve(merged.size());
   penalized.coefficients.reserve(merged.size());
   for (auto& [word, coeff] : merged) {
-    if (std::abs(coeff) >= threshold) {
+    if (protected_words.count(word) || std::abs(coeff) >= threshold) {
       penalized.words.push_back(word);
       penalized.coefficients.push_back(coeff);
     }

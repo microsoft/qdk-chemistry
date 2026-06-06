@@ -124,6 +124,22 @@ class TestVerstraeteCiracSpectrum:
 
         assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
 
+    def test_hubbard_2x2_spectrum_survives_threshold(self) -> None:
+        """Penalty terms are retained even when the mapper threshold is large."""
+        nx, ny = 2, 2
+        n_sites = nx * ny
+        _, hamiltonian = _hubbard(nx, ny, t=1.0, u=4.0)
+
+        jw = MajoranaMapping.jordan_wigner(num_modes=2 * n_sites)
+        jw_qh = create("qubit_mapper", "qdk").run(hamiltonian, jw)
+        jw_eigs = _lowest_eigenvalues_dense(jw_qh, k=4)
+
+        vc = MajoranaMapping.verstraete_cirac(LatticeGraph.square(nx, ny))
+        vc_qh = create("qubit_mapper", "qdk", threshold=1.0).run(hamiltonian, vc)
+        vc_eigs = _lowest_eigenvalues_sparse(vc_qh, k=4)
+
+        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
+
 
 class TestVerstraeteCiracLocality:
     """Hopping terms keep a finite, size-independent Pauli weight."""
@@ -189,3 +205,11 @@ class TestVerstraeteCiracSerialization:
         assert reloaded.num_modes == mapping.num_modes
         assert len(reloaded.stabilizers) == len(mapping.stabilizers)
         self._assert_same_qubit_hamiltonian(reloaded)
+
+    def test_json_rejects_too_small_num_qubits(self) -> None:
+        """Reject JSON whose explicit num_qubits is smaller than the Pauli words."""
+        mapping = MajoranaMapping.verstraete_cirac(LatticeGraph.square(2, 2))
+        data = mapping.to_json()
+        data["num_qubits"] = 1
+        with pytest.raises(ValueError, match="num_qubits"):
+            MajoranaMapping.from_json(data)

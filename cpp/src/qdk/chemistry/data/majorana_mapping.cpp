@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
 #include <complex>
 #include <cstdint>
 #include <fstream>
@@ -16,6 +17,52 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
+namespace {
+
+std::size_t max_qubits_in_word(const SparsePauliWord& word) {
+  std::uint64_t max_idx = 0;
+  bool has_any = false;
+  for (const auto& [qubit, _] : word) {
+    if (!has_any || qubit >= max_idx) {
+      max_idx = qubit;
+      has_any = true;
+    }
+  }
+  return has_any ? static_cast<std::size_t>(max_idx + 1) : 0;
+}
+
+std::size_t minimum_num_qubits(
+    const std::vector<SparsePauliWord>& table,
+    const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+        bilinears,
+    const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+        stabilizers) {
+  std::size_t min_qubits = 0;
+  auto bump = [&](const SparsePauliWord& word) {
+    min_qubits = std::max(min_qubits, max_qubits_in_word(word));
+  };
+  for (const auto& word : table) {
+    bump(word);
+  }
+  for (const auto& [_, word] : bilinears) {
+    bump(word);
+  }
+  for (const auto& [_, word] : stabilizers) {
+    bump(word);
+  }
+  return min_qubits;
+}
+
+void validate_num_qubits(std::size_t nq, std::size_t min_required) {
+  if (nq < min_required) {
+    throw std::invalid_argument(
+        "MajoranaMapping::from_json: num_qubits (" + std::to_string(nq) +
+        ") is smaller than required by the stored Pauli words (" +
+        std::to_string(min_required) + ")");
+  }
+}
+
+}  // namespace
 
 // ── MajoranaMapping implementation ───────────────────────────────────
 
@@ -251,7 +298,10 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     }
     auto mapping = MajoranaMapping::from_bilinears(
         num_modes, std::move(bilinears), base_encoding);
-    std::size_t nq = data.value("num_qubits", mapping.num_qubits_);
+    const std::size_t min_qubits =
+        minimum_num_qubits(mapping.table_, mapping.bilinears_, stabilizers);
+    std::size_t nq = data.value("num_qubits", min_qubits);
+    validate_num_qubits(nq, min_qubits);
     if (name == base_encoding && !tapering && stabilizers.empty() &&
         nq == mapping.num_qubits_) {
       return mapping;
@@ -262,7 +312,10 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
-  std::size_t nq = data.value("num_qubits", mapping.num_qubits_);
+  const std::size_t min_qubits =
+      minimum_num_qubits(mapping.table_, mapping.bilinears_, stabilizers);
+  std::size_t nq = data.value("num_qubits", min_qubits);
+  validate_num_qubits(nq, min_qubits);
   if (name == base_encoding && !tapering && stabilizers.empty() &&
       nq == mapping.num_qubits_) {
     return mapping;
