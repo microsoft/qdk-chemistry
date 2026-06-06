@@ -47,6 +47,16 @@ pr.settings().set("seed", 42)
 ################################################################################
 
 ################################################################################
+# start-cell-configure-zassenhaus
+# Configure a Zassenhaus-expansion builder: higher order cancels successively
+# higher commutator corrections, giving error O(t^(order+1)) at fixed step count.
+zassenhaus = create("hamiltonian_unitary_builder", "zassenhaus")
+zassenhaus.settings().set("order", 4)
+zassenhaus.settings().set("num_divisions", 1)
+# end-cell-configure-zassenhaus
+################################################################################
+
+################################################################################
 # start-cell-run
 import numpy as np
 from qdk_chemistry.algorithms import create
@@ -92,6 +102,6 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered time evolution builder implementations
 implementations = registry.available("hamiltonian_unitary_builder")
-print(implementations)  # e.g. ['trotter', 'qdrift', 'partially_randomized']
+print(implementations)  # e.g. ['trotter', 'qdrift', 'partially_randomized', 'zassenhaus']
 # end-cell-list-implementations
 ################################################################################

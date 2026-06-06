@@ -172,6 +172,15 @@ At :math:`p = 1` the construction reduces to the first-order Trotter product.
    The number of correction factors grows with the expansion order, since successively higher nested commutators must be cancelled.
    The expansion is most economical when those commutators are sparse.
 
+.. rubric:: Configuring settings
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-configure-zassenhaus
+      :end-before: # end-cell-configure-zassenhaus
+
 .. rubric:: Settings
 
 .. list-table::
