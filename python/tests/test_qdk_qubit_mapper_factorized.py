@@ -55,16 +55,33 @@ ENCODINGS = ["jordan_wigner", "bravyi_kitaev", "parity"]
 # ─── Equivalence helper ───────────────────────────────────────────────────
 
 
+def _sum_coefficients_by_pauli(qh) -> dict:
+    """Collapse a QubitHamiltonian into a {pauli_string: summed_coefficient} map.
+
+    Coefficients are summed per Pauli string so the comparison is correct even
+    if an operator ever emits the same Pauli string in more than one term
+    (rather than silently overwriting, as a plain ``dict(zip(...))`` would).
+    ``strict=True`` enforces equal lengths (and is required by the repo's
+    ``B905`` lint rule; the project already targets Python >= 3.10).
+    """
+    acc: dict = {}
+    for label, coeff in zip(qh.pauli_strings, qh.coefficients, strict=True):
+        acc[label] = acc.get(label, 0.0 + 0.0j) + coeff
+    return acc
+
+
 def _assert_term_by_term_equivalent(qh_reference, qh_candidate, atol: float = 1e-12) -> None:
     """Assert two QubitHamiltonians match term-by-term after canonical sorting.
 
     Terms present in one operator but not the other are treated as having a
     zero coefficient in the missing operator; such a term passes only if its
     coefficient magnitude is below ``atol`` (i.e. it was legitimately pruned by
-    the shared coefficient threshold).
+    the shared coefficient threshold). The ``1e-12`` absolute tolerance is the
+    bar mandated by issue #474; it is not flaky here because every fast path
+    drives the *same* C++ mapping arithmetic as the dense path.
     """
-    ref = dict(zip(qh_reference.pauli_strings, qh_reference.coefficients, strict=True))
-    cand = dict(zip(qh_candidate.pauli_strings, qh_candidate.coefficients, strict=True))
+    ref = _sum_coefficients_by_pauli(qh_reference)
+    cand = _sum_coefficients_by_pauli(qh_candidate)
 
     assert qh_reference.num_qubits == qh_candidate.num_qubits
 
