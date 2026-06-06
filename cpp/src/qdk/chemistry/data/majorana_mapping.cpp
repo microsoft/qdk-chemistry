@@ -183,15 +183,18 @@ nlohmann::json MajoranaMapping::to_json() const {
   // round-trip even when the Majorana table is empty.
   if (!majorana_atomic_) {
     data["num_modes"] = num_modes_;
-    // Persist the qubit count explicitly: an auxiliary qubit referenced only by
-    // stabilizers (not by any bilinear) would otherwise be lost on reload.
-    data["num_qubits"] = num_qubits_;
     nlohmann::json bl_array = nlohmann::json::array();
     for (const auto& [coeff, word] : bilinears_) {
       bl_array.push_back(
           {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
     }
     data["bilinears"] = bl_array;
+  }
+  // Persist the qubit count whenever stabilizers are present: an auxiliary
+  // qubit referenced only by stabilizers (not by the table or bilinears) would
+  // otherwise be lost on reload.
+  if (!stabilizers_.empty()) {
+    data["num_qubits"] = num_qubits_;
   }
   // Codespace stabilizers (redundant encodings only).
   if (!stabilizers_.empty()) {
@@ -259,13 +262,14 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
-  if (name == base_encoding && !tapering && stabilizers.empty()) {
+  std::size_t nq = data.value("num_qubits", mapping.num_qubits_);
+  if (name == base_encoding && !tapering && stabilizers.empty() &&
+      nq == mapping.num_qubits_) {
     return mapping;
   }
   return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
-                         mapping.num_modes_, mapping.num_qubits_,
-                         std::move(base_encoding), std::move(tapering),
-                         std::move(stabilizers));
+                         mapping.num_modes_, nq, std::move(base_encoding),
+                         std::move(tapering), std::move(stabilizers));
 }
 
 void MajoranaMapping::to_json_file(const std::string& filename) const {

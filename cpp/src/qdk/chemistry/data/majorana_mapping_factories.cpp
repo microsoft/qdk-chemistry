@@ -525,6 +525,23 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
         "MajoranaMapping::verstraete_cirac: lattice connectivity is not a "
         "single rectangular grid");
   }
+  // Every edge must be a nearest-neighbour bond on the recovered grid.
+  for (std::size_t v = 0; v < n; ++v) {
+    for (auto w : adj[v]) {
+      if (w <= v) {
+        continue;
+      }
+      const int dx =
+          std::abs(coord[v].first - coord[static_cast<std::size_t>(w)].first);
+      const int dy =
+          std::abs(coord[v].second - coord[static_cast<std::size_t>(w)].second);
+      if (dx + dy != 1) {
+        throw std::invalid_argument(
+            "MajoranaMapping::verstraete_cirac: lattice edge does not connect "
+            "nearest neighbours on the recovered rectangular grid");
+      }
+    }
+  }
   auto snake = [rnx](int c, int r) -> std::size_t {
     return r % 2 == 0 ? static_cast<std::size_t>(r * rnx + c)
                       : static_cast<std::size_t>((r + 1) * rnx - 1 - c);

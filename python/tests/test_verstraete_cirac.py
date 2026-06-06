@@ -93,6 +93,15 @@ class TestVerstraeteCiracFactory:
         with pytest.raises(ValueError, match="rectangular grid"):
             MajoranaMapping.verstraete_cirac(chain)
 
+    def test_extra_long_range_edge_rejected(self) -> None:
+        """A rectangular site set with a non-nearest-neighbour edge is rejected."""
+        adj = LatticeGraph.square(2, 2).adjacency_matrix().copy()
+        adj[0, 3] = 1.0
+        adj[3, 0] = 1.0
+        bad = LatticeGraph.from_dense_matrix(adj)
+        with pytest.raises(ValueError, match="nearest neighbours"):
+            MajoranaMapping.verstraete_cirac(bad)
+
 
 class TestVerstraeteCiracSpectrum:
     """Codespace spectrum must reproduce Jordan-Wigner."""

@@ -278,11 +278,11 @@ class MajoranaMapping : public DataClass {
    * ``QubitMapper`` exactly like ``jordan_wigner(num_modes=2*n_sites)`` and
    * uses ``2 * num_modes`` qubits.
    *
-   * @param lattice A rectangular 2D lattice (built by ``LatticeGraph::square``
-   *        or any graph whose connected components are rectangular grids).
+   * @param lattice A single connected rectangular 2D lattice (e.g. built by
+   *        ``LatticeGraph::square`` with nearest-neighbour edges only).
    * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
    * @throws std::invalid_argument If the lattice is empty or its connectivity
-   *         is not a rectangular grid.
+   *         is not a single rectangular nearest-neighbour grid.
    *
    * @see F. Verstraete and J. I. Cirac, J. Stat. Mech. (2005) P09012.
    * @see J. D. Whitfield, V. Havlicek, M. Troyer, Phys. Rev. A 94, 030301(R).
