@@ -19,7 +19,7 @@ import numpy as np
 
 from qdk_chemistry._core.data import (
     majorana_map_hamiltonian,
-    majorana_map_hamiltonian_factorized,
+    majorana_map_hamiltonian_container_aware,
     sparse_pauli_word_to_label,
 )
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper, QubitMapperSettings
@@ -75,15 +75,24 @@ class QdkQubitMapper(QubitMapper):
     For unrestricted systems, the engine handles all four spin-channel ERI
     blocks (aa, ab, ba, bb) independently.
 
-    Sparse and factorized fast paths: when the input Hamiltonian is backed by a
-    :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` (three-center /
-    density-fitted factors) or a
-    :class:`~qdk_chemistry.data.SparseHamiltonianContainer` (sparse two-body
-    map), the two-body integrals are consumed directly in their compressed form
-    and the dense ``N**4`` tensor is never materialized. This reduces both memory
-    and runtime while producing a result numerically equivalent (term-by-term,
-    to within ``1e-12``) to the dense path. Selection is automatic based on the
-    container type; all other containers use the dense path.
+    Container-aware fast paths: when the input Hamiltonian is backed by a
+    :class:`~qdk_chemistry.data.SparseHamiltonianContainer` or a
+    :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`, the two-body
+    integrals are consumed directly in their compressed form and the dense
+    ``N**4`` tensor is never materialized:
+
+    * Sparse containers: the engine iterates only the stored non-zero
+      ``(p, q, r, s)`` entries, so both memory and runtime improve for the
+      mostly-zero integrals of lattice / model Hamiltonians.
+    * Cholesky containers: the three-center factors are kept in their
+      ``O(N**2 * naux)`` form, recovering ``(pq|rs)`` on the fly. This is a
+      **memory** optimization (it avoids the dense ``N**4`` tensor); it is not a
+      runtime speed-up, since each integral access costs an ``O(naux)`` dot
+      product.
+
+    In all cases the result is numerically equivalent (term-by-term, to within
+    ``1e-12``) to the dense path. Selection is automatic based on the container
+    type; all other containers use the dense path.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -163,14 +172,14 @@ class QdkQubitMapper(QubitMapper):
                 f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
             )
 
-        # Fast paths: factorized (Cholesky) and sparse containers feed their
-        # native low-rank / sparse two-body integrals straight into the C++
-        # engine, so the dense N^4 two-body tensor is never materialized. The
-        # output is numerically equivalent to the dense path (see the C++
-        # ``majorana_map_hamiltonian_factorized`` dispatcher).
+        # Fast paths: sparse and Cholesky containers feed their native sparse /
+        # low-rank two-body integrals straight into the C++ engine, so the dense
+        # N^4 two-body tensor is never materialized. The output is numerically
+        # equivalent to the dense path (see the C++
+        # ``majorana_map_hamiltonian_container_aware`` dispatcher).
         container_type = hamiltonian.get_container_type()
         if container_type in ("cholesky", "sparse"):
-            words, coefficients = majorana_map_hamiltonian_factorized(
+            words, coefficients = majorana_map_hamiltonian_container_aware(
                 base_mapping,
                 hamiltonian,
                 spin_symmetric,

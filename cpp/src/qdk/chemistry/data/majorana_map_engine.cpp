@@ -209,6 +209,8 @@ class PackedAccumulator {
 //   eri(p,q,r,s) -> ((p*N + q)*N + r)*N + s   (chemist notation (pq|rs)).
 
 struct DenseEriProvider {
+  // Dense storage is traversed with the standard symmetric quad loop.
+  static constexpr bool kSparse = false;
   const double* aaaa_;
   const double* aabb_;
   const double* bbbb_;
@@ -236,7 +238,15 @@ struct DenseEriProvider {
 // pair index in row-major order, so element (pair, Q) lives at
 // L[pair + Q * N^2].  (pq|rs) is recovered as the dot product of the two
 // pair rows over the auxiliary index.
+//
+// This is a *memory* optimization: it avoids materializing the dense N^4
+// four-center tensor (the factors are O(N^2 * naux)).  It is not a runtime
+// fast path — each integral access costs an O(naux) dot product, so the
+// surrounding O(N^4) loop becomes O(N^4 * naux).  It is intended for cases
+// where the dense tensor does not fit in memory.
 struct CholeskyEriProvider {
+  // Recovered on the fly via the standard symmetric quad loop.
+  static constexpr bool kSparse = false;
   const double* La_;
   const double* Lb_;
   std::size_t n_;
@@ -266,11 +276,25 @@ struct CholeskyEriProvider {
 
 // Sparse provider backed by hash maps keyed on the flattened idx4 index.
 // Missing entries are implicitly zero, exactly as in the dense layout.
+//
+// In addition to the maps (used for the unrestricted fallback and the
+// one-body delta fold), the explicit list of stored non-zero entries is
+// kept so the restricted two-body loop can iterate only the non-zeros
+// instead of enumerating the full O(N^4) index space.
 struct SparseEriProvider {
+  // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
+  static constexpr bool kSparse = true;
+  struct Entry {
+    std::size_t p, q, r, s;
+    double value;
+  };
   std::unordered_map<std::uint64_t, double> aaaa_map_;
   std::unordered_map<std::uint64_t, double> aabb_map_;
   std::unordered_map<std::uint64_t, double> bbbb_map_;
+  // Stored non-zero (p,q,r,s) -> value entries of the restricted ERI tensor.
+  std::vector<Entry> entries_;
   std::size_t n_ = 0;
+  const std::vector<Entry>& entries() const { return entries_; }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
                     std::size_t s) const {
     return static_cast<std::uint64_t>(((p * n_ + q) * n_ + r) * n_ + s);
@@ -465,35 +489,55 @@ MajoranaMapResult majorana_map_impl(
       }
     }
 
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = p; q < n_spatial; ++q) {
-        std::size_t pq_idx = sym_map[p * n_spatial + q];
-        const auto& s_pq = sym_e[pq_idx];
-        for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = r; s < n_spatial; ++s) {
-            std::size_t rs_idx = sym_map[r * n_spatial + s];
-            if (pq_idx > rs_idx) continue;
+    // Accumulate the contribution of one canonical (pq|rs) pair.  Both the
+    // dense quad loop and the sparse non-zero loop funnel through this lambda
+    // so the arithmetic, ordering, and thresholding are byte-for-byte
+    // identical between paths.  Pre-condition: pq_idx <= rs_idx.
+    auto process_pair = [&](std::size_t pq_idx, std::size_t rs_idx,
+                            double eri) {
+      if (std::abs(eri) < integral_threshold) return;
+      const auto& s_pq = sym_e[pq_idx];
+      const auto& s_rs = sym_e[rs_idx];
+      double half_eri = 0.5 * eri;
+      if (pq_idx == rs_idx) {
+        for (const auto& [c1, w1] : s_pq.terms) {
+          for (const auto& [c2, w2] : s_rs.terms) {
+            acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+          }
+        }
+      } else {
+        for (const auto& [c1, w1] : s_pq.terms) {
+          for (const auto& [c2, w2] : s_rs.terms) {
+            acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+            acc.accumulate_product(w2, w1, half_eri * c2 * c1);
+          }
+        }
+      }
+    };
 
-            double eri = eri_provider.aaaa(p, q, r, s);
-            if (std::abs(eri) < integral_threshold) continue;
-
-            const auto& s_rs = sym_e[rs_idx];
-
-            if (pq_idx == rs_idx) {
-              double half_eri = 0.5 * eri;
-              for (const auto& [c1, w1] : s_pq.terms) {
-                for (const auto& [c2, w2] : s_rs.terms) {
-                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-                }
-              }
-            } else {
-              double half_eri = 0.5 * eri;
-              for (const auto& [c1, w1] : s_pq.terms) {
-                for (const auto& [c2, w2] : s_rs.terms) {
-                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-                  acc.accumulate_product(w2, w1, half_eri * c2 * c1);
-                }
-              }
+    if constexpr (EriProvider::kSparse) {
+      // Fast path: visit only the stored non-zero entries.  An entry is
+      // processed iff it sits at a canonical position (p<=q, r<=s,
+      // sym(pq)<=sym(rs)) — exactly the positions the dense symmetric loop
+      // reads.  Stored entries at non-canonical positions are redundant under
+      // the 8-fold ERI symmetry and are never read by the dense path either,
+      // so skipping them keeps the result identical while touching no zeros.
+      for (const auto& e : eri_provider.entries()) {
+        if (e.p > e.q || e.r > e.s) continue;
+        std::size_t pq_idx = sym_map[e.p * n_spatial + e.q];
+        std::size_t rs_idx = sym_map[e.r * n_spatial + e.s];
+        if (pq_idx > rs_idx) continue;
+        process_pair(pq_idx, rs_idx, e.value);
+      }
+    } else {
+      for (std::size_t p = 0; p < n_spatial; ++p) {
+        for (std::size_t q = p; q < n_spatial; ++q) {
+          std::size_t pq_idx = sym_map[p * n_spatial + q];
+          for (std::size_t r = 0; r < n_spatial; ++r) {
+            for (std::size_t s = r; s < n_spatial; ++s) {
+              std::size_t rs_idx = sym_map[r * n_spatial + s];
+              if (pq_idx > rs_idx) continue;
+              process_pair(pq_idx, rs_idx, eri_provider.aaaa(p, q, r, s));
             }
           }
         }
@@ -683,12 +727,14 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
   detail::SparseEriProvider provider;
   provider.n_ = n_spatial;
   provider.aaaa_map_.reserve(num_entries);
+  provider.entries_.reserve(num_entries);
   for (std::size_t e = 0; e < num_entries; ++e) {
     const auto p = static_cast<std::size_t>(two_body_indices[4 * e + 0]);
     const auto q = static_cast<std::size_t>(two_body_indices[4 * e + 1]);
     const auto r = static_cast<std::size_t>(two_body_indices[4 * e + 2]);
     const auto s = static_cast<std::size_t>(two_body_indices[4 * e + 3]);
     provider.aaaa_map_[provider.key(p, q, r, s)] = two_body_values[e];
+    provider.entries_.push_back({p, q, r, s, two_body_values[e]});
   }
   // Model Hamiltonians are restricted, so the spin-summed (spin_symmetric)
   // path only reads the aaaa channel.  Mirror the data into the cross/beta

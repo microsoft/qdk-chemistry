@@ -7,7 +7,7 @@ These tests verify that mapping a Hamiltonian stored in a
 dense (:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`)
 path for the *same* underlying integrals.  The fast paths never materialize a
 dense N^4 two-body tensor (see ``QdkQubitMapper._run_impl`` and the C++
-``majorana_map_hamiltonian_factorized`` dispatcher), so this is the primary
+``majorana_map_hamiltonian_container_aware`` dispatcher), so this is the primary
 correctness bar from issue #474.
 """
 
@@ -17,6 +17,8 @@ correctness bar from issue #474.
 # --------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+
+from typing import ClassVar
 
 import numpy as np
 import pytest
@@ -38,10 +40,10 @@ from qdk_chemistry.utils.model_hamiltonians import (
 from .test_helpers import create_test_basis_set, create_test_orbitals
 
 try:
-    import pyscf  # noqa: F401
-    import pyscf.ao2mo  # noqa: F401
-    import pyscf.gto  # noqa: F401
-    import pyscf.scf  # noqa: F401
+    import pyscf
+    import pyscf.ao2mo
+    import pyscf.gto
+    import pyscf.scf
 
     PYSCF_AVAILABLE = True
 except ImportError:
@@ -106,9 +108,7 @@ def _build_restricted_cholesky_pair(n: int, naux: int, seed: int):
     empty_fock = np.eye(0)
 
     dense = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, eri, orbitals, core_energy, empty_fock))
-    cholesky = Hamiltonian(
-        CholeskyHamiltonianContainer(one_body, three_center, orbitals, core_energy, empty_fock)
-    )
+    cholesky = Hamiltonian(CholeskyHamiltonianContainer(one_body, three_center, orbitals, core_energy, empty_fock))
     return dense, cholesky
 
 
@@ -188,7 +188,7 @@ class TestCholeskyFastPathRestricted:
     """Restricted Cholesky path equals the dense path for every encoding."""
 
     # Differing sizes exercise both single-word and multi-orbital dispatch.
-    SYSTEMS = [(1, 3), (2, 5), (3, 8), (4, 6)]
+    SYSTEMS: ClassVar = [(1, 3), (2, 5), (3, 8), (4, 6)]
 
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize(("n", "naux"), SYSTEMS)
@@ -211,7 +211,7 @@ class TestCholeskyFastPathRestricted:
 class TestCholeskyFastPathUnrestricted:
     """Unrestricted Cholesky path equals the dense path for every encoding."""
 
-    SYSTEMS = [(2, 5), (3, 7)]
+    SYSTEMS: ClassVar = [(2, 5), (3, 7)]
 
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize(("n", "naux"), SYSTEMS)
@@ -268,9 +268,7 @@ def _molecular_cholesky_pair(atom: str, basis: str):
     dense = Hamiltonian(
         CanonicalFourCenterHamiltonianContainer(h1, np.ascontiguousarray(eri_recon.ravel()), orbitals, enuc, empty)
     )
-    cholesky = Hamiltonian(
-        CholeskyHamiltonianContainer(h1, np.ascontiguousarray(factors), orbitals, enuc, empty)
-    )
+    cholesky = Hamiltonian(CholeskyHamiltonianContainer(h1, np.ascontiguousarray(factors), orbitals, enuc, empty))
     return dense, cholesky, norb
 
 
@@ -279,10 +277,8 @@ class TestCholeskyFastPathMolecular:
     """Cholesky path equals the dense path on real molecular Hamiltonians."""
 
     @pytest.mark.parametrize("encoding", ENCODINGS)
-    @pytest.mark.parametrize(("name", "atom", "basis"), MOLECULES, ids=[m[0] for m in MOLECULES])
-    def test_molecular_cholesky_matches_dense(
-        self, name: str, atom: str, basis: str, encoding: str
-    ) -> None:
+    @pytest.mark.parametrize(("atom", "basis"), [(m[1], m[2]) for m in MOLECULES], ids=[m[0] for m in MOLECULES])
+    def test_molecular_cholesky_matches_dense(self, atom: str, basis: str, encoding: str) -> None:
         dense, cholesky, norb = _molecular_cholesky_pair(atom, basis)
         assert cholesky.get_container_type() == "cholesky"
 
@@ -320,8 +316,8 @@ class TestSparseFastPath:
     """Sparse path equals the dense path for lattice/model Hamiltonians."""
 
     @pytest.mark.parametrize("encoding", ENCODINGS)
-    @pytest.mark.parametrize(("name", "factory"), SPARSE_SYSTEMS, ids=[s[0] for s in SPARSE_SYSTEMS])
-    def test_sparse_matches_dense(self, name: str, factory, encoding: str) -> None:
+    @pytest.mark.parametrize("factory", [s[1] for s in SPARSE_SYSTEMS], ids=[s[0] for s in SPARSE_SYSTEMS])
+    def test_sparse_matches_dense(self, factory, encoding: str) -> None:
         sparse = factory()
         assert sparse.get_container_type() == "sparse"
 

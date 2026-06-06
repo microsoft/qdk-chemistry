@@ -1308,7 +1308,7 @@ Examples:
   // never materialized; any other container falls back to the dense path.  The
   // result is numerically equivalent to the dense path for the same integrals.
   data.def(
-      "majorana_map_hamiltonian_factorized",
+      "majorana_map_hamiltonian_container_aware",
       [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
          bool spin_symmetric, double threshold,
          double integral_threshold) -> py::tuple {
