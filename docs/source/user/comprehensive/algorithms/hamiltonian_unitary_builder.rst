@@ -142,6 +142,55 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
+.. _zassenhaus-builder:
+
+Zassenhaus expansion
+~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"zassenhaus"``
+
+The Zassenhaus formula is the dual of the Baker-Campbell-Hausdorff formula :cite:`Wilcox1967`: it writes the time-evolution operator as an *ordered product* of exponentials in which the low-order commutator corrections appear as **explicit factors**, rather than being absorbed implicitly into a Trotter step count.
+
+For a Hamiltonian :math:`H = \sum_j \alpha_j P_j`, starting from the bare first-order product :math:`\prod_j e^{-i\alpha_j P_j t}`, the builder appends commutator corrections order by order:
+
+.. math::
+
+   e^{-iHt} \approx \Bigl[\prod_j e^{-i\alpha_j P_j t/N}\Bigr] \, e^{-iC_2} \, e^{-iC_3} \cdots e^{-iC_p}
+
+where each :math:`C_n` collects the degree-:math:`n` nested-commutator corrections needed to make the product exact through order :math:`n`.
+Because every nested commutator of Pauli strings is itself a scalar multiple of a single Pauli string, each :math:`C_n` decomposes into ordinary Pauli rotations :math:`e^{-i\theta P}`, so the output remains a ``PauliProductFormulaContainer``.
+
+For expansion order :math:`p` the operator-norm error at fixed step count obeys :cite:`Casas2012,Childs2021`
+
+.. math::
+
+   \bigl\lVert e^{-iHt} - U_{\text{Zassenhaus}} \bigr\rVert = O\!\left(t^{\,p+1}\right),
+
+so Hamiltonians whose dominant commutators are sparse or analytically tractable (lattice models with limited geometric coupling, chemistry Hamiltonians under term partitions with small inter-group commutators) are simulated with fewer steps than Trotter-Suzuki would require.
+At :math:`p = 1` the construction reduces to the first-order Trotter product.
+
+.. note::
+   The number of correction factors grows with the expansion order, since successively higher nested commutators must be cancelled.
+   The expansion is most economical when those commutators are sparse.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Zassenhaus expansion order :math:`p \ge 1`. ``1`` reproduces first-order Trotter; higher orders cancel successively higher commutator corrections. Default is 2.
+   * - ``num_divisions``
+     - int
+     - Number of time divisions :math:`N` (each evolves for ``time / N`` and the step repeats :math:`N` times). Default is 1.
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+
 
 Consuming term partitions
 -------------------------
