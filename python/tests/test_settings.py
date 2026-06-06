@@ -1476,7 +1476,7 @@ class TestAlgorithmRefSettings:
         outer_ref_json = {
             "__type__": "algorithm_ref",
             "algorithm_type": "phase_estimation",
-            "algorithm_name": "iterative",
+            "algorithm_name": "qdk_iterative",
             "settings": {
                 "num_bits": 10,
                 "circuit_executor": inner_ref_json,
@@ -1492,7 +1492,7 @@ class TestAlgorithmRefSettings:
         outer = restored.get("my_algo")
         assert isinstance(outer, AlgorithmRef)
         assert outer.algorithm_type == "phase_estimation"
-        assert outer.algorithm_name == "iterative"
+        assert outer.algorithm_name == "qdk_iterative"
         assert outer.settings is not None
         assert outer.settings.get("num_bits") == 10
 
