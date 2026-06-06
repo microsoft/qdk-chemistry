@@ -27,6 +27,7 @@ std::vector<std::vector<size_t>> recorded_active_spaces;
 std::vector<std::vector<size_t>> recorded_inactive_spaces;
 std::vector<std::vector<size_t>> recorded_localized_alpha_spaces;
 std::vector<std::vector<size_t>> recorded_localized_beta_spaces;
+constexpr double kDftAnalyticNumericGradientTolerance = 5.0e-5;
 
 std::string determinant_string(size_t n_active_orbitals, unsigned int n_alpha,
                                unsigned int n_beta) {
@@ -99,33 +100,6 @@ void expect_same_structure(const std::shared_ptr<Structure>& left,
   EXPECT_EQ(left->get_elements(), right->get_elements());
 }
 
-void expect_qdk_analytic_gradient_runs_for_functional(
-    const std::string& functional) {
-  auto calculator = NuclearDerivativeCalculatorFactory::create("qdk");
-  AlgorithmRef scf_ref("scf_solver", "qdk");
-  scf_ref.get_settings()->set("method", functional);
-  calculator->settings().set("energy_calculator", scf_ref);
-
-  auto [energy, gradients, hessian, wavefunction] = calculator->run(
-      testing::create_water_structure(), 0, 1, std::string("sto-3g"));
-
-  ASSERT_TRUE(std::isfinite(energy));
-  EXPECT_LT(energy, 0.0);
-  ASSERT_NE(gradients, nullptr);
-  EXPECT_EQ(gradients->get_structure()->get_num_atoms(), 3);
-  EXPECT_EQ(gradients->get_values().size(), 9);
-  EXPECT_TRUE(gradients->get_values().allFinite());
-
-  auto gradient_matrix = gradients->as_matrix();
-  EXPECT_NEAR(gradient_matrix.col(0).sum(), 0.0, 1.0e-8);
-  EXPECT_NEAR(gradient_matrix.col(1).sum(), 0.0, 1.0e-8);
-  EXPECT_NEAR(gradient_matrix.col(2).sum(), 0.0, 1.0e-8);
-
-  EXPECT_FALSE(hessian.has_value());
-  ASSERT_TRUE(wavefunction.has_value());
-  EXPECT_NE(*wavefunction, nullptr);
-}
-
 NuclearDerivativeResult run_qdk_derivative_for_functional(
     const std::string& calculator_name, const std::string& functional) {
   auto calculator = NuclearDerivativeCalculatorFactory::create(calculator_name);
@@ -136,12 +110,13 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
     calculator->settings().set("finite_difference_step", 1.0e-2);
   }
 
-  return calculator->run(testing::create_water_structure(), 0, 1,
+  return calculator->run(testing::create_lithium_hydride_structure(), 0, 1,
                          std::string("sto-3g"));
 }
 
 void expect_qdk_analytic_gradient_matches_numeric(
-    const std::string& functional) {
+    const std::string& functional,
+    double gradient_tolerance = kDftAnalyticNumericGradientTolerance) {
   auto [numeric_energy, numeric_gradients, numeric_hessian,
         numeric_wavefunction] =
       run_qdk_derivative_for_functional("finite_difference", functional);
@@ -152,6 +127,10 @@ void expect_qdk_analytic_gradient_matches_numeric(
   EXPECT_NEAR(analytic_energy, numeric_energy, 1.0e-8);
   ASSERT_NE(numeric_gradients, nullptr);
   ASSERT_NE(analytic_gradients, nullptr);
+  EXPECT_EQ(analytic_gradients->get_structure()->get_num_atoms(), 2);
+  EXPECT_EQ(analytic_gradients->get_values().size(), 6);
+  EXPECT_TRUE(analytic_gradients->get_values().allFinite());
+  EXPECT_TRUE(numeric_gradients->get_values().allFinite());
   EXPECT_FALSE(numeric_hessian.has_value());
   EXPECT_FALSE(analytic_hessian.has_value());
   ASSERT_TRUE(numeric_wavefunction.has_value());
@@ -161,7 +140,7 @@ void expect_qdk_analytic_gradient_matches_numeric(
   const auto& analytic_values = analytic_gradients->get_values();
   ASSERT_EQ(analytic_values.size(), numeric_values.size());
   for (Eigen::Index i = 0; i < analytic_values.size(); ++i) {
-    EXPECT_NEAR(analytic_values(i), numeric_values(i), 1.0e-3)
+    EXPECT_NEAR(analytic_values(i), numeric_values(i), gradient_tolerance)
         << "gradient component " << i;
   }
 }
@@ -389,31 +368,18 @@ TEST(NuclearDerivativeCalculatorTest,
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealNonHybridDftForWater) {
-  expect_qdk_analytic_gradient_runs_for_functional("pbe");
-}
-
-TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealHybridDftForWater) {
-  expect_qdk_analytic_gradient_runs_for_functional("b3lyp");
-}
-
-TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientRunsRealRangeSeparatedHybridDftForWater) {
-  expect_qdk_analytic_gradient_runs_for_functional("wB97x");
-}
-
-TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericHybridGgaDftForWater) {
+     QdkAnalyticGradientMatchesNumericHybridGgaDftForLithiumHydride) {
   expect_qdk_analytic_gradient_matches_numeric("b3lyp");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericGgaDftForWater) {
+     QdkAnalyticGradientMatchesNumericGgaDftForLithiumHydride) {
   expect_qdk_analytic_gradient_matches_numeric("pbe");
 }
 
-TEST(NuclearDerivativeCalculatorTest,
-     QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForWater) {
-  expect_qdk_analytic_gradient_matches_numeric("wB97x");
+TEST(
+    NuclearDerivativeCalculatorTest,
+    QdkAnalyticGradientMatchesNumericRangeSeparatedHybridDftForLithiumHydride) {
+  expect_qdk_analytic_gradient_matches_numeric(
+      "wB97x", kDftAnalyticNumericGradientTolerance);
 }

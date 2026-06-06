@@ -25,13 +25,15 @@ class ScopedLogLevel {
       : previous_level_(utils::Logger::get_global_level()) {
     if (static_cast<int>(previous_level_) < static_cast<int>(minimum_level)) {
       utils::Logger::set_global_level(minimum_level);
+      scoped_level_ = minimum_level;
       changed_ = true;
     }
   }
 
   ~ScopedLogLevel() {
     if (changed_) {
-      utils::Logger::set_global_level(previous_level_);
+      utils::Logger::restore_global_level_if_unchanged(scoped_level_,
+                                                       previous_level_);
     }
   }
 
@@ -40,6 +42,7 @@ class ScopedLogLevel {
 
  private:
   utils::LogLevel previous_level_;
+  utils::LogLevel scoped_level_ = utils::LogLevel::off;
   bool changed_ = false;
 };
 
@@ -502,11 +505,12 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
 
   auto scf_result = solver.run_with_analytic_gradient(
       structure, charge, spin_multiplicity, seed_to_scf_input(seed, true));
-  std::shared_ptr<data::NuclearGradients> gradients;
-  if (scf_result.nuclear_gradient.has_value()) {
-    gradients = std::make_shared<data::NuclearGradients>(
-        copy_structure(structure), *scf_result.nuclear_gradient);
+  if (!scf_result.nuclear_gradient.has_value()) {
+    throw std::runtime_error(
+        "Internal SCF did not return the requested analytic nuclear gradient");
   }
+  auto gradients = std::make_shared<data::NuclearGradients>(
+      copy_structure(structure), *scf_result.nuclear_gradient);
 
   return {scf_result.energy, gradients, std::nullopt, scf_result.wavefunction};
 }

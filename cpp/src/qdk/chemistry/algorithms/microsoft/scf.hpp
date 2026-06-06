@@ -133,10 +133,14 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
   virtual std::string name() const final { return "qdk"; }
 
   /**
-   * @brief Run the internal SCF solver and return analytic nuclear gradients.
+   * @brief Run the internal SCF solver and return analytic nuclear gradients
+   * when available.
    *
-   * Settings are locked in the same way as the base run() API. The returned
-   * gradient vector is atom-major with length 3 * number of atoms.
+   * Settings are locked in the same way as the base run() API. The gradient is
+   * returned atom-major with length 3 * number of atoms.
+   *
+   * @note When MPI is enabled, the analytic gradient is only populated on rank
+   * 0. See ScfCalculationResult::nuclear_gradient.
    */
   ScfCalculationResult run_with_analytic_gradient(
       std::shared_ptr<data::Structure> structure, int charge,
