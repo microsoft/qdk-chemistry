@@ -42,9 +42,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Constructor for restricted active space Hamiltonian with four center
    * integrals.
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::VectorXd& two_body_integrals,
@@ -55,9 +53,7 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with four
    * center integrals using separate spin components.
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CanonicalFourCenterHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -104,12 +100,10 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get two-electron integrals in MO basis for all spin channels
-   * @deprecated Use two_body_integrals() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use two_body_integrals() for SymmetryBlockedTensor access.")]]
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
-             const Eigen::VectorXd&> get_two_body_integrals()
-      const override final;
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override final;
 
   /**
    * @brief Two-body integrals as a rank-4 symmetry-blocked tensor.

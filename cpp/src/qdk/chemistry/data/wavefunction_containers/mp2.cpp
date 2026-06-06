@@ -1034,23 +1034,20 @@ bool MP2Container::has_two_rdm_spin_traced() const {
   return has_two_rdm_spin_dependent();
 }
 
-std::tuple<MP2Container::MatrixVariant, MP2Container::MatrixVariant>
-MP2Container::get_active_one_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<2>& MP2Container::active_one_rdm() const {
   // If not already computed, generate from CI expansion
   if (!_active_one_rdm) {
     _generate_rdms_from_ci_expansion();
   }
-  return WavefunctionContainer::get_active_one_rdm_spin_dependent();
+  return WavefunctionContainer::active_one_rdm();
 }
 
-std::tuple<MP2Container::VectorVariant, MP2Container::VectorVariant,
-           MP2Container::VectorVariant>
-MP2Container::get_active_two_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<4>& MP2Container::active_two_rdm() const {
   // If not already computed, generate from CI expansion
   if (!_active_two_rdm) {
     _generate_rdms_from_ci_expansion();
   }
-  return WavefunctionContainer::get_active_two_rdm_spin_dependent();
+  return WavefunctionContainer::active_two_rdm();
 }
 
 const MP2Container::MatrixVariant&
@@ -1059,7 +1056,7 @@ MP2Container::get_active_one_rdm_spin_traced() const {
     return *_one_rdm_spin_traced;
   }
   // Ensure spin-dependent RDMs are computed (this triggers lazy eval).
-  get_active_one_rdm_spin_dependent();
+  active_one_rdm();
   return WavefunctionContainer::get_active_one_rdm_spin_traced();
 }
 

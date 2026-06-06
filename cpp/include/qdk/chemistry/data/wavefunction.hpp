@@ -320,49 +320,33 @@ class WavefunctionContainer {
   /**
    * @brief Get spin-dependent one-particle RDMs for active orbitals only
    *
-   * @deprecated Use @ref active_one_rdm() (variant-typed
-   * @ref SymmetryBlockedTensorVariant) instead.
-   *
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active
    * orbitals, constructed from the canonical symmetry-blocked tensor.
    */
-  [[deprecated("Use active_one_rdm() instead")]]
   virtual std::tuple<MatrixVariant, MatrixVariant>
   get_active_one_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
    *
-   * @deprecated Use @ref active_two_rdm() (variant-typed
-   * @ref SymmetryBlockedTensorVariant) instead.
-   *
    * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals,
    * constructed from the canonical symmetry-blocked tensor.
    */
-  [[deprecated("Use active_two_rdm() instead")]]
   virtual std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
    *
-   * @deprecated Use @ref active_one_rdm() and trace over the spin variant
-   * instead.
-   *
    * @return Spin-traced one-particle RDM for active orbitals
    */
-  [[deprecated("Use active_one_rdm() instead")]]
   virtual const MatrixVariant& get_active_one_rdm_spin_traced() const;
 
   /**
    * @brief Get spin-traced two-particle RDM for active orbitals only
    *
-   * @deprecated Use @ref active_two_rdm() and trace over the spin variant
-   * instead.
-   *
    * @return Spin-traced two-particle RDM for active orbitals
    */
-  [[deprecated("Use active_two_rdm() instead")]]
   virtual const VectorVariant& get_active_two_rdm_spin_traced() const;
 
   /**
@@ -489,7 +473,7 @@ class WavefunctionContainer {
    * @return Const reference to the 1-RDM symmetry-blocked tensor variant.
    * @throws std::runtime_error if not available.
    */
-  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
+  virtual const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
 
   /**
    * @brief Active-space 1-RDM block for the given row/column symmetry labels.
@@ -524,7 +508,7 @@ class WavefunctionContainer {
    * @return Const reference to the 2-RDM symmetry-blocked tensor variant.
    * @throws std::runtime_error if not available.
    */
-  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
+  virtual const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
 
   /**
    * @brief Active-space 2-RDM block for the given symmetry labels.

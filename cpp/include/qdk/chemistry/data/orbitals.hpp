@@ -166,7 +166,6 @@ class Orbitals : public DataClass,
    * @return Pair of references to (alpha, beta) coefficient matrices
    * @throws std::runtime_error if coefficients are not set
    */
-  [[deprecated("Use coefficients() instead.")]]
   virtual std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_coefficients() const;
 
@@ -175,7 +174,6 @@ class Orbitals : public DataClass,
    * @return Pair of references to (alpha, beta) energy vectors
    * @throws std::runtime_error if energies are not set
    */
-  [[deprecated("Use energies() instead.")]]
   virtual std::pair<const Eigen::VectorXd&, const Eigen::VectorXd&>
   get_energies() const;
 
@@ -189,7 +187,6 @@ class Orbitals : public DataClass,
    * @brief Get active space information
    * @return Pair of (alpha, beta) active space indices
    */
-  [[deprecated("Use Orbitals active-space index vectors directly.")]]
   virtual std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_active_space_indices() const;
 
@@ -197,7 +194,6 @@ class Orbitals : public DataClass,
    * @brief Get inactive space information
    * @return Pair of (alpha, beta) inactive space indices
    */
-  [[deprecated("Use Orbitals inactive-space index vectors directly.")]]
   std::pair<const std::vector<size_t>&, const std::vector<size_t>&>
   get_inactive_space_indices() const;
 
@@ -205,7 +201,6 @@ class Orbitals : public DataClass,
    * @brief Get virtual space information (orbitals not in active or inactive)
    * @return Pair of (alpha, beta) virtual space indices
    */
-  [[deprecated("Use Orbitals virtual-space index vectors directly.")]]
   std::pair<std::vector<size_t>, std::vector<size_t>>
   get_virtual_space_indices() const;
 
@@ -239,7 +234,6 @@ class Orbitals : public DataClass,
    * alpha-alpha. For orthonormal MOs, alpha-alpha and beta-beta should be
    * identity matrices.
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual std::tuple<Eigen::MatrixXd, Eigen::MatrixXd, Eigen::MatrixXd>
   get_mo_overlap() const;
 
@@ -254,7 +248,6 @@ class Orbitals : public DataClass,
    * coefficients. For orthonormal alpha MOs, this should be the identity
    * matrix.
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_alpha_alpha() const;
 
   /**
@@ -265,7 +258,6 @@ class Orbitals : public DataClass,
    * Computes the overlap matrix between alpha and beta molecular orbitals.
    * For restricted calculations, this equals the alpha-alpha overlap matrix.
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_alpha_beta() const;
 
   /**
@@ -279,7 +271,6 @@ class Orbitals : public DataClass,
    * For orthonormal beta MOs, this should be the identity matrix.
    * For restricted calculations, this equals the alpha-alpha overlap matrix.
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware overlap routine instead.")]]
   virtual Eigen::MatrixXd get_mo_overlap_beta_beta() const;
 
   /**
@@ -341,28 +332,24 @@ class Orbitals : public DataClass,
    * @brief Get alpha orbital coefficients
    * @return Reference to alpha coefficient matrix
    */
-  [[deprecated("Use coefficients()->block(...) instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_alpha() const;
 
   /**
    * @brief Get beta orbital coefficients
    * @return Reference to beta coefficient matrix
    */
-  [[deprecated("Use coefficients()->block(...) instead.")]]
   virtual const Eigen::MatrixXd& get_coefficients_beta() const;
 
   /**
    * @brief Get alpha orbital energies
    * @return Reference to alpha energy vector
    */
-  [[deprecated("Use energies()->block(...) instead.")]]
   virtual const Eigen::VectorXd& get_energies_alpha() const;
 
   /**
    * @brief Get beta orbital energies
    * @return Reference to beta energy vector
    */
-  [[deprecated("Use energies()->block(...) instead.")]]
   virtual const Eigen::VectorXd& get_energies_beta() const;
 
   /**
@@ -389,7 +376,6 @@ class Orbitals : public DataClass,
    * @throws std::runtime_error if occupation vector sizes don't match number of
    * MOs
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
   calculate_ao_density_matrix(const Eigen::VectorXd& occupations_alpha,
                               const Eigen::VectorXd& occupations_beta) const;
@@ -402,7 +388,6 @@ class Orbitals : public DataClass,
    * @throws std::runtime_error if occupation vector size doesn't match number
    * of MOs
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual Eigen::MatrixXd calculate_ao_density_matrix(
       const Eigen::VectorXd& occupations) const;
 
@@ -415,7 +400,6 @@ class Orbitals : public DataClass,
    * @return Pair of (alpha, beta) AO density matrices
    * @throws std::runtime_error if 1RDM matrix sizes don't match number of MOs
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual std::pair<Eigen::MatrixXd, Eigen::MatrixXd>
   calculate_ao_density_matrix_from_rdm(const Eigen::MatrixXd& rdm_alpha,
                                        const Eigen::MatrixXd& rdm_beta) const;
@@ -427,7 +411,6 @@ class Orbitals : public DataClass,
    * @return AO density matrix (total alpha + beta)
    * @throws std::runtime_error if 1RDM matrix size doesn't match number of MOs
    */
-  [[deprecated("Use a SymmetryBlockedTensor-aware density routine instead.")]]
   virtual Eigen::MatrixXd calculate_ao_density_matrix_from_rdm(
       const Eigen::MatrixXd& rdm) const;
 

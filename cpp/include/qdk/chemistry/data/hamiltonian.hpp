@@ -59,9 +59,7 @@ class HamiltonianContainer {
   /**
    * @brief Constructor for active space Hamiltonian with shared_ptr orbitals
    * and inactive Fock matrix (restricted).
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
                        const Eigen::MatrixXd& inactive_fock_matrix,
@@ -70,9 +68,7 @@ class HamiltonianContainer {
   /**
    * @brief Constructor for unrestricted active space Hamiltonian with separate
    * spin components.
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   HamiltonianContainer(const Eigen::MatrixXd& one_body_integrals_alpha,
                        const Eigen::MatrixXd& one_body_integrals_beta,
                        std::shared_ptr<Orbitals> orbitals, double core_energy,
@@ -133,9 +129,7 @@ class HamiltonianContainer {
 
   /**
    * @brief Get tuple of alpha, beta one-electron integrals in MO basis
-   * @deprecated Use one_body_integrals() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use one_body_integrals() for SymmetryBlockedTensor access.")]]
   std::tuple<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_one_body_integrals() const;
 
@@ -192,9 +186,7 @@ class HamiltonianContainer {
 
   /**
    * @brief Get inactive Fock matrix for the selected active space
-   * @deprecated Use inactive_fock() for SymmetryBlockedTensor access.
    */
-  [[deprecated("Use inactive_fock() for SymmetryBlockedTensor access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_inactive_fock_matrix() const;
 

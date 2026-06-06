@@ -34,9 +34,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
  public:
   /**
    * @brief Constructor for restricted Cholesky Hamiltonian.
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals,
       const Eigen::MatrixXd& three_center_integrals,
@@ -47,9 +45,7 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Constructor for unrestricted Cholesky Hamiltonian.
-   * @deprecated Use the SymmetryBlockedTensor constructor instead.
    */
-  [[deprecated("Use the SymmetryBlockedTensor constructor instead.")]]
   CholeskyHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals_alpha,
       const Eigen::MatrixXd& one_body_integrals_beta,
@@ -111,10 +107,8 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
-   * @deprecated Use three_center() for SymmetryBlockedTensor access.
    * @return Pair of dense @c [norb^2, naux] @c MatrixXd for (alpha, beta).
    */
-  [[deprecated("Use three_center() for SymmetryBlockedTensor access.")]]
   std::pair<const Eigen::MatrixXd&, const Eigen::MatrixXd&>
   get_three_center_integrals() const;
 

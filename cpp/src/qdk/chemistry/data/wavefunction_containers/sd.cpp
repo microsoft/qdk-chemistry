@@ -143,8 +143,8 @@ void SlaterDeterminantContainer::clear_caches() const {
   _clear_rdms();
 }
 
-std::tuple<ContainerTypes::MatrixVariant, ContainerTypes::MatrixVariant>
-SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<2>&
+SlaterDeterminantContainer::active_one_rdm() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_one_rdm) {
     auto [alpha_occupations, beta_occupations] =
@@ -184,12 +184,11 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
         make_spin_diagonal_rank2_sbt(tmp_one_rdm_aa, tmp_one_rdm_bb,
                                      restricted));
   }
-  return WavefunctionContainer::get_active_one_rdm_spin_dependent();
+  return WavefunctionContainer::active_one_rdm();
 }
 
-std::tuple<ContainerTypes::VectorVariant, ContainerTypes::VectorVariant,
-           ContainerTypes::VectorVariant>
-SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<4>&
+SlaterDeterminantContainer::active_two_rdm() const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] =
@@ -257,7 +256,7 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
         make_spin_diagonal_rank4_sbt(tmp_two_rdm_aaaa, tmp_two_rdm_aabb,
                                      tmp_two_rdm_bbbb, restricted));
   }
-  return WavefunctionContainer::get_active_two_rdm_spin_dependent();
+  return WavefunctionContainer::active_two_rdm();
 }
 
 const ContainerTypes::MatrixVariant&

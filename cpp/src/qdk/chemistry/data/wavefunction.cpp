@@ -230,9 +230,6 @@ WavefunctionContainer::WavefunctionContainer(
 std::tuple<ContainerTypes::MatrixVariant, ContainerTypes::MatrixVariant>
 WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!has_one_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent one-body RDM not set");
-  }
   return std::visit(
       [&](const auto& sbt) -> std::tuple<ContainerTypes::MatrixVariant,
                                          ContainerTypes::MatrixVariant> {
@@ -277,9 +274,6 @@ std::tuple<ContainerTypes::VectorVariant, ContainerTypes::VectorVariant,
            ContainerTypes::VectorVariant>
 WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!has_two_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent two-body RDM not set");
-  }
 
   return std::visit(
       [&](const auto& sbt) -> std::tuple<ContainerTypes::VectorVariant,
@@ -459,24 +453,25 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
         "single-orbital entropies");
   }
 
-  auto one_rdm_dep = get_active_one_rdm_spin_dependent();
-  auto two_rdm_dep = get_active_two_rdm_spin_dependent();
-  const auto& one_rdm_aa_var = std::get<0>(one_rdm_dep);
-  const auto& one_rdm_bb_var = std::get<1>(one_rdm_dep);
-  const auto& two_rdm_ab_var = std::get<0>(two_rdm_dep);
+  const auto& one_rdm = active_one_rdm();
+  const auto& two_rdm = active_two_rdm();
 
   Eigen::MatrixXd one_rdm_aa;
   Eigen::MatrixXd one_rdm_bb;
   Eigen::VectorXd two_rdm_ab;
 
-  if (detail::is_matrix_variant_complex(one_rdm_aa_var) ||
-      detail::is_vector_variant_complex(two_rdm_ab_var) ||
-      detail::is_matrix_variant_complex(one_rdm_bb_var)) {
+  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+          one_rdm) ||
+      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
+          two_rdm)) {
     throw std::runtime_error("Complex entropy calculation not yet implemented");
   } else {
-    one_rdm_aa = std::get<Eigen::MatrixXd>(one_rdm_aa_var);
-    one_rdm_bb = std::get<Eigen::MatrixXd>(one_rdm_bb_var);
-    two_rdm_ab = std::get<Eigen::VectorXd>(two_rdm_ab_var);
+    const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+    const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+    one_rdm_aa = one_sbt.block({axes::alpha(), axes::alpha()});
+    one_rdm_bb = one_sbt.block({axes::beta(), axes::beta()});
+    two_rdm_ab = two_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
   }
 
   size_t norbs = static_cast<size_t>(one_rdm_aa.rows());

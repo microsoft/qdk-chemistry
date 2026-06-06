@@ -133,13 +133,6 @@ SettingNotFoundError = SettingNotFound
 SettingTypeMismatchError = SettingTypeMismatch
 SettingsAreLockedError = SettingsAreLocked
 
-# Install Python-level DeprecationWarning on v1 Hamiltonian/Wavefunction accessors.
-# Late import: must run after all the symbols above are bound so the wrapper
-# can attach to the live classes.
-from qdk_chemistry.data._v1_deprecation import _install_deprecation_warnings  # noqa: E402
-
-_install_deprecation_warnings()
-
 
 __all__ = [
     "AOType",

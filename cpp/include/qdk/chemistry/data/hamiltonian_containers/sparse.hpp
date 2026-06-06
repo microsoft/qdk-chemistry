@@ -221,12 +221,8 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Direct access to the sparse two-body integral map.
-   * @deprecated Use two_body_integrals_sparse() for SymmetryBlockedTensor
-   * access.
    * @return Const reference to the internal two-body map
    */
-  [[deprecated(
-      "Use two_body_integrals_sparse() for SymmetryBlockedTensor access.")]]
   TwoBodyMap sparse_two_body_integrals() const;
 
   /**

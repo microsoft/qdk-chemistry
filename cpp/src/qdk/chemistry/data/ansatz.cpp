@@ -180,17 +180,22 @@ double Ansatz::calculate_energy() const {
   // Unrestricted case
   else {
     // Use spin-dependent RDMs for unrestricted case
-    const auto& [rdm1_aa_var, rdm1_bb_var] =
-        _wavefunction->get_active_one_rdm_spin_dependent();
-    const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =
-        _wavefunction->get_active_two_rdm_spin_dependent();
+    const auto& rdm1_sbt = std::get<SymmetryBlockedTensor<2, double>>(
+        _wavefunction->active_one_rdm());
+    const auto& rdm2_sbt = std::get<SymmetryBlockedTensor<4, double>>(
+        _wavefunction->active_two_rdm());
 
-    // Extract RDM matrices/vectors from variants
-    const auto& rdm1_aa = std::get<Eigen::MatrixXd>(rdm1_aa_var);
-    const auto& rdm1_bb = std::get<Eigen::MatrixXd>(rdm1_bb_var);
-    const auto& rdm2_aabb = std::get<Eigen::VectorXd>(rdm2_aabb_var);
-    const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
-    const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
+    // Extract RDM blocks from the symmetry-blocked tensors
+    const Eigen::MatrixXd& rdm1_aa =
+        rdm1_sbt.block({axes::alpha(), axes::alpha()});
+    const Eigen::MatrixXd& rdm1_bb =
+        rdm1_sbt.block({axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aabb = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aaaa = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+    const Eigen::VectorXd& rdm2_bbbb = rdm2_sbt.block(
+        {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
 
     // get one body integrals from hamiltonian
     const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();

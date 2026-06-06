@@ -365,19 +365,20 @@ CasWavefunctionContainer::get_active_orbital_occupations() const {
 
   // For active space orbitals, get occupations from 1RDM eigenvalues
   if (has_one_rdm_spin_dependent()) {
-    const auto& rdm_tuple = get_active_one_rdm_spin_dependent();
-    const auto& alpha_rdm_var = std::get<0>(rdm_tuple);
-    const auto& beta_rdm_var = std::get<1>(rdm_tuple);
+    const auto& rdm = active_one_rdm();
 
     // Extract real matrices (assuming real for now)
-    if (detail::is_matrix_variant_complex(alpha_rdm_var) ||
-        detail::is_matrix_variant_complex(beta_rdm_var)) {
+    if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+            rdm)) {
       throw std::runtime_error(
           "Complex 1RDM diagonalization not yet implemented");
     }
 
-    const Eigen::MatrixXd& alpha_rdm = std::get<Eigen::MatrixXd>(alpha_rdm_var);
-    const Eigen::MatrixXd& beta_rdm = std::get<Eigen::MatrixXd>(beta_rdm_var);
+    const auto& rdm_sbt = std::get<SymmetryBlockedTensor<2, double>>(rdm);
+    const Eigen::MatrixXd& alpha_rdm =
+        rdm_sbt.block({axes::alpha(), axes::alpha()});
+    const Eigen::MatrixXd& beta_rdm =
+        rdm_sbt.block({axes::beta(), axes::beta()});
 
     // Diagonalize alpha 1RDM to get occupations
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> alpha_solver(alpha_rdm);
