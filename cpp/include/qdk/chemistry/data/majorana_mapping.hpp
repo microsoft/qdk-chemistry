@@ -330,4 +330,66 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold);
 
+/**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms directly from
+ *        three-center (Cholesky/density-fitted) two-body factors.
+ *
+ * Equivalent to ::majorana_map_hamiltonian but consumes the low-rank
+ * factors instead of a dense N^4 tensor.  Each two-body integral is
+ * recovered on the fly as (pq|rs) = sum_Q L_pq,Q L_rs,Q, so a dense
+ * four-center tensor is never materialized.  The result is numerically
+ * equivalent to the dense path for the same integrals.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param core_energy Core (nuclear repulsion + frozen core) energy.
+ * @param h1_alpha One-body integrals, alpha spin (n_spatial x n_spatial),
+ *        row-major.
+ * @param h1_beta One-body integrals, beta spin (row-major).
+ * @param three_center_aa Alpha three-center factors, column-major
+ *        [n_spatial^2 x naux] with the orbital pair index in row-major order.
+ * @param three_center_bb Beta three-center factors (same layout). For
+ *        restricted inputs this may alias @p three_center_aa.
+ * @param n_spatial Number of spatial orbitals.
+ * @param naux Number of auxiliary (Cholesky) vectors.
+ * @param spin_symmetric If true, use the spin-summed restricted fast path.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian_cholesky(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* three_center_aa,
+    const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
+    bool spin_symmetric, double threshold, double integral_threshold);
+
+/**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms directly from a
+ *        sparse two-body integral list.
+ *
+ * Equivalent to ::majorana_map_hamiltonian but consumes the stored
+ * non-zero (p,q,r,s) integrals instead of a dense N^4 tensor, which is
+ * never materialized.  Missing entries are treated as zero, exactly as in
+ * the dense layout, so the result is numerically equivalent to the dense
+ * path for the same integrals.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param core_energy Core (nuclear repulsion + frozen core) energy.
+ * @param h1_alpha One-body integrals, alpha spin (row-major).
+ * @param h1_beta One-body integrals, beta spin (row-major).
+ * @param two_body_indices Flattened (p,q,r,s) indices, 4 ints per entry.
+ * @param two_body_values Integral values, one per entry.
+ * @param num_entries Number of stored non-zero two-body integrals.
+ * @param n_spatial Number of spatial orbitals.
+ * @param spin_symmetric If true, use the spin-summed restricted fast path.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian_sparse(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const int* two_body_indices,
+    const double* two_body_values, std::size_t num_entries,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold);
+
 }  // namespace qdk::chemistry::data

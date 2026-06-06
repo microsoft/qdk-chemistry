@@ -13,7 +13,10 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
+#include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+
+#include <vector>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -1295,4 +1298,106 @@ Examples:
 
   // Data type name class attribute
   hamiltonian.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Hamiltonian);
+
+  // ============================================================================
+  // Container-aware fast mapping entry point
+  // ============================================================================
+  // Maps a Hamiltonian to qubit Pauli terms by dispatching on the underlying
+  // container type.  Cholesky and sparse containers are consumed through their
+  // native (factorized / sparse) storage so the dense N^4 two-body tensor is
+  // never materialized; any other container falls back to the dense path.  The
+  // result is numerically equivalent to the dense path for the same integrals.
+  data.def(
+      "majorana_map_hamiltonian_factorized",
+      [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
+         bool spin_symmetric, double threshold,
+         double integral_threshold) -> py::tuple {
+        auto one_body = hamiltonian.get_one_body_integrals();
+        const Eigen::MatrixXd& h1a = std::get<0>(one_body);
+        const Eigen::MatrixXd& h1b = std::get<1>(one_body);
+        const std::size_t n = static_cast<std::size_t>(h1a.rows());
+
+        // Flatten one-body integrals to row-major [n*n] as the engine expects.
+        std::vector<double> h1a_flat(n * n);
+        std::vector<double> h1b_flat(n * n);
+        for (std::size_t p = 0; p < n; ++p) {
+          for (std::size_t s = 0; s < n; ++s) {
+            h1a_flat[p * n + s] = h1a(static_cast<Eigen::Index>(p),
+                                      static_cast<Eigen::Index>(s));
+            h1b_flat[p * n + s] = h1b(static_cast<Eigen::Index>(p),
+                                      static_cast<Eigen::Index>(s));
+          }
+        }
+
+        MajoranaMapResult result;
+        if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
+          const auto& container =
+              hamiltonian.get_container<CholeskyHamiltonianContainer>();
+          auto three_center = container.get_three_center_integrals();
+          const Eigen::MatrixXd& three_center_aa = three_center.first;
+          const Eigen::MatrixXd& three_center_bb = three_center.second;
+          const std::size_t naux =
+              static_cast<std::size_t>(three_center_aa.cols());
+          result = majorana_map_hamiltonian_cholesky(
+              mapping, 0.0, h1a_flat.data(), h1b_flat.data(),
+              three_center_aa.data(), three_center_bb.data(), n, naux,
+              spin_symmetric, threshold, integral_threshold);
+        } else if (hamiltonian
+                       .has_container_type<SparseHamiltonianContainer>()) {
+          const auto& container =
+              hamiltonian.get_container<SparseHamiltonianContainer>();
+          const auto& two_body_map = container.sparse_two_body_integrals();
+          std::vector<int> indices;
+          std::vector<double> values;
+          indices.reserve(two_body_map.size() * 4);
+          values.reserve(two_body_map.size());
+          for (const auto& [idx, val] : two_body_map) {
+            const auto& [p, q, r, s] = idx;
+            indices.push_back(p);
+            indices.push_back(q);
+            indices.push_back(r);
+            indices.push_back(s);
+            values.push_back(val);
+          }
+          result = majorana_map_hamiltonian_sparse(
+              mapping, 0.0, h1a_flat.data(), h1b_flat.data(), indices.data(),
+              values.data(), values.size(), n, spin_symmetric, threshold,
+              integral_threshold);
+        } else {
+          // Dense fallback for canonical four-center (and any other) container.
+          auto two_body = hamiltonian.get_two_body_integrals();
+          const Eigen::VectorXd& aaaa = std::get<0>(two_body);
+          const Eigen::VectorXd& aabb = std::get<1>(two_body);
+          const Eigen::VectorXd& bbbb = std::get<2>(two_body);
+          result = majorana_map_hamiltonian(
+              mapping, 0.0, h1a_flat.data(), h1b_flat.data(), aaaa.data(),
+              aabb.data(), bbbb.data(), n, spin_symmetric, threshold,
+              integral_threshold);
+        }
+
+        return py::make_tuple(py::cast(result.words),
+                              py::cast(result.coefficients));
+      },
+      py::arg("mapping"), py::arg("hamiltonian"), py::arg("spin_symmetric"),
+      py::arg("threshold"), py::arg("integral_threshold"),
+      R"(
+Map a fermionic Hamiltonian to qubit Pauli terms, dispatching on container type.
+
+Cholesky (three-center) and sparse containers are consumed through their native
+factorized / sparse storage so the dense N^4 two-body integral tensor is never
+materialized.  Any other container type falls back to the dense path.  The
+returned ``(words, coefficients)`` are numerically equivalent to the dense path
+for the same underlying integrals.
+
+Args:
+    mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
+    hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+    spin_symmetric (bool): Use the spin-summed restricted fast path.
+    threshold (float): Drop Pauli terms with magnitude below this value.
+    integral_threshold (float): Skip integrals with magnitude below this value.
+
+Returns:
+    tuple: ``(words, coefficients)`` where ``words`` is a list of sparse Pauli
+    words and ``coefficients`` is a list of complex coefficients.
+)");
 }

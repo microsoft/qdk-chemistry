@@ -189,12 +189,117 @@ class PackedAccumulator {
 //     cross-spin channels are related by Coulomb symmetry (pq|rs) =
 //     (rs|pq) and are handled in a single merged loop.
 
-template <std::size_t NW>
+// ─── ERI providers ─────────────────────────────────────────────────
+//
+// The two-body engine reads each electron-repulsion integral through a
+// small accessor object instead of a raw dense pointer.  This lets the
+// *same* mapping arithmetic consume integrals from different storage
+// formats without ever materializing a dense N^4 tensor:
+//
+//   * DenseEriProvider     — flat row-major N^4 array (canonical storage)
+//   * CholeskyEriProvider  — three-center factors L, eri computed on the
+//                            fly as (pq|rs) = sum_Q L_pq,Q L_rs,Q
+//   * SparseEriProvider    — sparse (p,q,r,s) -> value map, zeros implied
+//
+// Because the loop structure, ordering, thresholds, and accumulation are
+// untouched, every provider produces results numerically equivalent to
+// the dense path for the same underlying integrals.
+//
+// Index convention matches the dense layout used throughout the engine:
+//   eri(p,q,r,s) -> ((p*N + q)*N + r)*N + s   (chemist notation (pq|rs)).
+
+struct DenseEriProvider {
+  const double* aaaa_;
+  const double* aabb_;
+  const double* bbbb_;
+  std::size_t n_;
+  std::size_t idx4(std::size_t p, std::size_t q, std::size_t r,
+                   std::size_t s) const {
+    return ((p * n_ + q) * n_ + r) * n_ + s;
+  }
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return aaaa_[idx4(p, q, r, s)];
+  }
+  double aabb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return aabb_[idx4(p, q, r, s)];
+  }
+  double bbbb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return bbbb_[idx4(p, q, r, s)];
+  }
+};
+
+// Three-center (Cholesky/density-fitted) provider.  The factor matrices
+// are column-major Eigen storage of shape [N^2 x naux] with the orbital
+// pair index in row-major order, so element (pair, Q) lives at
+// L[pair + Q * N^2].  (pq|rs) is recovered as the dot product of the two
+// pair rows over the auxiliary index.
+struct CholeskyEriProvider {
+  const double* La_;
+  const double* Lb_;
+  std::size_t n_;
+  std::size_t naux_;
+  double dot(const double* l1, std::size_t pair1, const double* l2,
+             std::size_t pair2) const {
+    const std::size_t n2 = n_ * n_;
+    double acc = 0.0;
+    for (std::size_t Q = 0; Q < naux_; ++Q) {
+      acc += l1[pair1 + Q * n2] * l2[pair2 + Q * n2];
+    }
+    return acc;
+  }
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return dot(La_, p * n_ + q, La_, r * n_ + s);
+  }
+  double aabb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return dot(La_, p * n_ + q, Lb_, r * n_ + s);
+  }
+  double bbbb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return dot(Lb_, p * n_ + q, Lb_, r * n_ + s);
+  }
+};
+
+// Sparse provider backed by hash maps keyed on the flattened idx4 index.
+// Missing entries are implicitly zero, exactly as in the dense layout.
+struct SparseEriProvider {
+  std::unordered_map<std::uint64_t, double> aaaa_map_;
+  std::unordered_map<std::uint64_t, double> aabb_map_;
+  std::unordered_map<std::uint64_t, double> bbbb_map_;
+  std::size_t n_ = 0;
+  std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
+                    std::size_t s) const {
+    return static_cast<std::uint64_t>(((p * n_ + q) * n_ + r) * n_ + s);
+  }
+  static double lookup(const std::unordered_map<std::uint64_t, double>& m,
+                       std::uint64_t k) {
+    auto it = m.find(k);
+    return it == m.end() ? 0.0 : it->second;
+  }
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return lookup(aaaa_map_, key(p, q, r, s));
+  }
+  double aabb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return lookup(aabb_map_, key(p, q, r, s));
+  }
+  double bbbb(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return lookup(bbbb_map_, key(p, q, r, s));
+  }
+};
+
+template <std::size_t NW, class EriProvider>
 MajoranaMapResult majorana_map_impl(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
-    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
-    double threshold, double integral_threshold) {
+    const double* h1_beta, const EriProvider& eri_provider,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
 
   PackedAccumulator<NW> acc;
@@ -268,11 +373,6 @@ MajoranaMapResult majorana_map_impl(
     acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
-  auto idx4 = [n_spatial](std::size_t p, std::size_t q, std::size_t r,
-                          std::size_t s) -> std::size_t {
-    return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
-  };
-
   // ─── One-body terms ──────────────────────────────────────────────
   std::vector<double> h1_eff_alpha(n_spatial * n_spatial);
   std::vector<double> h1_eff_beta(n_spatial * n_spatial);
@@ -283,7 +383,7 @@ MajoranaMapResult majorana_map_impl(
       if (spin_symmetric) {
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
-          delta_corr += eri_aaaa[idx4(p, q, q, s)];
+          delta_corr += eri_provider.aaaa(p, q, q, s);
         }
         h_a -= 0.5 * delta_corr;
         h_b = h_a;
@@ -374,7 +474,7 @@ MajoranaMapResult majorana_map_impl(
             std::size_t rs_idx = sym_map[r * n_spatial + s];
             if (pq_idx > rs_idx) continue;
 
-            double eri = eri_aaaa[idx4(p, q, r, s)];
+            double eri = eri_provider.aaaa(p, q, r, s);
             if (std::abs(eri) < integral_threshold) continue;
 
             const auto& s_rs = sym_e[rs_idx];
@@ -437,7 +537,7 @@ MajoranaMapResult majorana_map_impl(
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_aaaa[idx4(p, q, r, s)];
+            double eri = eri_provider.aaaa(p, q, r, s);
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_alpha(r), mode_alpha(s), eri);
@@ -454,7 +554,7 @@ MajoranaMapResult majorana_map_impl(
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_bbbb[idx4(p, q, r, s)];
+            double eri = eri_provider.bbbb(p, q, r, s);
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -471,7 +571,7 @@ MajoranaMapResult majorana_map_impl(
       for (std::size_t q = 0; q < n_spatial; ++q) {
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_aabb[idx4(p, q, r, s)];
+            double eri = eri_provider.aabb(p, q, r, s);
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -498,28 +598,37 @@ MajoranaMapResult majorana_map_impl(
   return result;
 }
 
-// Dispatch table: function pointer per NW, covering 1..16 (up to 1024 qubits).
-using DispatchFn = MajoranaMapResult (*)(const MajoranaMapping&, double,
-                                         const double*, const double*,
-                                         const double*, const double*,
-                                         const double*, std::size_t, bool,
-                                         double, double);
-
-template <std::size_t... Is>
-constexpr std::array<DispatchFn, sizeof...(Is)> make_dispatch_table(
-    std::index_sequence<Is...>) {
-  return {{&majorana_map_impl<Is + 1>...}};
-}
-
 constexpr std::size_t max_nw = 16;
 
-}  // namespace detail
-
-MajoranaMapResult majorana_map_hamiltonian(
+// Runtime dispatch over the number of 64-bit words needed for the qubit
+// count, templated on the ERI provider so each storage format reuses the
+// identical mapping implementation.
+template <class EriProvider, std::size_t... Is>
+MajoranaMapResult dispatch_by_words(
+    std::index_sequence<Is...>, std::size_t num_words,
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
-    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
-    double threshold, double integral_threshold) {
+    const double* h1_beta, const EriProvider& eri_provider,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
+  using Fn = MajoranaMapResult (*)(const MajoranaMapping&, double,
+                                   const double*, const double*,
+                                   const EriProvider&, std::size_t, bool,
+                                   double, double);
+  static const std::array<Fn, sizeof...(Is)> table = {
+      {&majorana_map_impl<Is + 1, EriProvider>...}};
+  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta,
+                              eri_provider, n_spatial, spin_symmetric, threshold,
+                              integral_threshold);
+}
+
+template <class EriProvider>
+MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
+                                    double core_energy, const double* h1_alpha,
+                                    const double* h1_beta,
+                                    const EriProvider& eri_provider,
+                                    std::size_t n_spatial, bool spin_symmetric,
+                                    double threshold,
+                                    double integral_threshold) {
   const std::size_t num_qubits = mapping.num_qubits();
   if (num_qubits == 0) {
     throw std::invalid_argument(
@@ -528,18 +637,69 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
   const std::size_t num_words = (num_qubits + 63) / 64;
 
-  if (num_words > detail::max_nw) {
+  if (num_words > max_nw) {
     throw std::invalid_argument(
         "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
-        " exceeds the maximum of " + std::to_string(detail::max_nw * 64) +
-        " qubits.");
+        " exceeds the maximum of " + std::to_string(max_nw * 64) + " qubits.");
   }
 
-  static const auto table =
-      detail::make_dispatch_table(std::make_index_sequence<detail::max_nw>{});
-  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta, eri_aaaa,
-                              eri_aabb, eri_bbbb, n_spatial, spin_symmetric,
-                              threshold, integral_threshold);
+  return dispatch_by_words<EriProvider>(
+      std::make_index_sequence<max_nw>{}, num_words, mapping, core_energy,
+      h1_alpha, h1_beta, eri_provider, n_spatial, spin_symmetric, threshold,
+      integral_threshold);
+}
+
+}  // namespace detail
+
+MajoranaMapResult majorana_map_hamiltonian(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
+    double threshold, double integral_threshold) {
+  detail::DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial};
+  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
+                                   provider, n_spatial, spin_symmetric,
+                                   threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian_cholesky(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* three_center_aa,
+    const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
+    bool spin_symmetric, double threshold, double integral_threshold) {
+  detail::CholeskyEriProvider provider{three_center_aa, three_center_bb,
+                                       n_spatial, naux};
+  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
+                                   provider, n_spatial, spin_symmetric,
+                                   threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian_sparse(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const int* two_body_indices,
+    const double* two_body_values, std::size_t num_entries,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
+  detail::SparseEriProvider provider;
+  provider.n_ = n_spatial;
+  provider.aaaa_map_.reserve(num_entries);
+  for (std::size_t e = 0; e < num_entries; ++e) {
+    const auto p = static_cast<std::size_t>(two_body_indices[4 * e + 0]);
+    const auto q = static_cast<std::size_t>(two_body_indices[4 * e + 1]);
+    const auto r = static_cast<std::size_t>(two_body_indices[4 * e + 2]);
+    const auto s = static_cast<std::size_t>(two_body_indices[4 * e + 3]);
+    provider.aaaa_map_[provider.key(p, q, r, s)] = two_body_values[e];
+  }
+  // Model Hamiltonians are restricted, so the spin-summed (spin_symmetric)
+  // path only reads the aaaa channel.  Mirror the data into the cross/beta
+  // channels for the rare unrestricted dispatch so the provider is complete.
+  if (!spin_symmetric) {
+    provider.aabb_map_ = provider.aaaa_map_;
+    provider.bbbb_map_ = provider.aaaa_map_;
+  }
+  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
+                                   provider, n_spatial, spin_symmetric,
+                                   threshold, integral_threshold);
 }
 
 }  // namespace qdk::chemistry::data

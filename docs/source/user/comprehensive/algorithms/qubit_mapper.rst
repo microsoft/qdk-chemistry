@@ -197,6 +197,33 @@ Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
+.. rubric:: Sparse and factorized fast paths
+
+The ``"qdk"`` backend consumes two-body integrals directly from the underlying
+:doc:`HamiltonianContainer <../data/hamiltonian>` without ever materializing a
+dense :math:`N^4` two-body tensor when the container stores its integrals in a
+compressed form:
+
+- :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
+  (Cholesky / density-fitted) factors are contracted on the fly, exploiting the
+  low Cholesky rank instead of building the full four-center tensor.
+- :class:`~qdk_chemistry.data.SparseHamiltonianContainer` — only the stored
+  non-zero ``(p, q, r, s)`` integrals are visited, skipping the zeros that
+  dominate lattice/model Hamiltonians (e.g. those produced by
+  :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`
+  and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
+
+These fast paths reduce both the memory footprint (no :math:`O(N^4)`
+materialization) and the runtime (no iteration over zeros or over the dense
+rank), while producing a :class:`~qdk_chemistry.data.QubitHamiltonian` that is
+numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
+:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
+the same integrals. The behaviour of ``run()`` and the shape of the returned
+operator are unchanged; only memory and runtime improve, and the selection is
+fully automatic based on the container type. The
+:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues
+to use the dense path.
+
 .. rubric:: Settings
 
 .. list-table::
