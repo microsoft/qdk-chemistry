@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -153,6 +154,17 @@ bilinear(j, k) is available on both forms.
                              })
       .def_property_readonly("is_majorana_atomic",
                              &MajoranaMapping::is_majorana_atomic)
+      .def_property_readonly(
+          "stabilizers",
+          [](const MajoranaMapping& self) {
+            py::list out;
+            for (const auto& [coeff, word] : self.stabilizers()) {
+              out.append(py::make_tuple(coeff, word));
+            }
+            return out;
+          },
+          "Codespace stabilizers as a list of (coefficient, sparse Pauli "
+          "word) tuples. Empty for non-redundant encodings.")
       .def(
           "__call__",
           [](const MajoranaMapping& self,
@@ -229,7 +241,14 @@ bilinear(j, k) is available on both forms.
                 num_modes, n_alpha, n_beta);
           },
           py::arg("num_modes"), py::arg("symmetries"),
-          "Construct a symmetry-conserving Bravyi-Kitaev encoding.");
+          "Construct a symmetry-conserving Bravyi-Kitaev encoding.")
+      .def_static(
+          "verstraete_cirac", &MajoranaMapping::verstraete_cirac,
+          py::arg("lattice"),
+          "Construct a Verstraete-Cirac encoding from a rectangular 2D "
+          "LatticeGraph. The lattice describes one spin species; the result "
+          "has num_modes = 2 * n_sites (one block per spin) and carries "
+          "codespace stabilizers().");
 
   mapping
       .def(

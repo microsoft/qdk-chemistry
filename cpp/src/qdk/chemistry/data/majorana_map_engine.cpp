@@ -8,12 +8,14 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -537,9 +539,50 @@ MajoranaMapResult majorana_map_hamiltonian(
 
   static const auto table =
       detail::make_dispatch_table(std::make_index_sequence<detail::max_nw>{});
-  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta, eri_aaaa,
-                              eri_aabb, eri_bbbb, n_spatial, spin_symmetric,
-                              threshold, integral_threshold);
+  auto result = table[num_words - 1](
+      mapping, core_energy, h1_alpha, h1_beta, eri_aaaa, eri_aabb, eri_bbbb,
+      n_spatial, spin_symmetric, threshold, integral_threshold);
+
+  // ─── Generic codespace stabilizer penalty ───────────────────────────
+  //
+  // Redundant encodings (e.g. Verstraete-Cirac) expose stabilizers S that
+  // equal +1 on the physical subspace.  Adding lambda*(I - S) per stabilizer
+  // leaves codespace eigenvalues unchanged (I - S = 0 there) while lifting
+  // non-codespace states by >= 2*lambda.  Choosing lambda above the physical
+  // operator's 1-norm guarantees the physical spectrum stays lowest.  This is
+  // applied uniformly for any mapping; mappings without stabilizers (the
+  // common case) skip it entirely.
+  const auto& stabilizers = mapping.stabilizers();
+  if (stabilizers.empty()) {
+    return result;
+  }
+
+  double one_norm = 0.0;
+  for (const auto& c : result.coefficients) {
+    one_norm += std::abs(c);
+  }
+  const double lambda = one_norm + 1.0;
+
+  std::map<SparsePauliWord, std::complex<double>> merged;
+  for (std::size_t i = 0; i < result.words.size(); ++i) {
+    merged[result.words[i]] += result.coefficients[i];
+  }
+  merged[SparsePauliWord{}] += std::complex<double>(
+      lambda * static_cast<double>(stabilizers.size()), 0.0);
+  for (const auto& [coeff, word] : stabilizers) {
+    merged[word] += -lambda * coeff;
+  }
+
+  MajoranaMapResult penalized;
+  penalized.words.reserve(merged.size());
+  penalized.coefficients.reserve(merged.size());
+  for (auto& [word, coeff] : merged) {
+    if (std::abs(coeff) >= threshold) {
+      penalized.words.push_back(word);
+      penalized.coefficients.push_back(coeff);
+    }
+  }
+  return penalized;
 }
 
 }  // namespace qdk::chemistry::data

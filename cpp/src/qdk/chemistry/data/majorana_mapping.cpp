@@ -23,7 +23,8 @@ MajoranaMapping::MajoranaMapping(
     std::vector<SparsePauliWord> table,
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
     std::string name, std::size_t num_modes, std::size_t num_qubits,
-    std::string base_encoding, std::optional<TaperingSpecification> tapering)
+    std::string base_encoding, std::optional<TaperingSpecification> tapering,
+    std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers)
     : table_(std::move(table)),
       bilinears_(std::move(bilinears)),
       name_(std::move(name)),
@@ -31,7 +32,8 @@ MajoranaMapping::MajoranaMapping(
       num_modes_(num_modes),
       num_qubits_(num_qubits),
       majorana_atomic_(!table_.empty()),
-      tapering_(std::move(tapering)) {
+      tapering_(std::move(tapering)),
+      stabilizers_(std::move(stabilizers)) {
   if (base_encoding_.empty()) {
     base_encoding_ = name_;
   }
@@ -149,7 +151,8 @@ MajoranaMapping::bilinear(std::size_t j, std::size_t k) const {
 
 MajoranaMapping MajoranaMapping::without_tapering() const {
   return MajoranaMapping(table_, bilinears_, base_encoding_, num_modes_,
-                         num_qubits_, base_encoding_);
+                         num_qubits_, base_encoding_, std::nullopt,
+                         stabilizers_);
 }
 
 std::string MajoranaMapping::get_summary() const {
@@ -161,6 +164,9 @@ std::string MajoranaMapping::get_summary() const {
   ss << "\n  Modes: " << num_modes_ << "\n  Qubits: " << num_qubits_;
   if (tapering_) {
     ss << "\n  Tapered qubits: " << tapering_->num_tapered();
+  }
+  if (!stabilizers_.empty()) {
+    ss << "\n  Stabilizers: " << stabilizers_.size();
   }
   return ss.str();
 }
@@ -177,12 +183,24 @@ nlohmann::json MajoranaMapping::to_json() const {
   // round-trip even when the Majorana table is empty.
   if (!majorana_atomic_) {
     data["num_modes"] = num_modes_;
+    // Persist the qubit count explicitly: an auxiliary qubit referenced only by
+    // stabilizers (not by any bilinear) would otherwise be lost on reload.
+    data["num_qubits"] = num_qubits_;
     nlohmann::json bl_array = nlohmann::json::array();
     for (const auto& [coeff, word] : bilinears_) {
       bl_array.push_back(
           {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
     }
     data["bilinears"] = bl_array;
+  }
+  // Codespace stabilizers (redundant encodings only).
+  if (!stabilizers_.empty()) {
+    nlohmann::json stab_array = nlohmann::json::array();
+    for (const auto& [coeff, word] : stabilizers_) {
+      stab_array.push_back(
+          {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
+    }
+    data["stabilizers"] = stab_array;
   }
   return data;
 }
@@ -207,6 +225,17 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     tapering = TaperingSpecification::from_json(data.at("tapering"));
   }
 
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  if (data.contains("stabilizers")) {
+    for (const auto& entry : data.at("stabilizers")) {
+      double real = entry.at("real").get<double>();
+      double imag = entry.at("imag").get<double>();
+      auto word = entry.at("word").get<SparsePauliWord>();
+      stabilizers.emplace_back(std::complex<double>(real, imag),
+                               std::move(word));
+    }
+  }
+
   // Bilinear-only mapping: table is empty, bilinears stored explicitly.
   if (table.empty() && data.contains("bilinears")) {
     auto num_modes = data.at("num_modes").get<std::size_t>();
@@ -219,21 +248,24 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     }
     auto mapping = MajoranaMapping::from_bilinears(
         num_modes, std::move(bilinears), base_encoding);
-    if (name == base_encoding && !tapering) {
+    std::size_t nq = data.value("num_qubits", mapping.num_qubits_);
+    if (name == base_encoding && !tapering && stabilizers.empty() &&
+        nq == mapping.num_qubits_) {
       return mapping;
     }
     return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
-                           mapping.num_modes_, mapping.num_qubits_,
-                           std::move(base_encoding), std::move(tapering));
+                           mapping.num_modes_, nq, std::move(base_encoding),
+                           std::move(tapering), std::move(stabilizers));
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
-  if (name == base_encoding && !tapering) {
+  if (name == base_encoding && !tapering && stabilizers.empty()) {
     return mapping;
   }
   return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
                          mapping.num_modes_, mapping.num_qubits_,
-                         std::move(base_encoding), std::move(tapering));
+                         std::move(base_encoding), std::move(tapering),
+                         std::move(stabilizers));
 }
 
 void MajoranaMapping::to_json_file(const std::string& filename) const {

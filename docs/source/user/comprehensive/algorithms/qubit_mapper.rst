@@ -52,6 +52,11 @@ Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
 Bravyi-Kitaev tree :cite:`Havlicek2017`
    A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
 
+.. _encoding-verstraete-cirac:
+
+Verstraete-Cirac :cite:`VerstraeteCirac2005,Whitfield2016,Havlicek2017locality`
+   A locality-preserving encoding for 2D-local fermionic models (e.g. Fermi-Hubbard). Each lattice site is paired with one auxiliary qubit so that nearest-neighbour hopping terms map to constant-weight Pauli strings independent of system size, at the cost of doubling the qubit count and introducing codespace stabilizers. Use :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with a rectangular :class:`~qdk_chemistry.data.LatticeGraph` describing a single spin species; the factory emits one block per spin sector. The resulting mapping carries ``stabilizers()`` and the mapper appends an energy penalty per stabilizer, so the physical (codespace) spectrum is reproduced without special-casing by mapper consumers.
+
 
 Using the QubitMapper
 ---------------------

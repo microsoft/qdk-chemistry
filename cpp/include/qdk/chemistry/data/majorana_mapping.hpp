@@ -18,6 +18,8 @@
 
 namespace qdk::chemistry::data {
 
+class LatticeGraph;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -99,6 +101,23 @@ class MajoranaMapping : public DataClass {
   /// Optional post-mapping tapering specification.
   const std::optional<TaperingSpecification>& tapering() const {
     return tapering_;
+  }
+
+  /**
+   * @brief Codespace stabilizers for redundant (qubit-overcomplete) encodings.
+   *
+   * Each entry is a Pauli operator ``coeff * word`` that commutes with the
+   * physical Hamiltonian and equals ``+1`` on the physical subspace.  Standard
+   * (non-redundant) encodings such as Jordan-Wigner return an empty vector.
+   * The mapper engine uses these generically to append an energy penalty
+   * ``lambda * (I - S)`` per stabilizer, lifting non-codespace states out of
+   * the low-energy spectrum without changing codespace eigenvalues.
+   *
+   * @return Reference to the (possibly empty) stabilizer list.
+   */
+  const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+  stabilizers() const {
+    return stabilizers_;
   }
 
   /**
@@ -244,13 +263,42 @@ class MajoranaMapping : public DataClass {
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
+  /**
+   * @brief Verstraete-Cirac (auxiliary-qubit) encoding for a 2D lattice.
+   *
+   * Builds a locality-preserving fermion-to-qubit encoding directly from the
+   * edges of a rectangular 2D ``LatticeGraph``.  Each lattice site is paired
+   * with one auxiliary qubit; nearest-neighbour hopping terms map to
+   * constant-weight Pauli operators independent of system size.  The encoding
+   * acts on the physical subspace defined by the returned ``stabilizers()``.
+   *
+   * The lattice describes a single spin species (``n_sites`` sites); the
+   * factory produces a mapping with ``num_modes == 2 * n_sites`` (one
+   * Verstraete-Cirac block per spin sector), so it is consumed by
+   * ``QubitMapper`` exactly like ``jordan_wigner(num_modes=2*n_sites)`` and
+   * uses ``2 * num_modes`` qubits.
+   *
+   * @param lattice A rectangular 2D lattice (built by ``LatticeGraph::square``
+   *        or any graph whose connected components are rectangular grids).
+   * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
+   * @throws std::invalid_argument If the lattice is empty or its connectivity
+   *         is not a rectangular grid.
+   *
+   * @see F. Verstraete and J. I. Cirac, J. Stat. Mech. (2005) P09012.
+   * @see J. D. Whitfield, V. Havlicek, M. Troyer, Phys. Rev. A 94, 030301(R).
+   * @see V. Havlicek, M. Troyer, J. D. Whitfield, Phys. Rev. A 95, 032332.
+   */
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
-      std::optional<TaperingSpecification> tapering = std::nullopt);
+      std::optional<TaperingSpecification> tapering = std::nullopt,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+          stabilizers = {});
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
@@ -275,6 +323,9 @@ class MajoranaMapping : public DataClass {
 
   /// Optional tapering metadata for post-mapping qubit reduction.
   std::optional<TaperingSpecification> tapering_;
+
+  /// Codespace stabilizers for redundant encodings (empty otherwise).
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers_;
 
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
