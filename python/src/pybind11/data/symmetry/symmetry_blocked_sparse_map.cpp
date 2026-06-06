@@ -24,16 +24,17 @@ void bind_symmetry_blocked_sparse_map(py::module& m) {
       "Immutable rank-4 symmetry-blocked sparse map (double-valued). Each "
       "block is a dict-like map from a per-slot local-index tuple to a "
       "scalar value.")
-      .def("symmetries",
-           [](const SBSM& self) {
-             std::vector<std::shared_ptr<SymmetryProduct>> out;
-             out.reserve(self.symmetries().size());
-             for (const auto& sym : self.symmetries()) {
-               out.push_back(std::const_pointer_cast<SymmetryProduct>(sym));
-             }
-             return out;
-           },
-           "Per-slot SymmetryProduct instances.")
+      .def(
+          "symmetries",
+          [](const SBSM& self) {
+            std::vector<std::shared_ptr<SymmetryProduct>> out;
+            out.reserve(self.symmetries().size());
+            for (const auto& sym : self.symmetries()) {
+              out.push_back(std::const_pointer_cast<SymmetryProduct>(sym));
+            }
+            return out;
+          },
+          "Per-slot SymmetryProduct instances.")
       .def("extents", &SBSM::extents, "Per-slot per-label extents.")
       .def("has_block", &SBSM::has_block, py::arg("labels"),
            "True iff a block is stored for the given per-slot labels.")
@@ -55,11 +56,12 @@ void bind_symmetry_blocked_sparse_map(py::module& m) {
            "Total number of stored blocks (including aliases).")
       .def("num_entries", &SBSM::num_entries,
            "Total number of stored sparse entries across all blocks.")
-      .def("get",
-           [](const SBSM& self, const SBSM::Labels& labels,
-              const SBSM::IndexTuple& idx) { return self.get(labels, idx); },
-           py::arg("labels"), py::arg("idx"),
-           "Single-entry lookup; returns 0.0 if the entry is absent.")
+      .def(
+          "get",
+          [](const SBSM& self, const SBSM::Labels& labels,
+             const SBSM::IndexTuple& idx) { return self.get(labels, idx); },
+          py::arg("labels"), py::arg("idx"),
+          "Single-entry lookup; returns 0.0 if the entry is absent.")
       .def("get_data_type_name", &SBSM::get_data_type_name)
       .def("get_summary", &SBSM::get_summary)
       .def("__repr__", &SBSM::get_summary);
