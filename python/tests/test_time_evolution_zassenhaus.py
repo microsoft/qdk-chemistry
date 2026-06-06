@@ -210,8 +210,9 @@ def _fit_error_slope(hamiltonian: QubitHamiltonian, order: int) -> float:
 
     For high orders on small-coefficient Hamiltonians the error at the smallest
     times reaches the floating-point floor (``~1e-15``), where the log-log slope is
-    meaningless.  Such points are dropped before the fit; the remaining points still
-    lie within the specified ``[1e-3, 1e-1]`` window.
+    meaningless.  Points within ~2 orders of that floor (``< 1e-13``) are dropped
+    before the fit; every remaining point still follows the power law and lies within
+    the specified ``[1e-3, 1e-1]`` window.
     """
     hamiltonian_matrix = hamiltonian.to_matrix()
     times = np.logspace(-3, -1, 12)
@@ -224,7 +225,7 @@ def _fit_error_slope(hamiltonian: QubitHamiltonian, order: int) -> float:
         errors.append(np.linalg.norm(u_exact - u_builder, 2))
     errors = np.asarray(errors)
 
-    mask = errors > 1e-10
+    mask = errors > 1e-13
     if int(mask.sum()) < 4:
         # Too few points above the floor: keep the six largest-t points.
         mask = np.zeros_like(errors, dtype=bool)
@@ -380,4 +381,9 @@ def test_h2_ground_state_chemical_accuracy():
         shots_per_bit=1,
     )
     resolved = _resolve_energy(phase_fraction, evolution_time, expected_energy=ground_energy)
-    assert abs(resolved - ground_energy) < 1.6e-3
+    error = abs(resolved - ground_energy)
+    print(
+        f"\n[H2/STO-3G QPE] estimated = {resolved:.6f} Ha | exact (FCI) = {ground_energy:.6f} Ha "
+        f"| |error| = {error:.2e} Ha (chemical accuracy = 1.6e-3 Ha)"
+    )
+    assert error < 1.6e-3
