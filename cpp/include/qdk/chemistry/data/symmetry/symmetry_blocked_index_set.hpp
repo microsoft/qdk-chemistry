@@ -169,7 +169,7 @@ class SymmetryBlockedIndexSet
    * produced by @ref to_json.
    *
    * Validates the serialization version recorded in @p j against
-   * @ref SERIALIZATION_VERSION before reconstructing.
+   * @c SERIALIZATION_VERSION before reconstructing.
    *
    * @param j JSON object produced by a prior @ref to_json call.
    * @return Shared pointer to the reconstructed index set.
@@ -193,7 +193,7 @@ class SymmetryBlockedIndexSet
    * @brief Reconstruct a @ref SymmetryBlockedIndexSet from an HDF5 group
    * produced by @ref to_hdf5.
    *
-   * Validates the @c version attribute against @ref SERIALIZATION_VERSION
+   * Validates the @c version attribute against @c SERIALIZATION_VERSION
    * before reconstructing.
    *
    * @param group HDF5 group to read from.

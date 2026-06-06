@@ -18,6 +18,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <variant>
@@ -26,45 +27,21 @@
 namespace qdk::chemistry::data {
 
 /**
- * @brief Maps a tensor rank to the Eigen storage type used for one block.
+ * @brief Storage type for one block of a rank-@p Rank tensor over @p Scalar.
  *
- * Rank-1 and rank-4 blocks are stored as (flat) column vectors; rank-2 and
- * rank-3 blocks are stored as dense matrices. Partial specializations are
- * provided for ranks 1–4; higher ranks have no specialization and will
- * produce a compilation error.
- */
-template <std::size_t Rank, class Scalar>
-struct TensorType;
-
-/** @brief Rank-1 block storage: a dense column vector. */
-template <class S>
-struct TensorType<1, S> {
-  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
-};
-/** @brief Rank-2 block storage: a dense matrix. */
-template <class S>
-struct TensorType<2, S> {
-  using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
-};
-/** @brief Rank-3 block storage: a dense matrix (typically packed as
- *  @c [outer*outer, inner] for two paired index slots plus one trailing
- *  index, e.g. Cholesky three-center @f$L^{Q}_{ij}@f$ stored as
- *  @f$[ij,\,Q]@f$). The size is validated against the product of the
- *  per-slot extents; the precise row/column split is producer-chosen. */
-template <class S>
-struct TensorType<3, S> {
-  using type = Eigen::Matrix<S, Eigen::Dynamic, Eigen::Dynamic>;
-};
-/** @brief Rank-4 block storage: a flat-packed column vector. */
-template <class S>
-struct TensorType<4, S> {
-  using type = Eigen::Matrix<S, Eigen::Dynamic, 1>;
-};
-
-/** @brief Storage type for one block of a rank-@p Rank tensor over @p Scalar.
+ * Rank-1 and rank-4 blocks are stored as (flat) dense column vectors; rank-2
+ * and rank-3 blocks are stored as dense matrices. (Rank-3 blocks are typically
+ * packed as @c [outer*outer, inner] for two paired index slots plus one
+ * trailing index, e.g. a Cholesky three-center factor @f$L^{Q}_{ij}@f$ stored
+ * as @f$[ij,\,Q]@f$; the size is validated against the product of the per-slot
+ * extents and the precise row/column split is producer-chosen.) Only ranks 1–4
+ * are supported; @ref SymmetryBlockedTensor rejects other ranks.
  */
 template <std::size_t Rank, class Scalar = double>
-using Tensor = typename TensorType<Rank, Scalar>::type;
+using Tensor =
+    std::conditional_t<(Rank == 1 || Rank == 4),
+                       Eigen::Matrix<Scalar, Eigen::Dynamic, 1>,
+                       Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>>;
 
 namespace detail {
 
@@ -114,6 +91,8 @@ S scalar_from_json(const nlohmann::json& j) {
 template <std::size_t Rank, class Scalar = double>
 class SymmetryBlockedTensor
     : public SymmetryBlocked<Rank, Tensor<Rank, Scalar>> {
+  static_assert(Rank >= 1 && Rank <= 4,
+                "SymmetryBlockedTensor only supports ranks 1-4.");
   using Base = SymmetryBlocked<Rank, Tensor<Rank, Scalar>>;
 
  public:
@@ -127,10 +106,11 @@ class SymmetryBlockedTensor
   /**
    * @brief Shared pointer to immutable per-block dense storage.
    *
-   * Inherited from @ref SymmetryBlocked. Held as @c shared_ptr<const Block>
-   * so that symmetry-equivalent sectors can alias the same storage.
+   * Equivalent to the base @ref SymmetryBlocked @c BlockPtr with the block
+   * type resolved to @ref Tensor. Held as @c shared_ptr<const Tensor> so that
+   * symmetry-equivalent sectors can alias the same storage.
    */
-  using typename Base::BlockPtr;
+  using BlockPtr = std::shared_ptr<const Tensor<Rank, Scalar>>;
   /**
    * @brief Per-slot per-label extents.
    *
@@ -288,12 +268,12 @@ class SymmetryBlockedTensor
    * @brief Reconstruct from a JSON object produced by @ref to_json.
    *
    * Validates the serialization version recorded in @p j against
-   * @ref SERIALIZATION_VERSION before reconstructing.
+   * @c SERIALIZATION_VERSION before reconstructing.
    *
    * @param j JSON object produced by a prior @ref to_json call.
    * @return Shared pointer to the reconstructed tensor.
    * @throws std::runtime_error if @p j is missing the @c "version" field or
-   *         its version is incompatible with @ref SERIALIZATION_VERSION.
+   *         its version is incompatible with @c SERIALIZATION_VERSION.
    * @throws nlohmann::json::exception if @p j is otherwise malformed.
    */
   static std::shared_ptr<SymmetryBlockedTensor> from_json(
@@ -323,7 +303,7 @@ class SymmetryBlockedTensor
    * @brief Reconstruct from an HDF5 group produced by @ref to_hdf5.
    *
    * Validates the @c "version" field in the HDF5 metadata payload against
-   * @ref SERIALIZATION_VERSION before reconstructing.
+   * @c SERIALIZATION_VERSION before reconstructing.
    *
    * @param group HDF5 group to read from.
    * @return Shared pointer to the reconstructed tensor.

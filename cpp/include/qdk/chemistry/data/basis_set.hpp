@@ -905,7 +905,7 @@ class BasisSet : public DataClass,
   bool _is_valid() const;
 
   /**
-   * @brief Populate @ref _ao_symmetries and @ref _ao_extents from the
+   * @brief Populate @c _ao_symmetries and @c _ao_extents from the
    * supplied values, defaulting to a restricted-spin axis with
    * @ref get_num_atomic_orbitals() extent per label when @p ao_symmetries
    * is null.
@@ -919,8 +919,8 @@ class BasisSet : public DataClass,
       std::unordered_map<SymmetryLabel, std::size_t> ao_extents);
 
   /**
-   * @brief Validate that @ref _ao_extents keys are admissible and satisfy
-   * symmetry aliasing under @ref _ao_symmetries.
+   * @brief Validate that @c _ao_extents keys are admissible and satisfy
+   * symmetry aliasing under @c _ao_symmetries.
    * @throws std::invalid_argument on violation
    */
   void _validate_ao_symmetries() const;

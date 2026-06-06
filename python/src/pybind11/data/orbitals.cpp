@@ -203,8 +203,8 @@ This is the preferred (non-deprecated) construction path. The orbital
 coefficients and energies are supplied as SymmetryBlockedTensor objects.
 
 Args:
-    coefficients (SymmetryBlockedTensor): Rank-2 coefficient tensor [AO x MO]
-    energies (SymmetryBlockedTensor | None): Rank-1 energy tensor, can be None
+    coefficients (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2): Rank-2 coefficient tensor [AO x MO]
+    energies (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1 | None): Rank-1 energy tensor, can be None
     ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
     basis_set (BasisSet | None): The basis set, can be None
 )",

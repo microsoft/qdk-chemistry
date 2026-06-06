@@ -3,8 +3,8 @@
 This module exposes the single-particle symmetry types used to block
 quantum-chemistry tensors (orbital coefficients, energies, integrals, reduced
 density matrices) by conserved single-particle quantum numbers, together with
-the :class:`SymmetryBlockedTensor` storage primitive and its index-set
-companion :class:`SymmetryBlockedIndexSet`.
+the symmetry-blocked tensor storage primitives (the rank/scalar variants listed
+below) and their index-set companion :class:`SymmetryBlockedIndexSet`.
 
 In this release only the spin axis (:math:`S_z`) is populated, supporting
 restricted (RHF/ROHF) and unrestricted (UHF) references.

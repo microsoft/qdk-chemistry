@@ -185,7 +185,7 @@ Returns:
 One-body integrals as a rank-2 symmetry-blocked tensor.
 
 Returns:
-    SymmetryBlockedTensorRank2Real: The h1 SBT.
+    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2: The h1 SBT.
 )");
 
   hamiltonian_container.def("one_body_integrals_block",
@@ -210,7 +210,7 @@ Returns:
 Inactive Fock matrix as a rank-2 symmetry-blocked tensor.
 
 Returns:
-    SymmetryBlockedTensorRank2Real: The inactive Fock SBT.
+    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2: The inactive Fock SBT.
 )");
 
   hamiltonian_container.def("inactive_fock_block",
@@ -507,7 +507,7 @@ Row axis keyed by MO spin symmetries (extent = norb^2 per spin),
 column axis has no symmetry (extent = naux).
 
 Returns:
-    SymmetryBlockedTensorRank2Real: The three-center SBT.
+    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2: The three-center SBT.
 )");
 
   cholesky_container.def("is_valid", &CholeskyHamiltonianContainer::is_valid,
@@ -710,7 +710,7 @@ Returns:
 Two-body integrals as a rank-4 symmetry-blocked tensor.
 
 Returns:
-    SymmetryBlockedTensorRank4Real: The h2 SBT.
+    qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank4: The h2 SBT.
 )");
 
   canonical_four_center.def(

@@ -61,10 +61,12 @@ class SymmetryBlockedSparseMap
   /**
    * @brief Shared pointer to immutable per-block sparse storage.
    *
-   * Inherited from @ref SymmetryBlocked. Held as @c shared_ptr<const Block>
-   * so that symmetry-equivalent sectors can alias the same storage.
+   * Equivalent to the base @ref SymmetryBlocked @c BlockPtr with the block
+   * type resolved to @ref SparseMapBlock. Held as
+   * @c shared_ptr<const SparseMapBlock> so that symmetry-equivalent sectors can
+   * alias the same storage.
    */
-  using typename Base::BlockPtr;
+  using BlockPtr = std::shared_ptr<const SparseMapBlock<Rank, Scalar>>;
   /**
    * @brief Per-slot per-label extents.
    *
@@ -223,7 +225,6 @@ class SymmetryBlockedSparseMap
   /**
    * @brief HDF5 serialization is not yet implemented for sparse maps;
    * always throws.
-   * @param group Unused HDF5 group target.
    * @throws std::runtime_error unconditionally.
    */
   void to_hdf5(H5::Group& /*group*/) const override {
@@ -234,7 +235,6 @@ class SymmetryBlockedSparseMap
   /**
    * @brief HDF5 serialization is not yet implemented for sparse maps;
    * always throws.
-   * @param filename Unused HDF5 target path.
    * @throws std::runtime_error unconditionally.
    */
   void to_hdf5_file(const std::string& /*filename*/) const override {
