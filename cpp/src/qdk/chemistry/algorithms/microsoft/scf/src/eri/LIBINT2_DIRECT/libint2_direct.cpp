@@ -683,6 +683,25 @@ class ERI {
       P_J = P_total.data();
     }
 
+    const auto ln_max_engine_precision = std::log(max_engine_precision);
+    std::vector<std::vector<std::shared_ptr<::libint2::ShellPair>>>
+        shell_pair_data(nsh, std::vector<std::shared_ptr<::libint2::ShellPair>>(
+                                 nsh, nullptr));
+    for (size_t s1 = 0; s1 < nsh; ++s1) {
+      const auto& shell_pairs = splist_.at(s1);
+      const auto& shell_pair_data_for_s1 = spdata_.at(s1);
+      for (size_t pair_index = 0; pair_index < shell_pairs.size();
+           ++pair_index) {
+        const size_t s2 = shell_pairs[pair_index];
+        shell_pair_data[s1][s2] = shell_pair_data_for_s1[pair_index];
+        if (s1 != s2) {
+          shell_pair_data[s2][s1] = std::make_shared<::libint2::ShellPair>(
+              obs_[s2], obs_[s1], ln_max_engine_precision,
+              ::libint2::ScreeningMethod::Original);
+        }
+      }
+    }
+
 #ifdef _OPENMP
     const int nthreads = omp_get_max_threads();
 #else
@@ -729,11 +748,16 @@ class ERI {
         for (size_t s2 = 0; s2 < nsh; ++s2) {
           const auto bf2_st = shell2bf_[s2];
           const auto n2 = obs_[s2].size();
+          const auto* sp12_data = shell_pair_data[s1][s2].get();
           for (size_t s3 = 0; s3 < nsh; ++s3) {
             const auto bf3_st = shell2bf_[s3];
             const auto n3 = obs_[s3].size();
             for (size_t s4 = 0; s4 < nsh; ++s4, ++s1234) {
               if (s1234 % nthreads != static_cast<size_t>(thread_id)) continue;
+
+              if (!sp12_data) continue;
+              const auto* sp34_data = shell_pair_data[s3][s4].get();
+              if (!sp34_data) continue;
 
               if (K_schwarz_(s1, s2) * K_schwarz_(s3, s4) < eri_threshold_)
                 continue;
@@ -744,12 +768,14 @@ class ERI {
               if (need_coulomb) {
                 engine.compute2<::libint2::Operator::coulomb,
                                 ::libint2::BraKet::xx_xx, 1>(
-                    obs_[s1], obs_[s2], obs_[s3], obs_[s4]);
+                    obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
+                    sp34_data);
               }
               if (need_erf_exchange) {
                 engine_erf->compute2<::libint2::Operator::erf_coulomb,
                                      ::libint2::BraKet::xx_xx, 1>(
-                    obs_[s1], obs_[s2], obs_[s3], obs_[s4]);
+                    obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data,
+                    sp34_data);
               }
 
               const bool has_coulomb = need_coulomb && buf[0] != nullptr;
