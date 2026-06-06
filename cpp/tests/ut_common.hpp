@@ -237,7 +237,7 @@ inline std::shared_ptr<Structure> create_li_structure() {
 /**
  * @brief Creates a LiH structure
  */
-inline std::shared_ptr<Structure> create_lithium_hydride_structure() {
+inline std::shared_ptr<Structure> create_lih_structure() {
   std::vector<Eigen::Vector3d> coords = {
       {0.000000000, 0.000000000, 0.000000000},
       {0.000000000, 0.000000000, 1.595000000}};

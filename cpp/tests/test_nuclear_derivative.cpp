@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/nuclear_hessian.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -90,6 +91,23 @@ class RecordingLocalizer : public Localizer {
   }
 };
 
+template <typename Factory>
+class ScopedFactoryRegistration {
+ public:
+  explicit ScopedFactoryRegistration(std::string key) : key_(std::move(key)) {
+    Factory::unregister_instance(key_);
+  }
+
+  ~ScopedFactoryRegistration() { Factory::unregister_instance(key_); }
+
+  ScopedFactoryRegistration(const ScopedFactoryRegistration&) = delete;
+  ScopedFactoryRegistration& operator=(const ScopedFactoryRegistration&) =
+      delete;
+
+ private:
+  std::string key_;
+};
+
 void expect_same_structure(const std::shared_ptr<Structure>& left,
                            const std::shared_ptr<Structure>& right) {
   ASSERT_NE(left, nullptr);
@@ -110,7 +128,7 @@ NuclearDerivativeResult run_qdk_derivative_for_functional(
     calculator->settings().set("finite_difference_step", 1.0e-2);
   }
 
-  return calculator->run(testing::create_lithium_hydride_structure(), 0, 1,
+  return calculator->run(testing::create_lih_structure(), 0, 1,
                          std::string("sto-3g"));
 }
 
@@ -263,8 +281,9 @@ TEST(NuclearDerivativeCalculatorTest,
      MultiReferenceFiniteDifferenceReusesSeedActiveSpace) {
   recorded_active_spaces.clear();
   recorded_inactive_spaces.clear();
-  MultiConfigurationCalculatorFactory::unregister_instance(
-      "_test_nuclear_derivative_recording_mc");
+  [[maybe_unused]] ScopedFactoryRegistration<
+      MultiConfigurationCalculatorFactory>
+      mc_guard("_test_nuclear_derivative_recording_mc");
   MultiConfigurationCalculatorFactory::register_instance(
       []() -> MultiConfigurationCalculatorFactory::return_type {
         return std::make_unique<RecordingMultiConfigurationCalculator>();
@@ -300,9 +319,6 @@ TEST(NuclearDerivativeCalculatorTest,
   for (const auto& inactive_space : recorded_inactive_spaces) {
     EXPECT_TRUE(inactive_space.empty());
   }
-
-  MultiConfigurationCalculatorFactory::unregister_instance(
-      "_test_nuclear_derivative_recording_mc");
 }
 
 TEST(NuclearDerivativeCalculatorTest,
@@ -311,13 +327,14 @@ TEST(NuclearDerivativeCalculatorTest,
   recorded_inactive_spaces.clear();
   recorded_localized_alpha_spaces.clear();
   recorded_localized_beta_spaces.clear();
-  MultiConfigurationCalculatorFactory::unregister_instance(
-      "_test_nuclear_derivative_recording_mc");
+  [[maybe_unused]] ScopedFactoryRegistration<
+      MultiConfigurationCalculatorFactory>
+      mc_guard("_test_nuclear_derivative_recording_mc");
   MultiConfigurationCalculatorFactory::register_instance(
       []() -> MultiConfigurationCalculatorFactory::return_type {
         return std::make_unique<RecordingMultiConfigurationCalculator>();
       });
-  LocalizerFactory::unregister_instance(
+  [[maybe_unused]] ScopedFactoryRegistration<LocalizerFactory> localizer_guard(
       "_test_nuclear_derivative_recording_localizer");
   LocalizerFactory::register_instance([]() -> LocalizerFactory::return_type {
     return std::make_unique<RecordingLocalizer>();
@@ -360,11 +377,6 @@ TEST(NuclearDerivativeCalculatorTest,
   for (const auto& localized_space : recorded_localized_beta_spaces) {
     EXPECT_EQ(localized_space, std::vector<size_t>{0});
   }
-
-  LocalizerFactory::unregister_instance(
-      "_test_nuclear_derivative_recording_localizer");
-  MultiConfigurationCalculatorFactory::unregister_instance(
-      "_test_nuclear_derivative_recording_mc");
 }
 
 TEST(NuclearDerivativeCalculatorTest,

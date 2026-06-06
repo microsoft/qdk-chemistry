@@ -13,6 +13,10 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+#include <mpi.h>
+#endif
+
 #include "microsoft/scf.hpp"
 
 namespace qdk::chemistry::algorithms {
@@ -62,6 +66,54 @@ std::shared_ptr<data::Structure> copy_structure(
     throw std::invalid_argument("Structure must not be null");
   }
   return std::make_shared<data::Structure>(*structure);
+}
+
+std::optional<Eigen::VectorXd> broadcast_gradient_from_root(
+    const std::optional<Eigen::VectorXd>& gradient) {
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  int initialized = 0;
+  MPI_Initialized(&initialized);
+  if (!initialized) {
+    return gradient;
+  }
+
+  int finalized = 0;
+  MPI_Finalized(&finalized);
+  if (finalized) {
+    return gradient;
+  }
+
+  int world_size = 1;
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  if (world_size <= 1) {
+    return gradient;
+  }
+
+  int world_rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
+
+  int gradient_size = -1;
+  if (world_rank == 0 && gradient.has_value()) {
+    gradient_size = static_cast<int>(gradient->size());
+  }
+  MPI_Bcast(&gradient_size, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+  if (gradient_size < 0) {
+    return std::nullopt;
+  }
+
+  Eigen::VectorXd broadcast_gradient;
+  if (world_rank == 0) {
+    broadcast_gradient = *gradient;
+  } else {
+    broadcast_gradient.resize(gradient_size);
+  }
+  MPI_Bcast(broadcast_gradient.data(), gradient_size, MPI_DOUBLE, 0,
+            MPI_COMM_WORLD);
+  return broadcast_gradient;
+#else
+  return gradient;
+#endif
 }
 
 std::shared_ptr<data::Structure> displace_structure(
@@ -505,12 +557,14 @@ NuclearDerivativeResult QdkNuclearDerivativeCalculator::_run_impl(
 
   auto scf_result = solver.run_with_analytic_gradient(
       structure, charge, spin_multiplicity, seed_to_scf_input(seed, true));
-  if (!scf_result.nuclear_gradient.has_value()) {
+  auto nuclear_gradient =
+      broadcast_gradient_from_root(scf_result.nuclear_gradient);
+  if (!nuclear_gradient.has_value()) {
     throw std::runtime_error(
         "Internal SCF did not return the requested analytic nuclear gradient");
   }
   auto gradients = std::make_shared<data::NuclearGradients>(
-      copy_structure(structure), *scf_result.nuclear_gradient);
+      copy_structure(structure), *nuclear_gradient);
 
   return {scf_result.energy, gradients, std::nullopt, scf_result.wavefunction};
 }

@@ -90,12 +90,6 @@ Args:
            R"(Return the atom-major gradient vector in Hartree/Bohr.)")
       .def("as_matrix", &NuclearGradients::as_matrix,
            R"(Return gradients as an ``(num_atoms, 3)`` matrix.)")
-      .def(
-          "get_num_atoms",
-          [](const NuclearGradients& gradients) {
-            return gradients.get_structure()->get_num_atoms();
-          },
-          R"(Return the number of atoms in the associated structure.)")
       .def("get_data_type_name", &NuclearGradients::get_data_type_name,
            R"(Return the serialized data type name.)")
       .def("get_summary", &NuclearGradients::get_summary,

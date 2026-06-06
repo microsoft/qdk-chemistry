@@ -11,16 +11,18 @@ from qdk_chemistry import algorithms, data
 
 
 def _h2_structure():
+    """Create an H2 structure for derivative data tests."""
     return data.Structure([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]], [1, 1])
 
 
 def test_nuclear_gradients_roundtrip_json():
+    """Round-trip nuclear gradients through JSON."""
     structure = _h2_structure()
     values = np.arange(6, dtype=float)
 
     gradients = data.NuclearGradients(structure, values)
 
-    assert gradients.get_num_atoms() == 2
+    assert gradients.get_structure().get_num_atoms() == 2
     np.testing.assert_allclose(gradients.get_values(), values)
     assert gradients.as_matrix().shape == (2, 3)
 
@@ -33,12 +35,13 @@ def test_nuclear_gradients_roundtrip_json():
 
 
 def test_nuclear_hessian_roundtrip_json():
+    """Round-trip a nuclear Hessian through JSON."""
     structure = _h2_structure()
     matrix = np.eye(6)
 
     hessian = data.NuclearHessian(structure, matrix)
 
-    assert hessian.get_num_atoms() == 2
+    assert hessian.get_structure().get_num_atoms() == 2
     np.testing.assert_allclose(hessian.get_matrix(), matrix)
 
     loaded = data.NuclearHessian.from_json(hessian.to_json())
@@ -50,6 +53,7 @@ def test_nuclear_hessian_roundtrip_json():
 
 
 def test_nuclear_derivative_factory_registered():
+    """Create the default nuclear derivative calculator from the factory."""
     calculator = algorithms.create("nuclear_derivative_calculator")
 
     assert isinstance(calculator, algorithms.NuclearDerivativeCalculator)
@@ -57,6 +61,7 @@ def test_nuclear_derivative_factory_registered():
 
 
 def test_qdk_nuclear_derivative_factory_registered():
+    """Create the QDK nuclear derivative calculator from the factory."""
     calculator = algorithms.create("nuclear_derivative_calculator", "qdk")
 
     assert isinstance(calculator, algorithms.QdkNuclearDerivativeCalculator)

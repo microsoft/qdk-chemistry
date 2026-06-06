@@ -85,12 +85,6 @@ Args:
       .def("get_matrix", &NuclearHessian::get_matrix,
            py::return_value_policy::reference_internal,
            R"(Return the Hessian matrix in Hartree/Bohr^2.)")
-      .def(
-          "get_num_atoms",
-          [](const NuclearHessian& hessian) {
-            return hessian.get_structure()->get_num_atoms();
-          },
-          R"(Return the number of atoms in the associated structure.)")
       .def("get_data_type_name", &NuclearHessian::get_data_type_name,
            R"(Return the serialized data type name.)")
       .def("get_summary", &NuclearHessian::get_summary,
