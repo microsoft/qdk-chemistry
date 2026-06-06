@@ -95,14 +95,16 @@ qiskit-extras = [
   "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
   "qiskit-nature; python_version < '3.14'",
   "qiskit-qasm3-import; python_version < '3.14'",
-  "pylatexenc==2.10; python_version < '3.14'"
+  "pylatexenc==2.10; python_version < '3.14'",
+  "requests>=2.33.0; python_version < '3.14'"
 ]
 test = [
   "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
   "nbclient",
   "nbformat",
   "pennylane",
-  "rdkit"
+  "rdkit",
+  "requests>=2.33.0"
 ]
 
 [project.urls]

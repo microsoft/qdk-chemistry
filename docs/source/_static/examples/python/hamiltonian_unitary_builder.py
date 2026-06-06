@@ -68,8 +68,13 @@ hamiltonian_constructor = create("hamiltonian_constructor")
 hamiltonian = hamiltonian_constructor.run(wfn_scf.get_orbitals())
 
 # 4. Qubit mapping
-qubit_mapper = create("qubit_mapper", encoding="jordan-wigner")
-qubit_ham = qubit_mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_mapper = create("qubit_mapper")
+qubit_ham = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 
 # 5. Build time evolution unitary
 trotter = create("hamiltonian_unitary_builder", "trotter", order=2, time=0.1)

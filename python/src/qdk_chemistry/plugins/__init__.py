@@ -57,8 +57,10 @@ Examples:
     >>> # Import the OpenFermion plugin to register its implementations
     >>> import qdk_chemistry.plugins.openfermion  # noqa: F401
     >>> # Create an OpenFermion qubit mapper through the registry
-    >>> mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
-    >>> qubit_hamiltonian = mapper.run(hamiltonian)
+    >>> from qdk_chemistry.data import MajoranaMapping
+    >>> mapper = create("qubit_mapper", "openfermion")
+    >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+    >>> qubit_hamiltonian = mapper.run(hamiltonian, mapping)
 
 Notes:
     Plugin modules may have additional dependencies beyond core QDK/Chemistry.
