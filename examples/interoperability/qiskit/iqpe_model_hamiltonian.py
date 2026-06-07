@@ -72,22 +72,26 @@ state_prep_circuit_1 = Circuit(qasm3.dumps(state_prep_1))
 # 2. Run iterative QPE
 iqpe_1 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_1,
-    evolution_time=TIME_STEP_1,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_1,
+)
+iqpe_1.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_1,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_1
+        ),
+    ),
 )
 iqpe_1.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1),
-)
-iqpe_1.settings().set(
-    "evolution_builder",
-    AlgorithmRef("time_evolution_builder", "trotter"),
-)
-iqpe_1.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
 )
 
 result_1 = iqpe_1.run(
@@ -151,22 +155,26 @@ state_prep_circuit_2 = Circuit(qasm3.dumps(state_prep_2))
 # 2. Run iterative QPE
 iqpe_2 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_2,
-    evolution_time=TIME_STEP_2,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_2,
+)
+iqpe_2.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_2,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_2
+        ),
+    ),
 )
 iqpe_2.settings().set(
     "circuit_executor",
     AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2),
-)
-iqpe_2.settings().set(
-    "evolution_builder",
-    AlgorithmRef("time_evolution_builder", "trotter"),
-)
-iqpe_2.settings().set(
-    "circuit_mapper",
-    AlgorithmRef("controlled_evolution_circuit_mapper", "pauli_sequence"),
 )
 
 result_2 = iqpe_2.run(

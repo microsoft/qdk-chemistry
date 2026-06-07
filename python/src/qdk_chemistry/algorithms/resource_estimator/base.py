@@ -33,7 +33,7 @@ class ResourceEstimator(Algorithm):
     def _run_impl(
         self,
         circuit: Circuit,
-    ) -> ResourceEstimatorData:
+    ) -> list[ResourceEstimatorData]:
         """Estimate the quantum resources required for the given circuit.
 
         Estimation parameters are provided via ``self.settings()``.
@@ -42,7 +42,7 @@ class ResourceEstimator(Algorithm):
             circuit: The quantum circuit to estimate resources for.
 
         Returns:
-            ResourceEstimatorData: The estimated resources.
+            list[ResourceEstimatorData]: The estimated resources.
 
         """
 

@@ -14,7 +14,8 @@ import qsharp
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.resource_estimator.base import ResourceEstimator
-from qdk_chemistry.algorithms.resource_estimator.qdk import QdkQreV1
+from qdk_chemistry.algorithms.resource_estimator.qdk_v1 import QdkQreV1
+from qdk_chemistry.algorithms.resource_estimator.qdk_v3 import QdkQreV3
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.resource_estimator_data import (
@@ -42,6 +43,12 @@ class TestResourceEstimatorRegistry:
         """Test creating a resource estimator by explicit name."""
         estimator = create("resource_estimator", "qdk_qre_v1")
         assert isinstance(estimator, QdkQreV1)
+
+    def test_create_qre_v3_by_name(self):
+        """Test creating the QRE v3 resource estimator by explicit name."""
+        estimator = create("resource_estimator", "qdk_qre_v3")
+        assert isinstance(estimator, QdkQreV3)
+        assert estimator.settings().get("error_budget") == 0.01
 
     def test_algorithm_name(self):
         """Test the algorithm name property."""
@@ -76,7 +83,9 @@ class TestQdkQreV1:
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
         estimator = QdkQreV1()
-        result = estimator.run(circuit)
+        results = estimator.run(circuit)
+        assert len(results) == 1
+        result = results[0]
         assert isinstance(result, ResourceEstimatorData)
         assert result.estimator == "qdk_qre_v1"
         assert result.logical_counts is not None
@@ -98,7 +107,9 @@ class TestQdkQreV1:
         """
         circuit = Circuit(qasm=qasm_with_t)
         estimator = QdkQreV1()
-        result = estimator.run(circuit)
+        results = estimator.run(circuit)
+        assert len(results) == 1
+        result = results[0]
         assert isinstance(result, ResourceEstimatorData)
         assert result.logical_counts.t_count >= 0
         assert result.status == "success"
@@ -144,8 +155,9 @@ class TestQdkQreV1:
         circuit = Circuit(qasm=qasm_with_t)
         estimator = QdkQreV1()
         estimator.settings().set("error_budget", 0.01)
-        result = estimator.run(circuit)
-        assert isinstance(result, ResourceEstimatorData)
+        results = estimator.run(circuit)
+        assert len(results) == 1
+        assert isinstance(results[0], ResourceEstimatorData)
 
 
 class TestResourceEstimatorData:
@@ -154,33 +166,52 @@ class TestResourceEstimatorData:
     def _make_sample_data(self) -> ResourceEstimatorData:
         return ResourceEstimatorData(
             logical_counts=LogicalCounts(
-                num_qubits=4, t_count=10, rotation_count=0,
-                rotation_depth=0, ccz_count=0, ccix_count=0, measurement_count=2,
+                num_qubits=4,
+                t_count=10,
+                rotation_count=0,
+                rotation_depth=0,
+                ccz_count=0,
+                ccix_count=0,
+                measurement_count=2,
             ),
             physical_counts=PhysicalCounts(
-                physical_qubits=1000, runtime=500, runtime_unit="ns",
-                rqops=100, algorithm_qubits=600, factory_qubits=400,
-                algorithmic_logical_depth=3, logical_depth=10,
+                physical_qubits=1000,
+                runtime=500,
+                runtime_unit="ns",
+                rqops=100,
+                algorithm_qubits=600,
+                factory_qubits=400,
+                algorithmic_logical_depth=3,
+                logical_depth=10,
             ),
             logical_qubit=LogicalQubit(
-                code_distance=7, logical_cycle_time=2800,
-                logical_error_rate=3e-6, physical_qubits=98,
+                code_distance=7,
+                logical_cycle_time=2800,
+                logical_error_rate=3e-6,
+                physical_qubits=98,
             ),
             error_budget=ErrorBudget(
-                logical=0.0005, rotations=0.0, tstates=0.0005,
+                logical=0.0005,
+                rotations=0.0,
+                tstates=0.0005,
             ),
             estimator="qdk_qre_v1",
             status="success",
             error=0.001,
             circuit_counts=CircuitCounts(
-                depth=5, num_gates=8,
-                num_single_qubit_clifford=3, num_two_qubit_clifford=2,
+                depth=5,
+                num_gates=8,
+                num_single_qubit_clifford=3,
+                num_two_qubit_clifford=2,
                 num_non_clifford=3,
             ),
             config=EstimationConfig(
                 qubit_model="qubit_gate_ns_e3",
                 qec_scheme="surface_code",
                 error_budget=0.001,
+                gate_time_ns=50,
+                measurement_time_ns=100,
+                factory="round_based",
             ),
         )
 
@@ -220,7 +251,7 @@ class TestResourceEstimatorData:
         assert "Resource Estimator Data" in summary
         assert "qdk_qre_v1" in summary
         assert "success" in summary
-        assert "4" in summary   # logical qubits
+        assert "4" in summary  # logical qubits
         assert "10" in summary  # T-count
 
     def test_json_roundtrip(self):

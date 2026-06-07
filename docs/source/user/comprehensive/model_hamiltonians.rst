@@ -271,6 +271,22 @@ The transverse-field Ising model is a special case of the Heisenberg model with 
       :start-after: # start-cell-create-ising
       :end-before: # end-cell-create-ising
 
+.. _model-term-partition:
+
+Geometry-aware term grouping
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Both :func:`~qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian` and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ising_hamiltonian` accept an ``include_term_groups`` flag (default ``True``).
+When enabled, the builder consults the lattice's edge coloring and stores the resulting group-and-layer structure on :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` as a :class:`~qdk_chemistry.data.LayeredPartition` with ``strategy="geometry_coloring"``:
+
+* each *group* corresponds to one interaction type (``XX``, ``YY``, ``ZZ``) or one external-field direction (``X``, ``Y``, ``Z``);
+* each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel.
+
+Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/hamiltonian_unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
+No manual geometry boilerplate is required at the call site.
+
+Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).
+
 Parameter flexibility
 ---------------------
 

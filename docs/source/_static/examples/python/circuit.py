@@ -10,7 +10,7 @@
 import json
 
 import qdk
-import qsharp
+from qdk import qsharp
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 
@@ -56,7 +56,7 @@ print(f"Qubits: {len(circuit_json['qubits'])}")
 from qdk_chemistry.algorithms import create as create_algorithm
 
 estimator = create_algorithm("resource_estimator")
-estimate_result = estimator.run(circuit)
+estimate_result = estimator.run(circuit)[0]
 print(f"Physical qubits: {estimate_result.physical_counts.physical_qubits}")
 print(f"Runtime: {estimate_result.physical_counts.runtime}")
 # end-cell-qsharp-workflow

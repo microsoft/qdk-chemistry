@@ -14,30 +14,39 @@ from qdk_chemistry.data.base import DataClass
 __all__: list[str] = []
 
 
+def _slot_names(obj: object) -> tuple[str, ...]:
+    """Return slot names for a __slots__-based object."""
+    slots = getattr(obj, "__slots__", ())
+    if isinstance(slots, str):
+        return (slots,)
+    return tuple(slots)
+
+
 def _typed_obj_to_dict(obj: object) -> dict[str, Any]:
     """Serialize a __slots__-based object to a dict."""
-    return {s: getattr(obj, s) for s in obj.__slots__}
+    return {s: getattr(obj, s) for s in _slot_names(obj)}
 
 
 def _typed_obj_to_hdf5(obj: object, group: h5py.Group) -> None:
     """Write a __slots__-based object as HDF5 attributes."""
-    for s in obj.__slots__:
+    for s in _slot_names(obj):
         group.attrs[s] = getattr(obj, s)
 
 
 def _make_eq(cls):
     """Add __eq__ and __repr__ based on __slots__."""
-    def __eq__(self, other):
+
+    def _eq(self, other):
         if not isinstance(other, cls):
             return NotImplemented
-        return all(getattr(self, s) == getattr(other, s) for s in self.__slots__)
+        return all(getattr(self, s) == getattr(other, s) for s in _slot_names(self))
 
-    def __repr__(self):
-        fields = ", ".join(f"{s}={getattr(self, s)}" for s in self.__slots__)
+    def _repr(self):
+        fields = ", ".join(f"{s}={getattr(self, s)}" for s in _slot_names(self))
         return f"{cls.__name__}({fields})"
 
-    cls.__eq__ = __eq__
-    cls.__repr__ = __repr__
+    cls.__eq__ = _eq
+    cls.__repr__ = _repr
     return cls
 
 
@@ -55,9 +64,9 @@ class CircuitCounts:
     __slots__ = (
         "depth",
         "num_gates",
+        "num_non_clifford",
         "num_single_qubit_clifford",
         "num_two_qubit_clifford",
-        "num_non_clifford",
     )
 
     def __init__(
@@ -83,13 +92,13 @@ class LogicalCounts:
     """Logical resource counts from a quantum resource estimation."""
 
     __slots__ = (
+        "ccix_count",
+        "ccz_count",
+        "measurement_count",
         "num_qubits",
-        "t_count",
         "rotation_count",
         "rotation_depth",
-        "ccz_count",
-        "ccix_count",
-        "measurement_count",
+        "t_count",
     )
 
     def __init__(
@@ -119,14 +128,14 @@ class PhysicalCounts:
     """Physical resource counts from a quantum resource estimation."""
 
     __slots__ = (
+        "algorithm_qubits",
+        "algorithmic_logical_depth",
+        "factory_qubits",
+        "logical_depth",
         "physical_qubits",
+        "rqops",
         "runtime",
         "runtime_unit",
-        "rqops",
-        "algorithm_qubits",
-        "factory_qubits",
-        "algorithmic_logical_depth",
-        "logical_depth",
     )
 
     def __init__(
@@ -210,10 +219,13 @@ class EstimationConfig:
     """
 
     __slots__ = (
-        "qubit_model",
-        "qec_scheme",
-        "error_budget",
         "description",
+        "error_budget",
+        "factory",
+        "gate_time_ns",
+        "measurement_time_ns",
+        "qec_scheme",
+        "qubit_model",
     )
 
     def __init__(
@@ -222,11 +234,17 @@ class EstimationConfig:
         qec_scheme: str = "",
         error_budget: float = 0.0,
         description: str = "",
+        gate_time_ns: int = 0,
+        measurement_time_ns: int = 0,
+        factory: str = "",
     ) -> None:
         self.qubit_model = qubit_model
         self.qec_scheme = qec_scheme
         self.error_budget = error_budget
         self.description = description
+        self.gate_time_ns = gate_time_ns
+        self.measurement_time_ns = measurement_time_ns
+        self.factory = factory
 
 
 # ---------------------------------------------------------------------------
@@ -415,13 +433,20 @@ class ResourceEstimatorData(DataClass):
                 num_single_qubit_clifford=cc_d.get("num_single_qubit_clifford", 0),
                 num_two_qubit_clifford=cc_d.get("num_two_qubit_clifford", 0),
                 num_non_clifford=cc_d.get("num_non_clifford", 0),
-            ) if cc_d is not None else None,
+            )
+            if cc_d is not None
+            else None,
             config=EstimationConfig(
                 qubit_model=cfg_d.get("qubit_model", ""),
                 qec_scheme=cfg_d.get("qec_scheme", ""),
                 error_budget=cfg_d.get("error_budget", 0.0),
                 description=cfg_d.get("description", ""),
-            ) if cfg_d is not None else None,
+                gate_time_ns=cfg_d.get("gate_time_ns", 0),
+                measurement_time_ns=cfg_d.get("measurement_time_ns", 0),
+                factory=cfg_d.get("factory", ""),
+            )
+            if cfg_d is not None
+            else None,
         )
 
     @classmethod
@@ -461,6 +486,9 @@ class ResourceEstimatorData(DataClass):
                 qec_scheme=str(cfg_grp.attrs["qec_scheme"]),
                 error_budget=float(cfg_grp.attrs["error_budget"]),
                 description=str(cfg_grp.attrs["description"]),
+                gate_time_ns=int(cfg_grp.attrs.get("gate_time_ns", 0)),
+                measurement_time_ns=int(cfg_grp.attrs.get("measurement_time_ns", 0)),
+                factory=str(cfg_grp.attrs.get("factory", "")),
             )
 
         return cls(

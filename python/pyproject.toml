@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,plugins,qiskit-extras,openfermion-extras]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,test]"
 ]
 coverage = [
   "coverage",
@@ -80,17 +80,31 @@ jupyter = [
   "pandas>=2.0.0",
   "qdk-chemistry[plugins]",
 ]
+networkx-extras = [
+  "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
+]
+openfermion-extras = [
+  "openfermion>=1.0.0; python_version < '3.14'"
+]
 plugins = [
   "pyscf>=2.9.0,<2.12.1"
 ]
 qiskit-extras = [
-  "qiskit[qasm3-import]>=2.2.0",
-  "qiskit-aer",
-  "qiskit-nature",
-  "pylatexenc==2.10"
+  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
+  "qiskit-aer; python_version < '3.14'",
+  "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
+  "qiskit-nature; python_version < '3.14'",
+  "qiskit-qasm3-import; python_version < '3.14'",
+  "pylatexenc==2.10; python_version < '3.14'",
+  "requests>=2.33.0; python_version < '3.14'"
 ]
-openfermion-extras = [
-  "openfermion>=1.0.0"
+test = [
+  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
+  "nbclient",
+  "nbformat",
+  "pennylane",
+  "rdkit",
+  "requests>=2.33.0"
 ]
 
 [project.urls]

@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import pytest
-from qsharp.openqasm import compile as compile_qasm_to_qir
+from qdk.openqasm import compile as compile_qasm_to_qir
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
