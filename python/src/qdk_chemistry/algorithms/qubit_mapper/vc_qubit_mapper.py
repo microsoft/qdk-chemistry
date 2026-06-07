@@ -136,7 +136,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
             if abs(h_nn) < integral_threshold:
                 continue
             const += h_nn / 2.0
-            _add({n: "Z"}, complex(h_nn / 2.0))
+            _add({n: "Z"}, complex(-h_nn / 2.0))
         if abs(const) >= threshold:
             pauli_strs.append(identity)
             coeffs.append(complex(const))
