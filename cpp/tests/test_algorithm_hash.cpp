@@ -18,9 +18,10 @@ class AlgorithmHashSettings : public qdk::chemistry::data::Settings {
  public:
   AlgorithmHashSettings() {
     set_default("threshold", 0.0);
-    set_default("nested", qdk::chemistry::data::AlgorithmRef(
-                              "child_type", "child_a",
-                              std::make_shared<qdk::chemistry::data::Settings>()));
+    set_default("nested",
+                qdk::chemistry::data::AlgorithmRef(
+                    "child_type", "child_a",
+                    std::make_shared<qdk::chemistry::data::Settings>()));
   }
 };
 

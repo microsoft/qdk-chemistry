@@ -77,8 +77,7 @@ void hash_algorithm_arg(utils::HashContext& ctx,
 }
 
 template <typename T>
-void hash_algorithm_arg(utils::HashContext& ctx,
-                        const std::vector<T>& values) {
+void hash_algorithm_arg(utils::HashContext& ctx, const std::vector<T>& values) {
   ctx.update(uint8_t(4));
   ctx.update(static_cast<uint64_t>(values.size()));
   for (const auto& value : values) {
