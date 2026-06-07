@@ -394,8 +394,13 @@ StabilityChecker::_run_impl(
   // Extract needed components, orbitals, basis set, coefficients, eigenvalues
   const auto orbitals = wavefunction->get_orbitals();
   const auto basis_set_qdk = orbitals->get_basis_set();
-  const auto [Ca, Cb] = orbitals->get_coefficients();
-  const auto [energies_alpha, energies_beta] = orbitals->get_energies();
+  const auto& Ca = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& Cb =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
+  const auto& energies_alpha =
+      orbitals->energies()->block({data::axes::alpha()});
+  const auto& energies_beta = orbitals->energies()->block({data::axes::beta()});
   const auto num_atomic_orbitals = basis_set_qdk->get_num_atomic_orbitals();
   const auto num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
   auto [n_alpha_electrons, n_beta_electrons] =
