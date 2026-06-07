@@ -8,6 +8,7 @@
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -108,6 +109,39 @@ SparsePauliWord build_sorted_word(
 constexpr std::uint8_t op_x = 1;
 constexpr std::uint8_t op_y = 2;
 constexpr std::uint8_t op_z = 3;
+
+bool find_hamiltonian_path_dfs(
+    std::uint64_t curr, const std::vector<std::vector<std::uint64_t>>& adj,
+    std::vector<bool>& visited, std::vector<std::uint64_t>& path) {
+  path.push_back(curr);
+  if (path.size() == adj.size()) {
+    return true;
+  }
+  visited[curr] = true;
+  for (std::uint64_t neighbor : adj[curr]) {
+    if (!visited[neighbor]) {
+      if (find_hamiltonian_path_dfs(neighbor, adj, visited, path)) {
+        return true;
+      }
+    }
+  }
+  visited[curr] = false;
+  path.pop_back();
+  return false;
+}
+
+std::vector<std::uint64_t> find_hamiltonian_path(
+    const std::vector<std::vector<std::uint64_t>>& adj) {
+  std::uint64_t V = adj.size();
+  std::vector<bool> visited(V, false);
+  std::vector<std::uint64_t> path;
+  for (std::uint64_t start = 0; start < V; ++start) {
+    if (find_hamiltonian_path_dfs(start, adj, visited, path)) {
+      return path;
+    }
+  }
+  return {};
+}
 
 }  // namespace detail
 
@@ -335,101 +369,133 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
                          std::move(tapering));
 }
 
-namespace detail {
-
-std::pair<std::uint64_t, std::uint64_t> snake_coordinates(std::uint64_t index,
-                                                          std::uint64_t nx,
-                                                          std::uint64_t ny) {
-  std::uint64_t row = index / nx;
-  std::uint64_t col;
-  if (row % 2 == 0) {
-    col = index % nx;
-  } else {
-    col = nx - 1 - (index % nx);
-  }
-  return {col, row};
-}
-
-bool is_vertical_edge(std::uint64_t i, std::uint64_t j, std::uint64_t nx,
-                      std::uint64_t ny) {
-  auto [ix, iy] = snake_coordinates(i, nx, ny);
-  auto [jx, jy] = snake_coordinates(j, nx, ny);
-  return (ix == jx && (iy + 1 == jy || jy + 1 == iy));
-}
-
-}  // namespace detail
+// ── Factory: Verstraete-Cirac ──────────────────────────────────────────
 
 MajoranaMapping MajoranaMapping::verstraete_cirac(
     const LatticeGraph& lattice, std::size_t num_spin_species) {
+  using namespace detail;
+  const std::string name = "verstraete-cirac";
   if (num_spin_species == 0) {
-    throw std::invalid_argument(
-        "verstraete_cirac requires num_spin_species > 0");
+    throw std::invalid_argument(name + " requires num_spin_species > 0");
   }
-
   std::uint64_t V = lattice.num_sites();
-  std::uint64_t E = lattice.num_edges();
-
-  // Solve: nx * ny = V, nx + ny = 2V - E
-  double b = double(2 * V - E);
-  double c = double(V);
-  double disc = b * b - 4.0 * c;
-  if (disc < 0) {
+  if (V < 3) {
     throw std::invalid_argument(
-        "Lattice graph is not a 2D square lattice with open boundaries");
+        name + " requires a lattice graph with at least 3 sites");
   }
-  double r1 = 0.5 * (b - std::sqrt(disc));
-  double r2 = 0.5 * (b + std::sqrt(disc));
-  std::uint64_t nx1 = std::round(r1);
-  std::uint64_t nx2 = std::round(r2);
 
-  auto check_nx = [&](std::uint64_t nx) -> bool {
-    if (nx == 0 || V % nx != 0) return false;
-    std::uint64_t ny = V / nx;
-    std::uint64_t count = 0;
-    const auto& adj = lattice.sparse_adjacency_matrix();
-    for (int k = 0; k < adj.outerSize(); ++k) {
-      for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
-        std::uint64_t i = it.row();
-        std::uint64_t j = it.col();
-        if (i >= j) continue;
-        if (std::abs(int(i - j)) == 1) {
-          if (std::min(i, j) % nx == nx - 1) return false;
-          count++;
-        } else if (std::abs(int(i - j)) == nx) {
-          count++;
-        } else {
-          return false;
-        }
+  // Find all edges in the lattice (upper triangle of adjacency matrix)
+  std::vector<std::vector<std::uint64_t>> adj_list(V);
+  const auto& adj = lattice.sparse_adjacency_matrix();
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      std::uint64_t u = it.row();
+      std::uint64_t v = it.col();
+      if (u != v) {
+        adj_list[u].push_back(v);
       }
     }
-    return count == E;
-  };
-
-  std::uint64_t nx = 0, ny = 0;
-  if (check_nx(nx1)) {
-    nx = nx1;
-    ny = V / nx1;
-  } else if (check_nx(nx2)) {
-    nx = nx2;
-    ny = V / nx2;
-  } else {
-    throw std::invalid_argument(
-        "Lattice graph is not a 2D square lattice with open boundaries");
   }
 
-  if (nx < 2 || ny < 2) {
+  // Find Hamiltonian path dynamically directly from the graph adjacency
+  std::vector<std::uint64_t> snake_path = find_hamiltonian_path(adj_list);
+  if (snake_path.empty()) {
     throw std::invalid_argument(
-        "verstraete_cirac requires a 2D grid of size at least 2x2");
+        name +
+        ": No Hamiltonian path found in the lattice graph. A Hamiltonian path "
+        "is required to construct commuting stabilizers.");
+  }
+
+  // Maps row-major site index to its position in the snake path (system mode
+  // order)
+  std::vector<std::uint64_t> rm_to_snake(V);
+  for (std::uint64_t k = 0; k < V; ++k) {
+    rm_to_snake[snake_path[k]] = k;
   }
 
   std::size_t num_modes = num_spin_species * V;
-  // Combined system has 2 * num_modes modes.
   std::size_t base_modes = 2 * num_modes;
+  std::size_t M = 2 * num_modes;
   auto jw_base = MajoranaMapping::jordan_wigner(base_modes);
 
-  // Construct upper triangle of bilinears: M * (M - 1) / 2 entries, where M = 2
-  // * num_modes.
-  std::size_t M = 2 * num_modes;
+  auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t a) -> std::size_t {
+    std::size_t snake_idx = rm_to_snake[site];
+    return 2 * (2 * (spin * V + snake_idx)) + a;
+  };
+
+  auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t a) -> std::size_t {
+    std::size_t snake_idx = rm_to_snake[site];
+    return 2 * (2 * (spin * V + snake_idx) + 1) + a;
+  };
+
+  auto get_bilinear =
+      [&](std::size_t p,
+          std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
+    if (p < q) {
+      auto b = jw_base.bilinear(p, q);
+      return {b.first, b.second};
+    } else {
+      auto b = jw_base.bilinear(q, p);
+      return {-b.first, b.second};
+    }
+  };
+
+  // Find all non-path edges incident to each vertex.
+  // An edge (u, v) is a non-path edge if |rm_to_snake[u] - rm_to_snake[v]| > 1.
+  std::vector<std::vector<std::uint64_t>> non_path_incident(V);
+  for (std::uint64_t u = 0; u < V; ++u) {
+    for (std::uint64_t v : adj_list[u]) {
+      if (u < v) {
+        std::size_t s_u = rm_to_snake[u];
+        std::size_t s_v = rm_to_snake[v];
+        std::size_t diff = (s_u > s_v) ? (s_u - s_v) : (s_v - s_u);
+        if (diff > 1) {
+          non_path_incident[u].push_back(v);
+          non_path_incident[v].push_back(u);
+        }
+      }
+    }
+  }
+
+  // Ensure that no vertex has more than 2 non-path edges (auxiliary space
+  // limit)
+  for (std::uint64_t u = 0; u < V; ++u) {
+    if (non_path_incident[u].size() > 2) {
+      throw std::invalid_argument(name + ": Vertex has " +
+                                  std::to_string(non_path_incident[u].size()) +
+                                  " non-path edges, which exceeds the "
+                                  "2-auxiliary-Majorana limit of the mapping.");
+    }
+  }
+
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  std::vector<std::map<std::pair<std::uint64_t, std::uint64_t>, std::size_t>>
+      edge_to_stab_idx(num_spin_species);
+
+  for (std::size_t spin = 0; spin < num_spin_species; ++spin) {
+    for (std::uint64_t u = 0; u < V; ++u) {
+      for (std::uint64_t v : non_path_incident[u]) {
+        if (u < v) {
+          auto it_u = std::find(non_path_incident[u].begin(),
+                                non_path_incident[u].end(), v);
+          auto it_v = std::find(non_path_incident[v].begin(),
+                                non_path_incident[v].end(), u);
+          std::size_t a = std::distance(non_path_incident[u].begin(), it_u);
+          std::size_t b = std::distance(non_path_incident[v].begin(), it_v);
+
+          std::size_t p = get_aux_majorana(u, spin, a);
+          std::size_t q = get_aux_majorana(v, spin, b);
+
+          auto [coeff, word] = get_bilinear(p, q);
+          edge_to_stab_idx[spin][{u, v}] = stabilizers.size();
+          stabilizers.emplace_back(coeff, std::move(word));
+        }
+      }
+    }
+  }
+
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
   upper_triangle.reserve(M * (M - 1) / 2);
 
@@ -444,52 +510,41 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
       std::size_t a = u % 2;
       std::size_t b_idx = v % 2;
 
-      if (s_u == s_v && detail::is_vertical_edge(i, j, nx, ny)) {
-        // Vertical edge: multiply by stabilizer
-        std::uint64_t top = std::min(i, j);
-        std::uint64_t bot = std::max(i, j);
-        auto coord_top = detail::snake_coordinates(top, nx, ny);
-        std::uint64_t col = coord_top.first;
+      bool connected = (s_u == s_v) && lattice.are_connected(i, j);
 
-        std::size_t top_aux_mode = 2 * s_u * V + 2 * top + 1;
-        std::size_t bot_aux_mode = 2 * s_u * V + 2 * bot + 1;
+      if (connected) {
+        std::size_t snake_i = rm_to_snake[i];
+        std::size_t snake_j = rm_to_snake[j];
+        std::size_t snake_min = std::min(snake_i, snake_j);
+        std::size_t snake_max = std::max(snake_i, snake_j);
 
-        std::size_t p, q;
-        if (col % 2 == 0) {
-          p = 2 * top_aux_mode;
-          q = 2 * bot_aux_mode + 1;
-        } else {
-          p = 2 * bot_aux_mode;
-          q = 2 * top_aux_mode + 1;
+        std::size_t p = get_sys_majorana(i, s_u, a);
+        std::size_t q = get_sys_majorana(j, s_v, b_idx);
+        auto [coeff, word] = get_bilinear(p, q);
+
+        if (snake_max - snake_min > 1) {
+          auto key = std::make_pair(std::min(i, j), std::max(i, j));
+          std::size_t stab_idx = edge_to_stab_idx[s_u].at(key);
+          const auto& stab = stabilizers[stab_idx];
+          auto [phase, new_word] =
+              PauliTermAccumulator::multiply_uncached(word, stab.second);
+          coeff *= stab.first * phase;
+          word = std::move(new_word);
         }
 
-        // Stabilizer S = i * gamma_p * gamma_q
-        auto [coeff_stab, word_stab] = jw_base.bilinear(p, q);
-
-        // System modes:
-        std::size_t r = 2 * (2 * s_u * V + 2 * i) + a;
-        std::size_t s_jw = 2 * (2 * s_v * V + 2 * j) + b_idx;
-        auto [coeff_sys, word_sys] = jw_base.bilinear(r, s_jw);
-
-        auto [phase, word_final] =
-            PauliTermAccumulator::multiply_uncached(word_sys, word_stab);
-        std::complex<double> coeff_final = coeff_sys * coeff_stab * phase;
-
-        upper_triangle.emplace_back(coeff_final, std::move(word_final));
+        upper_triangle.emplace_back(coeff, std::move(word));
       } else {
-        // Not a vertical edge
-        std::size_t r = 2 * (2 * s_u * V + 2 * i) + a;
-        std::size_t s_jw = 2 * (2 * s_v * V + 2 * j) + b_idx;
-        auto [coeff, word] = jw_base.bilinear(r, s_jw);
-        upper_triangle.emplace_back(coeff, word);
+        std::size_t p = get_sys_majorana(i, s_u, a);
+        std::size_t q = get_sys_majorana(j, s_v, b_idx);
+        auto [coeff, word] = get_bilinear(p, q);
+        upper_triangle.emplace_back(coeff, std::move(word));
       }
     }
   }
 
   return MajoranaMapping(std::vector<SparsePauliWord>{},
-                         std::move(upper_triangle), "verstraete-cirac",
-                         num_modes, 2 * num_modes, "verstraete-cirac",
-                         std::nullopt, nx, ny);
+                         std::move(upper_triangle), name, num_modes, base_modes,
+                         name, std::nullopt, std::move(stabilizers));
 }
 
 }  // namespace qdk::chemistry::data

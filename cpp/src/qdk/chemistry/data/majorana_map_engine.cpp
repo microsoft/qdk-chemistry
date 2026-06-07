@@ -198,6 +198,8 @@ MajoranaMapResult majorana_map_impl(
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
+  const std::size_t num_spin_species =
+      (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
 
   PackedAccumulator<NW> acc;
 
@@ -231,9 +233,6 @@ MajoranaMapResult majorana_map_impl(
     }
     return cache;
   };
-
-  const std::size_t num_spin_species = (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
-  const bool use_spin_symmetric = spin_symmetric && (num_spin_species == 2);
 
   auto ppair_alpha = build_pair_cache(alpha_offset);
   std::vector<PackedPairProduct> ppair_beta;
@@ -287,8 +286,8 @@ MajoranaMapResult majorana_map_impl(
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t s = 0; s < n_spatial; ++s) {
       double h_a = h1_alpha[p * n_spatial + s];
-      double h_b = use_spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
-      if (use_spin_symmetric) {
+      double h_b = spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
+      if (spin_symmetric) {
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
           delta_corr += eri_aaaa[idx4(p, q, q, s)];
@@ -318,7 +317,7 @@ MajoranaMapResult majorana_map_impl(
 
   // ─── Two-body terms ───────────────────────────────────────────────
 
-  if (use_spin_symmetric) {
+  if (spin_symmetric) {
     struct SpinSummedE {
       std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
     };
@@ -332,9 +331,11 @@ MajoranaMapResult majorana_map_impl(
             const auto& [coeff_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(coeff_a * 0.25 * excitation_coeff[a][b],
                                    word_a);
-            const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
-                                   word_b);
+            if (num_spin_species == 2) {
+              const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
+              sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
+                                     word_b);
+            }
           }
         }
       }
@@ -459,8 +460,8 @@ MajoranaMapResult majorana_map_impl(
       }
     }
 
+    // ββ channel
     if (num_spin_species == 2) {
-      // ββ channel
       for (std::size_t p = 0; p < n_spatial; ++p) {
         for (std::size_t q = 0; q < n_spatial; ++q) {
           for (std::size_t r = 0; r < n_spatial; ++r) {
@@ -476,8 +477,10 @@ MajoranaMapResult majorana_map_impl(
           }
         }
       }
+    }
 
-      // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
+    // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
+    if (num_spin_species == 2) {
       for (std::size_t p = 0; p < n_spatial; ++p) {
         for (std::size_t q = 0; q < n_spatial; ++q) {
           for (std::size_t r = 0; r < n_spatial; ++r) {
@@ -495,18 +498,13 @@ MajoranaMapResult majorana_map_impl(
     }
   }
 
-  if (mapping.base_encoding() == "verstraete-cirac" && mapping.grid_nx() > 0 &&
-      mapping.grid_ny() > 0) {
-    std::uint64_t nx = mapping.grid_nx();
-    std::uint64_t ny = mapping.grid_ny();
-    std::uint64_t V = nx * ny;
-
+  if (!mapping.stabilizers().empty()) {
     double h1_sum = 0.0;
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
         if (num_spin_species == 2) {
-          if (!use_spin_symmetric) {
+          if (!spin_symmetric) {
             h1_sum += std::abs(h1_beta[p * n_spatial + q]);
           } else {
             h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
@@ -516,101 +514,13 @@ MajoranaMapResult majorana_map_impl(
     }
     double aux_ham_coefficient = 1.0 + h1_sum;
 
-    std::size_t num_modes = mapping.num_modes();
-    std::size_t base_modes = 2 * num_modes;
-    auto jw_base = MajoranaMapping::jordan_wigner(base_modes);
-    std::size_t num_spin_species = num_modes / V;
-
-    auto get_snake_coordinates =
-        [&](std::uint64_t index) -> std::pair<std::uint64_t, std::uint64_t> {
-      std::uint64_t row = index / nx;
-      std::uint64_t col;
-      if (row % 2 == 0) {
-        col = index % nx;
-      } else {
-        col = nx - 1 - (index % nx);
-      }
-      return {col, row};
-    };
-
-    auto get_snake_index = [&](std::uint64_t col,
-                               std::uint64_t row) -> std::uint64_t {
-      if (row % 2 == 0) {
-        return row * nx + col;
-      } else {
-        return (row + 1) * nx - 1 - col;
-      }
-    };
-
-    auto get_stabilizer = [&](std::size_t u, std::size_t v)
-        -> std::pair<std::complex<double>, PackedPauliWord<NW>> {
-      std::size_t s_u = (u - 1) / (2 * V);
-      std::size_t i = ((u - 1) / 2) % V;
-      std::size_t j = ((v - 1) / 2) % V;
-
-      std::size_t top = std::min(i, j);
-      std::size_t bot = std::max(i, j);
-      auto coord_top = get_snake_coordinates(top);
-      std::size_t col = coord_top.first;
-
-      std::size_t top_aux_mode = 2 * s_u * V + 2 * top + 1;
-      std::size_t bot_aux_mode = 2 * s_u * V + 2 * bot + 1;
-
-      std::size_t p, q;
-      if (col % 2 == 0) {
-        p = 2 * top_aux_mode;
-        q = 2 * bot_aux_mode + 1;
-      } else {
-        p = 2 * bot_aux_mode;
-        q = 2 * top_aux_mode + 1;
-      }
-
-      auto [coeff_stab, word_stab] = jw_base.bilinear(p, q);
-      return {coeff_stab, sparse_to_packed<NW>(word_stab)};
-    };
-
-    // Calculate number of plaquettes per spin sector: (nx - 1) * (ny - 1)
-    std::size_t num_plaquettes = (nx - 1) * (ny - 1);
-
     PackedPauliWord<NW> identity{};
     acc.accumulate(
-        identity,
-        std::complex<double>(
-            aux_ham_coefficient * num_plaquettes * num_spin_species, 0.0));
+        identity, std::complex<double>(
+                      aux_ham_coefficient * mapping.stabilizers().size(), 0.0));
 
-    for (std::size_t s = 0; s < num_spin_species; ++s) {
-      for (std::uint64_t k = 0; k < nx - 1; ++k) {
-        for (std::uint64_t l = 0; l < ny - 1; ++l) {
-          // Sites of the plaquette
-          std::uint64_t i00 = get_snake_index(k, l);
-          std::uint64_t i10 = get_snake_index(k + 1, l);
-          std::uint64_t i01 = get_snake_index(k, l + 1);
-          std::uint64_t i11 = get_snake_index(k + 1, l + 1);
-
-          // Expanded auxiliary modes
-          std::uint64_t u00 = 2 * s * V + 2 * i00 + 1;
-          std::uint64_t u10 = 2 * s * V + 2 * i10 + 1;
-          std::uint64_t u01 = 2 * s * V + 2 * i01 + 1;
-          std::uint64_t u11 = 2 * s * V + 2 * i11 + 1;
-
-          // Get the 4 link stabilizers
-          auto [c_v1, w_v1] = get_stabilizer(u00, u01);
-          auto [c_v2, w_v2] = get_stabilizer(u10, u11);
-          auto [c_h_bot, w_h_bot] = get_stabilizer(u00, u10);
-          auto [c_h_top, w_h_top] = get_stabilizer(u01, u11);
-
-          // Multiply them: plaquette = w_v1 * w_v2 * w_h_bot * w_h_top
-          auto [phase1, w_tmp1] = multiply_packed(w_v1, w_v2);
-          auto [phase2, w_tmp2] = multiply_packed(w_h_bot, w_h_top);
-          auto [phase3, w_final] = multiply_packed(w_tmp1, w_tmp2);
-
-          std::complex<double> coeff_final =
-              c_v1 * c_v2 * c_h_bot * c_h_top * apply_phase(phase1, 1.0) *
-              apply_phase(phase2, 1.0) * apply_phase(phase3, 1.0);
-
-          acc.accumulate(w_final, -aux_ham_coefficient * coeff_final);
-        }
-      }
+    for (const auto& [coeff, word] : mapping.stabilizers()) {
+      acc.accumulate(sparse_to_packed<NW>(word), -aux_ham_coefficient * coeff);
     }
   }
 

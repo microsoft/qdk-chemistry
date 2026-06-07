@@ -143,10 +143,14 @@ class QdkQubitMapper(QubitMapper):
         n_spin_orbitals = 2 * n_spatial
         spin_symmetric = hamiltonian.get_orbitals().is_restricted()
 
-        if base_mapping.num_modes not in (n_spatial, n_spin_orbitals):
+        allowed_modes: tuple[int, ...] = (
+            (n_spin_orbitals,) if hamiltonian.has_two_body_integrals() else (n_spatial, n_spin_orbitals)
+        )
+
+        if base_mapping.num_modes not in allowed_modes:
             raise ValueError(
                 f"MajoranaMapping has {base_mapping.num_modes} modes but the Hamiltonian has "
-                f"{n_spatial} spatial orbitals (which requires either {n_spatial} or {n_spin_orbitals} modes). "
+                f"{n_spatial} spatial orbitals (which requires one of {allowed_modes} modes). "
                 f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
             )
 

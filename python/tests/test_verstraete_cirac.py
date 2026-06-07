@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 from scipy.sparse.linalg import eigsh
 
+from qdk_chemistry._core.data import sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import LatticeGraph, MajoranaMapping, QubitHamiltonian
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, create_huckel_hamiltonian
@@ -22,36 +23,32 @@ class TestVerstraeteCiracMapping:
 
     def test_factory_and_dimensions(self) -> None:
         """Test that VC factory accepts correct grid dimensions and rejects invalid ones."""
-        # Valid even x_dimension grids
+        # Testing valid grids: square and rectangular
         lattice_2x2 = LatticeGraph.square(2, 2)
         mapping_2x2 = MajoranaMapping.verstraete_cirac(lattice_2x2)
-        assert mapping_2x2.grid_nx == 2
-        assert mapping_2x2.grid_ny == 2
+        assert len(mapping_2x2.stabilizers) > 0
         assert mapping_2x2.name == "verstraete-cirac"
         assert mapping_2x2.base_encoding == "verstraete-cirac"
         assert not mapping_2x2.is_majorana_atomic
 
         lattice_2x3 = LatticeGraph.square(2, 3)
         mapping_2x3 = MajoranaMapping.verstraete_cirac(lattice_2x3)
-        assert mapping_2x3.grid_nx == 2
-        assert mapping_2x3.grid_ny == 3
-
-        lattice_4x4 = LatticeGraph.square(4, 4)
-        mapping_4x4 = MajoranaMapping.verstraete_cirac(lattice_4x4)
-        assert mapping_4x4.grid_nx == 4
-        assert mapping_4x4.grid_ny == 4
+        assert len(mapping_2x3.stabilizers) > 0
 
         lattice_3x3 = LatticeGraph.square(3, 3)
         mapping_3x3 = MajoranaMapping.verstraete_cirac(lattice_3x3)
-        assert mapping_3x3.grid_nx == 3
-        assert mapping_3x3.grid_ny == 3
+        assert len(mapping_3x3.stabilizers) > 0
+
+        lattice_4x4 = LatticeGraph.square(4, 4)
+        mapping_4x4 = MajoranaMapping.verstraete_cirac(lattice_4x4)
+        assert len(mapping_4x4.stabilizers) > 0
 
         # Invalid spin species count should raise ValueError / invalid_argument
         with pytest.raises(ValueError, match="spin"):
             MajoranaMapping.verstraete_cirac(lattice_2x2, num_spin_species=0)
 
-    def test_general_lattices_single_spin(self) -> None:
-        """Verify that QubitMapper consumes VC mapping for general 2D lattices with single spin species."""
+    def test_general_lattices(self) -> None:
+        """Verify that QubitMapper consumes VC mapping for general 2D lattices."""
         mapper = create("qubit_mapper", "qdk")
         for nx, ny in [(2, 2), (2, 3), (3, 3), (4, 4)]:
             lattice = LatticeGraph.square(nx, ny)
@@ -72,8 +69,7 @@ class TestVerstraeteCiracMapping:
         lattice = LatticeGraph.square(2, 2)
         mapping = MajoranaMapping.verstraete_cirac(lattice)
         base = mapping.without_tapering()
-        assert base.grid_nx == 2
-        assert base.grid_ny == 2
+        assert len(base.stabilizers) == len(mapping.stabilizers)
         assert base.name == "verstraete-cirac"
 
     def test_serialization_round_trip(self) -> None:
@@ -81,15 +77,27 @@ class TestVerstraeteCiracMapping:
         lattice = LatticeGraph.square(2, 2)
         mapping = MajoranaMapping.verstraete_cirac(lattice)
 
+        # Construct a simple Hubbard Hamiltonian on the lattice
+        ham = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
+        mapper = create("qubit_mapper", "qdk")
+        qh_orig = mapper.run(ham, mapping)
+
         # JSON Round-trip
         json_data = mapping.to_json()
         loaded_json = MajoranaMapping.from_json(json_data)
         assert loaded_json.name == mapping.name
-        assert loaded_json.grid_nx == mapping.grid_nx
-        assert loaded_json.grid_ny == mapping.grid_ny
         assert loaded_json.num_modes == mapping.num_modes
         assert loaded_json.num_qubits == mapping.num_qubits
         assert not loaded_json.is_majorana_atomic
+
+        qh_json = mapper.run(ham, loaded_json)
+        assert qh_json.num_qubits == qh_orig.num_qubits
+        assert len(qh_json.pauli_strings) == len(qh_orig.pauli_strings)
+        terms_orig = sorted(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=False))
+        terms_json = sorted(zip(qh_json.pauli_strings, qh_json.coefficients, strict=False))
+        for (p_orig, c_orig), (p_json, c_json) in zip(terms_orig, terms_json, strict=False):
+            assert p_orig == p_json
+            assert np.isclose(c_orig, c_json, atol=1e-10)
 
         # HDF5 Round-trip
         with tempfile.NamedTemporaryFile(suffix=".h5") as f:
@@ -98,30 +106,109 @@ class TestVerstraeteCiracMapping:
             with h5py.File(f.name, "r") as hf:
                 loaded_hdf5 = MajoranaMapping.from_hdf5(hf)
         assert loaded_hdf5.name == mapping.name
-        assert loaded_hdf5.grid_nx == mapping.grid_nx
-        assert loaded_hdf5.grid_ny == mapping.grid_ny
         assert loaded_hdf5.num_modes == mapping.num_modes
         assert loaded_hdf5.num_qubits == mapping.num_qubits
         assert not loaded_hdf5.is_majorana_atomic
 
+        qh_hdf5 = mapper.run(ham, loaded_hdf5)
+        assert qh_hdf5.num_qubits == qh_orig.num_qubits
+        assert len(qh_hdf5.pauli_strings) == len(qh_orig.pauli_strings)
+        terms_hdf5 = sorted(zip(qh_hdf5.pauli_strings, qh_hdf5.coefficients, strict=False))
+        for (p_orig, c_orig), (p_h5, c_h5) in zip(terms_orig, terms_hdf5, strict=False):
+            assert p_orig == p_h5
+            assert np.isclose(c_orig, c_h5, atol=1e-10)
 
-class TestVerstraeteCiracHubbardSpectral:
-    """Spectral validation of Verstraete-Cirac mapping for Fermi-Hubbard model."""
+    def test_stabilizers_and_commutation(self) -> None:
+        """Verify that stabilizers mutually commute and commute with mapped H."""
 
+        def commute(p1: str, p2: str) -> bool:
+            assert len(p1) == len(p2)
+            anti_commutes = 0
+            for c1, c2 in zip(p1, p2, strict=False):
+                if c1 != "I" and c2 not in {"I", c1}:
+                    anti_commutes += 1
+            return (anti_commutes % 2) == 0
+
+        mapper = create("qubit_mapper", "qdk")
+        for nx, ny in [(2, 2), (3, 3), (3, 4)]:
+            lattice = LatticeGraph.square(nx, ny)
+            ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
+
+            mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
+            assert len(mapping.stabilizers) == nx * ny - nx - ny + 1
+
+            qh_vc = mapper.run(ham, mapping)
+
+            # Convert stabilizers to Pauli labels
+            stabs = []
+            for _, word in mapping.stabilizers:
+                label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
+                stabs.append(label)
+
+            # Check mutual commutation of stabilizers: [S_i, S_j] = 0
+            for i in range(len(stabs)):
+                for j in range(i + 1, len(stabs)):
+                    assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
+
+            # Check commutation with Hamiltonian: [H, S_i] = 0
+            for i, stab in enumerate(stabs):
+                for p_term in qh_vc.pauli_strings:
+                    assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
+
+    def test_pauli_weight_scaling(self) -> None:
+        """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
+
+        Max Pauli weight of nearest-neighbor hops should be constant for square grids of dimensions:
+        - 2x2 (L=2)
+        - 3x3 (L=3)
+        - 4x4 (L=4)
+        """
+        mapper = create("qubit_mapper", "qdk")
+
+        max_weights = []
+        for grid_length in [2, 3, 4]:
+            lattice = LatticeGraph.square(grid_length, grid_length)
+            # Create a simple hopping-only Hamiltonian (U=0) on the L x L lattice
+            ham = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=0.0)
+
+            vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
+            qh_vc = mapper.run(ham, vc_mapping)
+
+            weights = []
+            for pauli_str, coeff in zip(qh_vc.pauli_strings, qh_vc.coefficients, strict=False):
+                if pauli_str == "I" * len(pauli_str):
+                    continue
+                # Skip stabilizer penalty terms (which have coefficient >= 9.0,
+                # whereas nearest-neighbor hops have coefficient <= 1.0)
+                if np.abs(coeff) > 2.0:
+                    continue
+                # Weight is the number of non-I characters
+                weight = sum(1 for c in pauli_str if c != "I")
+                weights.append(weight)
+
+            max_weights.append(max(weights))
+
+        assert max_weights[0] == max_weights[1] == max_weights[2], (
+            f"Maximum Pauli weights grew or varied with grid length: {max_weights}"
+        )
+
+
+class TestVerstraeteCiracSpectral:
+    """Tests covering the spectral validation of the Verstraete-Cirac mapping."""
+
+    @pytest.mark.slow
     def test_spectral_validation_2x2_hubbard(self) -> None:
-        """Compare eigenvalues of 2x2 Hubbard model under VC and Jordan-Wigner mappings.
+        """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and Jordan-Wigner mappings.
 
         Model parameters: t = 1.0, U = 4.0, half-filling (epsilon = -U/2 = -2.0).
         """
-        # 1. Construct 2x2 square lattice
-        lattice = LatticeGraph.square(2, 2)
+        lattice = LatticeGraph.square(2, 2, periodic_x=True)
+
         # 4 sites in lattice, each with 2 spin species -> 8 spin-orbitals / modes
         n_modes = 8
 
-        # 2. Construct Hubbard Hamiltonian
         hubbard_ham = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
 
-        # 3. Map using Jordan-Wigner (JW)
         mapper = create("qubit_mapper", "qdk")
         jw_mapping = MajoranaMapping.jordan_wigner(num_modes=n_modes)
         qh_jw = mapper.run(hubbard_ham, jw_mapping)
@@ -132,64 +219,62 @@ class TestVerstraeteCiracHubbardSpectral:
         eigs_jw = np.sort(eigs_jw)
         unique_jw = np.unique(np.round(eigs_jw, 6))
 
-        # 4. Map using Verstraete-Cirac (VC)
         vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
         qh_vc = mapper.run(hubbard_ham, vc_mapping)
 
-        # Verify VC number of qubits.
         assert qh_vc.num_qubits == 2 * n_modes
-
-        # Solve VC eigenvalues using sparse solver
         h_vc = qh_vc.to_matrix(sparse=True)
+
         # Solve for 128 eigenvalues to cover the 64-fold degeneracy of the ground state and first excited state
         eigs_vc, _ = eigsh(h_vc, k=128, which="SA")
         eigs_vc = np.sort(eigs_vc)
         unique_vc = np.unique(np.round(eigs_vc, 6))
 
-        # The unique lowest eigenvalues in the code space of VC must match the unique lowest eigenvalues of JW.
         # We check the 2 lowest unique eigenvalues.
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
-        # Test serialization of the resulting QubitHamiltonian
-        qh_json = qh_vc.to_json()
-        qh_loaded = QubitHamiltonian.from_json(qh_json)
-        assert qh_loaded.num_qubits == qh_vc.num_qubits
-        assert len(qh_loaded.pauli_strings) == len(qh_vc.pauli_strings)
+    @pytest.mark.slow
+    def test_spectral_validation_3x3_huckel(self) -> None:
+        """Compare eigenvalues of 3x3 Hückel model under VC and Jordan-Wigner mappings."""
+        lattice = LatticeGraph.square(3, 3)
 
+        # 9 sites in lattice, each with 1 spin species -> 9 spin-orbitals / modes
+        n_modes = 9
 
-class TestVerstraeteCiracPauliWeightScaling:
-    """Verify that nearest-neighbor hop Pauli weight remains constant for grid lengths L in {2, 3, 4}."""
+        huckel_ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
 
-    def test_pauli_weight_scaling(self) -> None:
-        """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
-
-        Max Pauli weight of nearest-neighbor hops should be constant for grids of dimensions:
-        - 2x2 (L=2)
-        - 2x3 (L=3)
-        - 2x4 (L=4)
-        """
         mapper = create("qubit_mapper", "qdk")
+        jw_mapping = MajoranaMapping.jordan_wigner(num_modes=n_modes)
+        qh_jw = mapper.run(huckel_ham, jw_mapping)
+        h_jw = qh_jw.to_matrix(sparse=True)
+        eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
+        unique_jw = np.unique(np.round(np.sort(eigs_jw), 6))
 
-        max_weights = []
-        for grid_length in [2, 3, 4]:
-            lattice = LatticeGraph.square(2, grid_length)
-            # Create a simple hopping-only Hamiltonian (U=0) on the 2xL lattice
-            ham = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=0.0)
+        mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
+        qh_vc = mapper.run(huckel_ham, mapping)
+        h_vc = qh_vc.to_matrix(sparse=True)
 
-            vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
-            qh_vc = mapper.run(ham, vc_mapping)
+        # We solve for a few eigenvalues of H_vc and project into the code space (+1 eigenstate of all stabilizers)
+        eigs_vc, vecs_vc = eigsh(h_vc, k=40, which="SA")
 
-            weights = []
-            for pauli_str in qh_vc.pauli_strings:
-                if pauli_str == "I" * len(pauli_str):
-                    continue
-                # Weight is the number of non-I characters
-                weight = sum(1 for c in pauli_str if c != "I")
-                weights.append(weight)
+        stabs = []
+        for coeff, word in mapping.stabilizers:
+            label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
+            qh_stab = QubitHamiltonian([label], np.array([coeff]))
+            stabs.append(qh_stab.to_matrix(sparse=True))
 
-            max_weights.append(max(weights))
+        code_space_eigs = []
+        for idx in range(len(eigs_vc)):
+            vec = vecs_vc[:, idx]
+            is_in_code_space = True
+            for stab in stabs:
+                exp = np.real(vec.conj().T @ (stab @ vec))
+                if not np.isclose(exp, 1.0, atol=1e-4):
+                    is_in_code_space = False
+                    break
+            if is_in_code_space:
+                code_space_eigs.append(eigs_vc[idx])
 
-        # Check that the maximum Pauli weight does not grow with L
-        assert max_weights[0] == max_weights[1] == max_weights[2], (
-            f"Maximum Pauli weights grew or varied with grid length: {max_weights}"
-        )
+        assert len(code_space_eigs) >= 2
+        unique_vc = np.unique(np.round(np.sort(code_space_eigs), 6))
+        np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
