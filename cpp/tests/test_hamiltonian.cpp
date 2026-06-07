@@ -23,6 +23,7 @@
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <sstream>
+#include <stdexcept>
 
 #include "ut_common.hpp"
 using namespace qdk::chemistry::data;
@@ -314,9 +315,9 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   nlohmann::json j = h.to_json();
 
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
-  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_orbitals"]);
+  EXPECT_TRUE(j["container"].contains("one_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("two_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("orbitals"));
 
   // Test round-trip conversion
   auto h2 = Hamiltonian::from_json(j);
@@ -663,7 +664,7 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there is an index out of bounds
   EXPECT_THROW(
@@ -677,7 +678,7 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::invalid_argument);
+      std::out_of_range);
 
   // Throw if there are repeated indices in the active space
   EXPECT_THROW(
@@ -703,7 +704,7 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
             std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
         hc->run(orbitals);
       },
-      std::runtime_error);
+      std::invalid_argument);
 
   // Throw if alpha and beta active spaces have different sizes
   EXPECT_THROW(
@@ -1026,8 +1027,8 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
 
   EXPECT_EQ(j["container"]["container_type"], "cholesky");
   EXPECT_EQ(j["container"]["core_energy"], 1.5);
-  EXPECT_TRUE(j["container"]["has_one_body_integrals"]);
-  EXPECT_TRUE(j["container"]["has_two_body_integrals"]);
+  EXPECT_TRUE(j["container"].contains("one_body_integrals"));
+  EXPECT_TRUE(j["container"].contains("three_center_integrals"));
   EXPECT_TRUE(j["container"].contains("ao_cholesky_vectors"));
 
   // Test deserialization
@@ -1281,8 +1282,8 @@ TEST_F(HamiltonianTest, SparseContainerJSONSerialization) {
   nlohmann::json j = h.to_json();
   EXPECT_EQ(j["container"]["container_type"], "sparse");
   EXPECT_DOUBLE_EQ(j["container"]["core_energy"].get<double>(), core_energy);
-  EXPECT_TRUE(j["container"]["has_one_body_integrals"].get<bool>());
-  EXPECT_TRUE(j["container"]["has_two_body_integrals"].get<bool>());
+  EXPECT_TRUE(j["container"].contains("one_body_integrals_alpha_sparse"));
+  EXPECT_TRUE(j["container"].contains("two_body_integrals"));
 
   // Round-trip
   auto h_loaded = Hamiltonian::from_json(j);
@@ -1310,7 +1311,7 @@ TEST_F(HamiltonianTest, SparseContainerJSONSerializationOneBodyOnly) {
 
   nlohmann::json j = h.to_json();
   EXPECT_EQ(j["container"]["container_type"], "sparse");
-  EXPECT_FALSE(j["container"]["has_two_body_integrals"].get<bool>());
+  EXPECT_FALSE(j["container"].contains("two_body_integrals"));
 
   auto h_loaded = Hamiltonian::from_json(j);
   EXPECT_EQ(h_loaded->get_container_type(), "sparse");
@@ -1770,6 +1771,7 @@ class ForceUnrestrictedOrbitals : public Orbitals {
   void set_active_space(const std::vector<size_t>& alpha_active,
                         const std::vector<size_t>& beta_active) {
     _active_space_indices = {alpha_active, beta_active};
+    _build_space_index_sets();
   }
 };
 

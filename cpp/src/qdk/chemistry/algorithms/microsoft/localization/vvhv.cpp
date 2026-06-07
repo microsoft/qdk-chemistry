@@ -1308,7 +1308,10 @@ std::shared_ptr<data::Wavefunction> VVHVLocalizer::_run_impl(
   std::string minimal_basis_name =
       _settings->get_or_default<std::string>("minimal_basis", "sto-3g");
 
-  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  const auto& coeffs_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& coeffs_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   auto ao_overlap = orbitals->get_overlap_matrix();
 
   // Create reusable Pipek-Mezey localizer for inner localization
