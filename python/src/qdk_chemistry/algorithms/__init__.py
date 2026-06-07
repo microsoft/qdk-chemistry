@@ -49,7 +49,12 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     QdkMacisPmc,
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
-from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
+from qdk_chemistry.algorithms.qubit_mapper import (
+    QdkQubitMapper,
+    QubitMapper,
+    VerstraeteCiracQubitMapper,
+    build_vc_majorana_mapping,
+)
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
@@ -91,6 +96,8 @@ __all__ = [
     "StabilityChecker",
     "StatePreparation",
     "TimeEvolutionBuilder",
+    "VerstraeteCiracQubitMapper",
+    "build_vc_majorana_mapping",
     # Factory functions
     "available",
     "create",
