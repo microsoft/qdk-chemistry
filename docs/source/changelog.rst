@@ -16,6 +16,14 @@ Breaking changes
   Pre-group with ``create("term_grouper", "qubit_wise_commuting")`` to restore
   the previous behavior.
 
+- The on-disk serialization format for :class:`~qdk_chemistry.data.Orbitals`,
+  :class:`~qdk_chemistry.data.ModelOrbitals`, :class:`~qdk_chemistry.data.Hamiltonian` containers, and
+  :class:`~qdk_chemistry.data.Wavefunction` containers was bumped from ``0.1.0`` to ``0.2.0`` to
+  reflect the switch to ``SymmetryBlockedTensor``-backed storage. Files
+  written by earlier versions are **not** loaded by this release; re-generate
+  them with the current version. Backward-compatible loading of ``0.1.0`` files
+  is planned for a future release.
+
 Version 1.1.0
 =============
 

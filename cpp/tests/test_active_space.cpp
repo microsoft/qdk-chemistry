@@ -482,12 +482,12 @@ class MockWavefunctionContainer : public WavefunctionContainer {
 
   bool has_single_orbital_entropies() const override { return true; }
 
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override {
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const override {
     throw std::runtime_error("Not implemented");
   }
 
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const override {
     throw std::runtime_error("Not implemented");
   }

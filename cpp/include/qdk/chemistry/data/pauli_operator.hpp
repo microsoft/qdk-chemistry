@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <list>
 #include <memory>
-#include <qdk/chemistry/utils/hash.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
@@ -58,15 +58,18 @@ SparsePauliWord label_to_sparse_pauli_word(const std::string& label);
 /**
  * @brief Hash function for SparsePauliWord.
  *
- * Uses boost-style hash_combine for portable and efficient hash computation.
+ * Uses HashContext for deterministic hash computation.
  */
 struct SparsePauliWordHash {
-  std::size_t operator()(const SparsePauliWord& word) const noexcept {
-    std::size_t seed = 0;
+  std::size_t operator()(const SparsePauliWord& word) const {
+    utils::HashContext ctx;
+    ctx.update("sparse_pauli_word");
+    ctx.update(static_cast<uint64_t>(word.size()));
     for (const auto& [qubit, op_type] : word) {
-      seed = utils::hash_combine(seed, qubit, op_type);
+      ctx.update(static_cast<uint64_t>(qubit));
+      ctx.update(static_cast<uint8_t>(op_type));
     }
-    return seed;
+    return ctx.hash_code();
   }
 };
 
@@ -74,15 +77,24 @@ struct SparsePauliWordHash {
  * @brief Hash function for pairs of SparsePauliWord (used for multiplication
  * caching).
  *
- * Combines two SparsePauliWordHash results using hash_combine.
+ * Hashes both words through HashContext.
  */
 struct SparsePauliWordPairHash {
   std::size_t operator()(
-      const std::pair<SparsePauliWord, SparsePauliWord>& pair) const noexcept {
-    SparsePauliWordHash hasher;
-    std::size_t h1 = hasher(pair.first);
-    std::size_t h2 = hasher(pair.second);
-    return utils::hash_combine(h1, h2);
+      const std::pair<SparsePauliWord, SparsePauliWord>& pair) const {
+    utils::HashContext ctx;
+    ctx.update("sparse_pauli_word_pair");
+    ctx.update(static_cast<uint64_t>(pair.first.size()));
+    for (const auto& [qubit, op_type] : pair.first) {
+      ctx.update(static_cast<uint64_t>(qubit));
+      ctx.update(static_cast<uint8_t>(op_type));
+    }
+    ctx.update(static_cast<uint64_t>(pair.second.size()));
+    for (const auto& [qubit, op_type] : pair.second) {
+      ctx.update(static_cast<uint64_t>(qubit));
+      ctx.update(static_cast<uint8_t>(op_type));
+    }
+    return ctx.hash_code();
   }
 };
 

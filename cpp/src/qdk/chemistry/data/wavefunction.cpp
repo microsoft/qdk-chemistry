@@ -6,6 +6,7 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -171,7 +172,6 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
   QDK_LOG_TRACE_ENTERING();
 }
 
-// \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
 WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
@@ -186,9 +186,7 @@ WavefunctionContainer::WavefunctionContainer(
                             entropies, type) {
   QDK_LOG_TRACE_ENTERING();
 }
-// \endcond
 
-// \cond DOXYGEN_SUPPRESS (suppress warnings for declaration with "using")
 WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_spin_traced,
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_aa,
@@ -198,92 +196,49 @@ WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_aaaa,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
     const OrbitalEntropies& entropies, WavefunctionType type)
-    : _type(type), _entropies(entropies) {
+    : WavefunctionContainer(
+          one_rdm_spin_traced.has_value()
+              ? std::make_shared<MatrixVariant>(one_rdm_spin_traced.value())
+              : nullptr,
+          two_rdm_spin_traced.has_value()
+              ? std::make_shared<VectorVariant>(two_rdm_spin_traced.value())
+              : nullptr,
+          make_spin_diagonal_rank2_sbt_variant(one_rdm_aa, one_rdm_bb),
+          make_spin_diagonal_rank4_sbt_variant(two_rdm_aaaa, two_rdm_aabb,
+                                               two_rdm_bbbb),
+          entropies, type) {
   QDK_LOG_TRACE_ENTERING();
-  if (one_rdm_spin_traced.has_value()) {
-    _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
-        one_rdm_spin_traced.value());
-  } else {
-    _one_rdm_spin_traced = nullptr;
-  }
-  if (one_rdm_aa.has_value()) {
-    _one_rdm_spin_dependent_aa =
-        std::make_shared<ContainerTypes::MatrixVariant>(one_rdm_aa.value());
-  } else {
-    _one_rdm_spin_dependent_aa = nullptr;
-  }
-  if (one_rdm_bb.has_value()) {
-    _one_rdm_spin_dependent_bb =
-        std::make_shared<ContainerTypes::MatrixVariant>(one_rdm_bb.value());
-  } else {
-    _one_rdm_spin_dependent_bb = nullptr;
-  }
-  if (two_rdm_spin_traced.has_value()) {
-    _two_rdm_spin_traced = std::make_shared<ContainerTypes::VectorVariant>(
-        two_rdm_spin_traced.value());
-  } else {
-    _two_rdm_spin_traced = nullptr;
-  }
-  if (two_rdm_aabb.has_value()) {
-    _two_rdm_spin_dependent_aabb =
-        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_aabb.value());
-  } else {
-    _two_rdm_spin_dependent_aabb = nullptr;
-  }
-  if (two_rdm_aaaa.has_value()) {
-    _two_rdm_spin_dependent_aaaa =
-        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_aaaa.value());
-  } else {
-    _two_rdm_spin_dependent_aaaa = nullptr;
-  }
-  if (two_rdm_bbbb.has_value()) {
-    _two_rdm_spin_dependent_bbbb =
-        std::make_shared<ContainerTypes::VectorVariant>(two_rdm_bbbb.value());
-  } else {
-    _two_rdm_spin_dependent_bbbb = nullptr;
-  }
 }
-// \endcond
 
-// RDM handling
-std::tuple<const ContainerTypes::MatrixVariant&,
-           const ContainerTypes::MatrixVariant&>
+WavefunctionContainer::WavefunctionContainer(
+    std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
+    std::shared_ptr<VectorVariant> two_rdm_spin_traced,
+    std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
+    std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
+    const OrbitalEntropies& entropies, WavefunctionType type)
+    : _one_rdm_spin_traced(std::move(one_rdm_spin_traced)),
+      _two_rdm_spin_traced(std::move(two_rdm_spin_traced)),
+      _active_one_rdm(std::move(active_one_rdm)),
+      _active_two_rdm(std::move(active_two_rdm)),
+      _type(type),
+      _entropies(entropies) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+// ---- v1 spin-dependent / spin-traced accessors ----------------------------
+
+std::tuple<ContainerTypes::MatrixVariant, ContainerTypes::MatrixVariant>
 WavefunctionContainer::get_active_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!has_one_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent one-body RDM not set");
-  }
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_bb));
-  }
-
-  // For restricted closed-shell, if only one spin component is available, use
-  // it for both
-  if (_is_restricted_closed_shell() && _one_rdm_spin_dependent_aa != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_aa));
-  }
-  if (_is_restricted_closed_shell() && _one_rdm_spin_dependent_bb != nullptr) {
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_bb),
-                           std::cref(*_one_rdm_spin_dependent_bb));
-  }
-
-  // If restricted closed-shell and only spin-traced RDM is available, derive
-  // spin components
-  if (_is_restricted_closed_shell() && _one_rdm_spin_traced != nullptr) {
-    // Lazy evaluation - only compute if necessary
-    if (_one_rdm_spin_dependent_aa == nullptr) {
-      _one_rdm_spin_dependent_aa =
-          detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
-    }
-    return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                           std::cref(*_one_rdm_spin_dependent_aa));
-  }
-
-  // Should not reach this exception
-  throw std::runtime_error("No one-body RDMs are set");
+  return std::visit(
+      [&](const auto& sbt) -> std::tuple<ContainerTypes::MatrixVariant,
+                                         ContainerTypes::MatrixVariant> {
+        return std::make_tuple(ContainerTypes::MatrixVariant{sbt.block(
+                                   {axes::alpha(), axes::alpha()})},
+                               ContainerTypes::MatrixVariant{
+                                   sbt.block({axes::beta(), axes::beta()})});
+      },
+      active_one_rdm());
 }
 
 const ContainerTypes::MatrixVariant&
@@ -295,53 +250,44 @@ WavefunctionContainer::get_active_one_rdm_spin_traced() const {
   if (_one_rdm_spin_traced != nullptr) {
     return *_one_rdm_spin_traced;
   }
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
-    // evaluate only if necessary
-    _one_rdm_spin_traced = detail::add_matrix_variants(
-        *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
+  // Derive from the SBT.
+  if (_active_one_rdm) {
+    auto aa = std::visit(
+        [&](const auto& sbt) -> ContainerTypes::MatrixVariant {
+          return ContainerTypes::MatrixVariant{
+              sbt.block({axes::alpha(), axes::alpha()})};
+        },
+        *_active_one_rdm);
+    auto bb = std::visit(
+        [&](const auto& sbt) -> ContainerTypes::MatrixVariant {
+          return ContainerTypes::MatrixVariant{
+              sbt.block({axes::beta(), axes::beta()})};
+        },
+        *_active_one_rdm);
+    _one_rdm_spin_traced = detail::add_matrix_variants(aa, bb);
     return *_one_rdm_spin_traced;
   }
-  // If restricted closed-shell, we can derive spin-traced from a single
-  // component.
-  if (_is_restricted_closed_shell() && _one_rdm_spin_dependent_aa != nullptr) {
-    _one_rdm_spin_traced =
-        detail::multiply_matrix_variant(*_one_rdm_spin_dependent_aa, 2.0);
-    return *_one_rdm_spin_traced;
-  }
-  if (_is_restricted_closed_shell() && _one_rdm_spin_dependent_bb != nullptr) {
-    _one_rdm_spin_traced =
-        detail::multiply_matrix_variant(*_one_rdm_spin_dependent_bb, 2.0);
-    return *_one_rdm_spin_traced;
-  }
-  // Should not reach this exception.
   throw std::runtime_error("No spin-traced one-body RDMs are set");
 }
 
-std::tuple<const ContainerTypes::VectorVariant&,
-           const ContainerTypes::VectorVariant&,
-           const ContainerTypes::VectorVariant&>
+std::tuple<ContainerTypes::VectorVariant, ContainerTypes::VectorVariant,
+           ContainerTypes::VectorVariant>
 WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!has_two_rdm_spin_dependent()) {
-    throw std::runtime_error("Spin-dependent two-body RDM not set");
-  }
-  if (_two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
-    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
-                           std::cref(*_two_rdm_spin_dependent_aaaa),
-                           std::cref(*_two_rdm_spin_dependent_bbbb));
-  }
-  if (_is_restricted_closed_shell() &&
-      _two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr) {
-    return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
-                           std::cref(*_two_rdm_spin_dependent_aaaa),
-                           std::cref(*_two_rdm_spin_dependent_aaaa));
-  }
-  // Should not reach this exception
-  throw std::runtime_error("No spin-dependent two-body RDMs are set");
+
+  return std::visit(
+      [&](const auto& sbt) -> std::tuple<ContainerTypes::VectorVariant,
+                                         ContainerTypes::VectorVariant,
+                                         ContainerTypes::VectorVariant> {
+        return std::make_tuple(
+            ContainerTypes::VectorVariant{sbt.block(
+                {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})},
+            ContainerTypes::VectorVariant{sbt.block(
+                {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})},
+            ContainerTypes::VectorVariant{sbt.block(
+                {axes::beta(), axes::beta(), axes::beta(), axes::beta()})});
+      },
+      active_two_rdm());
 }
 
 const ContainerTypes::VectorVariant&
@@ -353,36 +299,43 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
   if (_two_rdm_spin_traced != nullptr) {
     return *_two_rdm_spin_traced;
   }
-  if (_two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
-    auto two_rdm_ss_part = detail::add_vector_variants(
-        *(_two_rdm_spin_dependent_aaaa), *(_two_rdm_spin_dependent_bbbb));
-    auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-        *_two_rdm_spin_dependent_aabb,
-        get_orbitals()->get_active_space_indices().first.size());
+  // Derive from the SBT.
+  if (_active_two_rdm) {
+    auto extract = [&](const SymmetryLabel& p, const SymmetryLabel& q,
+                       const SymmetryLabel& r, const SymmetryLabel& s) {
+      return std::visit(
+          [&](const auto& sbt) -> ContainerTypes::VectorVariant {
+            return ContainerTypes::VectorVariant{sbt.block({p, q, r, s})};
+          },
+          *_active_two_rdm);
+    };
+    auto aabb =
+        extract(axes::alpha(), axes::alpha(), axes::beta(), axes::beta());
+    auto aaaa =
+        extract(axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha());
 
-    auto two_rdm_os_part = detail::add_vector_variants(
-        *(_two_rdm_spin_dependent_aabb), *(two_rdm_spin_bbaa));
+    // For restricted closed-shell, exploit aaaa=bbbb and aabb=bbaa to skip
+    // the transpose: spin-traced = 2*aaaa + 2*aabb. (Matches the legacy
+    // shortcut and is faster for the common path.)
+    if (_is_restricted_closed_shell()) {
+      auto double_aabb = detail::multiply_vector_variant(aabb, 2.0);
+      auto double_aaaa = detail::multiply_vector_variant(aaaa, 2.0);
+      _two_rdm_spin_traced =
+          detail::add_vector_variants(*double_aabb, *double_aaaa);
+      return *_two_rdm_spin_traced;
+    }
+
+    auto bbbb = extract(axes::beta(), axes::beta(), axes::beta(), axes::beta());
+    auto two_rdm_ss_part = detail::add_vector_variants(aaaa, bbbb);
+    auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
+        aabb, get_orbitals()->get_active_space_indices().first.size());
+    auto two_rdm_os_part =
+        detail::add_vector_variants(aabb, *two_rdm_spin_bbaa);
 
     _two_rdm_spin_traced =
         detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
-
     return *_two_rdm_spin_traced;
   }
-  if (_is_restricted_closed_shell() &&
-      _two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr) {
-    // For restricted closed-shell: aabb + bbaa + aaaa + bbbb = 2*aabb + 2*aaaa
-    auto double_aabb =
-        detail::multiply_vector_variant(*_two_rdm_spin_dependent_aabb, 2.0);
-    auto double_aaaa =
-        detail::multiply_vector_variant(*_two_rdm_spin_dependent_aaaa, 2.0);
-    _two_rdm_spin_traced =
-        detail::add_vector_variants(*double_aabb, *double_aaaa);
-    return *_two_rdm_spin_traced;
-  }
-  // Should not reach this exception
   throw std::runtime_error("No spin-traced two-body RDMs are set");
 }
 
@@ -393,12 +346,8 @@ bool WavefunctionContainer::_is_restricted_closed_shell() const {
 
 bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  return (_one_rdm_spin_dependent_aa != nullptr &&
-          _one_rdm_spin_dependent_bb != nullptr) ||
-         (_is_restricted_closed_shell() &&
-          (_one_rdm_spin_dependent_aa != nullptr ||
-           _one_rdm_spin_dependent_bb != nullptr ||
-           _one_rdm_spin_traced != nullptr));
+  return _active_one_rdm != nullptr ||
+         (_is_restricted_closed_shell() && _one_rdm_spin_traced != nullptr);
 }
 
 bool WavefunctionContainer::has_one_rdm_spin_traced() const {
@@ -408,18 +357,87 @@ bool WavefunctionContainer::has_one_rdm_spin_traced() const {
 
 bool WavefunctionContainer::has_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  return (_two_rdm_spin_dependent_aabb != nullptr &&
-          _two_rdm_spin_dependent_aaaa != nullptr &&
-          _two_rdm_spin_dependent_bbbb != nullptr) ||
-         (_is_restricted_closed_shell() &&
-          _two_rdm_spin_dependent_aabb != nullptr &&
-          (_two_rdm_spin_dependent_aaaa != nullptr ||
-           _two_rdm_spin_dependent_bbbb != nullptr));
+  return _active_two_rdm != nullptr;
 }
 
 bool WavefunctionContainer::has_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
   return _two_rdm_spin_traced != nullptr || has_two_rdm_spin_dependent();
+}
+
+// ---- SBT-native RDM accessors --------------------------------------------
+
+const SymmetryBlockedTensorVariant<2>& WavefunctionContainer::active_one_rdm()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  // Derive the spin-dependent SBT from the spin-traced 1-RDM on demand
+  // (restricted closed-shell), caching the result.
+  if (!_active_one_rdm && _is_restricted_closed_shell() &&
+      _one_rdm_spin_traced != nullptr) {
+    auto half = detail::multiply_matrix_variant(*_one_rdm_spin_traced, 0.5);
+    _active_one_rdm = std::visit(
+        [](const auto& half_block)
+            -> std::shared_ptr<const SymmetryBlockedTensorVariant<2>> {
+          using Scalar = typename std::decay_t<decltype(half_block)>::Scalar;
+          using SBT = SymmetryBlockedTensor<2, Scalar>;
+          std::size_t n = static_cast<std::size_t>(half_block.rows());
+          auto sym = std::make_shared<const SymmetryProduct>(
+              SymmetryProduct({axes::spin(1, /*restricted=*/true)}));
+          std::unordered_map<SymmetryLabel, std::size_t> ext;
+          ext[axes::alpha()] = n;
+          ext[axes::beta()] = n;
+          typename SBT::BlockMap blocks;
+          blocks[{axes::alpha(), axes::alpha()}] =
+              std::make_shared<const Tensor<2, Scalar>>(half_block);
+          return std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+              std::in_place_type<SBT>,
+              SBT(typename SBT::SymmetriesArray{sym, sym},
+                  typename SBT::ExtentsArray{ext, ext}, std::move(blocks)));
+        },
+        *half);
+  }
+  if (!_active_one_rdm) {
+    throw std::runtime_error(
+        "Active 1-RDM symmetry-blocked tensor is not available.");
+  }
+  return *_active_one_rdm;
+}
+
+ContainerTypes::MatrixVariant WavefunctionContainer::active_one_rdm_block(
+    const SymmetryLabel& row, const SymmetryLabel& col) const {
+  return std::visit(
+      [&](const auto& sbt) -> ContainerTypes::MatrixVariant {
+        return ContainerTypes::MatrixVariant{sbt.block({row, col})};
+      },
+      active_one_rdm());
+}
+
+bool WavefunctionContainer::has_active_one_rdm() const {
+  return _active_one_rdm != nullptr;
+}
+
+const SymmetryBlockedTensorVariant<4>& WavefunctionContainer::active_two_rdm()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!_active_two_rdm) {
+    throw std::runtime_error(
+        "Active 2-RDM symmetry-blocked tensor is not available.");
+  }
+  return *_active_two_rdm;
+}
+
+ContainerTypes::VectorVariant WavefunctionContainer::active_two_rdm_block(
+    const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
+    const SymmetryLabel& s) const {
+  return std::visit(
+      [&](const auto& sbt) -> ContainerTypes::VectorVariant {
+        return ContainerTypes::VectorVariant{sbt.block({p, q, r, s})};
+      },
+      active_two_rdm());
+}
+
+bool WavefunctionContainer::has_active_two_rdm() const {
+  return _active_two_rdm != nullptr;
 }
 
 // entropies
@@ -429,33 +447,31 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
   if (_entropies.single_orbital) {
     return *_entropies.single_orbital;
   }
-  if (!has_one_rdm_spin_dependent()) {
+  if (!has_one_rdm_spin_dependent() || !has_two_rdm_spin_dependent()) {
     throw std::runtime_error(
-        "Spin-dependent one-body RDMs must be set to evaluate "
+        "Spin-dependent one- and two-body RDMs must be set to evaluate "
         "single-orbital entropies");
   }
-  if (_two_rdm_spin_dependent_aabb == nullptr) {
-    throw std::runtime_error(
-        "alpha-alpha-beta-beta block of spin-dependent two-body RDMs must be "
-        "set to evaluate single-orbital entropies");
-  }
 
-  const auto& one_rdm_aa_var = std::get<0>(get_active_one_rdm_spin_dependent());
-  const auto& one_rdm_bb_var = std::get<1>(get_active_one_rdm_spin_dependent());
-  const auto& two_rdm_ab_var = std::get<0>(get_active_two_rdm_spin_dependent());
+  const auto& one_rdm = active_one_rdm();
+  const auto& two_rdm = active_two_rdm();
 
   Eigen::MatrixXd one_rdm_aa;
   Eigen::MatrixXd one_rdm_bb;
   Eigen::VectorXd two_rdm_ab;
 
-  if (detail::is_matrix_variant_complex(one_rdm_aa_var) ||
-      detail::is_vector_variant_complex(two_rdm_ab_var) ||
-      detail::is_matrix_variant_complex(one_rdm_bb_var)) {
+  if (std::holds_alternative<SymmetryBlockedTensor<2, std::complex<double>>>(
+          one_rdm) ||
+      std::holds_alternative<SymmetryBlockedTensor<4, std::complex<double>>>(
+          two_rdm)) {
     throw std::runtime_error("Complex entropy calculation not yet implemented");
   } else {
-    one_rdm_aa = std::get<Eigen::MatrixXd>(one_rdm_aa_var);
-    one_rdm_bb = std::get<Eigen::MatrixXd>(one_rdm_bb_var);
-    two_rdm_ab = std::get<Eigen::VectorXd>(two_rdm_ab_var);
+    const auto& one_sbt = std::get<SymmetryBlockedTensor<2, double>>(one_rdm);
+    const auto& two_sbt = std::get<SymmetryBlockedTensor<4, double>>(two_rdm);
+    one_rdm_aa = one_sbt.block({axes::alpha(), axes::alpha()});
+    one_rdm_bb = one_sbt.block({axes::beta(), axes::beta()});
+    two_rdm_ab = two_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
   }
 
   size_t norbs = static_cast<size_t>(one_rdm_aa.rows());
@@ -506,8 +522,7 @@ Eigen::VectorXd WavefunctionContainer::get_single_orbital_entropies() const {
 bool WavefunctionContainer::has_single_orbital_entropies() const {
   QDK_LOG_TRACE_ENTERING();
   return _entropies.single_orbital.has_value() ||
-         (has_one_rdm_spin_dependent() &&
-          _two_rdm_spin_dependent_aabb != nullptr);
+         (has_one_rdm_spin_dependent() && has_two_rdm_spin_dependent());
 }
 
 bool WavefunctionContainer::has_mutual_information() const {
@@ -580,309 +595,9 @@ Eigen::MatrixXd WavefunctionContainer::get_mutual_information() const {
 void WavefunctionContainer::_clear_rdms() const {
   QDK_LOG_TRACE_ENTERING();
   _one_rdm_spin_traced.reset();
-  _one_rdm_spin_dependent_aa.reset();
-  _one_rdm_spin_dependent_bb.reset();
   _two_rdm_spin_traced.reset();
-  _two_rdm_spin_dependent_aabb.reset();
-  _two_rdm_spin_dependent_aaaa.reset();
-  _two_rdm_spin_dependent_bbbb.reset();
-}
-
-void WavefunctionContainer::_serialize_rdms_to_hdf5(H5::Group& group) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  // Only serialize fields that are actually stored
-  bool has_any_rdm = _one_rdm_spin_traced != nullptr ||
-                     _one_rdm_spin_dependent_aa != nullptr ||
-                     _one_rdm_spin_dependent_bb != nullptr ||
-                     _two_rdm_spin_traced != nullptr ||
-                     _two_rdm_spin_dependent_aabb != nullptr ||
-                     _two_rdm_spin_dependent_aaaa != nullptr ||
-                     _two_rdm_spin_dependent_bbbb != nullptr;
-
-  if (has_any_rdm) {
-    H5::Group rdm_group = group.createGroup("rdms");
-
-    // Serialize spin-traced RDMs
-    if (_one_rdm_spin_traced != nullptr) {
-      std::string storage_name = "one_rdm_spin_traced";
-      bool is_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_traced);
-      H5::Attribute attr = rdm_group.createAttribute(
-          "is_one_rdm_spin_traced_complex", H5::PredType::NATIVE_HBOOL,
-          H5::DataSpace(H5S_SCALAR));
-      save_matrix_variant_to_group(is_complex, _one_rdm_spin_traced, rdm_group,
-                                   storage_name);
-      hbool_t flag = is_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-    if (_two_rdm_spin_traced != nullptr) {
-      std::string storage_name = "two_rdm_spin_traced";
-      bool is_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_traced);
-      H5::Attribute attr = rdm_group.createAttribute(
-          "is_two_rdm_spin_traced_complex", H5::PredType::NATIVE_HBOOL,
-          H5::DataSpace(H5S_SCALAR));
-      save_vector_variant_to_group(is_complex, _two_rdm_spin_traced, rdm_group,
-                                   storage_name);
-      hbool_t flag = is_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-
-    // Serialize spin-dependent one-RDMs
-    if (_one_rdm_spin_dependent_aa != nullptr) {
-      std::string storage_name = "one_rdm_aa";
-      bool is_aa_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-      H5::Attribute attr = rdm_group.createAttribute("is_one_rdm_aa_complex",
-                                                     H5::PredType::NATIVE_HBOOL,
-                                                     H5::DataSpace(H5S_SCALAR));
-      save_matrix_variant_to_group(is_aa_complex, _one_rdm_spin_dependent_aa,
-                                   rdm_group, storage_name);
-      hbool_t flag = is_aa_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-    if (_one_rdm_spin_dependent_bb != nullptr) {
-      std::string storage_name = "one_rdm_bb";
-      bool is_bb_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-      H5::Attribute attr = rdm_group.createAttribute("is_one_rdm_bb_complex",
-                                                     H5::PredType::NATIVE_HBOOL,
-                                                     H5::DataSpace(H5S_SCALAR));
-      save_matrix_variant_to_group(is_bb_complex, _one_rdm_spin_dependent_bb,
-                                   rdm_group, storage_name);
-      hbool_t flag = is_bb_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-
-    // Serialize spin-dependent two-RDMs
-    if (_two_rdm_spin_dependent_aabb != nullptr) {
-      std::string storage_name = "two_rdm_aabb";
-      bool is_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
-      H5::Attribute attr = rdm_group.createAttribute("is_two_rdm_aabb_complex",
-                                                     H5::PredType::NATIVE_HBOOL,
-                                                     H5::DataSpace(H5S_SCALAR));
-      save_vector_variant_to_group(is_complex, _two_rdm_spin_dependent_aabb,
-                                   rdm_group, storage_name);
-      hbool_t flag = is_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-    if (_two_rdm_spin_dependent_aaaa != nullptr) {
-      std::string storage_name = "two_rdm_aaaa";
-      bool is_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
-      H5::Attribute attr = rdm_group.createAttribute("is_two_rdm_aaaa_complex",
-                                                     H5::PredType::NATIVE_HBOOL,
-                                                     H5::DataSpace(H5S_SCALAR));
-      save_vector_variant_to_group(is_complex, _two_rdm_spin_dependent_aaaa,
-                                   rdm_group, storage_name);
-      hbool_t flag = is_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-    if (_two_rdm_spin_dependent_bbbb != nullptr) {
-      std::string storage_name = "two_rdm_bbbb";
-      bool is_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
-      H5::Attribute attr = rdm_group.createAttribute("is_two_rdm_bbbb_complex",
-                                                     H5::PredType::NATIVE_HBOOL,
-                                                     H5::DataSpace(H5S_SCALAR));
-      save_vector_variant_to_group(is_complex, _two_rdm_spin_dependent_bbbb,
-                                   rdm_group, storage_name);
-      hbool_t flag = is_complex ? 1 : 0;
-      attr.write(H5::PredType::NATIVE_HBOOL, &flag);
-    }
-  }
-}
-
-std::tuple<std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::VectorVariant>>
-WavefunctionContainer::_deserialize_rdms_from_hdf5(H5::Group& rdm_group) {
-  QDK_LOG_TRACE_ENTERING();
-
-  std::optional<MatrixVariant> one_rdm_aa;
-  std::optional<MatrixVariant> one_rdm_bb;
-  std::optional<VectorVariant> two_rdm_aabb;
-  std::optional<VectorVariant> two_rdm_aaaa;
-  std::optional<VectorVariant> two_rdm_bbbb;
-  std::optional<MatrixVariant> one_rdm_spin_traced;
-  std::optional<VectorVariant> two_rdm_spin_traced;
-
-  // Load spin-traced one-RDM
-  if (rdm_group.nameExists("one_rdm_spin_traced")) {
-    bool is_one_rdm_spin_traced_complex = false;
-    if (rdm_group.attrExists("is_one_rdm_spin_traced_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_one_rdm_spin_traced_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_one_rdm_spin_traced_complex = (is_complex_flag != 0);
-    }
-    one_rdm_spin_traced = load_matrix_variant_from_group(
-        rdm_group, "one_rdm_spin_traced", is_one_rdm_spin_traced_complex);
-  }
-
-  // Load spin-traced two-RDM
-  if (rdm_group.nameExists("two_rdm_spin_traced")) {
-    bool is_two_rdm_spin_traced_complex = false;
-    if (rdm_group.attrExists("is_two_rdm_spin_traced_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_two_rdm_spin_traced_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_two_rdm_spin_traced_complex = (is_complex_flag != 0);
-    }
-    two_rdm_spin_traced = load_vector_variant_from_group(
-        rdm_group, "two_rdm_spin_traced", is_two_rdm_spin_traced_complex);
-  }
-
-  // Load spin-dependent one-RDMs
-  if (rdm_group.nameExists("one_rdm_aa")) {
-    bool is_one_rdm_aa_complex = false;
-    if (rdm_group.attrExists("is_one_rdm_aa_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_one_rdm_aa_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_one_rdm_aa_complex = (is_complex_flag != 0);
-    }
-    one_rdm_aa = load_matrix_variant_from_group(rdm_group, "one_rdm_aa",
-                                                is_one_rdm_aa_complex);
-  }
-
-  if (rdm_group.nameExists("one_rdm_bb")) {
-    bool is_one_rdm_bb_complex = false;
-    if (rdm_group.attrExists("is_one_rdm_bb_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_one_rdm_bb_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_one_rdm_bb_complex = (is_complex_flag != 0);
-    }
-    one_rdm_bb = load_matrix_variant_from_group(rdm_group, "one_rdm_bb",
-                                                is_one_rdm_bb_complex);
-  }
-
-  // Load spin-dependent two-RDMs
-  if (rdm_group.nameExists("two_rdm_aabb")) {
-    bool is_two_rdm_aabb_complex = false;
-    if (rdm_group.attrExists("is_two_rdm_aabb_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_two_rdm_aabb_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_two_rdm_aabb_complex = (is_complex_flag != 0);
-    }
-    two_rdm_aabb = load_vector_variant_from_group(rdm_group, "two_rdm_aabb",
-                                                  is_two_rdm_aabb_complex);
-  }
-  if (rdm_group.nameExists("two_rdm_aaaa")) {
-    bool is_two_rdm_aaaa_complex = false;
-    if (rdm_group.attrExists("is_two_rdm_aaaa_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_two_rdm_aaaa_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_two_rdm_aaaa_complex = (is_complex_flag != 0);
-    }
-    two_rdm_aaaa = load_vector_variant_from_group(rdm_group, "two_rdm_aaaa",
-                                                  is_two_rdm_aaaa_complex);
-  }
-  if (rdm_group.nameExists("two_rdm_bbbb")) {
-    bool is_two_rdm_bbbb_complex = false;
-    if (rdm_group.attrExists("is_two_rdm_bbbb_complex")) {
-      H5::Attribute complex_attr =
-          rdm_group.openAttribute("is_two_rdm_bbbb_complex");
-      hbool_t is_complex_flag;
-      complex_attr.read(H5::PredType::NATIVE_HBOOL, &is_complex_flag);
-      is_two_rdm_bbbb_complex = (is_complex_flag != 0);
-    }
-    two_rdm_bbbb = load_vector_variant_from_group(rdm_group, "two_rdm_bbbb",
-                                                  is_two_rdm_bbbb_complex);
-  }
-
-  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
-                         two_rdm_bbbb, one_rdm_spin_traced,
-                         two_rdm_spin_traced);
-}
-
-void WavefunctionContainer::_serialize_rdms_to_json(nlohmann::json& j) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  // Only serialize fields that are actually stored (non-null)
-  bool has_any_rdm = _one_rdm_spin_traced != nullptr ||
-                     _one_rdm_spin_dependent_aa != nullptr ||
-                     _one_rdm_spin_dependent_bb != nullptr ||
-                     _two_rdm_spin_traced != nullptr ||
-                     _two_rdm_spin_dependent_aabb != nullptr ||
-                     _two_rdm_spin_dependent_aaaa != nullptr ||
-                     _two_rdm_spin_dependent_bbbb != nullptr;
-
-  if (has_any_rdm) {
-    nlohmann::json rdm_json;
-
-    // Serialize spin-traced RDMs
-    if (_one_rdm_spin_traced != nullptr) {
-      bool is_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_traced);
-      rdm_json["is_one_rdm_spin_traced_complex"] = is_complex;
-      rdm_json["one_rdm_spin_traced"] =
-          matrix_variant_to_json(*_one_rdm_spin_traced, is_complex);
-    }
-    if (_two_rdm_spin_traced != nullptr) {
-      bool is_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_traced);
-      rdm_json["is_two_rdm_spin_traced_complex"] = is_complex;
-      rdm_json["two_rdm_spin_traced"] =
-          vector_variant_to_json(*_two_rdm_spin_traced, is_complex);
-    }
-
-    // Serialize spin-dependent one-RDMs
-    if (_one_rdm_spin_dependent_aa != nullptr) {
-      bool is_aa_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_aa);
-      rdm_json["is_one_rdm_aa_complex"] = is_aa_complex;
-      rdm_json["one_rdm_aa"] =
-          matrix_variant_to_json(*_one_rdm_spin_dependent_aa, is_aa_complex);
-    }
-    if (_one_rdm_spin_dependent_bb != nullptr) {
-      bool is_bb_complex =
-          detail::is_matrix_variant_complex(*_one_rdm_spin_dependent_bb);
-      rdm_json["is_one_rdm_bb_complex"] = is_bb_complex;
-      rdm_json["one_rdm_bb"] =
-          matrix_variant_to_json(*_one_rdm_spin_dependent_bb, is_bb_complex);
-    }
-
-    // Serialize spin-dependent two-RDMs
-    if (_two_rdm_spin_dependent_aabb != nullptr) {
-      bool is_aabb_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aabb);
-      rdm_json["is_two_rdm_aabb_complex"] = is_aabb_complex;
-      rdm_json["two_rdm_aabb"] = vector_variant_to_json(
-          *_two_rdm_spin_dependent_aabb, is_aabb_complex);
-    }
-    if (_two_rdm_spin_dependent_aaaa != nullptr) {
-      bool is_aaaa_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_aaaa);
-      rdm_json["is_two_rdm_aaaa_complex"] = is_aaaa_complex;
-      rdm_json["two_rdm_aaaa"] = vector_variant_to_json(
-          *_two_rdm_spin_dependent_aaaa, is_aaaa_complex);
-    }
-    if (_two_rdm_spin_dependent_bbbb != nullptr) {
-      bool is_bbbb_complex =
-          detail::is_vector_variant_complex(*_two_rdm_spin_dependent_bbbb);
-      rdm_json["is_two_rdm_bbbb_complex"] = is_bbbb_complex;
-      rdm_json["two_rdm_bbbb"] = vector_variant_to_json(
-          *_two_rdm_spin_dependent_bbbb, is_bbbb_complex);
-    }
-
-    j["rdms"] = rdm_json;
-  }
+  _active_one_rdm.reset();
+  _active_two_rdm.reset();
 }
 
 void WavefunctionContainer::_serialize_entropies_to_json(
@@ -904,74 +619,6 @@ void WavefunctionContainer::_serialize_entropies_to_json(
         mi_data.data(), mi.rows(), mi.cols()) = mi;
     j["mutual_information"] = mi_data;
   }
-}
-
-std::tuple<std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::VectorVariant>,
-           std::optional<ContainerTypes::MatrixVariant>,
-           std::optional<ContainerTypes::VectorVariant>>
-WavefunctionContainer::_deserialize_rdms_from_json(const nlohmann::json& j) {
-  QDK_LOG_TRACE_ENTERING();
-
-  std::optional<MatrixVariant> one_rdm_aa;
-  std::optional<MatrixVariant> one_rdm_bb;
-  std::optional<VectorVariant> two_rdm_aabb;
-  std::optional<VectorVariant> two_rdm_aaaa;
-  std::optional<VectorVariant> two_rdm_bbbb;
-  std::optional<MatrixVariant> one_rdm_spin_traced;
-  std::optional<VectorVariant> two_rdm_spin_traced;
-
-  if (j.contains("rdms")) {
-    const auto& rdm_json = j["rdms"];
-
-    // Load spin-traced RDMs
-    if (rdm_json.contains("one_rdm_spin_traced")) {
-      bool is_complex = rdm_json.value("is_one_rdm_spin_traced_complex", false);
-      one_rdm_spin_traced =
-          json_to_matrix_variant(rdm_json["one_rdm_spin_traced"], is_complex);
-    }
-    if (rdm_json.contains("two_rdm_spin_traced")) {
-      bool is_complex = rdm_json.value("is_two_rdm_spin_traced_complex", false);
-      two_rdm_spin_traced =
-          json_to_vector_variant(rdm_json["two_rdm_spin_traced"], is_complex);
-    }
-
-    // Load spin-dependent one-RDMs
-    if (rdm_json.contains("one_rdm_aa")) {
-      bool is_aa_complex = rdm_json.value("is_one_rdm_aa_complex", false);
-      one_rdm_aa =
-          json_to_matrix_variant(rdm_json["one_rdm_aa"], is_aa_complex);
-    }
-    if (rdm_json.contains("one_rdm_bb")) {
-      bool is_bb_complex = rdm_json.value("is_one_rdm_bb_complex", false);
-      one_rdm_bb =
-          json_to_matrix_variant(rdm_json["one_rdm_bb"], is_bb_complex);
-    }
-
-    // Load two-RDMs
-    if (rdm_json.contains("two_rdm_aabb")) {
-      bool is_aabb_complex = rdm_json.value("is_two_rdm_aabb_complex", false);
-      two_rdm_aabb =
-          json_to_vector_variant(rdm_json["two_rdm_aabb"], is_aabb_complex);
-    }
-    if (rdm_json.contains("two_rdm_aaaa")) {
-      bool is_aaaa_complex = rdm_json.value("is_two_rdm_aaaa_complex", false);
-      two_rdm_aaaa =
-          json_to_vector_variant(rdm_json["two_rdm_aaaa"], is_aaaa_complex);
-    }
-    if (rdm_json.contains("two_rdm_bbbb")) {
-      bool is_bbbb_complex = rdm_json.value("is_two_rdm_bbbb_complex", false);
-      two_rdm_bbbb =
-          json_to_vector_variant(rdm_json["two_rdm_bbbb"], is_bbbb_complex);
-    }
-  }
-
-  return std::make_tuple(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa,
-                         two_rdm_bbbb, one_rdm_spin_traced,
-                         two_rdm_spin_traced);
 }
 
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
@@ -1067,37 +714,68 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 
     // Load RDMs if they are available
     if (j.contains("rdms")) {
-      // Deserialize RDMs
-      std::optional<MatrixVariant> one_rdm_aa;
-      std::optional<MatrixVariant> one_rdm_bb;
-      std::optional<VectorVariant> two_rdm_aabb;
-      std::optional<VectorVariant> two_rdm_aaaa;
-      std::optional<VectorVariant> two_rdm_bbbb;
-      std::optional<MatrixVariant> one_rdm_spin_traced;
-      std::optional<VectorVariant> two_rdm_spin_traced;
+      const auto& rdm_json = j["rdms"];
 
-      std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
-               one_rdm_spin_traced, two_rdm_spin_traced) =
-          _deserialize_rdms_from_json(j);
+      std::shared_ptr<MatrixVariant> one_rdm_spin_traced;
+      std::shared_ptr<VectorVariant> two_rdm_spin_traced;
+      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm;
+      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm;
 
-      // Return appropriate container with RDMs
-      bool has_one_rdm =
-          one_rdm_aa.has_value() || one_rdm_spin_traced.has_value();
-      bool has_two_rdm =
-          (two_rdm_aabb.has_value() && two_rdm_aaaa.has_value()) ||
-          two_rdm_spin_traced.has_value();
+      if (rdm_json.contains("one_rdm_spin_traced")) {
+        bool is_complex =
+            rdm_json.value("is_one_rdm_spin_traced_complex", false);
+        one_rdm_spin_traced =
+            std::make_shared<MatrixVariant>(json_to_matrix_variant(
+                rdm_json["one_rdm_spin_traced"], is_complex));
+      }
+      if (rdm_json.contains("two_rdm_spin_traced")) {
+        bool is_complex =
+            rdm_json.value("is_two_rdm_spin_traced_complex", false);
+        two_rdm_spin_traced =
+            std::make_shared<VectorVariant>(json_to_vector_variant(
+                rdm_json["two_rdm_spin_traced"], is_complex));
+      }
+      if (rdm_json.contains("active_one_rdm")) {
+        const auto& sub = rdm_json["active_one_rdm"];
+        if (sub.at("scalar").get<std::string>() == "complex") {
+          active_one_rdm =
+              std::make_shared<SymmetryBlockedTensorVariant<2>>(std::move(
+                  *SymmetryBlockedTensor<2, std::complex<double>>::from_json(
+                      sub)));
+        } else {
+          active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+              std::move(*SymmetryBlockedTensor<2, double>::from_json(sub)));
+        }
+      }
+      if (rdm_json.contains("active_two_rdm")) {
+        const auto& sub = rdm_json["active_two_rdm"];
+        if (sub.at("scalar").get<std::string>() == "complex") {
+          active_two_rdm =
+              std::make_shared<SymmetryBlockedTensorVariant<4>>(std::move(
+                  *SymmetryBlockedTensor<4, std::complex<double>>::from_json(
+                      sub)));
+        } else {
+          active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+              std::move(*SymmetryBlockedTensor<4, double>::from_json(sub)));
+        }
+      }
 
-      if (has_one_rdm || has_two_rdm) {
+      bool has_any = one_rdm_spin_traced || two_rdm_spin_traced ||
+                     active_one_rdm || active_two_rdm;
+
+      if (has_any) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
+              coefficients, determinants, orbitals,
+              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
+              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
+              type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
+              coefficients, determinants, orbitals,
+              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
+              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
+              type);
         } else {
           throw std::runtime_error(
               "RDMs are only supported for CAS and SCI containers in "
@@ -1375,16 +1053,14 @@ Wavefunction::ScalarVariant Wavefunction::overlap(
   return _container->overlap(*other._container);
 }
 
-std::tuple<const Wavefunction::MatrixVariant&,
-           const Wavefunction::MatrixVariant&>
+std::tuple<Wavefunction::MatrixVariant, Wavefunction::MatrixVariant>
 Wavefunction::get_active_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_active_one_rdm_spin_dependent();
 }
 
-std::tuple<const Wavefunction::VectorVariant&,
-           const Wavefunction::VectorVariant&,
-           const Wavefunction::VectorVariant&>
+std::tuple<Wavefunction::VectorVariant, Wavefunction::VectorVariant,
+           Wavefunction::VectorVariant>
 Wavefunction::get_active_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_active_two_rdm_spin_dependent();
@@ -1400,6 +1076,39 @@ const Wavefunction::VectorVariant&
 Wavefunction::get_active_two_rdm_spin_traced() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_active_two_rdm_spin_traced();
+}
+
+const SymmetryBlockedTensorVariant<2>& Wavefunction::active_one_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_one_rdm();
+}
+
+Wavefunction::MatrixVariant Wavefunction::active_one_rdm_block(
+    const SymmetryLabel& row, const SymmetryLabel& col) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_one_rdm_block(row, col);
+}
+
+bool Wavefunction::has_active_one_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_active_one_rdm();
+}
+
+const SymmetryBlockedTensorVariant<4>& Wavefunction::active_two_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_two_rdm();
+}
+
+Wavefunction::VectorVariant Wavefunction::active_two_rdm_block(
+    const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
+    const SymmetryLabel& s) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_two_rdm_block(p, q, r, s);
+}
+
+bool Wavefunction::has_active_two_rdm() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->has_active_two_rdm();
 }
 
 bool Wavefunction::has_single_orbital_entropies() const {
@@ -1763,8 +1472,42 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
       get_configuration_set().to_hdf5(config_set_group);
     }
 
-    // Serialize RDMs if available
-    _serialize_rdms_to_hdf5(group);
+    // Serialize RDMs (if any) — spin-traced via Eigen helpers, active-space
+    // via the canonical SBT serializer.
+    {
+      bool has_any_rdm =
+          _one_rdm_spin_traced != nullptr || _two_rdm_spin_traced != nullptr ||
+          _active_one_rdm != nullptr || _active_two_rdm != nullptr;
+      if (has_any_rdm) {
+        H5::Group rdm_group = group.createGroup("rdms");
+        if (_one_rdm_spin_traced != nullptr) {
+          save_matrix_variant_to_group_with_complex_attr(
+              _one_rdm_spin_traced, rdm_group, "one_rdm_spin_traced",
+              "is_one_rdm_spin_traced_complex");
+        }
+        if (_two_rdm_spin_traced != nullptr) {
+          save_vector_variant_to_group_with_complex_attr(
+              _two_rdm_spin_traced, rdm_group, "two_rdm_spin_traced",
+              "is_two_rdm_spin_traced_complex");
+        }
+        if (_active_one_rdm != nullptr) {
+          H5::Group sub = rdm_group.createGroup("active_one_rdm");
+          hbool_t is_complex = _active_one_rdm->index() == 1 ? 1 : 0;
+          sub.createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
+                              H5::DataSpace(H5S_SCALAR))
+              .write(H5::PredType::NATIVE_HBOOL, &is_complex);
+          std::visit([&](const auto& t) { t.to_hdf5(sub); }, *_active_one_rdm);
+        }
+        if (_active_two_rdm != nullptr) {
+          H5::Group sub = rdm_group.createGroup("active_two_rdm");
+          hbool_t is_complex = _active_two_rdm->index() == 1 ? 1 : 0;
+          sub.createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
+                              H5::DataSpace(H5S_SCALAR))
+              .write(H5::PredType::NATIVE_HBOOL, &is_complex);
+          std::visit([&](const auto& t) { t.to_hdf5(sub); }, *_active_two_rdm);
+        }
+      }
+    }
 
     // Serialize entropies if available
     if (_entropies.single_orbital) {
@@ -1914,37 +1657,82 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     if (group.nameExists("rdms")) {
       H5::Group rdm_group = group.openGroup("rdms");
 
-      // Deserialize RDMs
-      std::optional<MatrixVariant> one_rdm_aa;
-      std::optional<MatrixVariant> one_rdm_bb;
-      std::optional<VectorVariant> two_rdm_aabb;
-      std::optional<VectorVariant> two_rdm_aaaa;
-      std::optional<VectorVariant> two_rdm_bbbb;
-      std::optional<MatrixVariant> one_rdm_spin_traced;
-      std::optional<VectorVariant> two_rdm_spin_traced;
+      std::shared_ptr<MatrixVariant> one_rdm_spin_traced;
+      std::shared_ptr<VectorVariant> two_rdm_spin_traced;
+      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm;
+      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm;
 
-      std::tie(one_rdm_aa, one_rdm_bb, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
-               one_rdm_spin_traced, two_rdm_spin_traced) =
-          _deserialize_rdms_from_hdf5(rdm_group);
+      if (rdm_group.nameExists("one_rdm_spin_traced")) {
+        bool is_complex = false;
+        if (rdm_group.attrExists("is_one_rdm_spin_traced_complex")) {
+          hbool_t flag;
+          rdm_group.openAttribute("is_one_rdm_spin_traced_complex")
+              .read(H5::PredType::NATIVE_HBOOL, &flag);
+          is_complex = (flag != 0);
+        }
+        one_rdm_spin_traced =
+            std::make_shared<MatrixVariant>(load_matrix_variant_from_group(
+                rdm_group, "one_rdm_spin_traced", is_complex));
+      }
+      if (rdm_group.nameExists("two_rdm_spin_traced")) {
+        bool is_complex = false;
+        if (rdm_group.attrExists("is_two_rdm_spin_traced_complex")) {
+          hbool_t flag;
+          rdm_group.openAttribute("is_two_rdm_spin_traced_complex")
+              .read(H5::PredType::NATIVE_HBOOL, &flag);
+          is_complex = (flag != 0);
+        }
+        two_rdm_spin_traced =
+            std::make_shared<VectorVariant>(load_vector_variant_from_group(
+                rdm_group, "two_rdm_spin_traced", is_complex));
+      }
+      if (rdm_group.nameExists("active_one_rdm")) {
+        H5::Group sub = rdm_group.openGroup("active_one_rdm");
+        hbool_t is_complex = 0;
+        sub.openAttribute("is_complex")
+            .read(H5::PredType::NATIVE_HBOOL, &is_complex);
+        if (is_complex) {
+          active_one_rdm =
+              std::make_shared<SymmetryBlockedTensorVariant<2>>(std::move(
+                  *SymmetryBlockedTensor<2, std::complex<double>>::from_hdf5(
+                      sub)));
+        } else {
+          active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+              std::move(*SymmetryBlockedTensor<2, double>::from_hdf5(sub)));
+        }
+      }
+      if (rdm_group.nameExists("active_two_rdm")) {
+        H5::Group sub = rdm_group.openGroup("active_two_rdm");
+        hbool_t is_complex = 0;
+        sub.openAttribute("is_complex")
+            .read(H5::PredType::NATIVE_HBOOL, &is_complex);
+        if (is_complex) {
+          active_two_rdm =
+              std::make_shared<SymmetryBlockedTensorVariant<4>>(std::move(
+                  *SymmetryBlockedTensor<4, std::complex<double>>::from_hdf5(
+                      sub)));
+        } else {
+          active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+              std::move(*SymmetryBlockedTensor<4, double>::from_hdf5(sub)));
+        }
+      }
 
-      // Return appropriate container with RDMs
-      bool has_one_rdm =
-          one_rdm_aa.has_value() || one_rdm_spin_traced.has_value();
-      bool has_two_rdm =
-          (two_rdm_aabb.has_value() && two_rdm_aaaa.has_value()) ||
-          two_rdm_spin_traced.has_value();
+      bool has_any = one_rdm_spin_traced || two_rdm_spin_traced ||
+                     active_one_rdm || active_two_rdm;
 
-      if (has_one_rdm || has_two_rdm) {
+      if (has_any) {
         if (container_type == "cas") {
           return std::make_unique<CasWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
+              coefficients, determinants, orbitals,
+              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
+              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
+              type);
         } else if (container_type == "sci") {
           return std::make_unique<SciWavefunctionContainer>(
-              coefficients, determinants, orbitals, one_rdm_spin_traced,
-              one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-              two_rdm_aaaa, two_rdm_bbbb, entropies, type);
+              coefficients, determinants, orbitals,
+              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
+              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
+              type);
         }
       }
     }

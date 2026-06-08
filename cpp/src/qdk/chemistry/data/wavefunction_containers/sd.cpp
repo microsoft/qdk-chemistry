@@ -143,12 +143,10 @@ void SlaterDeterminantContainer::clear_caches() const {
   _clear_rdms();
 }
 
-std::tuple<const ContainerTypes::MatrixVariant&,
-           const ContainerTypes::MatrixVariant&>
-SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<2>&
+SlaterDeterminantContainer::active_one_rdm() const {
   QDK_LOG_TRACE_ENTERING();
-  if (_one_rdm_spin_dependent_aa == nullptr ||
-      _one_rdm_spin_dependent_bb == nullptr) {
+  if (!_active_one_rdm) {
     auto [alpha_occupations, beta_occupations] =
         get_active_orbital_occupations();
     if (_orbitals->get_active_space_indices().first.size() !=
@@ -175,24 +173,24 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_dependent() const {
       if (beta_occupations(i) > 0.0) tmp_one_rdm_bb(i, i) = 1.0;
     }
 
-    _one_rdm_spin_dependent_aa =
-        std::make_shared<ContainerTypes::MatrixVariant>(
-            std::move(tmp_one_rdm_aa));
-    _one_rdm_spin_dependent_bb =
-        std::make_shared<ContainerTypes::MatrixVariant>(
-            std::move(tmp_one_rdm_bb));
+    // SD's RDM restrictedness requires both a closed-shell determinant
+    // (alpha/beta occupation patterns coincide) AND restricted orbitals
+    // (alpha/beta MO coefficients share storage). Either being open-shell
+    // forces distinct alpha/beta blocks.
+    const bool restricted =
+        _determinant.is_closed_shell() && _orbitals->is_restricted();
+    _active_one_rdm = std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+        std::in_place_type<SymmetryBlockedTensor<2, double>>,
+        make_spin_diagonal_rank2_sbt(tmp_one_rdm_aa, tmp_one_rdm_bb,
+                                     restricted));
   }
-  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                         std::cref(*_one_rdm_spin_dependent_bb));
+  return WavefunctionContainer::active_one_rdm();
 }
 
-std::tuple<const ContainerTypes::VectorVariant&,
-           const ContainerTypes::VectorVariant&,
-           const ContainerTypes::VectorVariant&>
-SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<4>&
+SlaterDeterminantContainer::active_two_rdm() const {
   QDK_LOG_TRACE_ENTERING();
-  if (!_two_rdm_spin_dependent_aaaa || !_two_rdm_spin_dependent_bbbb ||
-      !_two_rdm_spin_dependent_aabb) {
+  if (!_active_two_rdm) {
     auto [alpha_occupations, beta_occupations] =
         get_active_orbital_occupations();
     if (_orbitals->get_active_space_indices().first.size() !=
@@ -251,19 +249,14 @@ SlaterDeterminantContainer::get_active_two_rdm_spin_dependent() const {
         }
       }
     }
-    _two_rdm_spin_dependent_aabb =
-        std::make_shared<ContainerTypes::VectorVariant>(
-            std::move(tmp_two_rdm_aabb));
-    _two_rdm_spin_dependent_aaaa =
-        std::make_shared<ContainerTypes::VectorVariant>(
-            std::move(tmp_two_rdm_aaaa));
-    _two_rdm_spin_dependent_bbbb =
-        std::make_shared<ContainerTypes::VectorVariant>(
-            std::move(tmp_two_rdm_bbbb));
+    const bool restricted =
+        _determinant.is_closed_shell() && _orbitals->is_restricted();
+    _active_two_rdm = std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+        std::in_place_type<SymmetryBlockedTensor<4, double>>,
+        make_spin_diagonal_rank4_sbt(tmp_two_rdm_aaaa, tmp_two_rdm_aabb,
+                                     tmp_two_rdm_bbbb, restricted));
   }
-  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
-                         std::cref(*_two_rdm_spin_dependent_aaaa),
-                         std::cref(*_two_rdm_spin_dependent_bbbb));
+  return WavefunctionContainer::active_two_rdm();
 }
 
 const ContainerTypes::MatrixVariant&
@@ -276,24 +269,21 @@ SlaterDeterminantContainer::get_active_one_rdm_spin_traced() const {
           "Spin traced 1-RDM not implemented for different alpha and beta "
           "active space sizes");
     }
-    if (_one_rdm_spin_dependent_aa != nullptr &&
-        _one_rdm_spin_dependent_bb != nullptr) {
-      _one_rdm_spin_traced = detail::add_matrix_variants(
-          *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
-    } else {
-      auto [alpha_occupations, beta_occupations] =
-          get_active_orbital_occupations();
-      size_t n_orbs = _orbitals->get_active_space_indices().first.size();
-      Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
-      for (size_t i = 0; i < alpha_occupations.size(); ++i) {
-        if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
-      }
-      for (size_t i = 0; i < beta_occupations.size(); ++i) {
-        if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
-      }
-      _one_rdm_spin_traced = std::make_shared<ContainerTypes::MatrixVariant>(
-          std::move(tmp_one_rdm));
+    if (_active_one_rdm != nullptr) {
+      return WavefunctionContainer::get_active_one_rdm_spin_traced();
     }
+    auto [alpha_occupations, beta_occupations] =
+        get_active_orbital_occupations();
+    size_t n_orbs = _orbitals->get_active_space_indices().first.size();
+    Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
+    for (size_t i = 0; i < alpha_occupations.size(); ++i) {
+      if (alpha_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
+    }
+    for (size_t i = 0; i < beta_occupations.size(); ++i) {
+      if (beta_occupations(i) > 0.0) tmp_one_rdm(i, i) += 1.0;
+    }
+    _one_rdm_spin_traced =
+        std::make_shared<ContainerTypes::MatrixVariant>(std::move(tmp_one_rdm));
   }
   return *_one_rdm_spin_traced;
 }

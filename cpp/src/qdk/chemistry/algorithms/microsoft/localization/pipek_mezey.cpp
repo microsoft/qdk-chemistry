@@ -95,7 +95,10 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
   };
 
   // Construct the localized orbitals object
-  auto [coeffs_alpha, coeffs_beta] = orbitals->get_coefficients();
+  const auto& coeffs_alpha = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& coeffs_beta =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
 
   if (not orbitals->is_restricted()) {
     // Alpha spin channel - localize selected orbitals

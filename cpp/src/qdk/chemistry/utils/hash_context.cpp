@@ -291,4 +291,9 @@ std::string HashContext::hexdigest(size_t truncate_chars) const {
   return full_hash;
 }
 
+std::size_t HashContext::hash_code() const {
+  const std::string prefix = hexdigest(sizeof(std::size_t) * 2);
+  return static_cast<std::size_t>(std::stoull(prefix, nullptr, 16));
+}
+
 }  // namespace qdk::chemistry::utils

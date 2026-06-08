@@ -180,17 +180,22 @@ double Ansatz::calculate_energy() const {
   // Unrestricted case
   else {
     // Use spin-dependent RDMs for unrestricted case
-    const auto& [rdm1_aa_var, rdm1_bb_var] =
-        _wavefunction->get_active_one_rdm_spin_dependent();
-    const auto& [rdm2_aabb_var, rdm2_aaaa_var, rdm2_bbbb_var] =
-        _wavefunction->get_active_two_rdm_spin_dependent();
+    const auto& rdm1_sbt = std::get<SymmetryBlockedTensor<2, double>>(
+        _wavefunction->active_one_rdm());
+    const auto& rdm2_sbt = std::get<SymmetryBlockedTensor<4, double>>(
+        _wavefunction->active_two_rdm());
 
-    // Extract RDM matrices/vectors from variants
-    const auto& rdm1_aa = std::get<Eigen::MatrixXd>(rdm1_aa_var);
-    const auto& rdm1_bb = std::get<Eigen::MatrixXd>(rdm1_bb_var);
-    const auto& rdm2_aabb = std::get<Eigen::VectorXd>(rdm2_aabb_var);
-    const auto& rdm2_aaaa = std::get<Eigen::VectorXd>(rdm2_aaaa_var);
-    const auto& rdm2_bbbb = std::get<Eigen::VectorXd>(rdm2_bbbb_var);
+    // Extract RDM blocks from the symmetry-blocked tensors
+    const Eigen::MatrixXd& rdm1_aa =
+        rdm1_sbt.block({axes::alpha(), axes::alpha()});
+    const Eigen::MatrixXd& rdm1_bb =
+        rdm1_sbt.block({axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aabb = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+    const Eigen::VectorXd& rdm2_aaaa = rdm2_sbt.block(
+        {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+    const Eigen::VectorXd& rdm2_bbbb = rdm2_sbt.block(
+        {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
 
     // get one body integrals from hamiltonian
     const auto& [h1_alpha, h1_beta] = _hamiltonian->get_one_body_integrals();
@@ -383,10 +388,14 @@ void Ansatz::validate_orbital_consistency() const {
 
   // Compare orbital coefficients numerically
 
-  const auto& [ham_coeffs_alpha, ham_coeffs_beta] =
-      ham_orbitals.get_coefficients();
-  const auto& [wf_coeffs_alpha, wf_coeffs_beta] =
-      wf_orbitals.get_coefficients();
+  const auto& ham_coeffs_alpha =
+      ham_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& ham_coeffs_beta =
+      ham_orbitals.coefficients()->block({axes::beta(), axes::beta()});
+  const auto& wf_coeffs_alpha =
+      wf_orbitals.coefficients()->block({axes::alpha(), axes::alpha()});
+  const auto& wf_coeffs_beta =
+      wf_orbitals.coefficients()->block({axes::beta(), axes::beta()});
 
   // Check alpha coefficients
   if (ham_coeffs_alpha.rows() != wf_coeffs_alpha.rows() ||
@@ -424,10 +433,14 @@ void Ansatz::validate_orbital_consistency() const {
   if (ham_orbitals.has_energies() && wf_orbitals.has_energies()) {
     constexpr double energy_tolerance = 1e-12;
 
-    const auto& [ham_energies_alpha, ham_energies_beta] =
-        ham_orbitals.get_energies();
-    const auto& [wf_energies_alpha, wf_energies_beta] =
-        wf_orbitals.get_energies();
+    const auto& ham_energies_alpha =
+        ham_orbitals.energies()->block({axes::alpha()});
+    const auto& ham_energies_beta =
+        ham_orbitals.energies()->block({axes::beta()});
+    const auto& wf_energies_alpha =
+        wf_orbitals.energies()->block({axes::alpha()});
+    const auto& wf_energies_beta =
+        wf_orbitals.energies()->block({axes::beta()});
 
     // Check alpha energies
     if (ham_energies_alpha.size() != wf_energies_alpha.size()) {

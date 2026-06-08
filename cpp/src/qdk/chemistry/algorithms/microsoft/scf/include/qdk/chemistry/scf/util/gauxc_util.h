@@ -8,6 +8,7 @@
 #include <functional>
 #include <gauxc/enums.hpp>
 #include <gauxc/grid_factory.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <string>
 
 namespace qdk::chemistry::scf {
@@ -175,8 +176,8 @@ struct GAUXCInput {
  * containers. This is useful for caching GauXC integrators with specific
  * configurations.
  *
- * The hash function combines all GAUXCInput fields using the golden ratio
- * hash constant (0x9e3779b9) to minimize hash collisions.
+ * The hash function streams all GAUXCInput fields through HashContext and
+ * returns a std::hash-compatible size_t value for local hash tables.
  */
 namespace std {
 template <>
@@ -184,45 +185,44 @@ struct hash<qdk::chemistry::scf::GAUXCInput> {
   /**
    * @brief Compute hash value for GAUXCInput
    *
-   * Combines hashes of all GAUXCInput members using the golden ratio method
-   * from Boost. Handles both enum and non-enum types appropriately.
+   * Hashes all GAUXCInput members through HashContext. Handles both enum and
+   * non-enum types appropriately.
    *
    * @param input GAUXCInput instance to hash
    * @return size_t Hash value combining all configuration parameters
    */
-  size_t operator()(
-      const qdk::chemistry::scf::GAUXCInput& input) const noexcept {
-    // 0x9e3779b9 is the golden ratio hash constant from Boost
-    constexpr size_t HASH_CONSTANT = 0x9e3779b9;
-
-    // Lambda to handle hash combining with a unified approach
-    auto hash_combine = [&](size_t& seed, const auto& value) {
+  size_t operator()(const qdk::chemistry::scf::GAUXCInput& input) const {
+    qdk::chemistry::utils::HashContext ctx;
+    ctx.update("gauxc_input");
+    auto update_hash = [&](const auto& value) {
       using ValueType = std::decay_t<decltype(value)>;
       if constexpr (std::is_enum_v<ValueType>) {
-        seed ^= std::hash<int>{}(static_cast<int>(value)) + HASH_CONSTANT +
-                (seed << 6) + (seed >> 2);
+        ctx.update(static_cast<int64_t>(value));
+      } else if constexpr (std::is_floating_point_v<ValueType>) {
+        ctx.update(static_cast<double>(value));
+      } else if constexpr (std::is_integral_v<ValueType> &&
+                           std::is_signed_v<ValueType>) {
+        ctx.update(static_cast<int64_t>(value));
+      } else if constexpr (std::is_integral_v<ValueType>) {
+        ctx.update(static_cast<uint64_t>(value));
       } else {
-        seed ^= std::hash<ValueType>{}(value) + HASH_CONSTANT + (seed << 6) +
-                (seed >> 2);
+        ctx.update(std::string(value));
       }
     };
 
-    size_t seed = 0;
+    update_hash(input.grid_spec);
+    update_hash(input.rad_quad_spec);
+    update_hash(input.prune_spec);
+    update_hash(input.basis_tol);
+    update_hash(input.batch_size);
+    update_hash(input.integrator_kernel);
+    update_hash(input.lwd_kernel);
+    update_hash(input.reduction_kernel);
+    update_hash(input.integrator_ex);
+    update_hash(input.loadbalancer_ex);
+    update_hash(input.weights_ex);
 
-    // Apply hash_combine to each field of GAUXCInput
-    hash_combine(seed, input.grid_spec);
-    hash_combine(seed, input.rad_quad_spec);
-    hash_combine(seed, input.prune_spec);
-    hash_combine(seed, input.basis_tol);
-    hash_combine(seed, input.batch_size);
-    hash_combine(seed, input.integrator_kernel);
-    hash_combine(seed, input.lwd_kernel);
-    hash_combine(seed, input.reduction_kernel);
-    hash_combine(seed, input.integrator_ex);
-    hash_combine(seed, input.loadbalancer_ex);
-    hash_combine(seed, input.weights_ex);
-
-    return seed;
+    return ctx.hash_code();
   }
 };
 }  // namespace std

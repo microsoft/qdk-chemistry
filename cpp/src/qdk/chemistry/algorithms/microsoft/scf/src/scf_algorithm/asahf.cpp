@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/config.h>
 
 #include <qdk/chemistry/constants.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -210,56 +211,43 @@ bool BasisEqChecker::operator()(const BasisSet& a,
   return true;
 }
 
-/**
- * @brief Combine the hash of a value into an existing hash seed
- * @tparam T Type of the value to hash
- * @param seed Existing hash seed
- * @param v Value to hash and combine
- * @return Combined hash value
- */
-template <typename T>
-size_t hash_combine(size_t seed, const T& v) {
-  using value_type = std::decay_t<T>;
-  seed ^= std::hash<value_type>()(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-  return seed;
-}
-
 size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
-  size_t hash = 0;
+  qdk::chemistry::utils::HashContext ctx;
+  ctx.update("basis_set");
   // mol only has one atom, hash atomic number
-  hash = hash_combine(hash, basis.mol->atomic_nums[0]);
+  ctx.update(static_cast<int64_t>(basis.mol->atomic_nums[0]));
 
   // hash basis set
-  hash = hash_combine(hash, basis.n_ecp_electrons);
-  hash = hash_combine(hash, basis.pure);
-  hash = hash_combine(hash, basis.num_atomic_orbitals);
-  hash = hash_combine(hash, basis.shells.size());
-  hash = hash_combine(hash, basis.ecp_shells.size());
-  hash = hash_combine(hash, basis.element_ecp_electrons.size());
+  ctx.update(static_cast<uint64_t>(basis.n_ecp_electrons));
+  ctx.update(basis.pure);
+  ctx.update(static_cast<uint64_t>(basis.num_atomic_orbitals));
+  ctx.update(static_cast<uint64_t>(basis.shells.size()));
+  ctx.update(static_cast<uint64_t>(basis.ecp_shells.size()));
+  ctx.update(static_cast<uint64_t>(basis.element_ecp_electrons.size()));
 
   // hash shells
   for (const auto& shell : basis.shells) {
-    hash = hash_combine(hash, shell.angular_momentum);
-    hash = hash_combine(hash, shell.contraction);
+    ctx.update(static_cast<int64_t>(shell.angular_momentum));
+    ctx.update(static_cast<uint64_t>(shell.contraction));
     for (size_t j = 0; j < shell.contraction; ++j) {
-      hash = hash_combine(hash, shell.exponents[j]);
-      hash = hash_combine(hash, shell.coefficients[j]);
-      hash = hash_combine(hash, shell.rpowers[j]);
+      ctx.update(shell.exponents[j]);
+      ctx.update(shell.coefficients[j]);
+      ctx.update(static_cast<int64_t>(shell.rpowers[j]));
     }
   }
 
   // hash ecp shells
   for (const auto& shell : basis.ecp_shells) {
-    hash = hash_combine(hash, shell.angular_momentum);
-    hash = hash_combine(hash, shell.contraction);
+    ctx.update(static_cast<int64_t>(shell.angular_momentum));
+    ctx.update(static_cast<uint64_t>(shell.contraction));
     for (size_t j = 0; j < shell.contraction; ++j) {
-      hash = hash_combine(hash, shell.exponents[j]);
-      hash = hash_combine(hash, shell.coefficients[j]);
-      hash = hash_combine(hash, shell.rpowers[j]);
+      ctx.update(shell.exponents[j]);
+      ctx.update(shell.coefficients[j]);
+      ctx.update(static_cast<int64_t>(shell.rpowers[j]));
     }
   }
 
-  return hash;
+  return ctx.hash_code();
 }
 
 }  // namespace detail

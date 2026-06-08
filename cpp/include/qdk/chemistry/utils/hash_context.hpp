@@ -132,6 +132,10 @@ class HashContext {
   /// @param truncate_chars Number of hex characters to return (default 16)
   std::string hexdigest(size_t truncate_chars = 16) const;
 
+  /// Finalize and return the leading digest bytes as a size_t hash code.
+  /// Intended for std::hash-compatible local hash tables.
+  std::size_t hash_code() const;
+
  private:
   // SHA-256 state
   std::array<uint32_t, 8> _state;
