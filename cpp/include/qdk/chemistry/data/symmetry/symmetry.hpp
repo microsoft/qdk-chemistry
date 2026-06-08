@@ -565,7 +565,7 @@ class SymmetryLabel {
 
  public:
   /** @brief Construct a trivial (empty) label with no axis values. */
-  SymmetryLabel() : _hash(0) {}
+  SymmetryLabel() : _hash(_compute_hash(_values)) {}
 
   /**
    * @brief Construct from a brace-enclosed list of axis values.
