@@ -25,6 +25,13 @@ __all__ = ["VerstraeteCiracQubitMapper", "build_vc_majorana_mapping"]
 
 
 def _pauli_str(n_qubits: int, ops: dict) -> str:
+    """Build a Pauli string in QDK/Chemistry little-endian convention.
+
+    String position 0 (leftmost) = qubit n_qubits-1 (most significant).
+    String position -1 (rightmost) = qubit 0 (least significant).
+    So qubit index qi maps to string position n_qubits - 1 - qi.
+    This matches the convention used by QubitHamiltonian.to_matrix().
+    """
     chars = ["I"] * n_qubits
     for qi, op in ops.items():
         chars[n_qubits - 1 - qi] = op
@@ -93,7 +100,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
     def name(self):
         return "verstraete-cirac"
 
-    def _run_impl(self, hamiltonian: "Hamiltonian", symmetries=None) -> QubitHamiltonian:
+    def _run_impl(self, hamiltonian: "Hamiltonian", mapping: "MajoranaMapping | None" = None) -> QubitHamiltonian:
         """Build the VC qubit Hamiltonian.
 
         For VC Majorana Gamma_{2n} = JW_{2n} . Z_{an}:
@@ -107,7 +114,21 @@ class VerstraeteCiracQubitMapper(QubitMapper):
         threshold = self._threshold
         integral_threshold = self._integral_threshold
 
-        h1_alpha, _ = hamiltonian.get_one_body_integrals()
+        if mapping is not None and mapping is not self._mapping:
+            raise ValueError(
+                "The supplied mapping does not match the mapper's internal "
+                "VC mapping. Pass mapper.mapping or omit the argument."
+            )
+        h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+        import numpy as _np
+        if h1_beta is not None and not _np.allclose(
+            h1_beta, h1_alpha, atol=self._integral_threshold
+        ):
+            raise ValueError(
+                "VerstraeteCiracQubitMapper only supports restricted "
+                "(spin-symmetric) one-body Hamiltonians. A non-trivial "
+                "beta-spin channel was detected."
+            )
         n_sites = h1_alpha.shape[0]
         n_rows, n_cols = self._lattice_shape
 
@@ -129,7 +150,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
             pauli_strs.append(_pauli_str(n_qubits, ops))
             coeffs.append(coeff)
 
-        # Diagonal: h_{nn} * n_n = h_{nn}/2 * (I + Z_{pn})
+        # Diagonal: h_{nn} * n_n = h_{nn}/2 * (I - Z_{pn})
         const = 0.0
         for n in range(N):
             h_nn = float(h1_alpha[n, n].real)
