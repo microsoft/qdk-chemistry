@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
+#include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
@@ -92,6 +93,35 @@ TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
 
   EXPECT_NEAR(energy, -74.9630631297275, testing::scf_energy_tolerance);
   EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPrefersExternalInstability) {
+  auto n2 = testing::create_stretched_n2_structure(1.6);
+
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [_regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  auto stability_checker = StabilityCheckerFactory::create("qdk");
+  stability_checker->settings().set("internal", true);
+  stability_checker->settings().set("external", true);
+  auto [regular_is_stable, regular_stability_result] =
+      stability_checker->run(regular_wavefunction);
+
+  EXPECT_FALSE(regular_stability_result->is_internal_stable());
+  EXPECT_FALSE(regular_stability_result->is_external_stable());
+  EXPECT_FALSE(regular_is_stable);
+
+  auto stabilized_scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  stabilized_scf_solver->settings().set("method", "hf");
+  stabilized_scf_solver->settings().set("max_stability_iterations", 1);
+  stabilized_scf_solver->settings().set("fail_on_unstable", false);
+  auto [stabilized_energy, stabilized_wavefunction] =
+      stabilized_scf_solver->run(n2, 0, 1, "def2-svp");
+
+  EXPECT_LT(stabilized_energy, _regular_energy);
+  EXPECT_FALSE(stabilized_wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, Water) {

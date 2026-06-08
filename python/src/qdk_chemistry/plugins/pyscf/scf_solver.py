@@ -400,10 +400,11 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
 
         max_iterations = self._settings.get("max_stability_iterations")
         check_internal = self._settings.get("check_internal")
-        check_external = self._settings.get("check_external")
+        check_external_setting = self._settings.get("check_external")
 
         is_stable = False
         for _ in range(max_iterations):
+            check_external = check_external_setting and self._can_check_external_stability(mf)
             stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
             mo_internal, mo_external, internal_stable, external_stable = self._unpack_stability(stability)
 
@@ -411,17 +412,17 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
             if is_stable:
                 break
 
-            if check_internal and not internal_stable and mo_internal is not None:
-                dm0 = mf.make_rdm1(mo_internal, mf.mo_occ)
-                energy = mf.kernel(dm0=dm0)
-            elif check_external and not external_stable and mo_external is not None:
+            if check_external and not external_stable and mo_external is not None:
                 mf = self._convert_to_unrestricted(mf)
                 dm0 = self._make_external_density(mf, mo_external)
                 energy = mf.kernel(dm0=dm0)
-                check_external = False
+            elif check_internal and not internal_stable and mo_internal is not None:
+                dm0 = mf.make_rdm1(mo_internal, mf.mo_occ)
+                energy = mf.kernel(dm0=dm0)
             else:
                 break
         else:
+            check_external = check_external_setting and self._can_check_external_stability(mf)
             stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
             _, _, internal_stable, external_stable = self._unpack_stability(stability)
             is_stable = (not check_internal or internal_stable) and (not check_external or external_stable)
@@ -457,6 +458,14 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
         if hasattr(scf.addons, "convert_to_uhf"):
             return scf.addons.convert_to_uhf(mf)
         raise RuntimeError("PySCF does not provide convert_to_uhf for external stability reruns.")
+
+    @staticmethod
+    def _can_check_external_stability(mf) -> bool:
+        """Return whether PySCF external stability is applicable for this reference."""
+        if isinstance(mf, scf.uhf.UHF):
+            return False
+        nalpha, nbeta = mf.mol.nelec
+        return nalpha == nbeta
 
     @staticmethod
     def _make_external_density(mf, mo_external):

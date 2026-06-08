@@ -29,6 +29,15 @@ void copy_common_scf_settings(const data::Settings& source,
   }
 }
 
+bool can_check_external_stability(
+    const std::shared_ptr<data::Wavefunction>& wavefunction) {
+  if (!wavefunction->get_orbitals()->is_restricted()) {
+    return false;
+  }
+  auto [num_alpha, num_beta] = wavefunction->get_total_num_electrons();
+  return num_alpha == num_beta;
+}
+
 }  // namespace
 
 StabilizedScfSettings::StabilizedScfSettings()
@@ -109,9 +118,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
   for (int64_t iteration = 0; iteration < max_stability_iterations;
        ++iteration) {
-    const bool is_restricted =
-        wavefunction->get_orbitals()->is_restricted() && spin_multiplicity == 1;
-    const bool check_external = check_external_setting && is_restricted;
+    const bool check_external =
+        check_external_setting && can_check_external_stability(wavefunction);
     auto stability_checker = create_stability_checker(check_external);
 
     std::shared_ptr<data::StabilityResult> result;
@@ -122,13 +130,13 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
 
     bool do_external = false;
     Eigen::VectorXd rotation_vector;
-    if (!result->is_internal_stable()) {
-      rotation_vector =
-          result->get_smallest_internal_eigenvalue_and_vector().second;
-    } else if (!result->is_external_stable() && result->has_external_result()) {
+    if (!result->is_external_stable() && result->has_external_result()) {
       rotation_vector =
           result->get_smallest_external_eigenvalue_and_vector().second;
       do_external = true;
+    } else if (!result->is_internal_stable()) {
+      rotation_vector =
+          result->get_smallest_internal_eigenvalue_and_vector().second;
     } else {
       throw std::runtime_error(
           "Stability checker reported an unstable wavefunction without an "
@@ -150,10 +158,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   }
 
   if (max_stability_iterations > 0) {
-    const bool is_restricted =
-        wavefunction->get_orbitals()->is_restricted() && spin_multiplicity == 1;
-    auto stability_checker =
-        create_stability_checker(check_external_setting && is_restricted);
+    auto stability_checker = create_stability_checker(
+        check_external_setting && can_check_external_stability(wavefunction));
     std::tie(is_stable, std::ignore) = stability_checker->run(wavefunction);
   }
 

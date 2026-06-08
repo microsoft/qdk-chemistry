@@ -60,7 +60,9 @@ E_scf3, wfn3 = scf_solver.run(
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("scf_solver"))  # ['qdk', 'qdk_stabilized', ...]
+print(
+    registry.available("scf_solver")
+)  # ['qdk', 'qdk_stabilized', 'pyscf', 'pyscf_stabilized', ...]
 # end-cell-list-implementations
 ################################################################################
 
