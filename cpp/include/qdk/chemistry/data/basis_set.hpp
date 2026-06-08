@@ -11,7 +11,9 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -302,6 +304,32 @@ class BasisSet : public DataClass,
            AOType basis_type = AOType::Spherical);
 
   /**
+   * @brief Constructor with explicit atomic-orbital (AO) symmetries
+   *
+   * Use this overload to block the AO basis under a non-default
+   * @ref SymmetryProduct. The default (used by every other constructor) is a
+   * restricted spin axis (@c axes::spin(1, true)) whose
+   * @f$\alpha@f$/@f$\beta@f$ labels each carry an extent equal to
+   * @ref get_num_atomic_orbitals().
+   *
+   * @param name Name of the basis set
+   * @param shells Vector of shells to initialize the basis set with
+   * @param structure The molecular structure
+   * @param ao_symmetries Symmetry definitions the AO basis is blocked under
+   * @param ao_extents Per-label AO extents; if empty, defaults to
+   *        @ref get_num_atomic_orbitals() for every admissible label
+   * @param atomic_orbital_type Whether to use spherical or cartesian atomic
+   *        orbitals
+   * @throws std::invalid_argument if extents are inadmissible or violate
+   *         symmetry aliasing
+   */
+  BasisSet(const std::string& name, const std::vector<Shell>& shells,
+           std::shared_ptr<Structure> structure,
+           std::shared_ptr<const SymmetryProduct> ao_symmetries,
+           std::unordered_map<SymmetryLabel, std::size_t> ao_extents = {},
+           AOType atomic_orbital_type = AOType::Spherical);
+
+  /**
    * @brief Default destructor
    */
   virtual ~BasisSet() = default;
@@ -522,6 +550,34 @@ class BasisSet : public DataClass,
    * @return Total number of atomic orbitals
    */
   size_t get_num_atomic_orbitals() const;
+
+  /**
+   * @brief Symmetry definitions the atomic-orbital basis is blocked under
+   *
+   * Returns the AO-basis symmetries. This is distinct from
+   * @ref Orbitals::symmetries(), which returns the MO-basis symmetries — AOs
+   * and MOs live in different single-particle bases and may carry different
+   * SymmetryProduct instances (e.g. an intertwiner stored on @ref Orbitals
+   * carries AO symmetries on one slot and MO symmetries on the other). The @c
+   * ao_ prefix exists to keep this distinction explicit on classes that touch
+   * both bases.
+   *
+   * Defaults to a restricted spin axis (@c axes::spin(1, true)). Override at
+   * construction with the AO-symmetries constructor overload.
+   *
+   * @return Shared pointer to the AO @ref SymmetryProduct
+   */
+  std::shared_ptr<const SymmetryProduct> ao_symmetries() const;
+
+  /**
+   * @brief Per-label extents of the atomic-orbital basis.
+   *
+   * Maps each admissible @ref SymmetryLabel to the number of atomic orbitals it
+   * carries.
+   *
+   * @return Map from AO symmetry label to extent
+   */
+  const std::unordered_map<SymmetryLabel, std::size_t>& ao_extents() const;
 
   /**
    * @brief Get the atom index for a atomic orbital
@@ -818,6 +874,12 @@ class BasisSet : public DataClass,
   /// Number of ECP electrons replaced for each atom
   std::vector<size_t> _ecp_electrons;
 
+  /// Symmetry definitions the AO basis is blocked under.
+  std::shared_ptr<const SymmetryProduct> _ao_symmetries;
+
+  /// Per-label AO extents.
+  std::unordered_map<SymmetryLabel, std::size_t> _ao_extents;
+
   /// Lazily computed cache for atomic orbital to atom mapping
   mutable std::vector<size_t> _basis_to_atom_map;
 
@@ -841,6 +903,27 @@ class BasisSet : public DataClass,
    * @return True if basis set is valid
    */
   bool _is_valid() const;
+
+  /**
+   * @brief Populate @c _ao_symmetries and @c _ao_extents from the
+   * supplied values, defaulting to a restricted-spin axis with
+   * @ref get_num_atomic_orbitals() extent per label when @p ao_symmetries
+   * is null.
+   * @param ao_symmetries Override AO symmetries, or null for default.
+   * @param ao_extents Per-label extents, or empty to default from
+   *        @ref get_num_atomic_orbitals().
+   * @throws std::invalid_argument on validation failure.
+   */
+  void _init_ao_symmetries(
+      std::shared_ptr<const SymmetryProduct> ao_symmetries,
+      std::unordered_map<SymmetryLabel, std::size_t> ao_extents);
+
+  /**
+   * @brief Validate that @c _ao_extents keys are admissible and satisfy
+   * symmetry aliasing under @c _ao_symmetries.
+   * @throws std::invalid_argument on violation
+   */
+  void _validate_ao_symmetries() const;
 
   /**
    * @brief Validate consistency with the associated molecular structure

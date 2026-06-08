@@ -329,4 +329,26 @@ void save_vector_variant_to_group(
   }
 }
 
+void save_matrix_variant_to_group_with_complex_attr(
+    const std::shared_ptr<MatrixVariant>& matrix_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name) {
+  bool is_complex = std::holds_alternative<Eigen::MatrixXcd>(*matrix_variant);
+  H5::Attribute attr = group.createAttribute(
+      complex_attr_name, H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  save_matrix_variant_to_group(is_complex, matrix_variant, group, storage_name);
+  hbool_t flag = is_complex ? 1 : 0;
+  attr.write(H5::PredType::NATIVE_HBOOL, &flag);
+}
+
+void save_vector_variant_to_group_with_complex_attr(
+    const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name) {
+  bool is_complex = std::holds_alternative<Eigen::VectorXcd>(*vector_variant);
+  H5::Attribute attr = group.createAttribute(
+      complex_attr_name, H5::PredType::NATIVE_HBOOL, H5::DataSpace(H5S_SCALAR));
+  save_vector_variant_to_group(is_complex, vector_variant, group, storage_name);
+  hbool_t flag = is_complex ? 1 : 0;
+  attr.write(H5::PredType::NATIVE_HBOOL, &flag);
+}
+
 }  // namespace qdk::chemistry::data

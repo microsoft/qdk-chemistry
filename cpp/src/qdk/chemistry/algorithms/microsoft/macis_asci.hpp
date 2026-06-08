@@ -137,7 +137,12 @@ class MacisAsciSettings : public MacisSettings {
         data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
 
     // Core selection strategy parameter
-    set_default<std::string>("core_selection_strategy", "percentage");
+    set_default<std::string>(
+        "core_selection_strategy", "percentage",
+        "Core determinant selection strategy: 'percentage' uses cumulative "
+        "weight threshold, 'fixed' uses a fixed number of determinants",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"percentage", "fixed"}}});
     set_default<double>("core_selection_threshold",
                         macis_defaults.core_selection_threshold,
                         "Cumulative weight threshold for core selection",

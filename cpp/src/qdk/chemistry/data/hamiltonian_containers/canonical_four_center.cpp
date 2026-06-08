@@ -24,20 +24,14 @@ CanonicalFourCenterHamiltonianContainer::
         const Eigen::VectorXd& two_body_integrals,
         std::shared_ptr<Orbitals> orbitals, double core_energy,
         const Eigen::MatrixXd& inactive_fock_matrix, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
-                           inactive_fock_matrix, type),
-      _two_body_integrals(
-          make_restricted_two_body_integrals(two_body_integrals)) {
+    : CanonicalFourCenterHamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals, one_body_integrals,
+                                       /*restricted=*/true),
+          make_spin_diagonal_rank4_sbt(two_body_integrals), orbitals,
+          core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix, Eigen::MatrixXd{}),
+          type) {
   QDK_LOG_TRACE_ENTERING();
-
-  validate_integral_dimensions();
-  validate_restrictedness_consistency();
-  validate_active_space_dimensions();
-
-  if (!is_valid()) {
-    throw std::invalid_argument(
-        "Tried to generate invalid Hamiltonian object.");
-  }
 }
 
 CanonicalFourCenterHamiltonianContainer::
@@ -50,13 +44,31 @@ CanonicalFourCenterHamiltonianContainer::
         std::shared_ptr<Orbitals> orbitals, double core_energy,
         const Eigen::MatrixXd& inactive_fock_matrix_alpha,
         const Eigen::MatrixXd& inactive_fock_matrix_beta, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
-                           orbitals, core_energy, inactive_fock_matrix_alpha,
-                           inactive_fock_matrix_beta, type),
-      _two_body_integrals(
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aaaa),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_aabb),
-          std::make_unique<Eigen::VectorXd>(two_body_integrals_bbbb)) {
+    : CanonicalFourCenterHamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals_alpha,
+                                       one_body_integrals_beta,
+                                       /*restricted=*/false),
+          make_spin_diagonal_rank4_sbt(two_body_integrals_aaaa,
+                                       two_body_integrals_aabb,
+                                       two_body_integrals_bbbb,
+                                       /*restricted=*/false),
+          orbitals, core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix_alpha,
+                                       inactive_fock_matrix_beta),
+          type) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+CanonicalFourCenterHamiltonianContainer::
+    CanonicalFourCenterHamiltonianContainer(
+        SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<4> two_body,
+        std::shared_ptr<Orbitals> orbitals, double core_energy,
+        std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
+        HamiltonianType type)
+    : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
+                           std::move(inactive_fock), type),
+      _two_body(std::make_shared<const SymmetryBlockedTensor<4>>(
+          std::move(two_body))) {
   QDK_LOG_TRACE_ENTERING();
 
   validate_integral_dimensions();
@@ -72,16 +84,10 @@ CanonicalFourCenterHamiltonianContainer::
 std::unique_ptr<HamiltonianContainer>
 CanonicalFourCenterHamiltonianContainer::clone() const {
   QDK_LOG_TRACE_ENTERING();
-  if (is_restricted()) {
-    return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-        *_one_body_integrals.first, *std::get<0>(_two_body_integrals),
-        _orbitals, _core_energy, *_inactive_fock_matrix.first, _type);
-  }
+  // SBT is immutable and shared via shared_ptr; pass the existing containers
+  // straight through (no per-block copy or v1 round-trip needed).
   return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-      *_one_body_integrals.first, *_one_body_integrals.second,
-      *std::get<0>(_two_body_integrals), *std::get<1>(_two_body_integrals),
-      *std::get<2>(_two_body_integrals), _orbitals, _core_energy,
-      *_inactive_fock_matrix.first, *_inactive_fock_matrix.second, _type);
+      *_one_body, *_two_body, _orbitals, _core_energy, _inactive_fock, _type);
 }
 
 std::string CanonicalFourCenterHamiltonianContainer::get_container_type()
@@ -97,9 +103,14 @@ CanonicalFourCenterHamiltonianContainer::get_two_body_integrals() const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Two-body integrals are not set");
   }
-  return std::make_tuple(std::cref(*std::get<0>(_two_body_integrals)),
-                         std::cref(*std::get<1>(_two_body_integrals)),
-                         std::cref(*std::get<2>(_two_body_integrals)));
+
+  return std::make_tuple(
+      std::cref(_two_body->block(
+          {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})),
+      std::cref(_two_body->block(
+          {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})),
+      std::cref(_two_body->block(
+          {axes::beta(), axes::beta(), axes::beta(), axes::beta()})));
 }
 
 double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
@@ -117,14 +128,16 @@ double CanonicalFourCenterHamiltonianContainer::get_two_body_element(
 
   size_t index = get_two_body_index(i, j, k, l);
 
-  // Select the appropriate integral based on spin channel
   switch (channel) {
     case SpinChannel::aaaa:
-      return (*std::get<0>(_two_body_integrals))[index];
+      return _two_body->block(
+          {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})[index];
     case SpinChannel::aabb:
-      return (*std::get<1>(_two_body_integrals))[index];
+      return _two_body->block(
+          {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})[index];
     case SpinChannel::bbbb:
-      return (*std::get<2>(_two_body_integrals))[index];
+      return _two_body->block(
+          {axes::beta(), axes::beta(), axes::beta(), axes::beta()})[index];
     default:
       throw std::invalid_argument("Invalid spin channel");
   }
@@ -139,21 +152,27 @@ size_t CanonicalFourCenterHamiltonianContainer::get_two_body_index(
 
 bool CanonicalFourCenterHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return std::get<0>(_two_body_integrals) != nullptr &&
-         std::get<0>(_two_body_integrals)->size() > 0;
+  return _two_body != nullptr;
 }
 
 bool CanonicalFourCenterHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
-  // Hamiltonian is restricted if alpha and beta components point to the same
-  // data
-  return (_one_body_integrals.first == _one_body_integrals.second) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<1>(_two_body_integrals)) &&
-         (std::get<0>(_two_body_integrals) ==
-          std::get<2>(_two_body_integrals)) &&
-         (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
-          (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
+
+  bool h1_restricted =
+      !_one_body || _one_body->all_aliased({{{axes::alpha(), axes::alpha()},
+                                             {axes::beta(), axes::beta()}}});
+  bool fock_restricted =
+      !_inactive_fock ||
+      _inactive_fock->all_aliased(
+          {{{axes::alpha(), axes::alpha()}, {axes::beta(), axes::beta()}}});
+  bool h2_restricted =
+      !_two_body ||
+      _two_body->all_aliased(
+          {{{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()},
+            {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()},
+            {axes::beta(), axes::beta(), axes::beta(), axes::beta()}}});
+
+  return h1_restricted && h2_restricted && fock_restricted;
 }
 
 bool CanonicalFourCenterHamiltonianContainer::is_valid() const {
@@ -176,54 +195,63 @@ bool CanonicalFourCenterHamiltonianContainer::is_valid() const {
 void CanonicalFourCenterHamiltonianContainer::validate_integral_dimensions()
     const {
   QDK_LOG_TRACE_ENTERING();
-  // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
 
   if (!has_two_body_integrals()) {
     return;
   }
 
-  // Check two-body integrals dimensions
-  size_t norb_alpha = _one_body_integrals.first->rows();
+  size_t norb_alpha = static_cast<size_t>(
+      _one_body->block({axes::alpha(), axes::alpha()}).rows());
   size_t expected_size = norb_alpha * norb_alpha * norb_alpha * norb_alpha;
 
-  // Check alpha-alpha integrals
-  if (static_cast<size_t>(std::get<0>(_two_body_integrals)->size()) !=
-      expected_size) {
+  const auto& aaaa = _two_body->block(
+      {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+  if (static_cast<size_t>(aaaa.size()) != expected_size) {
     throw std::invalid_argument(
-        "Alpha-alpha two-body integrals size (" +
-        std::to_string(std::get<0>(_two_body_integrals)->size()) +
+        "Alpha-alpha two-body integrals size (" + std::to_string(aaaa.size()) +
         ") does not match expected size (" + std::to_string(expected_size) +
         ") for " + std::to_string(norb_alpha) + " orbitals");
   }
 
   // Check alpha-beta integrals (if different from alpha-alpha)
-  if (std::get<1>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<size_t>(std::get<1>(_two_body_integrals)->size()) !=
-        expected_size) {
+  if (!_two_body->all_aliased(
+          {{{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()},
+            {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()}}})) {
+    const auto& aabb = _two_body->block(
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()});
+    if (static_cast<size_t>(aabb.size()) != expected_size) {
       throw std::invalid_argument(
           "Alpha-beta two-body integrals size mismatch");
     }
   }
 
   // Check beta-beta integrals (if different from alpha-alpha)
-  if (std::get<2>(_two_body_integrals) != std::get<0>(_two_body_integrals)) {
-    if (static_cast<size_t>(std::get<2>(_two_body_integrals)->size()) !=
-        expected_size) {
+  if (!_two_body->all_aliased(
+          {{{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()},
+            {axes::beta(), axes::beta(), axes::beta(), axes::beta()}}})) {
+    const auto& bbbb = _two_body->block(
+        {axes::beta(), axes::beta(), axes::beta(), axes::beta()});
+    if (static_cast<size_t>(bbbb.size()) != expected_size) {
       throw std::invalid_argument("Beta-beta two-body integrals size mismatch");
     }
   }
 }
 
-std::tuple<std::shared_ptr<Eigen::VectorXd>, std::shared_ptr<Eigen::VectorXd>,
-           std::shared_ptr<Eigen::VectorXd>>
-CanonicalFourCenterHamiltonianContainer::make_restricted_two_body_integrals(
-    const Eigen::VectorXd& integrals) {
+const SymmetryBlockedTensor<4>&
+CanonicalFourCenterHamiltonianContainer::two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::VectorXd>(integrals);
-  return std::make_tuple(
-      shared_integrals, shared_integrals,
-      shared_integrals);  // aaaa, aabb, bbbb all point to same data
+  if (!_two_body) {
+    throw std::runtime_error("Two-body symmetry-blocked tensor is not set.");
+  }
+  return *_two_body;
+}
+
+const Eigen::VectorXd&
+CanonicalFourCenterHamiltonianContainer::two_body_integrals_block(
+    const SymmetryLabel& p, const SymmetryLabel& q, const SymmetryLabel& r,
+    const SymmetryLabel& s) const {
+  return two_body_integrals().block({p, q, r, s});
 }
 
 nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {
@@ -240,113 +268,22 @@ nlohmann::json CanonicalFourCenterHamiltonianContainer::to_json() const {
   j["core_energy"] = _core_energy;
   j["type"] =
       (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
-
-  // Store restrictedness information
   j["is_restricted"] = is_restricted();
 
-  // Store one-body integrals
-  if (has_one_body_integrals()) {
-    j["has_one_body_integrals"] = true;
-
-    // Store alpha one-body integrals
-    std::vector<std::vector<double>> one_body_alpha_vec;
-    for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _one_body_integrals.first->cols(); ++j_idx) {
-        row.push_back((*_one_body_integrals.first)(i, j_idx));
-      }
-      one_body_alpha_vec.push_back(row);
-    }
-    j["one_body_integrals_alpha"] = one_body_alpha_vec;
-
-    // Store beta one-body integrals (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> one_body_beta_vec;
-      for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _one_body_integrals.second->cols();
-             ++j_idx) {
-          row.push_back((*_one_body_integrals.second)(i, j_idx));
-        }
-        one_body_beta_vec.push_back(row);
-      }
-      j["one_body_integrals_beta"] = one_body_beta_vec;
-    }
-  } else {
-    j["has_one_body_integrals"] = false;
+  // Store integrals via SBT-direct serialization
+  if (_one_body) {
+    j["one_body_integrals"] = _one_body->to_json();
   }
-
-  // Store two-body integrals
-  if (has_two_body_integrals()) {
-    j["has_two_body_integrals"] = true;
-
-    // Store as object {"aaaa": [...], "aabb": [...], "bbbb": [...]}
-    nlohmann::json two_body_obj;
-
-    // Store aaaa
-    std::vector<double> two_body_aaaa_vec;
-    for (int i = 0; i < std::get<0>(_two_body_integrals)->size(); ++i) {
-      two_body_aaaa_vec.push_back((*std::get<0>(_two_body_integrals))(i));
-    }
-    two_body_obj["aaaa"] = two_body_aaaa_vec;
-
-    // Store aabb
-    std::vector<double> two_body_aabb_vec;
-    for (int i = 0; i < std::get<1>(_two_body_integrals)->size(); ++i) {
-      two_body_aabb_vec.push_back((*std::get<1>(_two_body_integrals))(i));
-    }
-    two_body_obj["aabb"] = two_body_aabb_vec;
-
-    // Store bbbb
-    std::vector<double> two_body_bbbb_vec;
-    for (int i = 0; i < std::get<2>(_two_body_integrals)->size(); ++i) {
-      two_body_bbbb_vec.push_back((*std::get<2>(_two_body_integrals))(i));
-    }
-    two_body_obj["bbbb"] = two_body_bbbb_vec;
-
-    j["two_body_integrals"] = two_body_obj;
-  } else {
-    j["has_two_body_integrals"] = false;
+  if (_two_body) {
+    j["two_body_integrals"] = _two_body->to_json();
   }
-
-  // Store inactive Fock matrix
-  if (has_inactive_fock_matrix()) {
-    j["has_inactive_fock_matrix"] = true;
-    // Store alpha inactive Fock matrix
-    std::vector<std::vector<double>> inactive_fock_alpha_vec;
-    for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
-           ++j_idx) {
-        row.push_back((*_inactive_fock_matrix.first)(i, j_idx));
-      }
-      inactive_fock_alpha_vec.push_back(row);
-    }
-    j["inactive_fock_matrix_alpha"] = inactive_fock_alpha_vec;
-
-    // Store beta inactive Fock matrix (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> inactive_fock_beta_vec;
-      for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _inactive_fock_matrix.second->cols();
-             ++j_idx) {
-          row.push_back((*_inactive_fock_matrix.second)(i, j_idx));
-        }
-        inactive_fock_beta_vec.push_back(row);
-      }
-      j["inactive_fock_matrix_beta"] = inactive_fock_beta_vec;
-    }
-  } else {
-    j["has_inactive_fock_matrix"] = false;
+  if (_inactive_fock) {
+    j["inactive_fock_matrix"] = _inactive_fock->to_json();
   }
 
   // Store orbital data
   if (has_orbitals()) {
-    j["has_orbitals"] = true;
     j["orbitals"] = _orbitals->to_json();
-  } else {
-    j["has_orbitals"] = false;
   }
 
   return j;
@@ -367,148 +304,52 @@ CanonicalFourCenterHamiltonianContainer::from_json(const nlohmann::json& j) {
 
     // Load Hamiltonian type
     HamiltonianType type = HamiltonianType::Hermitian;
-    if (j.contains("type")) {
-      std::string type_str = j["type"].get<std::string>();
-      if (type_str == "NonHermitian") {
-        type = HamiltonianType::NonHermitian;
-      }
-    }
-
-    // Determine if the saved Hamiltonian was restricted or unrestricted
-    bool is_restricted_data = j.value("is_restricted", true);
-
-    // Helper function to load matrix from JSON
-    auto load_matrix =
-        [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
-      auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      if (matrix_vec.empty()) {
-        return Eigen::MatrixXd(0, 0);
-      }
-
-      Eigen::MatrixXd matrix(matrix_vec.size(), matrix_vec[0].size());
-      for (Eigen::Index i = 0; i < matrix.rows(); ++i) {
-        if (static_cast<Eigen::Index>(matrix_vec[i].size()) != matrix.cols()) {
-          throw std::runtime_error(
-              "Matrix rows have inconsistent column counts");
-        }
-        matrix.row(i) =
-            Eigen::VectorXd::Map(matrix_vec[i].data(), matrix.cols());
-      }
-      return matrix;
-    };
-
-    // Helper function to load vector from JSON
-    auto load_vector =
-        [](const nlohmann::json& vector_json) -> Eigen::VectorXd {
-      auto vector_vec = vector_json.get<std::vector<double>>();
-      Eigen::VectorXd vector(vector_vec.size());
-      for (size_t i = 0; i < vector_vec.size(); ++i) {
-        vector(i) = vector_vec[i];
-      }
-      return vector;
-    };
-
-    // Load one-body integrals
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    if (j.value("has_one_body_integrals", false)) {
-      if (j.contains("one_body_integrals_alpha")) {
-        one_body_alpha = load_matrix(j["one_body_integrals_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        one_body_beta = one_body_alpha;
-      } else if (j.contains("one_body_integrals_beta")) {
-        one_body_beta = load_matrix(j["one_body_integrals_beta"]);
-      } else {
-        throw std::runtime_error("Should have beta integrals, if unrestricted");
-      }
-    }
-
-    // Load two-body integrals
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
-    bool has_two_body = j.value("has_two_body_integrals", false);
-    if (has_two_body) {
-      if (!j.contains("two_body_integrals")) {
-        throw std::runtime_error("Two-body integrals data not found in JSON");
-      }
-
-      auto two_body_obj = j["two_body_integrals"];
-      if (!two_body_obj.is_object()) {
-        throw std::runtime_error(
-            "two_body_integrals must be an object with aaaa, aabb, bbbb keys");
-      }
-
-      if (!two_body_obj.contains("aaaa") || !two_body_obj.contains("aabb") ||
-          !two_body_obj.contains("bbbb")) {
-        throw std::runtime_error(
-            "two_body_integrals must contain aaaa, aabb, and bbbb keys");
-      }
-
-      two_body_aaaa = load_vector(two_body_obj["aaaa"]);
-      two_body_aabb = load_vector(two_body_obj["aabb"]);
-      two_body_bbbb = load_vector(two_body_obj["bbbb"]);
-    }
-
-    // Load inactive Fock matrix
-
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
-    bool has_inactive_fock = j.value("has_inactive_fock_matrix", false);
-    if (has_inactive_fock) {
-      if (j.contains("inactive_fock_matrix_alpha")) {
-        inactive_fock_alpha = load_matrix(j["inactive_fock_matrix_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        inactive_fock_beta = inactive_fock_alpha;
-      } else if (j.contains("inactive_fock_matrix_beta")) {
-        inactive_fock_beta = load_matrix(j["inactive_fock_matrix_beta"]);
-      }
+    if (j.contains("type") && j["type"].get<std::string>() == "NonHermitian") {
+      type = HamiltonianType::NonHermitian;
     }
 
     // Load orbital data
-    if (!j.value("has_orbitals", false)) {
+    if (!j.contains("orbitals")) {
       throw std::runtime_error("Hamiltonian JSON must include orbitals data");
     }
     auto orbitals = Orbitals::from_json(j["orbitals"]);
 
-    // Validate consistency: if orbitals have inactive indices,
-    // then inactive fock matrix must be present
+    // Load integrals via SBT-direct deserialization
+    if (!j.contains("one_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian JSON must include one_body_integrals");
+    }
+    auto one_body =
+        SymmetryBlockedTensor<2>::from_json(j["one_body_integrals"]);
+
+    if (!j.contains("two_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian JSON must include two_body_integrals");
+    }
+    auto two_body =
+        SymmetryBlockedTensor<4>::from_json(j["two_body_integrals"]);
+
     if (orbitals->has_inactive_space()) {
-      if (!has_inactive_fock) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
+      if (!j.contains("inactive_fock_matrix")) {
         throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no inactive Fock matrix is provided");
+            "Hamiltonian JSON: orbitals have inactive indices but no "
+            "inactive Fock matrix is provided");
       }
-      // Core energy should be explicitly set when there are inactive orbitals
       if (!j.contains("core_energy")) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
         throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no core energy is provided");
+            "Hamiltonian JSON: orbitals have inactive indices but no core "
+            "energy is provided");
       }
     }
 
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      // so alpha and beta point to the same data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
-    }
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock =
+        j.contains("inactive_fock_matrix")
+            ? SymmetryBlockedTensor<2>::from_json(j["inactive_fock_matrix"])
+            : nullptr;
+
+    return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+        std::move(*one_body), std::move(*two_body), orbitals, core_energy,
+        std::move(inactive_fock), type);
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse Hamiltonian from JSON: " +
@@ -556,39 +397,22 @@ void CanonicalFourCenterHamiltonianContainer::to_hdf5(H5::Group& group) const {
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
     restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
 
-    // Save integrals data
-    if (has_one_body_integrals()) {
-      save_matrix_to_group(group, "one_body_integrals_alpha",
-                           *_one_body_integrals.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "one_body_integrals_beta",
-                             *_one_body_integrals.second);
-      }
+    // Save integrals via SBT-direct serialization
+    if (_one_body) {
+      H5::Group sub = group.createGroup("one_body_integrals");
+      _one_body->to_hdf5(sub);
+    }
+    if (_two_body) {
+      H5::Group sub = group.createGroup("two_body_integrals");
+      _two_body->to_hdf5(sub);
+    }
+    if (_inactive_fock) {
+      H5::Group sub = group.createGroup("inactive_fock_matrix");
+      _inactive_fock->to_hdf5(sub);
     }
 
-    if (has_two_body_integrals()) {
-      save_vector_to_group(group, "two_body_integrals_aaaa",
-                           *std::get<0>(_two_body_integrals));
-      if (is_unrestricted()) {
-        save_vector_to_group(group, "two_body_integrals_aabb",
-                             *std::get<1>(_two_body_integrals));
-        save_vector_to_group(group, "two_body_integrals_bbbb",
-                             *std::get<2>(_two_body_integrals));
-      }
-    }
-
-    // Save inactive Fock matrix
-    if (has_inactive_fock_matrix()) {
-      save_matrix_to_group(group, "inactive_fock_matrix_alpha",
-                           *_inactive_fock_matrix.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "inactive_fock_matrix_beta",
-                             *_inactive_fock_matrix.second);
-      }
-    }
-
-    // Save nested orbitals data using HDF5 group
-    if (_orbitals) {
+    // Save nested orbitals data
+    if (has_orbitals()) {
       H5::Group orbitals_group = group.createGroup("orbitals");
       _orbitals->to_hdf5(orbitals_group);
     }
@@ -602,7 +426,6 @@ std::unique_ptr<CanonicalFourCenterHamiltonianContainer>
 CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
-    // Validate version first
     if (!group.attrExists("version")) {
       throw std::runtime_error(
           "HDF5 group missing required 'version' attribute");
@@ -619,103 +442,51 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
 
     // Load core energy
     double core_energy;
-    H5::Attribute core_energy_attr =
-        metadata_group.openAttribute("core_energy");
-    core_energy_attr.read(H5::PredType::NATIVE_DOUBLE, &core_energy);
+    metadata_group.openAttribute("core_energy")
+        .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
 
     // Load Hamiltonian type
     HamiltonianType type = HamiltonianType::Hermitian;
     if (metadata_group.attrExists("type")) {
       H5::Attribute type_attr = metadata_group.openAttribute("type");
-      H5::StrType string_type = type_attr.getStrType();
       std::string type_str;
-      type_attr.read(string_type, type_str);
+      type_attr.read(type_attr.getStrType(), type_str);
       if (type_str == "NonHermitian") {
         type = HamiltonianType::NonHermitian;
       }
     }
 
-    // Load restrictedness information
-    bool is_restricted_data = true;  // default to restricted
-    if (metadata_group.attrExists("is_restricted")) {
-      H5::Attribute restricted_attr =
-          metadata_group.openAttribute("is_restricted");
-      hbool_t is_restricted_flag;
-      restricted_attr.read(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
-      is_restricted_data = (is_restricted_flag != 0);
-    }
-
-    // Load orbitals data from nested group
-    std::shared_ptr<Orbitals> orbitals;
-    if (group.nameExists("orbitals")) {
-      H5::Group orbitals_group = group.openGroup("orbitals");
-      orbitals = Orbitals::from_hdf5(orbitals_group);
-    }
-
-    if (!orbitals) {
+    // Load orbital data
+    if (!group.nameExists("orbitals")) {
       throw std::runtime_error("Hamiltonian HDF5 must include orbitals data");
     }
+    H5::Group orbitals_group = group.openGroup("orbitals");
+    auto orbitals = Orbitals::from_hdf5(orbitals_group);
 
-    // Load integral data based on restrictedness
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::VectorXd two_body_aaaa, two_body_aabb, two_body_bbbb;
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
+    // Load integrals via SBT-direct deserialization
+    if (!group.nameExists("one_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian HDF5 must include one_body_integrals");
+    }
+    H5::Group one_body_group = group.openGroup("one_body_integrals");
+    auto one_body = SymmetryBlockedTensor<2>::from_hdf5(one_body_group);
 
-    // Load one-body integrals
-    if (dataset_exists_in_group(group, "one_body_integrals_alpha")) {
-      one_body_alpha =
-          load_matrix_from_group(group, "one_body_integrals_alpha");
+    if (!group.nameExists("two_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian HDF5 must include two_body_integrals");
+    }
+    H5::Group two_body_group = group.openGroup("two_body_integrals");
+    auto two_body = SymmetryBlockedTensor<4>::from_hdf5(two_body_group);
+
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock;
+    if (group.nameExists("inactive_fock_matrix")) {
+      H5::Group fock_group = group.openGroup("inactive_fock_matrix");
+      inactive_fock = SymmetryBlockedTensor<2>::from_hdf5(fock_group);
     }
 
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "one_body_integrals_beta")) {
-      one_body_beta = load_matrix_from_group(group, "one_body_integrals_beta");
-    }
-
-    // Load two-body integrals
-    if (dataset_exists_in_group(group, "two_body_integrals_aaaa")) {
-      two_body_aaaa = load_vector_from_group(group, "two_body_integrals_aaaa");
-    }
-
-    // For unrestricted, load aabb and bbbb separately
-    if (!is_restricted_data) {
-      if (dataset_exists_in_group(group, "two_body_integrals_aabb")) {
-        two_body_aabb =
-            load_vector_from_group(group, "two_body_integrals_aabb");
-      }
-      if (dataset_exists_in_group(group, "two_body_integrals_bbbb")) {
-        two_body_bbbb =
-            load_vector_from_group(group, "two_body_integrals_bbbb");
-      }
-    }
-
-    // Load inactive Fock matrix
-    if (dataset_exists_in_group(group, "inactive_fock_matrix_alpha")) {
-      inactive_fock_alpha =
-          load_matrix_from_group(group, "inactive_fock_matrix_alpha");
-    }
-
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "inactive_fock_matrix_beta")) {
-      inactive_fock_beta =
-          load_matrix_from_group(group, "inactive_fock_matrix_beta");
-    }
-
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, two_body_aaaa, orbitals, core_energy,
-          inactive_fock_alpha, type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-          one_body_alpha, one_body_beta, two_body_aaaa, two_body_aabb,
-          two_body_bbbb, orbitals, core_energy, inactive_fock_alpha,
-          inactive_fock_beta, type);
-    }
+    return std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+        std::move(*one_body), std::move(*two_body), orbitals, core_energy,
+        std::move(inactive_fock), type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));

@@ -45,6 +45,15 @@ py::object variant_to_python(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
 
+// SymmetryBlockedTensorVariant<Rank> -> Python: resolves to the bound
+// SymmetryBlockedTensorRank{N}{,Complex} class via pybind11's class caster.
+template <std::size_t Rank>
+py::object variant_to_python(
+    const qdk::chemistry::data::SymmetryBlockedTensorVariant<Rank>& var) {
+  return std::visit([](const auto& sbt) -> py::object { return py::cast(sbt); },
+                    var);
+}
+
 // Wrapper functions for file I/O methods that accept both strings and pathlib
 // Path objects
 void wavefunction_to_file_wrapper(qdk::chemistry::data::Wavefunction& self,
@@ -187,6 +196,54 @@ It uses variant types to support both real and complex arithmetic.
            &WavefunctionContainer::has_two_rdm_spin_traced,
            "Check if spin-traced two-particle RDM for active orbitals is "
            "available")
+      // SymmetryBlockedTensor-native RDM accessors
+      .def(
+          "active_one_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_one_rdm());
+          },
+          "Active-space 1-RDM as a rank-2 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank2`) or complex "
+          "(`SymmetryBlockedTensorRank2Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_one_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& row,
+             const SymmetryLabel& col) {
+            return variant_to_python(self.active_one_rdm_block(row, col));
+          },
+          "Active-space 1-RDM block for given row/col symmetry labels. "
+          "Returns a real (`numpy.ndarray[float64]`) or complex "
+          "(`numpy.ndarray[complex128]`) matrix.",
+          py::arg("row"), py::arg("col"))
+      .def("has_active_one_rdm", &WavefunctionContainer::has_active_one_rdm,
+           "True if the active-space 1-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
+      .def(
+          "active_two_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_two_rdm());
+          },
+          "Active-space 2-RDM as a rank-4 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank4`) or complex "
+          "(`SymmetryBlockedTensorRank4Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_two_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& p,
+             const SymmetryLabel& q, const SymmetryLabel& r,
+             const SymmetryLabel& s) {
+            return variant_to_python(self.active_two_rdm_block(p, q, r, s));
+          },
+          "Active-space 2-RDM block for given symmetry labels. Returns a real "
+          "(`numpy.ndarray[float64]`) or complex (`numpy.ndarray[complex128]`) "
+          "flat vector.",
+          py::arg("p"), py::arg("q"), py::arg("r"), py::arg("s"))
+      .def("has_active_two_rdm", &WavefunctionContainer::has_active_two_rdm,
+           "True if the active-space 2-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
       .def("is_complex", &WavefunctionContainer::is_complex,
            "Check if the wavefunction is complex-valued")
       .def("has_single_orbital_entropies",

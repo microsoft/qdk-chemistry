@@ -18,7 +18,11 @@ import re
 
 import numpy as np
 import pytest
-import qsharp
+
+try:
+    from qdk._native import Circuit as QdkCircuitType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
@@ -66,7 +70,7 @@ def test_sparse_isometry_gf2x_basic(wavefunction_4e4o):
     circuit = prep.run(wavefunction_4e4o)
     assert isinstance(circuit, Circuit)
     qsc = circuit.get_qsharp_circuit()
-    assert isinstance(qsc, qsharp._native.Circuit)
+    assert isinstance(qsc, QdkCircuitType)
     qsc_json_str = qsc.json()
     qsc_json = json.loads(qsc_json_str)
     num_qubits = len(qsc_json["qubits"])
@@ -113,7 +117,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
     single_ref_qsc = single_ref_circuit.get_qsharp_circuit()
-    assert isinstance(single_ref_qsc, qsharp._native.Circuit)
+    assert isinstance(single_ref_qsc, QdkCircuitType)
     single_ref_qsc_json_str = single_ref_qsc.json()
     single_ref_qsc_json = json.loads(single_ref_qsc_json_str)
     num_qubits = len(single_ref_qsc_json["qubits"])
