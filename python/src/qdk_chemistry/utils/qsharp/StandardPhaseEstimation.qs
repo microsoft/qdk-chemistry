@@ -10,7 +10,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
     /// - `controlledEvolution`: A function to perform controlled-U on (control, systems).
-    /// - `phaseQubitPrep`: A function to prepare the phase (ancilla) qubits. Defaults to applying H to each.
+    /// - `phaseQubitPrep`: A function to prepare the phase (ancilla) qubits (e.g., Hadamard on each qubit).
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices representing the ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits.
