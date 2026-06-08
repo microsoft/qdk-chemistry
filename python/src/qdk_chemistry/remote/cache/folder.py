@@ -189,7 +189,7 @@ class FolderCache(CacheBackend):
 
     def to_config(self) -> dict:
         """Return kwargs to reconstruct this FolderCache."""
-        return {"path": str(self._root)}
+        return {"path": str(self._root), "is_shared": self.is_shared}
 
     # ── Deletion ────────────────────────────────────────────────────────────
 
@@ -214,12 +214,24 @@ class FolderCache(CacheBackend):
         for manifest_path in list_matches:
             import json as _json  # noqa: PLC0415
 
-            manifest = _json.loads(manifest_path.read_text())
+            try:
+                manifest = _json.loads(manifest_path.read_text())
+            except (_json.JSONDecodeError, OSError):
+                try:
+                    manifest_path.unlink()
+                    deleted = True
+                except OSError:
+                    pass
+                continue
+
             for item_hash in manifest.get("items", []):
                 for f in self._root.glob(f"{item_hash}.*.h5"):
                     f.unlink()
-            manifest_path.unlink()
-            deleted = True
+            try:
+                manifest_path.unlink()
+                deleted = True
+            except OSError:
+                pass
 
         # Remove single-object blobs
         for f in self._root.glob(f"{content_hash}.*.h5"):

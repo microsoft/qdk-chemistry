@@ -187,6 +187,47 @@ class TestFolderCacheData:
         """Deleting nonexistent data returns False."""
         assert not folder_cache.delete_data("nope")
 
+    def test_delete_data_corrupt_list_manifest_deletes_manifest(self, folder_cache, cache_dir):
+        """Corrupt list manifests are removed without raising."""
+        cache_dir.mkdir()
+        manifest_path = cache_dir / "list_hash.list[orbitals].json"
+        manifest_path.write_text("not json")
+
+        assert folder_cache.delete_data("list_hash")
+        assert not manifest_path.exists()
+
+    def test_delete_data_corrupt_list_manifest_continues_to_blobs(self, folder_cache, cache_dir, sample_orbitals):
+        """Corrupt list manifests do not prevent deleting matching blobs."""
+        folder_cache.put_data("list_hash", sample_orbitals)
+        manifest_path = cache_dir / "list_hash.list[orbitals].json"
+        manifest_path.write_text("not json")
+
+        assert folder_cache.delete_data("list_hash")
+        assert not manifest_path.exists()
+        assert not list(cache_dir.glob("list_hash.*.h5"))
+
+    def test_delete_data_missing_list_manifest_continues_to_blobs(
+        self, folder_cache, cache_dir, sample_orbitals, monkeypatch
+    ):
+        """List manifests that disappear mid-read do not abort cleanup."""
+        folder_cache.put_data("list_hash", sample_orbitals)
+        manifest_path = cache_dir / "list_hash.list[orbitals].json"
+        manifest_path.write_text(json.dumps({"type": "orbitals", "items": []}))
+
+        original_read_text = type(manifest_path).read_text
+
+        def read_text(path, *args, **kwargs):
+            if path == manifest_path:
+                path.unlink()
+                raise FileNotFoundError(path)
+            return original_read_text(path, *args, **kwargs)
+
+        monkeypatch.setattr(type(manifest_path), "read_text", read_text)
+
+        assert folder_cache.delete_data("list_hash")
+        assert not manifest_path.exists()
+        assert not list(cache_dir.glob("list_hash.*.h5"))
+
     def test_data_filename_contains_type_name(self, folder_cache, sample_orbitals, cache_dir):
         """Blob file is named <hash>.<type_name>.h5."""
         folder_cache.put_data("myhash", sample_orbitals)
@@ -268,6 +309,17 @@ class TestCacheRegistry:
         """get_cache('folder', path=...) creates a FolderCache."""
         cache = get_cache("folder", path=str(tmp_path / "c"))
         assert isinstance(cache, FolderCache)
+
+    def test_folder_cache_config_preserves_is_shared(self, tmp_path):
+        """FolderCache.to_config() preserves shared-cache behavior."""
+        cache = FolderCache(path=tmp_path / "shared_cache", is_shared=True)
+
+        config = cache.to_config()
+        restored = get_cache("folder", **config)
+
+        assert config["is_shared"] is True
+        assert isinstance(restored, FolderCache)
+        assert restored.is_shared is True
 
     def test_get_cache_unknown_raises(self):
         """get_cache with an unknown name raises ValueError."""
