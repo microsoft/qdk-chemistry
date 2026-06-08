@@ -123,11 +123,6 @@ def _make_iterative_circuit_builder_ref(builder_name: str, num_bits: int, evolut
     )
 
 
-def create_iterative_circuit_builder_algorithm_ref(num_bits: int, evolution_time: float) -> AlgorithmRef:
-    """Return the default iterative circuit builder instance."""
-    return _make_iterative_circuit_builder_ref("qdk_iterative", num_bits, evolution_time)
-
-
 def _run_iterative(problem: PhaseEstimationProblem, builder_name: str = "qdk_iterative") -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
@@ -197,7 +192,7 @@ def _run_iterative_with_parameters(
     )
 
     iqpe = IterativePhaseEstimation(shots_per_bit=shots_per_bit)
-    circuit_builder = create_iterative_circuit_builder_algorithm_ref(num_bits=num_bits, evolution_time=evolution_time)
+    circuit_builder = _make_iterative_circuit_builder_ref("qdk_iterative", num_bits, evolution_time)
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
     iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=seed))
 
@@ -376,8 +371,10 @@ def test_iterative_qpe_with_noise_model(two_qubit_phase_problem: PhaseEstimation
             "s": {"depolarizing_error": error_rate},
         },
     )
-    iqpe_circuit_builder = create_iterative_circuit_builder_algorithm_ref(
-        num_bits=two_qubit_phase_problem.num_bits, evolution_time=two_qubit_phase_problem.evolution_time
+    iqpe_circuit_builder = _make_iterative_circuit_builder_ref(
+        "qdk_iterative",
+        num_bits=two_qubit_phase_problem.num_bits,
+        evolution_time=two_qubit_phase_problem.evolution_time,
     )
     iqpe = IterativePhaseEstimation(
         shots_per_bit=two_qubit_phase_problem.shots_iterative,
