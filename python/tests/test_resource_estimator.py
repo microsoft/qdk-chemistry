@@ -10,7 +10,7 @@ from pathlib import Path
 
 import h5py
 import pytest
-import qsharp
+from qdk import openqasm
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.resource_estimator.base import ResourceEstimator
@@ -124,7 +124,7 @@ class TestQdkQreV1:
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimation raises when only QIR representation is available."""
-        qir = qsharp.openqasm.compile("""
+        qir = openqasm.compile("""
             OPENQASM 3.0;
             include "stdgates.inc";
             qubit[2] q;
