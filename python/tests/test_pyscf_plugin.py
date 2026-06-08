@@ -141,6 +141,7 @@ class TestPyscfPlugin:
         """Test that PySCF plugin is properly registered."""
         available_solvers = algorithms.available("scf_solver")
         assert "pyscf" in available_solvers
+        assert "pyscf_stabilized" in available_solvers
 
         available_localizers = algorithms.available("orbital_localizer")
         assert "pyscf_multi" in available_localizers
@@ -154,6 +155,11 @@ class TestPyscfPlugin:
     def test_pyscf_scf_solver_creation(self):
         """Test creating PySCF SCF solver."""
         scf_solver = algorithms.create("scf_solver", "pyscf")
+        assert scf_solver is not None
+
+    def test_pyscf_stabilized_scf_solver_creation(self):
+        """Test creating PySCF stabilized SCF solver."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
         assert scf_solver is not None
 
     def test_pyscf_localizer_creation(self):
@@ -193,6 +199,20 @@ class TestPyscfPlugin:
         # Test setting other parameters
         settings.set("scf_type", "restricted")
         assert settings.get("scf_type") == "restricted"
+
+    def test_pyscf_stabilized_scf_solver_settings(self):
+        """Test PySCF stabilized SCF solver settings interface."""
+        scf_solver = algorithms.create("scf_solver", "pyscf_stabilized")
+        settings = scf_solver.settings()
+
+        assert settings is not None
+        assert settings.get("max_stability_iterations") == 5
+        assert settings.get("check_internal") is True
+        assert settings.get("check_external") is True
+        assert settings.get("fail_on_unstable") is True
+
+        settings.set("max_stability_iterations", 2)
+        assert settings.get("max_stability_iterations") == 2
 
     def test_pyscf_localizer_settings(self):
         """Test PySCF localizer settings interface."""

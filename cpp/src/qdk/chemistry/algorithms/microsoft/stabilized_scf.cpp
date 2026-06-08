@@ -7,7 +7,6 @@
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
-
 #include <stdexcept>
 #include <string>
 
@@ -39,10 +38,10 @@ StabilizedScfSettings::StabilizedScfSettings()
   set_default("stability_checker",
               data::AlgorithmRef("stability_checker", "qdk"),
               "Nested stability checker used after each SCF optimization.");
-  set_default("max_stability_iterations", static_cast<int64_t>(5),
-              "Maximum number of stability-check/rerun cycles.",
-              data::BoundConstraint<int64_t>{0,
-                                             std::numeric_limits<int64_t>::max()});
+  set_default(
+      "max_stability_iterations", static_cast<int64_t>(5),
+      "Maximum number of stability-check/rerun cycles.",
+      data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
   set_default("check_internal", true,
               "Check internal orbital-rotation stability.");
   set_default("check_external", true,
@@ -53,8 +52,8 @@ StabilizedScfSettings::StabilizedScfSettings()
   set_default("external_instability_action", std::string("unrestricted"),
               "Action for external instabilities: 'unrestricted' switches to "
               "unrestricted SCF, 'rotate_only' only rotates orbitals.",
-              data::ListConstraint<std::string>{{std::vector<std::string>{
-                  "unrestricted", "rotate_only"}}});
+              data::ListConstraint<std::string>{
+                  {std::vector<std::string>{"unrestricted", "rotate_only"}}});
 }
 
 StabilizedScfSolver::StabilizedScfSolver() {
@@ -89,8 +88,7 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
   };
 
   auto create_stability_checker = [&](bool check_external) {
-  auto checker = _create_nested<StabilityCheckerFactory>(
-    "stability_checker");
+    auto checker = _create_nested<StabilityCheckerFactory>("stability_checker");
     if (checker->settings().has("internal")) {
       checker->settings().set("internal", check_internal);
     }
@@ -147,8 +145,8 @@ StabilizedScfSolver::_run_impl(std::shared_ptr<data::Structure> structure,
     }
 
     scf_solver = create_scf_solver(scf_type_override);
-    std::tie(energy, wavefunction) = scf_solver->run(
-        structure, charge, spin_multiplicity, rotated_orbitals);
+    std::tie(energy, wavefunction) =
+        scf_solver->run(structure, charge, spin_multiplicity, rotated_orbitals);
   }
 
   if (max_stability_iterations > 0) {
