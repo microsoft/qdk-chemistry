@@ -194,6 +194,26 @@ class TestFolderCacheData:
         assert len(matches) == 1
         assert "orbitals" in matches[0].name
 
+    def test_get_data_list_corrupt_manifest_is_miss(self, folder_cache, cache_dir):
+        """Corrupt list manifests behave like cache misses."""
+        cache_dir.mkdir()
+        (cache_dir / "list_hash.list[orbitals].json").write_text("not json")
+
+        assert folder_cache.get_data("list_hash") is None
+
+    def test_get_data_list_incomplete_manifest_is_miss(self, folder_cache, cache_dir):
+        """List manifests missing required fields behave like cache misses."""
+        cache_dir.mkdir()
+        (cache_dir / "list_hash.list[orbitals].json").write_text(json.dumps({"type": "orbitals"}))
+
+        assert folder_cache.get_data("list_hash") is None
+
+    def test_get_data_list_missing_manifest_is_miss(self, folder_cache, cache_dir):
+        """Missing list manifests behave like cache misses."""
+        manifest_path = cache_dir / "list_hash.list[orbitals].json"
+
+        assert folder_cache._get_data_list(manifest_path) is None
+
 
 # ── FolderCache: clear ───────────────────────────────────────────────────────
 

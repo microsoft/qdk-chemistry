@@ -127,14 +127,16 @@ class FolderCache(CacheBackend):
 
     def _get_data_list(self, manifest_path: pathlib.Path) -> list | None:
         """Reconstruct a list of DataClass objects from a manifest."""
-        import json  # noqa: PLC0415
-
-        manifest = json.loads(manifest_path.read_text())
-        dataclass_type = _resolve_dataclass_type(manifest["type"])
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            dataclass_type = _resolve_dataclass_type(manifest["type"])
+            item_hashes = manifest["items"]
+        except (json.JSONDecodeError, KeyError, OSError):
+            return None
         if dataclass_type is None:
             return None
         items = []
-        for item_hash in manifest["items"]:
+        for item_hash in item_hashes:
             matches = sorted(self._root.glob(f"{item_hash}.*.h5"))
             if not matches:
                 return None
