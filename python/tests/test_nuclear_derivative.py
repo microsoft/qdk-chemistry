@@ -66,3 +66,11 @@ def test_qdk_nuclear_derivative_factory_registered():
 
     assert isinstance(calculator, algorithms.QdkNuclearDerivativeCalculator)
     assert calculator.name() == "qdk"
+
+
+def test_geometry_optimizer_factory_registered():
+    """The geometry optimizer algorithm type is registered in the core registry."""
+    assert algorithms.show_default("geometry_optimizer") == "geometric"
+    available = algorithms.available("geometry_optimizer")
+    assert isinstance(available, list)
+    assert not available or "geometric" in available

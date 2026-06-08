@@ -26,6 +26,7 @@ from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCi
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
+from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer
 from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
@@ -70,6 +71,7 @@ __all__ = [
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "FiniteDifferenceNuclearDerivativeCalculator",
+    "GeometryOptimizer",
     "HamiltonianConstructor",
     "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",

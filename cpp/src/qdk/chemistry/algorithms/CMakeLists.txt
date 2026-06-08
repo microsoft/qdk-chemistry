@@ -7,6 +7,7 @@ target_sources(chemistry PRIVATE
     nuclear_derivative.cpp
     pmc.cpp
     dynamical_correlation_calculator.cpp
+    geometry_optimization.cpp
     scf.cpp
     stability.cpp
 )
