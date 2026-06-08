@@ -23,6 +23,9 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     TimeEvolutionBuilder,
     TimeEvolutionSettings,
 )
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import (
+    qdrift_samples_campbell,
+)
 from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -64,7 +67,28 @@ class QDriftSettings(TimeEvolutionSettings):
             "num_samples",
             "int",
             100,
-            "Number of random samples N. Error scales as O(λ²t²/N).",
+            "Number of random samples N (acts as a manual floor when target_accuracy is set). "
+            "Error scales as O(λ²t²/N).",
+        )
+        self._set_default(
+            "target_accuracy",
+            "double",
+            0.0,
+            "Target accuracy ε for automatic sample-count computation (0.0 means disabled). "
+            "Uses N >= ceil(2 λ² t² / ε).",
+        )
+        self._set_default(
+            "error_bound",
+            "string",
+            "campbell",
+            "Strategy for computing the qDRIFT error bound ('campbell').",
+            ["campbell"],
+        )
+        self._set_default(
+            "weight_threshold",
+            "float",
+            1e-12,
+            "The absolute threshold for filtering small coefficients.",
         )
         self._set_default(
             "seed",
@@ -134,6 +158,9 @@ class QDrift(TimeEvolutionBuilder):
         *,
         time: float = 0.0,
         num_samples: int = 100,
+        target_accuracy: float = 0.0,
+        error_bound: str = "campbell",
+        weight_threshold: float = 1e-12,
         seed: int = -1,
         merge_duplicate_terms: bool = True,
         commutation_type: str = "general",
@@ -144,9 +171,19 @@ class QDrift(TimeEvolutionBuilder):
 
         Args:
             time: The evolution time. Defaults to 0.0.
-            num_samples: Number of random samples N. More samples increase accuracy
-                but also increase circuit depth. Error scales as O(λ²t²/N).
-                Defaults to 100.
+            num_samples: Number of random samples N. Acts as a manual floor when
+                ``target_accuracy`` is also provided (the larger value wins). More
+                samples increase accuracy but also increase circuit depth. Error
+                scales as O(λ²t²/N). Defaults to 100.
+            target_accuracy: Target accuracy ε for automatic sample-count
+                computation using the Campbell (2019) bound
+                ``N >= ceil(2 λ² t² / ε)``. Use ``0.0`` (default) to disable
+                and rely solely on ``num_samples``. When both are provided, the
+                larger of the two values is used.
+            error_bound: Strategy for computing the qDRIFT error bound. Currently
+                only ``"campbell"`` is supported. Defaults to ``"campbell"``.
+            weight_threshold: Threshold for filtering small coefficients when
+                computing λ and when sampling. Defaults to 1e-12.
             seed: Random seed for reproducibility. Use -1 for non-deterministic
                 sampling. Defaults to -1.
             merge_duplicate_terms: If ``True``, identical Pauli terms within
@@ -170,6 +207,9 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("power", power)
         self._settings.set("power_strategy", power_strategy)
         self._settings.set("num_samples", num_samples)
+        self._settings.set("target_accuracy", target_accuracy)
+        self._settings.set("error_bound", error_bound)
+        self._settings.set("weight_threshold", weight_threshold)
         self._settings.set("seed", seed)
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
@@ -194,20 +234,18 @@ class QDrift(TimeEvolutionBuilder):
         time: float = effective_time
         seed: int = self._settings.get("seed")
         rng = np.random.default_rng(seed if seed >= 0 else None)
+        weight_threshold: float = self._settings.get("weight_threshold")
 
-        num_samples: int = self._settings.get("num_samples")
-
-        if not qubit_hamiltonian.is_hermitian():
+        if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        # Build (label, real_coeff) pairs from the full Hamiltonian
-        all_terms = list(
-            zip(
-                qubit_hamiltonian.pauli_strings,
-                np.real(qubit_hamiltonian.coefficients).tolist(),
-                strict=True,
-            )
-        )
+        # Build (label, real_coeff) pairs from the Hamiltonian, dropping
+        # sub-threshold terms so λ and the sampling distribution match.
+        all_terms = [
+            (label, coeff) for label, coeff in qubit_hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+        ]
+
+        num_samples = self._resolve_num_samples(qubit_hamiltonian, time)
 
         terms = self._sample_qdrift_terms(all_terms, time, num_samples, rng)
 
@@ -232,6 +270,36 @@ class QDrift(TimeEvolutionBuilder):
     # ------------------------------------------------------------------
     # qDRIFT sampling and duplicate-term fusion helpers
     # ------------------------------------------------------------------
+
+    def _resolve_num_samples(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+        """Determine the number of qDRIFT samples to use.
+
+        When both *num_samples* and *target_accuracy* are provided, the
+        larger value wins. When neither is provided, the default
+        *num_samples* is used.
+        """
+        num_samples = self._settings.get("num_samples")
+        if num_samples <= 0:
+            raise ValueError(f"num_samples must be a positive integer, got {num_samples}.")
+        manual = num_samples
+
+        target_accuracy = self._settings.get("target_accuracy")
+        if target_accuracy <= 0.0:
+            return manual
+
+        weight_threshold = self._settings.get("weight_threshold")
+        error_bound = self._settings.get("error_bound")
+        if error_bound == "campbell":
+            auto = qdrift_samples_campbell(
+                hamiltonian=qubit_hamiltonian,
+                time=time,
+                target_accuracy=target_accuracy,
+                weight_threshold=weight_threshold,
+            )
+        else:
+            raise NotImplementedError(f"Unsupported qDRIFT error_bound: {error_bound!r}.")
+
+        return max(manual, auto)
 
     @staticmethod
     def _sample_qdrift_terms(
