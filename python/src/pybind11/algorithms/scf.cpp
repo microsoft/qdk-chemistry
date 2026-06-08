@@ -237,7 +237,7 @@ Initializes an SCF solver with default settings.
     See Also:
       :class:`ScfSolver`
       :class:`QdkScfSolver`
-      :class:`QdkStabilityChecker`
+      :class:`qdk_chemistry.algorithms.QdkStabilityChecker`
 
     )")
       .def(py::init<>(), R"(
