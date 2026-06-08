@@ -69,7 +69,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices for the ancilla qubits.
     /// - `systems`: An array of indices for the system qubits.
-    /// - `phaseQubitPrep`: Optional function to prepare the phase qubits. Defaults to Hadamard on all.
+    /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// # Returns
     /// The measurement results of the ancilla qubits.
     operation MakeStandardQPECircuit(
