@@ -17,13 +17,27 @@ from qdk_chemistry.algorithms import GeometryOptimizer
 from qdk_chemistry.data import AlgorithmRef, NuclearHessian, Settings, Structure
 from qdk_chemistry.utils import Logger
 
-__all__ = ["GeometricOptimizer", "GeometricOptimizerSettings"]
+__all__ = [
+    "GEOMETRIC_OPTIMIZER_ALGORITHMS",
+    "GeometricOptimizer",
+    "GeometricOptimizerSettings",
+]
+
+
+GEOMETRIC_OPTIMIZER_ALGORITHMS = {
+    "tric": "tric",
+    "tric_p": "tric-p",
+    "dlc": "dlc",
+    "hdlc": "hdlc",
+    "prim": "prim",
+    "cartesian": "cart",
+}
 
 
 class GeometricOptimizerSettings(Settings):
     """Settings for the geomeTRIC geometry optimizer."""
 
-    def __init__(self):
+    def __init__(self, *, transition_state: bool = False, coordinate_system: str = "tric"):
         """Initialize geomeTRIC optimizer defaults."""
         super().__init__()
         self._set_default(
@@ -33,7 +47,14 @@ class GeometricOptimizerSettings(Settings):
             "Nuclear derivative calculator used to evaluate energies and gradients.",
         )
         self._set_default(
-            "transition_state", "bool", False, "Run transition-state optimization instead of minimization."
+            "transition_state", "bool", transition_state, "Run transition-state optimization instead of minimization."
+        )
+        self._set_default(
+            "coordinate_system",
+            "string",
+            coordinate_system,
+            "geomeTRIC coordinate-system optimizer algorithm.",
+            limit=list(GEOMETRIC_OPTIMIZER_ALGORITHMS.values()),
         )
         self._set_default("max_iterations", "int", 300, "Maximum number of geometry optimization steps.")
         self._set_default("convergence_energy", "double", 1.0e-6, "Energy convergence threshold.")
@@ -53,8 +74,9 @@ class _QdkDerivativeEngine(Engine):
         spin_multiplicity: int,
         seed_or_basis: Any,
         derivative_calculator: Any,
+        molecule: Any,
     ):
-        super().__init__()
+        super().__init__(molecule)
         self._structure = structure
         self._charge = charge
         self._spin_multiplicity = spin_multiplicity
@@ -90,19 +112,28 @@ class _QdkDerivativeEngine(Engine):
 class GeometricOptimizer(GeometryOptimizer):
     """Geometry optimizer implemented with the geomeTRIC Python library."""
 
-    def __init__(self):
+    def __init__(self, *, algorithm: str = "tric", transition_state: bool = False):
         """Initialize the geomeTRIC optimizer."""
         Logger.trace_entering()
         super().__init__()
-        self._settings = GeometricOptimizerSettings()
+        if algorithm not in GEOMETRIC_OPTIMIZER_ALGORITHMS:
+            raise ValueError(f"Unknown geomeTRIC optimizer algorithm: {algorithm}")
+        self._algorithm = algorithm
+        self._coordinate_system = GEOMETRIC_OPTIMIZER_ALGORITHMS[algorithm]
+        self._transition_state = transition_state
+        self._settings = GeometricOptimizerSettings(
+            transition_state=transition_state,
+            coordinate_system=self._coordinate_system,
+        )
 
     def name(self) -> str:
         """Return the implementation name."""
-        return "geometric"
+        mode = "tsopt" if self._transition_state else "geoopt"
+        return f"geometric_{mode}_{self._algorithm}"
 
     def aliases(self) -> list[str]:
         """Return accepted factory aliases."""
-        return ["geometric", "geomeTRIC"]
+        return [self.name()]
 
     def _run_impl(
         self, structure: Structure, charge: int, spin_multiplicity: int, seed_or_basis: Any
@@ -112,28 +143,21 @@ class GeometricOptimizer(GeometryOptimizer):
         from geometric.molecule import Molecule  # noqa: PLC0415
         from geometric.optimize import run_optimizer  # noqa: PLC0415
 
-        derivative_calculator = self._create_nested("derivative_calculator")
-        derivative_calculator.settings().set("compute_hessian", False)
-        engine = _QdkDerivativeEngine(structure, charge, spin_multiplicity, seed_or_basis, derivative_calculator)
-
         molecule = Molecule()
         molecule.elem = structure.get_atomic_symbols()
         molecule.xyzs = [np.asarray(structure.get_coordinates(), dtype=float)]
-        engine.M = molecule
 
-        params = {
-            "customengine": engine,
-            "input": None,
-            "maxiter": self._settings["max_iterations"],
-            "convergence_energy": self._settings["convergence_energy"],
-            "convergence_grms": self._settings["convergence_gradient"],
-            "convergence_drms": self._settings["convergence_displacement"],
-            "transition": self._settings["transition_state"],
-            "verbose": self._settings["print_level"],
-        }
+        derivative_calculator = self._create_nested("derivative_calculator")
+        derivative_calculator.settings().set("compute_hessian", False)
+        engine = _QdkDerivativeEngine(
+            structure, charge, spin_multiplicity, seed_or_basis, derivative_calculator, molecule
+        )
+
+        params = self._geometric_options()
+        params.update({"customengine": engine, "input": None})
 
         with TemporaryDirectory(prefix="qdk-chemistry-geometric-") as tmpdir:
-            result = run_optimizer(**params, dirname=tmpdir)
+            result = run_optimizer(**params, prefix=f"{tmpdir}/qdk-chemistry", dirname=tmpdir)
 
         optimized_coordinates = _extract_coordinates(result, engine)
         optimized_structure = engine.structure_from_coordinates(optimized_coordinates)
@@ -147,6 +171,17 @@ class GeometricOptimizer(GeometryOptimizer):
             hessian = None
 
         return final_energy, optimized_structure, wavefunction, hessian
+
+    def _geometric_options(self) -> dict[str, Any]:
+        return {
+            "transition": self._settings["transition_state"],
+            "coordsys": self._settings["coordinate_system"],
+            "maxiter": self._settings["max_iterations"],
+            "convergence_energy": self._settings["convergence_energy"],
+            "convergence_grms": self._settings["convergence_gradient"],
+            "convergence_drms": self._settings["convergence_displacement"],
+            "verbose": self._settings["print_level"],
+        }
 
 
 def _extract_coordinates(result: Any, engine: _QdkDerivativeEngine) -> np.ndarray:

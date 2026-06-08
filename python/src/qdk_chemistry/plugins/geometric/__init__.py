@@ -30,7 +30,15 @@ def _register_algorithms():
     """Register geomeTRIC-backed optimizer algorithms."""
     Logger.trace_entering()
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
-    from qdk_chemistry.plugins.geometric.geometry_optimizer import GeometricOptimizer  # noqa: PLC0415
+    from qdk_chemistry.plugins.geometric.geometry_optimizer import (  # noqa: PLC0415
+        GEOMETRIC_OPTIMIZER_ALGORITHMS,
+        GeometricOptimizer,
+    )
 
-    register(lambda: GeometricOptimizer())
-    Logger.debug(f"geomeTRIC plugin loaded: [{GeometricOptimizer().type_name()}: {GeometricOptimizer().name()}].")
+    for algorithm in GEOMETRIC_OPTIMIZER_ALGORITHMS:
+        register(lambda algorithm=algorithm: GeometricOptimizer(algorithm=algorithm))
+        register(lambda algorithm=algorithm: GeometricOptimizer(algorithm=algorithm, transition_state=True))
+
+    Logger.debug(
+        f"geomeTRIC plugin loaded: [{GeometricOptimizer().type_name()}: {', '.join(GEOMETRIC_OPTIMIZER_ALGORITHMS)}]."
+    )
