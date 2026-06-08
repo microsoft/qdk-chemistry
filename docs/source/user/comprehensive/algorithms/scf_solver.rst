@@ -284,6 +284,31 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - ``1073741824``
      - Number of steps between Fock matrix resets
 
+.. _qdk-stabilized-scf-native:
+
+QDK Stabilized
+~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_stabilized"``
+
+The stabilized QDK/Chemistry implementation automates the common stability-analysis workflow around the native :term:`SCF` solver.
+It runs an initial :term:`SCF` calculation, checks wavefunction stability, rotates orbitals along any detected instability direction, and reruns :term:`SCF` using the rotated orbitals as the initial guess.
+For restricted singlet wavefunctions with an external instability, it can switch subsequent reruns to unrestricted :term:`SCF`.
+
+.. code-block:: python
+
+  from qdk_chemistry.algorithms import create
+
+  scf_solver = create("scf_solver", "qdk_stabilized")
+  scf_solver.settings().set("max_stability_iterations", 5)
+  scf_solver.settings().set("check_external", True)
+
+  energy, wavefunction = scf_solver.run(structure, 0, 1, "def2-svp")
+
+The stabilized solver accepts the standard :class:`~qdk_chemistry.algorithms.ScfSolver` inputs and returns the same energy and wavefunction pair as a regular :term:`SCF` calculation.
+Its settings include nested ``scf_solver`` and ``stability_checker`` references for choosing or configuring the underlying implementations.
+Set ``max_stability_iterations`` to ``0`` to run only the initial nested :term:`SCF` calculation.
+
 PySCF
 ~~~~~
 

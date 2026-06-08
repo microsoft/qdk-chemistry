@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
@@ -55,8 +56,18 @@ class TestSCF : public ScfSolver {
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
-  EXPECT_EQ(available_solvers.size(), 1);
-  EXPECT_EQ(available_solvers[0], "qdk");
+  EXPECT_NE(
+      std::find(available_solvers.begin(), available_solvers.end(), "qdk"),
+      available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "qdk_stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized"),
+            available_solvers.end());
+  EXPECT_NE(std::find(available_solvers.begin(), available_solvers.end(),
+                      "stabilized_scf"),
+            available_solvers.end());
   EXPECT_THROW(ScfSolverFactory::create("nonexistent_solver"),
                std::runtime_error);
   EXPECT_NO_THROW(ScfSolverFactory::register_instance(
@@ -69,6 +80,18 @@ TEST_F(ScfTest, Factory) {
                    }),
                std::runtime_error);
   auto test_scf = ScfSolverFactory::create("test_scf");
+}
+
+TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create("qdk_stabilized");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("max_stability_iterations", 0);
+
+  auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  EXPECT_NEAR(energy, -74.9630631297275, testing::scf_energy_tolerance);
+  EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
 }
 
 TEST_F(ScfTest, Water) {
