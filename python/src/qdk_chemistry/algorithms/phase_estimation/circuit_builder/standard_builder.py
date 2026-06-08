@@ -91,11 +91,18 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
-        ctrl_unitary_circuit = self._create_controlled_circuit(qubit_hamiltonian, power=1)
 
-        if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
+        # Build one controlled circuit per ancilla with power=2^k,
+        # respecting the unitary builder's power_strategy (e.g. "rescale").
+        # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
+        ctrl_unitary_circuits = []
+        for k in range(num_bits):
+            power = 2 ** (num_bits - 1 - k)
+            ctrl_unitary_circuits.append(self._create_controlled_circuit(qubit_hamiltonian, power=power))
+
+        if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
             circuit = self._create_circuit_from_qsharp_op(
-                state_preparation, ctrl_unitary_circuit, num_bits, num_system_qubits
+                state_preparation, ctrl_unitary_circuits, num_bits, num_system_qubits
             )
             Logger.info(f"Built standard QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
@@ -108,7 +115,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _create_circuit_from_qsharp_op(
         self,
         state_preparation: Circuit,
-        controlled_unitary_circuit: Circuit,
+        controlled_unitary_circuits: list[Circuit],
         num_bits: int,
         num_system_qubits: int,
     ) -> Circuit:
@@ -116,7 +123,8 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             state_preparation: Circuit object containing a Q# operation for state preparation.
-            controlled_unitary_circuit: Circuit object containing a Q# operation for the controlled unitary.
+            controlled_unitary_circuits: List of Circuit objects (one per ancilla) containing
+                Q# operations for controlled-U^(2^k).
             num_bits: Number of ancilla qubits (phase bits).
             num_system_qubits: Number of system qubits.
 
@@ -125,13 +133,13 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        ctrl_unitary_ops = [c._qsharp_op for c in controlled_unitary_circuits]  # noqa: SLF001
         phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
             "statePrep": state_prep_op,
-            "controlledEvolution": ctrl_unitary_op,
+            "controlledEvolutions": ctrl_unitary_ops,
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,
