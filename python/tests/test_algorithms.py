@@ -851,6 +851,14 @@ class TestAlgorithmClasses:
         with pytest.raises(TypeError, match="Unsupported hash argument type"):
             run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
 
+    def test_run_content_hash_disambiguates_argument_types(self):
+        """Test algorithm hashing tags argument types to avoid cache collisions."""
+        values = [None, False, 0, 0.0, "", b"", [], (), {}, np.array([], dtype=np.float64)]
+
+        hashes = [run_content_hash("test_type", "test_name", Settings(), value) for value in values]
+
+        assert len(set(hashes)) == len(values)
+
     def test_abstract_methods_required(self):
         """Test that abstract methods must be implemented."""
         # Note: These classes are not currently implemented as abstract in the C++ bindings

@@ -33,6 +33,7 @@ Important Notes
 from __future__ import annotations
 
 import atexit
+import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -95,12 +96,23 @@ class _AlgorithmWrapper:
         if resolved_cache is None:
             return self._algo.run(*args, **kwargs)
 
-        # Compute deterministic run hash
-        import contextlib  # noqa: PLC0415
-
         run_hash = None
-        with contextlib.suppress(AttributeError):
+        try:
             run_hash = self._algo.hash(*args, **kwargs)
+        except AttributeError as exc:
+            warnings.warn(
+                f"Caching was requested for {self._algo!r}, but a run hash could not be computed "
+                f"because the algorithm does not expose a compatible hash method: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
+        except TypeError as exc:
+            warnings.warn(
+                f"Caching was requested for {self._algo!r}, but a run hash could not be computed "
+                f"with the provided arguments: {exc}",
+                UserWarning,
+                stacklevel=2,
+            )
 
         if run_hash is None:
             return self._algo.run(*args, **kwargs)

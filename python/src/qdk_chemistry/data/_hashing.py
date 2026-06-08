@@ -94,33 +94,51 @@ def _hash_optional(h: "hashlib._Hash", val: Any, hash_fn) -> None:
 def _hash_arg(h: "hashlib._Hash", arg: Any) -> None:
     """Hash an arbitrary argument, dispatching by type."""
     if arg is None:
+        h.update(b"N")
         h.update(b"\x00")
     elif hasattr(arg, "content_hash"):
+        h.update(b"H")
         _hash_str(h, arg.content_hash())
     elif isinstance(arg, bool):
+        h.update(b"B")
         _hash_bool(h, arg)
     elif isinstance(arg, np.bool_):
+        h.update(b"B")
         _hash_bool(h, bool(arg))
     elif isinstance(arg, int):
+        h.update(b"I")
         _hash_int(h, arg)
     elif isinstance(arg, np.integer):
+        h.update(b"I")
         _hash_int(h, int(arg))
     elif isinstance(arg, float):
+        h.update(b"F")
         _hash_float(h, arg)
     elif isinstance(arg, np.floating):
+        h.update(b"F")
         _hash_float(h, float(arg))
     elif isinstance(arg, str):
+        h.update(b"S")
         _hash_str(h, arg)
     elif isinstance(arg, bytes):
+        h.update(b"Y")
         _hash_uint(h, len(arg))
         _hash_bytes(h, arg)
     elif isinstance(arg, np.ndarray):
+        h.update(b"A")
         _hash_array(h, arg)
-    elif isinstance(arg, list | tuple):
+    elif isinstance(arg, list):
+        h.update(b"L")
+        _hash_uint(h, len(arg))
+        for item in arg:
+            _hash_arg(h, item)
+    elif isinstance(arg, tuple):
+        h.update(b"T")
         _hash_uint(h, len(arg))
         for item in arg:
             _hash_arg(h, item)
     elif isinstance(arg, dict):
+        h.update(b"D")
         _hash_uint(h, len(arg))
 
         def _key_sort_key(k: Any) -> tuple[str, bytes]:
