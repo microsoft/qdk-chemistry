@@ -281,15 +281,14 @@ class MP2Container : public WavefunctionContainer {
   bool has_two_rdm_spin_traced() const override;
 
   /**
-   * @brief Get spin-dependent one-particle RDMs
+   * @brief Active-space spin-dependent one-particle RDM as an SBT (lazy)
    *
    * If RDMs were not explicitly set but amplitudes are available, computes
    * RDMs lazily from the CI expansion generated from amplitudes.
    *
-   * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
+   * @return One-particle RDM symmetry-blocked tensor variant
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override;
+  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const override;
 
   /**
    * @brief Get spin-traced one-particle RDM
@@ -302,15 +301,14 @@ class MP2Container : public WavefunctionContainer {
   const MatrixVariant& get_active_one_rdm_spin_traced() const override;
 
   /**
-   * @brief Get spin-dependent two-particle RDMs
+   * @brief Active-space spin-dependent two-particle RDM as an SBT (lazy)
    *
    * If RDMs were not explicitly set but amplitudes are available, computes
    * RDMs lazily from the CI expansion generated from amplitudes.
    *
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   * @return Two-particle RDM symmetry-blocked tensor variant
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_active_two_rdm_spin_dependent() const override;
+  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const override;
 
   /**
    * @brief Get spin-traced two-particle RDM

@@ -19,6 +19,21 @@
 
 namespace qdk::chemistry::data {
 
+// Convert a v1 four-index sparse two-body map (tuple-of-size_t keys) into
+// a generic @ref SparseMapBlock<4, double> (array-of-unsigned keys), so
+// the v1 sparse constructors can delegate to the generic
+// @ref make_spin_diagonal_rank4_sbsm helper.
+static SparseMapBlock<4, double> to_sparse_block(
+    SparseHamiltonianContainer::TwoBodyMap map) {
+  SparseMapBlock<4, double> block;
+  for (const auto& [idx, val] : map) {
+    auto [p, q, r, s] = idx;
+    block[{static_cast<unsigned>(p), static_cast<unsigned>(q),
+           static_cast<unsigned>(r), static_cast<unsigned>(s)}] = val;
+  }
+  return block;
+}
+
 namespace detail {
 /**
  * @brief Pack two 32-bit unsigned indices into a single double via bitwise
@@ -58,59 +73,59 @@ inline std::pair<uint32_t, uint32_t> unpack_indices(double packed_val) {
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals,
     TwoBodyMap two_body_integrals, double core_energy, HamiltonianType type)
-    : HamiltonianContainer(
-          Eigen::MatrixXd(one_body_integrals),
-          _make_orbitals(static_cast<int>(one_body_integrals.rows())),
-          core_energy,
-          Eigen::MatrixXd::Zero(one_body_integrals.rows(),
-                                one_body_integrals.cols()),
-          type),
-      _one_body_sparse(std::move(one_body_integrals)),
-      _two_body_map(std::move(two_body_integrals)) {}
+    : SparseHamiltonianContainer(
+          Eigen::SparseMatrix<double>(one_body_integrals),
+          make_spin_diagonal_rank4_sbsm<double>(
+              to_sparse_block(std::move(two_body_integrals)),
+              static_cast<std::size_t>(one_body_integrals.rows())),
+          core_energy, type) {}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     Eigen::SparseMatrix<double> one_body_integrals, double core_energy,
     HamiltonianType type)
-    : HamiltonianContainer(
-          Eigen::MatrixXd(one_body_integrals),
-          _make_orbitals(static_cast<int>(one_body_integrals.rows())),
-          core_energy,
-          Eigen::MatrixXd::Zero(one_body_integrals.rows(),
-                                one_body_integrals.cols()),
-          type),
-      _one_body_sparse(std::move(one_body_integrals)) {}
+    : SparseHamiltonianContainer(std::move(one_body_integrals), nullptr,
+                                 core_energy, type) {}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::VectorXd& two_body_integrals, double core_energy,
     HamiltonianType type)
-    : HamiltonianContainer(
-          one_body_integrals,
-          _make_orbitals(static_cast<int>(one_body_integrals.rows())),
-          core_energy,
-          Eigen::MatrixXd::Zero(one_body_integrals.rows(),
-                                one_body_integrals.cols()),
-          type),
-      _one_body_sparse(_to_sparse(one_body_integrals)),
-      _two_body_map(_to_map(two_body_integrals,
-                            static_cast<size_t>(one_body_integrals.rows()))) {}
+    : SparseHamiltonianContainer(
+          _to_sparse(one_body_integrals),
+          make_spin_diagonal_rank4_sbsm<double>(
+              to_sparse_block(
+                  _to_map(two_body_integrals,
+                          static_cast<std::size_t>(one_body_integrals.rows()))),
+              static_cast<std::size_t>(one_body_integrals.rows())),
+          core_energy, type) {}
 
 SparseHamiltonianContainer::SparseHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals, double core_energy,
     HamiltonianType type)
+    : SparseHamiltonianContainer(_to_sparse(one_body_integrals), nullptr,
+                                 core_energy, type) {}
+
+SparseHamiltonianContainer::SparseHamiltonianContainer(
+    Eigen::SparseMatrix<double> one_body_integrals,
+    std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
+    double core_energy, HamiltonianType type)
     : HamiltonianContainer(
-          one_body_integrals,
+          make_spin_diagonal_rank2_sbt(Eigen::MatrixXd(one_body_integrals),
+                                       Eigen::MatrixXd{}, /*restricted=*/true),
           _make_orbitals(static_cast<int>(one_body_integrals.rows())),
           core_energy,
-          Eigen::MatrixXd::Zero(one_body_integrals.rows(),
-                                one_body_integrals.cols()),
+          make_spin_diagonal_rank2_sbt(
+              Eigen::MatrixXd(Eigen::MatrixXd::Zero(one_body_integrals.rows(),
+                                                    one_body_integrals.cols())),
+              Eigen::MatrixXd{}),
           type),
-      _one_body_sparse(_to_sparse(one_body_integrals)) {}
+      _one_body_sparse(std::move(one_body_integrals)),
+      _two_body_sparse(std::move(two_body)) {}
 
 std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
     const {
   return std::make_unique<SparseHamiltonianContainer>(
-      _one_body_sparse, _two_body_map, _core_energy, _type);
+      _one_body_sparse, _two_body_sparse, _core_energy, _type);
 }
 
 std::string SparseHamiltonianContainer::get_container_type() const {
@@ -130,15 +145,29 @@ SparseHamiltonianContainer::get_two_body_integrals() const {
 double SparseHamiltonianContainer::get_two_body_element(unsigned i, unsigned j,
                                                         unsigned k, unsigned l,
                                                         SpinChannel) const {
-  auto it = _two_body_map.find({i, j, k, l});
-  return it != _two_body_map.end() ? it->second : 0.0;
+  if (!_two_body_sparse) return 0.0;
+  const auto& block = _two_body_sparse->block(
+      {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+  auto it = block.find({i, j, k, l});
+  return it != block.end() ? it->second : 0.0;
 }
 
 bool SparseHamiltonianContainer::has_two_body_integrals() const {
-  return !_two_body_map.empty();
+  return _two_body_sparse != nullptr;
 }
 
-bool SparseHamiltonianContainer::is_restricted() const { return true; }
+bool SparseHamiltonianContainer::is_restricted() const {
+  // The dense one-body integral path goes through @ref HamiltonianContainer
+  // as a single block aliased across spin (this container has no separate
+  // β sparse matrix), so restrictedness is dictated entirely by the
+  // two-body sparse map: when present, all four equivalent spin patterns
+  // must share storage (orbit aliasing on a restricted spin axis).
+  if (!_two_body_sparse) return true;
+  return _two_body_sparse->all_aliased(
+      {{{axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()},
+        {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()},
+        {axes::beta(), axes::beta(), axes::beta(), axes::beta()}}});
+}
 
 bool SparseHamiltonianContainer::is_valid() const {
   QDK_LOG_TRACE_ENTERING();
@@ -166,9 +195,10 @@ nlohmann::json SparseHamiltonianContainer::to_json() const {
   j["core_energy"] = _core_energy;
   j["type"] =
       (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
-  j["is_restricted"] = true;
+  j["is_restricted"] = is_restricted();
 
-  // One-body integrals — store as sparse triplets [row, col, value]
+  // One-body integrals — stored as Eigen::SparseMatrix (not an SBT), kept as
+  // a triplet list.
   int n = _orbitals->get_num_molecular_orbitals();
   j["num_orbitals"] = n;
   j["has_one_body_integrals"] = (_one_body_sparse.nonZeros() > 0);
@@ -183,15 +213,8 @@ nlohmann::json SparseHamiltonianContainer::to_json() const {
     j["one_body_integrals_alpha_sparse"] = one_body_list;
   }
 
-  // Two-body integrals — store as sparse list of {p,q,r,s,value}
-  j["has_two_body_integrals"] = has_two_body_integrals();
-  if (has_two_body_integrals()) {
-    nlohmann::json two_body_list = nlohmann::json::array();
-    for (const auto& [idx, val] : _two_body_map) {
-      const auto& [p, q, r, s] = idx;
-      two_body_list.push_back({p, q, r, s, val});
-    }
-    j["two_body_integrals_sparse"] = two_body_list;
+  if (_two_body_sparse) {
+    j["two_body_integrals"] = _two_body_sparse->to_json();
   }
 
   return j;
@@ -235,26 +258,15 @@ SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
       }
     }
 
-    // Load two-body integrals
-    TwoBodyMap two_body_map;
-    if (j.value("has_two_body_integrals", false) &&
-        j.contains("two_body_integrals_sparse")) {
-      for (const auto& entry : j["two_body_integrals_sparse"]) {
-        int p = entry[0].get<int>();
-        int q = entry[1].get<int>();
-        int r = entry[2].get<int>();
-        int s = entry[3].get<int>();
-        double val = entry[4].get<double>();
-        two_body_map[{p, q, r, s}] = val;
-      }
+    // Load two-body integrals via SBSM-direct deserialization.
+    std::shared_ptr<const SymmetryBlockedSparseMap<4>> h2_sparse;
+    if (j.contains("two_body_integrals")) {
+      h2_sparse =
+          SymmetryBlockedSparseMap<4>::from_json(j["two_body_integrals"]);
     }
 
-    if (two_body_map.empty()) {
-      return std::make_unique<SparseHamiltonianContainer>(
-          std::move(one_body_sparse), core_energy, type);
-    }
     return std::make_unique<SparseHamiltonianContainer>(
-        std::move(one_body_sparse), std::move(two_body_map), core_energy, type);
+        std::move(one_body_sparse), std::move(h2_sparse), core_energy, type);
 
   } catch (const nlohmann::json::exception& e) {
     throw std::runtime_error(
@@ -332,19 +344,20 @@ void SparseHamiltonianContainer::to_hdf5(H5::Group& group) const {
 
     // Two-body integrals as sparse dataset: N x 3 (packed p|q, packed r|s, val)
     if (has_two_body_integrals()) {
-      auto n_entries = static_cast<hsize_t>(_two_body_map.size());
+      const auto& block = _two_body_sparse->block(
+          {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()});
+      auto n_entries = static_cast<hsize_t>(block.size());
       hsize_t dims[2] = {n_entries, 3};
       H5::DataSpace dataspace(2, dims);
 
       // Pack into row-major buffer: [packed(p,q), packed(r,s), value] per row
       std::vector<double> buffer(n_entries * 3);
       hsize_t row = 0;
-      for (const auto& [idx, val] : _two_body_map) {
-        const auto& [p, q, r, s] = idx;
-        buffer[row * 3 + 0] = detail::pack_indices(static_cast<uint32_t>(p),
-                                                   static_cast<uint32_t>(q));
-        buffer[row * 3 + 1] = detail::pack_indices(static_cast<uint32_t>(r),
-                                                   static_cast<uint32_t>(s));
+      for (const auto& [idx, val] : block) {
+        buffer[row * 3 + 0] = detail::pack_indices(
+            static_cast<uint32_t>(idx[0]), static_cast<uint32_t>(idx[1]));
+        buffer[row * 3 + 1] = detail::pack_indices(
+            static_cast<uint32_t>(idx[2]), static_cast<uint32_t>(idx[3]));
         buffer[row * 3 + 2] = val;
         ++row;
       }
@@ -355,7 +368,7 @@ void SparseHamiltonianContainer::to_hdf5(H5::Group& group) const {
     }
 
     // Save orbitals
-    if (_orbitals) {
+    if (has_orbitals()) {
       H5::Group orbitals_group = group.createGroup("orbitals");
       _orbitals->to_hdf5(orbitals_group);
     }
@@ -544,10 +557,12 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
   };
 
   // Write two-body integrals from sparse map (1-based indices)
-  for (const auto& [idx, val] : _two_body_map) {
-    if (std::abs(val) < print_thresh) continue;
-    const auto& [p, q, r, s] = idx;
-    formatted_line(p + 1, q + 1, r + 1, s + 1, val);
+  if (has_two_body_integrals()) {
+    for (const auto& [idx, val] : _two_body_sparse->block(
+             {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
+      if (std::abs(val) < print_thresh) continue;
+      formatted_line(idx[0] + 1, idx[1] + 1, idx[2] + 1, idx[3] + 1, val);
+    }
   }
 
   // Write one-body integrals from sparse matrix (lower triangle, 1-based)
@@ -569,9 +584,15 @@ SparseHamiltonianContainer::sparse_one_body_integrals() const {
   return _one_body_sparse;
 }
 
-const SparseHamiltonianContainer::TwoBodyMap&
+SparseHamiltonianContainer::TwoBodyMap
 SparseHamiltonianContainer::sparse_two_body_integrals() const {
-  return _two_body_map;
+  TwoBodyMap m;
+  if (!_two_body_sparse) return m;
+  for (const auto& [idx, val] : _two_body_sparse->block(
+           {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
+    m.emplace(std::make_tuple(idx[0], idx[1], idx[2], idx[3]), val);
+  }
+  return m;
 }
 
 double SparseHamiltonianContainer::one_body_element(int i, int j) const {
@@ -584,10 +605,12 @@ void SparseHamiltonianContainer::_materialize_dense_two_body() const {
   size_t n3 = n2 * n;
   _two_body_dense_cache =
       Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n * n * n * n));
-  for (const auto& [idx, val] : _two_body_map) {
-    const auto& [p, q, r, s] = idx;
-    _two_body_dense_cache(
-        static_cast<Eigen::Index>(p * n3 + q * n2 + r * n + s)) = val;
+  if (_two_body_sparse) {
+    for (const auto& [idx, val] : _two_body_sparse->block(
+             {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
+      _two_body_dense_cache(static_cast<Eigen::Index>(
+          idx[0] * n3 + idx[1] * n2 + idx[2] * n + idx[3])) = val;
+    }
   }
   _two_body_dense_valid = true;
 }
@@ -622,6 +645,16 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
           if (val != 0.0) m[{p, q, r, s}] = val;
         }
   return m;
+}
+
+const SymmetryBlockedSparseMap<4>&
+SparseHamiltonianContainer::two_body_integrals_sparse() const {
+  if (!_two_body_sparse) {
+    throw std::runtime_error(
+        "Sparse two-body symmetry-blocked tensor (two_body_integrals_sparse) "
+        "is not set.");
+  }
+  return *_two_body_sparse;
 }
 
 }  // namespace qdk::chemistry::data
