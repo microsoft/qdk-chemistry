@@ -1,8 +1,8 @@
 """OpenFermion-based qubit mappers to map electronic structure Hamiltonians to qubit Hamiltonians.
 
 This module provides an OpenFermionQubitMapper class to convert Hamiltonians to QubitHamiltonians
-using different mapping strategies ("jordan-wigner", "bravyi-kitaev",
-"symmetry-conserving-bravyi-kitaev", and "bravyi-kitaev-tree").
+using different mapping strategies. The encoding is determined by the MajoranaMapping passed
+to ``run()``.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -20,93 +20,124 @@ import openfermion as of
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.openfermion.conversion import (
-    hamiltonian_to_fermion_operator,
     hamiltonian_to_interaction_operator,
     qubit_operator_to_qubit_hamiltonian,
 )
 from qdk_chemistry.utils import Logger
 
 if TYPE_CHECKING:
-    from qdk_chemistry.data import Hamiltonian, QubitHamiltonian, Symmetries
+    from collections.abc import Callable
+
+    from qdk_chemistry.data import Hamiltonian, MajoranaMapping, QubitHamiltonian
 
 __all__ = ["OpenFermionQubitMapper", "OpenFermionQubitMapperSettings"]
 
-_VALID_ENCODINGS = [
-    "jordan-wigner",
-    "bravyi-kitaev",
-    "symmetry-conserving-bravyi-kitaev",
-    "bravyi-kitaev-tree",
-]
+_STANDARD_TRANSFORMS: dict[str, Callable[..., of.QubitOperator]] = {
+    "jordan-wigner": of.transforms.jordan_wigner,
+    "bravyi-kitaev": of.transforms.bravyi_kitaev,
+    "bravyi-kitaev-tree": of.transforms.bravyi_kitaev_tree,
+}
 
 
 class OpenFermionQubitMapperSettings(QubitMapperSettings):
-    """Settings configuration for an OpenFermionQubitMapper.
-
-    Inherits ``encoding`` from :class:`~qdk_chemistry.algorithms.qubit_mapper.QubitMapperSettings`.
-
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
-        - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
-        - ``"bravyi-kitaev-tree"``
-
-    """
+    """Settings configuration for an OpenFermionQubitMapper."""
 
     def __init__(self):
         """Initialize OpenFermionQubitMapperSettings."""
         Logger.trace_entering()
-        super().__init__(valid_encodings=_VALID_ENCODINGS)
+        super().__init__()
 
 
 class OpenFermionQubitMapper(QubitMapper):
     """Map an electronic structure Hamiltonian to a QubitHamiltonian using OpenFermion.
 
-    Available encodings:
-        - ``"jordan-wigner"`` (default)
-        - ``"bravyi-kitaev"``
-        - ``"symmetry-conserving-bravyi-kitaev"`` (requires :class:`~qdk_chemistry.data.Symmetries`)
-        - ``"bravyi-kitaev-tree"``
+    This is a **third-party** backend: it reads
+    ``mapping.base_encoding`` to select the corresponding OpenFermion
+    transform function and **ignores** ``mapping.table``.  The qubit
+    operator is built from scratch using OpenFermion's own
+    fermion-to-qubit pipeline.
+
+    .. warning::
+
+       Because this backend chooses its transform by encoding *name*
+       rather than from the Pauli table, it relies on the mapping's
+       ``base_encoding`` string being consistent with its table.
+       This is guaranteed for factory-produced mappings
+       (``MajoranaMapping.jordan_wigner()``, ``.bravyi_kitaev()``, etc.)
+       and is verified by cross-backend eigenvalue tests in the test
+       suite.  Manually built mappings with mismatched names will
+       produce silently incorrect results.
+
+    Tapering-based encodings (e.g. symmetry-conserving Bravyi-Kitaev) are
+    supported — each backend handles tapering in its own ``_run_impl()``
+    via the ``QubitMapper._taper_result()``
+    helper.
+
+    Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+    For unrestricted systems, separate alpha/beta spin channels are handled
+    via ``hamiltonian_to_interaction_operator``.
+
+    Supported base encodings:
+        - ``"jordan-wigner"`` → ``openfermion.transforms.jordan_wigner``
+        - ``"bravyi-kitaev"`` → ``openfermion.transforms.bravyi_kitaev``
+        - ``"bravyi-kitaev-tree"`` → ``openfermion.transforms.bravyi_kitaev_tree``
+
+    Examples:
+        >>> from qdk_chemistry.algorithms import create
+        >>> from qdk_chemistry.data import MajoranaMapping
+        >>> mapper = create("qubit_mapper", "openfermion")
+        >>> mapping = MajoranaMapping.jordan_wigner(num_modes=n_spin_orbitals)
+        >>> qh = mapper.run(hamiltonian, mapping)
 
     """
 
-    def __init__(self, encoding: str = "jordan-wigner"):
-        """Initialize OpenFermionQubitMapper with a specific mapping strategy.
-
-        Args:
-            encoding: Qubit mapping strategy. See *Available encodings* above.
-
-        """
+    def __init__(self):
+        """Initialize OpenFermionQubitMapper."""
         Logger.trace_entering()
         super().__init__()
         self._settings = OpenFermionQubitMapperSettings()
-        self._settings.set("encoding", encoding)
 
-    def _run_impl(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None = None) -> QubitHamiltonian:
-        """Construct a QubitHamiltonian from a Hamiltonian using the selected mapping strategy.
+    def _run_impl(
+        self,
+        hamiltonian: Hamiltonian,
+        mapping: MajoranaMapping,
+    ) -> QubitHamiltonian:
+        """Build a qubit Hamiltonian via OpenFermion.
+
+        Reads ``mapping.base_encoding`` to select an OpenFermion transform
+        function.  ``mapping.table`` is **not used** — the qubit operator
+        is built entirely by OpenFermion's own pipeline.
+
+        If *mapping* carries tapering metadata, the base encoding is
+        extracted first, mapped, and tapering is applied to the result
+        via :meth:`~QubitMapper._taper_result`.
 
         Args:
-            hamiltonian: The fermionic Hamiltonian.
-            symmetries: Symmetry information. Required for SCBK encoding.
+            hamiltonian: The fermionic Hamiltonian (restricted or unrestricted).
+            mapping: Encoding selector — only ``base_encoding`` is read.
 
         Returns:
             QubitHamiltonian: An instance of the QubitHamiltonian.
 
+        Raises:
+            NotImplementedError: If ``mapping.base_encoding`` is not a supported OpenFermion encoding.
+
         """
         Logger.trace_entering()
-        encoding = self._settings.get("encoding")
-        if encoding not in _VALID_ENCODINGS:
-            raise ValueError(
-                f"Encoding '{encoding}' is unknown for OpenFermionQubitMapper.\nPlease use one of: {_VALID_ENCODINGS}"
+
+        # --- Select transform by encoding name (see QubitMapper class docstring) ---
+        encoding_name = mapping.base_encoding
+
+        if encoding_name not in _STANDARD_TRANSFORMS:
+            raise NotImplementedError(
+                f"OpenFermion plugin does not support base encoding {encoding_name!r}. "
+                f"Supported encodings: {sorted(_STANDARD_TRANSFORMS.keys())}."
             )
 
-        Logger.debug(f"Mapping Hamiltonian with OpenFermion encoding: {encoding}")
+        qubit_op = self._map_standard(hamiltonian, encoding_name)
+        fermion_mode_order = FermionModeOrder.BLOCKED
 
-        if encoding == "symmetry-conserving-bravyi-kitaev":
-            qubit_op = self._map_scbk(hamiltonian, symmetries)
-            fermion_mode_order = FermionModeOrder.INTERLEAVED
-        else:
-            qubit_op = self._map_standard(hamiltonian, encoding)
-            fermion_mode_order = FermionModeOrder.BLOCKED
+        Logger.debug(f"Mapping Hamiltonian with OpenFermion encoding: {encoding_name}")
 
         qubit_op.compress()
 
@@ -117,11 +148,12 @@ class OpenFermionQubitMapper(QubitMapper):
             qubit_op -= core_energy * of.QubitOperator(())
             qubit_op.compress()
 
-        return qubit_operator_to_qubit_hamiltonian(
+        qh = qubit_operator_to_qubit_hamiltonian(
             qubit_op,
-            encoding=encoding,
+            encoding=encoding_name,
             fermion_mode_order=fermion_mode_order,
         )
+        return self._taper_result(qh, mapping)
 
     def _map_standard(self, hamiltonian: Hamiltonian, encoding: str) -> of.QubitOperator:
         """Apply a standard fermion-to-qubit transform (JW, BK, or BK-tree).
@@ -139,57 +171,8 @@ class OpenFermionQubitMapper(QubitMapper):
 
         """
         fermion_op = _build_blocked_fermion_operator(hamiltonian)
-
-        transform_map = {
-            "jordan-wigner": of.transforms.jordan_wigner,
-            "bravyi-kitaev": of.transforms.bravyi_kitaev,
-            "bravyi-kitaev-tree": of.transforms.bravyi_kitaev_tree,
-        }
-        transform = transform_map[encoding]
+        transform = _STANDARD_TRANSFORMS[encoding]
         return transform(fermion_op)
-
-    def _map_scbk(self, hamiltonian: Hamiltonian, symmetries: Symmetries | None) -> of.QubitOperator:
-        """Apply symmetry-conserving Bravyi-Kitaev transformation.
-
-        This transform reduces the qubit count by 2 by exploiting particle number
-        and spin symmetry. The number of active electrons is read from the
-        ``symmetries`` parameter.
-
-        Args:
-            hamiltonian: The fermionic Hamiltonian.
-            symmetries: Symmetry information providing the active electron count.
-
-        Returns:
-            openfermion.QubitOperator: The mapped qubit operator.
-
-        Raises:
-            ValueError: If ``symmetries`` is not provided.
-
-        """
-        if symmetries is None:
-            raise ValueError(
-                "The symmetry-conserving Bravyi-Kitaev encoding requires a Symmetries "
-                "object specifying the number of active electrons.\n"
-                "Example:\n"
-                "  from qdk_chemistry.data import Symmetries\n"
-                "  symmetries = Symmetries(n_alpha=1, n_beta=1)\n"
-                "  qubit_hamiltonian = mapper.run(hamiltonian, symmetries)"
-            )
-
-        fermion_op = hamiltonian_to_fermion_operator(hamiltonian)
-        n_active_electrons = symmetries.n_particles
-
-        # Number of spin-orbitals
-        h1_alpha, _ = hamiltonian.get_one_body_integrals()
-        n_spinorbitals = 2 * h1_alpha.shape[0]
-
-        Logger.debug(f"SCBK: n_spinorbitals={n_spinorbitals}, n_active_electrons={n_active_electrons}")
-
-        return of.transforms.symmetry_conserving_bravyi_kitaev(
-            fermion_op,
-            n_spinorbitals,
-            n_active_electrons,
-        )
 
     def name(self) -> str:
         """Return the algorithm name ``openfermion``."""

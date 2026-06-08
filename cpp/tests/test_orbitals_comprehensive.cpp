@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <stdexcept>
@@ -193,8 +194,8 @@ TEST_F(OrbitalsTest, OpenShellAndRestrictedQueries) {
   Orbitals unrestricted_orb(coeffs, coeffs, energies, energies, std::nullopt,
                             basis_set);
 
-  // Should now be open shell
-  EXPECT_TRUE(unrestricted_orb.is_restricted());
+  // Should now be open shell (different pointers even though same data)
+  EXPECT_FALSE(unrestricted_orb.is_restricted());
 }
 
 TEST_F(OrbitalsTest, HasEnergies) {

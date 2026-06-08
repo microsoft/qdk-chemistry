@@ -299,11 +299,9 @@ class PyscfScfSolver(ScfSolver):
         _ovlp = mf.get_ovlp()
 
         if scf_type == SCFType.RESTRICTED and mol.spin != 0:
-            # ROHF/ROKS case - create unrestricted-style orbitals but with same coefficients
+            # ROHF/ROKS case - restricted orbitals (same coefficients for alpha and beta)
             orbitals = Orbitals(
-                mf.mo_coeff,  # Same coefficients for alpha and beta
                 mf.mo_coeff,
-                mf.mo_energy,  # Same energies for alpha and beta
                 mf.mo_energy,
                 ao_overlap=_ovlp,
                 basis_set=basis_set,

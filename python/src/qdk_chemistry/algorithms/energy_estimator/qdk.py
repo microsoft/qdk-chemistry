@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
-import qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import (
@@ -29,6 +29,19 @@ __all__: list[str] = ["QdkEnergyEstimator"]
 def _parity(integer: int) -> int:
     """Return the parity of an integer."""
     return integer.bit_count() % 2
+
+
+def _is_identity_only(pauli_strings: list[str]) -> bool:
+    """Return True if all Pauli strings in the group are full identity operators.
+
+    Args:
+        pauli_strings: List of Pauli label strings.
+
+    Returns:
+        True if every string consists only of ``'I'`` characters.
+
+    """
+    return all(set(ps) == {"I"} for ps in pauli_strings)
 
 
 def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
@@ -213,33 +226,57 @@ class QdkEnergyEstimator(EnergyEstimator):
         circuit_executor = self._create_nested("circuit_executor")
 
         qubit_hamiltonians = self._resolve_measurement_groups(qubit_hamiltonian)
-        num_observables = len(qubit_hamiltonians)
+
+        # Create measurement circuits, filtering out identity-only groups
+        measurement_circuits, measurement_hamiltonians, identity_offset = self._create_measurement_circuits(
+            circuit=circuit,
+            grouped_hamiltonians=qubit_hamiltonians,
+        )
+
+        num_observables = len(measurement_circuits)
+
+        # If all groups are identity, return directly without measurement
+        if num_observables == 0:
+            Logger.warn("All Hamiltonian terms are identity; skipping circuit execution.")
+            return EnergyExpectationResult(
+                energy_expectation_value=identity_offset,
+                energy_variance=0.0,
+                expvals_each_term=[],
+                variances_each_term=[],
+            ), MeasurementData(
+                hamiltonians=qubit_hamiltonians,
+                bitstring_counts=[],
+                shots_list=[],
+            )
+
         if total_shots < num_observables:
             raise ValueError(
                 f"Total shots {total_shots} is less than the number of observables {num_observables}. "
                 "Please increase total shots to ensure each observable is measured."
             )
 
-        # Evenly distribute shots across all observables
+        # Evenly distribute shots across non-identity observables
         shots_list = [total_shots // num_observables] * num_observables
         Logger.debug(f"Shots allocated: {shots_list}")
 
-        # Create measurement circuits
-        measurement_circuits = self._create_measurement_circuits(
-            circuit=circuit,
-            grouped_hamiltonians=qubit_hamiltonians,
-        )
-
         measurement_data = self._get_measurement_data(
             measurement_circuits=measurement_circuits,
-            qubit_hamiltonians=qubit_hamiltonians,
+            qubit_hamiltonians=measurement_hamiltonians,
             circuit_executor=circuit_executor,
             shots_list=shots_list,
             noise_model=noise_model,
         )
 
-        return self._compute_energy_expectation_from_bitstrings(
-            qubit_hamiltonians, measurement_data.bitstring_counts
+        measured_result = self._compute_energy_expectation_from_bitstrings(
+            measurement_hamiltonians, measurement_data.bitstring_counts
+        )
+
+        # Add identity offset to the measured energy
+        return EnergyExpectationResult(
+            energy_expectation_value=measured_result.energy_expectation_value + identity_offset,
+            energy_variance=measured_result.energy_variance,
+            expvals_each_term=measured_result.expvals_each_term,
+            variances_each_term=measured_result.variances_each_term,
         ), measurement_data
 
     @staticmethod
@@ -299,26 +336,40 @@ class QdkEnergyEstimator(EnergyEstimator):
         ]
 
     @staticmethod
-    def _create_measurement_circuits(circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]) -> list[Circuit]:
+    def _create_measurement_circuits(
+        circuit: Circuit, grouped_hamiltonians: list[QubitHamiltonian]
+    ) -> tuple[list[Circuit], list[QubitHamiltonian], float]:
         """Create measurement circuits for each QubitHamiltonian.
+
+        Identity-only groups (e.g. ``"IIII"``) are dropped from the circuit
+        list and their coefficient sum is returned as an energy offset.
 
         Args:
             circuit: Circuit that provides an OpenQASM3 string of the base circuit.
             grouped_hamiltonians: List of ``QubitHamiltonian`` grouped in qubit-wise commuting sets.
 
         Returns:
-            List of Circuits that provide the measurement circuits in OpenQASM3 format.
+            Tuple of (measurement circuits, corresponding hamiltonians, identity energy offset).
 
         """
         Logger.trace_entering()
-        meas_circuits = []
+        meas_circuits: list[Circuit] = []
+        meas_hamiltonians: list[QubitHamiltonian] = []
+        identity_offset = 0.0
 
         for hamiltonian in grouped_hamiltonians:
-            basis = _determine_measurement_basis(hamiltonian.pauli_strings)
-            full_circuit = _append_measurement_to_circuit(circuit, basis)
-            meas_circuits.append(full_circuit)
+            if _is_identity_only(hamiltonian.pauli_strings):
+                identity_offset += float(np.real(np.sum(hamiltonian.coefficients)))
+                Logger.debug(
+                    f"Dropping identity-only group from measurement circuits. Energy offset += {identity_offset:.4f}"
+                )
+            else:
+                basis = _determine_measurement_basis(hamiltonian.pauli_strings)
+                full_circuit = _append_measurement_to_circuit(circuit, basis)
+                meas_circuits.append(full_circuit)
+                meas_hamiltonians.append(hamiltonian)
 
-        return meas_circuits
+        return meas_circuits, meas_hamiltonians, identity_offset
 
     @staticmethod
     def _compute_energy_expectation_from_bitstrings(
@@ -414,7 +465,10 @@ class QdkEnergyEstimator(EnergyEstimator):
 
         """
         counts = self._run_measurement_circuits_and_get_bitstring_counts(
-            measurement_circuits, circuit_executor, shots_list, noise_model
+            measurement_circuits,
+            circuit_executor,
+            shots_list,
+            noise_model,
         )
         return MeasurementData(
             bitstring_counts=counts,

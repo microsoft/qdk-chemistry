@@ -6,14 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledCircuitMapperFactory
-from .pauli_sequence_mapper import PauliSequenceMapper
+from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .prep_sel_prep_mapper import PrepSelPrepMapper, PrepSelPrepSettings
 from .select_mapper import MultiControlledSelectMapper, SelectMapper, SelectMapperFactory
 
 __all__ = [
     "ControlledCircuitMapperFactory",
+    "ControlledPauliSequenceMapper",
     "MultiControlledSelectMapper",
-    "PauliSequenceMapper",
     "PrepSelPrepMapper",
     "PrepSelPrepSettings",
     "SelectMapper",

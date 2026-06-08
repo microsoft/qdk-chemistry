@@ -505,6 +505,7 @@ def _register_python_factories():
     be called by users.
     """
     from qdk_chemistry.algorithms.circuit_executor import CircuitExecutorFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledCircuitMapperFactory,
         SelectMapperFactory,
@@ -512,12 +513,19 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import (  # noqa: PLC0415
+        HamiltonianSimulationFactory,
+    )
 
     register_factory(EnergyEstimatorFactory())
+    register_factory(CircuitMapperFactory())
+    register_factory(HamiltonianSimulationFactory())
     register_factory(StatePreparationFactory())
     register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
@@ -526,7 +534,9 @@ def _register_python_factories():
     register_factory(ControlledCircuitMapperFactory())
     register_factory(SelectMapperFactory())
     register_factory(CircuitExecutorFactory())
+    register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(PropagatorFactory())
 
 
 _ = _register_cpp_factories()
@@ -582,8 +592,9 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
+    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
-        PauliSequenceMapper,
+        ControlledPauliSequenceMapper,
         PrepSelPrepMapper,
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper.select_mapper import (  # noqa: PLC0415
@@ -598,9 +609,16 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
+        QdkIterativeQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
     )
+    from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import (  # noqa: PLC0415
+        StandardPhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
@@ -610,6 +628,7 @@ def _register_python_algorithms():
         IdentityTermGrouper,
         QubitWiseCommutingTermGrouper,
     )
+    from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
     register(lambda: QdkEnergyEstimator())
     register(lambda: SparseIsometryGF2XStatePreparation())
@@ -627,9 +646,14 @@ def _register_python_algorithms():
     register(lambda: PrepSelPrepMapper())
     register(lambda: MultiControlledSelectMapper())
     register(lambda: DensePureStatePreparation())
+    register(lambda: ControlledPauliSequenceMapper())
+    register(lambda: EulerIntegrator())
+    register(lambda: MagnusPropagator())
     register(lambda: QdkFullStateSimulator())
     register(lambda: QdkSparseStateSimulator())
+    register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: StandardPhaseEstimation())
 
 
 _register_python_algorithms()

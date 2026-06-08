@@ -306,6 +306,32 @@ void save_vector_variant_to_group(
     bool is_vector_variant_complex,
     const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
     const std::string& storage_name);
+
+/**
+ * @brief Save matrix variant to group together with a sibling boolean
+ * attribute recording its scalar type, suitable for round-tripping with
+ * @ref load_matrix_variant_from_group.
+ * @param matrix_variant The matrix variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name Dataset name within the group
+ * @param complex_attr_name Attribute name to record the complex/real flag
+ */
+void save_matrix_variant_to_group_with_complex_attr(
+    const std::shared_ptr<MatrixVariant>& matrix_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name);
+
+/**
+ * @brief Save vector variant to group together with a sibling boolean
+ * attribute recording its scalar type, suitable for round-tripping with
+ * @ref load_vector_variant_from_group.
+ * @param vector_variant The vector variant to store
+ * @param group Which hdf5 group to save to
+ * @param storage_name Dataset name within the group
+ * @param complex_attr_name Attribute name to record the complex/real flag
+ */
+void save_vector_variant_to_group_with_complex_attr(
+    const std::shared_ptr<VectorVariant>& vector_variant, H5::Group& group,
+    const std::string& storage_name, const std::string& complex_attr_name);
 // Template implementations
 
 // Save STL vector to HDF5 file
