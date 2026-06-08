@@ -10,8 +10,8 @@ Overview
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
-QDK/Chemistry currently provides Trotter-Suzuki product formulas for this task.
-These decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the Trotter order and number of time divisions :cite:`Suzuki1992`.
+QDK/Chemistry currently provides two product-formula methods for this task: Trotter-Suzuki and the Zassenhaus recursion.
+Both decompose :math:`e^{-iHt}` into a sequence of elementary Pauli rotations :math:`e^{-i\theta P}` that can be directly implemented as quantum gates, with controllable approximation error via the expansion order and number of time divisions :cite:`Suzuki1992,Casas2012`.
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` — a list of exponentiated Pauli terms with a repetition count.
 
 
@@ -138,6 +138,59 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``error_bound``
      - str
      - Error bound strategy: ``"commutator"`` (default, tighter) or ``"naive"`` (simpler).
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+
+.. _zassenhaus-builder:
+
+Zassenhaus recursion
+~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"zassenhaus"``
+
+The Zassenhaus expansion is the dual of the Baker-Campbell-Hausdorff formula :cite:`Wilcox1967`: it factorises a single exponential of a sum into an ordered product of exponentials in which low-order nested-commutator corrections appear as **explicit** factors, rather than being suppressed implicitly by the step count.
+For two anti-Hermitian generators :math:`X = -i t A` and :math:`Y = -i t B`:
+
+.. math::
+
+   e^{X + Y} = e^{X}\, e^{Y}\, e^{C_2}\, e^{C_3}\, e^{C_4}\cdots
+
+where the corrections are nested commutators :cite:`Casas2012`:
+
+.. math::
+
+   C_2 &= -\tfrac{1}{2}[X, Y] \\
+   C_3 &= \tfrac{1}{3}[Y, [X, Y]] + \tfrac{1}{6}[X, [X, Y]] \\
+   C_4 &= -\tfrac{1}{24}[X, [X, [X, Y]]] - \tfrac{1}{8}[Y, [X, [X, Y]]] - \tfrac{1}{8}[Y, [Y, [X, Y]]]
+
+Truncating after :math:`C_p` yields an operator-norm error of :math:`O(t^{p+1})` at a single time division.
+Unlike Trotter-Suzuki, where the commutator structure is absorbed into the step count, here it is cancelled directly :cite:`Childs2021` — an advantage when the dominant commutators are sparse (lattice models with limited geometric coupling, or chemistry Hamiltonians under term partitions with small inter-group commutators).
+
+To handle a Hamiltonian with more than two non-commuting parts, the builder first partitions :math:`H` into internally-commuting groups :math:`G_1, \ldots, G_K` (each :math:`e^{-i t G_i}` is then exact) and applies the expansion recursively:
+
+.. math::
+
+   Z_p(G_1, \ldots, G_K) = e^{-i t G_1}\; Z_p(G_2, \ldots, G_K)\; e^{C_2} \cdots e^{C_p}
+
+with the corrections evaluated against the exact remaining block :math:`-i t (G_2 + \cdots + G_K)`.
+Groups are taken from the Hamiltonian's :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` when it is present and internally commuting; otherwise the builder groups terms greedily with the :ref:`commuting term grouper <algorithms-term-grouper>`.
+The output is a ``PauliProductFormulaContainer`` of the same shape as the :ref:`Trotter builder <trotter-builder>`, so it is consumable by downstream algorithms such as :doc:`PhaseEstimation <phase_estimation>` without changes.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Zassenhaus expansion order :math:`p`. Supported values are 2, 3, and 4; order 1 (no commutator corrections) falls back to the first-order Trotter builder. Default is 2.
+   * - ``num_divisions``
+     - int
+     - Number of time divisions :math:`N`. The Zassenhaus product approximates :math:`e^{-iHt/N}` and is repeated :math:`N` times. Default is 1.
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
