@@ -89,7 +89,10 @@ std::shared_ptr<data::Hamiltonian> HamiltonianConstructor::_run_impl(
   utils::microsoft::initialize_backend();
 
   auto basis_set = orbitals->get_basis_set();
-  const auto& [Ca, Cb] = orbitals->get_coefficients();
+  const auto& Ca = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
+  const auto& Cb =
+      orbitals->coefficients()->block({data::axes::beta(), data::axes::beta()});
   const size_t num_atomic_orbitals = basis_set->get_num_atomic_orbitals();
   const size_t num_molecular_orbitals = orbitals->get_num_molecular_orbitals();
 

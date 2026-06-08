@@ -312,7 +312,10 @@ ScfCalculationResult ScfSolver::_run_with_options(
   if (basis_set_type == BasisSetType::FromOrbitals) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
-    auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();
+    const auto& coeff_alpha = initial_guess->coefficients()->block(
+        {data::axes::alpha(), data::axes::alpha()});
+    const auto& coeff_beta = initial_guess->coefficients()->block(
+        {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
     auto [n_alpha, n_beta] =

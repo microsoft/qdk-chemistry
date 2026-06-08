@@ -11,6 +11,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_sparse_map.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -89,6 +90,25 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    */
   explicit SparseHamiltonianContainer(
       const Eigen::MatrixXd& one_body_integrals, double core_energy = 0.0,
+      HamiltonianType type = HamiltonianType::Hermitian);
+
+  /**
+   * @brief Construct from a sparse one-body matrix and a preconstructed
+   *        @ref SymmetryBlockedSparseMap two-body container.
+   *
+   * Used by the serialization layer to hand a deserialized sparse map to the
+   * container without going through the @ref TwoBodyMap conversion path.
+   *
+   * @param one_body_integrals Sparse one-body integral matrix [n x n].
+   * @param two_body Preconstructed sparse two-body container (may be
+   *        @c nullptr to indicate no two-body integrals).
+   * @param core_energy Scalar energy offset.
+   * @param type Hamiltonian type.
+   */
+  SparseHamiltonianContainer(
+      Eigen::SparseMatrix<double> one_body_integrals,
+      std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
+      double core_energy = 0.0,
       HamiltonianType type = HamiltonianType::Hermitian);
 
   /**
@@ -203,7 +223,14 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Direct access to the sparse two-body integral map.
    * @return Const reference to the internal two-body map
    */
-  const TwoBodyMap& sparse_two_body_integrals() const;
+  TwoBodyMap sparse_two_body_integrals() const;
+
+  /**
+   * @brief Two-body integrals as a rank-4 symmetry-blocked sparse map.
+   * @return Const reference to the two-body sparse map.
+   * @throws std::runtime_error if not set.
+   */
+  const SymmetryBlockedSparseMap<4>& two_body_integrals_sparse() const;
 
   /**
    * @brief Access a single one-body integral element.
@@ -215,12 +242,13 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
  private:
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /// Sparse storage of one-body integrals
   Eigen::SparseMatrix<double> _one_body_sparse;
-  /// Sparse storage of two-body integrals (p,q,r,s) -> value
-  TwoBodyMap _two_body_map;
+
+  /// sparse two-body integrals.
+  std::shared_ptr<const SymmetryBlockedSparseMap<4>> _two_body_sparse;
 
   /// Lazy-materialized dense two-body vector for base class interface
   mutable Eigen::VectorXd _two_body_dense_cache;
