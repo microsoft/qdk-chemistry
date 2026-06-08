@@ -126,6 +126,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        phase_qubit_prep_op = QSHARP_UTILS.StatePreparation.MakePrepareHadamardAllOp()
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]
         standard_parameters = {
@@ -134,6 +135,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             "numBits": num_bits,
             "ancillas": ancillas,
             "systems": systems,
+            "phaseQubitPrep": phase_qubit_prep_op,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

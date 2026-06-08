@@ -10,12 +10,14 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
     /// - `controlledEvolution`: A function to perform controlled-U on (control, systems).
+    /// - `phaseQubitPrep`: A function to prepare the phase (ancilla) qubits. Defaults to applying H to each.
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices representing the ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         controlledEvolution : (Qubit, Qubit[]) => Unit,
+        phaseQubitPrep : Qubit[] => Unit,
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
@@ -36,10 +38,8 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         // Step 1: Prepare the initial state on system qubits
         params.statePrep(systems);
 
-        // Step 2: Apply Hadamard to all ancilla qubits
-        for idx in 0..params.numBits - 1 {
-            H(ancillas[idx]);
-        }
+        // Step 2: Prepare phase (ancilla) qubits
+        params.phaseQubitPrep(ancillas);
 
         // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
         // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
@@ -69,6 +69,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numBits`: The number of ancilla qubits (phase bits) for QPE.
     /// - `ancillas`: An array of indices for the ancilla qubits.
     /// - `systems`: An array of indices for the system qubits.
+    /// - `phaseQubitPrep`: Optional function to prepare the phase qubits. Defaults to Hadamard on all.
     /// # Returns
     /// The measurement results of the ancilla qubits.
     operation MakeStandardQPECircuit(
@@ -77,10 +78,12 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         numBits : Int,
         ancillas : Int[],
         systems : Int[],
+        phaseQubitPrep : Qubit[] => Unit,
     ) : Result[] {
         return RunStandardQPE(new StandardPhaseEstimationParams {
             statePrep = statePrep,
             controlledEvolution = controlledEvolution,
+            phaseQubitPrep = phaseQubitPrep,
             numBits = numBits,
             ancillas = ancillas,
             systems = systems
