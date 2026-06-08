@@ -399,6 +399,9 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
         energy = self._run_scf(mf, scf_type, basis_or_guess)
 
         max_iterations = self._settings.get("max_stability_iterations")
+        if max_iterations == 0:
+            return self._to_wavefunction(mf, structure, basis_name, scf_type, energy)
+
         check_internal = self._settings.get("check_internal")
         check_external_setting = self._settings.get("check_external")
 
@@ -421,11 +424,11 @@ class PyscfStabilizedScfSolver(PyscfScfSolver):
                 energy = mf.kernel(dm0=dm0)
             else:
                 break
-        else:
-            check_external = check_external_setting and self._can_check_external_stability(mf)
-            stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
-            _, _, internal_stable, external_stable = self._unpack_stability(stability)
-            is_stable = (not check_internal or internal_stable) and (not check_external or external_stable)
+
+        check_external = check_external_setting and self._can_check_external_stability(mf)
+        stability = mf.stability(internal=check_internal, external=check_external, return_status=True)
+        _, _, internal_stable, external_stable = self._unpack_stability(stability)
+        is_stable = (not check_internal or internal_stable) and (not check_external or external_stable)
 
         if not is_stable and self._settings.get("fail_on_unstable"):
             raise RuntimeError("PySCF stabilized SCF did not reach a stable reference.")

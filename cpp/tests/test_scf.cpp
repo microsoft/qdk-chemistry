@@ -85,13 +85,19 @@ TEST_F(ScfTest, Factory) {
 
 TEST_F(ScfTest, StabilizedScfSolverPassthrough) {
   auto water = testing::create_water_structure();
+  auto regular_scf_solver = ScfSolverFactory::create("qdk");
+  regular_scf_solver->settings().set("method", "hf");
+  auto [regular_energy, regular_wavefunction] =
+      regular_scf_solver->run(water, 0, 1, "sto-3g");
+
   auto scf_solver = ScfSolverFactory::create("qdk_stabilized");
   scf_solver->settings().set("method", "hf");
   scf_solver->settings().set("max_stability_iterations", 0);
 
   auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
 
-  EXPECT_NEAR(energy, -74.9630631297275, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy, regular_energy, testing::scf_energy_tolerance);
+  EXPECT_TRUE(regular_wavefunction->get_orbitals()->is_restricted());
   EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
 }
 

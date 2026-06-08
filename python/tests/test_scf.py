@@ -101,15 +101,18 @@ class TestScfSolver:
     def test_stabilized_scf_solver_passthrough(self):
         """Test stabilized SCF solver can run a regular SCF calculation."""
         water = create_water_structure()
+        regular_scf_solver = algorithms.create("scf_solver", "qdk")
+        regular_scf_solver.settings().set("method", "hf")
+        regular_energy, regular_wavefunction = regular_scf_solver.run(water, 0, 1, "sto-3g")
+
         scf_solver = algorithms.create("scf_solver", "qdk_stabilized")
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("max_stability_iterations", 0)
 
         energy, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
 
-        assert np.isclose(
-            energy, -74.9630631297275, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
-        )
+        assert np.isclose(energy, regular_energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+        assert regular_wavefunction.get_orbitals().is_restricted()
         assert wavefunction.get_orbitals().is_restricted()
 
     def test_scf_solver_water_default_settings(self):
