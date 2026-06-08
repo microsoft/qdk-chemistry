@@ -35,6 +35,7 @@ def _register_algorithms():
         GeometricOptimizer,
     )
 
+    register(lambda: GeometricOptimizer(algorithm="tric", name="geometric"))
     for algorithm in GEOMETRIC_OPTIMIZER_ALGORITHMS:
         register(lambda algorithm=algorithm: GeometricOptimizer(algorithm=algorithm))
         register(lambda algorithm=algorithm: GeometricOptimizer(algorithm=algorithm, transition_state=True))

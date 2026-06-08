@@ -112,7 +112,7 @@ class _QdkDerivativeEngine(Engine):
 class GeometricOptimizer(GeometryOptimizer):
     """Geometry optimizer implemented with the geomeTRIC Python library."""
 
-    def __init__(self, *, algorithm: str = "tric", transition_state: bool = False):
+    def __init__(self, *, algorithm: str = "tric", transition_state: bool = False, name: str | None = None):
         """Initialize the geomeTRIC optimizer."""
         Logger.trace_entering()
         super().__init__()
@@ -121,6 +121,7 @@ class GeometricOptimizer(GeometryOptimizer):
         self._algorithm = algorithm
         self._coordinate_system = GEOMETRIC_OPTIMIZER_ALGORITHMS[algorithm]
         self._transition_state = transition_state
+        self._name = name
         self._settings = GeometricOptimizerSettings(
             transition_state=transition_state,
             coordinate_system=self._coordinate_system,
@@ -128,6 +129,8 @@ class GeometricOptimizer(GeometryOptimizer):
 
     def name(self) -> str:
         """Return the implementation name."""
+        if self._name is not None:
+            return self._name
         mode = "tsopt" if self._transition_state else "geoopt"
         return f"geometric_{mode}_{self._algorithm}"
 

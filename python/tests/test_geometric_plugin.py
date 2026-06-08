@@ -22,9 +22,15 @@ def _h2_structure():
 def test_geometric_plugin_registration():
     """The geomeTRIC plugin registers a geometry optimizer when installed."""
     available = algorithms.available("geometry_optimizer")
+    assert "geometric" in available
     for algorithm in GEOMETRIC_OPTIMIZER_ALGORITHMS:
         assert f"geometric_geoopt_{algorithm}" in available
         assert f"geometric_tsopt_{algorithm}" in available
+
+    default_optimizer = algorithms.create("geometry_optimizer", "geometric")
+    assert isinstance(default_optimizer, algorithms.GeometryOptimizer)
+    assert default_optimizer.name() == "geometric"
+    assert default_optimizer.settings().get("coordinate_system") == "tric"
 
     optimizer = algorithms.create("geometry_optimizer", "geometric_geoopt_tric")
     assert isinstance(optimizer, algorithms.GeometryOptimizer)
