@@ -110,39 +110,54 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_bits = self._settings.get("num_bits")
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
-        ancilla = QuantumRegister(num_bits, "ancilla")
-        system = QuantumRegister(qubit_hamiltonian.num_qubits, "system")
+
+        # Determine unitary ancilla qubit count by inspecting a trial controlled circuit.
+        trial_ctrl_circuit = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
+        trial_qc = trial_ctrl_circuit.get_qiskit_circuit()
+        num_system = qubit_hamiltonian.num_qubits
+        num_unitary_ancilla = trial_qc.num_qubits - 1 - num_system
+
+        phase = QuantumRegister(num_bits, "phase")
+        system = QuantumRegister(num_system, "system")
+        registers = [phase, system]
+        if num_unitary_ancilla > 0:
+            unitary_ancilla = QuantumRegister(num_unitary_ancilla, "unitary_ancilla")
+            registers.append(unitary_ancilla)
+        else:
+            unitary_ancilla = None
         classical = ClassicalRegister(num_bits, "c")
-        qc = QuantumCircuit(ancilla, system, classical)
+        registers.append(classical)
+        qc = QuantumCircuit(*registers)
 
         Logger.debug(f"Creating traditional QPE circuit with {num_bits} ancilla qubits and measurements.")
         state_prep = state_preparation.get_qiskit_circuit()
-        if state_prep.num_qubits != qubit_hamiltonian.num_qubits:
+        if state_prep.num_qubits != num_system:
             raise ValueError(
                 "state_preparation must prepare the same number of system qubits as the Hamiltonian "
-                f"(expected {qubit_hamiltonian.num_qubits}, received {state_prep.num_qubits}).",
+                f"(expected {num_system}, received {state_prep.num_qubits}).",
             )
 
         qc.compose(state_prep, qubits=system, inplace=True)
 
         for idx in range(num_bits):
-            qc.h(ancilla[idx])
+            qc.h(phase[idx])
 
-        for ancilla_idx in range(num_bits):
-            power = 2**ancilla_idx
+        target_qubits = list(system) + (list(unitary_ancilla) if unitary_ancilla else [])
+        for phase_idx in range(num_bits):
+            power = 2**phase_idx
             self._append_controlled_unitary(
                 circuit=qc,
                 qubit_hamiltonian=qubit_hamiltonian,
-                control_qubit=ancilla[ancilla_idx],
-                target_qubits=system,
+                control_qubit=phase[phase_idx],
+                target_qubits=target_qubits,
                 power=power,
             )
 
         inverse_qft = synth_qft_full(
             num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True, name="Inverse QFT"
         )
-        qc.compose(inverse_qft.to_gate(), qubits=ancilla, inplace=True)
-        qc.measure(ancilla, classical)
+        qc.compose(inverse_qft.to_gate(), qubits=phase, inplace=True)
+        qc.measure(phase, classical)
         Logger.debug(f"Completed standard QPE circuit with {qc.num_qubits} qubits.")
 
         return Circuit(qasm3.dumps(qc))
@@ -323,13 +338,24 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         state_prep_qc = state_preparation.get_qiskit_circuit()
         ctrl_unitary_qc = controlled_unitary_circuit.get_qiskit_circuit()
-        ancilla = QuantumRegister(1, "ancilla")
-        system_target = QuantumRegister(state_prep_qc.num_qubits, "system")
+        num_system = state_prep_qc.num_qubits
+        num_unitary_ancilla = ctrl_unitary_qc.num_qubits - 1 - num_system
+
+        phase = QuantumRegister(1, "phase")
+        system_target = QuantumRegister(num_system, "system")
+        registers = [phase, system_target]
+        if num_unitary_ancilla > 0:
+            unitary_ancilla = QuantumRegister(num_unitary_ancilla, "unitary_ancilla")
+            registers.append(unitary_ancilla)
+        else:
+            unitary_ancilla = None
         classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
+        registers.append(classical)
+        circuit = QuantumCircuit(*registers)
+
         circuit.append(state_prep_qc.to_gate(), system_target)
-        control = ancilla[0]
-        target_qubits = list(system_target)
+        control = phase[0]
+        target_qubits = list(system_target) + (list(unitary_ancilla) if unitary_ancilla else [])
         circuit.h(control)
 
         # Apply phase correction if provided

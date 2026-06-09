@@ -6,11 +6,14 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
@@ -19,15 +22,69 @@ from .reference_tolerances import (
     qpe_energy_tolerance,
 )
 
+_builder_params = [
+    pytest.param("qdk_iterative", id="qdk_iterative"),
+    pytest.param(
+        "qiskit_iterative",
+        id="qiskit_iterative",
+        marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
+    ),
+]
 
-def _qubitization_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
+
+def _qubitization_circuit_builder_ref(num_bits: int = 4, builder: str = "qdk_iterative") -> AlgorithmRef:
     """Return an AlgorithmRef for the iterative QPE circuit builder with qubitization."""
     return AlgorithmRef(
         "qpe_circuit_builder",
-        "qdk_iterative",
+        builder,
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+    )
+
+
+@pytest.fixture
+def h2_hamiltonian() -> QubitHamiltonian:
+    # H2 / STO-3G qubit Hamiltonian (Jordan-Wigner, 4 qubits, 15 terms)
+    h2_pauli_strings = [
+        "ZIZI",
+        "YYYY",
+        "XXYY",
+        "IIII",
+        "XXXX",
+        "IIIZ",
+        "IZII",
+        "IIZI",
+        "ZIII",
+        "ZIIZ",
+        "IIZZ",
+        "IZZI",
+        "ZZII",
+        "IZIZ",
+        "YYXX",
+    ]
+    h2_coefficients = np.array(
+        [
+            0.19176479,
+            0.04104867,
+            0.04104867,
+            -0.5734373,
+            0.04104867,
+            0.23708567,
+            0.23708567,
+            -0.46083546,
+            -0.46083546,
+            0.18168163,
+            0.14063296,
+            0.18168163,
+            0.14063296,
+            0.18454294,
+            0.04104867,
+        ]
+    )
+    return QubitHamiltonian(
+        pauli_strings=h2_pauli_strings,
+        coefficients=h2_coefficients,
     )
 
 
@@ -83,7 +140,8 @@ class TestIQPEWithQubitization:
             atol=qpe_energy_tolerance,
         )
 
-    def test_iterative_qpe_with_qubitization_h2(self):
+    @pytest.mark.parametrize("builder_name", _builder_params)
+    def test_iterative_qpe_with_qubitization_h2(self, builder_name, h2_hamiltonian):
         """Verify QPE with qubitization recovers H2 ground-state energy.
 
         Uses the full H2/STO-3G qubit Hamiltonian (15 Pauli terms, 4 qubits)
@@ -94,54 +152,12 @@ class TestIQPEWithQubitization:
         Reference ground-state energy: -2.2472 Ha (from exact diagonalization).
         With 4 phase bits, the discretization error is ~0.02 Ha.
         """
-        # H2 / STO-3G qubit Hamiltonian (Jordan-Wigner, 4 qubits, 15 terms)
-        h2_pauli_strings = [
-            "ZIZI",
-            "YYYY",
-            "XXYY",
-            "IIII",
-            "XXXX",
-            "IIIZ",
-            "IZII",
-            "IIZI",
-            "ZIII",
-            "ZIIZ",
-            "IIZZ",
-            "IZZI",
-            "ZZII",
-            "IZIZ",
-            "YYXX",
-        ]
-        h2_coefficients = np.array(
-            [
-                0.19176479,
-                0.04104867,
-                0.04104867,
-                -0.5734373,
-                0.04104867,
-                0.23708567,
-                0.23708567,
-                -0.46083546,
-                -0.46083546,
-                0.18168163,
-                0.14063296,
-                0.18168163,
-                0.14063296,
-                0.18454294,
-                0.04104867,
-            ]
-        )
-        hamiltonian = QubitHamiltonian(
-            pauli_strings=h2_pauli_strings,
-            coefficients=h2_coefficients,
-        )
-
         # Exact ground state from qubit Hamiltonian solver (dense diagonalization)
         solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
-        reference_energy, ground_state_vector = solver.run(hamiltonian)
+        reference_energy, ground_state_vector = solver.run(h2_hamiltonian)
         ground_state_vector = ground_state_vector.real.tolist()
 
-        num_qubits = hamiltonian.num_qubits
+        num_qubits = h2_hamiltonian.num_qubits
         state_prep_params = {
             "rowMap": [3, 2, 1, 0],
             "stateVector": ground_state_vector,
@@ -157,21 +173,91 @@ class TestIQPEWithQubitization:
 
         num_bits = 4
         iqpe = IterativePhaseEstimation(shots_per_bit=3)
-        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=num_bits))
+        iqpe.settings().set(
+            "qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=num_bits, builder=builder_name)
+        )
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
         )
 
         result = iqpe.run(
-            qubit_hamiltonian=hamiltonian,
+            qubit_hamiltonian=h2_hamiltonian,
             state_preparation=state_prep,
         )
 
         # With 4 phase bits the phase 0.376 rounds to 6/16 = 0.375,
         # giving E = lambda * cos(2*pi * 0.375) ~ -2.231.
         # Allow 0.02 Ha tolerance for discretization error.
-        lambda_norm = np.sum(np.abs(h2_coefficients))
+        lambda_norm = np.sum(np.abs(h2_hamiltonian.coefficients))
+        phi_exact = np.arccos(reference_energy / lambda_norm) / (2 * np.pi)
+        # Discretize to num_bits
+        num_levels = 2**num_bits  # e.g. 16 for 4 bits
+        phi_disc = round(phi_exact * num_levels) / num_levels
+        # Conjugate branch (QPE may measure either)
+        phi_disc_alt = 1.0 - phi_disc
+        # Discretized energy (same for both branches)
+        energy_disc = lambda_norm * np.cos(2 * np.pi * phi_disc)
+        assert np.isclose(
+            result.phase_fraction,
+            phi_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        ) or np.isclose(
+            result.phase_fraction,
+            phi_disc_alt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(
+            result.raw_energy,
+            energy_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
+        assert np.isclose(result.raw_energy, reference_energy, atol=0.02)
+
+    @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+    def test_standard_qpe_with_qubitization_h2(self, h2_hamiltonian):
+        """Verify standard QPE with qubitization recovers H2 ground-state energy."""
+        # Exact ground state from qubit Hamiltonian solver (dense diagonalization)
+        solver = create("qubit_hamiltonian_solver", "qdk_dense_matrix_solver")
+        reference_energy, ground_state_vector = solver.run(h2_hamiltonian)
+        ground_state_vector = ground_state_vector.real.tolist()
+
+        num_qubits = h2_hamiltonian.num_qubits
+        state_prep_params = {
+            "rowMap": [3, 2, 1, 0],
+            "stateVector": ground_state_vector,
+            "expansionOps": [],
+            "numQubits": num_qubits,
+        }
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        )
+        qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
+        state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+        num_bits = 4
+        qpe = StandardPhaseEstimation(shots=3)
+        qpe.settings().set(
+            "qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=num_bits, builder="qiskit_standard")
+        )
+        qpe.settings().set(
+            "circuit_executor",
+            AlgorithmRef("circuit_executor", "qiskit_aer_simulator"),
+        )
+
+        result = qpe.run(
+            qubit_hamiltonian=h2_hamiltonian,
+            state_preparation=state_prep,
+        )
+
+        # With 4 phase bits the phase 0.376 rounds to 6/16 = 0.375,
+        # giving E = lambda * cos(2*pi * 0.375) ~ -2.231.
+        # Allow 0.02 Ha tolerance for discretization error.
+        lambda_norm = np.sum(np.abs(h2_hamiltonian.coefficients))
         phi_exact = np.arccos(reference_energy / lambda_norm) / (2 * np.pi)
         # Discretize to num_bits
         num_levels = 2**num_bits  # e.g. 16 for 4 bits
