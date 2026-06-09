@@ -149,14 +149,14 @@ class TestLCUBuilder:
         container_no_walk = builder_no_walk.run(hamiltonian).get_container()
         assert container_no_walk.quantum_walk is False
 
-    def test_rejects_zero_schatten_norm(self):
+    def test_rejects_zero_l1_norm(self):
         """Verify LCUBuilder raises ValueError when all coefficients are zero."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.0, 0.0]),
         )
         builder = LCUBuilder()
-        with pytest.raises(ValueError, match="Schatten norm is too small"):
+        with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
 
 

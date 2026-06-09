@@ -39,8 +39,7 @@ class LCUSettings(HamiltonianUnitaryBuilderSettings):
             power: The power to which the Hamiltonian is raised.
             quantum_walk: If True, wrap block encoding with quantum walk operator (use with QPE).
                 If False, use plain block encoding (use with Hadamard test).
-            min_schatten_norm: Minimum Schatten norm below which the LCU decomposition
-                is numerically ill-defined.
+            tolerance: Minimum L1 norm below which the LCU decomposition is numerically ill-defined.
 
         """
         super().__init__()
@@ -53,10 +52,10 @@ class LCUSettings(HamiltonianUnitaryBuilderSettings):
             "If False, use plain block encoding (use with Hadamard test).",
         )
         self._set_default(
-            "min_schatten_norm",
+            "tolerance",
             "float",
-            1e-15,
-            "Minimum Schatten norm below which the LCU decomposition is numerically ill-defined.",
+            1e-12,
+            "Minimum L1 norm below which the LCU decomposition is numerically ill-defined.",
         )
 
 
@@ -73,7 +72,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         Given a qubit Hamiltonian :math:`H = \sum_{j=1}^{L} \alpha_j P_j` expressed as a
         linear combination of Pauli strings :math:`P_j` with scalar coefficients
         :math:`\alpha_j`, this builder constructs an LCU representation that block-encodes
-        :math:`H / \lambda`, where :math:`\lambda` is the Schatten norm (L1 norm) of the
+        :math:`H / \lambda`, where :math:`\lambda` is the L1 norm of the
         Hamiltonian. The LCU representation follows the PREPARE-SELECT-PREPARE† pattern.
 
         The PREPARE oracle encodes amplitudes :math:`\sqrt{|\alpha_j| / \lambda}` into
@@ -118,7 +117,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         num_terms = len(coefficients)
         num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
 
-        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits, self._settings.get("min_schatten_norm"))
+        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits, self._settings.get("tolerance"))
         select = self._build_select(qubit_hamiltonian, num_prepare_qubits)
 
         container = LCUContainer(
@@ -131,18 +130,16 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(
-        qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int, min_schatten_norm: float
-    ) -> Prepare:
+    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int, tolerance: float) -> Prepare:
         """Compute the PREPARE statevector from Hamiltonian coefficients.
 
-        Normalizes the absolute Hamiltonian coefficients by the Schatten 1-norm and
+        Normalizes the absolute Hamiltonian coefficients by the L1 norm and
         takes the element-wise square root to produce the state-preparation amplitudes.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian whose coefficients define the amplitudes.
             num_prepare_qubits: Number of qubits in the prepare (ancilla) register.
-            min_schatten_norm: Minimum allowable Schatten norm; raises if the norm is below
+            tolerance: Minimum allowable L1 norm; raises if the norm is below
                 this threshold.
 
         Returns:
@@ -150,12 +147,12 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
 
         """
         coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
-        schatten_norm = qubit_hamiltonian.schatten_norm
-        if schatten_norm < min_schatten_norm:
-            raise ValueError("Schatten norm is too small, cannot build LCU block encoding.")
+        l1_norm = float(np.sum(np.abs(coefficients)))
+        if l1_norm < tolerance:
+            raise ValueError("L1 norm is too small, cannot build LCU block encoding.")
 
         abs_coeffs = np.abs(coefficients)
-        statevector = np.sqrt(abs_coeffs / schatten_norm)
+        statevector = np.sqrt(abs_coeffs / l1_norm)
 
         return Prepare(
             statevector=statevector,

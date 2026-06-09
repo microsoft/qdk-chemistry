@@ -5,10 +5,12 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from qdk import qsharp
+
 from qdk_chemistry.data import AlgorithmRef, Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, Select
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import ControlledCircuitMapper
@@ -22,8 +24,6 @@ class PrepSelPrepSettings(Settings):
     Attributes:
         state_prep: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
-        select_mapper: Algorithm reference for the SELECT oracle mapper.
-            Defaults to ``MultiControlledSelectMapper``.
 
     """
 
@@ -35,22 +35,17 @@ class PrepSelPrepSettings(Settings):
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
         )
-        self._set_default(
-            "select_mapper",
-            "algorithm_ref",
-            AlgorithmRef("select_mapper", "multi_controlled_select"),
-        )
 
 
 class PrepSelPrepMapper(ControlledCircuitMapper):
     r"""Controlled circuit mapper using the PREPARE-SELECT-PREPARE pattern.
 
-    Composes a controlled block encoding from two independent sub-algorithms:
+    Composes a controlled block encoding from:
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
        the ``state_prep`` setting.  Defaults to ``DensePureStatePreparation``.
-    2. **SELECT** — multi-controlled unitary application on the system register,
-       resolved via the ``select_mapper`` setting.
+    2. **SELECT** — Pauli SELECT oracle applied on the system register,
+       constructed directly from the block-encoding container's SELECT data.
 
     The two callables are stitched together by the Q# ``BlockEncoding`` operation:
 
@@ -97,8 +92,8 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         1. **PREPARE** — delegates to the nested ``state_prep`` algorithm
            to build a Q# callable that loads amplitudes into the ancilla register.
-        2. **SELECT** — delegates to the nested ``select_mapper`` algorithm
-           to build a Q# callable that applies controlled unitaries.
+        2. **SELECT** — builds the Pauli SELECT oracle directly from the
+           block-encoding container's SELECT data.
         3. **Compose** — stitches controlled PREPARE-SELECT-PREPARE into either a plain block
            encoding or a quantum walk step (when ``quantum_walk=True``), via the
            Q# ``PrepSelPrep`` / ``QuantumWalkStep`` operations.
@@ -133,10 +128,8 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
         )
         prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
 
-        # 2. Create SELECT circuit via the select-mapper algorithm.
-        select_mapper = self._create_nested("select_mapper")
-        select_circuit = select_mapper.run(select)
-        select_op = select_circuit._qsharp_op  # noqa: SLF001
+        # 2. Create SELECT circuit directly (Pauli SELECT oracle).
+        select_op = self._build_pauli_select_op(select)
 
         # 3. Compose into a controlled PREPARE-SELECT-PREPARE (optionally with quantum walk).
         num_system = select.num_target_qubits
@@ -168,3 +161,33 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
             )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
+
+    @staticmethod
+    def _build_pauli_select_op(select: Select):
+        """Build the Pauli SELECT Q# operation from a Select data object.
+
+        Converts each controlled operation's Pauli string into Q# ``Pauli`` enums
+        and packages them with sign phases into a ``PauliSelectParams`` struct.
+
+        Args:
+            select: The SELECT oracle data object containing controlled operations,
+                phases, and qubit layout.
+
+        Returns:
+            A Q# callable implementing the Pauli SELECT oracle.
+
+        """
+        pauli_terms: list[list[qsharp.Pauli]] = []
+        control_states: list[int] = []
+        for op in select.controlled_operations:
+            base_paulis = [qsharp.Pauli.I] * select.num_target_qubits
+            for i, pauli_char in enumerate(reversed(op.operation)):
+                if pauli_char != "I":
+                    base_paulis[i] = getattr(qsharp.Pauli, pauli_char)
+            pauli_terms.append(base_paulis)
+            control_states.append(op.ctrl_state)
+        phases = [int(s) for s in select.phases]
+        select_params = QSHARP_UTILS.Select.PauliSelectParams(
+            pauliTerms=pauli_terms, signs=phases, controlStates=control_states
+        )
+        return QSHARP_UTILS.Select.MakeSelectOp(select_params)

@@ -10,14 +10,14 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledUnitary`: A function to perform repeated controlled unitary operations.
     /// - `accumulatePhase`: The phase to accumulate during the evolution.
-    /// - `control`: The index of the control qubit.
+    /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
         accumulatePhase : Double,
-        control : Int,
+        phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
     }
@@ -29,7 +29,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `Result[]`: The result of measuring the control qubit after the IQPE circuit is executed.
     operation RunIQPE(params : IterativePhaseEstimationParams) : Result[] {
         use qs = Qubit[Length(params.systems) + 1 + params.numAncillaQubits];
-        let control = qs[params.control];
+        let phaseQubit = qs[params.phaseQubit];
         let systems = Subarray(params.systems, qs);
         let ancillas = if params.numAncillaQubits == 0 {
             []
@@ -41,13 +41,13 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         params.statePrep(systems);
 
         within {
-            H(control);
+            H(phaseQubit);
         } apply {
-            Rz(params.accumulatePhase, control);
-            params.repControlledUnitary(control, allTargets);
+            Rz(params.accumulatePhase, phaseQubit);
+            params.repControlledUnitary(phaseQubit, allTargets);
         }
         ResetAll(allTargets);
-        return [MResetZ(control)];
+        return [MResetZ(phaseQubit)];
     }
 
     /// Prepare iterative Quantum Phase Estimation (IQPE) circuit.
@@ -55,16 +55,16 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledUnitary`: A function to perform repeated controlled unitary operations.
     /// - `accumulatePhase`: The phase to accumulate during the evolution.
-    /// - `control`: The index of the control qubit.
+    /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
     /// # Returns
-    /// The result of measuring the control qubit after the IQPE circuit is executed.
+    /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
         accumulatePhase : Double,
-        control : Int,
+        phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
     ) : Result[] {
@@ -72,7 +72,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             statePrep = statePrep,
             repControlledUnitary = repControlledUnitary,
             accumulatePhase = accumulatePhase,
-            control = control,
+            phaseQubit = phaseQubit,
             systems = systems,
             numAncillaQubits = numAncillaQubits
         });

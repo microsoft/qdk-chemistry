@@ -7,7 +7,7 @@
 
 import numpy as np
 import pytest
-import qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import PrepSelPrepMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
@@ -182,7 +182,9 @@ class TestPrepareSelectMapper:
         # Walk eigenvalues: e^{±i·theta_plus} and e^{±i·theta_minus}
         expected_phases = np.sort([-theta_minus, -theta_plus, theta_plus, theta_minus])
 
-        assert np.allclose(phases, expected_phases, atol=1e-10)
+        assert np.allclose(
+            phases, expected_phases, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
 
     def test_reflect_via_dump_machine(self):
         r"""Verify the Reflect oracle via Q# dump_machine.
