@@ -14,6 +14,7 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation, PhaseEstimationSettings
 from qdk_chemistry.data import (
     Circuit,
@@ -107,10 +108,19 @@ class StandardPhaseEstimation(PhaseEstimation):
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         if isinstance(unitary_builder, TimeEvolutionBuilder):
             evolution_time = unitary_builder.settings().get("time")
-            return QpeResult.from_phase_fraction(
+            return QpeResult.from_time_evolution_result(
                 method=self.name(),
                 phase_fraction=raw_phase,
                 evolution_time=evolution_time,
+                bits_msb_first=dominant_bitstring,
+            )
+        if isinstance(unitary_builder, LCUBuilder):
+            # For block-encoding builders (qubitization), use E = λ cos(2πφ).
+            lambda_val = qubit_hamiltonian.schatten_norm
+            return QpeResult.from_block_encoding_result(
+                method=self.name(),
+                phase_fraction=raw_phase,
+                lambda_val=lambda_val,
                 bits_msb_first=dominant_bitstring,
             )
         raise NotImplementedError(

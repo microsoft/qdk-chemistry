@@ -9,7 +9,7 @@ import json
 
 import numpy as np
 import pytest
-import qsharp
+from qdk import qsharp
 
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
@@ -19,6 +19,11 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
 from .test_helpers import create_test_orbitals
+
+try:
+    from qdk._native import Circuit as QdkCircuitType
+except ImportError:
+    from qsharp._native import Circuit as QdkCircuitType
 
 
 def _run_state_prep_and_dump(circuit: Circuit) -> np.ndarray:
@@ -113,7 +118,7 @@ class TestDensePureStatePreparation:
         circuit = prep.run(wavefunction_4e4o)
 
         qsc = circuit.get_qsharp_circuit()
-        assert isinstance(qsc, qsharp._native.Circuit)
+        assert isinstance(qsc, QdkCircuitType)
         qsc_json = json.loads(qsc.json())
         num_qubits = len(qsc_json["qubits"])
         # 4 orbitals -> 8 qubits (4 alpha + 4 beta)

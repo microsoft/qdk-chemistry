@@ -508,7 +508,6 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.circuit_mapper import CircuitMapperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledCircuitMapperFactory,
-        SelectMapperFactory,
     )
     from qdk_chemistry.algorithms.energy_estimator import EnergyEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
@@ -532,7 +531,6 @@ def _register_python_factories():
     register_factory(QubitHamiltonianSolverFactory())
     register_factory(HamiltonianUnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
-    register_factory(SelectMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
@@ -597,9 +595,6 @@ def _register_python_algorithms():
         ControlledPauliSequenceMapper,
         PrepSelPrepMapper,
     )
-    from qdk_chemistry.algorithms.controlled_circuit_mapper.select_mapper import (  # noqa: PLC0415
-        MultiControlledSelectMapper,
-    )
     from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
@@ -644,7 +639,6 @@ def _register_python_algorithms():
     register(lambda: LCUBuilder())
     register(lambda: PauliSequenceMapper())
     register(lambda: PrepSelPrepMapper())
-    register(lambda: MultiControlledSelectMapper())
     register(lambda: DensePureStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: EulerIntegrator())

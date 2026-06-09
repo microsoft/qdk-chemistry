@@ -1,4 +1,4 @@
-"""Integration tests for QPE using the LCU block encoding unitary builder."""
+"""Integration tests for iterative QPE with qubitization (LCU quantum walk)."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -14,16 +14,28 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
 )
 
 
-class TestIQPEWithLCU:
-    """Integration tests for IQPE using LCU unitary builder."""
+def _qubitization_circuit_builder_ref(num_bits: int = 4) -> AlgorithmRef:
+    """Return an AlgorithmRef for the iterative QPE circuit builder with qubitization."""
+    return AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+    )
 
-    def test_iterative_qpe_with_lcu_two_qubit(self):
-        """Verify IQPE with LCU quantum walk recovers the expected energy for a 2-qubit Hamiltonian.
+
+class TestIQPEWithQubitization:
+    """Integration tests for iterative QPE with qubitization (LCU quantum walk)."""
+
+    def test_iterative_qpe_with_qubitization_two_qubit(self):
+        """Verify IQPE with qubitization recovers the expected energy for a 2-qubit Hamiltonian.
 
         Uses H = (pi/4)*ZI + (pi/4)*IZ, a 2-term diagonal Hamiltonian.
         Eigenstate |00> has eigenvalue (pi/4) + (pi/4) = pi/2.
@@ -51,22 +63,11 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        # Configure IQPE with LCU
-        iqpe = IterativePhaseEstimation(
-            num_bits=4,
-            shots_per_bit=3,
-        )
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(
@@ -82,8 +83,8 @@ class TestIQPEWithLCU:
             atol=qpe_energy_tolerance,
         )
 
-    def test_iterative_qpe_with_lcu_h2_quantum_walk(self):
-        """Verify QPE with block encoding quantum walk recovers H2 ground-state energy.
+    def test_iterative_qpe_with_qubitization_h2(self):
+        """Verify QPE with qubitization recovers H2 ground-state energy.
 
         Uses the full H2/STO-3G qubit Hamiltonian (15 Pauli terms, 4 qubits)
         with the exact ground state as the initial state. The quantum walk
@@ -154,22 +155,12 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        # Configure IQPE with LCU quantum walk
-        iqpe = IterativePhaseEstimation(
-            num_bits=4,
-            shots_per_bit=3,
-        )
+        num_bits = 4
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=num_bits))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(
@@ -180,14 +171,36 @@ class TestIQPEWithLCU:
         # With 4 phase bits the phase 0.376 rounds to 6/16 = 0.375,
         # giving E = lambda * cos(2*pi * 0.375) ~ -2.231.
         # Allow 0.02 Ha tolerance for discretization error.
+        lambda_norm = np.sum(np.abs(h2_coefficients))
+        phi_exact = np.arccos(reference_energy / lambda_norm) / (2 * np.pi)
+        # Discretize to num_bits
+        num_levels = 2**num_bits  # e.g. 16 for 4 bits
+        phi_disc = round(phi_exact * num_levels) / num_levels
+        # Conjugate branch (QPE may measure either)
+        phi_disc_alt = 1.0 - phi_disc
+        # Discretized energy (same for both branches)
+        energy_disc = lambda_norm * np.cos(2 * np.pi * phi_disc)
+        assert np.isclose(
+            result.phase_fraction,
+            phi_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        ) or np.isclose(
+            result.phase_fraction,
+            phi_disc_alt,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
+        )
         assert np.isclose(
             result.raw_energy,
-            reference_energy,
-            atol=0.02,
+            energy_disc,
+            atol=float_comparison_absolute_tolerance,
+            rtol=float_comparison_relative_tolerance,
         )
+        assert np.isclose(result.raw_energy, reference_energy, atol=0.02)
 
-    def test_iterative_qpe_with_lcu_off_diagonal(self):
-        """Verify IQPE with LCU quantum walk handles off-diagonal Pauli terms.
+    def test_iterative_qpe_with_qubitization_off_diagonal(self):
+        """Verify IQPE with qubitization handles off-diagonal Pauli terms.
 
         Uses H = (pi/4)*XX + (pi/4)*ZZ, a Hamiltonian with both off-diagonal (XX)
         and diagonal (ZZ) terms.
@@ -216,18 +229,11 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
@@ -240,8 +246,8 @@ class TestIQPEWithLCU:
             atol=qpe_energy_tolerance,
         )
 
-    def test_iterative_qpe_with_lcu_negative_coefficient(self):
-        """Verify IQPE with LCU quantum walk handles negative Hamiltonian coefficients.
+    def test_iterative_qpe_with_qubitization_negative_coefficient(self):
+        """Verify IQPE with qubitization handles negative Hamiltonian coefficients.
 
         Uses H = -(pi/4)*XX + (pi/4)*ZZ, mixing negative coefficients with
         off-diagonal terms.
@@ -271,18 +277,11 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
@@ -295,8 +294,8 @@ class TestIQPEWithLCU:
             atol=qpe_energy_tolerance,
         )
 
-    def test_iterative_qpe_with_lcu_three_qubit(self):
-        """Verify IQPE with LCU quantum walk on a 3-qubit, 3-term Hamiltonian.
+    def test_iterative_qpe_with_qubitization_three_qubit(self):
+        """Verify IQPE with qubitization on a 3-qubit, 3-term Hamiltonian.
 
         Uses H = (pi/4)*ZII + (pi/4)*IZI + (pi/4)*IIZ (sum of single-qubit Z
         operators). With 3 terms, ceil(log2(3)) = 2 ancilla qubits are needed.
@@ -324,18 +323,11 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
@@ -348,8 +340,8 @@ class TestIQPEWithLCU:
             atol=qpe_energy_tolerance,
         )
 
-    def test_iterative_qpe_with_lcu_asymmetric_pauli(self):
-        """Verify IQPE with LCU quantum walk on an asymmetric Hamiltonian.
+    def test_iterative_qpe_with_qubitization_asymmetric_pauli(self):
+        """Verify IQPE with qubitization on an asymmetric Hamiltonian.
 
         Uses H = (pi/4)*XI + (pi/4)*IZ, where the Pauli terms are NOT symmetric
         under qubit swap (XI != IX). This tests that the SELECT oracle applies
@@ -367,7 +359,7 @@ class TestIQPEWithLCU:
             coefficients=np.array([coeff, coeff]),
         )
 
-        # |+>_q1 x |0>_q0:  X on q1 gives +1, Z on q0 gives +1 → E = pi/2.
+        # |+>_q1 x |0>_q0:  X on q1 gives +1, Z on q0 gives +1 -> E = pi/2.
         # In Q# big-endian register: targets[0] = q1 (MSB), targets[1] = q0 (LSB).
         #   index 0 = |q1=0,q0=0>, index 1 = |q1=0,q0=1>,
         #   index 2 = |q1=1,q0=0>, index 3 = |q1=1,q0=1>
@@ -387,18 +379,11 @@ class TestIQPEWithLCU:
         qsharp_op = QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params)
         state_prep = Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)
 
-        iqpe = IterativePhaseEstimation(num_bits=4, shots_per_bit=3)
+        iqpe = IterativePhaseEstimation(shots_per_bit=3)
+        iqpe.settings().set("qpe_circuit_builder", _qubitization_circuit_builder_ref(num_bits=4))
         iqpe.settings().set(
             "circuit_executor",
             AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
-        )
-        iqpe.settings().set(
-            "circuit_mapper",
-            AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
-        )
-        iqpe.settings().set(
-            "unitary_builder",
-            AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         )
 
         result = iqpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_prep)
