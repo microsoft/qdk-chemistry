@@ -164,8 +164,8 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,        // one_rdm_aa
                             std::nullopt,        // one_rdm_bb
                             std::nullopt,        // two_rdm_spin_traced
-                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_aaaa
+                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_bbbb
                             OrbitalEntropies{},  // entropies
                             type) {
