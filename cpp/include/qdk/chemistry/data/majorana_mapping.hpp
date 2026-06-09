@@ -245,14 +245,18 @@ class MajoranaMapping : public DataClass {
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
   /**
-   * @brief Verstraete-Cirac encoding for 2D-local fermionic problems.
+   * @brief Verstraete-Cirac encoding (extended interleaved construction).
    *
-   * Introduces N auxiliary qubits so that every nearest-neighbor hopping
-   * term maps to a constant-weight (weight-4) Pauli string, independent
-   * of system size.  Requires num_modes >= 2.
+   * Doubles the qubit register to 2*num_modes qubits using an interleaved
+   * layout: physical mode j at qubit 2j, auxiliary mode j at qubit 2j+1.
+   * The Majorana table is a Jordan-Wigner expansion whose Z-string spans
+   * both physical and auxiliary qubits.  Vertex operators K_j = -Z_{2j+1}
+   * commute with every Hamiltonian bilinear.  In the codespace (K_j = +1)
+   * sequential nearest-neighbour hops have constant Pauli weight 3 and the
+   * spectrum matches Jordan-Wigner on N qubits.
    *
-   * @param num_modes Number of fermionic modes (physical + auxiliary =
-   * 2*num_modes qubits).
+   * @param num_modes Number of fermionic modes N; the mapping uses 2*N
+   *        qubits (N physical at even indices, N auxiliary at odd indices).
    * @return MajoranaMapping with name ``"verstraete-cirac"``.
    * @throws std::invalid_argument If num_modes < 2.
    */

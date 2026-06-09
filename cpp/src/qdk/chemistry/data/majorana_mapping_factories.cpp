@@ -324,15 +324,24 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
 
 // ── Factory: Verstraete-Cirac ────────────────────────────────────────
 
-// The VC encoding (Verstraete & Cirac, J. Stat. Mech. 2005 P09012) doubles
-// the qubit register by pairing each physical mode j with an auxiliary qubit
-// a_j.  The 2N Majorana operators are assigned weight-2 Pauli strings on the
-// (j, a_j) pair, and the vertex operators V_j = X_j ⊗ X_{a_j} serve as
-// stabilizers of the codespace.  Concretely, for mode j we set:
-//   gamma_{2j}   = Z_j ⊗ X_{a_j}
-//   gamma_{2j+1} = Y_j ⊗ I
-// which satisfies {gamma_k, gamma_l} = 2δ_{kl} I on the full 2N-qubit space.
-// Physical qubits occupy indices 0..N-1; auxiliary qubits occupy N..2N-1.
+// Extended-system (interleaved) construction following Verstraete & Cirac
+// (J. Stat. Mech. 2005 P09012) and Whitfield, Havlicek & Troyer (PRA 2016).
+//
+// The register has 2N qubits.  Physical mode j occupies qubit 2j; the
+// corresponding auxiliary mode occupies qubit 2j+1.  The N Majorana pairs
+// for physical fermions are placed at the even-indexed positions using a
+// standard Jordan-Wigner Z-string that spans ALL 2j preceding qubits
+// (both physical and auxiliary):
+//
+//   gamma_{2j}   = Z_0 Z_1 ... Z_{2j-1}  X_{2j}
+//   gamma_{2j+1} = Z_0 Z_1 ... Z_{2j-1}  Y_{2j}
+//
+// Vertex operators K_j = -Z_{2j+1} (pure auxiliary-qubit operators) commute
+// with every bilinear formed from the physical Majoranas, so the physical
+// Hamiltonian is block-diagonal in the K_j eigenspaces.  In the codespace
+// where K_j = +1 (i.e. Z_{2j+1} = -1, all auxiliary qubits in |1>) the
+// nearest-neighbour hopping operators have constant Pauli weight 3 and the
+// spectrum equals the Jordan-Wigner spectrum on N qubits.
 
 MajoranaMapping MajoranaMapping::verstraete_cirac(std::size_t num_modes) {
   using namespace detail;
@@ -340,32 +349,31 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(std::size_t num_modes) {
     throw std::invalid_argument("verstraete_cirac requires num_modes >= 2");
   }
 
-  // 2*num_modes qubits: physical qubit j at index j,
-  // auxiliary qubit for mode j at index num_modes + j.
+  // 2*num_modes qubits in interleaved layout:
+  //   qubit 2j   = physical mode j
+  //   qubit 2j+1 = auxiliary mode j  (enters only via Z-string)
   std::vector<SparsePauliWord> table;
   table.reserve(2 * num_modes);
 
   for (std::size_t j = 0; j < num_modes; ++j) {
-    std::size_t aux = num_modes + j;
-
-    // gamma_{2j}   = Z_{N+0} ... Z_{N+j-1} * X_j * X_{N+j}
-    // gamma_{2j+1} = Z_{N+0} ... Z_{N+j-1} * Y_j
-    // The Z string on auxiliary qubits ensures cross-mode anticommutation.
-    // gamma_{2j}   = (prod_{k<j} Z_k) * X_j * X_{N+j}
-    // gamma_{2j+1} = (prod_{k<j} Z_k) * Y_j * X_{N+j}
-    // Z string runs only on physical qubits 0..j-1.
-    // Both entries share X on auxiliary qubit N+j; this gives the single
-    // shared qubit needed for anticommutation across different modes.
+    // Z string covers all qubits 0 .. 2j-1 (physical AND auxiliary).
     std::vector<std::pair<std::uint64_t, std::uint8_t>> even_entries;
     std::vector<std::pair<std::uint64_t, std::uint8_t>> odd_entries;
-    for (std::size_t k = 0; k < j; ++k) {
-      even_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
-      odd_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
+    for (std::size_t q = 0; q < 2 * j; ++q) {
+      even_entries.emplace_back(static_cast<std::uint64_t>(q), op_z);
+      odd_entries.emplace_back(static_cast<std::uint64_t>(q), op_z);
     }
-    even_entries.emplace_back(static_cast<std::uint64_t>(j), op_x);
-    even_entries.emplace_back(static_cast<std::uint64_t>(aux), op_x);
-    odd_entries.emplace_back(static_cast<std::uint64_t>(j), op_y);
-    odd_entries.emplace_back(static_cast<std::uint64_t>(aux), op_x);
+    even_entries.emplace_back(static_cast<std::uint64_t>(2 * j), op_x);
+    odd_entries.emplace_back(static_cast<std::uint64_t>(2 * j), op_y);
+
+    // For the last mode, append Z on the trailing auxiliary qubit 2N-1 so
+    // that num_qubits equals 2*num_modes and K_{N-1} = -Z_{2N-1} is defined.
+    if (j == num_modes - 1) {
+      even_entries.emplace_back(static_cast<std::uint64_t>(2 * num_modes - 1),
+                                op_z);
+      odd_entries.emplace_back(static_cast<std::uint64_t>(2 * num_modes - 1),
+                               op_z);
+    }
 
     table.push_back(build_sorted_word(std::move(even_entries)));
     table.push_back(build_sorted_word(std::move(odd_entries)));

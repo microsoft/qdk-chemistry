@@ -105,11 +105,12 @@ def _fermi_hubbard_hamiltonian(rows: int, cols: int, t: float, u: float, single_
                 h1[j, k] = h1[k, j] = -t
 
     if single_spin:
-        # Single spin: pass as 1-orbital-per-site with no beta spin.
-        # We use n spatial orbitals; QDK doubles to 2n spin-orbitals automatically.
-        # To stay single-spin we set U=0 (no cross-spin repulsion matters here)
-        # and use only the alpha integrals. For the eigenvalue test we compare
-        # JW vs VC on the same Hamiltonian object, so the comparison is self-consistent.
+        # QDK always uses both spin channels (alpha + beta), so a call with
+        # n spatial orbitals produces 2n spin-orbitals internally.  The h1
+        # matrix passed here is the spatial (spin-summed) hopping; QDK applies
+        # it symmetrically to both spins.  The on-site U term is encoded as
+        # the (j,j|j,j) two-body integral, which becomes the alpha-beta
+        # interaction after QDK's spin doubling.
         h2 = np.zeros(n**4)
         if u != 0.0:
             for j in range(n):
@@ -158,31 +159,26 @@ class TestVerstraeteCiracFactory:
         assert len(vc.table) == 8
 
     def test_reference_n2(self) -> None:
-        """n=2: verify table for the corrected VC construction with aux Z strings.
+        """n=2: verify table for the interleaved JW construction.
 
-        Physical qubits: 0, 1.  Auxiliary qubits: 2, 3.
-        gamma_0 = X_0 X_2          (j=0: no Z prefix)
-        gamma_1 = Y_0
-        gamma_2 = Z_2 X_1 X_3     (j=1: Z_{N+0}=Z_2 prefix)
-        gamma_3 = Z_2 Y_1
+        Qubits 0,2 are physical (modes 0,1); qubits 1,3 are auxiliary.
+        Z string spans all qubits before the physical qubit of each mode.
+        The last mode also carries Z on qubit 2N-1=3 to anchor num_qubits=2N.
 
         Little-endian: rightmost char = qubit 0.
         4-char string: char[0]=q3, char[1]=q2, char[2]=q1, char[3]=q0.
         """
         vc = MajoranaMapping.verstraete_cirac(num_modes=2)
+        assert vc.num_qubits == 4
         labels = tuple(_word_to_label(w, vc.num_qubits) for w in vc.table)
-        # gamma_0 = X_0 X_2          (j=0: Z string empty, aux=N+0=2)
-        #   q0=X(char3), q2=X(char1) → "IXIX"
-        assert labels[0] == "IXIX"
-        # gamma_1 = Y_0 X_2          (j=0: Z string empty, aux=2)
-        #   q0=Y(char3), q2=X(char1) → "IXIY"
-        assert labels[1] == "IXIY"
-        # gamma_2 = Z_0 X_1 X_3      (j=1: Z string = Z_0, aux=N+1=3)
-        #   q0=Z(char3), q1=X(char2), q3=X(char0) → "XIXZ"
-        assert labels[2] == "XIXZ"
-        # gamma_3 = Z_0 Y_1 X_3      (j=1: Z string = Z_0, aux=3)
-        #   q0=Z(char3), q1=Y(char2), q3=X(char0) → "XIYZ"
-        assert labels[3] == "XIYZ"
+        # gamma_0 = X_0            (j=0: no Z string)   → "IIIX"
+        assert labels[0] == "IIIX"
+        # gamma_1 = Y_0                                  → "IIIY"
+        assert labels[1] == "IIIY"
+        # gamma_2 = Z_0 Z_1 X_2 Z_3  (j=1: Z on 0,1; X on 2; last-aux Z on 3) → "ZXZZ"
+        assert labels[2] == "ZXZZ"
+        # gamma_3 = Z_0 Z_1 Y_2 Z_3                     → "ZYZZ"
+        assert labels[3] == "ZYZZ"
 
 
 # ─── Pauli weight locality ────────────────────────────────────────────────
@@ -213,9 +209,9 @@ class TestVerstraeteCiracLocality:
     """Tests for the constant Pauli-weight locality property."""
 
     def test_weight_independent_of_size(self) -> None:
-        """Max Pauli weight for sequential NN hopping is the same for chains of 4, 9, 16 sites."""
+        """Max Pauli weight for sequential NN hopping is constant 4 for all chain lengths."""
         weights = {_max_nn_pauli_weight(n) for n in (4, 9, 16)}
-        assert len(weights) == 1, f"Pauli weights differ across sizes: {weights}"
+        assert weights == {4}, f"Expected constant weight 4, got: {weights}"
 
 
 # ─── Eigenvalue correctness ───────────────────────────────────────────────
@@ -224,28 +220,39 @@ class TestVerstraeteCiracLocality:
 class TestVerstraeteCiracEigenvalues:
     """Tests for eigenvalue correctness of the VC-encoded Hamiltonian."""
 
-    def test_fermi_hubbard_spectrum_matches_jw(self) -> None:
-        """VC and JW produce the same unique eigenvalues for a 2-site Fermi-Hubbard.
+    def test_fermi_hubbard_codespace_matches_jw(self) -> None:
+        """VC codespace eigenvalues match JW for a 2-site Fermi-Hubbard (t=1, U=4).
 
-        The VC Hamiltonian on 2N qubits has the physical spectrum embedded in it
-        (each JW eigenvalue appears with multiplicity 2^N due to auxiliary qubits).
-        We verify the unique eigenvalues match to 1e-10.
+        Codespace: vertex operators K_j = -Z_{2j+1} = +1, i.e. auxiliary qubits
+        (odd indices 1,3,...,2N-1) all in state |1>.  The 2^N-dimensional codespace
+        Hamiltonian is identical in spectrum to the N-qubit JW Hamiltonian.
         """
         ham = _fermi_hubbard_hamiltonian(1, 2, t=1.0, u=4.0)
         mapper = create("qubit_mapper", "qdk")
-
         n_modes = 4  # 2 spatial orbitals x 2 spins
 
         qh_jw = mapper.run(ham, MajoranaMapping.jordan_wigner(num_modes=n_modes))
         qh_vc = mapper.run(ham, MajoranaMapping.verstraete_cirac(num_modes=n_modes))
 
         eigs_jw = np.sort(np.real(np.linalg.eigvalsh(_to_matrix(qh_jw))))
-        eigs_vc = np.sort(np.real(np.linalg.eigvalsh(_to_matrix(qh_vc))))
 
-        unique_jw = np.unique(np.round(eigs_jw, 10))
-        unique_vc = np.unique(np.round(eigs_vc, 10))
+        # Build codespace basis: physical qubits (even indices 0,2,...) vary freely,
+        # auxiliary qubits (odd indices 1,3,...) all fixed to |1>.
+        n_vc = qh_vc.num_qubits  # 2*n_modes = 8
+        indices = []
+        for phys in range(2**n_modes):
+            state = 0
+            for j in range(n_modes):
+                state |= ((phys >> j) & 1) << (2 * j)
+                state |= 1 << (2 * j + 1)
+            indices.append(state)
+        basis = np.zeros((2**n_vc, 2**n_modes), dtype=complex)
+        for col, idx in enumerate(indices):
+            basis[idx, col] = 1.0
+        H_vc = _to_matrix(qh_vc)  # noqa: N806
+        eigs_vc = np.sort(np.real(np.linalg.eigvalsh(basis.conj().T @ H_vc @ basis)))
 
-        np.testing.assert_allclose(unique_vc, unique_jw, atol=1e-10)
+        np.testing.assert_allclose(eigs_vc, eigs_jw, atol=1e-10)
 
 
 # ─── serialization ───────────────────────────────────────────────────────
