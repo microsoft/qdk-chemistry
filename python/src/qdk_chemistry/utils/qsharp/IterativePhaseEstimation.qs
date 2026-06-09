@@ -26,7 +26,7 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// # Parameters
     /// - `params`: An `IterativePhaseEstimationParams` struct containing the parameters for IQPE.
     /// # Returns
-    /// - `Result[]`: The result of measuring the control qubit after the IQPE circuit is executed.
+    /// - `Result[]`: The result of measuring the phase qubit after the IQPE circuit is executed.
     operation RunIQPE(params : IterativePhaseEstimationParams) : Result[] {
         use qs = Qubit[Length(params.systems) + 1 + params.numAncillaQubits];
         let phaseQubit = qs[params.phaseQubit];

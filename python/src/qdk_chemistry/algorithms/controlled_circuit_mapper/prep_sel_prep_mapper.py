@@ -47,7 +47,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
     2. **SELECT** — Pauli SELECT oracle applied on the system register,
        constructed directly from the block-encoding container's SELECT data.
 
-    The two callables are stitched together by the Q# ``BlockEncoding`` operation:
+    The two callables are stitched together by the Q# ``PrepSelPrep`` operation:
 
     .. math::
 
