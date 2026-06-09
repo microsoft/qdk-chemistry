@@ -44,7 +44,7 @@ import numpy as np
 from pyscf import cc
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
-from qdk_chemistry.data import CoupledClusterContainer, Settings, Wavefunction
+from qdk_chemistry.data import AmplitudeContainer, Settings, Wavefunction
 from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -195,8 +195,8 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 t2_aabb = np.reshape(t2_aabb, (t2_aabb.size, 1))
                 t2_bbbb = np.reshape(t2_bbbb, (t2_bbbb.size, 1))
 
-                # Create CoupledClusterContainer with spin-separated amplitudes
-                cc_container = CoupledClusterContainer(
+                # Create AmplitudeContainer with spin-separated amplitudes
+                cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
                     t1_aa,  # Alpha T1 amplitudes
@@ -206,8 +206,8 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     t2_bbbb,  # Beta-beta T2 amplitudes
                 )
             else:
-                # Create CoupledClusterContainer without storing amplitudes
-                cc_container = CoupledClusterContainer(
+                # Create AmplitudeContainer without storing amplitudes
+                cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
                     None,  # No T1 alpha amplitudes
@@ -226,16 +226,16 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 t1 = np.reshape(t1, (t1.size, 1))
                 t2 = np.reshape(t2, (t2.size, 1))
 
-                # Create CoupledClusterContainer with spatial amplitudes
-                cc_container = CoupledClusterContainer(
+                # Create AmplitudeContainer with spatial amplitudes
+                cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
                     t1,  # T1 amplitudes (used for both alpha and beta in restricted case)
                     t2,  # T2 amplitudes (alpha-beta coupling)
                 )
             else:
-                # Create CoupledClusterContainer without storing amplitudes
-                cc_container = CoupledClusterContainer(
+                # Create AmplitudeContainer without storing amplitudes
+                cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
                     None,  # No T1 amplitudes
@@ -267,8 +267,8 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     l2_aabb = np.reshape(l2_aabb, (l2_aabb.size, 1))
                     l2_bbbb = np.reshape(l2_bbbb, (l2_bbbb.size, 1))
 
-                    # Create CoupledClusterContainer for bra with lambda amplitudes
-                    bra_container = CoupledClusterContainer(
+                    # Create AmplitudeContainer for bra with lambda amplitudes
+                    bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
                         l1_aa,  # Alpha L1 (gamma) amplitudes
@@ -278,8 +278,8 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                         l2_bbbb,  # Beta-beta L2 (gamma) amplitudes
                     )
                 else:
-                    # Create CoupledClusterContainer without storing amplitudes
-                    bra_container = CoupledClusterContainer(
+                    # Create AmplitudeContainer without storing amplitudes
+                    bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
                         None,
@@ -298,16 +298,16 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     l1 = np.reshape(l1, (l1.size, 1))
                     l2 = np.reshape(l2, (l2.size, 1))
 
-                    # Create CoupledClusterContainer for bra with lambda amplitudes
-                    bra_container = CoupledClusterContainer(
+                    # Create AmplitudeContainer for bra with lambda amplitudes
+                    bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
                         l1,  # L1 (gamma) amplitudes
                         l2,  # L2 (gamma) amplitudes
                     )
                 else:
-                    # Create CoupledClusterContainer without storing amplitudes
-                    bra_container = CoupledClusterContainer(
+                    # Create AmplitudeContainer without storing amplitudes
+                    bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
                         None,

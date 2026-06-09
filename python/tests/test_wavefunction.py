@@ -13,11 +13,10 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
+    AmplitudeContainer,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
-    CoupledClusterContainer,
     Hamiltonian,
-    MP2Container,
     Orbitals,
     StateVectorContainer,
     Structure,
@@ -1274,40 +1273,34 @@ class TestMP2Container:
         sd_container = StateVectorContainer(ref, basic_orbitals)
         return Wavefunction(sd_container)
 
-    def test_mp2_container_construction(self, basic_hamiltonian, reference_wavefunction):
-        """Test MP2Container construction with lazy evaluation."""
-        mp2_container = MP2Container(basic_hamiltonian, reference_wavefunction)
+    def test_mp2_container_construction(self, basic_orbitals, reference_wavefunction):
+        """Test AmplitudeContainer with MP2-style amplitudes (zero T1, non-zero T2)."""
+        # T1: nocc * nvir = 2 * 1 = 2 (zero for MP2)
+        t1 = np.zeros(2)
+        # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
+
+        mp2_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
 
         assert mp2_container is not None
+        assert mp2_container.has_t1_amplitudes()
+        assert mp2_container.has_t2_amplitudes()
 
-        # Amplitudes should not be computed initially
-        assert not mp2_container.has_t1_amplitudes(), (
-            "T1 amplitudes should NOT be computed until requested (lazy evaluation)"
-        )
-        assert not mp2_container.has_t2_amplitudes(), (
-            "T2 amplitudes should NOT be computed until requested (lazy evaluation)"
-        )
-
-        # Trigger computations
         t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
         t2_abab, t2_aaaa, t2_bbbb = mp2_container.get_t2_amplitudes()
-
-        # amplitudes should now be available
-        assert mp2_container.has_t1_amplitudes(), "T1 amplitudes should be cached after first access"
-        assert mp2_container.has_t2_amplitudes(), "T2 amplitudes should be cached after first access"
 
         # Verify T1 amplitudes are zero for MP2
         assert np.allclose(t1_aa, 0.0), "T1 alpha amplitudes should be zero for MP2"
         assert np.allclose(t1_bb, 0.0), "T1 beta amplitudes should be zero for MP2"
 
-        # Verify T2 amplitudes exist (non-zero)
+        # Verify T2 amplitudes are stored
         assert t2_abab is not None
         assert t2_aaaa is not None
         assert t2_bbbb is not None
 
 
 class TestCCContainer:
-    """Test the CoupledClusterContainer wavefunction container."""
+    """Test the AmplitudeContainer wavefunction container."""
 
     @pytest.fixture
     def basic_orbitals(self):
@@ -1325,7 +1318,7 @@ class TestCCContainer:
         return Wavefunction(sd_container)
 
     def test_cc_container_construction(self, basic_orbitals, reference_wavefunction):
-        """Test CoupledClusterContainer construction."""
+        """Test AmplitudeContainer construction."""
         # Create dummy amplitudes for 2 occupied, 1 virtual orbital
         # T1: nocc * nvir = 2 * 1 = 2
         t1 = np.array([0.01, 0.02])
@@ -1333,25 +1326,25 @@ class TestCCContainer:
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
         # Enable amplitude storage
-        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
 
         assert cc_container is not None
         assert cc_container.has_t1_amplitudes()
         assert cc_container.has_t2_amplitudes()
 
     def test_cc_container_in_wavefunction(self, basic_orbitals, reference_wavefunction):
-        """Test CoupledClusterContainer within a Wavefunction wrapper."""
+        """Test AmplitudeContainer within a Wavefunction wrapper."""
         # Create dummy amplitudes
         # T1: nocc * nvir = 2 * 1 = 2
         t1 = np.array([0.01, 0.02])
         # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
-        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
         wf = Wavefunction(cc_container)
 
         # Test container type checking
-        assert wf.get_container_type() == "coupled_cluster"
+        assert wf.get_container_type() == "amplitude"
 
         # Test getting the container back
         retrieved_container = wf.get_container()
@@ -1360,8 +1353,8 @@ class TestCCContainer:
         assert retrieved_container.has_t2_amplitudes()
 
     def test_cc_container_electron_counts(self, basic_orbitals, reference_wavefunction):
-        """Test getting electron counts from CoupledClusterContainer."""
-        cc_container = CoupledClusterContainer(basic_orbitals, reference_wavefunction)
+        """Test getting electron counts from AmplitudeContainer."""
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction)
         wf = Wavefunction(cc_container)
 
         n_alpha, n_beta = wf.get_active_num_electrons()
@@ -1372,8 +1365,32 @@ class TestCCContainer:
         assert n_alpha_total == 2
         assert n_beta_total == 2
 
+    def test_amplitude_expansion_accessors_throw(self, basic_orbitals, reference_wavefunction):
+        """Amplitude wavefunctions have no determinant/coefficient expansion.
 
-def test_wavefunction_data_type_name():
+        The top-level Wavefunction accessors must propagate the container's error.
+        """
+        t1 = np.array([0.01, 0.02])
+        t2 = np.array([0.001, 0.002, 0.003, 0.004])
+        wf = Wavefunction(AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2))
+
+        assert wf.get_container_type() == "amplitude"
+
+        # Determinant/coefficient accessors throw through the Wavefunction facade.
+        with pytest.raises(RuntimeError):
+            wf.get_coefficients()
+        with pytest.raises(RuntimeError):
+            wf.get_active_determinants()
+        with pytest.raises(RuntimeError):
+            wf.size()
+        with pytest.raises(RuntimeError):
+            wf.get_total_determinants()
+
+        # Amplitudes and electron counts remain accessible.
+        container = wf.get_container()
+        assert container.has_t1_amplitudes()
+        assert container.has_t2_amplitudes()
+        assert wf.get_active_num_electrons() == (2, 2)
     """Test that Wavefunction has the correct _data_type_name class attribute."""
     assert hasattr(Wavefunction, "_data_type_name")
     assert Wavefunction._data_type_name == "wavefunction"

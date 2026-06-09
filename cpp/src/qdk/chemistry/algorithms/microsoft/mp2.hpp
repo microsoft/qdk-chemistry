@@ -47,8 +47,8 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    *
    * This method performs the MP2 calculation using the provided ansatz and
    * returns the total energy (reference + correlation), the MP2 ket
-   * wavefunction stored in an MP2Container. T2 amplitudes are computed
-   * lazily by the MP2Container when first requested.
+   * wavefunction stored in an AmplitudeContainer. The T1/T2 amplitudes are
+   * computed here and stored in the container.
    *
    * @param ansatz The Ansatz (Wavefunction and Hamiltonian) describing the
    *               quantum system
@@ -156,6 +156,36 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
    * @return Total MP2 correlation energy
    */
   double calculate_unrestricted_mp2_energy(
+      std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
+      std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
+      size_t n_beta) const;
+
+  /**
+   * @brief Bundle of MP2 T1/T2 amplitude blocks.
+   *
+   * T1 amplitudes are zero for MP2 (Brillouin's theorem). When @c restricted
+   * is true the spin-separated T2 blocks mirror the spatial (opposite-spin)
+   * block.
+   */
+  struct Amplitudes {
+    Eigen::VectorXd t1_aa;
+    Eigen::VectorXd t1_bb;
+    Eigen::VectorXd t2_abab;
+    Eigen::VectorXd t2_aaaa;
+    Eigen::VectorXd t2_bbbb;
+    bool restricted = true;
+  };
+
+  /**
+   * @brief Compute MP2 T1/T2 amplitudes from the Hamiltonian and orbitals.
+   *
+   * @param ham Shared pointer to the Hamiltonian containing MO integrals
+   * @param orbitals Shared pointer to orbitals containing orbital energies
+   * @param n_alpha Number of alpha electrons
+   * @param n_beta Number of beta electrons
+   * @return The computed amplitude blocks
+   */
+  Amplitudes compute_amplitudes(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
       std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
       size_t n_beta) const;

@@ -9,8 +9,7 @@ import numpy as np
 from qdk_chemistry.data import (
     Orbitals,
     StateVectorContainer,
-    CoupledClusterContainer,
-    MP2Container,
+    AmplitudeContainer,
     Configuration,
     Wavefunction,
     Hamiltonian,
@@ -143,18 +142,19 @@ sci_wavefunction = Wavefunction(sci_container)
 ################################################################################
 # start-cell-create-mp2
 # Create an MP2 wavefunction for H2
-# MP2 uses a reference wavefunction and Hamiltonian to compute amplitudes on demand
+# In practice the MP2 algorithm computes the amplitudes; here we store them
+# directly in an AmplitudeContainer. T1 is zero for MP2.
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-hamiltonian = make_minimal_hamiltonian(orbitals)
 ref_det = Configuration("20")
 sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
-# Create MP2 container: requires Hamiltonian and reference wavefunction
-# Amplitudes are computed lazily when first requested
-mp2_container = MP2Container(hamiltonian, ref_wavefunction, "mp")
+# MP2 amplitudes (T1 is zero for MP2)
+t1_mp2 = np.zeros(1)
+t2_mp2 = np.array([0.1])
+mp2_container = AmplitudeContainer(orbitals, ref_wavefunction, t1_mp2, t2_mp2)
 mp2_wavefunction = Wavefunction(mp2_container)
 # end-cell-create-mp2
 ################################################################################
@@ -179,7 +179,7 @@ t1_amplitudes = np.array([0.05])
 t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
-cc_container = CoupledClusterContainer(
+cc_container = AmplitudeContainer(
     orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes
 )
 cc_wavefunction = Wavefunction(cc_container)

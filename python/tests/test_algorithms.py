@@ -22,11 +22,11 @@ from qdk_chemistry.algorithms import (
     StatePreparation,
 )
 from qdk_chemistry.data import (
+    AmplitudeContainer,
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
-    CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
@@ -342,8 +342,8 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
         # Get reference determinants from the original wavefunction
         original_wavefunction = ansatz.get_wavefunction()
 
-        # Create CoupledClusterContainer with T1 and T2 amplitudes
-        cc_container = CoupledClusterContainer(orbs, original_wavefunction, t1, t2)
+        # Create AmplitudeContainer with T1 and T2 amplitudes
+        cc_container = AmplitudeContainer(orbs, original_wavefunction, t1, t2)
 
         updated_wavefunction = Wavefunction(cc_container)
 

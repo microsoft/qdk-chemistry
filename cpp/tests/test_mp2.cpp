@@ -20,7 +20,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 
 #include "ut_common.hpp"
 
@@ -87,6 +87,17 @@ class MP2Test : public ::testing::Test {
 
   void TearDown() override {}
 };
+
+// Runs MP2 on the given setup and returns the resulting wavefunction, which is
+// backed by an AmplitudeContainer storing the computed T1/T2 amplitudes.
+inline std::shared_ptr<Wavefunction> run_mp2(const O2TestSetup& setup) {
+  auto ansatz =
+      std::make_shared<Ansatz>(*setup.hf_hamiltonian, *setup.hf_wavefunction);
+  auto mp2_calculator =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+  auto [energy, wavefunction, bra] = mp2_calculator->run(ansatz);
+  return wavefunction;
+}
 
 TEST_F(MP2Test, UMP2Energies_CCPVDZ) {
   // Test the UMP2 energies against reference for cc-pvdz
@@ -188,39 +199,24 @@ TEST_F(MP2Test, ActiveRMP2Energies_CCPVDZ) {
 }
 
 TEST_F(MP2Test, MP2Container) {
-  // Test that MP2Container properly computes amplitudes
-  // Singlet O2 (restricted)
+  // Test that the MP2 algorithm produces an AmplitudeContainer with the
+  // expected amplitudes. Singlet O2 (restricted).
   auto setup = create_o2_hf_setup(1);
 
-  // Create MP2Container
-  auto mp2_container_with_amplitudes = std::make_unique<MP2Container>(
-      setup.hf_hamiltonian, setup.hf_wavefunction);
+  auto wavefunction = run_mp2(setup);
+  EXPECT_EQ(wavefunction->get_container_type(), "amplitude");
+  const auto& container = wavefunction->get_container<AmplitudeContainer>();
 
-  // Verify Hamiltonian is stored
-  EXPECT_NE(mp2_container_with_amplitudes->get_hamiltonian(), nullptr)
-      << "MP2Container should store Hamiltonian reference";
+  EXPECT_TRUE(container.has_t1_amplitudes())
+      << "T1 amplitudes should be stored by the MP2 algorithm";
+  EXPECT_TRUE(container.has_t2_amplitudes())
+      << "T2 amplitudes should be stored by the MP2 algorithm";
 
-  // Lazy evaluation: Amplitudes should not be available initially
-  EXPECT_FALSE(mp2_container_with_amplitudes->has_t1_amplitudes())
-      << "T1 amplitudes should NOT be computed until requested (lazy "
-         "evaluation)";
-  EXPECT_FALSE(mp2_container_with_amplitudes->has_t2_amplitudes())
-      << "T2 amplitudes should NOT be computed until requested (lazy "
-         "evaluation)";
-
-  // Verify we can retrieve the amplitudes (this triggers lazy computation)
-  auto [t1_aa, t1_bb] = mp2_container_with_amplitudes->get_t1_amplitudes();
-  auto [t2_abab, t2_aaaa, t2_bbbb] =
-      mp2_container_with_amplitudes->get_t2_amplitudes();
-
-  // After calling getters, amplitudes should now be available
-  EXPECT_TRUE(mp2_container_with_amplitudes->has_t1_amplitudes())
-      << "T1 amplitudes should be cached after first access";
-  EXPECT_TRUE(mp2_container_with_amplitudes->has_t2_amplitudes())
-      << "T2 amplitudes should be cached after first access";
+  auto [t1_aa, t1_bb] = container.get_t1_amplitudes();
+  auto [t2_abab, t2_aaaa, t2_bbbb] = container.get_t2_amplitudes();
 
   // Verify T1 amplitudes are zero for MP2
-  auto check_t1_zero = [](const MP2Container::VectorVariant& t1) {
+  auto check_t1_zero = [](const AmplitudeContainer::VectorVariant& t1) {
     return std::visit([](auto&& vec) { return vec.isZero(1e-10); }, t1);
   };
 
@@ -230,7 +226,7 @@ TEST_F(MP2Test, MP2Container) {
       << "T1 beta amplitudes should be zero for MP2";
 
   // Verify T2 amplitudes are non-zero
-  auto check_t2_nonzero = [](const MP2Container::VectorVariant& t2) {
+  auto check_t2_nonzero = [](const AmplitudeContainer::VectorVariant& t2) {
     return std::visit([](auto&& vec) { return vec.norm() > 1e-10; }, t2);
   };
 
@@ -247,28 +243,26 @@ TEST_F(MP2Test, JsonSerializationSpatial) {
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1);
 
-  // Create MP2Container and compute amplitudes
-  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                 setup.hf_wavefunction);
-
-  // Trigger amplitude computation
-  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  // Run MP2 to obtain an AmplitudeContainer with stored amplitudes
+  auto wavefunction = run_mp2(setup);
+  const auto& original = wavefunction->get_container<AmplitudeContainer>();
+  auto [t1_aa_orig, t1_bb_orig] = original.get_t1_amplitudes();
   auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
-      original->get_t2_amplitudes();
+      original.get_t2_amplitudes();
 
   // Serialize to JSON
-  nlohmann::json j = original->to_json();
+  nlohmann::json j = original.to_json();
 
   // Deserialize from JSON
-  auto restored = MP2Container::from_json(j);
+  auto restored = AmplitudeContainer::from_json(j);
 
   // Verify amplitudes match
   auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
   auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
       restored->get_t2_amplitudes();
 
-  auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
-                               const MP2Container::VectorVariant& rest) {
+  auto compare_amplitudes = [](const AmplitudeContainer::VectorVariant& orig,
+                               const AmplitudeContainer::VectorVariant& rest) {
     return std::visit(
         [](auto&& orig_vec, auto&& rest_vec) {
           using T1 = std::decay_t<decltype(orig_vec)>;
@@ -299,28 +293,26 @@ TEST_F(MP2Test, JsonSerializationSpin) {
   // Triplet O2 (unrestricted)
   auto setup = create_o2_hf_setup(3);
 
-  // Create MP2Container and compute amplitudes
-  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                 setup.hf_wavefunction);
-
-  // Trigger amplitude computation
-  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  // Run MP2 to obtain an AmplitudeContainer with stored amplitudes
+  auto wavefunction = run_mp2(setup);
+  const auto& original = wavefunction->get_container<AmplitudeContainer>();
+  auto [t1_aa_orig, t1_bb_orig] = original.get_t1_amplitudes();
   auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
-      original->get_t2_amplitudes();
+      original.get_t2_amplitudes();
 
   // Serialize to JSON
-  nlohmann::json j = original->to_json();
+  nlohmann::json j = original.to_json();
 
   // Deserialize from JSON
-  auto restored = MP2Container::from_json(j);
+  auto restored = AmplitudeContainer::from_json(j);
 
   // Verify amplitudes match
   auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
   auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
       restored->get_t2_amplitudes();
 
-  auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
-                               const MP2Container::VectorVariant& rest) {
+  auto compare_amplitudes = [](const AmplitudeContainer::VectorVariant& orig,
+                               const AmplitudeContainer::VectorVariant& rest) {
     return std::visit(
         [](auto&& orig_vec, auto&& rest_vec) {
           using T1 = std::decay_t<decltype(orig_vec)>;
@@ -351,14 +343,12 @@ TEST_F(MP2Test, Hdf5SerializationSpatial) {
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1);
 
-  // Create MP2Container and compute amplitudes
-  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                 setup.hf_wavefunction);
-
-  // Trigger amplitude computation
-  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  // Run MP2 to obtain an AmplitudeContainer with stored amplitudes
+  auto wavefunction = run_mp2(setup);
+  const auto& original = wavefunction->get_container<AmplitudeContainer>();
+  auto [t1_aa_orig, t1_bb_orig] = original.get_t1_amplitudes();
   auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
-      original->get_t2_amplitudes();
+      original.get_t2_amplitudes();
 
   std::string filename = "test_mp2_spatial_serialization.h5";
   {
@@ -366,30 +356,31 @@ TEST_F(MP2Test, Hdf5SerializationSpatial) {
     H5::Group root = file.openGroup("/");
 
     // Serialize to HDF5
-    original->to_hdf5(root);
+    original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = MP2Container::from_hdf5(root);
+    auto restored = AmplitudeContainer::from_hdf5(root);
 
     // Verify amplitudes match
     auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
     auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
         restored->get_t2_amplitudes();
 
-    auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
-                                 const MP2Container::VectorVariant& rest) {
-      return std::visit(
-          [](auto&& orig_vec, auto&& rest_vec) {
-            using T1 = std::decay_t<decltype(orig_vec)>;
-            using T2 = std::decay_t<decltype(rest_vec)>;
-            if constexpr (std::is_same_v<T1, T2>) {
-              return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
-            } else {
-              return false;
-            }
-          },
-          orig, rest);
-    };
+    auto compare_amplitudes =
+        [](const AmplitudeContainer::VectorVariant& orig,
+           const AmplitudeContainer::VectorVariant& rest) {
+          return std::visit(
+              [](auto&& orig_vec, auto&& rest_vec) {
+                using T1 = std::decay_t<decltype(orig_vec)>;
+                using T2 = std::decay_t<decltype(rest_vec)>;
+                if constexpr (std::is_same_v<T1, T2>) {
+                  return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+                } else {
+                  return false;
+                }
+              },
+              orig, rest);
+        };
 
     EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
         << "T1 alpha amplitudes should match after HDF5 serialization";
@@ -413,14 +404,12 @@ TEST_F(MP2Test, Hdf5SerializationSpin) {
   // Triplet O2 (unrestricted)
   auto setup = create_o2_hf_setup(3);
 
-  // Create MP2Container and compute amplitudes
-  auto original = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                 setup.hf_wavefunction);
-
-  // Trigger amplitude computation
-  auto [t1_aa_orig, t1_bb_orig] = original->get_t1_amplitudes();
+  // Run MP2 to obtain an AmplitudeContainer with stored amplitudes
+  auto wavefunction = run_mp2(setup);
+  const auto& original = wavefunction->get_container<AmplitudeContainer>();
+  auto [t1_aa_orig, t1_bb_orig] = original.get_t1_amplitudes();
   auto [t2_abab_orig, t2_aaaa_orig, t2_bbbb_orig] =
-      original->get_t2_amplitudes();
+      original.get_t2_amplitudes();
 
   std::string filename = "test_mp2_spin_serialization.h5";
   {
@@ -428,30 +417,31 @@ TEST_F(MP2Test, Hdf5SerializationSpin) {
     H5::Group root = file.openGroup("/");
 
     // Serialize to HDF5
-    original->to_hdf5(root);
+    original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = MP2Container::from_hdf5(root);
+    auto restored = AmplitudeContainer::from_hdf5(root);
 
     // Verify amplitudes match
     auto [t1_aa_rest, t1_bb_rest] = restored->get_t1_amplitudes();
     auto [t2_abab_rest, t2_aaaa_rest, t2_bbbb_rest] =
         restored->get_t2_amplitudes();
 
-    auto compare_amplitudes = [](const MP2Container::VectorVariant& orig,
-                                 const MP2Container::VectorVariant& rest) {
-      return std::visit(
-          [](auto&& orig_vec, auto&& rest_vec) {
-            using T1 = std::decay_t<decltype(orig_vec)>;
-            using T2 = std::decay_t<decltype(rest_vec)>;
-            if constexpr (std::is_same_v<T1, T2>) {
-              return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
-            } else {
-              return false;
-            }
-          },
-          orig, rest);
-    };
+    auto compare_amplitudes =
+        [](const AmplitudeContainer::VectorVariant& orig,
+           const AmplitudeContainer::VectorVariant& rest) {
+          return std::visit(
+              [](auto&& orig_vec, auto&& rest_vec) {
+                using T1 = std::decay_t<decltype(orig_vec)>;
+                using T2 = std::decay_t<decltype(rest_vec)>;
+                if constexpr (std::is_same_v<T1, T2>) {
+                  return orig_vec.isApprox(rest_vec, testing::wf_tolerance);
+                } else {
+                  return false;
+                }
+              },
+              orig, rest);
+        };
 
     EXPECT_TRUE(compare_amplitudes(t1_aa_orig, t1_aa_rest))
         << "T1 alpha amplitudes should match after HDF5 serialization";
@@ -471,38 +461,31 @@ TEST_F(MP2Test, Hdf5SerializationSpin) {
 }
 
 // Test (base) Wavefunction-level JSON serialization/deserialization
-// The other tests test the MP2Container directly
+// The other tests exercise the AmplitudeContainer directly
 TEST_F(MP2Test, WavefunctionJsonSerializationSpatial) {
   // Test JSON serialization/deserialization for MP2 via
   // Wavefunction::from_json()
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1);
 
-  // Create MP2Container
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  // Trigger amplitude computation before wrapping in Wavefunction
-  mp2_container->get_t2_amplitudes();
-
-  auto original_wavefunction =
-      std::make_shared<Wavefunction>(std::move(mp2_container));
+  // Run MP2 to obtain a wavefunction backed by an AmplitudeContainer.
+  auto original_wavefunction = run_mp2(setup);
 
   // Verify container type
-  EXPECT_EQ(original_wavefunction->get_container_type(), "mp2");
+  EXPECT_EQ(original_wavefunction->get_container_type(), "amplitude");
 
   // Serialize to JSON using Wavefunction::to_json()
   nlohmann::json j = original_wavefunction->to_json();
 
   // Verify JSON contains container_type field
   EXPECT_TRUE(j.contains("container_type"));
-  EXPECT_EQ(j["container_type"], "mp2");
+  EXPECT_EQ(j["container_type"], "amplitude");
 
   // Deserialize from JSON using Wavefunction::from_json()
   auto restored_wavefunction = Wavefunction::from_json(j);
 
   // Verify restored wavefunction has correct container type
-  EXPECT_EQ(restored_wavefunction->get_container_type(), "mp2");
+  EXPECT_EQ(restored_wavefunction->get_container_type(), "amplitude");
 }
 
 // Test (base-) Wavefunction-level HDF5 serialization/deserialization
@@ -512,14 +495,10 @@ TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
   // Singlet O2 (restricted)
   auto setup = create_o2_hf_setup(1);
 
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-  mp2_container->get_t2_amplitudes();
+  // Run MP2 to obtain a wavefunction backed by an AmplitudeContainer.
+  auto original_wavefunction = run_mp2(setup);
 
-  auto original_wavefunction =
-      std::make_shared<Wavefunction>(std::move(mp2_container));
-
-  EXPECT_EQ(original_wavefunction->get_container_type(), "mp2");
+  EXPECT_EQ(original_wavefunction->get_container_type(), "amplitude");
 
   std::string filename = "test_mp2_wavefunction_hdf5_serialization.h5";
   {
@@ -529,237 +508,10 @@ TEST_F(MP2Test, WavefunctionHdf5SerializationSpatial) {
     original_wavefunction->to_hdf5(root);
     auto restored_wavefunction = Wavefunction::from_hdf5(root);
 
-    EXPECT_EQ(restored_wavefunction->get_container_type(), "mp2");
+    EXPECT_EQ(restored_wavefunction->get_container_type(), "amplitude");
 
     file.close();
   }
 
   std::remove(filename.c_str());
-}
-
-// Test CI coefficients generation from MP2 amplitudes
-TEST_F(MP2Test, CICoefficientsGeneration) {
-  // Singlet O2 (restricted)
-  auto setup = create_o2_hf_setup(1);
-
-  // Create MP2Container
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  // Test that CI coefficients can be retrieved (lazy evaluation)
-  const auto& coefficients = mp2_container->get_coefficients();
-
-  // Verify number of coefficients matches expected for MP2 expansion
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_EQ(vec.size(), 4909)
-            << "4909 coefficients should be generated for MP2 expansion";
-      },
-      coefficients);
-
-  // Test that determinants can be retrieved and count matches
-  const auto& determinants = mp2_container->get_active_determinants();
-  EXPECT_EQ(determinants.size(), 4909)
-      << "4909 determinants should be generated for MP2 expansion";
-
-  // The number of coefficients should match the number of determinants
-  std::visit(
-      [&determinants](const auto& vec) {
-        EXPECT_EQ(static_cast<size_t>(vec.size()), determinants.size())
-            << "Number of coefficients should match number of determinants";
-      },
-      coefficients);
-
-  // Test size() returns the number of determinants
-  EXPECT_EQ(mp2_container->size(), determinants.size())
-      << "size() should return the number of determinants";
-}
-
-// Test CI expansion consistency for MP2
-TEST_F(MP2Test, CIExpansionConsistency) {
-  // Singlet O2 (restricted)
-  auto setup = create_o2_hf_setup(1);
-
-  // Create MP2Container
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  const auto& coefficients = mp2_container->get_coefficients();
-  const auto& determinants = mp2_container->get_active_determinants();
-
-  // Verify each determinant can be looked up individually
-  for (size_t i = 0; i < std::min(determinants.size(), static_cast<size_t>(10));
-       ++i) {
-    auto coeff = mp2_container->get_coefficient(determinants[i]);
-    std::visit(
-        [i, &coefficients](const auto& individual_coeff) {
-          using T = std::decay_t<decltype(individual_coeff)>;
-          std::visit(
-              [i, &individual_coeff](const auto& all_coeffs) {
-                using U = std::decay_t<decltype(all_coeffs[0])>;
-                if constexpr (std::is_same_v<T, U>) {
-                  EXPECT_NEAR(std::abs(individual_coeff),
-                              std::abs(all_coeffs[i]), testing::wf_tolerance)
-                      << "Individual coefficient lookup should match vector at "
-                         "index "
-                      << i;
-                }
-              },
-              coefficients);
-        },
-        coeff);
-  }
-}
-
-// Test that reference determinant is in MP2 expansion with coefficient 1.0
-TEST_F(MP2Test, ReferenceInExpansion) {
-  // Singlet O2 (restricted)
-  auto setup = create_o2_hf_setup(1);
-
-  // Create MP2Container
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  const auto& determinants = mp2_container->get_active_determinants();
-
-  // The reference determinant should be the first one in the expansion
-  const auto& ref_dets = setup.hf_wavefunction->get_total_determinants();
-  ASSERT_FALSE(ref_dets.empty())
-      << "Reference wavefunction should have determinants";
-
-  // Check that the reference is in the MP2 expansion
-  bool found_reference = false;
-  for (const auto& det : determinants) {
-    for (const auto& ref : ref_dets) {
-      if (det.to_string() == ref.to_string()) {
-        found_reference = true;
-        // The reference should have coefficient 1.0 in MP2
-        auto ref_coeff = mp2_container->get_coefficient(det);
-        std::visit(
-            [](const auto& coeff) {
-              // The reference coefficient should be dominant in the MP2
-              // expansion. We check that it is greater than 0.9, rather than
-              // matching a hardcoded value.
-              EXPECT_GT(std::abs(coeff), 0.9);
-            },
-            ref_coeff);
-        break;
-      }
-    }
-    if (found_reference) break;
-  }
-  EXPECT_TRUE(found_reference)
-      << "Reference determinant should be in the MP2 expansion";
-}
-
-// Test RDM availability for MP2 container
-TEST_F(MP2Test, LazyRDMComputationFromAmplitudes) {
-  // Singlet O2 (restricted)
-  auto setup = create_o2_hf_setup(1);
-
-  // Create MP2Container
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  // CI coefficients should be available (lazy evaluation from amplitudes)
-  const auto& coefficients = mp2_container->get_coefficients();
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should be available";
-      },
-      coefficients);
-
-  // RDMs SHOULD be available via lazy computation from CI coefficients
-  EXPECT_TRUE(mp2_container->has_one_rdm_spin_dependent())
-      << "MP2 container should have spin-dependent 1-RDM via lazy computation";
-  EXPECT_TRUE(mp2_container->has_one_rdm_spin_traced())
-      << "MP2 container should have spin-traced 1-RDM via lazy computation";
-  EXPECT_TRUE(mp2_container->has_two_rdm_spin_dependent())
-      << "MP2 container should have spin-dependent 2-RDM via lazy computation";
-  EXPECT_TRUE(mp2_container->has_two_rdm_spin_traced())
-      << "MP2 container should have spin-traced 2-RDM via lazy computation";
-
-  // Get RDMs and verify they have reasonable values
-  auto [one_rdm_aa, one_rdm_bb] =
-      mp2_container->get_active_one_rdm_spin_dependent();
-
-  // Verify 1-RDM has non-zero values (visit each variant separately)
-  std::visit(
-      [](const auto& mat) {
-        EXPECT_GT(mat.norm(), 0.0) << "1-RDM aa should not be zero";
-      },
-      one_rdm_aa);
-  std::visit(
-      [](const auto& mat) {
-        EXPECT_GT(mat.norm(), 0.0) << "1-RDM bb should not be zero";
-      },
-      one_rdm_bb);
-
-  // Get number of electrons
-  auto [n_alpha, n_beta] = setup.hf_wavefunction->get_active_num_electrons();
-  size_t n_electrons = n_alpha + n_beta;
-
-  // Verify 1-RDM trace equals number of electrons
-  // Tr(γ) = N
-  const auto& rdm1 = std::get<Eigen::MatrixXd>(
-      mp2_container->get_active_one_rdm_spin_traced());
-  double rdm1_trace = rdm1.trace();
-  EXPECT_NEAR(rdm1_trace, static_cast<double>(n_electrons), 1e-6)
-      << "1-RDM trace should equal number of electrons. "
-      << "Trace: " << rdm1_trace << ", N_electrons: " << n_electrons;
-
-  // Verify 2-RDMs are available and have non-zero values
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
-      mp2_container->get_active_two_rdm_spin_dependent();
-  std::visit(
-      [](const auto& rdm) {
-        bool has_nonzero = false;
-        for (size_t i = 0; i < rdm.size() && !has_nonzero; ++i) {
-          if (std::abs(rdm.data()[i]) > 1e-12) {
-            has_nonzero = true;
-          }
-        }
-        EXPECT_TRUE(has_nonzero) << "2-RDM aaaa should have non-zero values";
-      },
-      two_rdm_aaaa);
-}
-
-// Test that both amplitudes and CI coefficients are available on MP2Container
-TEST_F(MP2Test, AmplitudesAndCICoefficientsAvailable) {
-  // Singlet O2 (restricted)
-  auto setup = create_o2_hf_setup(1);
-
-  auto mp2_container = std::make_unique<MP2Container>(setup.hf_hamiltonian,
-                                                      setup.hf_wavefunction);
-
-  // Test that both T amplitudes and CI coefficients are available
-  // First, get CI coefficients (this triggers lazy evaluation)
-  const auto& coefficients = mp2_container->get_coefficients();
-  const auto& determinants = mp2_container->get_active_determinants();
-
-  // Then, get amplitudes
-  auto [t1_aa, t1_bb] = mp2_container->get_t1_amplitudes();
-  auto [t2_abab, t2_aaaa, t2_bbbb] = mp2_container->get_t2_amplitudes();
-
-  // Verify all are available
-  EXPECT_TRUE(mp2_container->has_t1_amplitudes())
-      << "T1 amplitudes should be available";
-  EXPECT_TRUE(mp2_container->has_t2_amplitudes())
-      << "T2 amplitudes should be available";
-
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_GT(vec.size(), 0) << "CI coefficients should be non-empty";
-      },
-      coefficients);
-
-  EXPECT_GT(determinants.size(), 0) << "Determinants should be non-empty";
-
-  // Verify T1 is zero for MP2
-  std::visit(
-      [](const auto& vec) {
-        EXPECT_TRUE(vec.isZero(1e-10))
-            << "T1 amplitudes should be zero for MP2";
-      },
-      t1_aa);
 }

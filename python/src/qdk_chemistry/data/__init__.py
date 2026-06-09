@@ -6,6 +6,7 @@ primary interface for managing quantum chemical data within the QDK/Chemistry fr
 
 Exposed classes are:
 
+- :class:`AmplitudeContainer`: Amplitude-based correlated wavefunction (coupled cluster or MP2).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
@@ -15,7 +16,6 @@ Exposed classes are:
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`ControlledUnitary`: Controlled unitary.
-- :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
@@ -28,7 +28,6 @@ Exposed classes are:
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
-- :class:`MP2Container`: Container for MP2 wavefunction with Hamiltonian reference and optional amplitudes.
 - :class:`Orbitals`: Molecular orbital information and properties.
 - :class:`OrbitalType`: Enumeration of orbital angular momentum types (s, p, d, f, etc.).
 - :class:`PauliOperator`: Pauli operator (I, X, Y, Z) for quantum operator expressions with arithmetic support.
@@ -67,6 +66,7 @@ from contextlib import suppress
 
 from qdk_chemistry._core.data import (
     AlgorithmRef,
+    AmplitudeContainer,
     Ansatz,
     AOType,
     BasisSet,
@@ -74,7 +74,6 @@ from qdk_chemistry._core.data import (
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
-    CoupledClusterContainer,
     ElectronicStructureSettings,
     Element,
     Hamiltonian,
@@ -83,7 +82,6 @@ from qdk_chemistry._core.data import (
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
-    MP2Container,
     Orbitals,
     OrbitalType,
     PauliOperator,
@@ -133,6 +131,7 @@ SettingsAreLockedError = SettingsAreLocked
 __all__ = [
     "AOType",
     "AlgorithmRef",
+    "AmplitudeContainer",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
@@ -142,7 +141,6 @@ __all__ = [
     "Configuration",
     "ConfigurationSet",
     "ControlledUnitary",
-    "CoupledClusterContainer",
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
@@ -156,7 +154,6 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
-    "MP2Container",
     "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",

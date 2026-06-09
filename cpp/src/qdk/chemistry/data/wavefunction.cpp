@@ -12,8 +12,7 @@
 #include <memory>
 #include <numeric>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
@@ -799,6 +798,35 @@ WavefunctionType WavefunctionContainer::get_type() const {
   return _type;
 }
 
+namespace {
+constexpr const char* kNotDeterminantExpansionMessage =
+    "This wavefunction container is not a determinant/coefficient expansion, "
+    "so determinant and coefficient accessors are not available.";
+}  // namespace
+
+const ContainerTypes::VectorVariant& WavefunctionContainer::get_coefficients()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+ContainerTypes::ScalarVariant WavefunctionContainer::get_coefficient(
+    const Configuration&) const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+const ContainerTypes::DeterminantVector&
+WavefunctionContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+size_t WavefunctionContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
 // Wavefunction implementations
 Wavefunction::Wavefunction(std::unique_ptr<WavefunctionContainer> container)
     : _container(std::move(container)) {
@@ -1211,10 +1239,9 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci" || container_type == "sd") {
       container = StateVectorContainer::from_json(j["container"]);
-    } else if (container_type == "coupled_cluster") {
-      container = CoupledClusterContainer::from_json(j["container"]);
-    } else if (container_type == "mp2") {
-      container = MP2Container::from_json(j["container"]);
+    } else if (container_type == "amplitude" ||
+               container_type == "coupled_cluster" || container_type == "mp2") {
+      container = AmplitudeContainer::from_json(j["container"]);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
@@ -1308,10 +1335,9 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci" || container_type == "sd") {
       container = StateVectorContainer::from_hdf5(container_group);
-    } else if (container_type == "coupled_cluster") {
-      container = CoupledClusterContainer::from_hdf5(container_group);
-    } else if (container_type == "mp2") {
-      container = MP2Container::from_hdf5(container_group);
+    } else if (container_type == "amplitude" ||
+               container_type == "coupled_cluster" || container_type == "mp2") {
+      container = AmplitudeContainer::from_hdf5(container_group);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }

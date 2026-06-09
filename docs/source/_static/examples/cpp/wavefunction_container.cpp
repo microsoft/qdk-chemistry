@@ -150,17 +150,19 @@ int main() {
 
   // Use the Slater determinant as reference
   auto orbitals_mp2 = make_minimal_orbitals();
-  auto hamiltonian = make_minimal_hamiltonian(orbitals_mp2);
   Configuration ref_det("20");
   auto sd_container_mp2 =
       std::make_unique<StateVectorContainer>(ref_det, orbitals_mp2);
   auto ref_wavefunction =
       std::make_shared<Wavefunction>(std::move(sd_container_mp2));
 
-  // Create MP2 container: requires Hamiltonian and reference wavefunction
-  // Amplitudes are computed lazily when first requested
-  auto mp2_container =
-      std::make_unique<MP2Container>(hamiltonian, ref_wavefunction, "mp");
+  // In practice the MP2 algorithm computes the amplitudes; here we store them
+  // directly in an AmplitudeContainer. T1 is zero for MP2.
+  Eigen::VectorXd t1_mp2 = Eigen::VectorXd::Zero(1);
+  Eigen::VectorXd t2_mp2(1);
+  t2_mp2 << 0.1;
+  auto mp2_container = std::make_unique<AmplitudeContainer>(
+      orbitals_mp2, ref_wavefunction, t1_mp2, t2_mp2);
   Wavefunction mp2_wavefunction(std::move(mp2_container));
   // end-cell-create-mp2
   // --------------------------------------------------------------------------------------------
@@ -190,7 +192,7 @@ int main() {
 
   // Create CC container: requires reference wavefunction, orbitals, and
   // amplitudes
-  auto cc_container = std::make_unique<CoupledClusterContainer>(
+  auto cc_container = std::make_unique<AmplitudeContainer>(
       orbitals_cc, ref_wavefunction_cc, t1_amplitudes, t2_amplitudes);
   Wavefunction cc_wavefunction(std::move(cc_container));
   // end-cell-create-cc
@@ -227,18 +229,17 @@ int main() {
   // MP2
   // Get the container back from wfn
   const auto& mp2_container_ref =
-      mp2_wavefunction.get_container<MP2Container>();
-  // Amplitudes are lazily evaluated on first call then cached
+      mp2_wavefunction.get_container<AmplitudeContainer>();
   auto [t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2] =
-      mp2_container_ref->get_t2_amplitudes();
+      mp2_container_ref.get_t2_amplitudes();
 
   // CC
   const auto& cc_container_ref =
-      cc_wavefunction.get_container<CoupledClusterContainer>();
+      cc_wavefunction.get_container<AmplitudeContainer>();
   // Amplitudes are stored already from construction
-  auto [t1_aa, t1_bb] = cc_container_ref->get_t1_amplitudes();
+  auto [t1_aa, t1_bb] = cc_container_ref.get_t1_amplitudes();
   auto [t2_abab_cc, t2_aaaa_cc, t2_bbbb_cc] =
-      cc_container_ref->get_t2_amplitudes();
+      cc_container_ref.get_t2_amplitudes();
   // end-cell-access-amplitudes
   // --------------------------------------------------------------------------------------------
 

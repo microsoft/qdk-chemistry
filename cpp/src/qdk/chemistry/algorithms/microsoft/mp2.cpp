@@ -11,7 +11,7 @@
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <tuple>
@@ -55,17 +55,122 @@ DynamicalCorrelationResult MP2Calculator::_run_impl(
     E_corr = calculate_restricted_mp2_energy(hamiltonian, orbitals, n_alpha);
   }
 
-  // Create MP2Container
-  auto mp2_container =
-      std::make_unique<data::MP2Container>(hamiltonian, wavefunction);
+  // Compute amplitudes eagerly and wrap them in an AmplitudeContainer
+  // (pure storage; the container no longer computes amplitudes lazily).
+  Amplitudes amps = compute_amplitudes(hamiltonian, orbitals, n_alpha, n_beta);
+  std::unique_ptr<data::AmplitudeContainer> amplitude_container;
+  using VV = data::ContainerTypes::VectorVariant;
+  if (amps.restricted) {
+    amplitude_container = std::make_unique<data::AmplitudeContainer>(
+        orbitals, wavefunction, std::optional<VV>(amps.t1_aa),
+        std::optional<VV>(amps.t2_abab));
+  } else {
+    amplitude_container = std::make_unique<data::AmplitudeContainer>(
+        orbitals, wavefunction, std::optional<VV>(amps.t1_aa),
+        std::optional<VV>(amps.t1_bb), std::optional<VV>(amps.t2_abab),
+        std::optional<VV>(amps.t2_aaaa), std::optional<VV>(amps.t2_bbbb));
+  }
 
   auto mp2_wavefunction =
-      std::make_shared<data::Wavefunction>(std::move(mp2_container));
+      std::make_shared<data::Wavefunction>(std::move(amplitude_container));
 
   // Calculate total energy = reference energy + correlation energy
   double reference_energy_ = ansatz->calculate_energy();
   double total_energy = reference_energy_ + E_corr;
   return {total_energy, mp2_wavefunction, mp2_wavefunction};
+}
+
+MP2Calculator::Amplitudes MP2Calculator::compute_amplitudes(
+    std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
+    std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
+    size_t n_beta) const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!orbitals->has_energies()) {
+    throw std::runtime_error(
+        "Orbital energies are required for MP2 amplitude calculation");
+  }
+
+  // Active-space size (falls back to the full MO count).
+  size_t active_space_size = orbitals->get_num_molecular_orbitals();
+  if (orbitals->has_active_space()) {
+    active_space_size = orbitals->get_active_space_indices().first.size();
+  }
+  const Eigen::Index active_size_idx =
+      static_cast<Eigen::Index>(active_space_size);
+
+  // Extract (active) orbital energies per spin.
+  const auto& eps_alpha = orbitals->energies()->block({data::axes::alpha()});
+  const auto& eps_beta = orbitals->energies()->block({data::axes::beta()});
+  Eigen::VectorXd eps_active_alpha(active_space_size);
+  Eigen::VectorXd eps_active_beta(active_space_size);
+  if (orbitals->has_active_space()) {
+    const auto& [active_alpha, active_beta] =
+        orbitals->get_active_space_indices();
+    for (Eigen::Index i = 0; i < active_size_idx; ++i) {
+      eps_active_alpha[i] = eps_alpha[active_alpha[i]];
+      eps_active_beta[i] = eps_beta[active_beta[i]];
+    }
+  } else {
+    eps_active_alpha = eps_alpha;
+    eps_active_beta = eps_beta;
+  }
+
+  const bool use_unrestricted = ham->is_unrestricted() || (n_alpha != n_beta);
+
+  // Strides for the 4D integral arrays.
+  const size_t stride_k = active_space_size;
+  const size_t stride_j = active_space_size * active_space_size;
+  const size_t stride_i =
+      active_space_size * active_space_size * active_space_size;
+
+  const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
+      ham->get_two_body_integrals();
+
+  Amplitudes amps;
+  amps.restricted = !use_unrestricted;
+
+  if (use_unrestricted) {
+    const size_t n_vir_alpha = active_space_size - n_alpha;
+    const size_t n_vir_beta = active_space_size - n_beta;
+
+    // T1 amplitudes are zero for MP2.
+    amps.t1_aa = Eigen::VectorXd::Zero(n_alpha * n_vir_alpha);
+    amps.t1_bb = Eigen::VectorXd::Zero(n_beta * n_vir_beta);
+
+    amps.t2_aaaa =
+        Eigen::VectorXd::Zero(n_alpha * n_alpha * n_vir_alpha * n_vir_alpha);
+    amps.t2_abab =
+        Eigen::VectorXd::Zero(n_alpha * n_beta * n_vir_alpha * n_vir_beta);
+    amps.t2_bbbb =
+        Eigen::VectorXd::Zero(n_beta * n_beta * n_vir_beta * n_vir_beta);
+
+    compute_same_spin_t2(eps_active_alpha, moeri_aaaa, n_alpha, n_vir_alpha,
+                         stride_i, stride_j, stride_k, amps.t2_aaaa);
+    compute_opposite_spin_t2(eps_active_alpha, eps_active_beta, moeri_aabb,
+                             n_alpha, n_beta, n_vir_alpha, n_vir_beta, stride_i,
+                             stride_j, stride_k, amps.t2_abab);
+    compute_same_spin_t2(eps_beta, moeri_bbbb, n_beta, n_vir_beta, stride_i,
+                         stride_j, stride_k, amps.t2_bbbb);
+  } else {
+    if (n_alpha != n_beta) {
+      throw std::runtime_error(
+          "Restricted MP2 requires equal alpha and beta electrons");
+    }
+    const size_t n_occ = n_alpha;
+    const size_t n_vir = active_space_size - n_occ;
+
+    amps.t1_aa = Eigen::VectorXd::Zero(n_occ * n_vir);
+    amps.t1_bb = amps.t1_aa;
+
+    // For restricted systems all components share the spatial T2 block.
+    amps.t2_abab = Eigen::VectorXd::Zero(n_occ * n_occ * n_vir * n_vir);
+    compute_restricted_t2(eps_active_alpha, moeri_aaaa, n_occ, n_vir, stride_i,
+                          stride_j, stride_k, amps.t2_abab);
+    amps.t2_aaaa = amps.t2_abab;
+    amps.t2_bbbb = amps.t2_abab;
+  }
+
+  return amps;
 }
 
 double MP2Calculator::calculate_restricted_mp2_energy(

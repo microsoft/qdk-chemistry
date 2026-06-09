@@ -14,8 +14,7 @@
 #include <numeric>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
@@ -150,13 +149,6 @@ Abstract base class for wavefunction containers.
 This class provides the interface for different types of wavefunction representations (e.g., CI, MCSCF, coupled cluster).
 It uses variant types to support both real and complex arithmetic.
     )")
-      .def("get_coefficient", &WavefunctionContainer::get_coefficient,
-           "Get coefficient for a specific determinant", py::arg("det"))
-      .def("get_active_determinants",
-           &WavefunctionContainer::get_active_determinants,
-           "Get all determinants in the wavefunction",
-           py::return_value_policy::reference_internal)
-      .def("size", &WavefunctionContainer::size, "Get number of determinants")
       .def("norm", &WavefunctionContainer::norm,
            "Calculate norm of the wavefunction")
       .def("get_orbitals", &WavefunctionContainer::get_orbitals,
@@ -321,10 +313,8 @@ Examples:
         }
         if (self.has_container_type<StateVectorContainer>()) {
           return self.get_container<StateVectorContainer>();
-        } else if (self.has_container_type<MP2Container>()) {
-          return self.get_container<MP2Container>();
-        } else if (self.has_container_type<CoupledClusterContainer>()) {
-          return self.get_container<CoupledClusterContainer>();
+        } else if (self.has_container_type<AmplitudeContainer>()) {
+          return self.get_container<AmplitudeContainer>();
         } else {
           throw std::runtime_error("Unknown container type.");
         }
@@ -1180,55 +1170,61 @@ Examples:
       .def("get_coefficients", &StateVectorContainer::get_coefficients,
            "Get the coefficients of the wavefunction",
            py::return_value_policy::reference_internal)
+      .def("get_coefficient", &StateVectorContainer::get_coefficient,
+           "Get coefficient for a specific determinant", py::arg("det"))
+      .def("get_active_determinants",
+           &StateVectorContainer::get_active_determinants,
+           "Get all determinants in the wavefunction",
+           py::return_value_policy::reference_internal)
+      .def("size", &StateVectorContainer::size, "Get number of determinants")
       .def("contains_determinant", &StateVectorContainer::contains_determinant,
            "Check if a determinant is present in the expansion",
            py::arg("det"));
 
-  // Bind CoupledClusterContainer
-  py::class_<CoupledClusterContainer, WavefunctionContainer, py::smart_holder>(
-      data, "CoupledClusterContainer",
+  // Bind AmplitudeContainer
+  py::class_<AmplitudeContainer, WavefunctionContainer, py::smart_holder>(
+      data, "AmplitudeContainer",
       R"(
-Coupled cluster wavefunction container implementation.
+Amplitude-based correlated wavefunction container (e.g. coupled cluster or MP2).
 
-This container represents a coupled cluster wavefunction with T1 and T2 amplitudes.
-It supports both restricted and unrestricted coupled cluster methods, optionally storing
-spin-separated amplitudes as well as reduced density matrices (RDMs).
+This container stores a reference wavefunction together with T1/T2 excitation
+amplitudes. It is pure storage: it does not expand the amplitudes into a
+determinant/coefficient representation and does not compute reduced density
+matrices, so determinant- and RDM-based accessors raise. It supports both
+restricted and unrestricted amplitudes (optionally spin-separated).
     )")
-      .def(py::init<
-               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
+      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&>(),
            R"(
-Constructs a coupled cluster wavefunction container with amplitudes.
+Constructs an amplitude wavefunction container with spatial (restricted) amplitudes.
 
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    wavefunction (Wavefunction): Shared pointer to wavefunction
+    wavefunction (Wavefunction): Shared pointer to the reference wavefunction
     t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (both alpha, beta spin)
     t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (both alpha, beta spin)
 
 Examples:
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
-    >>> container = qdk_chemistry.CoupledClusterContainer(
-    ...     orbitals, wfn, t1, t2)
+    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, t1, t2)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt)
-      .def(py::init<
-               std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&,
-               const std::optional<CoupledClusterContainer::VectorVariant>&>(),
+      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&>(),
            R"(
-Constructs a coupled cluster wavefunction container with spin-separated amplitudes.
+Constructs an amplitude wavefunction container with spin-separated amplitudes.
 
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
-    wavefunction (Wavefunction): Shared pointer to wavefunction
+    wavefunction (Wavefunction): Shared pointer to the reference wavefunction
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
@@ -1236,10 +1232,7 @@ Args:
     t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
 
 Examples:
-    >>> t1_aa = np.array([...])
-    >>> t1_bb = np.array([...])
-    >>> t2_abab = np.array([...])
-    >>> container = qdk_chemistry.CoupledClusterContainer(
+    >>> container = qdk_chemistry.AmplitudeContainer(
     ...     orbitals, wfn, t1_aa, t1_bb, t2_abab, None, None)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
@@ -1248,147 +1241,36 @@ Examples:
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt)
-
-      .def("get_wavefunction", &CoupledClusterContainer::get_wavefunction,
+      .def("get_wavefunction", &AmplitudeContainer::get_wavefunction,
            R"(
-Get reference to Wavefunction.
+Get the reference wavefunction.
 
 Returns:
-    Wavefunction: Shared pointer to Wavefunction
+    Wavefunction: Shared pointer to the reference wavefunction
 
 Examples:
-    >>> wfn = cc_container.get_wavefunction()
+    >>> wfn = container.get_wavefunction()
         )",
            py::return_value_policy::reference_internal)
-
       .def(
           "get_t1_amplitudes",
-          [](const CoupledClusterContainer& self) {
+          [](const AmplitudeContainer& self) {
             const auto& [t1_aa, t1_bb] = self.get_t1_amplitudes();
             return py::make_tuple(variant_to_python(t1_aa),
                                   variant_to_python(t1_bb));
           },
           R"(
-Get T1 amplitudes. In restricted CC, both T1 amplitudes will be identical.
+Get T1 amplitudes. For restricted wavefunctions both blocks are identical.
 
 Returns:
     tuple: Pair of (alpha, beta) T1 amplitudes
 
 Examples:
-    >>> t1_aa, t1_bb = cc_container.get_t1_amplitudes()
+    >>> t1_aa, t1_bb = container.get_t1_amplitudes()
         )")
-
       .def(
           "get_t2_amplitudes",
-          [](const CoupledClusterContainer& self) {
-            const auto& [t2_abab, t2_aaaa, t2_bbbb] = self.get_t2_amplitudes();
-            return py::make_tuple(variant_to_python(t2_abab),
-                                  variant_to_python(t2_aaaa),
-                                  variant_to_python(t2_bbbb));
-          },
-          R"(
-Get T2 amplitudes. In restricted CC, only the alpha-beta T2 amplitudes will be used.
-
-Returns:
-    tuple: Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
-
-
-Examples:
-    >>> t2_abab, t2_aaaa, t2_bbbb = cc_container.get_t2_amplitudes()
-        )")
-
-      .def("has_t1_amplitudes", &CoupledClusterContainer::has_t1_amplitudes,
-           R"(
-Check if T1 amplitudes are available.
-
-Returns:
-    bool: True if T1 amplitudes are available
-
-Examples:
-    >>> if cc_container.has_t1_amplitudes():
-...     t1_aa, t1_bb = cc_container.get_t1_amplitudes()
-        )")
-
-      .def("has_t2_amplitudes", &CoupledClusterContainer::has_t2_amplitudes,
-           R"(
-Check if T2 amplitudes are available.
-
-Returns:
-    bool: True if T2 amplitudes are available
-
-Examples:
-    >>> if cc_container.has_t2_amplitudes():
-    ...     t2 = cc_container.get_t2_amplitudes()
-        )");
-
-  // Bind MP2Container
-  py::class_<MP2Container, WavefunctionContainer, py::smart_holder>(
-      data, "MP2Container",
-      R"(
-    MP2 wavefunction container implementation.
-    )")
-      .def(py::init<std::shared_ptr<Hamiltonian>, std::shared_ptr<Wavefunction>,
-                    const std::string&>(),
-           R"(
-Constructs an MP2 wavefunction container.
-
-Args:
-    hamiltonian (Hamiltonian): Shared pointer to the Hamiltonian
-    wavefunction (Wavefunction): Shared pointer to the Wavefunction
-    partitioning (str, optional): Choice of partitioning in perturbation theory (default: "mp")
-
-Examples:
-    >>> container = qdk_chemistry.MP2Container(
-    ...     hamiltonian, wfn, "mp")
-        )",
-           py::arg("hamiltonian"), py::arg("wavefunction"),
-           py::arg("partitioning") = "mp")
-
-      .def("get_hamiltonian", &MP2Container::get_hamiltonian,
-           R"(
-Get reference to Hamiltonian.
-
-Returns:
-    Hamiltonian: Shared pointer to Hamiltonian
-
-Examples:
-    >>> ham = mp2_container.get_hamiltonian()
-        )",
-           py::return_value_policy::reference_internal)
-
-      .def("get_wavefunction", &MP2Container::get_wavefunction,
-           R"(
-Get reference to Wavefunction.
-
-Returns:
-    Wavefunction: Shared pointer to Wavefunction
-
-Examples:
-    >>> wfn = mp2_container.get_wavefunction()
-        )",
-           py::return_value_policy::reference_internal)
-
-      .def(
-          "get_t1_amplitudes",
-          [](const MP2Container& self) {
-            const auto& [t1_aa, t1_bb] = self.get_t1_amplitudes();
-            return py::make_tuple(variant_to_python(t1_aa),
-                                  variant_to_python(t1_bb));
-          },
-          R"(
-Get T1 amplitudes.
-
-Returns:
-    tuple: Pair of (alpha, beta) T1 amplitudes (zeros for MP2)
-
-Examples:
-    >>> if mp2_container.has_t1_amplitudes():
-    ...     t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
-        )")
-
-      .def(
-          "get_t2_amplitudes",
-          [](const MP2Container& self) {
+          [](const AmplitudeContainer& self) {
             const auto& [t2_abab, t2_aaaa, t2_bbbb] = self.get_t2_amplitudes();
             return py::make_tuple(variant_to_python(t2_abab),
                                   variant_to_python(t2_aaaa),
@@ -1401,31 +1283,28 @@ Returns:
     tuple: Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
 
 Examples:
-    >>> if mp2_container.has_t2_amplitudes():
-    ...     t2_abab, t2_aaaa, t2_bbbb = mp2_container.get_t2_amplitudes()
+    >>> t2_abab, t2_aaaa, t2_bbbb = container.get_t2_amplitudes()
         )")
-
-      .def("has_t1_amplitudes", &MP2Container::has_t1_amplitudes,
+      .def("has_t1_amplitudes", &AmplitudeContainer::has_t1_amplitudes,
            R"(
 Check if T1 amplitudes are available.
 
 Returns:
-    bool: Whether t1 amplitudes are available.
+    bool: True if T1 amplitudes are available
 
 Examples:
-    >>> if mp2_container.has_t1_amplitudes():
-    ...     t1_aa, t1_bb = mp2_container.get_t1_amplitudes()
+    >>> if container.has_t1_amplitudes():
+    ...     t1_aa, t1_bb = container.get_t1_amplitudes()
         )")
-
-      .def("has_t2_amplitudes", &MP2Container::has_t2_amplitudes,
+      .def("has_t2_amplitudes", &AmplitudeContainer::has_t2_amplitudes,
            R"(
 Check if T2 amplitudes are available.
 
 Returns:
-    bool: Whether T2 amplitudes are available.
+    bool: True if T2 amplitudes are available
 
 Examples:
-    >>> if mp2_container.has_t2_amplitudes():
-    ...     t2 = mp2_container.get_t2_amplitudes()
+    >>> if container.has_t2_amplitudes():
+    ...     t2 = container.get_t2_amplitudes()
         )");
 }

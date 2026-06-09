@@ -281,28 +281,48 @@ class WavefunctionContainer {
 
   /**
    * @brief Get all coefficients
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all coefficients (real or complex)
    */
-  virtual const VectorVariant& get_coefficients() const = 0;
+  virtual const VectorVariant& get_coefficients() const;
 
   /**
    * @brief Get coefficient for a specific determinant
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @param det Configuration/determinant to get coefficient for
    * @return Scalar coefficient (real or complex)
    */
-  virtual ScalarVariant get_coefficient(const Configuration& det) const = 0;
+  virtual ScalarVariant get_coefficient(const Configuration& det) const;
 
   /**
    * @brief Get all determinants in the wavefunction
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all configurations/determinants
    */
-  virtual const DeterminantVector& get_active_determinants() const = 0;
+  virtual const DeterminantVector& get_active_determinants() const;
 
   /**
    * @brief Get number of determinants
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Number of determinants in the wavefunction
    */
-  virtual size_t size() const = 0;
+  virtual size_t size() const;
 
   /**
    * @brief Calculate overlap with another wavefunction

@@ -1575,7 +1575,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1605,7 +1605,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1661,7 +1661,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()
@@ -1727,7 +1727,7 @@ class TestPyscfPlugin:
         _, cc_wavefunction, _ = cc_calculator.run(ansatz_object)
 
         # Verify original wavefunction properties
-        assert cc_wavefunction.get_container_type() == "coupled_cluster"
+        assert cc_wavefunction.get_container_type() == "amplitude"
 
         # Get original container and check it has amplitudes
         original_container = cc_wavefunction.get_container()
@@ -1752,7 +1752,7 @@ class TestPyscfPlugin:
         restored_json = data.Wavefunction.from_json(wf_json)
 
         # Verify JSON restored wavefunction
-        assert restored_json.get_container_type() == "coupled_cluster"
+        assert restored_json.get_container_type() == "amplitude"
 
         json_container = restored_json.get_container()
         assert json_container.has_t1_amplitudes()
@@ -1789,7 +1789,7 @@ class TestPyscfPlugin:
         restored_hdf5 = data.Wavefunction.from_hdf5_file(str(filename))
 
         # Verify HDF5 restored wavefunction
-        assert restored_hdf5.get_container_type() == "coupled_cluster"
+        assert restored_hdf5.get_container_type() == "amplitude"
 
         hdf5_container = restored_hdf5.get_container()
         assert hdf5_container.has_t1_amplitudes()

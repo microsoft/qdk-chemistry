@@ -1,0 +1,262 @@
+/*
+ * Copyright (c) Microsoft Corporation. All rights reserved.
+ * Licensed under the MIT License. See LICENSE.txt in the project root for
+ * license information.
+ */
+
+#pragma once
+#include <H5Cpp.h>
+
+#include <Eigen/Dense>
+#include <complex>
+#include <memory>
+#include <nlohmann/json.hpp>
+#include <optional>
+#include <qdk/chemistry/data/configuration.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
+#include <tuple>
+#include <variant>
+#include <vector>
+
+namespace qdk::chemistry::data {
+
+/**
+ * @class AmplitudeContainer
+ * @brief Wavefunction container representing an amplitude-based correlated
+ *        wavefunction (e.g. coupled cluster or MP2).
+ *
+ * This is the single container type for wavefunctions parameterized by
+ * excitation amplitudes relative to a reference. It stores the reference
+ * wavefunction together with T1/T2 amplitude blocks and subsumes the previous
+ * coupled-cluster and MP2 containers.
+ *
+ * The container is pure storage: it does not expand the amplitudes into a
+ * determinant/coefficient (CI) representation and does not compute reduced
+ * density matrices. Determinant- and RDM-based accessors therefore throw.
+ * Amplitudes are supplied by the producing algorithm; they are not computed
+ * lazily.
+ */
+class AmplitudeContainer : public WavefunctionContainer {
+ public:
+  using MatrixVariant = ContainerTypes::MatrixVariant;
+  using VectorVariant = ContainerTypes::VectorVariant;
+  using ScalarVariant = ContainerTypes::ScalarVariant;
+  using DeterminantVector = ContainerTypes::DeterminantVector;
+
+  /**
+   * @brief Constructs an amplitude wavefunction with spatial (restricted)
+   *        amplitudes.
+   *
+   * T1/T2 amplitudes are stored if provided.
+   *
+   * @param orbitals Shared pointer to orbitals
+   * @param wavefunction Shared pointer to the reference wavefunction
+   * @param t1_amplitudes T1 amplitudes (optional)
+   * @param t2_amplitudes T2 amplitudes (optional)
+   */
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
+                     std::shared_ptr<Wavefunction> wavefunction,
+                     const std::optional<VectorVariant>& t1_amplitudes,
+                     const std::optional<VectorVariant>& t2_amplitudes);
+
+  /**
+   * @brief Constructs an amplitude wavefunction with spin-separated amplitudes.
+   *
+   * T1/T2 amplitudes are stored if provided.
+   *
+   * @param orbitals Shared pointer to orbitals
+   * @param wavefunction Shared pointer to the reference wavefunction
+   * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
+   * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
+   * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
+   * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
+   * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
+   */
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
+                     std::shared_ptr<Wavefunction> wavefunction,
+                     const std::optional<VectorVariant>& t1_amplitudes_aa,
+                     const std::optional<VectorVariant>& t1_amplitudes_bb,
+                     const std::optional<VectorVariant>& t2_amplitudes_abab,
+                     const std::optional<VectorVariant>& t2_amplitudes_aaaa,
+                     const std::optional<VectorVariant>& t2_amplitudes_bbbb);
+
+  /** @brief Destructor */
+  ~AmplitudeContainer() override = default;
+
+  /**
+   * @brief Create a deep copy of this container
+   * @return Unique pointer to cloned container
+   */
+  std::unique_ptr<WavefunctionContainer> clone() const override;
+
+  /**
+   * @brief Get reference to orbitals
+   * @return Shared pointer to orbitals
+   */
+  std::shared_ptr<Orbitals> get_orbitals() const override;
+
+  /**
+   * @brief Get the reference wavefunction
+   * @return Shared pointer to the reference wavefunction
+   */
+  std::shared_ptr<Wavefunction> get_wavefunction() const;
+
+  /**
+   * @brief Get T1 amplitudes
+   *
+   * @return Pair of (alpha, beta) T1 amplitudes
+   * @throws std::runtime_error if T1 amplitudes are not available
+   */
+  std::pair<const VectorVariant&, const VectorVariant&> get_t1_amplitudes()
+      const;
+
+  /**
+   * @brief Get T2 amplitudes
+   *
+   * @return Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
+   * @throws std::runtime_error if T2 amplitudes are not available
+   */
+  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  get_t2_amplitudes() const;
+
+  /**
+   * @brief Check if T1 amplitudes are available
+   * @return True if T1 amplitudes are available
+   */
+  bool has_t1_amplitudes() const;
+
+  /**
+   * @brief Check if T2 amplitudes are available
+   * @return True if T2 amplitudes are available
+   */
+  bool has_t2_amplitudes() const;
+
+  /**
+   * @brief Not supported for amplitude wavefunctions.
+   * @throws std::runtime_error Always.
+   */
+  ScalarVariant overlap(const WavefunctionContainer& other) const override;
+
+  /**
+   * @brief Not supported for amplitude wavefunctions.
+   * @throws std::runtime_error Always.
+   */
+  double norm() const override;
+
+  /**
+   * @brief Get total number of alpha and beta electrons (active + inactive)
+   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   */
+  std::pair<size_t, size_t> get_total_num_electrons() const override;
+
+  /**
+   * @brief Get number of active alpha and beta electrons
+   * @return Pair of (n_alpha_active, n_beta_active) electrons
+   */
+  std::pair<size_t, size_t> get_active_num_electrons() const override;
+
+  /**
+   * @brief Not supported: orbital occupations require reduced density
+   *        matrices, which are not stored by amplitude wavefunctions.
+   * @throws std::runtime_error Always.
+   */
+  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
+      const override;
+
+  /**
+   * @brief Not supported: orbital occupations require reduced density
+   *        matrices, which are not stored by amplitude wavefunctions.
+   * @throws std::runtime_error Always.
+   */
+  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
+      const override;
+
+  /**
+   * @brief Check if a determinant is in the reference wavefunction
+   * @param det Configuration/determinant to check
+   * @return True if determinant matches any reference determinant
+   */
+  bool contains_determinant(const Configuration& det) const;
+
+  /**
+   * @brief Check if a determinant is in the reference wavefunction
+   * @param det Configuration/determinant to check
+   * @return True if determinant matches any reference determinant
+   */
+  bool contains_reference(const Configuration& det) const;
+
+  /**
+   * @brief Clear cached data to release memory
+   */
+  void clear_caches() const override;
+
+  /**
+   * @brief Convert container to JSON format
+   * @return JSON object containing container data
+   */
+  nlohmann::json to_json() const override;
+
+  /**
+   * @brief Load container from JSON format
+   *
+   * Reads the current "amplitude" format as well as the legacy
+   * "coupled_cluster" and "mp2" formats (read-only backward compatibility).
+   * Legacy "mp2" files did not store amplitudes, so the resulting container
+   * has none.
+   *
+   * @param j JSON object containing container data
+   * @return Unique pointer to the container created from JSON data
+   * @throws std::runtime_error if JSON is malformed
+   */
+  static std::unique_ptr<AmplitudeContainer> from_json(const nlohmann::json& j);
+
+  /**
+   * @brief Convert container to HDF5 group
+   * @param group HDF5 group to write container data to
+   * @throws std::runtime_error if HDF5 I/O error occurs
+   */
+  void to_hdf5(H5::Group& group) const override;
+
+  /**
+   * @brief Load container from HDF5 group
+   *
+   * Reads the current "amplitude" format as well as the legacy
+   * "coupled_cluster" and "mp2" formats (read-only backward compatibility).
+   * Legacy "mp2" files did not store amplitudes, so the resulting container
+   * has none.
+   *
+   * @param group HDF5 group containing container data
+   * @return Unique pointer to the container created from HDF5 group
+   * @throws std::runtime_error if HDF5 data is malformed or I/O error occurs
+   */
+  static std::unique_ptr<AmplitudeContainer> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Get container type identifier for serialization
+   * @return String "amplitude"
+   */
+  std::string get_container_type() const override;
+
+  /**
+   * @brief Check if the wavefunction is complex-valued
+   * @return True if amplitudes contain complex values
+   */
+  bool is_complex() const override;
+
+ private:
+  // Orbital information
+  std::shared_ptr<Orbitals> _orbitals;
+  // Reference wavefunction
+  std::shared_ptr<Wavefunction> _wavefunction;
+
+  std::shared_ptr<VectorVariant> _t1_amplitudes_aa = nullptr;
+  std::shared_ptr<VectorVariant> _t1_amplitudes_bb = nullptr;
+
+  std::shared_ptr<VectorVariant> _t2_amplitudes_abab = nullptr;
+  std::shared_ptr<VectorVariant> _t2_amplitudes_aaaa = nullptr;
+  std::shared_ptr<VectorVariant> _t2_amplitudes_bbbb = nullptr;
+
+  /// Serialization version
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+};
+}  // namespace qdk::chemistry::data
