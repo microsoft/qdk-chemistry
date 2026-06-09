@@ -42,7 +42,6 @@ class QpeResult(DataClass):
         canonical_phase_angle: float,
         raw_energy: float,
         branching: tuple[float, ...],
-        evolution_time: float | None,
         resolved_energy: float | None = None,
         bits_msb_first: tuple[int, ...] | None = None,
         bitstring_msb_first: str | None = None,
@@ -58,7 +57,6 @@ class QpeResult(DataClass):
             canonical_phase_angle: Alias-resolved phase angle in radians.
             raw_energy: Energy computed directly from ``phase_fraction``.
             branching: Sorted tuple of all alias energy candidates considered.
-            evolution_time: Evolution time ``t`` used in ``U = exp(-i H t)``.
             resolved_energy: Alias energy selected with the optional reference value, if available.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
@@ -73,7 +71,6 @@ class QpeResult(DataClass):
         self.canonical_phase_angle = canonical_phase_angle
         self.raw_energy = raw_energy
         self.branching = branching
-        self.evolution_time = evolution_time
         self.resolved_energy = resolved_energy
         self.bits_msb_first = bits_msb_first
         self.bitstring_msb_first = bitstring_msb_first
@@ -152,7 +149,6 @@ class QpeResult(DataClass):
 
         return cls(
             method=method_label,
-            evolution_time=float(evolution_time),
             phase_fraction=normalized_phase,
             phase_angle=phase_angle,
             canonical_phase_fraction=canonical_phase_fraction,
@@ -166,7 +162,7 @@ class QpeResult(DataClass):
         )
 
     @classmethod
-    def from_block_encoding_result(
+    def from_qubitization_result(
         cls,
         *,
         method: str,
@@ -211,7 +207,6 @@ class QpeResult(DataClass):
 
         return cls(
             method=method_label,
-            evolution_time=None,
             phase_fraction=normalized_phase,
             phase_angle=phase_angle,
             canonical_phase_fraction=normalized_phase,
@@ -235,8 +230,6 @@ class QpeResult(DataClass):
         lines = [
             f"QPE Result ({self.method})",
         ]
-        if self.evolution_time is not None:
-            lines.append(f"  Evolution time: {self.evolution_time}")
         lines.extend(
             [
                 f"  Phase fraction: {self.phase_fraction:.6f}",
@@ -266,8 +259,6 @@ class QpeResult(DataClass):
             "branching": list(self.branching),
         }
 
-        if self.evolution_time is not None:
-            data["evolution_time"] = self.evolution_time
         if self.resolved_energy is not None:
             data["resolved_energy"] = self.resolved_energy
         if self.bits_msb_first is not None:
@@ -288,8 +279,6 @@ class QpeResult(DataClass):
         """
         self._add_hdf5_version(group)
         group.attrs["method"] = self.method
-        if self.evolution_time is not None:
-            group.attrs["evolution_time"] = self.evolution_time
         group.attrs["phase_fraction"] = self.phase_fraction
         group.attrs["phase_angle"] = self.phase_angle
         group.attrs["canonical_phase_fraction"] = self.canonical_phase_fraction
@@ -326,7 +315,6 @@ class QpeResult(DataClass):
 
         return cls(
             method=json_data["method"],
-            evolution_time=json_data.get("evolution_time"),
             phase_fraction=json_data["phase_fraction"],
             phase_angle=json_data["phase_angle"],
             canonical_phase_fraction=json_data["canonical_phase_fraction"],
@@ -367,7 +355,6 @@ class QpeResult(DataClass):
 
         return cls(
             method=group.attrs["method"],
-            evolution_time=group.attrs.get("evolution_time"),
             phase_fraction=group.attrs["phase_fraction"],
             phase_angle=group.attrs["phase_angle"],
             canonical_phase_fraction=group.attrs["canonical_phase_fraction"],

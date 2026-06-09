@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 
 import h5py
+import numpy as np
 
 from qdk_chemistry.data import QpeResult
 
@@ -24,7 +25,6 @@ def test_qpe_result_creation():
 
     assert result.method == "IQPE"
     assert result.phase_fraction == 0.25
-    assert result.evolution_time == 1.0
     assert result.bits_msb_first == (0, 1)
     assert result.bitstring_msb_first == "01"
 
@@ -44,7 +44,6 @@ def test_qpe_result_json_serialization():
     assert isinstance(json_dict, dict)
     assert json_dict["method"] == "IQPE"
     assert json_dict["phase_fraction"] == 0.125
-    assert json_dict["evolution_time"] == 2.0
     assert "raw_energy" in json_dict
     assert "branching" in json_dict
 
@@ -71,7 +70,6 @@ def test_qpe_result_json_file_io():
         # Verify data
         assert loaded_result.method == result.method
         assert loaded_result.phase_fraction == result.phase_fraction
-        assert loaded_result.evolution_time == result.evolution_time
         assert loaded_result.raw_energy == result.raw_energy
     finally:
         Path(filename).unlink()
@@ -101,7 +99,6 @@ def test_qpe_result_hdf5_file_io():
         # Verify data
         assert loaded_result.method == result.method
         assert loaded_result.phase_fraction == result.phase_fraction
-        assert loaded_result.evolution_time == result.evolution_time
         assert loaded_result.resolved_energy == result.resolved_energy
     finally:
         Path(filename).unlink()
@@ -118,7 +115,6 @@ def test_qpe_result_summary():
     summary = result.get_summary()
     assert isinstance(summary, str)
     assert "IQPE" in summary
-    assert "Evolution time" in summary
     assert "Phase fraction" in summary
     assert "Raw energy" in summary
 
@@ -139,7 +135,6 @@ def test_qpe_result_from_json():
     json_data = {
         "version": QpeResult._serialization_version,
         "method": "IQPE",
-        "evolution_time": 1.5,
         "phase_fraction": 0.25,
         "phase_angle": 1.5707963267948966,
         "canonical_phase_fraction": 0.25,
@@ -155,7 +150,6 @@ def test_qpe_result_from_json():
     result = QpeResult.from_json(json_data)
 
     assert result.method == "IQPE"
-    assert result.evolution_time == 1.5
     assert result.phase_fraction == 0.25
     assert result.raw_energy == -1.0
     assert result.branching == (-1.0, -0.5, 0.0)
@@ -170,7 +164,6 @@ def test_qpe_result_from_json_minimal():
     json_data = {
         "version": QpeResult._serialization_version,
         "method": "QPE",
-        "evolution_time": 2.0,
         "phase_fraction": 0.5,
         "phase_angle": 3.141592653589793,
         "canonical_phase_fraction": 0.5,
@@ -182,7 +175,6 @@ def test_qpe_result_from_json_minimal():
     result = QpeResult.from_json(json_data)
 
     assert result.method == "QPE"
-    assert result.evolution_time == 2.0
     assert result.phase_fraction == 0.5
     assert result.resolved_energy is None
     assert result.bits_msb_first is None
@@ -209,7 +201,6 @@ def test_qpe_result_json_roundtrip():
 
     # Verify all fields match
     assert restored.method == original.method
-    assert restored.evolution_time == original.evolution_time
     assert restored.phase_fraction == original.phase_fraction
     assert restored.phase_angle == original.phase_angle
     assert restored.canonical_phase_fraction == original.canonical_phase_fraction
@@ -247,7 +238,6 @@ def test_qpe_result_hdf5_roundtrip():
 
         # Verify all fields match
         assert restored.method == original.method
-        assert restored.evolution_time == original.evolution_time
         assert restored.phase_fraction == original.phase_fraction
         assert restored.phase_angle == original.phase_angle
         assert restored.canonical_phase_fraction == original.canonical_phase_fraction
@@ -279,7 +269,6 @@ def test_qpe_result_from_file_json():
 
         assert loaded.method == result.method
         assert loaded.phase_fraction == result.phase_fraction
-        assert loaded.evolution_time == result.evolution_time
     finally:
         Path(filename).unlink()
 
@@ -301,6 +290,28 @@ def test_qpe_result_from_file_hdf5():
 
         assert loaded.method == result.method
         assert loaded.phase_fraction == result.phase_fraction
-        assert loaded.evolution_time == result.evolution_time
     finally:
         Path(filename).unlink()
+
+
+def test_qpe_result_from_qubitization_result():
+    """Test QpeResult creation from qubitization phase measurement."""
+    lambda_val = 5.0
+    phase_fraction = 0.25
+    expected_energy = lambda_val * np.cos(2 * np.pi * phase_fraction)
+
+    result = QpeResult.from_qubitization_result(
+        method="qubitization_qpe",
+        phase_fraction=phase_fraction,
+        lambda_val=lambda_val,
+        bits_msb_first=[0, 1, 0, 0],
+    )
+
+    assert result.method == "qubitization_qpe"
+    assert result.phase_fraction == phase_fraction
+    assert np.isclose(result.raw_energy, expected_energy)
+    assert result.branching == (result.raw_energy,)
+    assert result.resolved_energy is None
+    assert result.bits_msb_first == (0, 1, 0, 0)
+    assert result.bitstring_msb_first == "0100"
+    assert result.metadata is None
