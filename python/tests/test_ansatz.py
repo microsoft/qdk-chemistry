@@ -15,10 +15,10 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     Ansatz,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -66,7 +66,7 @@ class TestAnsatzSerialization:
         det1 = Configuration("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
-        container = CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
+        container = StateVectorContainer(coeffs, [det1], basic_orbitals)
         return Wavefunction(container)
 
     @pytest.fixture

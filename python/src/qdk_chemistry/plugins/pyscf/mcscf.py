@@ -54,12 +54,11 @@ from qdk_chemistry.algorithms import (
 from qdk_chemistry.data import (
     AlgorithmRef,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
-    SciWavefunctionContainer,
     Settings,
+    StateVectorContainer,
     Wavefunction,
 )
 from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
@@ -150,7 +149,7 @@ class _QdkMcSolverWrapper:
 
         # get coeffs
         coeffs = None
-        if self.wavefunction.get_container_type() == "cas" or self.wavefunction.get_container_type() == "sci":
+        if self.wavefunction.get_container_type() == "state_vector":
             coeffs = self.wavefunction.get_container().get_coefficients()
         else:
             raise RuntimeError(
@@ -435,9 +434,9 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         except RuntimeError:
             use_spin_traced = True
 
-        if wfn.get_container_type() == "cas":
+        if wfn.get_container_type() == "state_vector":
             if use_spin_traced:
-                container = CasWavefunctionContainer(
+                container = StateVectorContainer(
                     wfn.get_container().get_coefficients(),
                     wfn.get_active_determinants(),
                     orbitals,
@@ -446,31 +445,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                     type=wfn.get_type(),
                 )
             else:
-                container = CasWavefunctionContainer(
-                    wfn.get_container().get_coefficients(),
-                    wfn.get_active_determinants(),
-                    orbitals,
-                    one_rdm_spin_traced=None,
-                    one_rdm_aa=one_rdm_aa,
-                    one_rdm_bb=one_rdm_bb,
-                    two_rdm_spin_traced=None,
-                    two_rdm_aabb=two_rdm_aabb,
-                    two_rdm_aaaa=two_rdm_aaaa,
-                    two_rdm_bbbb=two_rdm_bbbb,
-                    type=wfn.get_type(),
-                )
-        elif wfn.get_container_type() == "sci":
-            if use_spin_traced:
-                container = SciWavefunctionContainer(
-                    wfn.get_container().get_coefficients(),
-                    wfn.get_active_determinants(),
-                    orbitals,
-                    one_rdm_spin_traced=wfn.get_active_one_rdm_spin_traced(),
-                    two_rdm_spin_traced=wfn.get_active_two_rdm_spin_traced(),
-                    type=wfn.get_type(),
-                )
-            else:
-                container = SciWavefunctionContainer(
+                container = StateVectorContainer(
                     wfn.get_container().get_coefficients(),
                     wfn.get_active_determinants(),
                     orbitals,

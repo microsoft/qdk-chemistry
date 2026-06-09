@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -35,7 +35,7 @@ class TestMultiConfigurationScfSolver : public MultiConfigurationScf {
     coeffs(0) = std::complex<double>(1.0, 0.0);
     Wavefunction::DeterminantVector dets{Configuration("2")};
     auto container =
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
+        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
     Wavefunction wfn(std::move(container));
     return {-100.0, std::make_shared<Wavefunction>(std::move(wfn))};
   }
@@ -63,7 +63,7 @@ class TestMultiConfigurationScfSolverAlternative
             "hamiltonian_constructor");
     auto hamil = ham_ctor->run(orbitals);
     auto container =
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
+        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
     auto wfn = std::make_shared<Wavefunction>(std::move(container));
     return {-200.0, wfn};
   }

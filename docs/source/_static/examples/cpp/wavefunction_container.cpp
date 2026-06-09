@@ -90,7 +90,7 @@ int main() {
 
   // Constructor takes single determinant and orbitals as input
   auto sd_container =
-      std::make_unique<SlaterDeterminantContainer>(det, orbitals);
+      std::make_unique<StateVectorContainer>(det, orbitals);
   Wavefunction sd_wavefunction(std::move(sd_container));
   // end-cell-create-slater
   // --------------------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ int main() {
 
   // Create a CAS wavefunction : requires all coefficients and determinants, as
   // well as orbitals, in constructor
-  auto cas_container = std::make_unique<CasWavefunctionContainer>(
+  auto cas_container = std::make_unique<StateVectorContainer>(
       cas_coeffs, cas_dets, orbitals);
   Wavefunction cas_wavefunction(std::move(cas_container));
   // end-cell-create-cas
@@ -136,7 +136,7 @@ int main() {
 
   // Create a SCI wavefunction: requires selected coefficients and determinants,
   // as well as orbitals, in constructor
-  auto sci_container = std::make_unique<SciWavefunctionContainer>(
+  auto sci_container = std::make_unique<StateVectorContainer>(
       sci_coeffs, sci_dets, orbitals);
   Wavefunction sci_wavefunction(std::move(sci_container));
   // end-cell-create-sci
@@ -153,7 +153,7 @@ int main() {
   auto hamiltonian = make_minimal_hamiltonian(orbitals_mp2);
   Configuration ref_det("20");
   auto sd_container_mp2 =
-      std::make_unique<SlaterDeterminantContainer>(ref_det, orbitals_mp2);
+      std::make_unique<StateVectorContainer>(ref_det, orbitals_mp2);
   auto ref_wavefunction =
       std::make_shared<Wavefunction>(std::move(sd_container_mp2));
 
@@ -174,7 +174,7 @@ int main() {
   auto orbitals_cc = make_minimal_orbitals();
   Configuration ref_det_cc("20");
   auto sd_container_cc =
-      std::make_unique<SlaterDeterminantContainer>(ref_det_cc, orbitals_cc);
+      std::make_unique<StateVectorContainer>(ref_det_cc, orbitals_cc);
   auto ref_wavefunction_cc =
       std::make_shared<Wavefunction>(std::move(sd_container_cc));
 

@@ -10,7 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
@@ -495,9 +495,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   // Create Configuration object
   data::Configuration hf_det(config_str);
 
-  // Create SlaterDeterminantContainer
+  // Create StateVectorContainer
   auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(hf_det, orbitals);
+      std::make_unique<data::StateVectorContainer>(hf_det, orbitals);
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

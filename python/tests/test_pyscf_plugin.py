@@ -1345,6 +1345,34 @@ class TestPyscfPlugin:
         assert list(alpha_before) == list(alpha_after), f"{localizer_name}: alpha indices changed"
         assert list(beta_before) == list(beta_after), f"{localizer_name}: beta indices changed"
 
+    def test_pyscf_localization_multi_determinant_unsupported(self):
+        """Localizing a multi-determinant wavefunction is rejected (basis change invalidates the CI vector)."""
+        water = create_water_structure()
+        scf_solver = algorithms.create("scf_solver", "pyscf")
+        _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
+
+        # Select an active space (6 electrons, 5 orbitals -> 3 alpha, 3 beta)
+        selector = algorithms.create("active_space_selector", "qdk_valence")
+        selector.settings().set("num_active_electrons", 6)
+        selector.settings().set("num_active_orbitals", 5)
+        active_wfn = selector.run(wavefunction)
+
+        active_alpha, active_beta = active_wfn.get_orbitals().get_active_space_indices()
+        active_orbitals = active_wfn.get_orbitals()
+
+        # Build a two-determinant expansion over the active space
+        dets = [data.Configuration("22200"), data.Configuration("22020")]
+        coeffs = np.array([0.96, np.sqrt(1.0 - 0.96**2)])
+        multi_wfn = data.Wavefunction(data.StateVectorContainer(coeffs, dets, active_orbitals))
+        assert len(multi_wfn.get_active_determinants()) == 2
+
+        localizer = algorithms.create("orbital_localizer", "pyscf_multi")
+        localizer.settings().set("method", "pipek-mezey")
+
+        # Localizing the orbitals would invalidate the CI coefficients, so this must be rejected.
+        with pytest.raises(NotImplementedError):
+            localizer.run(multi_wfn, list(active_alpha), list(active_beta))
+
     @pytest.mark.parametrize("method", ["pipek-mezey", "foster-boys", "edmiston-ruedenberg", "cholesky"])
     def test_pyscf_localization_preserves_active_space_restricted(self, method):
         """Test that PySCF localization preserves active space indices (restricted)."""
@@ -1379,7 +1407,7 @@ class TestPyscfPlugin:
         num_mo = orbitals.get_num_molecular_orbitals()
 
         # Define active space: frozen core (first 2 are inactive), rest are active
-        # Must include all occupied orbitals in active space for SlaterDeterminantContainer
+        # Must include all occupied orbitals in active space for StateVectorContainer
         active_alpha = list(range(2, num_mo))
         active_beta = list(range(2, num_mo))
         inactive_alpha = [0, 1]
@@ -1396,7 +1424,7 @@ class TestPyscfPlugin:
         )
 
         active_wfn = data.Wavefunction(
-            data.SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], active_orbitals)
+            data.StateVectorContainer(wavefunction.get_active_determinants()[0], active_orbitals)
         )
 
         # Localize only the active orbitals
@@ -1482,7 +1510,7 @@ class TestPyscfPlugin:
         # Verify we have unrestricted orbitals
         orbitals = wavefunction.get_orbitals()
         assert orbitals.is_unrestricted(), "O2 triplet should have unrestricted orbitals"
-        assert wavefunction.get_container_type() == "sd"
+        assert wavefunction.get_container_type() == "state_vector"
         assert wavefunction.size() == 1, "single determinant"
 
         # Create Hamiltonian

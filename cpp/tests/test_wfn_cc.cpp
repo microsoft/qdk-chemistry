@@ -10,7 +10,7 @@
 #include <filesystem>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -26,7 +26,7 @@ class CoupledClusterContainerTest : public ::testing::Test {
   std::shared_ptr<Wavefunction> create_test_wavefunction(
       const Configuration& ref, std::shared_ptr<Orbitals> orbitals) {
     auto sd_container =
-        std::make_unique<SlaterDeterminantContainer>(ref, orbitals);
+        std::make_unique<StateVectorContainer>(ref, orbitals);
     return std::make_shared<Wavefunction>(std::move(sd_container));
   }
 };

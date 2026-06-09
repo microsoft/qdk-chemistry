@@ -25,14 +25,13 @@ from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     CoupledClusterContainer,
     Hamiltonian,
     Orbitals,
     Settings,
-    SlaterDeterminantContainer,
     StabilityResult,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -102,7 +101,7 @@ class MockMultiConfigurationCalculator(MultiConfigurationCalculator):
 
     def _run_impl(self, hamiltonian, _: int, __: int):
         """A simple test implementation of the calculate method."""
-        sd = SlaterDeterminantContainer(Configuration("20"), hamiltonian.get_orbitals())
+        sd = StateVectorContainer(Configuration("20"), hamiltonian.get_orbitals())
         return 0.0, Wavefunction(sd)
 
     def name(self) -> str:
@@ -126,7 +125,7 @@ class MockProjectedMultiConfigurationCalculator(ProjectedMultiConfigurationCalcu
         if not configurations:
             raise RuntimeError("Empty configuration set")
 
-        sd = SlaterDeterminantContainer(configurations[0], hamiltonian.get_orbitals())
+        sd = StateVectorContainer(configurations[0], hamiltonian.get_orbitals())
         return 0.0, Wavefunction(sd)
 
     def name(self) -> str:
@@ -189,7 +188,7 @@ class MockScfSolver(ScfSolver):
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, energies, None, basis_set)
         hf_config = Configuration("20")
-        wavefunction = Wavefunction(SlaterDeterminantContainer(hf_config, orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(hf_config, orbitals))
         return 0.0, wavefunction
 
     def name(self) -> str:
@@ -260,7 +259,7 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
                 orbitals.get_basis_set(),
                 [indices, indices, [], []],
             )
-            return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], new_orbitals))
+            return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
         # Restricted case - use restricted constructor
         new_orbitals = Orbitals(
             coeffs_data,
@@ -269,7 +268,7 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
             orbitals.get_basis_set(),
             [indices, []],
         )
-        return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], new_orbitals))
+        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -296,7 +295,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         hf_config_str = "20"
         hf_config = Configuration(hf_config_str)
         orbitals = create_test_orbitals(2)
-        wavefunction = Wavefunction(SlaterDeterminantContainer(hf_config, orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(hf_config, orbitals))
         return energy, wavefunction
 
     def name(self) -> str:
@@ -379,7 +378,7 @@ class TestAlgorithmClasses:
         det1 = Configuration("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
-        container = CasWavefunctionContainer(coeffs, [det1], basic_orbitals)
+        container = StateVectorContainer(coeffs, [det1], basic_orbitals)
         return Wavefunction(container)
 
     @pytest.fixture
@@ -449,7 +448,7 @@ class TestAlgorithmClasses:
         assert isinstance(settings, Settings)
 
         # Test prepare_state method
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("20"), create_test_orbitals(2)))
+        wavefunction = Wavefunction(StateVectorContainer(Configuration("20"), create_test_orbitals(2)))
         circuit = state_prep.run(wavefunction)
         assert isinstance(circuit, str)
         assert circuit == "mock_circuit_representation"
@@ -528,7 +527,7 @@ class TestAlgorithmClasses:
         energies = np.array([0.0, 1.0, 2.0, 3.0])
         orbitals = Orbitals(coeffs, energies, None, create_test_basis_set(4))
 
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("2200"), orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(Configuration("2200"), orbitals))
 
         selected_wfn = selector.run(wavefunction)
         active_orbitals = selected_wfn.get_orbitals()
@@ -891,7 +890,7 @@ class TestAlgorithmClasses:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, None, None, basis_set)
-        wavefunction = Wavefunction(SlaterDeterminantContainer(Configuration("20"), orbitals))
+        wavefunction = Wavefunction(StateVectorContainer(Configuration("20"), orbitals))
 
         # Test with orbital indices
         result = localizer.run(wavefunction, [0, 1], [0, 1])
@@ -1085,7 +1084,7 @@ class TestAlgorithmClasses:
         coeffs = np.array([[1.0, 0.0], [0.0, 1.0]])
         basis_set = create_test_basis_set(2)
         orbitals = Orbitals(coeffs, None, None, basis_set)
-        sd_container = SlaterDeterminantContainer(Configuration("20"), orbitals)
+        sd_container = StateVectorContainer(Configuration("20"), orbitals)
         wavefunction = Wavefunction(sd_container)
 
         # Test run method

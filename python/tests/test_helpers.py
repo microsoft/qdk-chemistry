@@ -11,12 +11,12 @@ from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
     OrbitalType,
     Shell,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -212,7 +212,7 @@ def create_test_wavefunction(num_orbitals: int = 2):
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
 
     return Wavefunction(container)
 
@@ -243,7 +243,7 @@ def create_test_ansatz(num_orbitals: int = 2):
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)

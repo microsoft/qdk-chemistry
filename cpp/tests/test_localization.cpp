@@ -10,7 +10,7 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "testing_utilities.hpp"
 #include "ut_common.hpp"
@@ -310,7 +310,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
             fake_basis_set, std::nullopt);
         // Provide different indices for alpha and beta to trigger the exception
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
@@ -331,7 +331,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
@@ -416,7 +416,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
@@ -431,7 +431,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, coeffs_beta, fake_energies, fake_energies,
             std::make_optional(fake_ao_overlap), fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2000"),
+            std::make_unique<StateVectorContainer>(Configuration("2000"),
                                                          orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
@@ -446,7 +446,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("0000"),
+            std::make_unique<StateVectorContainer>(Configuration("0000"),
                                                          orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
@@ -461,7 +461,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2u00"),
+            std::make_unique<StateVectorContainer>(Configuration("2u00"),
                                                          orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
@@ -479,7 +479,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
@@ -495,7 +495,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
@@ -520,7 +520,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         vvhv_localizer->run(wfn, incomplete_indices_a, all_indices_b);
       },
@@ -537,7 +537,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, coeffs, std::nullopt, std::nullopt,
             std::make_optional(fake_ao_overlap), fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         vvhv_localizer->run(wfn, all_indices_a, incomplete_indices_b);
       },
@@ -555,7 +555,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         vvhv_localizer->run(wfn, indices_a, indices_b);
       },
@@ -571,7 +571,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         vvhv_localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
@@ -589,7 +589,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set, std::nullopt);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
         vvhv_localizer->run(wfn, out_of_bounds_indices, valid_indices);
       },
@@ -1040,7 +1040,7 @@ TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
 
   // Define active space: frozen core (first 2 are inactive), rest are active
   // Must include all occupied orbitals in active space for
-  // SlaterDeterminantContainer
+  // StateVectorContainer
   std::vector<size_t> active_alpha, active_beta, inactive_alpha, inactive_beta;
 
   // First 2 are inactive (core)
@@ -1061,7 +1061,7 @@ TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
                       inactive_beta));
 
   auto active_wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(
+      std::make_unique<StateVectorContainer>(
           wfn->get_active_determinants()[0], active_orbitals));
 
   // Localize only the active orbitals
@@ -1139,7 +1139,7 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
                       inactive_beta));
 
   auto active_wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(
+      std::make_unique<StateVectorContainer>(
           wfn->get_active_determinants()[0], active_orbitals));
 
   // Get virtual indices for VVHV

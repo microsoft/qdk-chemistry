@@ -10,9 +10,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <tuple>
 
@@ -52,7 +50,7 @@ class WavefunctionCoreTest : public ::testing::Test {
 
     // Create a test wavefunction
     wf = std::make_unique<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(
+        std::make_unique<StateVectorContainer>(
             coeffs, dets, orbitals, std::nullopt, std::nullopt, std::nullopt,
             std::nullopt, std::nullopt, std::nullopt, std::nullopt));
   }
@@ -69,7 +67,7 @@ TEST_F(WavefunctionCoreTest, Size) {
   // Test empty wavefunction created with empty vectors
   Eigen::VectorXcd empty_coeffs(0);
   Wavefunction::DeterminantVector empty_dets(0);
-  Wavefunction empty_wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction empty_wf(std::make_unique<StateVectorContainer>(
       empty_coeffs, empty_dets, testing::create_test_orbitals(), std::nullopt,
       std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
       std::nullopt));
@@ -82,7 +80,7 @@ TEST_F(WavefunctionCoreTest, Size) {
   for (int i = 0; i < 5; ++i) {
     sized_dets[i] = Configuration("u0");
   }
-  Wavefunction sized_wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction sized_wf(std::make_unique<StateVectorContainer>(
       sized_coeffs, sized_dets, testing::create_test_orbitals(), std::nullopt,
       std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
       std::nullopt));
@@ -93,7 +91,7 @@ TEST_F(WavefunctionCoreTest, Size) {
 TEST_F(WavefunctionCoreTest, CoefficientsGet) {
   // Get initial coefficients
   auto original_coeffs =
-      wf->get_container<CasWavefunctionContainer>().get_coefficients();
+      wf->get_container<StateVectorContainer>().get_coefficients();
   EXPECT_EQ(std::get<Eigen::VectorXcd>(original_coeffs).size(), size);
   EXPECT_EQ(std::get<Eigen::VectorXcd>(original_coeffs)(0),
             std::complex<double>(1.0, 0.0));
@@ -109,13 +107,13 @@ TEST_F(WavefunctionCoreTest, CoefficientsGet) {
   new_coeffs(2) = std::complex<double>(0.6, 0.7);
 
   auto original_dets = wf->get_active_determinants();
-  Wavefunction new_wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction new_wf(std::make_unique<StateVectorContainer>(
       new_coeffs, original_dets, orbitals, std::nullopt, std::nullopt,
       std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt));
 
   // Verify new wavefunction has different coefficients
   auto updated_coeffs =
-      new_wf.get_container<CasWavefunctionContainer>().get_coefficients();
+      new_wf.get_container<StateVectorContainer>().get_coefficients();
   EXPECT_EQ(std::get<Eigen::VectorXcd>(updated_coeffs).size(), size);
   EXPECT_EQ(std::get<Eigen::VectorXcd>(updated_coeffs)(0),
             std::complex<double>(0.2, 0.3));
@@ -161,8 +159,8 @@ TEST_F(WavefunctionCoreTest, DeterminantsGet) {
   new_dets[2] = config3;
 
   auto original_coeffs =
-      wf->get_container<CasWavefunctionContainer>().get_coefficients();
-  Wavefunction new_wf(std::make_unique<CasWavefunctionContainer>(
+      wf->get_container<StateVectorContainer>().get_coefficients();
+  Wavefunction new_wf(std::make_unique<StateVectorContainer>(
       original_coeffs, new_dets, orbitals, std::nullopt, std::nullopt,
       std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt));
 
@@ -192,11 +190,11 @@ TEST_F(WavefunctionCoreTest, OverlapCalculation) {
 
   // Create first wavefunction
   auto original_dets = wf->get_active_determinants();
-  Wavefunction wf1(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf1(std::make_unique<StateVectorContainer>(
       coeffs1, original_dets, orbitals));
 
   // Create second wavefunction using same determinants
-  Wavefunction wf2(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf2(std::make_unique<StateVectorContainer>(
       coeffs2, original_dets, orbitals));
 
   // Calculate overlap: conj(coeffs1) dot coeffs2
@@ -227,7 +225,7 @@ TEST_F(WavefunctionCoreTest, ExplicitElectronAndOccupationFunctions) {
   one_rdm(1, 1) = 2.0;
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
-  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf(std::make_unique<StateVectorContainer>(
       coeffs, dets, orbitals, one_rdm, std::nullopt));
 
   // Test electron counting functions (no inactive orbitals)
@@ -291,7 +289,7 @@ TEST_F(WavefunctionCoreTest, ExplicitFunctionsWithInactiveOrbitals) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf(std::make_unique<StateVectorContainer>(
       coeffs, dets, orbitals, one_rdm, std::nullopt));
 
   // Test electron counting with inactive orbitals
@@ -371,7 +369,7 @@ TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
   entropies.single_orbital = s1;
   entropies.two_orbital = s2;
 
-  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf(std::make_unique<StateVectorContainer>(
       coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
@@ -405,7 +403,7 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   entropies.single_orbital = s1;
   entropies.mutual_information = mi;
 
-  Wavefunction wf(std::make_unique<CasWavefunctionContainer>(
+  Wavefunction wf(std::make_unique<StateVectorContainer>(
       coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
@@ -446,16 +444,16 @@ class WavefunctionSerializationTest : public ::testing::Test {
 
     // Create test wavefunctions
     cas_real = std::make_shared<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(coeffs_real, dets, orbitals,
+        std::make_unique<StateVectorContainer>(coeffs_real, dets, orbitals,
                                                    std::nullopt, std::nullopt,
                                                    entropies));
 
     cas_complex = std::make_shared<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(coeffs_complex, dets,
+        std::make_unique<StateVectorContainer>(coeffs_complex, dets,
                                                    orbitals));
 
     sd_wavefunction = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("20"),
+        std::make_unique<StateVectorContainer>(Configuration("20"),
                                                      orbitals));
 
     // Create SCI wavefunctions with 4 configurations (2 orbitals each)
@@ -474,11 +472,11 @@ class WavefunctionSerializationTest : public ::testing::Test {
         std::complex<double>(0.2, 0.1);
 
     sci_real = std::make_shared<Wavefunction>(
-        std::make_unique<SciWavefunctionContainer>(sci_coeffs_real, sci_dets,
+        std::make_unique<StateVectorContainer>(sci_coeffs_real, sci_dets,
                                                    orbitals));
 
     sci_complex = std::make_shared<Wavefunction>(
-        std::make_unique<SciWavefunctionContainer>(sci_coeffs_complex, sci_dets,
+        std::make_unique<StateVectorContainer>(sci_coeffs_complex, sci_dets,
                                                    orbitals));
   }
 
@@ -499,7 +497,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationCASReal) {
   // Verify essential fields are present
   EXPECT_TRUE(j.contains("container_type"));
   EXPECT_TRUE(j.contains("container"));
-  EXPECT_EQ(j["container_type"], "cas");
+  EXPECT_EQ(j["container_type"], "state_vector");
 
   // Test round-trip serialization
   auto wf_reconstructed = Wavefunction::from_json(j);
@@ -540,7 +538,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationCASComplex) {
   // Verify essential fields are present
   EXPECT_TRUE(j.contains("container_type"));
   EXPECT_TRUE(j.contains("container"));
-  EXPECT_EQ(j["container_type"], "cas");
+  EXPECT_EQ(j["container_type"], "state_vector");
 
   // Test round-trip serialization
   auto wf_reconstructed = Wavefunction::from_json(j);
@@ -560,7 +558,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationSlaterDeterminant) {
   // Verify essential fields are present
   EXPECT_TRUE(j.contains("container_type"));
   EXPECT_TRUE(j.contains("container"));
-  EXPECT_EQ(j["container_type"], "sd");
+  EXPECT_EQ(j["container_type"], "state_vector");
 
   // Test round-trip serialization
   auto wf_reconstructed = Wavefunction::from_json(j);
@@ -579,7 +577,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationSCIReal) {
   // Verify essential fields are present
   EXPECT_TRUE(j.contains("container_type"));
   EXPECT_TRUE(j.contains("container"));
-  EXPECT_EQ(j["container_type"], "sci");
+  EXPECT_EQ(j["container_type"], "state_vector");
 
   // Test round-trip serialization
   auto wf_reconstructed = Wavefunction::from_json(j);
@@ -607,7 +605,7 @@ TEST_F(WavefunctionSerializationTest, JSONSerializationSCIComplex) {
   // Verify essential fields are present
   EXPECT_TRUE(j.contains("container_type"));
   EXPECT_TRUE(j.contains("container"));
-  EXPECT_EQ(j["container_type"], "sci");
+  EXPECT_EQ(j["container_type"], "state_vector");
 
   // Test round-trip serialization
   auto wf_reconstructed = Wavefunction::from_json(j);
@@ -865,7 +863,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantSingle) {
   Wavefunction::DeterminantVector dets = {active_det1};
 
   auto wf = std::make_unique<Wavefunction>(
-      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
 
   // Convert active determinant to total determinant
   Configuration total_det = wf->get_total_determinant(active_det1);
@@ -890,7 +888,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetActiveDeterminantSingle) {
   Wavefunction::DeterminantVector dets = {active_det1};
 
   auto wf = std::make_unique<Wavefunction>(
-      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
 
   // Convert total determinant to active determinant
   Configuration active_det = wf->get_active_determinant(expected_total_det1);
@@ -910,7 +908,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, RoundTripConversion) {
   Wavefunction::DeterminantVector dets = {active_det1};
 
   auto wf = std::make_unique<Wavefunction>(
-      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
 
   // Round trip: active -> total -> active
   Configuration total_det = wf->get_total_determinant(active_det1);
@@ -934,7 +932,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantsMultiple) {
                                                  active_det3};
 
   auto wf =
-      std::make_unique<Wavefunction>(std::make_unique<SciWavefunctionContainer>(
+      std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
           coeffs, active_dets, orbitals));
 
   // Get all total determinants
@@ -965,7 +963,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest,
                                                  active_det3};
 
   auto wf =
-      std::make_unique<Wavefunction>(std::make_unique<SciWavefunctionContainer>(
+      std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
           coeffs, active_dets, orbitals));
 
   // Get active determinants (should be unchanged)
@@ -999,7 +997,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, NoActiveSpacePassthrough) {
   wf_coeffs << 1.0;
 
   auto wf =
-      std::make_unique<Wavefunction>(std::make_unique<SciWavefunctionContainer>(
+      std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
           wf_coeffs, Wavefunction::DeterminantVector{det}, orbitals_no_active));
 
   // When no active space is defined, functions should pass through
@@ -1010,10 +1008,10 @@ TEST_F(WavefunctionActiveSpaceConversionTest, NoActiveSpacePassthrough) {
   EXPECT_EQ(active.to_string(), det.to_string());
 }
 
-TEST_F(WavefunctionActiveSpaceConversionTest, SlaterDeterminantContainer) {
-  // Test with SlaterDeterminantContainer (single determinant)
+TEST_F(WavefunctionActiveSpaceConversionTest, StateVectorContainer) {
+  // Test with StateVectorContainer (single determinant)
   auto wf = std::make_unique<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(active_det1, orbitals));
+      std::make_unique<StateVectorContainer>(active_det1, orbitals));
 
   // Convert to total determinant
   Configuration total_det = wf->get_total_determinant(active_det1);

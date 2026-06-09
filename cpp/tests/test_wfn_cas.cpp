@@ -10,7 +10,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -38,7 +38,7 @@ TEST_F(CasWavefunctionTest, BasicProperties) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  CasWavefunctionContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   EXPECT_EQ(cas.size(), 3);
   EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2200"))),
@@ -47,8 +47,9 @@ TEST_F(CasWavefunctionTest, BasicProperties) {
                    0.5);
   EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2002"))),
                    1.0 / sqrt(2));
-  EXPECT_THROW(std::get<double>(cas.get_coefficient(Configuration("2000"))),
-               std::runtime_error);
+  // A determinant absent from the expansion has zero amplitude.
+  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2000"))),
+                   0.0);
   EXPECT_EQ(cas.get_active_determinants().size(), 3);
   EXPECT_EQ(cas.get_active_determinants()[0].to_string(), "2200");
   EXPECT_EQ(cas.get_active_determinants()[1].to_string(), "2020");
@@ -104,7 +105,7 @@ TEST_F(CasWavefunctionTest, EmptyDeterminantsThrows) {
   std::vector<Configuration> empty_dets;
   Eigen::VectorXd empty_coeffs(0);
 
-  CasWavefunctionContainer cas(empty_coeffs, empty_dets, orbitals);
+  StateVectorContainer cas(empty_coeffs, empty_dets, orbitals);
 
   // All these methods should throw when determinants are empty
   EXPECT_THROW(cas.get_coefficient(Configuration("2200")), std::runtime_error);
@@ -123,7 +124,7 @@ TEST_F(CasWavefunctionTest, ErrorMessagesAreDescriptive) {
   std::vector<Configuration> empty_dets;
   Eigen::VectorXd empty_coeffs(0);
 
-  CasWavefunctionContainer cas(empty_coeffs, empty_dets, orbitals);
+  StateVectorContainer cas(empty_coeffs, empty_dets, orbitals);
 
   // Check that error messages are descriptive
   try {
@@ -137,13 +138,14 @@ TEST_F(CasWavefunctionTest, ErrorMessagesAreDescriptive) {
 // Test entropy calculation with missing RDMs
 TEST_F(CasWavefunctionTest, EntropyWithMissingRDMs) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  std::vector<Configuration> dets = {Configuration("2200")};
-  Eigen::VectorXd coeffs(1);
-  coeffs << 1.0;
+  std::vector<Configuration> dets = {Configuration("2200"),
+                                     Configuration("2020")};
+  Eigen::VectorXd coeffs(2);
+  coeffs << 1.0 / sqrt(2), 1.0 / sqrt(2);
 
-  CasWavefunctionContainer cas(coeffs, dets, orbitals);
+  StateVectorContainer cas(coeffs, dets, orbitals);
 
-  // Should throw when trying to calculate entropies without RDMs
+  // A multi-determinant expansion without RDMs cannot compute entropies.
   EXPECT_THROW(cas.get_single_orbital_entropies(), std::runtime_error);
 }
 
@@ -170,7 +172,7 @@ TEST_F(CasWavefunctionTest, WithInactiveOrbitals) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  CasWavefunctionContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   // Test electron counting with inactive orbitals
   auto [total_alpha_elec, total_beta_elec] = cas.get_total_num_electrons();
@@ -249,7 +251,7 @@ TEST_F(CasWavefunctionTest, WithNonContinuousActiveSpace) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  CasWavefunctionContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   // Test electron counting with non-continuous active space
   auto [total_alpha_elec, total_beta_elec] = cas.get_total_num_electrons();
@@ -335,27 +337,27 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
   one_rdm.setIdentity();
   one_rdm *= 2.0;
 
-  CasWavefunctionContainer original(coeffs, dets, orbitals, one_rdm,
+  StateVectorContainer original(coeffs, dets, orbitals, one_rdm,
                                     std::nullopt);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
   auto original_wf =
-      std::make_shared<Wavefunction>(std::make_unique<CasWavefunctionContainer>(
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           coeffs, dets, orbitals, one_rdm, std::nullopt));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
-  EXPECT_EQ(wf_restored->get_container_type(), "cas");
+  EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
   auto& wf_restored_container =
-      wf_restored->get_container<CasWavefunctionContainer>();
+      wf_restored->get_container<StateVectorContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -398,7 +400,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
   one_rdm.setIdentity();
   one_rdm *= 2.0;
 
-  CasWavefunctionContainer original(coeffs, dets, orbitals, one_rdm,
+  StateVectorContainer original(coeffs, dets, orbitals, one_rdm,
                                     std::nullopt);
 
   std::string filename = "test_cas_serialization.h5";
@@ -410,7 +412,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = CasWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -439,7 +441,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
   {
     // Create and serialize a Wavefunction wrapping the container
     auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals,
+        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals,
                                                    one_rdm, std::nullopt));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
@@ -451,14 +453,14 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
     H5::H5File file(wf_filename, H5F_ACC_RDONLY);
     H5::Group root = file.openGroup("/");
     auto wf_restored = Wavefunction::from_hdf5(root);
-    EXPECT_EQ(wf_restored->get_container_type(), "cas");
+    EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
     auto& wf_restored_container =
-        wf_restored->get_container<CasWavefunctionContainer>();
+        wf_restored->get_container<StateVectorContainer>();
 
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = CasWavefunctionContainer::from_hdf5(root2);
+    auto restored = StateVectorContainer::from_hdf5(root2);
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =
@@ -487,12 +489,12 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
   Eigen::VectorXcd coeffs(2);
   coeffs << std::complex<double>(0.5, 0.3), std::complex<double>(0.6, -0.2);
 
-  CasWavefunctionContainer original(coeffs, dets, orbitals);
+  StateVectorContainer original(coeffs, dets, orbitals);
 
   // Test JSON
   nlohmann::json j = original.to_json();
-  auto restored_json = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
+  auto restored_json = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   const auto& orig_coeffs =
@@ -507,7 +509,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
     H5::H5File file(filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original.to_hdf5(root);
-    auto restored_hdf5 = CasWavefunctionContainer::from_hdf5(root);
+    auto restored_hdf5 = StateVectorContainer::from_hdf5(root);
 
     const auto& rest_coeffs_h5 =
         std::get<Eigen::VectorXcd>(restored_hdf5->get_coefficients());
@@ -543,7 +545,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   two_rdm_aaaa.setOnes();
   two_rdm_aaaa *= 0.25;
 
-  CasWavefunctionContainer original(coeffs, dets, orbitals, std::nullopt,
+  StateVectorContainer original(coeffs, dets, orbitals, std::nullopt,
                                     one_rdm_aa, one_rdm_aa, std::nullopt,
                                     two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
 
@@ -556,8 +558,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify RDMs are available after deserialization
@@ -617,7 +619,7 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   mc->settings().set("calculate_two_rdm", true);
   auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
-  const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
+  const auto& original = wfn_cas->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -636,8 +638,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<CasWavefunctionContainer>(
-      dynamic_cast<CasWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify rdms are still there
@@ -742,7 +744,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
   mc->settings().set("calculate_two_rdm", true);
   auto [E_cas, wfn_cas] = mc->run(H, 2, 2);
 
-  const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
+  const auto& original = wfn_cas->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -759,7 +761,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMs) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = CasWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify rdms are still there
     EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -863,7 +865,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   mc->settings().set("calculate_two_rdm", true);
   auto [E_cas, wfn_cas] = mc->run(H, 2, 1);
 
-  const auto& original = wfn_cas->get_container<CasWavefunctionContainer>();
+  const auto& original = wfn_cas->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -883,7 +885,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = CasWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify rdms are still there
     EXPECT_TRUE(restored->has_one_rdm_spin_dependent());

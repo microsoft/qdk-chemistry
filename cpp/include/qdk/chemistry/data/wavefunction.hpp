@@ -580,7 +580,8 @@ class WavefunctionContainer {
 
   /**
    * @brief Get container type identifier for serialization
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const = 0;
 
@@ -732,7 +733,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const;
 
@@ -871,7 +873,7 @@ class Wavefunction : public DataClass,
    *
    * Creates a new wavefunction containing only the top N determinants
    * ranked by absolute coefficient value, with coefficients renormalized.
-   * The resulting wavefunction uses a SciWavefunctionContainer.
+   * The resulting wavefunction uses a StateVectorContainer.
    *
    * @param max_determinants Maximum number of determinants to keep.
    *        If nullopt, returns a copy with all determinants, with

@@ -8,9 +8,7 @@
 import numpy as np
 from qdk_chemistry.data import (
     Orbitals,
-    SlaterDeterminantContainer,
-    CasWavefunctionContainer,
-    SciWavefunctionContainer,
+    StateVectorContainer,
     CoupledClusterContainer,
     MP2Container,
     Configuration,
@@ -95,7 +93,7 @@ orbitals = make_minimal_orbitals()
 det = Configuration("20")
 
 # Constructor takes single determinant and orbitals as input
-sd_container = SlaterDeterminantContainer(det, orbitals)
+sd_container = StateVectorContainer(det, orbitals)
 sd_wavefunction = Wavefunction(sd_container)
 # end-cell-create-slater
 ################################################################################
@@ -117,7 +115,7 @@ cas_coeffs = np.array([0.95, 0.15, 0.15, 0.05])
 
 # Create a CAS wavefunction: requires all coefficients and determinants,
 # as well as orbitals, in constructor
-cas_container = CasWavefunctionContainer(cas_coeffs, cas_dets, orbitals)
+cas_container = StateVectorContainer(cas_coeffs, cas_dets, orbitals)
 cas_wavefunction = Wavefunction(cas_container)
 # end-cell-create-cas
 ################################################################################
@@ -137,7 +135,7 @@ sci_coeffs = np.array([0.96, 0.15, 0.15])
 
 # Create a SCI wavefunction: requires selected coefficients and determinants, as well
 # as orbitals, in constructor
-sci_container = SciWavefunctionContainer(sci_coeffs, sci_dets, orbitals)
+sci_container = StateVectorContainer(sci_coeffs, sci_dets, orbitals)
 sci_wavefunction = Wavefunction(sci_container)
 # end-cell-create-sci
 ################################################################################
@@ -151,7 +149,7 @@ sci_wavefunction = Wavefunction(sci_container)
 orbitals = make_minimal_orbitals()
 hamiltonian = make_minimal_hamiltonian(orbitals)
 ref_det = Configuration("20")
-sd_container = SlaterDeterminantContainer(ref_det, orbitals)
+sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
 # Create MP2 container: requires Hamiltonian and reference wavefunction
@@ -169,7 +167,7 @@ mp2_wavefunction = Wavefunction(mp2_container)
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
 ref_det = Configuration("20")
-sd_container = SlaterDeterminantContainer(ref_det, orbitals)
+sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
 # Create example T1 and T2 amplitudes

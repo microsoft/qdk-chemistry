@@ -11,7 +11,7 @@
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -153,14 +153,14 @@ struct pmc_helper {
 
         // Create wavefunction with RDMs
         return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
+            std::make_unique<data::StateVectorContainer>(
                 std::move(C_vector), std::move(dets_configs),
                 hamiltonian.get_orbitals(), std::move(one_rdm),
                 std::move(two_rdm)));
       } else {
         // Create wavefunction without RDMs
         return data::Wavefunction(
-            std::make_unique<data::SciWavefunctionContainer>(
+            std::make_unique<data::StateVectorContainer>(
                 std::move(C_vector), std::move(dets_configs),
                 hamiltonian.get_orbitals()));
       }

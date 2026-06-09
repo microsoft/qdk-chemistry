@@ -8,7 +8,7 @@
 import numpy as np
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Hamiltonian, SciWavefunctionContainer, Wavefunction
+from qdk_chemistry.data import Hamiltonian, StateVectorContainer, Wavefunction
 from qdk_chemistry.utils import Logger
 
 __all__ = [
@@ -76,7 +76,7 @@ def calculate_sparse_wavefunction(
     ranked = reference_wavefunction.get_top_determinants(max_determinants=max_determinants)
     if not ranked:
         Logger.warn("No determinants found; returning an empty wavefunction.")
-        return Wavefunction(SciWavefunctionContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
+        return Wavefunction(StateVectorContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
 
@@ -110,7 +110,7 @@ def calculate_sparse_wavefunction(
     Logger.info(f"Sparse CI finder ({best_count} dets) = {best_energy:.8f} Hartree (ΔE = {diff * 1000.0:.4f} mHartree)")
     determinants = list(best_wavefunction.get_active_determinants())
     coeffs = [best_wavefunction.get_coefficient(det) for det in determinants]
-    sci_container = SciWavefunctionContainer(
+    sci_container = StateVectorContainer(
         np.array(coeffs),
         determinants,
         best_wavefunction.get_orbitals(),

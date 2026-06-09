@@ -16,7 +16,7 @@ from qdk_chemistry.data import (
     Orbitals,
     OrbitalType,
     Shell,
-    SlaterDeterminantContainer,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -68,7 +68,7 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
         chars[pair_count + i] = unpaired
 
     config = Configuration("".join(chars))
-    container = SlaterDeterminantContainer(config, orbitals)
+    container = StateVectorContainer(config, orbitals)
     return Wavefunction(container)
 
 
@@ -105,7 +105,7 @@ class TestValenceParameters:
         basis_set = initial_orbitals.get_basis_set()
         coeffs_truncated = np.eye(10, 5)
         orbitals_truncated = Orbitals(coeffs_truncated, None, None, basis_set)
-        container_truncated = SlaterDeterminantContainer(det_truncated, orbitals_truncated)
+        container_truncated = StateVectorContainer(det_truncated, orbitals_truncated)
         wavefun_truncated = Wavefunction(container_truncated)
 
         (num_active_electrons, num_active_orbitals) = compute_valence_space_parameters(wavefun_truncated, 0)

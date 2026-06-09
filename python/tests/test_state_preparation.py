@@ -38,7 +38,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     _remove_zero_rows,
     gf2x_with_tracking,
 )
-from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 from .test_helpers import create_test_orbitals
@@ -109,7 +109,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     dets = [det]
     coeffs = [1.0]
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals)
     wavefunction = Wavefunction(container)
 
     prep = create("state_prep", "sparse_isometry_gf2x")

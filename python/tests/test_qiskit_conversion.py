@@ -8,7 +8,7 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import CasWavefunctionContainer, Configuration, Orbitals, Wavefunction
+from qdk_chemistry.data import Configuration, Orbitals, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit.conversion import (
     _configuration_to_statevector_index,
     create_statevector_from_wavefunction,
@@ -168,7 +168,7 @@ class TestCreateStatevectorFromWavefunction:
         dets = [det1, det2]
         coeffs = np.array([0.9, 0.436])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals)
         return Wavefunction(container)
 
     def test_statevector_basic_properties(self, simple_wavefunction):
@@ -237,7 +237,7 @@ class TestCreateStatevectorFromWavefunction:
         dets = [det1, det2]
         coeffs = np.array([0.8 + 0.2j, 0.3 - 0.4j])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals)
         wf = Wavefunction(container)
 
         sv = create_statevector_from_wavefunction(wf, normalize=False)
@@ -265,7 +265,7 @@ class TestCreateStatevectorFromWavefunction:
         dets = [det]
         coeffs = np.array([0.7])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals)
         wf = Wavefunction(container)
 
         sv = create_statevector_from_wavefunction(wf, normalize=False)
@@ -293,7 +293,7 @@ class TestCreateStatevectorFromWavefunction:
             dets = [det]
             coeffs_wf = np.array([1.0])
 
-            container = CasWavefunctionContainer(coeffs_wf, dets, orbitals)
+            container = StateVectorContainer(coeffs_wf, dets, orbitals)
             wf = Wavefunction(container)
 
             sv = create_statevector_from_wavefunction(wf, normalize=False)
@@ -308,7 +308,7 @@ class TestCreateStatevectorFromWavefunction:
         dets = [det]
         coeffs = np.array([0.0])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals)
         wf = Wavefunction(container)
 
         # Should not raise error, but normalization should not happen
@@ -324,7 +324,7 @@ class TestCreateStatevectorFromWavefunction:
         dets = [det1, det2, det3, det4]
         coeffs = np.array([0.5, 0.3, 0.2, 0.1])
 
-        container = CasWavefunctionContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals)
         wf = Wavefunction(container)
 
         sv = create_statevector_from_wavefunction(wf, normalize=False)

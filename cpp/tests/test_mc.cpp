@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -33,7 +33,7 @@ class TestMultiConfigurationCalculator : public MultiConfigurationCalculator {
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
     Wavefunction::DeterminantVector dets{Configuration("2000000")};
-    auto container = std::make_unique<CasWavefunctionContainer>(
+    auto container = std::make_unique<StateVectorContainer>(
         coeffs, dets, hamiltonian->get_orbitals());
     Wavefunction wfn(std::move(container));
     return {0.0, std::make_shared<Wavefunction>(std::move(wfn))};

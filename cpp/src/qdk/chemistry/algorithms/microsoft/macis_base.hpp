@@ -8,8 +8,7 @@
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {

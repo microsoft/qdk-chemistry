@@ -6,8 +6,7 @@
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/config.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <variant>
 
@@ -362,7 +361,7 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
 
   // Create a new container with the truncated/aufbau determinant
   std::unique_ptr<data::WavefunctionContainer> new_container;
-  new_container = std::make_unique<data::SlaterDeterminantContainer>(
+  new_container = std::make_unique<data::StateVectorContainer>(
       truncated_det, new_orbitals, wavefunction_type);
 
   return std::make_shared<data::Wavefunction>(std::move(new_container));

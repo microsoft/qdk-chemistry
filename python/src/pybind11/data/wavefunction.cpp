@@ -14,11 +14,9 @@
 #include <numeric>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -295,7 +293,7 @@ Args:
     container (WavefunctionContainer): The container holding the wavefunction implementation
 
 Examples:
-    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals)
     >>> wf = qdk_chemistry.Wavefunction(container)
 )",
                    py::arg("container"));
@@ -321,12 +319,8 @@ Examples:
           throw std::runtime_error(
               "The wavefunction does not have a valid container.");
         }
-        if (self.has_container_type<SciWavefunctionContainer>()) {
-          return self.get_container<SciWavefunctionContainer>();
-        } else if (self.has_container_type<CasWavefunctionContainer>()) {
-          return self.get_container<CasWavefunctionContainer>();
-        } else if (self.has_container_type<SlaterDeterminantContainer>()) {
-          return self.get_container<SlaterDeterminantContainer>();
+        if (self.has_container_type<StateVectorContainer>()) {
+          return self.get_container<StateVectorContainer>();
         } else if (self.has_container_type<MP2Container>()) {
           return self.get_container<MP2Container>();
         } else if (self.has_container_type<CoupledClusterContainer>()) {
@@ -564,7 +558,7 @@ Create a truncated wavefunction with top N determinants.
 
 Creates a new wavefunction containing only the top N determinants
 ranked by absolute coefficient value, with coefficients renormalized.
-The resulting wavefunction uses a SciWavefunctionContainer.
+The resulting wavefunction uses a StateVectorContainer.
 
 Args:
     max_determinants (int | None): Maximum number of determinants to keep.
@@ -1032,20 +1026,43 @@ Examples:
   // Data type name class attribute
   wavefunction.attr("_data_type_name") = DATACLASS_TO_SNAKE_CASE(Wavefunction);
 
-  // Bind SciWavefunctionContainer
-  py::class_<SciWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
-      data, "SciWavefunctionContainer",
+  // Bind StateVectorContainer
+  py::class_<StateVectorContainer, WavefunctionContainer, py::smart_holder>(
+      data, "StateVectorContainer",
       R"(
-Selected CI wavefunction container implementation.
+State-vector wavefunction container implementation.
 
-This container represents wavefunctions obtained from selected configuration interaction (SCI) methods or full configuration interaction (FCI).
+This container represents a wavefunction as a linear combination of Slater
+determinants (a coefficient vector together with the corresponding
+determinants). It is the single container type for determinant-expansion
+wavefunctions, covering single Slater determinants (e.g. Hartree-Fock
+references), complete active space (CAS), and selected configuration
+interaction (SCI). A single Slater determinant is the special case of a
+one-determinant expansion with coefficient 1.0.
 )")
+      // Single Slater-determinant convenience constructor
+      .def(py::init<const Configuration&, std::shared_ptr<Orbitals>,
+                    WavefunctionType>(),
+           R"(
+Constructs a single Slater-determinant state vector.
+
+Args:
+    det (Configuration): The single determinant configuration
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
+
+Examples:
+    >>> det = qdk_chemistry.Configuration("33221100")
+    >>> container = qdk_chemistry.StateVectorContainer(det, orbitals)
+)",
+           py::arg("det"), py::arg("orbitals"),
+           py::arg("type") = WavefunctionType::SelfDual)
       // Basic constructor: coeffs, dets, orbitals, type
       .def(py::init<const ContainerTypes::VectorVariant&,
                     const ContainerTypes::DeterminantVector&,
                     std::shared_ptr<Orbitals>, WavefunctionType>(),
            R"(
-Constructs a basic SCI wavefunction container.
+Constructs a basic state-vector wavefunction container.
 
 Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
@@ -1057,7 +1074,7 @@ Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals)
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals)
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("type") = WavefunctionType::SelfDual)
@@ -1070,12 +1087,12 @@ Examples:
                        std::optional<ContainerTypes::VectorVariant>
                            two_rdm_spin_traced,
                        py::object entropies, WavefunctionType type) {
-             return SciWavefunctionContainer(
+             return StateVectorContainer(
                  coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
                  two_rdm_spin_traced, parse_entropies(entropies), type);
            }),
            R"(
-Constructs a SCI wavefunction container with spin-traced RDMs.
+Constructs a state-vector wavefunction container with spin-traced RDMs.
 
 Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
@@ -1093,9 +1110,9 @@ Examples:
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> one_rdm = np.eye(4)  # Example 1-RDM
-    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, one_rdm, None)
     >>> # With entropies:
-    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
     ...     one_rdm, None, entropies={"single_orbital": s1_vec})
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
@@ -1118,13 +1135,13 @@ Examples:
                       std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
-            return SciWavefunctionContainer(
+            return StateVectorContainer(
                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
                 one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
                 two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
           R"(
-Constructs a SCI wavefunction container with full RDM data.
+Constructs a state-vector wavefunction container with full RDM data.
 
 Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
@@ -1146,7 +1163,7 @@ Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
     ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
 )",
@@ -1160,141 +1177,12 @@ Examples:
           py::arg("two_rdm_bbbb") = std::nullopt,
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)
-      .def("get_coefficients", &SciWavefunctionContainer::get_coefficients,
+      .def("get_coefficients", &StateVectorContainer::get_coefficients,
            "Get the coefficients of the wavefunction",
-           py::return_value_policy::reference_internal);
-
-  // Bind CasWavefunctionContainer
-  py::class_<CasWavefunctionContainer, WavefunctionContainer, py::smart_holder>(
-      data, "CasWavefunctionContainer",
-      R"(
-Complete Active Space (CAS) wavefunction container implementation.
-
-This container represents wavefunctions obtained from complete active space self-consistent field (CASSCF) or complete active space configuration interaction (CASCI) methods.
-)")
-      // Basic constructor: coeffs, dets, orbitals, type
-      .def(py::init<const ContainerTypes::VectorVariant&,
-                    const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>, WavefunctionType>(),
-           R"(
-Constructs a basic CAS wavefunction container.
-
-Args:
-    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
-    dets (list[Configuration]): The vector of determinants
-    orbitals (Orbitals): Shared pointer to orbital basis set
-    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
-
-Examples:
-    >>> import numpy as np
-    >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals)
-)",
-           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("type") = WavefunctionType::SelfDual)
-      // Constructor with spin-traced RDMs and optional entropies dict
-      .def(py::init([](const ContainerTypes::VectorVariant& coeffs,
-                       const ContainerTypes::DeterminantVector& dets,
-                       std::shared_ptr<Orbitals> orbitals,
-                       std::optional<ContainerTypes::MatrixVariant>
-                           one_rdm_spin_traced,
-                       std::optional<ContainerTypes::VectorVariant>
-                           two_rdm_spin_traced,
-                       py::object entropies, WavefunctionType type) {
-             return CasWavefunctionContainer(
-                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                 two_rdm_spin_traced, parse_entropies(entropies), type);
-           }),
-           R"(
-Constructs a CAS wavefunction container with spin-traced RDMs.
-
-Args:
-    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
-    dets (list[Configuration]): The vector of determinants
-    orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
-    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    entropies (dict | None): Orbital entropies, with optional keys
-        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
-        and ``"mutual_information"`` (2-D)
-    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
-
-Examples:
-    >>> import numpy as np
-    >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> one_rdm = np.eye(4)  # Example 1-RDM
-    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals, one_rdm, None)
-    >>> # With entropies:
-    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
-    ...     one_rdm, None, entropies={"single_orbital": s1_vec})
-)",
-           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("one_rdm_spin_traced") = std::nullopt,
-           py::arg("two_rdm_spin_traced") = std::nullopt,
-           py::arg("entropies") = py::none(),
-           py::arg("type") = WavefunctionType::SelfDual)
-      // Full constructor with all RDM components and optional entropies dict
-      .def(
-          py::init([](const ContainerTypes::VectorVariant& coeffs,
-                      const ContainerTypes::DeterminantVector& dets,
-                      std::shared_ptr<Orbitals> orbitals,
-                      std::optional<ContainerTypes::MatrixVariant>
-                          one_rdm_spin_traced,
-                      std::optional<ContainerTypes::MatrixVariant> one_rdm_aa,
-                      std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
-                      std::optional<ContainerTypes::VectorVariant>
-                          two_rdm_spin_traced,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
-                      py::object entropies, WavefunctionType type) {
-            return CasWavefunctionContainer(
-                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
-          }),
-          R"(
-Constructs a CAS wavefunction container with full RDM data.
-
-Args:
-    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
-    dets (list[Configuration]): The vector of determinants
-    orbitals (Orbitals): Shared pointer to orbital basis set
-    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
-    one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
-    one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
-    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
-    two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
-    two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
-    entropies (dict | None): Orbital entropies, with optional keys
-        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
-        and ``"mutual_information"`` (2-D)
-    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
-
-Examples:
-    >>> import numpy as np
-    >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
-    ...     one_rdm, one_rdm_aa, one_rdm_bb,
-    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
-)",
-          py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-          py::arg("one_rdm_spin_traced") = std::nullopt,
-          py::arg("one_rdm_aa") = std::nullopt,
-          py::arg("one_rdm_bb") = std::nullopt,
-          py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_aabb") = std::nullopt,
-          py::arg("two_rdm_aaaa") = std::nullopt,
-          py::arg("two_rdm_bbbb") = std::nullopt,
-          py::arg("entropies") = py::none(),
-          py::arg("type") = WavefunctionType::SelfDual)
-      .def("get_coefficients", &CasWavefunctionContainer::get_coefficients,
-           "Get the coefficients of the wavefunction",
-           py::return_value_policy::reference_internal);
+           py::return_value_policy::reference_internal)
+      .def("contains_determinant", &StateVectorContainer::contains_determinant,
+           "Check if a determinant is present in the expansion",
+           py::arg("det"));
 
   // Bind CoupledClusterContainer
   py::class_<CoupledClusterContainer, WavefunctionContainer, py::smart_holder>(
@@ -1540,33 +1428,4 @@ Examples:
     >>> if mp2_container.has_t2_amplitudes():
     ...     t2 = mp2_container.get_t2_amplitudes()
         )");
-
-  // Bind SlaterDeterminantContainer
-  py::class_<SlaterDeterminantContainer, WavefunctionContainer,
-             py::smart_holder>(data, "SlaterDeterminantContainer",
-                               R"(
-Single Slater determinant wavefunction container implementation.
-
-This container represents the simplest wavefunction - a single Slater determinant with coefficient 1.0.
-It provides efficient storage and computation for single-determinant wavefunctions such as Hartree-Fock reference states.
-)")
-      .def(py::init<const Configuration&, std::shared_ptr<Orbitals>,
-                    WavefunctionType>(),
-           R"(
-Constructs a single Slater determinant wavefunction container.
-
-Args:
-    det (Configuration): The single determinant configuration
-    orbitals (Orbitals): Shared pointer to orbital basis set
-    type (WavefunctionType | None): Type of wavefunction (default: Both)
-
-Examples:
-    >>> det = qdk_chemistry.Configuration("33221100")
-    >>> container = qdk_chemistry.SlaterDeterminantContainer(det, orbitals)
-)",
-           py::arg("det"), py::arg("orbitals"),
-           py::arg("type") = WavefunctionType::SelfDual)
-      .def("contains_determinant",
-           &SlaterDeterminantContainer::contains_determinant,
-           "Check if a determinant matches the stored one", py::arg("det"));
 }

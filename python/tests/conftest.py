@@ -21,12 +21,12 @@ import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     MajoranaMapping,
     Orbitals,
     QuantumErrorProfile,
+    StateVectorContainer,
     Wavefunction,
 )
 
@@ -137,7 +137,7 @@ def wavefunction_4e4o():
     dets = [det1, det2]
     coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals)
     return Wavefunction(container)
 
 
@@ -151,7 +151,7 @@ def wavefunction_10e6o():
     dets = [det1, det2, det3]
     coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
 
-    container = CasWavefunctionContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals)
     return Wavefunction(container)
 
 

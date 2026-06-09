@@ -21,7 +21,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <sstream>
 #include <stdexcept>
 
@@ -1862,12 +1862,12 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   // Need to create a UHF wavefunction with the unrestricted orbitals
   // Get the determinant from the RHF wavefunction
   const auto& rhf_sd_container =
-      rhf_wavefunction->get_container<SlaterDeterminantContainer>();
+      rhf_wavefunction->get_container<StateVectorContainer>();
   const auto& rhf_determinants = rhf_sd_container.get_active_determinants();
 
-  // Create a new SlaterDeterminantContainer with the same determinant but
+  // Create a new StateVectorContainer with the same determinant but
   // unrestricted orbitals
-  auto uhf_container = std::make_unique<SlaterDeterminantContainer>(
+  auto uhf_container = std::make_unique<StateVectorContainer>(
       rhf_determinants[0], unrestricted_orbitals);
   auto uhf_wavefunction =
       std::make_shared<Wavefunction>(std::move(uhf_container));

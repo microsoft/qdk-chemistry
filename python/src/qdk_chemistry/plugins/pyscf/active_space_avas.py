@@ -32,7 +32,7 @@ import numpy as np
 from pyscf.mcscf import avas
 
 from qdk_chemistry.algorithms import ActiveSpaceSelector
-from qdk_chemistry.data import Configuration, Orbitals, Settings, SlaterDeterminantContainer, Wavefunction
+from qdk_chemistry.data import Configuration, Orbitals, Settings, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -171,7 +171,7 @@ class PyscfAVAS(ActiveSpaceSelector):
 
         # Extract active indices
         # nelec_act is the number of active electrons (int or tuple of alpha/beta)
-        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, (tuple, list)) else int(nelec_act)  # noqa: UP038
+        n_active_electrons = sum(nelec_act) if isinstance(nelec_act, (tuple, list)) else int(nelec_act)
         n_inactive_occ = (mol.nelectron - n_active_electrons) // 2
         active_indices = [n_inactive_occ + i for i in range(norb_act)]
         inactive_indices = list(range(n_inactive_occ))
@@ -221,7 +221,7 @@ class PyscfAVAS(ActiveSpaceSelector):
                     new_config_chars.append("0")
 
             active_config = Configuration("".join(new_config_chars))
-            return Wavefunction(SlaterDeterminantContainer(active_config, active_orbitals))
+            return Wavefunction(StateVectorContainer(active_config, active_orbitals))
         raise NotImplementedError(
             "PySCF AVAS active space selector currently only supports single-determinant wavefunctions."
         )

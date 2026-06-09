@@ -10,7 +10,6 @@ Exposed classes are:
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
-- :class:`CasWavefunctionContainer`: Complete Active Space (CAS) wavefunction with CI coefficients and determinants.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
@@ -37,12 +36,11 @@ Exposed classes are:
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitHamiltonian`: Molecular electronic Hamiltonians mapped to qubits.
-- :class:`SciWavefunctionContainer`: Selected Configuration Interaction (SCI) wavefunction with CI coefficients.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
-- :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
+- :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state.
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
@@ -73,7 +71,6 @@ from qdk_chemistry._core.data import (
     AOType,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
@@ -91,17 +88,16 @@ from qdk_chemistry._core.data import (
     OrbitalType,
     PauliOperator,
     PauliTermAccumulator,
-    SciWavefunctionContainer,
     SettingNotFound,
     Settings,
     SettingsAreLocked,
     SettingTypeMismatch,
     SettingValue,
     Shell,
-    SlaterDeterminantContainer,
     SparseHamiltonianContainer,
     SpinChannel,
     StabilityResult,
+    StateVectorContainer,
     Structure,
     TaperingSpecification,
     Wavefunction,
@@ -140,7 +136,6 @@ __all__ = [
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
-    "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",
@@ -173,7 +168,6 @@ __all__ = [
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
-    "SciWavefunctionContainer",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",
@@ -183,10 +177,10 @@ __all__ = [
     "SettingsAreLocked",
     "SettingsAreLockedError",
     "Shell",
-    "SlaterDeterminantContainer",
     "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
+    "StateVectorContainer",
     "Structure",
     "Symmetries",
     "TaperingSpecification",

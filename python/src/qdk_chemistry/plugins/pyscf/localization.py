@@ -30,7 +30,7 @@ Requires: PySCF (the code uses the ``pyscf.lo`` localization routines).
 from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
-from qdk_chemistry.data import Orbitals, SciWavefunctionContainer, Settings, SlaterDeterminantContainer, Wavefunction
+from qdk_chemistry.data import Orbitals, Settings, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -157,6 +157,18 @@ class PyscfLocalizer(OrbitalLocalizer):
         if len(loc_indices_a) == 0 and len(loc_indices_b) == 0:
             return wavefunction
 
+        # Localization rotates the (active) orbital basis. A single Slater determinant is
+        # invariant under such a rotation, but a multi-determinant CI expansion is not: its
+        # coefficients are defined in the original basis and would have to be re-expressed in
+        # the localized basis. Carrying them over unchanged would silently yield a different
+        # physical state, so only single-determinant wavefunctions are supported.
+        if len(wavefunction.get_active_determinants()) > 1:
+            raise NotImplementedError(
+                "Orbital localization is only supported for single-determinant wavefunctions; "
+                "localizing the orbitals of a multi-determinant expansion would invalidate its "
+                "CI coefficients."
+            )
+
         pop_method = self._settings.get("population_method")
         loc_method = self._settings.get("method").lower()
 
@@ -239,10 +251,8 @@ class PyscfLocalizer(OrbitalLocalizer):
                 if active_alpha is not None
                 else None,
             )
-        if len(wavefunction.get_active_determinants()) == 1:
-            # Single determinant case - return new wavefunction with localized orbitals
-            return Wavefunction(SlaterDeterminantContainer(wavefunction.get_active_determinants()[0], loc_orbitals))
-        return Wavefunction(SciWavefunctionContainer(wavefunction.get_active_determinants(), loc_orbitals))
+        # Only single-determinant wavefunctions reach this point (guarded above).
+        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals))
 
     def name(self) -> str:
         """Return the settings for the localizer."""

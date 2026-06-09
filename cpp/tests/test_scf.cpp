@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
@@ -47,7 +47,7 @@ class TestSCF : public ScfSolver {
     auto orbitals = std::make_shared<Orbitals>(coefficients, energies,
                                                std::nullopt, nullptr);
     auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("000"),
+        std::make_unique<StateVectorContainer>(Configuration("000"),
                                                      orbitals));
     return {0.0, wfn};
   }

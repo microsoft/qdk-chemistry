@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -75,9 +75,9 @@ TEST_F(StabilityCheckerTest, StabilityResult) {
   // Test StabilityResult functionality
   TestStabilityChecker checker;
 
-  // Create a dummy wavefunction for testing using SlaterDeterminantContainer
+  // Create a dummy wavefunction for testing using StateVectorContainer
   auto wavefunction = std::make_shared<qdk::chemistry::data::Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(
+      std::make_unique<StateVectorContainer>(
           Configuration("200000"), testing::create_test_orbitals()));
 
   // Get the result

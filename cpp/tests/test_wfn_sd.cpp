@@ -7,7 +7,7 @@
 
 #include <filesystem>
 #include <nlohmann/json.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -23,7 +23,7 @@ class SlaterdeterminantTest : public ::testing::Test {
 TEST_F(SlaterdeterminantTest, BasicProperties) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   Configuration det("2200");
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   EXPECT_EQ(sd.size(), 1);
   EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(det)), 1.0);
@@ -91,7 +91,7 @@ TEST_F(SlaterdeterminantTest, WithInactiveOrbitals) {
 
   // Create determinant using only the active space (4 orbitals)
   Configuration det("2200");  // 2 alpha electrons in first 2 active orbitals
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with inactive orbitals
   auto [total_alpha_elec, total_beta_elec] = sd.get_total_num_electrons();
@@ -159,7 +159,7 @@ TEST_F(SlaterdeterminantTest, WithNonContinuousActiveSpace) {
 
   // Create determinant using only the active space (4 orbitals)
   Configuration det("2200");  // 2 alpha electrons in first 2 active orbitals
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with non-continuous active space
   auto [total_alpha_elec, total_beta_elec] = sd.get_total_num_electrons();
@@ -225,23 +225,23 @@ TEST_F(SlaterdeterminantTest, JsonSerialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   Configuration det("2200");
 
-  SlaterDeterminantContainer original(det, orbitals);
+  StateVectorContainer original(det, orbitals);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = SlaterDeterminantContainer::from_json(j);
+  auto restored = StateVectorContainer::from_json(j);
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
   auto original_wf = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(det, orbitals));
+      std::make_unique<StateVectorContainer>(det, orbitals));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
-  EXPECT_EQ(wf_restored->get_container_type(), "sd");
+  EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
   auto& wf_restored_container =
-      wf_restored->get_container<SlaterDeterminantContainer>();
+      wf_restored->get_container<StateVectorContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -263,7 +263,7 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   Configuration det("2200");
 
-  SlaterDeterminantContainer original(det, orbitals);
+  StateVectorContainer original(det, orbitals);
 
   std::string filename = "test_sd_serialization.h5";
   {
@@ -274,7 +274,7 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = SlaterDeterminantContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -292,7 +292,7 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
   {
     // Create and serialize a Wavefunction wrapping the container
     auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(det, orbitals));
+        std::make_unique<StateVectorContainer>(det, orbitals));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original_wf->to_hdf5(root);
@@ -303,14 +303,14 @@ TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
     H5::H5File file(wf_filename, H5F_ACC_RDONLY);
     H5::Group root = file.openGroup("/");
     auto wf_restored = Wavefunction::from_hdf5(root);
-    EXPECT_EQ(wf_restored->get_container_type(), "sd");
+    EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
     auto& wf_restored_container =
-        wf_restored->get_container<SlaterDeterminantContainer>();
+        wf_restored->get_container<StateVectorContainer>();
 
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = SlaterDeterminantContainer::from_hdf5(root2);
+    auto restored = StateVectorContainer::from_hdf5(root2);
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     EXPECT_EQ(restored->get_active_determinants().size(),
@@ -332,7 +332,7 @@ TEST_F(SlaterdeterminantTest, ClosedShellReducedDensityMatrices) {
   size_t norb = 4;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
   Configuration det("2200");
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   // get RDMs
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
@@ -375,7 +375,7 @@ TEST_F(SlaterdeterminantTest, OpenShellReducedDensityMatrices) {
   size_t norb = 4;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
   Configuration det("2uu0");
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   // get RDMs
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
@@ -419,7 +419,7 @@ TEST_F(SlaterdeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
   size_t norb = 12;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
   Configuration det("2ud0200u0u2d");
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
 
   // get RDMs
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
@@ -475,7 +475,7 @@ TEST_F(SlaterdeterminantTest, EntropiesTest) {
   size_t norb = 12;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
   Configuration det("2ud0200u0u2d");
-  SlaterDeterminantContainer sd(det, orbitals);
+  StateVectorContainer sd(det, orbitals);
   sd.get_active_one_rdm_spin_dependent();
   auto [aabb, aaaa, bbbb] = sd.get_active_two_rdm_spin_dependent();
 

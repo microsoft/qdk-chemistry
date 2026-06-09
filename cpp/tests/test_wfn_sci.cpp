@@ -10,7 +10,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -38,7 +38,7 @@ TEST_F(SciWavefunctionTest, BasicProperties) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  SciWavefunctionContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   EXPECT_EQ(sci.size(), 3);
   EXPECT_DOUBLE_EQ(std::get<double>(sci.get_coefficient(Configuration("2200"))),
@@ -47,8 +47,9 @@ TEST_F(SciWavefunctionTest, BasicProperties) {
                    0.5);
   EXPECT_DOUBLE_EQ(std::get<double>(sci.get_coefficient(Configuration("2002"))),
                    1.0 / sqrt(2));
-  EXPECT_THROW(std::get<double>(sci.get_coefficient(Configuration("2000"))),
-               std::runtime_error);
+  // A determinant absent from the expansion has zero amplitude.
+  EXPECT_DOUBLE_EQ(std::get<double>(sci.get_coefficient(Configuration("2000"))),
+                   0.0);
   EXPECT_EQ(sci.get_active_determinants().size(), 3);
   EXPECT_EQ(sci.get_active_determinants()[0].to_string(), "2200");
   EXPECT_EQ(sci.get_active_determinants()[1].to_string(), "2020");
@@ -104,7 +105,7 @@ TEST_F(SciWavefunctionTest, EmptyDeterminantsThrows) {
   std::vector<Configuration> empty_dets;
   Eigen::VectorXd empty_coeffs(0);
 
-  SciWavefunctionContainer sci(empty_coeffs, empty_dets, orbitals);
+  StateVectorContainer sci(empty_coeffs, empty_dets, orbitals);
 
   // All these methods should throw when determinants are empty
   EXPECT_THROW(sci.get_coefficient(Configuration("2200")), std::runtime_error);
@@ -123,7 +124,7 @@ TEST_F(SciWavefunctionTest, ErrorMessagesAreDescriptive) {
   std::vector<Configuration> empty_dets;
   Eigen::VectorXd empty_coeffs(0);
 
-  SciWavefunctionContainer sci(empty_coeffs, empty_dets, orbitals);
+  StateVectorContainer sci(empty_coeffs, empty_dets, orbitals);
 
   // Check that error messages are descriptive
   try {
@@ -137,13 +138,14 @@ TEST_F(SciWavefunctionTest, ErrorMessagesAreDescriptive) {
 // Test entropy calculation with missing RDMs
 TEST_F(SciWavefunctionTest, EntropyWithMissingRDMs) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  std::vector<Configuration> dets = {Configuration("2200")};
-  Eigen::VectorXd coeffs(1);
-  coeffs << 1.0;
+  std::vector<Configuration> dets = {Configuration("2200"),
+                                     Configuration("2020")};
+  Eigen::VectorXd coeffs(2);
+  coeffs << 1.0 / sqrt(2), 1.0 / sqrt(2);
 
-  SciWavefunctionContainer sci(coeffs, dets, orbitals);
+  StateVectorContainer sci(coeffs, dets, orbitals);
 
-  // Should throw when trying to calculate entropies without RDMs
+  // A multi-determinant expansion without RDMs cannot compute entropies.
   EXPECT_THROW(sci.get_single_orbital_entropies(), std::runtime_error);
 }
 
@@ -170,7 +172,7 @@ TEST_F(SciWavefunctionTest, WithInactiveOrbitals) {
   one_rdm(2, 2) = 0.0;
   one_rdm(3, 3) = 0.0;
 
-  SciWavefunctionContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   // Test electron counting with inactive orbitals
   auto [total_alpha_elec, total_beta_elec] = sci.get_total_num_electrons();
@@ -247,7 +249,7 @@ TEST_F(SciWavefunctionTest, WithNonContinuousActiveSpace) {
       Configuration("2200"), Configuration("2020"), Configuration("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1 / sqrt(2);
-  SciWavefunctionContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
+  StateVectorContainer sci(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   // Test electron counting with non-continuous active space
   auto [total_alpha_elec, total_beta_elec] = sci.get_total_num_electrons();
@@ -314,25 +316,25 @@ TEST_F(SciWavefunctionTest, JsonSerialization) {
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1.0 / sqrt(2);
 
-  SciWavefunctionContainer original(coeffs, dets, orbitals);
+  StateVectorContainer original(coeffs, dets, orbitals);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
   auto original_wf = std::make_shared<Wavefunction>(
-      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
-  EXPECT_EQ(wf_restored->get_container_type(), "sci");
+  EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
   auto& wf_restored_container =
-      wf_restored->get_container<SciWavefunctionContainer>();
+      wf_restored->get_container<StateVectorContainer>();
 
   // Verify key properties match
   EXPECT_EQ(original.size(), restored->size());
@@ -371,7 +373,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1.0 / sqrt(2);
 
-  SciWavefunctionContainer original(coeffs, dets, orbitals);
+  StateVectorContainer original(coeffs, dets, orbitals);
 
   std::string filename = "test_sci_serialization.h5";
   {
@@ -382,7 +384,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5 using container-specific method
-    auto restored = SciWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify key properties match
     EXPECT_EQ(original.size(), restored->size());
@@ -411,7 +413,7 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
   {
     // Create and serialize a Wavefunction wrapping the container
     auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original_wf->to_hdf5(root);
@@ -422,14 +424,14 @@ TEST_F(SciWavefunctionTest, Hdf5Serialization) {
     H5::H5File file(wf_filename, H5F_ACC_RDONLY);
     H5::Group root = file.openGroup("/");
     auto wf_restored = Wavefunction::from_hdf5(root);
-    EXPECT_EQ(wf_restored->get_container_type(), "sci");
+    EXPECT_EQ(wf_restored->get_container_type(), "state_vector");
     auto& wf_restored_container =
-        wf_restored->get_container<SciWavefunctionContainer>();
+        wf_restored->get_container<StateVectorContainer>();
 
     // Get the restored container from container-specific method for comparison
     H5::H5File file2(filename, H5F_ACC_RDONLY);
     H5::Group root2 = file2.openGroup("/");
-    auto restored = SciWavefunctionContainer::from_hdf5(root2);
+    auto restored = StateVectorContainer::from_hdf5(root2);
 
     EXPECT_EQ(restored->size(), wf_restored_container.size());
     const auto& rest_coeffs =
@@ -478,7 +480,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMs) {
 
   auto [E_sci, wfn_sci] = mc->run(H, 4, 4);
 
-  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
+  const auto& original = wfn_sci->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -495,7 +497,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMs) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = SciWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify rdms are still there
     EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -596,7 +598,7 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
   two_rdm_aaaa.setOnes();
   two_rdm_aaaa *= 0.25;
 
-  SciWavefunctionContainer original(coeffs, dets, orbitals, std::nullopt,
+  StateVectorContainer original(coeffs, dets, orbitals, std::nullopt,
                                     one_rdm_aa, one_rdm_aa, std::nullopt,
                                     two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
 
@@ -609,8 +611,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify RDMs are available after deserialization
@@ -674,7 +676,7 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   mc->settings().set("grow_factor", 2);
   auto [E_sci, wfn_sci] = mc->run(H, 2, 1);
 
-  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
+  const auto& original = wfn_sci->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -693,8 +695,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<SciWavefunctionContainer>(
-      dynamic_cast<SciWavefunctionContainer*>(
+  auto restored = std::unique_ptr<StateVectorContainer>(
+      dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify rdms are still there
@@ -811,7 +813,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   mc->settings().set("grow_factor", 2);
   auto [E_sci, wfn_sci] = mc->run(H, 2, 1);
 
-  const auto& original = wfn_sci->get_container<SciWavefunctionContainer>();
+  const auto& original = wfn_sci->get_container<StateVectorContainer>();
 
   EXPECT_TRUE(original.has_one_rdm_spin_dependent());
   EXPECT_TRUE(original.has_one_rdm_spin_traced());
@@ -831,7 +833,7 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
     original.to_hdf5(root);
 
     // Deserialize from HDF5
-    auto restored = SciWavefunctionContainer::from_hdf5(root);
+    auto restored = StateVectorContainer::from_hdf5(root);
 
     // Verify rdms are still there
     EXPECT_TRUE(restored->has_one_rdm_spin_dependent());
@@ -935,7 +937,7 @@ TEST_F(SciWavefunctionTest, Truncate) {
   coeffs << 0.8, 0.4, 0.3, 0.1;  // Not normalized
 
   Wavefunction wfn(
-      std::make_unique<SciWavefunctionContainer>(coeffs, dets, orbitals));
+      std::make_unique<StateVectorContainer>(coeffs, dets, orbitals));
 
   // Test truncation to 2 determinants
   auto truncated = wfn.truncate(2);

@@ -14,7 +14,7 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 #include <qdk/chemistry/utils/valence_space.hpp>
 #include <stdexcept>
@@ -53,7 +53,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
                                       basis_set, std::nullopt);
     std::shared_ptr<Orbitals> water_orbitals_truncated_ptr =
         std::make_shared<Orbitals>(water_orbitals_truncated);
-    auto wfn_container_truncated = std::make_unique<SlaterDeterminantContainer>(
+    auto wfn_container_truncated = std::make_unique<StateVectorContainer>(
         config_truncated, water_orbitals_truncated_ptr);
     water_wavefunction_truncated =
         std::make_shared<Wavefunction>(std::move(wfn_container_truncated));
@@ -80,14 +80,14 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
     // Create configuration for 8 electrons (4 doubly occupied orbitals)
     Configuration config_ohp("222200000");  // 4 doubly occupied orbitals
-    auto ohp_wfn_container = std::make_unique<SlaterDeterminantContainer>(
+    auto ohp_wfn_container = std::make_unique<StateVectorContainer>(
         config_ohp, base_orbitals_oh);
     ohp_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohp_wfn_container));
 
     // Create configuration for 10 electrons (5 doubly occupied orbitals)
     Configuration config_ohn("222220000");  // 4 doubly occupied orbitals
-    auto ohn_wfn_container = std::make_unique<SlaterDeterminantContainer>(
+    auto ohn_wfn_container = std::make_unique<StateVectorContainer>(
         config_ohn, base_orbitals_oh);
     ohn_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohn_wfn_container));
@@ -251,7 +251,7 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
     config_str[pair_count + i] = unpaired;
 
   return std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration(config_str),
+      std::make_unique<StateVectorContainer>(Configuration(config_str),
                                                    orbitals));
 }
 

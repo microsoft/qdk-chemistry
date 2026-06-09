@@ -6,8 +6,7 @@
 
 #include <filesystem>
 #include <qdk/chemistry/algorithms/active_space.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -152,7 +151,7 @@ TEST_F(ActiveSpaceTest, Occupation) {
   // Create a wavefunction with the orbitals
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
   auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration("2ud0"),
+      std::make_unique<StateVectorContainer>(Configuration("2ud0"),
                                                    orbitals_ptr));
 
   auto result_wavefunction = selector->run(wfn);
@@ -180,7 +179,7 @@ TEST_F(ActiveSpaceTest, Occupation_EdgeCase) {
 
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2000"),
+            std::make_unique<StateVectorContainer>(Configuration("2000"),
                                                          orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
@@ -205,7 +204,7 @@ TEST_F(ActiveSpaceTest, Valence) {
 
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
   auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<SlaterDeterminantContainer>(Configuration("2ud0"),
+      std::make_unique<StateVectorContainer>(Configuration("2ud0"),
                                                    orbitals_ptr));
 
   selector->settings().set("num_active_electrons", 2);
@@ -238,7 +237,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
                           basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
+            std::make_unique<StateVectorContainer>(Configuration("dd00"),
                                                          orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
@@ -260,7 +259,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", -1);
         selector->settings().set("num_active_orbitals", 2);
@@ -283,7 +282,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", -1);
@@ -306,7 +305,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 5);
@@ -329,7 +328,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2000"),
+            std::make_unique<StateVectorContainer>(Configuration("2000"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
@@ -352,7 +351,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis, std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
@@ -371,7 +370,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
                           std::nullopt);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<SlaterDeterminantContainer>(Configuration("2200"),
+            std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 2);
@@ -393,7 +392,7 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
         coeffs, std::nullopt, std::nullopt, basis,
         std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
     auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
+        std::make_unique<StateVectorContainer>(Configuration("dd00"),
                                                      orbitals));
     auto result_wavefunction = selector->run(wfn);
   });
@@ -414,7 +413,7 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
         coeffs, energies, std::nullopt, basis,
         std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
     auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("dd00"),
+        std::make_unique<StateVectorContainer>(Configuration("dd00"),
                                                      orbitals));
     selector->settings().set("num_active_electrons", 2);
     selector->settings().set("num_active_orbitals", 2);
