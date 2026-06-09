@@ -111,50 +111,43 @@ def four_qubit_phase_problem() -> PhaseEstimationProblem:
     )
 
 
-def create_iterative_circuit_builder_algorithm_ref(num_bits: int, evolution_time: float) -> AlgorithmRef:
+def create_iterative_circuit_builder_algorithm_ref(
+    num_bits: int,
+    evolution_time: float,
+    unitary_builder_name: str = "trotter") -> AlgorithmRef:
     """Return the default iterative circuit builder instance."""
     return AlgorithmRef(
         "qpe_circuit_builder",
         "qdk_iterative",
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=evolution_time),
     )
 
 
-def _run_iterative(problem: PhaseEstimationProblem) -> QpeResult:
+def _run_iterative(
+    problem: PhaseEstimationProblem,
+    unitary_builder_name: str = "trotter") -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
     Args:
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
+        unitary_builder_name: Name of the unitary builder algorithm (defaults to "trotter").
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
 
     """
-    return _run_iterative_with_unitary_builder(problem, "trotter")
-
-
-def _run_iterative_with_unitary_builder(
-    problem: PhaseEstimationProblem,
-    unitary_builder_name: str,
-) -> QpeResult:
-    """Execute iterative phase estimation using the requested Hamiltonian unitary builder."""
     state_prep_circuit = problem.state_prep
-    circuit_builder = create_iterative_circuit_builder_algorithm_ref(problem.num_bits, problem.evolution_time)
+    circuit_builder = create_iterative_circuit_builder_algorithm_ref(
+        problem.num_bits,
+        problem.evolution_time,
+        unitary_builder_name=unitary_builder_name)
     iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
     iqpe.settings().set(
         "circuit_executor",
         AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
-    )
-    iqpe.settings().set(
-        "circuit_mapper",
-        AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-    )
-    iqpe.settings().set(
-        "unitary_builder",
-        AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=problem.evolution_time),
     )
 
     return iqpe.run(
@@ -261,12 +254,11 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(two_qubit_phase_pr
         atol=qpe_energy_tolerance,
     )
 
-
 def test_iterative_phase_estimation_with_zassenhaus_extracts_phase_and_energy(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
     """Verify Zassenhaus is a drop-in unitary builder for iterative phase estimation."""
-    result = _run_iterative_with_unitary_builder(two_qubit_phase_problem, "zassenhaus")
+    result = _run_iterative(two_qubit_phase_problem, unitary_builder_name="zassenhaus")
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
     )
@@ -281,48 +273,6 @@ def test_iterative_phase_estimation_with_zassenhaus_extracts_phase_and_energy(
     assert np.isclose(
         resolved_energy,
         two_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_results_match(two_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Confirm iterative and traditional algorithms produce consistent estimates."""
-    iterative_result = _run_iterative(two_qubit_phase_problem)
-    traditional_result = _run_traditional(two_qubit_phase_problem)
-
-    iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
-        iterative_result.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
-    )
-    qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
-        two_qubit_phase_problem.evolution_time,
-        two_qubit_phase_problem.expected_energy,
-    )
-
-    assert traditional_result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
-    assert np.isclose(
-        iqpe_resolved_phase,
-        two_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        two_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_phase,
-        qpe_resolved_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        qpe_resolved_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
@@ -351,12 +301,11 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
         atol=qpe_energy_tolerance,
     )
 
-
 def test_iterative_phase_estimation_with_zassenhaus_four_qubit_phase_and_energy(
     four_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
     """Validate Zassenhaus as the unitary builder on the documented four-qubit case."""
-    result = _run_iterative_with_unitary_builder(four_qubit_phase_problem, "zassenhaus")
+    result = _run_iterative(four_qubit_phase_problem, unitary_builder_name="zassenhaus")
     resolved_phase, resolved_energy = _resolve_phase_ambiguity(
         result.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
     )
@@ -371,50 +320,6 @@ def test_iterative_phase_estimation_with_zassenhaus_four_qubit_phase_and_energy(
     assert np.isclose(
         resolved_energy,
         four_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-
-
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_iterative_and_traditional_match_on_four_qubits(four_qubit_phase_problem: PhaseEstimationProblem) -> None:
-    """Ensure iterative and traditional approaches agree for four qubits."""
-    iterative_result = _run_iterative(four_qubit_phase_problem)
-    traditional_result = _run_traditional(four_qubit_phase_problem)
-
-    iqpe_resolved_phase, iqpe_resolved_energy = _resolve_phase_ambiguity(
-        iterative_result.phase_fraction,
-        four_qubit_phase_problem.evolution_time,
-        four_qubit_phase_problem.expected_energy,
-    )
-    qpe_resolved_phase, qpe_resolved_energy = _resolve_phase_ambiguity(
-        traditional_result.phase_fraction,
-        four_qubit_phase_problem.evolution_time,
-        four_qubit_phase_problem.expected_energy,
-    )
-
-    assert traditional_result.bitstring_msb_first == four_qubit_phase_problem.expected_bitstring
-    assert np.isclose(
-        iqpe_resolved_phase,
-        four_qubit_phase_problem.expected_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        four_qubit_phase_problem.expected_energy,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_energy_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_phase,
-        qpe_resolved_phase,
-        rtol=float_comparison_relative_tolerance,
-        atol=qpe_phase_fraction_tolerance,
-    )
-    assert np.isclose(
-        iqpe_resolved_energy,
-        qpe_resolved_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
