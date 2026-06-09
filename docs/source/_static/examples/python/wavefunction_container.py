@@ -7,19 +7,19 @@
 
 import numpy as np
 from qdk_chemistry.data import (
-    Orbitals,
-    SlaterDeterminantContainer,
-    CasWavefunctionContainer,
-    SciWavefunctionContainer,
-    CoupledClusterContainer,
-    MP2Container,
-    Configuration,
-    Wavefunction,
-    Hamiltonian,
-    CanonicalFourCenterHamiltonianContainer,
     BasisSet,
-    Shell,
+    CanonicalFourCenterHamiltonianContainer,
+    CasWavefunctionContainer,
+    Configuration,
+    CoupledClusterContainer,
+    Hamiltonian,
+    MP2Container,
+    Orbitals,
     OrbitalType,
+    SciWavefunctionContainer,
+    Shell,
+    SlaterDeterminantContainer,
+    Wavefunction,
 )
 
 
@@ -203,7 +203,7 @@ n_alpha, n_beta = sd_wavefunction.get_total_num_electrons()
 # Get RDMs
 rdm1_aa, rdm1_bb = sd_wavefunction.get_active_one_rdm_spin_dependent()
 rdm1_total = sd_wavefunction.get_active_one_rdm_spin_traced()
-rdm2_aabb, rdm2_aaaa, rdm2_bbbb = sd_wavefunction.get_active_two_rdm_spin_dependent()
+rdm2_aaaa, rdm2_aabb, rdm2_bbbb = sd_wavefunction.get_active_two_rdm_spin_dependent()
 rdm2_total = sd_wavefunction.get_active_two_rdm_spin_traced()
 
 # Get single orbital entropies
