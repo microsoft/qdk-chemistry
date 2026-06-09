@@ -22,6 +22,21 @@ result = QpeResult.from_time_evolution_result(
 ################################################################################
 
 ################################################################################
+# start-cell-create-from-qubitization
+from qdk_chemistry.data import QpeResult
+
+# Construct a QpeResult from a qubitization (walk operator) measurement
+result_qubitization = QpeResult.from_qubitization_result(
+    method="qubitization_qpe",
+    phase_fraction=0.25,
+    lambda_val=5.0,
+    bits_msb_first=(0, 1, 0, 0),
+    bitstring_msb_first="0100",
+)
+# end-cell-create-from-qubitization
+################################################################################
+
+################################################################################
 # start-cell-inspect
 # Inspect the result
 print(f"Method: {result.method}")
