@@ -261,7 +261,7 @@ def test_create_energy_estimator_qdk():
 
 def test_estimator_fewer_shots(wavefunction_4e4o):
     """Test estimator raises error when total shots is less than number of observables."""
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     circuit = state_prep.run(wavefunction_4e4o)
     observable = QubitHamiltonian(["IIIIIIZZ", "IIIIIIXX", "IIIIIIYY"], np.array([2, 3, 4]))
     estimator = QdkEnergyEstimator()
@@ -413,7 +413,7 @@ def test_estimator_mixed_identity_and_pauli_terms():
 
 def test_estimator_multiple_identity_terms(wavefunction_4e4o):
     """Test energy estimator with multiple identity terms having different coefficients."""
-    state_prep = create("state_prep", "sparse_isometry_gf2x")
+    state_prep = create("state_prep", "sparse_isometry")
     circuit = state_prep.run(wavefunction_4e4o)
     # Multiple identity terms: sum of coefficients should be the energy
     observable = QubitHamiltonian(["IIIIIIII", "IIIIIIII", "IIIIIIII"], np.array([1.5, -0.5, 2.0]))
