@@ -89,8 +89,7 @@ int main() {
   Configuration det("20");
 
   // Constructor takes single determinant and orbitals as input
-  auto sd_container =
-      std::make_unique<StateVectorContainer>(det, orbitals);
+  auto sd_container = std::make_unique<StateVectorContainer>(det, orbitals);
   Wavefunction sd_wavefunction(std::move(sd_container));
   // end-cell-create-slater
   // --------------------------------------------------------------------------------------------
@@ -113,8 +112,8 @@ int main() {
 
   // Create a CAS wavefunction : requires all coefficients and determinants, as
   // well as orbitals, in constructor
-  auto cas_container = std::make_unique<StateVectorContainer>(
-      cas_coeffs, cas_dets, orbitals);
+  auto cas_container =
+      std::make_unique<StateVectorContainer>(cas_coeffs, cas_dets, orbitals);
   Wavefunction cas_wavefunction(std::move(cas_container));
   // end-cell-create-cas
   // --------------------------------------------------------------------------------------------
@@ -136,8 +135,8 @@ int main() {
 
   // Create a SCI wavefunction: requires selected coefficients and determinants,
   // as well as orbitals, in constructor
-  auto sci_container = std::make_unique<StateVectorContainer>(
-      sci_coeffs, sci_dets, orbitals);
+  auto sci_container =
+      std::make_unique<StateVectorContainer>(sci_coeffs, sci_dets, orbitals);
   Wavefunction sci_wavefunction(std::move(sci_container));
   // end-cell-create-sci
   // --------------------------------------------------------------------------------------------
@@ -162,7 +161,7 @@ int main() {
   Eigen::VectorXd t2_mp2(1);
   t2_mp2 << 0.1;
   auto mp2_container = std::make_unique<AmplitudeContainer>(
-      orbitals_mp2, ref_wavefunction, t1_mp2, t2_mp2);
+      orbitals_mp2, ref_wavefunction, AmplitudeType::MP2, t1_mp2, t2_mp2);
   Wavefunction mp2_wavefunction(std::move(mp2_container));
   // end-cell-create-mp2
   // --------------------------------------------------------------------------------------------
@@ -193,7 +192,8 @@ int main() {
   // Create CC container: requires reference wavefunction, orbitals, and
   // amplitudes
   auto cc_container = std::make_unique<AmplitudeContainer>(
-      orbitals_cc, ref_wavefunction_cc, t1_amplitudes, t2_amplitudes);
+      orbitals_cc, ref_wavefunction_cc, AmplitudeType::CCSD, t1_amplitudes,
+      t2_amplitudes);
   Wavefunction cc_wavefunction(std::move(cc_container));
   // end-cell-create-cc
   // --------------------------------------------------------------------------------------------

@@ -7,6 +7,7 @@ primary interface for managing quantum chemical data within the QDK/Chemistry fr
 Exposed classes are:
 
 - :class:`AmplitudeContainer`: Amplitude-based correlated wavefunction (coupled cluster or MP2).
+- :class:`AmplitudeType`: Enumeration of amplitude expansion types (MP2, CCSD, Unspecified).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
@@ -67,6 +68,7 @@ from contextlib import suppress
 from qdk_chemistry._core.data import (
     AlgorithmRef,
     AmplitudeContainer,
+    AmplitudeType,
     Ansatz,
     AOType,
     BasisSet,
@@ -132,6 +134,7 @@ __all__ = [
     "AOType",
     "AlgorithmRef",
     "AmplitudeContainer",
+    "AmplitudeType",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",

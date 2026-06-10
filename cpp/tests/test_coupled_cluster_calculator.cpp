@@ -50,8 +50,8 @@ class MockCoupledClusterCalculator : public DynamicalCorrelationCalculator {
     std::optional<AmplitudeContainer::VectorVariant> t1_opt = t1;
     std::optional<AmplitudeContainer::VectorVariant> t2_opt = t2;
 
-    auto cc_container = std::make_unique<AmplitudeContainer>(orbs, original_wfn,
-                                                             t1_opt, t2_opt);
+    auto cc_container = std::make_unique<AmplitudeContainer>(
+        orbs, original_wfn, AmplitudeType::CCSD, t1_opt, t2_opt);
 
     // Create wavefunction with CC container
     auto result_wfn = std::make_shared<Wavefunction>(std::move(cc_container));

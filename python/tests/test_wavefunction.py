@@ -14,6 +14,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.data import (
     AmplitudeContainer,
+    AmplitudeType,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
     Hamiltonian,
@@ -1280,9 +1281,10 @@ class TestMP2Container:
         # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
-        mp2_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        mp2_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.MP2, t1, t2)
 
         assert mp2_container is not None
+        assert mp2_container.get_amplitude_type() == AmplitudeType.MP2
         assert mp2_container.has_t1_amplitudes()
         assert mp2_container.has_t2_amplitudes()
 
@@ -1326,9 +1328,10 @@ class TestCCContainer:
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
         # Enable amplitude storage
-        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CCSD, t1, t2)
 
         assert cc_container is not None
+        assert cc_container.get_amplitude_type() == AmplitudeType.CCSD
         assert cc_container.has_t1_amplitudes()
         assert cc_container.has_t2_amplitudes()
 
@@ -1340,7 +1343,7 @@ class TestCCContainer:
         # T2: nocc * nocc * nvir * nvir = 2 * 2 * 1 * 1 = 4
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
 
-        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2)
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CCSD, t1, t2)
         wf = Wavefunction(cc_container)
 
         # Test container type checking
@@ -1354,7 +1357,7 @@ class TestCCContainer:
 
     def test_cc_container_electron_counts(self, basic_orbitals, reference_wavefunction):
         """Test getting electron counts from AmplitudeContainer."""
-        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction)
+        cc_container = AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CCSD)
         wf = Wavefunction(cc_container)
 
         n_alpha, n_beta = wf.get_active_num_electrons()
@@ -1372,7 +1375,7 @@ class TestCCContainer:
         """
         t1 = np.array([0.01, 0.02])
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
-        wf = Wavefunction(AmplitudeContainer(basic_orbitals, reference_wavefunction, t1, t2))
+        wf = Wavefunction(AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CCSD, t1, t2))
 
         assert wf.get_container_type() == "amplitude"
 
@@ -1391,6 +1394,7 @@ class TestCCContainer:
         assert container.has_t1_amplitudes()
         assert container.has_t2_amplitudes()
         assert wf.get_active_num_electrons() == (2, 2)
+
     """Test that Wavefunction has the correct _data_type_name class attribute."""
     assert hasattr(Wavefunction, "_data_type_name")
     assert Wavefunction._data_type_name == "wavefunction"

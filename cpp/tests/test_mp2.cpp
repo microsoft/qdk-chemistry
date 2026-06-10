@@ -207,6 +207,9 @@ TEST_F(MP2Test, MP2Container) {
   EXPECT_EQ(wavefunction->get_container_type(), "amplitude");
   const auto& container = wavefunction->get_container<AmplitudeContainer>();
 
+  EXPECT_EQ(container.get_amplitude_type(), AmplitudeType::MP2)
+      << "The MP2 algorithm should tag its container as MP2";
+
   EXPECT_TRUE(container.has_t1_amplitudes())
       << "T1 amplitudes should be stored by the MP2 algorithm";
   EXPECT_TRUE(container.has_t2_amplitudes())

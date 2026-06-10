@@ -23,19 +23,42 @@ constexpr const char* kNoOccupationMessage =
     "available for amplitude wavefunctions.";
 }  // namespace
 
+std::string amplitude_type_to_string(AmplitudeType type) {
+  switch (type) {
+    case AmplitudeType::MP2:
+      return "mp2";
+    case AmplitudeType::CCSD:
+      return "ccsd";
+    case AmplitudeType::Unspecified:
+      return "unspecified";
+  }
+  return "unspecified";
+}
+
+AmplitudeType amplitude_type_from_string(const std::string& s) {
+  if (s == "mp2") {
+    return AmplitudeType::MP2;
+  }
+  if (s == "ccsd") {
+    return AmplitudeType::CCSD;
+  }
+  return AmplitudeType::Unspecified;
+}
+
 AmplitudeContainer::AmplitudeContainer(
     std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
+    std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes)
-    : AmplitudeContainer(orbitals, wavefunction, t1_amplitudes, std::nullopt,
-                         t2_amplitudes, std::nullopt, std::nullopt) {
+    : AmplitudeContainer(orbitals, wavefunction, amplitude_type, t1_amplitudes,
+                         std::nullopt, t2_amplitudes, std::nullopt,
+                         std::nullopt) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 AmplitudeContainer::AmplitudeContainer(
     std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<Wavefunction> wavefunction,
+    std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
     const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -45,7 +68,8 @@ AmplitudeContainer::AmplitudeContainer(
           WavefunctionType::NotSelfDual),  // Amplitude wavefunctions are
                                            // always NotSelfDual
       _orbitals(orbitals),
-      _wavefunction(wavefunction) {
+      _wavefunction(wavefunction),
+      _amplitude_type(amplitude_type) {
   QDK_LOG_TRACE_ENTERING();
   if (!orbitals) {
     throw std::invalid_argument("Orbitals cannot be null");
@@ -199,7 +223,7 @@ std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
     return p ? std::optional<VectorVariant>(*p) : std::nullopt;
   };
   return std::make_unique<AmplitudeContainer>(
-      _orbitals, _wavefunction, as_optional(_t1_amplitudes_aa),
+      _orbitals, _wavefunction, _amplitude_type, as_optional(_t1_amplitudes_aa),
       as_optional(_t1_amplitudes_bb), as_optional(_t2_amplitudes_abab),
       as_optional(_t2_amplitudes_aaaa), as_optional(_t2_amplitudes_bbbb));
 }
@@ -212,6 +236,11 @@ std::shared_ptr<Orbitals> AmplitudeContainer::get_orbitals() const {
 std::shared_ptr<Wavefunction> AmplitudeContainer::get_wavefunction() const {
   QDK_LOG_TRACE_ENTERING();
   return _wavefunction;
+}
+
+AmplitudeType AmplitudeContainer::get_amplitude_type() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _amplitude_type;
 }
 
 std::pair<const AmplitudeContainer::VectorVariant&,
@@ -336,6 +365,7 @@ nlohmann::json AmplitudeContainer::to_json() const {
   nlohmann::json j;
   j["version"] = SERIALIZATION_VERSION;
   j["container_type"] = get_container_type();
+  j["amplitude_type"] = amplitude_type_to_string(_amplitude_type);
 
   if (_orbitals) {
     j["orbitals"] = _orbitals->to_json();
@@ -383,12 +413,27 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
       wavefunction = Wavefunction::from_json(j.at("wavefunction"));
     }
 
+    // Determine the amplitude expansion type. New "amplitude" files store an
+    // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
+    // encode it in the container tag, and anything else is left unspecified.
+    const std::string container_tag =
+        j.value("container_type", j.value("type", std::string{}));
+    AmplitudeType amplitude_type = AmplitudeType::Unspecified;
+    if (container_tag == "mp2") {
+      amplitude_type = AmplitudeType::MP2;
+    } else if (container_tag == "coupled_cluster") {
+      amplitude_type = AmplitudeType::CCSD;
+    } else if (j.contains("amplitude_type")) {
+      amplitude_type =
+          amplitude_type_from_string(j.at("amplitude_type").get<std::string>());
+    }
+
     // Legacy "mp2" JSON did not store amplitudes (they were recomputed from a
     // Hamiltonian). Such files load as an amplitude container with no
     // amplitudes.
-    if (j.value("type", std::string{}) == "mp2") {
-      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
-                                                  std::nullopt, std::nullopt);
+    if (container_tag == "mp2") {
+      return std::make_unique<AmplitudeContainer>(
+          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt);
     }
 
     bool is_complex = j.value("is_complex", false);
@@ -398,7 +443,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
                              : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, wavefunction, load("t1_amplitudes_aa"),
+        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
         load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
         load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"));
   } catch (const std::exception& e) {
@@ -422,6 +467,11 @@ void AmplitudeContainer::to_hdf5(H5::Group& group) const {
     H5::Attribute container_type_attr = group.createAttribute(
         "container_type", string_type, H5::DataSpace(H5S_SCALAR));
     container_type_attr.write(string_type, container_type);
+
+    std::string amplitude_type_str = amplitude_type_to_string(_amplitude_type);
+    H5::Attribute amplitude_type_attr = group.createAttribute(
+        "amplitude_type", string_type, H5::DataSpace(H5S_SCALAR));
+    amplitude_type_attr.write(string_type, amplitude_type_str);
 
     bool is_complex = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
@@ -479,6 +529,21 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
       wavefunction = Wavefunction::from_hdf5(wavefunction_group);
     }
 
+    // Determine the amplitude expansion type. New "amplitude" files store an
+    // explicit "amplitude_type" attribute; legacy "coupled_cluster"/"mp2"
+    // files encode it in the container tag, and anything else is unspecified.
+    AmplitudeType amplitude_type = AmplitudeType::Unspecified;
+    if (container_type == "mp2") {
+      amplitude_type = AmplitudeType::MP2;
+    } else if (container_type == "coupled_cluster") {
+      amplitude_type = AmplitudeType::CCSD;
+    } else if (group.attrExists("amplitude_type")) {
+      H5::Attribute amplitude_type_attr = group.openAttribute("amplitude_type");
+      std::string amplitude_type_str;
+      amplitude_type_attr.read(string_type, amplitude_type_str);
+      amplitude_type = amplitude_type_from_string(amplitude_type_str);
+    }
+
     // Legacy "mp2" HDF5 stored a Hamiltonian instead of amplitudes; such files
     // load as an amplitude container with no amplitudes. For legacy "mp2"
     // files orbitals come from the Hamiltonian, which we read but otherwise
@@ -489,8 +554,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
         auto hamiltonian = Hamiltonian::from_hdf5(hamiltonian_group);
         orbitals = hamiltonian->get_orbitals();
       }
-      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
-                                                  std::nullopt, std::nullopt);
+      return std::make_unique<AmplitudeContainer>(
+          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt);
     }
 
     bool is_complex = false;
@@ -508,7 +573,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
                  : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, wavefunction, load("t1_amplitudes_aa"),
+        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
         load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
         load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"));
   } catch (const H5::Exception& e) {

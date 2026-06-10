@@ -1181,6 +1181,26 @@ Examples:
            "Check if a determinant is present in the expansion",
            py::arg("det"));
 
+  // Bind AmplitudeType enum
+  py::enum_<AmplitudeType>(data, "AmplitudeType",
+                           R"(
+Correlated method that produced an amplitude wavefunction.
+
+Because all amplitude-based wavefunctions share a single container type, this
+tag lets downstream consumers know how to interpret the stored amplitudes.
+
+* MP2: Second-order Moller-Plesset perturbation theory
+* CCSD: Coupled cluster with single and double excitations
+* Unspecified: Producer did not record a type (e.g. legacy data)
+)")
+      .value("MP2", AmplitudeType::MP2,
+             "Second-order Moller-Plesset perturbation theory")
+      .value("CCSD", AmplitudeType::CCSD,
+             "Coupled cluster with single and double excitations")
+      .value("Unspecified", AmplitudeType::Unspecified,
+             "Producer did not record a type (e.g. legacy data)")
+      .export_values();
+
   // Bind AmplitudeContainer
   py::class_<AmplitudeContainer, WavefunctionContainer, py::smart_holder>(
       data, "AmplitudeContainer",
@@ -1191,9 +1211,12 @@ This container stores a reference wavefunction together with T1/T2 excitation
 amplitudes. It is pure storage: it does not expand the amplitudes into a
 determinant/coefficient representation and does not compute reduced density
 matrices, so determinant- and RDM-based accessors raise. It supports both
-restricted and unrestricted amplitudes (optionally spin-separated).
+restricted and unrestricted amplitudes (optionally spin-separated). The
+amplitude type (see :class:`AmplitudeType`) records which correlated method
+produced the amplitudes.
     )")
       .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&>(),
            R"(
@@ -1202,18 +1225,20 @@ Constructs an amplitude wavefunction container with spatial (restricted) amplitu
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to the reference wavefunction
+    amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
     t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (both alpha, beta spin)
     t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (both alpha, beta spin)
 
 Examples:
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
-    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, t1, t2)
+    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, AmplitudeType.CCSD, t1, t2)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
-           py::arg("t1_amplitudes") = std::nullopt,
+           py::arg("amplitude_type"), py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt)
       .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
@@ -1225,6 +1250,7 @@ Constructs an amplitude wavefunction container with spin-separated amplitudes.
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     wavefunction (Wavefunction): Shared pointer to the reference wavefunction
+    amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
     t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
     t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
@@ -1233,14 +1259,25 @@ Args:
 
 Examples:
     >>> container = qdk_chemistry.AmplitudeContainer(
-    ...     orbitals, wfn, t1_aa, t1_bb, t2_abab, None, None)
+    ...     orbitals, wfn, AmplitudeType.CCSD, t1_aa, t1_bb, t2_abab, None, None)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
+           py::arg("amplitude_type"),
            py::arg("t1_amplitudes_aa") = std::nullopt,
            py::arg("t1_amplitudes_bb") = std::nullopt,
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt)
+      .def("get_amplitude_type", &AmplitudeContainer::get_amplitude_type,
+           R"(
+Get the correlated method that produced these amplitudes.
+
+Returns:
+    AmplitudeType: The amplitude expansion type (MP2, CCSD, or Unspecified)
+
+Examples:
+    >>> amplitude_type = container.get_amplitude_type()
+        )")
       .def("get_wavefunction", &AmplitudeContainer::get_wavefunction,
            R"(
 Get the reference wavefunction.

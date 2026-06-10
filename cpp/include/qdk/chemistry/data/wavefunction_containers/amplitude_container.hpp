@@ -21,6 +21,36 @@
 namespace qdk::chemistry::data {
 
 /**
+ * @enum AmplitudeType
+ * @brief Identifies the correlated method that produced an amplitude
+ *        wavefunction.
+ *
+ * Because all amplitude-based wavefunctions share a single container type,
+ * this tag lets downstream consumers know how to interpret the stored
+ * amplitudes (for example, first-order perturbative doubles versus an
+ * exponential coupled-cluster ansatz).
+ */
+enum class AmplitudeType {
+  MP2,          ///< Second-order Moller-Plesset perturbation theory
+  CCSD,         ///< Coupled cluster with single and double excitations
+  Unspecified,  ///< Producer did not record a type (e.g. legacy data)
+};
+
+/**
+ * @brief Convert an AmplitudeType to its serialization string.
+ * @param type Amplitude type
+ * @return Lowercase string identifier ("mp2", "ccsd", or "unspecified")
+ */
+std::string amplitude_type_to_string(AmplitudeType type);
+
+/**
+ * @brief Parse an AmplitudeType from its serialization string.
+ * @param s String identifier ("mp2", "ccsd", or "unspecified")
+ * @return Corresponding AmplitudeType; unrecognized strings map to Unspecified
+ */
+AmplitudeType amplitude_type_from_string(const std::string& s);
+
+/**
  * @class AmplitudeContainer
  * @brief Wavefunction container representing an amplitude-based correlated
  *        wavefunction (e.g. coupled cluster or MP2).
@@ -51,11 +81,13 @@ class AmplitudeContainer : public WavefunctionContainer {
    *
    * @param orbitals Shared pointer to orbitals
    * @param wavefunction Shared pointer to the reference wavefunction
+   * @param amplitude_type Correlated method that produced the amplitudes
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    */
   AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
                      std::shared_ptr<Wavefunction> wavefunction,
+                     AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes,
                      const std::optional<VectorVariant>& t2_amplitudes);
 
@@ -66,6 +98,7 @@ class AmplitudeContainer : public WavefunctionContainer {
    *
    * @param orbitals Shared pointer to orbitals
    * @param wavefunction Shared pointer to the reference wavefunction
+   * @param amplitude_type Correlated method that produced the amplitudes
    * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
    * @param t1_amplitudes_bb Beta T1 amplitudes (optional)
    * @param t2_amplitudes_abab Alpha-beta T2 amplitudes (optional)
@@ -74,6 +107,7 @@ class AmplitudeContainer : public WavefunctionContainer {
    */
   AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
                      std::shared_ptr<Wavefunction> wavefunction,
+                     AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes_aa,
                      const std::optional<VectorVariant>& t1_amplitudes_bb,
                      const std::optional<VectorVariant>& t2_amplitudes_abab,
@@ -100,6 +134,12 @@ class AmplitudeContainer : public WavefunctionContainer {
    * @return Shared pointer to the reference wavefunction
    */
   std::shared_ptr<Wavefunction> get_wavefunction() const;
+
+  /**
+   * @brief Get the correlated method that produced these amplitudes.
+   * @return The amplitude expansion type (MP2, CCSD, or Unspecified)
+   */
+  AmplitudeType get_amplitude_type() const;
 
   /**
    * @brief Get T1 amplitudes
@@ -248,6 +288,8 @@ class AmplitudeContainer : public WavefunctionContainer {
   std::shared_ptr<Orbitals> _orbitals;
   // Reference wavefunction
   std::shared_ptr<Wavefunction> _wavefunction;
+  // Correlated method that produced the amplitudes
+  AmplitudeType _amplitude_type;
 
   std::shared_ptr<VectorVariant> _t1_amplitudes_aa = nullptr;
   std::shared_ptr<VectorVariant> _t1_amplitudes_bb = nullptr;

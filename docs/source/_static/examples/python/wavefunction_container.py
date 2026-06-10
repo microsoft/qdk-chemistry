@@ -10,6 +10,7 @@ from qdk_chemistry.data import (
     Orbitals,
     StateVectorContainer,
     AmplitudeContainer,
+    AmplitudeType,
     Configuration,
     Wavefunction,
     Hamiltonian,
@@ -154,7 +155,9 @@ ref_wavefunction = Wavefunction(sd_container)
 # MP2 amplitudes (T1 is zero for MP2)
 t1_mp2 = np.zeros(1)
 t2_mp2 = np.array([0.1])
-mp2_container = AmplitudeContainer(orbitals, ref_wavefunction, t1_mp2, t2_mp2)
+mp2_container = AmplitudeContainer(
+    orbitals, ref_wavefunction, AmplitudeType.MP2, t1_mp2, t2_mp2
+)
 mp2_wavefunction = Wavefunction(mp2_container)
 # end-cell-create-mp2
 ################################################################################
@@ -180,7 +183,7 @@ t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
 cc_container = AmplitudeContainer(
-    orbitals, ref_wavefunction, t1_amplitudes, t2_amplitudes
+    orbitals, ref_wavefunction, AmplitudeType.CCSD, t1_amplitudes, t2_amplitudes
 )
 cc_wavefunction = Wavefunction(cc_container)
 # end-cell-create-cc
