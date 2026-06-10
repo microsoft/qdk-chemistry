@@ -382,7 +382,6 @@ jobs:
         # Build a test-duration histogram (all tests vs @pytest.mark.slow tests)
         python - <<'PY'
         import math
-        import ast
         import subprocess
         import xml.etree.ElementTree as ET
         from pathlib import Path
@@ -423,70 +422,20 @@ jobs:
           print("No testcases found in JUnit XML, skipping histogram generation")
           raise SystemExit(0)
 
-        def normalize_nodeid(nodeid: str) -> str:
-          nid = nodeid.strip().replace("\\", "/")
-          while nid.startswith("./"):
-            nid = nid[2:]
-          if nid.startswith("python/"):
-            nid = nid[len("python/"):]
-          return nid
-
-        def collect_env_guarded_slow_tests(tests_root: Path) -> set[str]:
-          """Return nodeids for tests gated by _RUN_SLOW_TESTS/QDK_CHEMISTRY_RUN_SLOW_TESTS skipif."""
-          result: set[str] = set()
-
-          def has_slow_guard(decorators: list[ast.expr]) -> bool:
-            for deco in decorators:
-              if not isinstance(deco, ast.Call):
-                continue
-              func = deco.func
-              if not (isinstance(func, ast.Attribute) and func.attr == "skipif"):
-                continue
-              if not deco.args:
-                continue
-              cond_text = ast.unparse(deco.args[0])
-              if "_RUN_SLOW_TESTS" in cond_text or "QDK_CHEMISTRY_RUN_SLOW_TESTS" in cond_text:
-                return True
-            return False
-
-          for path in tests_root.rglob("test_*.py"):
-            try:
-              src = path.read_text(encoding="utf-8")
-              tree = ast.parse(src)
-            except Exception:
-              continue
-
-            rel = normalize_nodeid(str(path))
-            for node in tree.body:
-              if isinstance(node, ast.FunctionDef):
-                if has_slow_guard(node.decorator_list):
-                  result.add(f"{rel}::{node.name}")
-              elif isinstance(node, ast.ClassDef):
-                for item in node.body:
-                  if isinstance(item, ast.FunctionDef) and has_slow_guard(item.decorator_list):
-                    result.add(f"{rel}::{node.name}::{item.name}")
-
-          return result
-
-        slow_nodeids = collect_env_guarded_slow_tests(Path("tests"))
-
-        # Fallback: include pytest marker-based slow tests too.
         collect = subprocess.run(
           ["pytest", "--collect-only", "-q", "-m", "slow", "tests"],
           capture_output=True,
           text=True,
           check=False,
         )
-        slow_nodeids.update(
-          normalize_nodeid(line)
+        slow_nodeids = {
+          line.strip()
           for line in collect.stdout.splitlines()
-          if "::" in line and ".py::" in line
-        )
+          if line.strip().startswith("tests/") and "::" in line
+        }
 
-        normalized_test_items = [(normalize_nodeid(nid), d) for nid, d in test_items]
-
-        durations = [d for _, d in normalized_test_items]
-        slow_durations = [d for nid, d in normalized_test_items if nid in slow_nodeids]
+        durations = [d for _, d in test_items]
+        slow_durations = [d for nid, d in test_items if nid in slow_nodeids]
 
         n = len(durations)
         bins = min(30, max(5, int(math.sqrt(n))))
@@ -579,7 +528,7 @@ jobs:
 
         # Write Top-200 longest tests table (with slow marker) for summaries.
         top_md = Path("../coverage-reports/python_test_top200.md")
-        top_rows = sorted(normalized_test_items, key=lambda item: item[1], reverse=True)[:200]
+        top_rows = sorted(test_items, key=lambda item: item[1], reverse=True)[:200]
         md_lines = [
           "### Top 200 Longest Python Tests",
           "",
@@ -681,7 +630,7 @@ jobs:
           echo "" >> pr-comment.md
           cat coverage-reports/python_test_duration_histogram.svg >> pr-comment.md
           echo "" >> pr-comment.md
-          echo 'Generated histogram artifact: `coverage-reports/python_test_duration_histogram.svg`' >> pr-comment.md
+          echo "Generated histogram artifact: \\`coverage-reports/python_test_duration_histogram.svg\\`" >> pr-comment.md
           echo "" >> pr-comment.md
           echo "</details>" >> pr-comment.md
           echo "" >> pr-comment.md
@@ -758,7 +707,7 @@ jobs:
           echo "" >> coverage-summary.md
           cat coverage-reports/python_test_duration_histogram.svg >> coverage-summary.md
           echo "" >> coverage-summary.md
-          echo 'Generated histogram artifact: `coverage-reports/python_test_duration_histogram.svg`' >> coverage-summary.md
+          echo "Generated histogram artifact: \\`coverage-reports/python_test_duration_histogram.svg\\`" >> coverage-summary.md
           echo "" >> coverage-summary.md
           echo "</details>" >> coverage-summary.md
           echo "" >> coverage-summary.md
