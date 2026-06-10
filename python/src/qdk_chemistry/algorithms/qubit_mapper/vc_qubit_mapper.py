@@ -65,13 +65,11 @@ def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
     These satisfy the Clifford algebra {Gamma_a, Gamma_b} = 2 delta_{ab}
     exactly in the full 2*n_sites-qubit Hilbert space.
 
-    The codespace is the +1 eigenspace of the site stabilisers::
-
-        P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1}  for all j
-
-    (see Verstraete & Cirac, arXiv:cond-mat/0508353).
-    The codespace is defined by P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1} = +1 for all j.
+    Codespace: the +1 eigenspace of the auxiliary Z operators,
+    i.e. all auxiliary qubits in state |0> (Z_{an} = +1 for all n).
     In this sector the mapped Hamiltonian equals the Jordan-Wigner form.
+    The general VC stabiliser structure P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1}
+    (arXiv:cond-mat/0508353) is a planned follow-up.
 
     Args:
         n_sites: Total number of fermionic modes. Must be >= 1.
@@ -232,8 +230,14 @@ class VerstraeteCiracQubitMapper(QubitMapper):
             pauli_strs.append(_pauli_str(n_qubits, ops))
             coeffs.append(coeff)
 
+        # Include constant/core energy contribution to the identity term
+        try:
+            core_energy = float(getattr(hamiltonian, "core_energy", 0.0) or 0.0)
+        except (AttributeError, TypeError):
+            core_energy = 0.0
+
         # Diagonal: h_{nn} * n_n = h_{nn}/2 * (I - Z_{pn})
-        const = 0.0
+        const = core_energy
         for n in range(n_modes):
             h_nn = float(h1_alpha[n, n].real)
             if abs(h_nn) < integral_threshold:
