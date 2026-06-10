@@ -307,9 +307,24 @@ void AmplitudeContainer::clear_caches() const {
   _clear_rdms();
 }
 
-std::pair<size_t, size_t> AmplitudeContainer::get_total_num_electrons() const {
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+AmplitudeContainer::total_num_electrons() const {
   QDK_LOG_TRACE_ENTERING();
-  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
+  auto [n_alpha, n_beta] = _total_electron_counts();
+  return _make_num_electrons(n_alpha, n_beta);
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+AmplitudeContainer::active_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [n_alpha, n_beta] = _active_electron_counts();
+  return _make_num_electrons(n_alpha, n_beta);
+}
+
+std::pair<std::size_t, std::size_t> AmplitudeContainer::_total_electron_counts()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [n_alpha_active, n_beta_active] = _active_electron_counts();
   auto [alpha_inactive_indices, beta_inactive_indices] =
       get_orbitals()->get_inactive_space_indices();
   size_t n_alpha_total = n_alpha_active + alpha_inactive_indices.size();
@@ -317,7 +332,8 @@ std::pair<size_t, size_t> AmplitudeContainer::get_total_num_electrons() const {
   return {n_alpha_total, n_beta_total};
 }
 
-std::pair<size_t, size_t> AmplitudeContainer::get_active_num_electrons() const {
+std::pair<std::size_t, std::size_t>
+AmplitudeContainer::_active_electron_counts() const {
   QDK_LOG_TRACE_ENTERING();
   const auto& determinants = _wavefunction->get_total_determinants();
   if (determinants.empty()) {
@@ -327,14 +343,14 @@ std::pair<size_t, size_t> AmplitudeContainer::get_active_num_electrons() const {
   return {n_alpha, n_beta};
 }
 
-std::pair<Eigen::VectorXd, Eigen::VectorXd>
-AmplitudeContainer::get_total_orbital_occupations() const {
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+AmplitudeContainer::total_orbital_occupations() const {
   QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(kNoOccupationMessage);
 }
 
-std::pair<Eigen::VectorXd, Eigen::VectorXd>
-AmplitudeContainer::get_active_orbital_occupations() const {
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+AmplitudeContainer::active_orbital_occupations() const {
   QDK_LOG_TRACE_ENTERING();
   throw std::runtime_error(kNoOccupationMessage);
 }

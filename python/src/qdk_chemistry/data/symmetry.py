@@ -21,6 +21,7 @@ Exposed symmetry types are:
 
 Exposed storage types are:
 
+- :class:`SymmetryBlockedScalarCount`: One scalar count per symmetry sector.
 - :class:`SymmetryBlockedTensorRank1` / :class:`SymmetryBlockedTensorRank1Complex`
 - :class:`SymmetryBlockedTensorRank2` / :class:`SymmetryBlockedTensorRank2Complex`
 - :class:`SymmetryBlockedTensorRank3` / :class:`SymmetryBlockedTensorRank3Complex`
@@ -43,6 +44,7 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryAxis,
     SymmetryAxisValue,
     SymmetryBlockedIndexSet,
+    SymmetryBlockedScalarCount,
     SymmetryBlockedSparseMapRank4,
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank1Complex,
@@ -64,6 +66,7 @@ __all__ = [
     "SymmetryAxis",
     "SymmetryAxisValue",
     "SymmetryBlockedIndexSet",
+    "SymmetryBlockedScalarCount",
     "SymmetryBlockedSparseMapRank4",
     "SymmetryBlockedTensorRank1",
     "SymmetryBlockedTensorRank1Complex",

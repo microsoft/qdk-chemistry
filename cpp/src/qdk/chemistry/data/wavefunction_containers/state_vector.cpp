@@ -224,8 +224,7 @@ ScalarVariant StateVectorContainer::overlap(
         "Overlap only implemented for wavefunctions with same number of "
         "determinants");
   }
-  if (this->get_active_num_electrons() !=
-      other_sv->get_active_num_electrons()) {
+  if (this->_active_electron_counts() != other_sv->_active_electron_counts()) {
     throw std::runtime_error(
         "Overlap only implemented for wavefunctions with same number of "
         "electrons");
@@ -281,11 +280,25 @@ void StateVectorContainer::clear_caches() const {
   _clear_rdms();
 }
 
-std::pair<size_t, size_t> StateVectorContainer::get_total_num_electrons()
-    const {
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+StateVectorContainer::total_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [n_alpha, n_beta] = _total_electron_counts();
+  return _make_num_electrons(n_alpha, n_beta);
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+StateVectorContainer::active_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [n_alpha, n_beta] = _active_electron_counts();
+  return _make_num_electrons(n_alpha, n_beta);
+}
+
+std::pair<std::size_t, std::size_t>
+StateVectorContainer::_total_electron_counts() const {
   QDK_LOG_TRACE_ENTERING();
 
-  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
+  auto [n_alpha_active, n_beta_active] = _active_electron_counts();
 
   auto [alpha_inactive_indices, beta_inactive_indices] =
       get_orbitals()->get_inactive_space_indices();
@@ -296,8 +309,8 @@ std::pair<size_t, size_t> StateVectorContainer::get_total_num_electrons()
   return {n_alpha_total, n_beta_total};
 }
 
-std::pair<size_t, size_t> StateVectorContainer::get_active_num_electrons()
-    const {
+std::pair<std::size_t, std::size_t>
+StateVectorContainer::_active_electron_counts() const {
   QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
@@ -364,8 +377,7 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_one_rdm && _is_single_determinant()) {
-    auto [alpha_occupations, beta_occupations] =
-        get_active_orbital_occupations();
+    auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     if (get_orbitals()->get_active_space_indices().first.size() !=
         get_orbitals()->get_active_space_indices().second.size()) {
       throw std::runtime_error(
@@ -405,8 +417,7 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_two_rdm && _is_single_determinant()) {
-    auto [alpha_occupations, beta_occupations] =
-        get_active_orbital_occupations();
+    auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     if (get_orbitals()->get_active_space_indices().first.size() !=
         get_orbitals()->get_active_space_indices().second.size()) {
       throw std::runtime_error(
@@ -478,8 +489,7 @@ const MatrixVariant& StateVectorContainer::get_active_one_rdm_spin_traced()
           "Spin traced 1-RDM not implemented for different alpha and beta "
           "active space sizes");
     }
-    auto [alpha_occupations, beta_occupations] =
-        get_active_orbital_occupations();
+    auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     size_t n_orbs = get_orbitals()->get_active_space_indices().first.size();
     Eigen::MatrixXd tmp_one_rdm = Eigen::MatrixXd::Zero(n_orbs, n_orbs);
     for (size_t i = 0; i < alpha_occupations.size(); ++i) {
@@ -499,8 +509,7 @@ const VectorVariant& StateVectorContainer::get_active_two_rdm_spin_traced()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (_is_single_determinant() && !_two_rdm_spin_traced && !_active_two_rdm) {
-    auto [alpha_occupations, beta_occupations] =
-        get_active_orbital_occupations();
+    auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     if (get_orbitals()->get_active_space_indices().first.size() !=
         get_orbitals()->get_active_space_indices().second.size()) {
       throw std::runtime_error(
@@ -570,8 +579,15 @@ Eigen::VectorXd StateVectorContainer::get_single_orbital_entropies() const {
   return WavefunctionContainer::get_single_orbital_entropies();
 }
 
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+StateVectorContainer::active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [alpha, beta] = _active_occupations_pair();
+  return _make_orbital_occupations(alpha, beta);
+}
+
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
-StateVectorContainer::get_active_orbital_occupations() const {
+StateVectorContainer::_active_occupations_pair() const {
   QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
@@ -583,7 +599,7 @@ StateVectorContainer::get_active_orbital_occupations() const {
 
   if (alpha_active_indices.empty()) {
     if (_is_single_determinant()) {
-      return get_total_orbital_occupations();
+      return _total_occupations_pair();
     }
     return {Eigen::VectorXd::Zero(0), Eigen::VectorXd::Zero(0)};
   }
@@ -666,8 +682,15 @@ StateVectorContainer::get_active_orbital_occupations() const {
   return {alpha_occupations, beta_occupations};
 }
 
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+StateVectorContainer::total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  auto [alpha, beta] = _total_occupations_pair();
+  return _make_orbital_occupations(alpha, beta);
+}
+
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
-StateVectorContainer::get_total_orbital_occupations() const {
+StateVectorContainer::_total_occupations_pair() const {
   QDK_LOG_TRACE_ENTERING();
   const auto& determinants = get_active_determinants();
   if (determinants.empty()) {
@@ -699,7 +722,7 @@ StateVectorContainer::get_total_orbital_occupations() const {
         "1RDM must be available to compute orbital occupations");
   }
 
-  auto [alpha_active_occs, beta_active_occs] = get_active_orbital_occupations();
+  auto [alpha_active_occs, beta_active_occs] = _active_occupations_pair();
   auto [alpha_active_indices, beta_active_indices] =
       get_orbitals()->get_active_space_indices();
 

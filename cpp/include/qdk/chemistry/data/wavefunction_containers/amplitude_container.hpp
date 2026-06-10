@@ -184,23 +184,26 @@ class AmplitudeContainer : public WavefunctionContainer {
   double norm() const override;
 
   /**
-   * @brief Get total number of alpha and beta electrons (active + inactive)
-   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * scalar.
+   * @return Shared pointer to the symmetry-blocked total electron count.
    */
-  std::pair<size_t, size_t> get_total_num_electrons() const override;
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_electrons() const override;
 
   /**
-   * @brief Get number of active alpha and beta electrons
-   * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @brief Number of active-space electrons as a symmetry-blocked scalar.
+   * @return Shared pointer to the symmetry-blocked active electron count.
    */
-  std::pair<size_t, size_t> get_active_num_electrons() const override;
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_electrons() const override;
 
   /**
    * @brief Not supported: orbital occupations require reduced density
    *        matrices, which are not stored by amplitude wavefunctions.
    * @throws std::runtime_error Always.
    */
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
       const override;
 
   /**
@@ -208,7 +211,7 @@ class AmplitudeContainer : public WavefunctionContainer {
    *        matrices, which are not stored by amplitude wavefunctions.
    * @throws std::runtime_error Always.
    */
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
       const override;
 
   /**
@@ -297,6 +300,19 @@ class AmplitudeContainer : public WavefunctionContainer {
   std::shared_ptr<VectorVariant> _t2_amplitudes_abab = nullptr;
   std::shared_ptr<VectorVariant> _t2_amplitudes_aaaa = nullptr;
   std::shared_ptr<VectorVariant> _t2_amplitudes_bbbb = nullptr;
+
+  /**
+   * @brief Number of active (alpha, beta) electrons read from the reference
+   * wavefunction's determinants.
+   * @return Pair of (n_alpha_active, n_beta_active).
+   */
+  std::pair<std::size_t, std::size_t> _active_electron_counts() const;
+
+  /**
+   * @brief Number of total (active + inactive) (alpha, beta) electrons.
+   * @return Pair of (n_alpha_total, n_beta_total).
+   */
+  std::pair<std::size_t, std::size_t> _total_electron_counts() const;
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

@@ -341,6 +341,99 @@ bool WavefunctionContainer::_is_restricted_closed_shell() const {
   return get_orbitals()->is_restricted() && (n_alpha == n_beta);
 }
 
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+WavefunctionContainer::_make_num_electrons(std::size_t n_alpha,
+                                           std::size_t n_beta) const {
+  auto symmetries = get_orbitals()->symmetries();
+  if (symmetries && symmetries->has_axis(AxisName::Spin)) {
+    return std::make_shared<const SymmetryBlockedScalar<std::size_t>>(
+        make_spin_blocked_scalar<std::size_t>(n_alpha, n_beta));
+  }
+  return std::make_shared<const SymmetryBlockedScalar<std::size_t>>(
+      make_trivial_blocked_scalar<std::size_t>(n_alpha + n_beta));
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+WavefunctionContainer::_make_orbital_occupations(
+    const Eigen::VectorXd& alpha, const Eigen::VectorXd& beta) const {
+  using SBT = SymmetryBlockedTensor<1>;
+  auto symmetries = get_orbitals()->symmetries();
+  if (symmetries && symmetries->has_axis(AxisName::Spin)) {
+    // Alpha and beta occupations are stored independently (non-equivalent
+    // spin axis): even restricted orbitals can carry distinct per-spin
+    // occupations for open-shell references.
+    auto sym = std::make_shared<const SymmetryProduct>(
+        SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+    std::unordered_map<SymmetryLabel, std::size_t> ext;
+    ext[axes::alpha()] = static_cast<std::size_t>(alpha.size());
+    ext[axes::beta()] = static_cast<std::size_t>(beta.size());
+    SBT::BlockMap blocks;
+    blocks[{axes::alpha()}] = std::make_shared<const Eigen::VectorXd>(alpha);
+    blocks[{axes::beta()}] = std::make_shared<const Eigen::VectorXd>(beta);
+    return std::make_shared<const SBT>(
+        SBT::SymmetriesArray{sym}, SBT::ExtentsArray{ext}, std::move(blocks));
+  }
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  Eigen::VectorXd total = alpha + beta;
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[SymmetryLabel{}] = static_cast<std::size_t>(total.size());
+  SBT::BlockMap blocks;
+  blocks[{SymmetryLabel{}}] = std::make_shared<const Eigen::VectorXd>(total);
+  return std::make_shared<const SBT>(SBT::SymmetriesArray{sym},
+                                     SBT::ExtentsArray{ext}, std::move(blocks));
+}
+
+std::pair<std::size_t, std::size_t> WavefunctionContainer::_read_spin_count(
+    const SymmetryBlockedScalar<std::size_t>& scalar) {
+  const auto& symmetries = scalar.symmetries()[0];
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    throw std::runtime_error(
+        "Spin-resolved electron counts are unavailable: the single-particle "
+        "basis carries no spin (S_z) axis. Use active_num_electrons() / "
+        "total_num_electrons() for the symmetry-blocked count instead.");
+  }
+  return {scalar.value(axes::alpha()), scalar.value(axes::beta())};
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::_read_spin_occupations(
+    const SymmetryBlockedTensor<1>& tensor) {
+  const auto& symmetries = tensor.symmetries()[0];
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    throw std::runtime_error(
+        "Spin-resolved orbital occupations are unavailable: the "
+        "single-particle basis carries no spin (S_z) axis. Use "
+        "active_orbital_occupations() / total_orbital_occupations() for the "
+        "symmetry-blocked occupations instead.");
+  }
+  return {tensor.block({axes::alpha()}), tensor.block({axes::beta()})};
+}
+
+std::pair<size_t, size_t> WavefunctionContainer::get_total_num_electrons()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_count(*total_num_electrons());
+}
+
+std::pair<size_t, size_t> WavefunctionContainer::get_active_num_electrons()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_count(*active_num_electrons());
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_occupations(*total_orbital_occupations());
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_occupations(*active_orbital_occupations());
+}
+
 bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
   return _active_one_rdm != nullptr ||
@@ -856,6 +949,30 @@ std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
 std::string Wavefunction::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_container_type();
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+Wavefunction::total_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->total_num_electrons();
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+Wavefunction::active_num_electrons() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_num_electrons();
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+Wavefunction::total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->total_orbital_occupations();
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+Wavefunction::active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_orbital_occupations();
 }
 
 std::pair<size_t, size_t> Wavefunction::get_total_num_electrons() const {

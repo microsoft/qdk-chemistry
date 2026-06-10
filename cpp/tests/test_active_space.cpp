@@ -150,9 +150,9 @@ TEST_F(ActiveSpaceTest, Occupation) {
 
   // Create a wavefunction with the orbitals
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(Configuration("2ud0"),
-                                                   orbitals_ptr));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration("2ud0"), orbitals_ptr));
 
   auto result_wavefunction = selector->run(wfn);
   auto [indices_alpha, indices_beta] =
@@ -180,7 +180,7 @@ TEST_F(ActiveSpaceTest, Occupation_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2000"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -203,9 +203,9 @@ TEST_F(ActiveSpaceTest, Valence) {
                     std::nullopt);
 
   auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
-  auto wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(Configuration("2ud0"),
-                                                   orbitals_ptr));
+  auto wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          Configuration("2ud0"), orbitals_ptr));
 
   selector->settings().set("num_active_electrons", 2);
   selector->settings().set("num_active_orbitals", 2);
@@ -238,7 +238,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("dd00"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -260,7 +260,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", -1);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);
@@ -283,7 +283,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", -1);
         auto result_wavefunction = selector->run(wfn);
@@ -306,7 +306,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 5);
         auto result_wavefunction = selector->run(wfn);
@@ -329,7 +329,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2000"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -352,7 +352,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -371,7 +371,7 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals_ptr));
+                                                   orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);
@@ -391,9 +391,9 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs, std::nullopt, std::nullopt, basis,
         std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration("dd00"),
-                                                     orbitals));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration("dd00"), orbitals));
     auto result_wavefunction = selector->run(wfn);
   });
 
@@ -412,9 +412,9 @@ TEST_F(ActiveSpaceTest, ActiveSpaceAlreadySet) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs, energies, std::nullopt, basis,
         std::make_tuple(std::move(active_indices), std::vector<size_t>{}));
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration("dd00"),
-                                                     orbitals));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration("dd00"), orbitals));
     selector->settings().set("num_active_electrons", 2);
     selector->settings().set("num_active_orbitals", 2);
     auto result_wavefunction = selector->run(wfn);
@@ -503,20 +503,22 @@ class MockWavefunctionContainer : public WavefunctionContainer {
     return entropies_;
   }
 
-  std::pair<size_t, size_t> get_total_num_electrons() const override {
-    return std::make_pair(2, 2);
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_electrons() const override {
+    return _make_num_electrons(2, 2);
   }
 
-  std::pair<size_t, size_t> get_active_num_electrons() const override {
-    return std::make_pair(2, 2);
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_electrons() const override {
+    return _make_num_electrons(2, 2);
   }
 
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
       const override {
     throw std::runtime_error("Not implemented");
   }
 
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
       const override {
     throw std::runtime_error("Not implemented");
   }

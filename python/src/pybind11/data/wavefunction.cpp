@@ -161,15 +161,12 @@ It uses variant types to support both real and complex arithmetic.
       .def("get_total_num_electrons",
            &WavefunctionContainer::get_total_num_electrons,
            "Get total number of alpha and beta electrons")
-      .def("get_orbital_occupations",
-           &WavefunctionContainer::get_active_orbital_occupations,
-           "Get orbital occupations for active orbitals")
-      .def("get_active_orbital_occupations",
-           &WavefunctionContainer::get_total_orbital_occupations,
-           "Get orbital occupations for all orbitals")
       .def("get_active_orbital_occupations",
            &WavefunctionContainer::get_active_orbital_occupations,
            "Get orbital occupations for active orbitals only")
+      .def("get_total_orbital_occupations",
+           &WavefunctionContainer::get_total_orbital_occupations,
+           "Get orbital occupations for all orbitals")
       .def("has_one_rdm_spin_dependent",
            &WavefunctionContainer::has_one_rdm_spin_dependent,
            "Check if spin-dependent one-particle RDMs for active orbitals are "
@@ -234,6 +231,22 @@ It uses variant types to support both real and complex arithmetic.
       .def("has_active_two_rdm", &WavefunctionContainer::has_active_two_rdm,
            "True if the active-space 2-RDM symmetry-blocked tensor is "
            "available (real or complex).")
+      // Symmetry-blocked count / occupation accessors
+      .def("active_num_electrons", &WavefunctionContainer::active_num_electrons,
+           "Number of active-space electrons as a SymmetryBlockedScalarCount. "
+           "Carries an independent alpha/beta count when the basis has a spin "
+           "axis, otherwise a single trivial block with the aggregate count.")
+      .def("total_num_electrons", &WavefunctionContainer::total_num_electrons,
+           "Number of electrons (active + inactive) as a "
+           "SymmetryBlockedScalarCount, blocked like active_num_electrons.")
+      .def("active_orbital_occupations",
+           &WavefunctionContainer::active_orbital_occupations,
+           "Active orbital occupations as a rank-1 SymmetryBlockedTensor "
+           "(alpha/beta blocks when the basis has a spin axis).")
+      .def("total_orbital_occupations",
+           &WavefunctionContainer::total_orbital_occupations,
+           "Orbital occupations for all orbitals as a rank-1 "
+           "SymmetryBlockedTensor, blocked like active_orbital_occupations.")
       .def("is_complex", &WavefunctionContainer::is_complex,
            "Check if the wavefunction is complex-valued")
       .def("has_single_orbital_entropies",
@@ -380,6 +393,50 @@ Returns:
 
 Examples:
     >>> alpha_active, beta_active = wf.get_active_orbital_occupations()
+)");
+
+  // Symmetry-blocked count / occupation accessors
+  wavefunction.def("active_num_electrons", &Wavefunction::active_num_electrons,
+                   R"(
+Number of active-space electrons as a symmetry-blocked scalar.
+
+The block structure is induced by the single-particle basis: an alpha/beta
+count when the associated orbitals carry a spin axis, otherwise a single
+trivial block carrying the aggregate count.
+
+Returns:
+    SymmetryBlockedScalarCount: The symmetry-blocked active electron count.
+)");
+
+  wavefunction.def("total_num_electrons", &Wavefunction::total_num_electrons,
+                   R"(
+Number of electrons (active + inactive) as a symmetry-blocked scalar.
+
+Blocked like :func:`active_num_electrons`.
+
+Returns:
+    SymmetryBlockedScalarCount: The symmetry-blocked total electron count.
+)");
+
+  wavefunction.def("total_orbital_occupations",
+                   &Wavefunction::total_orbital_occupations,
+                   R"(
+Orbital occupations for all orbitals as a rank-1 symmetry-blocked tensor.
+
+Returns:
+    SymmetryBlockedTensorRank1: Alpha/beta occupation blocks when the basis
+    carries a spin axis, otherwise a single trivial block.
+)");
+
+  wavefunction.def("active_orbital_occupations",
+                   &Wavefunction::active_orbital_occupations,
+                   R"(
+Active orbital occupations as a rank-1 symmetry-blocked tensor.
+
+Blocked like :func:`total_orbital_occupations`.
+
+Returns:
+    SymmetryBlockedTensorRank1: The symmetry-blocked active orbital occupations.
 )");
 
   // Coefficient access methods

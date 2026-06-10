@@ -7,6 +7,8 @@
 
 import json
 import pickle
+import tempfile
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -23,6 +25,12 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
     WavefunctionType,
+)
+from qdk_chemistry.data.symmetry import (
+    AxisName,
+    SymmetryBlockedScalarCount,
+    SymmetryLabel,
+    axes,
 )
 
 from .reference_tolerances import (
@@ -113,6 +121,36 @@ class TestWavefunction:
         assert len(beta_occ) > 0
         assert all(occ >= 0.0 for occ in alpha_occ)
         assert all(occ >= 0.0 for occ in beta_occ)
+
+    def test_wavefunction_symmetry_blocked_electron_counts(self, slater_wavefunction):
+        """The v2 symmetry-blocked count matches the v1 spin-resolved pair."""
+        wf = slater_wavefunction
+        n_alpha, n_beta = wf.get_active_num_electrons()
+
+        count = wf.active_num_electrons()
+        assert count.symmetries()[0].has_axis(AxisName.Spin)
+        assert count.value(SymmetryLabel([axes.alpha()])) == n_alpha
+        assert count.value(SymmetryLabel([axes.beta()])) == n_beta
+
+    def test_wavefunction_symmetry_blocked_occupations(self, slater_wavefunction):
+        """The v2 symmetry-blocked occupations match the v1 spin-resolved pair."""
+        wf = slater_wavefunction
+        alpha_occ, beta_occ = wf.get_active_orbital_occupations()
+
+        occ = wf.active_orbital_occupations()
+        assert np.allclose(np.asarray(occ.block([SymmetryLabel([axes.alpha()])])).ravel(), alpha_occ)
+        assert np.allclose(np.asarray(occ.block([SymmetryLabel([axes.beta()])])).ravel(), beta_occ)
+
+    def test_symmetry_blocked_count_json_round_trip(self, slater_wavefunction):
+        """A symmetry-blocked count survives a JSON round-trip."""
+        count = slater_wavefunction.active_num_electrons()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "count.json"
+            count.to_json_file(path)
+            restored = SymmetryBlockedScalarCount.from_json_file(path)
+
+        alpha = SymmetryLabel([axes.alpha()])
+        assert restored.value(alpha) == count.value(alpha)
 
     def test_wavefunction_coefficient_access(self, cas_wavefunction):
         """Test accessing coefficients through wavefunction."""

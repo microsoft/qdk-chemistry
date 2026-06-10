@@ -118,6 +118,7 @@ find_package(pybind11 REQUIRED)
 pybind11_add_module(_core
     src/pybind11/data/data_class.cpp
     src/pybind11/data/symmetry/symmetry.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_scalar.cpp
     src/pybind11/data/symmetry/symmetry_blocked_tensor.cpp
     src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
     src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp

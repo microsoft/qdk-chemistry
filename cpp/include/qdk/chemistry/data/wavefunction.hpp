@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
@@ -423,31 +424,106 @@ class WavefunctionContainer {
   virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
-   * @brief Get total number of alpha and beta electrons (active + inactive)
-   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * The block structure is induced by the single-particle basis: when the
+   * associated @ref Orbitals carry a spin (@f$S_z@f$) axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ count; when they carry no spin
+   * axis the result holds a single trivial block with the aggregate count.
+   *
+   * @return Shared pointer to the symmetry-blocked total electron count.
    */
-  virtual std::pair<size_t, size_t> get_total_num_electrons() const = 0;
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_electrons() const = 0;
+
+  /**
+   * @brief Number of active-space electrons as a symmetry-blocked scalar.
+   *
+   * Blocked the same way as @ref total_num_electrons; see that method for the
+   * basis-induced block structure.
+   *
+   * @return Shared pointer to the symmetry-blocked active electron count.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_electrons() const = 0;
+
+  /**
+   * @brief Orbital occupations for all orbitals (total = active + inactive +
+   * virtual) as a rank-1 symmetry-blocked tensor.
+   *
+   * When the associated @ref Orbitals carry a spin axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ occupation vector; otherwise it
+   * holds a single trivial block with the spin-summed occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  total_orbital_occupations() const = 0;
+
+  /**
+   * @brief Orbital occupations for active orbitals only as a rank-1
+   * symmetry-blocked tensor.
+   *
+   * Blocked the same way as @ref total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  active_orbital_occupations() const = 0;
+
+  /**
+   * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_electrons.
+   *
+   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_electrons instead.
+   */
+  virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_electrons.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_electrons instead.
    */
-  virtual std::pair<size_t, size_t> get_active_num_electrons() const = 0;
+  virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_total_orbital_occupations() const = 0;
+  get_total_orbital_occupations() const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_active_orbital_occupations() const = 0;
+  get_active_orbital_occupations() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
@@ -661,6 +737,56 @@ class WavefunctionContainer {
    */
   bool _is_restricted_closed_shell() const;
 
+  /**
+   * @brief Build a symmetry-blocked electron count from per-spin counts.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * aggregate count @p n_alpha + @p n_beta.
+   *
+   * @param n_alpha Number of alpha electrons.
+   * @param n_beta Number of beta electrons.
+   * @return Shared pointer to the symmetry-blocked count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> _make_num_electrons(
+      std::size_t n_alpha, std::size_t n_beta) const;
+
+  /**
+   * @brief Build symmetry-blocked orbital occupations from per-spin vectors.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * spin-summed occupations @p alpha + @p beta.
+   *
+   * @param alpha Alpha-spin occupation vector.
+   * @param beta Beta-spin occupation vector.
+   * @return Shared pointer to the symmetry-blocked occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> _make_orbital_occupations(
+      const Eigen::VectorXd& alpha, const Eigen::VectorXd& beta) const;
+
+  /**
+   * @brief Read the (alpha, beta) values of a spin-blocked scalar.
+   *
+   * @param scalar Symmetry-blocked scalar to read.
+   * @return Pair of (alpha_value, beta_value).
+   * @throws std::runtime_error if @p scalar carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<std::size_t, std::size_t> _read_spin_count(
+      const SymmetryBlockedScalar<std::size_t>& scalar);
+
+  /**
+   * @brief Read the (alpha, beta) blocks of a rank-1 spin-blocked tensor.
+   *
+   * @param tensor Symmetry-blocked rank-1 tensor to read.
+   * @return Pair of (alpha_block, beta_block).
+   * @throws std::runtime_error if @p tensor carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<Eigen::VectorXd, Eigen::VectorXd> _read_spin_occupations(
+      const SymmetryBlockedTensor<1>& tensor);
+
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
@@ -784,28 +910,97 @@ class Wavefunction : public DataClass,
   }
 
   /**
+   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_num_electrons.
+   *
+   * @return Shared pointer to the symmetry-blocked total electron count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_electrons() const;
+
+  /**
+   * @brief Number of active-space electrons as a symmetry-blocked scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_num_electrons.
+   *
+   * @return Shared pointer to the symmetry-blocked active electron count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_electrons() const;
+
+  /**
+   * @brief Orbital occupations for all orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
+      const;
+
+  /**
+   * @brief Orbital occupations for active orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
+      const;
+
+  /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_electrons.
+   *
    * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_electrons instead.
    */
   virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_electrons.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_electrons instead.
    */
   virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
       const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
       const;
