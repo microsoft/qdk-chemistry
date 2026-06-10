@@ -254,26 +254,47 @@ void hash_value(HashContext& ctx, const HashContext::MatrixVariant& value);
 // above. User-defined types should provide their own hash_value() overload,
 // preferably in the same namespace as the type so ADL can find it.
 
-// Signed integral types other than the canonical int64_t overload are promoted
-// to int64_t before hashing.
+/**
+ * @brief Concept for signed integral types that need hash normalization.
+ * @tparam T The type to check
+ *
+ * Matches signed integral types other than bool, uint8_t, and the canonical
+ * int64_t overload. Matching values are promoted to int64_t before hashing.
+ */
 template <typename T>
 concept HashSignedIntegral =
     std::integral<T> && !std::same_as<T, bool> && !std::same_as<T, uint8_t> &&
     std::signed_integral<T> && !std::same_as<T, int64_t>;
 
-// Unsigned integral types other than the canonical uint64_t and single-byte
-// uint8_t overloads are promoted to uint64_t before hashing.
+/**
+ * @brief Concept for unsigned integral types that need hash normalization.
+ * @tparam T The type to check
+ *
+ * Matches unsigned integral types other than bool, uint8_t, and the canonical
+ * uint64_t overload. Matching values are promoted to uint64_t before hashing.
+ */
 template <typename T>
 concept HashUnsignedIntegral =
     std::integral<T> && !std::same_as<T, bool> && !std::same_as<T, uint8_t> &&
     std::unsigned_integral<T> && !std::same_as<T, uint64_t>;
 
+/**
+ * @brief Concept for scalar types supported by complex hashing.
+ * @tparam T The scalar type to check
+ *
+ * Matches the floating-point scalar types used by std::complex overloads.
+ */
 template <typename T>
 concept HashComplexScalar = std::same_as<T, float> || std::same_as<T, double> ||
                             std::same_as<T, long double>;
 
-// Enums hash through their declared underlying type so callers do not need
-// one-off casts at each use site.
+/**
+ * @brief Concept for enum types that hash through their underlying type.
+ * @tparam T The type to check
+ *
+ * Matching enum values are cast to their declared underlying type before
+ * hashing so callers do not need one-off casts at each use site.
+ */
 template <typename T>
 concept HashEnum = std::is_enum_v<T>;
 
