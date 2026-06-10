@@ -12,7 +12,7 @@ import json
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import Orbitals
+from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitHamiltonian
 from qdk_chemistry.remote.cache import (
     _CACHES,
     CacheBackend,
@@ -228,6 +228,40 @@ class TestFolderCacheData:
         assert not manifest_path.exists()
         assert not list(cache_dir.glob("list_hash.*.h5"))
 
+    def test_delete_data_tolerates_missing_list_item_blob(self, folder_cache, cache_dir, sample_orbitals, monkeypatch):
+        """List item blobs that disappear during deletion do not abort cleanup."""
+        folder_cache.put_data("list_hash", [sample_orbitals])
+        item_blob = next(cache_dir.glob(f"{sample_orbitals.content_hash()}.*.h5"))
+        original_unlink = type(item_blob).unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == item_blob:
+                original_unlink(path, *args, **kwargs)
+                raise FileNotFoundError(path)
+            return original_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(type(item_blob), "unlink", unlink)
+
+        assert folder_cache.delete_data("list_hash")
+        assert not item_blob.exists()
+
+    def test_delete_data_tolerates_missing_single_blob(self, folder_cache, cache_dir, sample_orbitals, monkeypatch):
+        """Single-object blobs that disappear during deletion do not abort cleanup."""
+        folder_cache.put_data("orb_hash", sample_orbitals)
+        blob = next(cache_dir.glob("orb_hash.*.h5"))
+        original_unlink = type(blob).unlink
+
+        def unlink(path, *args, **kwargs):
+            if path == blob:
+                original_unlink(path, *args, **kwargs)
+                raise FileNotFoundError(path)
+            return original_unlink(path, *args, **kwargs)
+
+        monkeypatch.setattr(type(blob), "unlink", unlink)
+
+        assert folder_cache.delete_data("orb_hash")
+        assert not blob.exists()
+
     def test_data_filename_contains_type_name(self, folder_cache, sample_orbitals, cache_dir):
         """Blob file is named <hash>.<type_name>.h5."""
         folder_cache.put_data("myhash", sample_orbitals)
@@ -248,6 +282,32 @@ class TestFolderCacheData:
         (cache_dir / "list_hash.list[orbitals].json").write_text(json.dumps({"type": "orbitals"}))
 
         assert folder_cache.get_data("list_hash") is None
+
+    def test_put_and_get_nested_list_tuple_result(self, folder_cache):
+        """Nested list/tuple results with mixed DataClass items round-trip."""
+        energy = EnergyExpectationResult(
+            energy_expectation_value=-1.5,
+            energy_variance=0.01,
+            expvals_each_term=[np.array([1.0, -0.5])],
+            variances_each_term=[np.array([0.001, 0.002])],
+        )
+        measurement = MeasurementData(
+            hamiltonians=[QubitHamiltonian(["ZI", "XI"], np.array([1.0, 0.5]))],
+            bitstring_counts=[{"0": 50, "1": 50}],
+            shots_list=[100],
+        )
+        result = [(energy, measurement)]
+
+        folder_cache.put_data("nested_hash", result)
+        loaded = folder_cache.get_data("nested_hash")
+
+        assert isinstance(loaded, list)
+        assert len(loaded) == 1
+        loaded_energy, loaded_measurement = loaded[0]
+        assert isinstance(loaded_energy, EnergyExpectationResult)
+        assert isinstance(loaded_measurement, MeasurementData)
+        assert loaded_energy.energy_expectation_value == energy.energy_expectation_value
+        assert loaded_measurement.shots_list == measurement.shots_list
 
     def test_get_data_list_missing_manifest_is_miss(self, folder_cache, cache_dir):
         """Missing list manifests behave like cache misses."""

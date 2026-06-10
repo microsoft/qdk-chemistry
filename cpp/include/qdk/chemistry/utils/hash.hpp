@@ -48,8 +48,7 @@ inline std::size_t hash_combine(std::size_t seed, const T& value) {
 template <typename T, typename... Args>
 inline std::size_t hash_combine(std::size_t seed, const T& value,
                                 Args&&... args) {
-  return hash_combine(hash_combine(seed, value),
-                      std::forward<Args>(args)...);
+  return hash_combine(hash_combine(seed, value), std::forward<Args>(args)...);
 }
 
 }  // namespace qdk::chemistry::utils

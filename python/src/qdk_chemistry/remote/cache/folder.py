@@ -21,6 +21,7 @@ import json
 import pathlib
 from typing import TYPE_CHECKING, Any
 
+from qdk_chemistry.data._hashing import _item_content_hash
 from qdk_chemistry.remote.cache.base import CacheBackend
 
 if TYPE_CHECKING:
@@ -108,6 +109,9 @@ class FolderCache(CacheBackend):
 
     def get_data(self, content_hash: str) -> DataClass | list | None:
         """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
+        generic_list_path = self._root / f"{content_hash}.list.json"
+        if generic_list_path.exists():
+            return self._get_generic_data_list(generic_list_path)
         # Check for list manifest first — escape literal brackets so glob
         # doesn't treat them as a character class.
         list_matches = sorted(self._root.glob(f"{content_hash}.list[[]*].json"))
@@ -143,6 +147,17 @@ class FolderCache(CacheBackend):
             items.append(dataclass_type.from_hdf5_file(str(matches[0])))  # type: ignore[attr-defined]
         return items  # type: ignore[return-value]
 
+    def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | None:
+        """Reconstruct a nested list/tuple result from a generic manifest."""
+        try:
+            manifest = json.loads(manifest_path.read_text())
+            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") != "list":
+                return None
+            data = self._node_to_data(manifest)
+        except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError):
+            return None
+        return data if isinstance(data, list) else None
+
     def put_data(self, content_hash: str, data: DataClass | list) -> None:
         """Store a DataClass object (or list of them) by content hash."""
         if isinstance(data, list):
@@ -157,22 +172,13 @@ class FolderCache(CacheBackend):
 
     def _put_data_list(self, content_hash: str, data_list: list) -> None:
         """Store a list of DataClass objects as individual files."""
-        if not data_list:
-            return
-        if not hasattr(data_list[0], "_data_type_name"):
-            raise TypeError("FolderCache only supports caching lists of DataClass objects")
-        type_name = data_list[0]._data_type_name  # noqa: SLF001
-        for item in data_list:
-            if not hasattr(item, "_data_type_name"):
-                raise TypeError("FolderCache only supports caching lists of DataClass objects")
-            if item._data_type_name != type_name:  # noqa: SLF001
-                raise TypeError("FolderCache only supports caching lists of a single DataClass type")
-        import json  # noqa: PLC0415
+        if not self._is_homogeneous_dataclass_list(data_list):
+            return self._put_generic_data_list(content_hash, data_list)
 
         type_name = data_list[0]._data_type_name  # noqa: SLF001
         manifest_path = self._root / f"{content_hash}.list[{type_name}].json"
         if manifest_path.exists():
-            return
+            return None
         self._root.mkdir(parents=True, exist_ok=True)
         item_hashes = []
         for item in data_list:
@@ -180,11 +186,83 @@ class FolderCache(CacheBackend):
             self.put_data(item_hash, item)
             item_hashes.append(item_hash)
         manifest_path.write_text(json.dumps({"type": type_name, "items": item_hashes}))
+        return None
+
+    def _put_generic_data_list(self, content_hash: str, data_list: list) -> None:
+        """Store a list containing nested tuples/lists, DataClass objects, and primitives."""
+        manifest_path = self._root / f"{content_hash}.list.json"
+        if manifest_path.exists():
+            return
+        self._root.mkdir(parents=True, exist_ok=True)
+        manifest = self._data_to_node(data_list)
+        manifest_path.write_text(json.dumps(manifest))
+
+    @staticmethod
+    def _is_homogeneous_dataclass_list(data_list: list) -> bool:
+        """Return whether *data_list* can use the legacy homogeneous-list manifest."""
+        if not data_list:
+            return False
+        if not hasattr(data_list[0], "_data_type_name"):
+            return False
+        type_name = data_list[0]._data_type_name  # noqa: SLF001
+        for item in data_list:
+            if not hasattr(item, "_data_type_name"):
+                return False
+            if item._data_type_name != type_name:  # noqa: SLF001
+                return False
+        return True
+
+    def _data_to_node(self, data: Any) -> dict[str, Any]:
+        """Convert supported cached data into a JSON manifest node."""
+        if isinstance(data, list | tuple):
+            return {
+                "kind": "sequence",
+                "sequence_type": "tuple" if isinstance(data, tuple) else "list",
+                "items": [self._data_to_node(item) for item in data],
+            }
+        if data is None or isinstance(data, bool | int | float | str):
+            return {"kind": "primitive", "value": data}
+        if hasattr(data, "_data_type_name"):
+            item_hash = _item_content_hash(data)
+            self.put_data(item_hash, data)
+            return {
+                "kind": "dataclass",
+                "hash": item_hash,
+                "type": data._data_type_name,  # noqa: SLF001
+            }
+        raise TypeError(
+            "FolderCache only supports caching DataClass objects, primitives, and nested lists/tuples containing them"
+        )
+
+    def _node_to_data(self, node: dict[str, Any]) -> Any:
+        """Reconstruct supported cached data from a JSON manifest node."""
+        kind = node["kind"]
+        if kind == "primitive":
+            return node.get("value")
+        if kind == "sequence":
+            items = [self._node_to_data(item) for item in node["items"]]
+            sequence_type = node["sequence_type"]
+            if sequence_type == "list":
+                return items
+            if sequence_type == "tuple":
+                return tuple(items)
+            raise ValueError(f"Unknown cached sequence type: {sequence_type!r}")
+        if kind == "dataclass":
+            dataclass_type = _resolve_dataclass_type(node["type"])
+            if dataclass_type is None:
+                raise ValueError(f"Unknown cached data type: {node['type']!r}")
+            path = self._root / f"{node['hash']}.{node['type']}.h5"
+            if not path.exists():
+                raise FileNotFoundError(path)
+            return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
+        raise ValueError(f"Unknown cached manifest node kind: {kind!r}")
 
     def has_data(self, content_hash: str) -> bool:
         """Fast existence check via glob (no deserialization)."""
-        return bool(list(self._root.glob(f"{content_hash}.*.h5"))) or bool(
-            list(self._root.glob(f"{content_hash}.list[[]*].json"))
+        return (
+            bool(list(self._root.glob(f"{content_hash}.*.h5")))
+            or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))
+            or (self._root / f"{content_hash}.list.json").exists()
         )
 
     def to_config(self) -> dict:
@@ -207,13 +285,26 @@ class FolderCache(CacheBackend):
 
     def delete_data(self, content_hash: str) -> bool:
         """Remove a DataClass blob (or list manifest and its items) by content hash."""
+        import json as _json  # noqa: PLC0415
+
         deleted = False
 
         # Remove list manifests and their per-item blobs
+        generic_manifest = self._root / f"{content_hash}.list.json"
+        if generic_manifest.exists():
+            try:
+                manifest = _json.loads(generic_manifest.read_text())
+                self._delete_data_nodes(manifest)
+            except (_json.JSONDecodeError, OSError, KeyError, TypeError):
+                pass
+            try:
+                generic_manifest.unlink()
+                deleted = True
+            except OSError:
+                pass
+
         list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
         for manifest_path in list_matches:
-            import json as _json  # noqa: PLC0415
-
             try:
                 manifest = _json.loads(manifest_path.read_text())
             except (_json.JSONDecodeError, OSError):
@@ -226,7 +317,7 @@ class FolderCache(CacheBackend):
 
             for item_hash in manifest.get("items", []):
                 for f in self._root.glob(f"{item_hash}.*.h5"):
-                    f.unlink()
+                    deleted = self._unlink_existing(f) or deleted
             try:
                 manifest_path.unlink()
                 deleted = True
@@ -235,10 +326,31 @@ class FolderCache(CacheBackend):
 
         # Remove single-object blobs
         for f in self._root.glob(f"{content_hash}.*.h5"):
-            f.unlink()
-            deleted = True
+            deleted = self._unlink_existing(f) or deleted
 
         return deleted
+
+    @staticmethod
+    def _unlink_existing(path: pathlib.Path) -> bool:
+        """Unlink *path*, tolerating concurrent deletion."""
+        try:
+            path.unlink()
+            return True
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+
+    def _delete_data_nodes(self, node: dict[str, Any]) -> None:
+        """Delete DataClass blobs referenced by a generic manifest node."""
+        kind = node.get("kind")
+        if kind == "dataclass":
+            for f in self._root.glob(f"{node['hash']}.*.h5"):
+                self._unlink_existing(f)
+            return
+        if kind == "sequence":
+            for item in node.get("items", []):
+                self._delete_data_nodes(item)
 
     def clear(self) -> None:
         """Remove all cached jobs and data blobs."""

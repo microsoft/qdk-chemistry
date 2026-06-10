@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import builtins
 import tempfile
 from pathlib import Path
 
@@ -305,6 +306,26 @@ def test_quantum_error_profile_hash():
 
     profile_dict = {profile1: "value1"}
     assert profile_dict[profile2] == "value1"
+
+
+def test_quantum_error_profile_content_hash_does_not_use_repr():
+    """Content hashing should not format error rates as strings."""
+    profile = QuantumErrorProfile(
+        name="test",
+        description="test",
+        errors={"h": {"depolarizing_error": 0.01}},
+    )
+
+    original_repr = builtins.repr
+
+    def fail_repr(_value):
+        raise AssertionError("repr should not be used by QuantumErrorProfile.content_hash")
+
+    try:
+        builtins.repr = fail_repr
+        assert len(profile.content_hash()) == 16
+    finally:
+        builtins.repr = original_repr
 
 
 def test_quantum_error_profile_immutability():

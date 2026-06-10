@@ -17,7 +17,7 @@ try:
 except ImportError:
     from qsharp._simulation import NoiseConfig
 
-from qdk_chemistry.data._hashing import _hash_str, _hash_uint
+from qdk_chemistry.data._hashing import _hash_float, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -192,7 +192,7 @@ class QuantumErrorProfile(DataClass):
             _hash_uint(h, len(error_dict))
             for error_type in sorted(error_dict.keys(), key=str):
                 _hash_str(h, str(error_type))
-                _hash_str(h, repr(error_dict[error_type]))
+                _hash_float(h, error_dict[error_type])
 
         # These sets are derived from `errors`, but include them deterministically
         for label, gates in (

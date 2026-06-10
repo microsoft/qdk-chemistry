@@ -196,7 +196,16 @@ def _store_result(
     items = result if isinstance(result, tuple) else (result,)
     for entry, item in zip(output_hashes, items, strict=False):
         if "value" not in entry:
-            cache.put_data(entry["hash"], item)
+            try:
+                cache.put_data(entry["hash"], item)
+            except (AttributeError, OSError, TypeError, ValueError) as exc:
+                warnings.warn(
+                    f"Caching skipped for {algorithm.type_name()}/{algorithm.name()} because output "
+                    f"{entry.get('type', type(item).__name__)!r} could not be persisted: {exc}",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                return
 
     cache.put_job(run_hash, job)
 
