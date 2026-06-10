@@ -455,13 +455,14 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
     }
   }
 
-  // Ensure that we have no more than 1 aux Majorana mode per sys mode
+  // Ensure that we have no more than 2 aux Majorana modes per site
   for (std::uint64_t u = 0; u < V; ++u) {
     if (non_path_incident[u].size() > 2) {
-      throw std::runtime_error(name + ": Vertex has " +
-                               std::to_string(non_path_incident[u].size()) +
-                               " non-path edges, which exceeds the "
-                               "2-auxiliary-Majorana limit of the mapping.");
+      throw std::runtime_error(
+          name +
+          " requires no more than 2 aux Majorana modes per "
+          "site. Found vertex with " +
+          std::to_string(non_path_incident[u].size()) + " non-path edges.");
     }
   }
 
@@ -514,6 +515,8 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
     }
   }
 
+  // Build a lookup table of VC bilinears by dressing non-local JW bilinears
+  // with their stabilizer to make everything local.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
   upper_triangle.reserve(base_modes * (base_modes - 1) / 2);
 
@@ -544,7 +547,6 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
         // Z-string by multiplying by edge stabilizer iγ̃_aγ̃_b
         if (path_max - path_min > 1) {
           auto key = std::make_pair(std::min(i, j), std::max(i, j));
-          // Fetch the coefficient and Pauli word for the edge
           std::size_t stab_idx = edge_to_stab_idx[s_u].at(key);
           const auto& [b_coeff, b_word] = stabilizers[stab_idx];
 
