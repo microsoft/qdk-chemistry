@@ -3,6 +3,7 @@
 // license information.
 
 #include <algorithm>
+#include <cmath>
 #include <complex>
 #include <cstdint>
 #include <map>
@@ -342,24 +343,125 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
 //
 // The Verstraete-Cirac encoding pairs each lattice site with one auxiliary
 // qubit so that nearest-neighbour hopping maps to constant-weight Pauli
-// operators.  The construction is built entirely from the lattice *edges*:
+// operators.  The construction is built from the lattice *edges*:
 //
-//   1. Recover (column, row) coordinates of every site from the adjacency
-//      alone (unit-square completion from a degree-2 corner).
-//   2. Order sites along a boustrophedon ("snake") path s(v); combined qubit
-//      2*s carries the physical mode and 2*s+1 carries its auxiliary partner.
+//   1. Recognise a 2D site layout (square/triangular grid labelling, or
+//      recover coordinates from connectivity for other planar graphs).
+//   2. Order sites along a boustrophedon ("snake") path; combined qubit 2*s
+//      carries the physical mode and 2*s+1 carries its auxiliary partner.
 //   3. The mapping is the combined Jordan-Wigner transform over the snake,
-//      with every non-path lattice edge decorated by an auxiliary bilinear
-//      P_e = i*c_{aux(top)}*d_{aux(bot)}.  Edge decorations are folded into the
-//      per-bilinear table, so the engine consumes the result generically.
-//   4. Vertical bonds plus a cyclic per-column closer form the stabilizers
-//      that define the physical subspace; they are returned via stabilizers().
+//      with every non-path lattice edge decorated by an auxiliary bilinear.
+//   4. Codespace stabilizers are *local* products of auxiliary Majorana
+//      bilinears along the auxiliary-fermion graph (Verstraete-Cirac 2005,
+//      eqs. 80–84; OpenFermion stabilizer_local_2d_square).  Individual
+//      bilinears would JW-map to non-local penalties; the products do not.
 //
 // The lattice describes one spin species; the factory emits two independent
 // Verstraete-Cirac blocks (alpha, then beta) so the result has
 // num_modes = 2 * n_sites and is consumed exactly like a Jordan-Wigner
 // mapping over 2 * n_sites modes.
 namespace detail {
+
+enum class VcGridKind { SQUARE, TRIANGULAR, RECOVERED };
+
+struct VcGridLayout {
+  int nx;
+  int ny;
+  VcGridKind kind;
+  std::vector<std::pair<int, int>> coord;
+};
+
+bool vc_has_edge(const std::vector<std::set<std::size_t>>& adj, std::size_t u,
+                 std::size_t v) {
+  return adj[u].count(v) != 0;
+}
+
+std::size_t vc_grid_index(int x, int y, int nx) {
+  return static_cast<std::size_t>(y * nx + x);
+}
+
+bool vc_matches_square_grid(int nx, int ny,
+                            const std::vector<std::set<std::size_t>>& adj) {
+  const std::size_t n = adj.size();
+  if (static_cast<std::size_t>(nx * ny) != n) {
+    return false;
+  }
+  for (int y = 0; y < ny; ++y) {
+    for (int x = 0; x < nx; ++x) {
+      const std::size_t v = vc_grid_index(x, y, nx);
+      if (x + 1 < nx && !vc_has_edge(adj, v, vc_grid_index(x + 1, y, nx))) {
+        return false;
+      }
+      if (y + 1 < ny && !vc_has_edge(adj, v, vc_grid_index(x, y + 1, nx))) {
+        return false;
+      }
+      if (x + 1 < nx && y + 1 < ny &&
+          vc_has_edge(adj, v, vc_grid_index(x + 1, y + 1, nx))) {
+        return false;
+      }
+    }
+  }
+  for (std::size_t v = 0; v < n; ++v) {
+    for (auto w : adj[v]) {
+      if (w <= v) {
+        continue;
+      }
+      const int dx =
+          std::abs(static_cast<int>(v % nx) - static_cast<int>(w % nx));
+      const int dy =
+          std::abs(static_cast<int>(v / nx) - static_cast<int>(w / nx));
+      if (!((dx == 1 && dy == 0) || (dx == 0 && dy == 1))) {
+        return false;
+      }
+      if (dx == 1 && dy == 1) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+bool vc_matches_triangular_grid(int nx, int ny,
+                                const std::vector<std::set<std::size_t>>& adj) {
+  const std::size_t n = adj.size();
+  if (static_cast<std::size_t>(nx * ny) != n) {
+    return false;
+  }
+  for (int y = 0; y < ny; ++y) {
+    for (int x = 0; x < nx; ++x) {
+      const std::size_t v = vc_grid_index(x, y, nx);
+      if (x + 1 < nx && !vc_has_edge(adj, v, vc_grid_index(x + 1, y, nx))) {
+        return false;
+      }
+      if (y + 1 < ny && !vc_has_edge(adj, v, vc_grid_index(x, y + 1, nx))) {
+        return false;
+      }
+      if (x + 1 < nx && y + 1 < ny &&
+          !vc_has_edge(adj, v, vc_grid_index(x + 1, y + 1, nx))) {
+        return false;
+      }
+    }
+  }
+  for (std::size_t v = 0; v < n; ++v) {
+    for (auto w : adj[v]) {
+      if (w <= v) {
+        continue;
+      }
+      const int x0 = static_cast<int>(v % nx);
+      const int y0 = static_cast<int>(v / nx);
+      const int x1 = static_cast<int>(w % nx);
+      const int y1 = static_cast<int>(w / nx);
+      const int dx = std::abs(x0 - x1);
+      const int dy = std::abs(y0 - y1);
+      const bool square_edge = (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
+      const bool diag_edge = (dx == 1 && dy == 1 && x0 < x1 && y0 < y1);
+      if (!square_edge && !diag_edge) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
 
 /// Combined Jordan-Wigner Majorana on `Q`: Z on all qubits < Q, then op on Q
 /// (op = X for the "c" Majorana, Y for the "d" Majorana).
@@ -380,6 +482,113 @@ std::pair<std::complex<double>, SparsePauliWord> vc_pstab(std::size_t a,
   auto d_b = vc_jw_majorana(b, op_y);
   auto [phase, word] = PauliTermAccumulator::multiply_uncached(c_a, d_b);
   return {std::complex<double>(0.0, 1.0) * phase, std::move(word)};
+}
+
+void vc_multiply_stabilizer(
+    std::complex<double>& coeff, SparsePauliWord& word,
+    const std::pair<std::complex<double>, SparsePauliWord>& factor) {
+  auto prod = PauliTermAccumulator::multiply_uncached(word, factor.second);
+  coeff = coeff * factor.first * prod.first;
+  word = std::move(prod.second);
+}
+
+int vc_snake_index(int col, int row, int nx) {
+  return row % 2 == 0 ? row * nx + col : (row + 1) * nx - 1 - col;
+}
+
+std::pair<int, int> vc_snake_to_coord(int site, int nx, int ny) {
+  for (int row = 0; row < ny; ++row) {
+    for (int col = 0; col < nx; ++col) {
+      if (vc_snake_index(col, row, nx) == site) {
+        return {col, row};
+      }
+    }
+  }
+  throw std::invalid_argument(
+      "MajoranaMapping::verstraete_cirac: invalid snake site index");
+}
+
+/// Local auxiliary stabilizer for a directed edge on the auxiliary graph.
+/// Follows OpenFermion ``stabilizer_local_2d_square`` (products of P_ij).
+std::pair<std::complex<double>, SparsePauliWord> vc_stabilizer_local_edge(
+    int site_from, int site_to, int nx, int ny, std::size_t block_off) {
+  const auto [col_i, row_i] = vc_snake_to_coord(site_from, nx, ny);
+  const auto [col_j, row_j] = vc_snake_to_coord(site_to, nx, ny);
+
+  const std::size_t aux_from =
+      2 * (block_off + static_cast<std::size_t>(site_from)) + 1;
+  const std::size_t aux_to =
+      2 * (block_off + static_cast<std::size_t>(site_to)) + 1;
+
+  auto result = (col_i % 2 == 0) ? vc_pstab(aux_from, aux_to)
+                                 : vc_pstab(aux_to, aux_from);
+
+  if (col_i == col_j && std::abs(row_i - row_j) == 1) {
+    const int top_row = std::min(row_i, row_j);
+    const int col = col_i;
+    if (top_row % 2 == 0) {
+      if (col + 1 < nx) {
+        const int et = vc_snake_index(col + 1, top_row, nx);
+        const int eb = vc_snake_index(col + 1, top_row + 1, nx);
+        const std::size_t aux_et =
+            2 * (block_off + static_cast<std::size_t>(et)) + 1;
+        const std::size_t aux_eb =
+            2 * (block_off + static_cast<std::size_t>(eb)) + 1;
+        const auto extra = ((col + 1) % 2 == 0) ? vc_pstab(aux_et, aux_eb)
+                                                : vc_pstab(aux_eb, aux_et);
+        vc_multiply_stabilizer(result.first, result.second, extra);
+      }
+    } else if (col > 0) {
+      const int et = vc_snake_index(col - 1, top_row, nx);
+      const int eb = vc_snake_index(col - 1, top_row + 1, nx);
+      const std::size_t aux_et =
+          2 * (block_off + static_cast<std::size_t>(et)) + 1;
+      const std::size_t aux_eb =
+          2 * (block_off + static_cast<std::size_t>(eb)) + 1;
+      const auto extra = ((col - 1) % 2 == 0) ? vc_pstab(aux_et, aux_eb)
+                                              : vc_pstab(aux_eb, aux_et);
+      vc_multiply_stabilizer(result.first, result.second, extra);
+    }
+  }
+  return result;
+}
+
+/// Directed edges of the auxiliary-fermion graph (OpenFermion layout).
+std::vector<std::pair<int, int>> vc_auxiliary_graph_edges(int nx, int ny) {
+  std::vector<std::pair<int, int>> edges;
+  for (int k = 0; k < nx; k += 2) {
+    if (k + 1 >= nx) {
+      for (int row = 0; row + 1 < ny; ++row) {
+        edges.emplace_back(vc_snake_index(k, row, nx),
+                           vc_snake_index(k, row + 1, nx));
+      }
+      if (nx > 1) {
+        edges.emplace_back(vc_snake_index(k, ny - 1, nx),
+                           vc_snake_index(0, 0, nx));
+      }
+      continue;
+    }
+    edges.emplace_back(vc_snake_index(k + 1, 0, nx), vc_snake_index(k, 0, nx));
+    edges.emplace_back(vc_snake_index(k, ny - 1, nx),
+                       vc_snake_index(k + 1, ny - 1, nx));
+    for (int row = 0; row + 1 < ny; ++row) {
+      edges.emplace_back(vc_snake_index(k, row, nx),
+                         vc_snake_index(k, row + 1, nx));
+      edges.emplace_back(vc_snake_index(k + 1, row + 1, nx),
+                         vc_snake_index(k + 1, row, nx));
+    }
+  }
+  return edges;
+}
+
+std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+vc_build_local_stabilizers(int nx, int ny, std::size_t block_off) {
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  for (const auto& [from, to] : vc_auxiliary_graph_edges(nx, ny)) {
+    stabilizers.push_back(
+        vc_stabilizer_local_edge(from, to, nx, ny, block_off));
+  }
+  return stabilizers;
 }
 
 /// Recover (column, row) coordinates of each vertex from edges alone.
@@ -496,6 +705,48 @@ std::vector<std::pair<int, int>> vc_recover_coords(
   return coord;
 }
 
+VcGridLayout vc_detect_grid_layout(
+    const std::vector<std::set<std::size_t>>& adj) {
+  const std::size_t n = adj.size();
+  for (int nx = 1; nx <= static_cast<int>(std::sqrt(static_cast<double>(n)));
+       ++nx) {
+    if (static_cast<std::size_t>(nx) > n ||
+        n % static_cast<std::size_t>(nx) != 0) {
+      continue;
+    }
+    const int ny = static_cast<int>(n / nx);
+    if (vc_matches_triangular_grid(nx, ny, adj)) {
+      VcGridLayout layout{nx, ny, VcGridKind::TRIANGULAR, {}};
+      layout.coord.reserve(n);
+      for (std::size_t v = 0; v < n; ++v) {
+        layout.coord.emplace_back(static_cast<int>(v % nx),
+                                  static_cast<int>(v / nx));
+      }
+      return layout;
+    }
+    if (vc_matches_square_grid(nx, ny, adj)) {
+      VcGridLayout layout{nx, ny, VcGridKind::SQUARE, {}};
+      layout.coord.reserve(n);
+      for (std::size_t v = 0; v < n; ++v) {
+        layout.coord.emplace_back(static_cast<int>(v % nx),
+                                  static_cast<int>(v / nx));
+      }
+      return layout;
+    }
+  }
+  VcGridLayout layout{0, 0, VcGridKind::RECOVERED, vc_recover_coords(adj)};
+  for (const auto& [x, y] : layout.coord) {
+    layout.nx = std::max(layout.nx, x + 1);
+    layout.ny = std::max(layout.ny, y + 1);
+  }
+  if (static_cast<std::size_t>(layout.nx * layout.ny) != n) {
+    throw std::invalid_argument(
+        "MajoranaMapping::verstraete_cirac: lattice connectivity is not a "
+        "recognised 2D nearest-neighbour layout");
+  }
+  return layout;
+}
+
 }  // namespace detail
 
 MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
@@ -520,32 +771,26 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     }
   }
 
-  auto coord = vc_recover_coords(adj);
-  int rnx = 0, rny = 0;
-  for (const auto& [x, y] : coord) {
-    rnx = std::max(rnx, x + 1);
-    rny = std::max(rny, y + 1);
-  }
-  // The recovered coordinates must tile a complete rectangle.
-  if (static_cast<std::size_t>(rnx) * static_cast<std::size_t>(rny) != n) {
-    throw std::invalid_argument(
-        "MajoranaMapping::verstraete_cirac: lattice connectivity is not a "
-        "single rectangular grid");
-  }
-  // Every edge must be a nearest-neighbour bond on the recovered grid.
-  for (std::size_t v = 0; v < n; ++v) {
-    for (auto w : adj[v]) {
-      if (w <= v) {
-        continue;
-      }
-      const int dx =
-          std::abs(coord[v].first - coord[static_cast<std::size_t>(w)].first);
-      const int dy =
-          std::abs(coord[v].second - coord[static_cast<std::size_t>(w)].second);
-      if (dx + dy != 1) {
-        throw std::invalid_argument(
-            "MajoranaMapping::verstraete_cirac: lattice edge does not connect "
-            "nearest neighbours on the recovered rectangular grid");
+  const auto layout = vc_detect_grid_layout(adj);
+  const auto& coord = layout.coord;
+  const int rnx = layout.nx;
+  const int rny = layout.ny;
+
+  if (layout.kind == VcGridKind::RECOVERED) {
+    for (std::size_t v = 0; v < n; ++v) {
+      for (auto w : adj[v]) {
+        if (w <= v) {
+          continue;
+        }
+        const int dx =
+            std::abs(coord[v].first - coord[static_cast<std::size_t>(w)].first);
+        const int dy = std::abs(coord[v].second -
+                                coord[static_cast<std::size_t>(w)].second);
+        if (dx + dy != 1) {
+          throw std::invalid_argument(
+              "MajoranaMapping::verstraete_cirac: lattice edge does not "
+              "connect nearest neighbours on the recovered 2D layout");
+        }
       }
     }
   }
@@ -604,23 +849,12 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     }
   }
 
-  // ── Stabilizers: vertical bonds + cyclic closers, per spin block ──
+  // ── Stabilizers: local plaquette products on the auxiliary graph ──
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
-  stabilizers.reserve(num_modes);
   for (std::size_t block = 0; block < 2; ++block) {
-    std::size_t off = block * n;
-    for (int c = 0; c < rnx; ++c) {
-      for (int r = 0; r + 1 < rny; ++r) {
-        std::size_t s_top = off + snake(c, r);
-        std::size_t s_bot = off + snake(c, r + 1);
-        stabilizers.push_back(vc_pstab(2 * s_top + 1, 2 * s_bot + 1));
-      }
-    }
-    for (int c = 0; c < rnx; ++c) {
-      std::size_t s_a = off + snake(c, rny - 1);
-      std::size_t s_b = off + snake((c + 1) % rnx, 0);
-      stabilizers.push_back(vc_pstab(2 * s_a + 1, 2 * s_b + 1));
-    }
+    auto block_stabs = vc_build_local_stabilizers(rnx, rny, block * n);
+    stabilizers.insert(stabilizers.end(), block_stabs.begin(),
+                       block_stabs.end());
   }
 
   return MajoranaMapping({}, std::move(bilinears), "verstraete-cirac",

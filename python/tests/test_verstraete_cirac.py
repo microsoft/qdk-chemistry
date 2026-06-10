@@ -69,8 +69,9 @@ class TestVerstraeteCiracFactory:
         assert mapping.num_modes == 2 * n_sites
         # Each physical mode carries one auxiliary qubit.
         assert mapping.num_qubits == 4 * n_sites
-        # Stabilizer count equals the number of physical modes.
-        assert len(mapping.stabilizers) == 2 * n_sites
+        # Local plaquette stabilizers (one per auxiliary-graph edge, per block).
+        assert len(mapping.stabilizers) > 0
+        assert all(len(word) >= 2 for _, word in mapping.stabilizers)
         assert not mapping.is_majorana_atomic
 
     @pytest.mark.parametrize(("nx", "ny"), LATTICE_SIZES)
@@ -88,18 +89,31 @@ class TestVerstraeteCiracFactory:
         assert qh.is_hermitian()
 
     def test_non_grid_lattice_rejected(self) -> None:
-        """A 1-D chain is not a 2-D rectangular grid and must be rejected."""
+        """A 1-D chain is not a 2-D lattice layout and must be rejected."""
         chain = LatticeGraph.chain(3)
-        with pytest.raises(ValueError, match="rectangular grid"):
+        with pytest.raises(ValueError, match="2D"):
             MajoranaMapping.verstraete_cirac(chain)
 
+    def test_triangular_lattice_accepted(self) -> None:
+        """Triangular 2D lattices are supported, not only rectangular grids."""
+        lattice = LatticeGraph.triangular(2, 2)
+        mapping = MajoranaMapping.verstraete_cirac(lattice)
+        assert mapping.num_modes == 2 * lattice.num_sites
+        assert len(mapping.stabilizers) > 0
+
+    def test_stabilizers_are_local_plaquettes(self) -> None:
+        """Stabilizers are multi-qubit plaquette products, not single bilinears."""
+        mapping = MajoranaMapping.verstraete_cirac(LatticeGraph.square(3, 3))
+        weights = [len(word) for _, word in mapping.stabilizers]
+        assert max(weights) > 2
+
     def test_extra_long_range_edge_rejected(self) -> None:
-        """A rectangular site set with a non-nearest-neighbour edge is rejected."""
+        """A site layout with a non-nearest-neighbour edge is rejected."""
         adj = LatticeGraph.square(2, 2).adjacency_matrix().copy()
-        adj[0, 3] = 1.0
-        adj[3, 0] = 1.0
+        adj[1, 2] = 1.0
+        adj[2, 1] = 1.0
         bad = LatticeGraph.from_dense_matrix(adj)
-        with pytest.raises(ValueError, match="nearest neighbours"):
+        with pytest.raises(ValueError, match="2D"):
             MajoranaMapping.verstraete_cirac(bad)
 
 

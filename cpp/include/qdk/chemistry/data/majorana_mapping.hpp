@@ -267,10 +267,11 @@ class MajoranaMapping : public DataClass {
    * @brief Verstraete-Cirac (auxiliary-qubit) encoding for a 2D lattice.
    *
    * Builds a locality-preserving fermion-to-qubit encoding directly from the
-   * edges of a rectangular 2D ``LatticeGraph``.  Each lattice site is paired
-   * with one auxiliary qubit; nearest-neighbour hopping terms map to
-   * constant-weight Pauli operators independent of system size.  The encoding
-   * acts on the physical subspace defined by the returned ``stabilizers()``.
+   * edges of a 2D ``LatticeGraph`` (square, triangular, or other planar
+   * nearest-neighbour layouts).  Each lattice site is paired with one
+   * auxiliary qubit; nearest-neighbour hopping terms map to constant-weight
+   * Pauli operators independent of system size.  The encoding acts on the
+   * physical subspace defined by the returned ``stabilizers()``.
    *
    * The lattice describes a single spin species (``n_sites`` sites); the
    * factory produces a mapping with ``num_modes == 2 * n_sites`` (one
@@ -278,11 +279,11 @@ class MajoranaMapping : public DataClass {
    * ``QubitMapper`` exactly like ``jordan_wigner(num_modes=2*n_sites)`` and
    * uses ``2 * num_modes`` qubits.
    *
-   * @param lattice A single connected rectangular 2D lattice (e.g. built by
-   *        ``LatticeGraph::square`` with nearest-neighbour edges only).
+   * @param lattice A single connected 2D nearest-neighbour lattice (e.g.
+   *        ``LatticeGraph::square`` or ``LatticeGraph::triangular``).
    * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
    * @throws std::invalid_argument If the lattice is empty or its connectivity
-   *         is not a single rectangular nearest-neighbour grid.
+   *         is not a recognised 2D nearest-neighbour layout.
    *
    * @see F. Verstraete and J. I. Cirac, J. Stat. Mech. (2005) P09012.
    * @see J. D. Whitfield, V. Havlicek, M. Troyer, Phys. Rev. A 94, 030301(R).
