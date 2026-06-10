@@ -8,13 +8,15 @@
 #include <Eigen/Sparse>
 #include <array>
 #include <complex>
+#include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <tuple>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -24,21 +26,26 @@ namespace qdk::chemistry::utils {
  * @class HashContext
  * @brief Streaming context for deterministic content hashes.
  *
- * Provides an incremental interface for feeding data into a content digest.
- * Producers must add fields in a deterministic order; this is a sequential
- * streaming hash interface, not a tree hash suitable for parallel producers.
- * Supports Eigen matrices, vectors, sparse matrices, and primitive types.
+ * Provides an incremental byte-oriented interface for feeding data into a
+ * content digest. Producers must add fields in a deterministic order; this is
+ * a sequential streaming hash interface, not a tree hash suitable for parallel
+ * producers. Use hash_value() to hash typed values.
  *
  * Content hashes are intended for cache keys and checkpoint/restart workflows
  * among compatible builds. They are not a data preservation format, and the
  * exact digest values are not guaranteed to remain stable across releases.
  *
+ * HashContext favors deterministic byte encodings over lookup speed. For
+ * performance-sensitive in-memory hash tables, prefer hash_combine() from
+ * qdk/chemistry/utils/hash.hpp unless the table key must intentionally use the
+ * deterministic content digest.
+ *
  * Usage:
  * @code
  *   HashContext ctx;
- *   ctx.update(some_matrix);
- *   ctx.update(some_double);
- *   ctx.update("some_string");
+ *   hash_value(ctx, some_matrix);
+ *   hash_value(ctx, some_double);
+ *   hash_value(ctx, "some_string");
  *   std::string hash = ctx.hexdigest();
  * @endcode
  */
@@ -46,85 +53,12 @@ class HashContext {
  public:
   HashContext();
 
-  // -- Primitive types --
-
   /// Feed raw bytes into the hash
   void update(const void* data, size_t len);
 
-  /// Hash a double value (8 bytes, little-endian)
-  void update(double val);
-
-  /// Hash an int64_t value (8 bytes, little-endian)
-  void update(int64_t val);
-
-  /// Hash a uint64_t value (8 bytes, little-endian)
-  void update(uint64_t val);
-
-  /// Hash a uint8_t sentinel byte
-  void update(uint8_t val);
-
-  /// Hash a boolean value (1 byte: 0x00 or 0x01)
-  void update(bool val);
-
-  /// Hash a string (length-prefixed to avoid collisions)
-  void update(const std::string& s);
-
-  // -- Eigen types --
-
-  /// Hash a dense matrix (raw contiguous bytes)
-  void update(const Eigen::MatrixXd& m);
-
-  /// Hash a dense vector (raw contiguous bytes)
-  void update(const Eigen::VectorXd& v);
-
-  /// Hash a dense integer vector
-  void update(const Eigen::VectorXi& v);
-
-  /// Hash a complex dense matrix
-  void update(const Eigen::MatrixXcd& m);
-
-  /// Hash a complex dense vector
-  void update(const Eigen::VectorXcd& v);
-
-  /// Hash a sparse matrix (sorted triplets)
-  void update(const Eigen::SparseMatrix<double>& m);
-
-  // -- Variant types (real or complex) --
+  // -- Common variant types --
   using VectorVariant = std::variant<Eigen::VectorXd, Eigen::VectorXcd>;
   using MatrixVariant = std::variant<Eigen::MatrixXd, Eigen::MatrixXcd>;
-
-  /// Hash a vector variant (tags real=0, complex=1 then raw data)
-  void update(const VectorVariant& v);
-
-  /// Hash a matrix variant
-  void update(const MatrixVariant& m);
-
-  // -- Optional helpers --
-
-  /// Hash an optional value: 0x00 if nullopt, 0x01 + data if present
-  template <typename T>
-  void update_optional(const std::optional<T>& opt) {
-    if (opt.has_value()) {
-      update(uint8_t(1));
-      update(opt.value());
-    } else {
-      update(uint8_t(0));
-    }
-  }
-
-  /// Hash an optional shared_ptr: 0x00 if null, 0x01 + data if present
-  template <typename T>
-  void update_optional(const std::shared_ptr<T>& ptr) {
-    if (ptr) {
-      update(uint8_t(1));
-      update(*ptr);
-    } else {
-      update(uint8_t(0));
-    }
-  }
-
-  /// Hash a vector of size_t values
-  void update(const std::vector<size_t>& v);
 
   // -- Finalization --
 
@@ -132,8 +66,8 @@ class HashContext {
   /// @param truncate_chars Number of hex characters to return (default 16)
   std::string hexdigest(size_t truncate_chars = 16) const;
 
-  /// Finalize and return the leading digest bytes as a size_t hash code.
-  /// Intended for std::hash-compatible local hash tables.
+  /// Finalize and return the leading digest bytes as a size_t value.
+  /// Prefer hash_combine() for hot std::hash-compatible table hashers.
   std::size_t hash_code() const;
 
  private:
@@ -145,5 +79,263 @@ class HashContext {
 
   void _process_block(const uint8_t block[64]);
 };
+
+/**
+ * @brief Hash a double value as deterministic little-endian bytes.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, double value);
+
+/**
+ * @brief Hash a float value through the canonical double encoding.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, float value);
+
+/**
+ * @brief Hash a long double value as a canonical hexadecimal string.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, long double value);
+
+/**
+ * @brief Hash a signed 64-bit integer as deterministic little-endian bytes.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, int64_t value);
+
+/**
+ * @brief Hash an unsigned 64-bit integer as deterministic little-endian bytes.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, uint64_t value);
+
+/**
+ * @brief Hash a single sentinel byte.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, uint8_t value);
+
+/**
+ * @brief Stable byte tags used to delimit generic hash_value encodings.
+ *
+ * These are explicit hash-format markers, not serialized C++ type identity.
+ * RTTI names are implementation-defined and may vary by compiler, standard
+ * library, and build flags; fixed tags keep the digest format deterministic.
+ */
+enum class HashValueTag : uint8_t {
+  RealAlternative = 0,
+  ComplexAlternative = 1,
+  SharedPtr = 2,
+  Optional = 3,
+  Vector = 4,
+  Variant = 5,
+};
+
+/**
+ * @brief Hash a generic hash-format tag.
+ *
+ * @param ctx Hash context to update
+ * @param tag Tag to hash
+ */
+inline void hash_value(HashContext& ctx, HashValueTag tag) {
+  hash_value(ctx, static_cast<uint8_t>(tag));
+}
+
+/**
+ * @brief Hash a boolean value as one byte.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, bool value);
+
+/**
+ * @brief Hash a string value with a length prefix.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const std::string& value);
+
+/**
+ * @brief Hash a string value with a length prefix.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, std::string_view value);
+
+/**
+ * @brief Hash a null-terminated string value.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const char* value);
+
+/**
+ * @brief Hash a dense matrix.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::MatrixXd& value);
+
+/**
+ * @brief Hash a dense vector.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::VectorXd& value);
+
+/**
+ * @brief Hash a dense integer vector.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::VectorXi& value);
+
+/**
+ * @brief Hash a complex dense matrix.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::MatrixXcd& value);
+
+/**
+ * @brief Hash a complex dense vector.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::VectorXcd& value);
+
+/**
+ * @brief Hash a sparse matrix.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const Eigen::SparseMatrix<double>& value);
+
+/**
+ * @brief Hash a vector variant.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const HashContext::VectorVariant& value);
+
+/**
+ * @brief Hash a matrix variant.
+ *
+ * @param ctx Hash context to update
+ * @param value Value to hash
+ */
+void hash_value(HashContext& ctx, const HashContext::MatrixVariant& value);
+
+// Fallback overloads normalize C++ scalar aliases to the fixed encodings
+// above. User-defined types should provide their own hash_value() overload,
+// preferably in the same namespace as the type so ADL can find it.
+
+// Signed integral types other than the canonical int64_t overload are promoted
+// to int64_t before hashing.
+template <typename T>
+concept HashSignedIntegral =
+    std::integral<T> && !std::same_as<T, bool> && !std::same_as<T, uint8_t> &&
+    std::signed_integral<T> && !std::same_as<T, int64_t>;
+
+// Unsigned integral types other than the canonical uint64_t and single-byte
+// uint8_t overloads are promoted to uint64_t before hashing.
+template <typename T>
+concept HashUnsignedIntegral =
+    std::integral<T> && !std::same_as<T, bool> && !std::same_as<T, uint8_t> &&
+    std::unsigned_integral<T> && !std::same_as<T, uint64_t>;
+
+template <typename T>
+concept HashComplexScalar = std::same_as<T, float> || std::same_as<T, double> ||
+                            std::same_as<T, long double>;
+
+// Enums hash through their declared underlying type so callers do not need
+// one-off casts at each use site.
+template <typename T>
+concept HashEnum = std::is_enum_v<T>;
+
+template <HashSignedIntegral T>
+void hash_value(HashContext& ctx, T value) {
+  hash_value(ctx, static_cast<int64_t>(value));
+}
+
+template <HashUnsignedIntegral T>
+void hash_value(HashContext& ctx, T value) {
+  hash_value(ctx, static_cast<uint64_t>(value));
+}
+
+template <HashEnum T>
+void hash_value(HashContext& ctx, T value) {
+  using UnderlyingType = std::underlying_type_t<T>;
+  hash_value(ctx, static_cast<UnderlyingType>(value));
+}
+
+template <HashComplexScalar T>
+void hash_value(HashContext& ctx, const std::complex<T>& value) {
+  hash_value(ctx, value.real());
+  hash_value(ctx, value.imag());
+}
+
+template <typename T>
+void hash_value(HashContext& ctx, const std::shared_ptr<T>& value) {
+  hash_value(ctx, HashValueTag::SharedPtr);
+  if (value) {
+    hash_value(ctx, true);
+    hash_value(ctx, *value);
+  } else {
+    hash_value(ctx, false);
+  }
+}
+
+template <typename T>
+void hash_value(HashContext& ctx, const std::optional<T>& value) {
+  hash_value(ctx, HashValueTag::Optional);
+  if (value) {
+    hash_value(ctx, true);
+    hash_value(ctx, *value);
+  } else {
+    hash_value(ctx, false);
+  }
+}
+
+template <typename T>
+void hash_value(HashContext& ctx, const std::vector<T>& values) {
+  hash_value(ctx, HashValueTag::Vector);
+  hash_value(ctx, static_cast<uint64_t>(values.size()));
+  for (const auto& value : values) {
+    hash_value(ctx, value);
+  }
+}
+
+template <typename... Ts>
+void hash_value(HashContext& ctx, const std::variant<Ts...>& value) {
+  hash_value(ctx, HashValueTag::Variant);
+  hash_value(ctx, static_cast<uint64_t>(value.index()));
+  std::visit([&ctx](const auto& selected) { hash_value(ctx, selected); },
+             value);
+}
 
 }  // namespace qdk::chemistry::utils

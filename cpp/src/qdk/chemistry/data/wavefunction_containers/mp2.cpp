@@ -1072,18 +1072,18 @@ MP2Container::get_active_two_rdm_spin_traced() const {
 
 void MP2Container::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
-  ctx.update(get_container_type());
+  hash_value(ctx, get_container_type());
   if (_hamiltonian) {
-    ctx.update(uint8_t(1));
-    ctx.update(_hamiltonian->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _hamiltonian->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_wavefunction) {
-    ctx.update(uint8_t(1));
-    ctx.update(_wavefunction->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _wavefunction->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   // NEVER access lazy amplitude caches
 }

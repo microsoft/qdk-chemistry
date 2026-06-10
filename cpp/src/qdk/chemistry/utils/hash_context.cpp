@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <iomanip>
+#include <locale>
 #include <qdk/chemistry/utils/hash_context.hpp>
 #include <sstream>
 #include <type_traits>
@@ -115,138 +116,148 @@ void HashContext::update(const void* data, size_t len) {
   }
 }
 
-void HashContext::update(double val) {
+void hash_value(HashContext& ctx, double value) {
   // Encode as little-endian bytes for cross-platform determinism
   uint64_t bits;
-  std::memcpy(&bits, &val, 8);
+  std::memcpy(&bits, &value, 8);
   uint8_t buf[8];
   for (int i = 0; i < 8; ++i) {
     buf[i] = static_cast<uint8_t>(bits >> (i * 8));
   }
-  update(buf, 8);
+  ctx.update(buf, 8);
 }
 
-void HashContext::update(int64_t val) {
+void hash_value(HashContext& ctx, float value) {
+  hash_value(ctx, static_cast<double>(value));
+}
+
+void hash_value(HashContext& ctx, long double value) {
+  std::ostringstream stream;
+  stream.imbue(std::locale::classic());
+  stream << std::hexfloat << value;
+  hash_value(ctx, stream.str());
+}
+
+void hash_value(HashContext& ctx, int64_t value) {
   uint8_t buf[8];
-  auto uval = static_cast<uint64_t>(val);
+  auto uval = static_cast<uint64_t>(value);
   for (int i = 0; i < 8; ++i) {
     buf[i] = static_cast<uint8_t>(uval >> (i * 8));
   }
-  update(buf, 8);
+  ctx.update(buf, 8);
 }
 
-void HashContext::update(uint64_t val) {
+void hash_value(HashContext& ctx, uint64_t value) {
   uint8_t buf[8];
   for (int i = 0; i < 8; ++i) {
-    buf[i] = static_cast<uint8_t>(val >> (i * 8));
+    buf[i] = static_cast<uint8_t>(value >> (i * 8));
   }
-  update(buf, 8);
+  ctx.update(buf, 8);
 }
 
-void HashContext::update(uint8_t val) { update(&val, 1); }
+void hash_value(HashContext& ctx, uint8_t value) { ctx.update(&value, 1); }
 
-void HashContext::update(bool val) {
-  uint8_t b = val ? 1 : 0;
-  update(&b, 1);
+void hash_value(HashContext& ctx, bool value) {
+  uint8_t b = value ? 1 : 0;
+  ctx.update(&b, 1);
 }
 
-void HashContext::update(const std::string& s) {
+void hash_value(HashContext& ctx, const std::string& value) {
+  hash_value(ctx, std::string_view(value));
+}
+
+void hash_value(HashContext& ctx, std::string_view value) {
   // Length-prefix to prevent "ab"+"c" == "a"+"bc" collisions
-  update(static_cast<uint64_t>(s.size()));
-  if (!s.empty()) {
-    update(s.data(), s.size());
+  hash_value(ctx, static_cast<uint64_t>(value.size()));
+  if (!value.empty()) {
+    ctx.update(value.data(), value.size());
   }
 }
 
-void HashContext::update(const Eigen::MatrixXd& m) {
+void hash_value(HashContext& ctx, const char* value) {
+  hash_value(ctx, std::string_view(value));
+}
+
+void hash_value(HashContext& ctx, const Eigen::MatrixXd& value) {
   // Hash dimensions for disambiguation
-  update(static_cast<int64_t>(m.rows()));
-  update(static_cast<int64_t>(m.cols()));
-  for (Eigen::Index i = 0; i < m.size(); ++i) {
-    update(m.data()[i]);
+  hash_value(ctx, static_cast<int64_t>(value.rows()));
+  hash_value(ctx, static_cast<int64_t>(value.cols()));
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    hash_value(ctx, value.data()[i]);
   }
 }
 
-void HashContext::update(const Eigen::VectorXd& v) {
-  update(static_cast<int64_t>(v.size()));
-  for (Eigen::Index i = 0; i < v.size(); ++i) {
-    update(v[i]);
+void hash_value(HashContext& ctx, const Eigen::VectorXd& value) {
+  hash_value(ctx, static_cast<int64_t>(value.size()));
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    hash_value(ctx, value[i]);
   }
 }
 
-void HashContext::update(const Eigen::VectorXi& v) {
-  update(static_cast<int64_t>(v.size()));
-  for (Eigen::Index i = 0; i < v.size(); ++i) {
-    update(static_cast<int64_t>(v[i]));
+void hash_value(HashContext& ctx, const Eigen::VectorXi& value) {
+  hash_value(ctx, static_cast<int64_t>(value.size()));
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    hash_value(ctx, static_cast<int64_t>(value[i]));
   }
 }
 
-void HashContext::update(const Eigen::MatrixXcd& m) {
-  update(static_cast<int64_t>(m.rows()));
-  update(static_cast<int64_t>(m.cols()));
-  for (Eigen::Index i = 0; i < m.size(); ++i) {
-    update(m.data()[i].real());
-    update(m.data()[i].imag());
+void hash_value(HashContext& ctx, const Eigen::MatrixXcd& value) {
+  hash_value(ctx, static_cast<int64_t>(value.rows()));
+  hash_value(ctx, static_cast<int64_t>(value.cols()));
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    hash_value(ctx, value.data()[i]);
   }
 }
 
-void HashContext::update(const Eigen::VectorXcd& v) {
-  update(static_cast<int64_t>(v.size()));
-  for (Eigen::Index i = 0; i < v.size(); ++i) {
-    update(v[i].real());
-    update(v[i].imag());
+void hash_value(HashContext& ctx, const Eigen::VectorXcd& value) {
+  hash_value(ctx, static_cast<int64_t>(value.size()));
+  for (Eigen::Index i = 0; i < value.size(); ++i) {
+    hash_value(ctx, value[i]);
   }
 }
 
-void HashContext::update(const Eigen::SparseMatrix<double>& m) {
-  update(static_cast<int64_t>(m.rows()));
-  update(static_cast<int64_t>(m.cols()));
-  update(static_cast<int64_t>(m.nonZeros()));
+void hash_value(HashContext& ctx, const Eigen::SparseMatrix<double>& value) {
+  hash_value(ctx, static_cast<int64_t>(value.rows()));
+  hash_value(ctx, static_cast<int64_t>(value.cols()));
+  hash_value(ctx, static_cast<int64_t>(value.nonZeros()));
   // Iterate in column-major order (Eigen's default storage order)
-  for (int k = 0; k < m.outerSize(); ++k) {
-    for (Eigen::SparseMatrix<double>::InnerIterator it(m, k); it; ++it) {
-      update(static_cast<int64_t>(it.row()));
-      update(static_cast<int64_t>(it.col()));
-      update(it.value());
+  for (int k = 0; k < value.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(value, k); it; ++it) {
+      hash_value(ctx, static_cast<int64_t>(it.row()));
+      hash_value(ctx, static_cast<int64_t>(it.col()));
+      hash_value(ctx, it.value());
     }
   }
 }
 
-void HashContext::update(const VectorVariant& v) {
+void hash_value(HashContext& ctx, const HashContext::VectorVariant& value) {
   std::visit(
-      [this](const auto& vec) {
+      [&ctx](const auto& vec) {
         using T = std::decay_t<decltype(vec)>;
         if constexpr (std::is_same_v<T, Eigen::VectorXd>) {
-          update(uint8_t(0));  // tag: real
-          update(vec);
+          hash_value(ctx, HashValueTag::RealAlternative);
+          hash_value(ctx, vec);
         } else {
-          update(uint8_t(1));  // tag: complex
-          update(vec);
+          hash_value(ctx, HashValueTag::ComplexAlternative);
+          hash_value(ctx, vec);
         }
       },
-      v);
+      value);
 }
 
-void HashContext::update(const MatrixVariant& m) {
+void hash_value(HashContext& ctx, const HashContext::MatrixVariant& value) {
   std::visit(
-      [this](const auto& mat) {
+      [&ctx](const auto& mat) {
         using T = std::decay_t<decltype(mat)>;
         if constexpr (std::is_same_v<T, Eigen::MatrixXd>) {
-          update(uint8_t(0));
-          update(mat);
+          hash_value(ctx, HashValueTag::RealAlternative);
+          hash_value(ctx, mat);
         } else {
-          update(uint8_t(1));
-          update(mat);
+          hash_value(ctx, HashValueTag::ComplexAlternative);
+          hash_value(ctx, mat);
         }
       },
-      m);
-}
-
-void HashContext::update(const std::vector<size_t>& v) {
-  update(static_cast<uint64_t>(v.size()));
-  for (auto val : v) {
-    update(static_cast<uint64_t>(val));
-  }
+      value);
 }
 
 std::string HashContext::hexdigest(size_t truncate_chars) const {

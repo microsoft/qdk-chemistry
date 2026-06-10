@@ -2188,36 +2188,36 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
 }
 
 void Orbitals::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
+  hash_value(ctx, get_data_type_name());
   if (_coefficients) {
-    ctx.update(uint8_t(1));
-    ctx.update(_coefficients->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _coefficients->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_energies) {
-    ctx.update(uint8_t(1));
-    ctx.update(_energies->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _energies->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_ao_overlap) {
-    ctx.update(uint8_t(1));
-    ctx.update(*_ao_overlap);
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, *_ao_overlap);
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   // Active/inactive space indices
-  ctx.update(_active_space_indices.first);
-  ctx.update(_active_space_indices.second);
-  ctx.update(_inactive_space_indices.first);
-  ctx.update(_inactive_space_indices.second);
+  hash_value(ctx, _active_space_indices.first);
+  hash_value(ctx, _active_space_indices.second);
+  hash_value(ctx, _inactive_space_indices.first);
+  hash_value(ctx, _inactive_space_indices.second);
   // Fold in basis set hash
   if (_basis_set) {
-    ctx.update(uint8_t(1));
-    ctx.update(_basis_set->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _basis_set->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
 }
 

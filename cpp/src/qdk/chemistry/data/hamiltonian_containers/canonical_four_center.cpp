@@ -496,12 +496,12 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
 void CanonicalFourCenterHamiltonianContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   HamiltonianContainer::hash_update(ctx);
-  ctx.update(get_container_type());
+  hash_value(ctx, get_container_type());
   if (_two_body) {
-    ctx.update(uint8_t(1));
-    ctx.update(_two_body->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _two_body->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
 }
 

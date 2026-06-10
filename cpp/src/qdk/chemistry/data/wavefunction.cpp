@@ -1836,7 +1836,7 @@ std::string Wavefunction::get_summary() const {
 void WavefunctionContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   // Base class hashes the type
-  ctx.update(static_cast<int64_t>(_type));
+  hash_value(ctx, static_cast<int64_t>(_type));
   // Note: mutable RDM caches and entropies are excluded;
   // subclasses hash their own defining data
 }

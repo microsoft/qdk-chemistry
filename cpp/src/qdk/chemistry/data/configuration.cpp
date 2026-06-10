@@ -455,7 +455,7 @@ Configuration Configuration::from_binary_strings(std::string alpha_string,
 }
 
 void Configuration::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(to_string());
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, to_string());
 }
 }  // namespace qdk::chemistry::data

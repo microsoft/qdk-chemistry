@@ -197,11 +197,11 @@ TaperingSpecification TaperingSpecification::from_file(
 
 void TaperingSpecification::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(qubit_indices_);
-  ctx.update(static_cast<std::uint64_t>(eigenvalues_.size()));
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, qubit_indices_);
+  hash_value(ctx, static_cast<std::uint64_t>(eigenvalues_.size()));
   for (auto eigenvalue : eigenvalues_) {
-    ctx.update(static_cast<std::int64_t>(eigenvalue));
+    hash_value(ctx, static_cast<std::int64_t>(eigenvalue));
   }
 }
 

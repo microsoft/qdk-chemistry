@@ -1511,25 +1511,25 @@ CoupledClusterContainer::get_active_two_rdm_spin_traced() const {
 void CoupledClusterContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
-  ctx.update(get_container_type());
+  hash_value(ctx, get_container_type());
   if (_orbitals) {
-    ctx.update(uint8_t(1));
-    ctx.update(_orbitals->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _orbitals->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_wavefunction) {
-    ctx.update(uint8_t(1));
-    ctx.update(_wavefunction->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _wavefunction->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   // Hash amplitudes (constructor-supplied, not lazy)
-  ctx.update_optional(_t1_amplitudes_aa);
-  ctx.update_optional(_t1_amplitudes_bb);
-  ctx.update_optional(_t2_amplitudes_abab);
-  ctx.update_optional(_t2_amplitudes_aaaa);
-  ctx.update_optional(_t2_amplitudes_bbbb);
+  hash_value(ctx, _t1_amplitudes_aa);
+  hash_value(ctx, _t1_amplitudes_bb);
+  hash_value(ctx, _t2_amplitudes_abab);
+  hash_value(ctx, _t2_amplitudes_aaaa);
+  hash_value(ctx, _t2_amplitudes_bbbb);
   // NEVER access _determinant_vector_cache or _coefficients_cache
 }
 

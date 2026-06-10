@@ -509,13 +509,13 @@ std::shared_ptr<StabilityResult> StabilityResult::_from_hdf5_file(
 
 void StabilityResult::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(internal_stable_);
-  ctx.update(external_stable_);
-  ctx.update(internal_eigenvalues_);
-  ctx.update(internal_eigenvectors_);
-  ctx.update(external_eigenvalues_);
-  ctx.update(external_eigenvectors_);
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, internal_stable_);
+  hash_value(ctx, external_stable_);
+  hash_value(ctx, internal_eigenvalues_);
+  hash_value(ctx, internal_eigenvectors_);
+  hash_value(ctx, external_eigenvalues_);
+  hash_value(ctx, external_eigenvectors_);
 }
 
 }  // namespace qdk::chemistry::data

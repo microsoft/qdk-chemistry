@@ -345,18 +345,18 @@ class SymmetryBlockedTensor
 
  protected:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override {
-    ctx.update(this->get_data_type_name());
-    ctx.update(static_cast<uint64_t>(Rank));
-    ctx.update(uint8_t(utils::is_complex_scalar_v<Scalar> ? 1 : 0));
+    hash_value(ctx, this->get_data_type_name());
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    hash_value(ctx, uint8_t(utils::is_complex_scalar_v<Scalar> ? 1 : 0));
     this->_hash_symmetry_blocked_metadata(ctx);
     auto groups = this->_sorted_pointer_groups();
-    ctx.update(static_cast<uint64_t>(groups.size()));
+    hash_value(ctx, static_cast<uint64_t>(groups.size()));
     for (const auto& group : groups) {
-      ctx.update(static_cast<uint64_t>(group.keys.size()));
+      hash_value(ctx, static_cast<uint64_t>(group.keys.size()));
       for (const auto& key : group.keys) {
         this->_hash_labels(ctx, key);
       }
-      ctx.update(*group.ptr);
+      hash_value(ctx, *group.ptr);
     }
   }
 

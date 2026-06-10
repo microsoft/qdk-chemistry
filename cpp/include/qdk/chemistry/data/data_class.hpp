@@ -106,7 +106,7 @@ class DataClass {
    *
    * Derived classes must override this to feed their minimal identifying
    * fields into the hasher. For nested DataClass objects, call
-   * ctx.update(child->content_hash()) to fold in the child's hash.
+   * hash_value(ctx, child->content_hash()) to fold in the child's hash.
    *
    * Lazy/cached/mutable fields must NOT be included.
    *
@@ -144,6 +144,17 @@ class DataClass {
    */
   DataClass& operator=(DataClass&& other) = default;
 };
+
+/**
+ * @brief Hash a DataClass by its content hash.
+ *
+ * @param ctx Hash context to update
+ * @param value Data object to hash
+ */
+inline void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                       const DataClass& value) {
+  qdk::chemistry::utils::hash_value(ctx, value.content_hash());
+}
 
 /**
  * @brief Concept to enforce inheritance of DataClass and presence of

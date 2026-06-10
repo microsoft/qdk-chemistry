@@ -948,18 +948,18 @@ std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
 }
 
 void Ansatz::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
+  hash_value(ctx, get_data_type_name());
   if (_hamiltonian) {
-    ctx.update(uint8_t(1));
-    ctx.update(_hamiltonian->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _hamiltonian->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_wavefunction) {
-    ctx.update(uint8_t(1));
-    ctx.update(_wavefunction->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _wavefunction->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
 }
 

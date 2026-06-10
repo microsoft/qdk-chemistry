@@ -213,37 +213,37 @@ bool BasisEqChecker::operator()(const BasisSet& a,
 
 size_t BasisHasher::operator()(const BasisSet& basis) const noexcept {
   qdk::chemistry::utils::HashContext ctx;
-  ctx.update("basis_set");
+  hash_value(ctx, "basis_set");
   // mol only has one atom, hash atomic number
-  ctx.update(static_cast<int64_t>(basis.mol->atomic_nums[0]));
+  hash_value(ctx, static_cast<int64_t>(basis.mol->atomic_nums[0]));
 
   // hash basis set
-  ctx.update(static_cast<uint64_t>(basis.n_ecp_electrons));
-  ctx.update(basis.pure);
-  ctx.update(static_cast<uint64_t>(basis.num_atomic_orbitals));
-  ctx.update(static_cast<uint64_t>(basis.shells.size()));
-  ctx.update(static_cast<uint64_t>(basis.ecp_shells.size()));
-  ctx.update(static_cast<uint64_t>(basis.element_ecp_electrons.size()));
+  hash_value(ctx, static_cast<uint64_t>(basis.n_ecp_electrons));
+  hash_value(ctx, basis.pure);
+  hash_value(ctx, static_cast<uint64_t>(basis.num_atomic_orbitals));
+  hash_value(ctx, static_cast<uint64_t>(basis.shells.size()));
+  hash_value(ctx, static_cast<uint64_t>(basis.ecp_shells.size()));
+  hash_value(ctx, static_cast<uint64_t>(basis.element_ecp_electrons.size()));
 
   // hash shells
   for (const auto& shell : basis.shells) {
-    ctx.update(static_cast<int64_t>(shell.angular_momentum));
-    ctx.update(static_cast<uint64_t>(shell.contraction));
+    hash_value(ctx, static_cast<int64_t>(shell.angular_momentum));
+    hash_value(ctx, static_cast<uint64_t>(shell.contraction));
     for (size_t j = 0; j < shell.contraction; ++j) {
-      ctx.update(shell.exponents[j]);
-      ctx.update(shell.coefficients[j]);
-      ctx.update(static_cast<int64_t>(shell.rpowers[j]));
+      hash_value(ctx, shell.exponents[j]);
+      hash_value(ctx, shell.coefficients[j]);
+      hash_value(ctx, static_cast<int64_t>(shell.rpowers[j]));
     }
   }
 
   // hash ecp shells
   for (const auto& shell : basis.ecp_shells) {
-    ctx.update(static_cast<int64_t>(shell.angular_momentum));
-    ctx.update(static_cast<uint64_t>(shell.contraction));
+    hash_value(ctx, static_cast<int64_t>(shell.angular_momentum));
+    hash_value(ctx, static_cast<uint64_t>(shell.contraction));
     for (size_t j = 0; j < shell.contraction; ++j) {
-      ctx.update(shell.exponents[j]);
-      ctx.update(shell.coefficients[j]);
-      ctx.update(static_cast<int64_t>(shell.rpowers[j]));
+      hash_value(ctx, shell.exponents[j]);
+      hash_value(ctx, shell.coefficients[j]);
+      hash_value(ctx, static_cast<int64_t>(shell.rpowers[j]));
     }
   }
 

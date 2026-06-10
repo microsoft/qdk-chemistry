@@ -515,9 +515,9 @@ nlohmann::json CasWavefunctionContainer::to_json() const {
 void CasWavefunctionContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
-  ctx.update(get_container_type());
-  ctx.update(_coefficients);
-  ctx.update(_configuration_set.content_hash());
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _coefficients);
+  hash_value(ctx, _configuration_set.content_hash());
 }
 
 }  // namespace qdk::chemistry::data

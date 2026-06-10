@@ -920,25 +920,25 @@ bool Hamiltonian::is_unrestricted() const {
 
 void HamiltonianContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(_core_energy);
-  ctx.update(static_cast<int64_t>(_type));
+  hash_value(ctx, _core_energy);
+  hash_value(ctx, static_cast<int64_t>(_type));
   if (_one_body) {
-    ctx.update(uint8_t(1));
-    ctx.update(_one_body->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _one_body->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_inactive_fock) {
-    ctx.update(uint8_t(1));
-    ctx.update(_inactive_fock->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _inactive_fock->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   if (_orbitals) {
-    ctx.update(uint8_t(1));
-    ctx.update(_orbitals->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _orbitals->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
 }
 

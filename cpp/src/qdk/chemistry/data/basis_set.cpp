@@ -2486,43 +2486,43 @@ std::pair<size_t, int> BasisSet::basis_to_shell_index(
 }
 
 void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(_name);
-  ctx.update(static_cast<int64_t>(_atomic_orbital_type));
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, _name);
+  hash_value(ctx, static_cast<int64_t>(_atomic_orbital_type));
   if (_structure) {
-    ctx.update(uint8_t(1));
-    ctx.update(_structure->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _structure->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
   // Hash all shells per atom
-  ctx.update(static_cast<uint64_t>(_shells_per_atom.size()));
+  hash_value(ctx, static_cast<uint64_t>(_shells_per_atom.size()));
   for (const auto& atom_shells : _shells_per_atom) {
-    ctx.update(static_cast<uint64_t>(atom_shells.size()));
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
     for (const auto& shell : atom_shells) {
-      ctx.update(static_cast<uint64_t>(shell.atom_index));
-      ctx.update(static_cast<int64_t>(shell.orbital_type));
-      ctx.update(shell.exponents);
-      ctx.update(shell.coefficients);
-      ctx.update(shell.rpowers);
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
     }
   }
   // Hash ECP shells
-  ctx.update(static_cast<uint64_t>(_ecp_shells_per_atom.size()));
+  hash_value(ctx, static_cast<uint64_t>(_ecp_shells_per_atom.size()));
   for (const auto& atom_shells : _ecp_shells_per_atom) {
-    ctx.update(static_cast<uint64_t>(atom_shells.size()));
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
     for (const auto& shell : atom_shells) {
-      ctx.update(static_cast<uint64_t>(shell.atom_index));
-      ctx.update(static_cast<int64_t>(shell.orbital_type));
-      ctx.update(shell.exponents);
-      ctx.update(shell.coefficients);
-      ctx.update(shell.rpowers);
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
     }
   }
-  ctx.update(_ecp_name);
-  ctx.update(static_cast<uint64_t>(_ecp_electrons.size()));
+  hash_value(ctx, _ecp_name);
+  hash_value(ctx, static_cast<uint64_t>(_ecp_electrons.size()));
   for (auto e : _ecp_electrons) {
-    ctx.update(static_cast<uint64_t>(e));
+    hash_value(ctx, static_cast<uint64_t>(e));
   }
 }
 

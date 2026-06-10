@@ -312,7 +312,7 @@ class Orbitals : public DataClass,
 
   /**
    * @brief Check if calculation is unrestricted (UHF/UKS)
-   * @return True if alpha and beta coefficients are different
+   * @return True if orbitals are unrestricted
    */
   virtual bool is_unrestricted() const;
 

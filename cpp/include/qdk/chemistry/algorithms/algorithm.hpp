@@ -13,7 +13,6 @@
 #include <utility>
 #include <vector>
 
-#include "qdk/chemistry/algorithms/detail/algorithm_hash.hpp"
 #include "qdk/chemistry/data/settings.hpp"
 #include "qdk/chemistry/utils/hash_context.hpp"
 
@@ -75,12 +74,12 @@ class Algorithm {
    */
   virtual std::string hash(Args... args) const {
     qdk::chemistry::utils::HashContext ctx;
-    ctx.update(std::string("qdk-chemistry.algorithm-run.v1"));
-    ctx.update(this->type_name());
-    ctx.update(this->name());
-    ctx.update(this->_settings->content_hash());
-    ctx.update(static_cast<uint64_t>(sizeof...(Args)));
-    (detail::hash_algorithm_arg(ctx, args), ...);
+    using qdk::chemistry::utils::hash_value;
+    hash_value(ctx, this->type_name());
+    hash_value(ctx, this->name());
+    hash_value(ctx, this->_settings->content_hash());
+    hash_value(ctx, static_cast<uint64_t>(sizeof...(Args)));
+    (hash_value(ctx, args), ...);
     return ctx.hexdigest();
   }
 

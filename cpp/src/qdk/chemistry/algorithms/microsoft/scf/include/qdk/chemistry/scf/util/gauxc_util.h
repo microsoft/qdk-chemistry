@@ -193,34 +193,18 @@ struct hash<qdk::chemistry::scf::GAUXCInput> {
    */
   size_t operator()(const qdk::chemistry::scf::GAUXCInput& input) const {
     qdk::chemistry::utils::HashContext ctx;
-    ctx.update("gauxc_input");
-    auto update_hash = [&](const auto& value) {
-      using ValueType = std::decay_t<decltype(value)>;
-      if constexpr (std::is_enum_v<ValueType>) {
-        ctx.update(static_cast<int64_t>(value));
-      } else if constexpr (std::is_floating_point_v<ValueType>) {
-        ctx.update(static_cast<double>(value));
-      } else if constexpr (std::is_integral_v<ValueType> &&
-                           std::is_signed_v<ValueType>) {
-        ctx.update(static_cast<int64_t>(value));
-      } else if constexpr (std::is_integral_v<ValueType>) {
-        ctx.update(static_cast<uint64_t>(value));
-      } else {
-        ctx.update(std::string(value));
-      }
-    };
-
-    update_hash(input.grid_spec);
-    update_hash(input.rad_quad_spec);
-    update_hash(input.prune_spec);
-    update_hash(input.basis_tol);
-    update_hash(input.batch_size);
-    update_hash(input.integrator_kernel);
-    update_hash(input.lwd_kernel);
-    update_hash(input.reduction_kernel);
-    update_hash(input.integrator_ex);
-    update_hash(input.loadbalancer_ex);
-    update_hash(input.weights_ex);
+    hash_value(ctx, "gauxc_input");
+    hash_value(ctx, input.grid_spec);
+    hash_value(ctx, input.rad_quad_spec);
+    hash_value(ctx, input.prune_spec);
+    hash_value(ctx, input.basis_tol);
+    hash_value(ctx, input.batch_size);
+    hash_value(ctx, input.integrator_kernel);
+    hash_value(ctx, input.lwd_kernel);
+    hash_value(ctx, input.reduction_kernel);
+    hash_value(ctx, input.integrator_ex);
+    hash_value(ctx, input.loadbalancer_ex);
+    hash_value(ctx, input.weights_ex);
 
     return ctx.hash_code();
   }

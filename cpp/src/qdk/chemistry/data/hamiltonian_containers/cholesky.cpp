@@ -651,14 +651,14 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
 void CholeskyHamiltonianContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   HamiltonianContainer::hash_update(ctx);
-  ctx.update(get_container_type());
+  hash_value(ctx, get_container_type());
   if (_three_center) {
-    ctx.update(uint8_t(1));
-    ctx.update(_three_center->content_hash());
+    hash_value(ctx, uint8_t(1));
+    hash_value(ctx, _three_center->content_hash());
   } else {
-    ctx.update(uint8_t(0));
+    hash_value(ctx, uint8_t(0));
   }
-  ctx.update_optional(_ao_cholesky_vectors);
+  hash_value(ctx, _ao_cholesky_vectors);
 }
 
 }  // namespace qdk::chemistry::data

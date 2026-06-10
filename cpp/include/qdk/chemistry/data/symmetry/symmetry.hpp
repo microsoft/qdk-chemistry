@@ -696,6 +696,24 @@ class SymmetryLabel {
 std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
     const nlohmann::json& j);
 
+/**
+ * @brief Hash a symmetry axis value without routing through JSON.
+ *
+ * @param ctx Hash context to update.
+ * @param value Axis value to hash.
+ */
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryAxisValue& value);
+
+/**
+ * @brief Hash a symmetry label without routing through JSON.
+ *
+ * @param ctx Hash context to update.
+ * @param label Label to hash.
+ */
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryLabel& label);
+
 namespace axes {
 
 /**

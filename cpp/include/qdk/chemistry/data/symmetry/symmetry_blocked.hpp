@@ -39,10 +39,10 @@ struct LabelsHash {
    */
   std::size_t operator()(const std::array<SymmetryLabel, Rank>& labels) const {
     utils::HashContext ctx;
-    ctx.update("symmetry_labels");
-    ctx.update(static_cast<uint64_t>(Rank));
+    hash_value(ctx, "symmetry_labels");
+    hash_value(ctx, static_cast<uint64_t>(Rank));
     for (const auto& label : labels) {
-      ctx.update(label.to_json().dump());
+      hash_value(ctx, label);
     }
     return ctx.hash_code();
   }
@@ -581,43 +581,50 @@ class SymmetryBlocked : public DataClass {
   }
 
   static std::string _labels_sort_key(const Labels& labels) {
-    nlohmann::json key = nlohmann::json::array();
+    qdk::chemistry::utils::HashContext ctx;
+    hash_value(ctx, "symmetry_blocked_labels_sort_key");
+    hash_value(ctx, static_cast<uint64_t>(Rank));
     for (const auto& label : labels) {
-      key.push_back(label.to_json());
+      hash_value(ctx, label);
     }
-    return key.dump();
+    return ctx.hexdigest(0);
   }
 
   static void _hash_labels(qdk::chemistry::utils::HashContext& ctx,
                            const Labels& labels) {
-    ctx.update(_labels_sort_key(labels));
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    for (const auto& label : labels) {
+      hash_value(ctx, label);
+    }
   }
 
   void _hash_symmetry_blocked_metadata(
       qdk::chemistry::utils::HashContext& ctx) const {
-    ctx.update(static_cast<uint64_t>(Rank));
+    hash_value(ctx, static_cast<uint64_t>(Rank));
     for (const auto& sym : _symmetries) {
       if (sym) {
-        ctx.update(uint8_t(1));
-        ctx.update(sym->content_hash());
+        hash_value(ctx, uint8_t(1));
+        hash_value(ctx, sym->content_hash());
       } else {
-        ctx.update(uint8_t(0));
+        hash_value(ctx, uint8_t(0));
       }
     }
     for (const auto& slot : _extents) {
       std::vector<std::pair<std::string, std::size_t>> extents;
       extents.reserve(slot.size());
       for (const auto& [label, extent] : slot) {
-        extents.emplace_back(label.to_json().dump(), extent);
+        qdk::chemistry::utils::HashContext label_ctx;
+        hash_value(label_ctx, label);
+        extents.emplace_back(label_ctx.hexdigest(0), extent);
       }
       std::sort(extents.begin(), extents.end(),
                 [](const auto& lhs, const auto& rhs) {
                   return lhs.first < rhs.first;
                 });
-      ctx.update(static_cast<uint64_t>(extents.size()));
+      hash_value(ctx, static_cast<uint64_t>(extents.size()));
       for (const auto& [label_json, extent] : extents) {
-        ctx.update(label_json);
-        ctx.update(static_cast<uint64_t>(extent));
+        hash_value(ctx, label_json);
+        hash_value(ctx, static_cast<uint64_t>(extent));
       }
     }
   }

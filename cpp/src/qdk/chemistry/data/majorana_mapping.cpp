@@ -17,26 +17,21 @@
 
 namespace qdk::chemistry::data {
 
-namespace {
-
-void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
-                            const SparsePauliWord& word) {
-  ctx.update(static_cast<std::uint64_t>(word.size()));
+static void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
+                                   const SparsePauliWord& word) {
+  hash_value(ctx, static_cast<std::uint64_t>(word.size()));
   for (const auto& [qubit, op] : word) {
-    ctx.update(static_cast<std::uint64_t>(qubit));
-    ctx.update(op);
+    hash_value(ctx, static_cast<std::uint64_t>(qubit));
+    hash_value(ctx, op);
   }
 }
 
-void hash_bilinear_entry(
+static void hash_bilinear_entry(
     qdk::chemistry::utils::HashContext& ctx,
     const std::pair<std::complex<double>, SparsePauliWord>& entry) {
-  ctx.update(entry.first.real());
-  ctx.update(entry.first.imag());
+  hash_value(ctx, entry.first);
   hash_sparse_pauli_word(ctx, entry.second);
 }
-
-}  // namespace
 
 // ── MajoranaMapping implementation ───────────────────────────────────
 
@@ -327,28 +322,28 @@ std::size_t MajoranaMapping::compute_num_qubits(
 
 void MajoranaMapping::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(name_);
-  ctx.update(base_encoding_);
-  ctx.update(static_cast<std::uint64_t>(num_modes_));
-  ctx.update(static_cast<std::uint64_t>(num_qubits_));
-  ctx.update(majorana_atomic_);
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, name_);
+  hash_value(ctx, base_encoding_);
+  hash_value(ctx, static_cast<std::uint64_t>(num_modes_));
+  hash_value(ctx, static_cast<std::uint64_t>(num_qubits_));
+  hash_value(ctx, majorana_atomic_);
 
-  ctx.update(static_cast<std::uint64_t>(table_.size()));
+  hash_value(ctx, static_cast<std::uint64_t>(table_.size()));
   for (const auto& word : table_) {
     hash_sparse_pauli_word(ctx, word);
   }
 
-  ctx.update(static_cast<std::uint64_t>(bilinears_.size()));
+  hash_value(ctx, static_cast<std::uint64_t>(bilinears_.size()));
   for (const auto& entry : bilinears_) {
     hash_bilinear_entry(ctx, entry);
   }
 
   if (tapering_) {
-    ctx.update(std::uint8_t{1});
-    ctx.update(tapering_->content_hash());
+    hash_value(ctx, std::uint8_t{1});
+    hash_value(ctx, tapering_->content_hash());
   } else {
-    ctx.update(std::uint8_t{0});
+    hash_value(ctx, std::uint8_t{0});
   }
 }
 

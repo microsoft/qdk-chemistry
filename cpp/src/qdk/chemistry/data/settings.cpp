@@ -1963,48 +1963,48 @@ std::shared_ptr<Settings> Settings::from_hdf5(H5::Group& group) {
 }
 
 void Settings::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
+  hash_value(ctx, get_data_type_name());
   // settings_ is a std::map which is already sorted by key
-  ctx.update(static_cast<uint64_t>(settings_.size()));
+  hash_value(ctx, static_cast<uint64_t>(settings_.size()));
   for (const auto& [key, value] : settings_) {
-    ctx.update(key);
+    hash_value(ctx, key);
     // Visit the variant and hash each type
     std::visit(
         [&ctx](const auto& v) {
           using T = std::decay_t<decltype(v)>;
           if constexpr (std::is_same_v<T, bool>) {
-            ctx.update(uint8_t(0));
-            ctx.update(v);
+            hash_value(ctx, uint8_t(0));
+            hash_value(ctx, v);
           } else if constexpr (std::is_same_v<T, int64_t>) {
-            ctx.update(uint8_t(1));
-            ctx.update(v);
+            hash_value(ctx, uint8_t(1));
+            hash_value(ctx, v);
           } else if constexpr (std::is_same_v<T, double>) {
-            ctx.update(uint8_t(2));
-            ctx.update(v);
+            hash_value(ctx, uint8_t(2));
+            hash_value(ctx, v);
           } else if constexpr (std::is_same_v<T, std::string>) {
-            ctx.update(uint8_t(3));
-            ctx.update(v);
+            hash_value(ctx, uint8_t(3));
+            hash_value(ctx, v);
           } else if constexpr (std::is_same_v<T, std::vector<int64_t>>) {
-            ctx.update(uint8_t(4));
-            ctx.update(static_cast<uint64_t>(v.size()));
-            for (auto val : v) ctx.update(val);
+            hash_value(ctx, uint8_t(4));
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (auto val : v) hash_value(ctx, val);
           } else if constexpr (std::is_same_v<T, std::vector<double>>) {
-            ctx.update(uint8_t(5));
-            ctx.update(static_cast<uint64_t>(v.size()));
-            for (auto val : v) ctx.update(val);
+            hash_value(ctx, uint8_t(5));
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (auto val : v) hash_value(ctx, val);
           } else if constexpr (std::is_same_v<T, std::vector<std::string>>) {
-            ctx.update(uint8_t(6));
-            ctx.update(static_cast<uint64_t>(v.size()));
-            for (const auto& val : v) ctx.update(val);
+            hash_value(ctx, uint8_t(6));
+            hash_value(ctx, static_cast<uint64_t>(v.size()));
+            for (const auto& val : v) hash_value(ctx, val);
           } else if constexpr (std::is_same_v<T, AlgorithmRef>) {
-            ctx.update(uint8_t(7));
-            ctx.update(v.get_algorithm_type());
-            ctx.update(v.get_algorithm_name());
+            hash_value(ctx, uint8_t(7));
+            hash_value(ctx, v.get_algorithm_type());
+            hash_value(ctx, v.get_algorithm_name());
             if (v.get_settings()) {
-              ctx.update(true);
-              ctx.update(v.get_settings()->content_hash());
+              hash_value(ctx, true);
+              hash_value(ctx, v.get_settings()->content_hash());
             } else {
-              ctx.update(false);
+              hash_value(ctx, false);
             }
           }
         },

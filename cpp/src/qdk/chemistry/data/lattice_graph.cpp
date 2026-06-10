@@ -943,10 +943,10 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
 }
 
 void LatticeGraph::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(static_cast<uint64_t>(_num_sites));
-  ctx.update(adjacency_);
-  ctx.update(_is_symmetric);
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, static_cast<uint64_t>(_num_sites));
+  hash_value(ctx, adjacency_);
+  hash_value(ctx, _is_symmetric);
 }
 
 }  // namespace qdk::chemistry::data

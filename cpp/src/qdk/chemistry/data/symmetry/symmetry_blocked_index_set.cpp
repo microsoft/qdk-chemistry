@@ -161,18 +161,18 @@ void SymmetryBlockedIndexSet::to_file(const std::string& filename,
 
 void SymmetryBlockedIndexSet::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
+  hash_value(ctx, get_data_type_name());
   _hash_symmetry_blocked_metadata(ctx);
   auto groups = _sorted_pointer_groups();
-  ctx.update(static_cast<uint64_t>(groups.size()));
+  hash_value(ctx, static_cast<uint64_t>(groups.size()));
   for (const auto& group : groups) {
-    ctx.update(static_cast<uint64_t>(group.keys.size()));
+    hash_value(ctx, static_cast<uint64_t>(group.keys.size()));
     for (const auto& key : group.keys) {
       _hash_labels(ctx, key);
     }
-    ctx.update(static_cast<uint64_t>(group.ptr->size()));
+    hash_value(ctx, static_cast<uint64_t>(group.ptr->size()));
     for (std::uint32_t index : *group.ptr) {
-      ctx.update(static_cast<uint64_t>(index));
+      hash_value(ctx, static_cast<uint64_t>(index));
     }
   }
 }

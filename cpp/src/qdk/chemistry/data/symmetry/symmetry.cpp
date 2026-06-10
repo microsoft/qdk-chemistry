@@ -38,9 +38,9 @@ bool SpinValue::equals(const SymmetryAxisValue& other) const {
 
 std::size_t SpinValue::hash() const {
   utils::HashContext ctx;
-  ctx.update("spin_value");
-  ctx.update(static_cast<int64_t>(AxisName::Spin));
-  ctx.update(static_cast<int64_t>(_two_ms));
+  hash_value(ctx, "spin_value");
+  hash_value(ctx, static_cast<int64_t>(AxisName::Spin));
+  hash_value(ctx, static_cast<int64_t>(_two_ms));
   return ctx.hash_code();
 }
 
@@ -64,6 +64,20 @@ std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
     return SpinValue::from_json(j);
   }
   throw std::runtime_error("Unknown symmetry axis value kind '" + kind + "'.");
+}
+
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryAxisValue& value) {
+  hash_value(ctx, static_cast<int64_t>(value.axis()));
+  if (value.axis() == AxisName::Spin) {
+    const auto* spin = dynamic_cast<const SpinValue*>(&value);
+    if (spin == nullptr) {
+      throw std::runtime_error("Spin axis value has unexpected runtime type.");
+    }
+    hash_value(ctx, static_cast<int64_t>(spin->value()));
+    return;
+  }
+  throw std::logic_error("Unknown AxisName value");
 }
 
 // ---------------------------------------------------------------------------
@@ -124,12 +138,12 @@ std::size_t SymmetryAxis::hash() const {
 }
 
 void SymmetryAxis::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(static_cast<int64_t>(_name));
-  ctx.update(_equivalent);
-  ctx.update(static_cast<uint64_t>(_labels.size()));
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, static_cast<int64_t>(_name));
+  hash_value(ctx, _equivalent);
+  hash_value(ctx, static_cast<uint64_t>(_labels.size()));
   for (const auto& label : _labels) {
-    ctx.update(label->to_json().dump());
+    hash_value(ctx, *label);
   }
 }
 
@@ -466,10 +480,10 @@ std::shared_ptr<SymmetryProduct> SymmetryProduct::from_file(
 
 void SymmetryProduct::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
-  ctx.update(get_data_type_name());
-  ctx.update(static_cast<uint64_t>(_axes.size()));
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, static_cast<uint64_t>(_axes.size()));
   for (const auto& axis : _axes) {
-    ctx.update(axis.content_hash());
+    hash_value(ctx, axis.content_hash());
   }
 }
 
@@ -481,17 +495,30 @@ std::size_t SymmetryLabel::_compute_hash(
     const std::map<AxisName, std::shared_ptr<const SymmetryAxisValue>>&
         values) {
   utils::HashContext ctx;
-  ctx.update("symmetry_label");
-  ctx.update(static_cast<uint64_t>(values.size()));
+  hash_value(ctx, "symmetry_label");
+  hash_value(ctx, static_cast<uint64_t>(values.size()));
   for (const auto& [axis, value] : values) {
     if (value == nullptr) {
       throw std::runtime_error(
           "SymmetryLabel values must not be null pointers.");
     }
-    ctx.update(static_cast<int64_t>(axis));
-    ctx.update(value->to_json().dump());
+    hash_value(ctx, static_cast<int64_t>(axis));
+    hash_value(ctx, *value);
   }
   return ctx.hash_code();
+}
+
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryLabel& label) {
+  hash_value(ctx, static_cast<uint64_t>(label.values().size()));
+  for (const auto& [axis, value] : label.values()) {
+    if (value == nullptr) {
+      throw std::runtime_error(
+          "SymmetryLabel values must not be null pointers.");
+    }
+    hash_value(ctx, static_cast<int64_t>(axis));
+    hash_value(ctx, *value);
+  }
 }
 
 SymmetryLabel::SymmetryLabel(
