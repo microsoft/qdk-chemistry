@@ -324,62 +324,115 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
 
 // ── Factory: Verstraete-Cirac ────────────────────────────────────────
 
-// Extended-system (interleaved) construction following Verstraete & Cirac
-// (J. Stat. Mech. 2005 P09012) and Whitfield, Havlicek & Troyer (PRA 2016).
+// Verstraete-Cirac encoding for a rows x cols lattice, following
+// Verstraete & Cirac (J. Stat. Mech. 2005 P09012) and Whitfield,
+// Havlicek & Troyer (PRA 94, 030301(R) 2016).
 //
-// The register has 2N qubits.  Physical mode j occupies qubit 2j; the
-// corresponding auxiliary mode occupies qubit 2j+1.  The N Majorana pairs
-// for physical fermions are placed at the even-indexed positions using a
-// standard Jordan-Wigner Z-string that spans ALL 2j preceding qubits
-// (both physical and auxiliary):
+// The mapping covers both spin species in blocked order: sites 0..N-1
+// (N = rows*cols, row-major) appear once per spin block.  Each site
+// carries one physical fermionic mode and one auxiliary mode.  The
+// combined 4N modes are Jordan-Wigner mapped in interleaved order
+// (phys_0, aux_0, phys_1, aux_1, ... per spin block) onto 4N qubits.
 //
-//   gamma_{2j}   = Z_0 Z_1 ... Z_{2j-1}  X_{2j}
-//   gamma_{2j+1} = Z_0 Z_1 ... Z_{2j-1}  Y_{2j}
+// For every vertical lattice edge (s, t = s + cols) the auxiliary modes
+// provide a stabilizer S_e = i c_s d_t, where c_s is the X-type Majorana
+// of site s's auxiliary mode and d_t the Y-type Majorana of site t's.
+// Each auxiliary Majorana appears in at most one stabilizer, so all S_e
+// mutually commute, and they commute with every physical bilinear (both
+// operators are even products of disjoint Majoranas).
 //
-// Vertex operators K_j = -Z_{2j+1} (pure auxiliary-qubit operators) commute
-// with every bilinear formed from the physical Majoranas, so the physical
-// Hamiltonian is block-diagonal in the K_j eigenspaces.  In the codespace
-// where K_j = +1 (i.e. Z_{2j+1} = -1, all auxiliary qubits in |1>) the
-// nearest-neighbour hopping operators have constant Pauli weight 3 and the
-// spectrum equals the Jordan-Wigner spectrum on N qubits.
+// Each physical bilinear i gamma_P gamma_Q whose Majoranas live on the
+// two endpoints of a vertical edge is dressed by that edge's stabilizer:
+// the auxiliary Z-string of S_e cancels the physical JW string, leaving
+// a constant weight-4 operator.  Horizontal hops are JW-adjacent in the
+// interleaved layout (weight 3) and need no dressing.  Since S_e = +1 on
+// the codespace, the mapped Hamiltonian restricted to the joint +1
+// eigenspace of all stabilizers is isospectral to the Jordan-Wigner
+// Hamiltonian on 2N qubits.
+//
+// The result is bilinear-only (no individual Majorana images exist for
+// dressed operators), so this factory uses from_bilinears.
 
-MajoranaMapping MajoranaMapping::verstraete_cirac(std::size_t num_modes) {
-  using namespace detail;
-  if (num_modes < 2) {
-    throw std::invalid_argument("verstraete_cirac requires num_modes >= 2");
+MajoranaMapping MajoranaMapping::verstraete_cirac(std::size_t rows,
+                                                  std::size_t cols) {
+  if (rows < 2 || cols < 2) {
+    throw std::invalid_argument(
+        "verstraete_cirac requires rows >= 2 and cols >= 2");
   }
 
-  // 2*num_modes qubits in interleaved layout:
-  //   qubit 2j   = physical mode j
-  //   qubit 2j+1 = auxiliary mode j  (enters only via Z-string)
-  std::vector<SparsePauliWord> table;
-  table.reserve(2 * num_modes);
+  const std::size_t n_sites = rows * cols;
+  const std::size_t n_modes = 2 * n_sites;  // exposed spin-orbital modes
+  const std::size_t M = 2 * n_modes;        // physical Majorana count
 
-  for (std::size_t j = 0; j < num_modes; ++j) {
-    // Z string covers all qubits 0 .. 2j-1 (physical AND auxiliary).
-    std::vector<std::pair<std::uint64_t, std::uint8_t>> even_entries;
-    std::vector<std::pair<std::uint64_t, std::uint8_t>> odd_entries;
-    for (std::size_t q = 0; q < 2 * j; ++q) {
-      even_entries.emplace_back(static_cast<std::uint64_t>(q), op_z);
-      odd_entries.emplace_back(static_cast<std::uint64_t>(q), op_z);
+  // Combined-mode layout (4*n_sites modes -> 4*n_sites qubits):
+  //   spin block sigma in {0, 1}, site s:
+  //     physical mode at combined index sigma*2N + 2s
+  //     auxiliary mode at combined index sigma*2N + 2s + 1
+  auto mu = [](std::size_t k) -> SparsePauliWord {
+    // Pauli image of combined-JW Majorana k (mode k/2, parity k%2).
+    std::size_t m = k / 2;
+    SparsePauliWord word;
+    word.reserve(m + 1);
+    for (std::size_t q = 0; q < m; ++q) {
+      word.emplace_back(static_cast<std::uint64_t>(q), detail::op_z);
     }
-    even_entries.emplace_back(static_cast<std::uint64_t>(2 * j), op_x);
-    odd_entries.emplace_back(static_cast<std::uint64_t>(2 * j), op_y);
+    word.emplace_back(static_cast<std::uint64_t>(m),
+                      (k % 2 == 0) ? detail::op_x : detail::op_y);
+    return word;
+  };
 
-    // For the last mode, append Z on the trailing auxiliary qubit 2N-1 so
-    // that num_qubits equals 2*num_modes and K_{N-1} = -Z_{2N-1} is defined.
-    if (j == num_modes - 1) {
-      even_entries.emplace_back(static_cast<std::uint64_t>(2 * num_modes - 1),
-                                op_z);
-      odd_entries.emplace_back(static_cast<std::uint64_t>(2 * num_modes - 1),
-                               op_z);
+  auto phys_majorana = [&](std::size_t P) -> SparsePauliWord {
+    std::size_t sigma = P / (2 * n_sites);
+    std::size_t p = P % (2 * n_sites);
+    std::size_t s = p / 2;
+    std::size_t b = p % 2;
+    return mu(2 * (sigma * 2 * n_sites + 2 * s) + b);
+  };
+
+  // S_e = i * c_s * d_t for vertical edge (s, t), both in spin block sigma.
+  auto stabilizer =
+      [&](std::size_t sigma, std::size_t s,
+          std::size_t t) -> std::pair<std::complex<double>, SparsePauliWord> {
+    auto c = mu(2 * (sigma * 2 * n_sites + 2 * s + 1));
+    auto d = mu(2 * (sigma * 2 * n_sites + 2 * t + 1) + 1);
+    auto [phase, word] = PauliTermAccumulator::multiply_uncached(c, d);
+    return {std::complex<double>(0.0, 1.0) * phase, std::move(word)};
+  };
+
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
+  bilinears.reserve(M * (M - 1) / 2);
+
+  for (std::size_t P = 0; P < M; ++P) {
+    std::size_t sigma_p = P / (2 * n_sites);
+    std::size_t site_p = (P % (2 * n_sites)) / 2;
+    auto img_p = phys_majorana(P);
+    for (std::size_t Q = P + 1; Q < M; ++Q) {
+      std::size_t sigma_q = Q / (2 * n_sites);
+      std::size_t site_q = (Q % (2 * n_sites)) / 2;
+
+      auto [phase, word] =
+          PauliTermAccumulator::multiply_uncached(img_p, phys_majorana(Q));
+      std::complex<double> coeff = std::complex<double>(0.0, 1.0) * phase;
+
+      // Dress vertical-edge bilinears with the edge stabilizer.
+      if (sigma_p == sigma_q && site_p != site_q) {
+        std::size_t lo = std::min(site_p, site_q);
+        std::size_t hi = std::max(site_p, site_q);
+        if (hi - lo == cols) {
+          auto [s_coeff, s_word] = stabilizer(sigma_p, lo, hi);
+          auto [d_phase, d_word] =
+              PauliTermAccumulator::multiply_uncached(word, s_word);
+          coeff *= s_coeff * d_phase;
+          word = std::move(d_word);
+        }
+      }
+
+      bilinears.emplace_back(coeff, std::move(word));
     }
-
-    table.push_back(build_sorted_word(std::move(even_entries)));
-    table.push_back(build_sorted_word(std::move(odd_entries)));
   }
 
-  return MajoranaMapping::from_table(std::move(table), "verstraete-cirac");
+  return MajoranaMapping::from_bilinears(n_modes, std::move(bilinears),
+                                         "verstraete-cirac");
 }
 
 MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(

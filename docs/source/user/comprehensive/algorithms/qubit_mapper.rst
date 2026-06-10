@@ -55,10 +55,14 @@ Bravyi-Kitaev tree :cite:`Havlicek2017`
 .. _encoding-verstraete-cirac:
 
 Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017b`
-   Introduces one auxiliary qubit per fermionic mode, doubling the register size, so that every
-   nearest-neighbor hopping term maps to a constant-weight Pauli string independent of system size.
-   Designed for 2D-local problems such as Fermi-Hubbard models, lattice gauge theories, and
-   fermionic tensor-network ansatze where Jordan-Wigner Z-strings inflate Trotter circuit depth.
+   An encoding for 2D lattice problems constructed with
+   :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` from the lattice dimensions
+   (rows, cols). It introduces one auxiliary qubit per fermionic mode and dresses vertical
+   nearest-neighbor bilinears with auxiliary-mode stabilizers, so every nearest-neighbor hopping
+   term maps to a Pauli string of weight at most 4 independent of lattice size. Designed for
+   2D-local problems such as Fermi-Hubbard models, lattice gauge theories, and fermionic
+   tensor-network ansatze where Jordan-Wigner Z-strings inflate Trotter circuit depth. The
+   mapping is bilinear-only and is supported by the QDK qubit mapper.
 
 
 Using the QubitMapper

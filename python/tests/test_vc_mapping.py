@@ -1,10 +1,14 @@
 """Tests for the Verstraete-Cirac fermion-to-qubit encoding.
 
 Acceptance criteria from the feature request:
-- Factory works for lattice sizes 2x2, 2x3, 3x3, 4x4 (single spin species).
-- Fermi-Hubbard 2x2 codespace eigenvalues match JW to 1e-10.
-- Max Pauli weight for nearest-neighbor hopping is constant across L in {2,3,4}.
-- JSON and HDF5 round-trips reproduce the mapping term-by-term.
+- Factory accepts 2D lattices of sizes 2x2, 2x3, 3x3, 4x4 and the result is
+  consumable by QubitMapper.
+- Fermi-Hubbard 2x2 (t=1, U=4, half filling): four lowest codespace
+  eigenvalues match Jordan-Wigner to 1e-10.
+- Max Pauli weight over all NN hopping terms is the same finite integer for
+  open LxL lattices with L in {2, 3, 4}.
+- JSON and HDF5 round-trips reproduce the mapping, and the round-tripped
+  mapping produces an identical QubitHamiltonian term-by-term.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -18,42 +22,18 @@ import h5py
 import numpy as np
 import pytest
 
-from qdk_chemistry._core.data import (
-    PauliTermAccumulator,
-    sparse_pauli_word_to_label,
-)
+from qdk_chemistry._core.data import PauliTermAccumulator, sparse_pauli_word_to_label
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
 )
+from qdk_chemistry.utils.pauli_matrix import pauli_to_sparse_matrix
 
 from .test_helpers import create_test_orbitals
 
 # ─── helpers ─────────────────────────────────────────────────────────────
-
-
-def _word_to_label(word, num_qubits: int) -> str:
-    """Convert a sparse Pauli word to a dense label string."""
-    return sparse_pauli_word_to_label(word, num_qubits)
-
-
-def _verify_clifford(mapping: MajoranaMapping) -> None:
-    """Assert {gamma_i, gamma_j} = 2*delta_ij for all pairs in the mapping."""
-    n = 2 * mapping.num_modes
-    for i in range(n):
-        wi = mapping.majorana(i)
-        for j in range(i, n):
-            wj = mapping.majorana(j)
-            phase_ij, word_ij = PauliTermAccumulator.multiply_uncached(wi, wj)
-            phase_ji, word_ji = PauliTermAccumulator.multiply_uncached(wj, wi)
-            if i == j:
-                assert word_ij == [], f"gamma_{i}^2 != I"
-                assert abs(phase_ij - 1.0) < 1e-12
-            else:
-                assert word_ij == word_ji
-                assert abs(phase_ij + phase_ji) < 1e-12, f"{{gamma_{i}, gamma_{j}}} != 0"
 
 
 def _pauli_weight(pauli_str: str) -> int:
@@ -61,65 +41,67 @@ def _pauli_weight(pauli_str: str) -> int:
     return sum(c != "I" for c in pauli_str)
 
 
-def _to_matrix(qh) -> np.ndarray:
-    """Build the dense Hamiltonian matrix from a QubitHamiltonian via Kronecker products."""
-    n = qh.num_qubits
-    dim = 2**n
-    mat = np.zeros((dim, dim), dtype=complex)
-    pm = {
-        "I": np.eye(2, dtype=complex),
-        "X": np.array([[0, 1], [1, 0]], dtype=complex),
-        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
-        "Z": np.array([[1, 0], [0, -1]], dtype=complex),
-    }
-    for ps, c in zip(qh.pauli_strings, qh.coefficients, strict=True):
-        term = np.array([[1.0]], dtype=complex)
-        for ch in ps:
-            term = np.kron(term, pm[ch])
-        mat += c * term
-    return mat
+def _hubbard_lattice(rows: int, cols: int, t: float, u: float) -> Hamiltonian:
+    """Open-boundary Fermi-Hubbard on a rows x cols lattice, row-major sites.
 
-
-def _fermi_hubbard_hamiltonian(rows: int, cols: int, t: float, u: float, single_spin: bool = True):
-    """Build a Fermi-Hubbard Hamiltonian on an open rows x cols lattice.
-
-    When single_spin=True, uses only one spin species (num_modes = rows*cols).
-    The QDK convention treats the one-body array as spin-summed for restricted
-    orbitals, so we pass it directly as h1 with spin_symmetric=True implied.
+    QDK doubles the n spatial orbitals to 2n spin-orbitals internally
+    (blocked order), which matches the VC mapping's two spin blocks.  The
+    on-site U enters as the (s,s|s,s) two-body integral, giving the
+    alpha-beta repulsion U * n_{s,up} n_{s,down} after spin doubling.
     """
     n = rows * cols
-
-    def site(r, c):
-        """Return the flat site index for lattice position (r, c)."""
-        return r * cols + c
-
     h1 = np.zeros((n, n))
     for r in range(rows):
         for c in range(cols):
-            j = site(r, c)
+            s = r * cols + c
             if c + 1 < cols:
-                k = site(r, c + 1)
-                h1[j, k] = h1[k, j] = -t
+                h1[s, s + 1] = h1[s + 1, s] = -t
             if r + 1 < rows:
-                k = site(r + 1, c)
-                h1[j, k] = h1[k, j] = -t
+                h1[s, s + cols] = h1[s + cols, s] = -t
+    h2 = np.zeros(n**4)
+    if u != 0.0:
+        for s in range(n):
+            h2[s * n**3 + s * n**2 + s * n + s] = u
+    orbitals = create_test_orbitals(n)
+    return Hamiltonian(CanonicalFourCenterHamiltonianContainer(h1, h2, orbitals, 0.0, np.eye(0)))
 
-    if single_spin:
-        # QDK always uses both spin channels (alpha + beta), so a call with
-        # n spatial orbitals produces 2n spin-orbitals internally.  The h1
-        # matrix passed here is the spatial (spin-summed) hopping; QDK applies
-        # it symmetrically to both spins.  The on-site U term is encoded as
-        # the (j,j|j,j) two-body integral, which becomes the alpha-beta
-        # interaction after QDK's spin doubling.
-        h2 = np.zeros(n**4)
-        if u != 0.0:
-            for j in range(n):
-                h2[j * n**3 + j * n**2 + j * n + j] = u
-        orbitals = create_test_orbitals(n)
-        fock = np.eye(0)
-        return Hamiltonian(CanonicalFourCenterHamiltonianContainer(h1, h2, orbitals, 0.0, fock))
 
-    raise NotImplementedError("two-spin not needed for these tests")
+def _mu(k: int) -> list[tuple[int, int]]:
+    """Pauli word of the combined-JW Majorana k in the VC interleaved layout."""
+    m, b = divmod(k, 2)
+    word = [(q, 3) for q in range(m)]
+    word.append((m, 1 if b == 0 else 2))
+    return word
+
+
+def _stabilizer(sigma: int, s: int, t: int, n_sites: int) -> tuple[complex, list[tuple[int, int]]]:
+    """S = i * c_s * d_t: the VC auxiliary stabilizer for sites s, t in spin block sigma."""
+    c = _mu(2 * (sigma * 2 * n_sites + 2 * s + 1))
+    d = _mu(2 * (sigma * 2 * n_sites + 2 * t + 1) + 1)
+    phase, word = PauliTermAccumulator.multiply_uncached(c, d)
+    return 1j * phase, word
+
+
+def _all_stabilizers(rows: int, cols: int) -> list[tuple[complex, list[tuple[int, int]]]]:
+    """Edge stabilizers plus column closers; their joint +1 space has dim 2^(2*rows*cols)."""
+    n_sites = rows * cols
+    stabs = []
+    for sigma in (0, 1):
+        for s in range(n_sites - cols):
+            stabs.append(_stabilizer(sigma, s, s + cols, n_sites))
+        for col in range(cols):
+            stabs.append(_stabilizer(sigma, (rows - 1) * cols + col, col, n_sites))
+    return stabs
+
+
+def _sparse_pauli(label: str, coeff: complex):
+    """Sparse matrix of coeff * (Pauli given by label)."""
+    return coeff * pauli_to_sparse_matrix([label], np.array([1.0 + 0j]))
+
+
+def _qh_sparse(qh):
+    """Sparse matrix of a QubitHamiltonian."""
+    return pauli_to_sparse_matrix(list(qh.pauli_strings), np.asarray(qh.coefficients))
 
 
 # ─── factory tests ───────────────────────────────────────────────────────
@@ -128,130 +110,155 @@ def _fermi_hubbard_hamiltonian(rows: int, cols: int, t: float, u: float, single_
 class TestVerstraeteCiracFactory:
     """Tests for the MajoranaMapping.verstraete_cirac factory."""
 
-    @pytest.mark.parametrize("n_modes", [4, 6, 9, 16])
-    def test_factory_sizes(self, n_modes: int) -> None:
-        """Factory constructs mappings for lattice sizes 2x2, 2x3, 3x3, 4x4."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=n_modes)
-        assert vc.num_modes == n_modes
-        assert vc.num_qubits == 2 * n_modes
+    @pytest.mark.parametrize(("rows", "cols"), [(2, 2), (2, 3), (3, 3), (4, 4)])
+    def test_factory_lattice_sizes(self, rows: int, cols: int) -> None:
+        """Factory constructs mappings for the lattice sizes in the acceptance criteria."""
+        vc = MajoranaMapping.verstraete_cirac(rows, cols)
+        n_sites = rows * cols
+        assert vc.num_modes == 2 * n_sites
+        assert vc.num_qubits == 4 * n_sites
         assert vc.name == "verstraete-cirac"
-        assert vc.is_majorana_atomic
+        assert vc.is_majorana_atomic is False
 
-    def test_too_few_modes_raises(self) -> None:
-        """num_modes=1 is rejected."""
-        with pytest.raises(ValueError, match="num_modes"):
-            MajoranaMapping.verstraete_cirac(num_modes=1)
+    @pytest.mark.parametrize(("rows", "cols"), [(1, 2), (2, 1), (0, 0), (1, 1)])
+    def test_too_small_lattice_raises(self, rows: int, cols: int) -> None:
+        """Lattices smaller than 2x2 are rejected."""
+        with pytest.raises(ValueError, match="rows >= 2 and cols >= 2"):
+            MajoranaMapping.verstraete_cirac(rows, cols)
 
-    def test_zero_modes_raises(self) -> None:
-        """num_modes=0 is rejected."""
-        with pytest.raises(ValueError, match="num_modes"):
-            MajoranaMapping.verstraete_cirac(num_modes=0)
+    def test_majorana_raises(self) -> None:
+        """Individual Majorana images are unavailable for the bilinear-only VC mapping."""
+        vc = MajoranaMapping.verstraete_cirac(2, 2)
+        with pytest.raises(ValueError, match="bilinear-only"):
+            vc.majorana(0)
 
-    @pytest.mark.parametrize("n_modes", [2, 4, 6, 9])
-    def test_clifford_algebra(self, n_modes: int) -> None:
-        """VC Majorana operators satisfy {gamma_i, gamma_j} = 2*delta_ij."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=n_modes)
-        _verify_clifford(vc)
+    @pytest.mark.parametrize(("rows", "cols"), [(2, 2), (2, 3)])
+    def test_bilinear_antisymmetry(self, rows: int, cols: int) -> None:
+        """bilinear(k, j) = -bilinear(j, k)."""
+        vc = MajoranaMapping.verstraete_cirac(rows, cols)
+        m = 2 * vc.num_modes
+        for j in range(0, m, 3):
+            for k in range(j + 1, m, 3):
+                c_fwd, w_fwd = vc.bilinear(j, k)
+                c_rev, w_rev = vc.bilinear(k, j)
+                assert w_fwd == w_rev
+                assert abs(c_fwd + c_rev) < 1e-12
 
-    def test_table_shape(self) -> None:
-        """Table has 2*num_modes entries."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=4)
-        assert len(vc.table) == 8
+    def test_bilinears_square_to_identity(self) -> None:
+        """(i gamma_j gamma_k)^2 = I for the VC bilinears."""
+        vc = MajoranaMapping.verstraete_cirac(2, 2)
+        m = 2 * vc.num_modes
+        for j in range(0, m, 2):
+            for k in range(j + 1, m, 2):
+                coeff, word = vc.bilinear(j, k)
+                phase, prod = PauliTermAccumulator.multiply_uncached(word, word)
+                assert prod == [], f"({j},{k}): word^2 not identity"
+                assert abs(coeff * coeff * phase - 1.0) < 1e-12
 
-    def test_reference_n2(self) -> None:
-        """n=2: verify table for the interleaved JW construction.
 
-        Qubits 0,2 are physical (modes 0,1); qubits 1,3 are auxiliary.
-        Z string spans all qubits before the physical qubit of each mode.
-        The last mode also carries Z on qubit 2N-1=3 to anchor num_qubits=2N.
+# ─── stabilizer structure ────────────────────────────────────────────────
 
-        Little-endian: rightmost char = qubit 0.
-        4-char string: char[0]=q3, char[1]=q2, char[2]=q1, char[3]=q0.
-        """
-        vc = MajoranaMapping.verstraete_cirac(num_modes=2)
-        assert vc.num_qubits == 4
-        labels = tuple(_word_to_label(w, vc.num_qubits) for w in vc.table)
-        # gamma_0 = X_0            (j=0: no Z string)   → "IIIX"
-        assert labels[0] == "IIIX"
-        # gamma_1 = Y_0                                  → "IIIY"
-        assert labels[1] == "IIIY"
-        # gamma_2 = Z_0 Z_1 X_2 Z_3  (j=1: Z on 0,1; X on 2; last-aux Z on 3) → "ZXZZ"
-        assert labels[2] == "ZXZZ"
-        # gamma_3 = Z_0 Z_1 Y_2 Z_3                     → "ZYZZ"
-        assert labels[3] == "ZYZZ"
+
+class TestVerstraeteCiracStabilizers:
+    """The mapped Hamiltonian commutes with every VC stabilizer."""
+
+    def test_hamiltonian_commutes_with_stabilizers(self) -> None:
+        """[H_vc, S_e] = 0 exactly for all edge and column-closing stabilizers."""
+        rows, cols = 2, 2
+        ham = _hubbard_lattice(rows, cols, t=1.0, u=4.0)
+        vc = MajoranaMapping.verstraete_cirac(rows, cols)
+        qh = create("qubit_mapper", "qdk").run(ham, vc)
+        nq = qh.num_qubits
+        H = _qh_sparse(qh)  # noqa: N806
+
+        for s_coeff, s_word in _all_stabilizers(rows, cols):
+            label = sparse_pauli_word_to_label(s_word, nq)
+            S = _sparse_pauli(label, s_coeff)  # noqa: N806
+            comm = H @ S - S @ H
+            assert abs(comm).max() < 1e-12, f"[H, S] != 0 for stabilizer {label}"
+
+    def test_stabilizers_square_to_identity(self) -> None:
+        """S_e^2 = +1 for every stabilizer."""
+        rows, cols = 2, 3
+        for s_coeff, s_word in _all_stabilizers(rows, cols):
+            phase, prod = PauliTermAccumulator.multiply_uncached(s_word, s_word)
+            assert prod == []
+            assert abs(s_coeff * s_coeff * phase - 1.0) < 1e-12
 
 
 # ─── Pauli weight locality ────────────────────────────────────────────────
 
 
-def _max_nn_pauli_weight(n_sites: int) -> int:
-    """Max Pauli weight for NN hopping on a 1D chain of n_sites under VC encoding.
-
-    Uses sequential adjacent-mode hops only (h[j, j+1] = -1). The VC construction
-    achieves constant weight 4 for these hops regardless of chain length.
-    """
-    h1 = np.zeros((n_sites, n_sites))
-    for j in range(n_sites - 1):
-        h1[j, j + 1] = h1[j + 1, j] = -1.0
-    h2 = np.zeros(n_sites**4)
-    orbitals = create_test_orbitals(n_sites)
-    fock = np.eye(0)
-    ham = Hamiltonian(CanonicalFourCenterHamiltonianContainer(h1, h2, orbitals, 0.0, fock))
-
-    num_modes = 2 * n_sites  # QDK uses both spin channels
-    vc = MajoranaMapping.verstraete_cirac(num_modes=num_modes)
-    mapper = create("qubit_mapper", "qdk")
-    qh = mapper.run(ham, vc)
-    return max(_pauli_weight(ps) for ps in qh.pauli_strings)
-
-
 class TestVerstraeteCiracLocality:
-    """Tests for the constant Pauli-weight locality property."""
+    """Constant Pauli weight for nearest-neighbour hopping."""
 
-    def test_weight_independent_of_size(self) -> None:
-        """Max Pauli weight for sequential NN hopping is constant 4 for all chain lengths."""
-        weights = {_max_nn_pauli_weight(n) for n in (4, 9, 16)}
+    def test_weight_independent_of_lattice_size(self) -> None:
+        """Max NN-hopping Pauli weight is the same finite integer for L in {2, 3, 4}."""
+        mapper = create("qubit_mapper", "qdk")
+        weights = set()
+        for size in (2, 3, 4):
+            ham = _hubbard_lattice(size, size, t=1.0, u=0.0)
+            vc = MajoranaMapping.verstraete_cirac(size, size)
+            qh = mapper.run(ham, vc)
+            weights.add(max(_pauli_weight(ps) for ps in qh.pauli_strings))
         assert weights == {4}, f"Expected constant weight 4, got: {weights}"
 
+    def test_jw_weight_grows_for_comparison(self) -> None:
+        """Under JW the same vertical hops produce strings that grow with L."""
+        mapper = create("qubit_mapper", "qdk")
+        jw_weights = []
+        for size in (2, 3, 4):
+            ham = _hubbard_lattice(size, size, t=1.0, u=0.0)
+            qh = mapper.run(ham, MajoranaMapping.jordan_wigner(num_modes=2 * size * size))
+            jw_weights.append(max(_pauli_weight(ps) for ps in qh.pauli_strings))
+        assert jw_weights == sorted(jw_weights)
+        assert jw_weights[0] < jw_weights[-1]
 
-# ─── Eigenvalue correctness ───────────────────────────────────────────────
+
+# ─── eigenvalue correctness ───────────────────────────────────────────────
 
 
 class TestVerstraeteCiracEigenvalues:
-    """Tests for eigenvalue correctness of the VC-encoded Hamiltonian."""
+    """Codespace spectrum equals the Jordan-Wigner spectrum."""
 
-    def test_fermi_hubbard_codespace_matches_jw(self) -> None:
-        """VC codespace eigenvalues match JW for a 2-site Fermi-Hubbard (t=1, U=4).
+    def test_fermi_hubbard_2x2_codespace_matches_jw(self) -> None:
+        """2x2 Fermi-Hubbard (t=1, U=4): codespace eigenvalues match JW to 1e-10.
 
-        Codespace: vertex operators K_j = -Z_{2j+1} = +1, i.e. auxiliary qubits
-        (odd indices 1,3,...,2N-1) all in state |1>.  The 2^N-dimensional codespace
-        Hamiltonian is identical in spectrum to the N-qubit JW Hamiltonian.
+        The codespace is the joint +1 eigenspace of all stabilizers (vertical
+        edges plus column closers); with all 2N auxiliary Majoranas fixed it
+        has dimension 2^(2N), exactly the JW Hilbert space.
         """
-        ham = _fermi_hubbard_hamiltonian(1, 2, t=1.0, u=4.0)
+        rows, cols = 2, 2
+        n_sites = rows * cols
+        ham = _hubbard_lattice(rows, cols, t=1.0, u=4.0)
         mapper = create("qubit_mapper", "qdk")
-        n_modes = 4  # 2 spatial orbitals x 2 spins
 
-        qh_jw = mapper.run(ham, MajoranaMapping.jordan_wigner(num_modes=n_modes))
-        qh_vc = mapper.run(ham, MajoranaMapping.verstraete_cirac(num_modes=n_modes))
+        qh_jw = mapper.run(ham, MajoranaMapping.jordan_wigner(num_modes=2 * n_sites))
+        qh_vc = mapper.run(ham, MajoranaMapping.verstraete_cirac(rows, cols))
 
-        eigs_jw = np.sort(np.real(np.linalg.eigvalsh(_to_matrix(qh_jw))))
+        eigs_jw = np.sort(np.linalg.eigvalsh(_qh_sparse(qh_jw).toarray()))
 
-        # Build codespace basis: physical qubits (even indices 0,2,...) vary freely,
-        # auxiliary qubits (odd indices 1,3,...) all fixed to |1>.
-        n_vc = qh_vc.num_qubits  # 2*n_modes = 8
-        indices = []
-        for phys in range(2**n_modes):
-            state = 0
-            for j in range(n_modes):
-                state |= ((phys >> j) & 1) << (2 * j)
-                state |= 1 << (2 * j + 1)
-            indices.append(state)
-        basis = np.zeros((2**n_vc, 2**n_modes), dtype=complex)
-        for col, idx in enumerate(indices):
-            basis[idx, col] = 1.0
-        H_vc = _to_matrix(qh_vc)  # noqa: N806
-        eigs_vc = np.sort(np.real(np.linalg.eigvalsh(basis.conj().T @ H_vc @ basis)))
+        nq = qh_vc.num_qubits
+        dim = 2**nq
+        H_vc = _qh_sparse(qh_vc)  # noqa: N806
 
+        # Project a random block onto the joint +1 stabilizer eigenspace,
+        # orthonormalize, and diagonalize the restricted Hamiltonian.
+        code_dim = 2 ** (2 * n_sites)
+        rng = np.random.default_rng(7)
+        V = rng.standard_normal((dim, code_dim + 40)) + 1j * rng.standard_normal((dim, code_dim + 40))  # noqa: N806
+        for s_coeff, s_word in _all_stabilizers(rows, cols):
+            label = sparse_pauli_word_to_label(s_word, nq)
+            S = _sparse_pauli(label, s_coeff)  # noqa: N806
+            V = 0.5 * (V + S @ V)  # noqa: N806
+        Q, R = np.linalg.qr(V)  # noqa: N806
+        basis = Q[:, np.abs(np.diag(R)) > 1e-8]
+        assert basis.shape[1] == code_dim
+
+        H_res = basis.conj().T @ (H_vc @ basis)  # noqa: N806
+        eigs_vc = np.sort(np.linalg.eigvalsh(H_res))
+
+        np.testing.assert_allclose(eigs_vc[:4], eigs_jw[:4], atol=1e-10)
         np.testing.assert_allclose(eigs_vc, eigs_jw, atol=1e-10)
 
 
@@ -259,20 +266,32 @@ class TestVerstraeteCiracEigenvalues:
 
 
 class TestVerstraeteCiracSerialization:
-    """Tests for JSON and HDF5 round-trip serialization."""
+    """JSON and HDF5 round-trip tests."""
+
+    @staticmethod
+    def _bilinears_equal(a: MajoranaMapping, b: MajoranaMapping) -> bool:
+        m = 2 * a.num_modes
+        for j in range(m):
+            for k in range(j + 1, m):
+                ca, wa = a.bilinear(j, k)
+                cb, wb = b.bilinear(j, k)
+                if list(wa) != list(wb) or abs(ca - cb) > 1e-14:
+                    return False
+        return True
 
     def test_json_round_trip(self) -> None:
-        """JSON serialize/deserialize preserves table and name."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=4)
-        data = vc.to_json()
-        loaded = MajoranaMapping.from_json(data)
+        """JSON round-trip preserves every bilinear."""
+        vc = MajoranaMapping.verstraete_cirac(2, 2)
+        loaded = MajoranaMapping.from_json(vc.to_json())
         assert loaded.name == vc.name
         assert loaded.num_modes == vc.num_modes
-        assert loaded.table == vc.table
+        assert loaded.num_qubits == vc.num_qubits
+        assert not loaded.is_majorana_atomic
+        assert self._bilinears_equal(vc, loaded)
 
     def test_hdf5_round_trip(self) -> None:
-        """HDF5 serialize/deserialize preserves table and name."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=4)
+        """HDF5 round-trip preserves every bilinear."""
+        vc = MajoranaMapping.verstraete_cirac(2, 2)
         with tempfile.NamedTemporaryFile(suffix=".h5") as f:
             with h5py.File(f.name, "w") as hf:
                 vc.to_hdf5(hf)
@@ -280,33 +299,22 @@ class TestVerstraeteCiracSerialization:
                 loaded = MajoranaMapping.from_hdf5(hf)
         assert loaded.name == vc.name
         assert loaded.num_modes == vc.num_modes
-        assert loaded.table == vc.table
-
-    def test_json_file_round_trip(self) -> None:
-        """JSON file round-trip preserves the mapping."""
-        vc = MajoranaMapping.verstraete_cirac(num_modes=6)
-        with tempfile.NamedTemporaryFile(suffix=".json") as f:
-            vc.to_json_file(f.name)
-            loaded = MajoranaMapping.from_json_file(f.name)
-        assert loaded.name == vc.name
-        assert loaded.table == vc.table
+        assert loaded.num_qubits == vc.num_qubits
+        assert self._bilinears_equal(vc, loaded)
 
     def test_round_tripped_hamiltonian_terms_match(self) -> None:
-        """Mapper output from round-tripped mapping equals original term-by-term."""
-        ham = _fermi_hubbard_hamiltonian(1, 2, t=1.0, u=0.0)
+        """Round-tripped mapping produces a term-by-term identical QubitHamiltonian."""
+        ham = _hubbard_lattice(2, 2, t=1.0, u=4.0)
         mapper = create("qubit_mapper", "qdk")
 
-        n_modes = 2 * 2  # 2 spatial orbitals x 2 spins
-        vc = MajoranaMapping.verstraete_cirac(num_modes=n_modes)
+        vc = MajoranaMapping.verstraete_cirac(2, 2)
         qh_orig = mapper.run(ham, vc)
 
-        data = vc.to_json()
-        vc_loaded = MajoranaMapping.from_json(data)
-        qh_loaded = mapper.run(ham, vc_loaded)
+        loaded = MajoranaMapping.from_json(vc.to_json())
+        qh_loaded = mapper.run(ham, loaded)
 
-        orig_dict = dict(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=True))
-        load_dict = dict(zip(qh_loaded.pauli_strings, qh_loaded.coefficients, strict=True))
-
-        assert set(orig_dict) == set(load_dict)
-        for ps, coeff in orig_dict.items():
-            assert np.isclose(coeff, load_dict[ps], atol=1e-14)
+        orig = dict(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=True))
+        rt = dict(zip(qh_loaded.pauli_strings, qh_loaded.coefficients, strict=True))
+        assert set(orig) == set(rt)
+        for ps, coeff in orig.items():
+            assert np.isclose(coeff, rt[ps], atol=1e-14)

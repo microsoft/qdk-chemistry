@@ -245,22 +245,27 @@ class MajoranaMapping : public DataClass {
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
   /**
-   * @brief Verstraete-Cirac encoding (extended interleaved construction).
+   * @brief Verstraete-Cirac encoding for a 2D lattice.
    *
-   * Doubles the qubit register to 2*num_modes qubits using an interleaved
-   * layout: physical mode j at qubit 2j, auxiliary mode j at qubit 2j+1.
-   * The Majorana table is a Jordan-Wigner expansion whose Z-string spans
-   * both physical and auxiliary qubits.  Vertex operators K_j = -Z_{2j+1}
-   * commute with every Hamiltonian bilinear.  In the codespace (K_j = +1)
-   * sequential nearest-neighbour hops have constant Pauli weight 3 and the
-   * spectrum matches Jordan-Wigner on N qubits.
+   * Bilinear-only mapping for a rows x cols lattice (row-major site
+   * order), covering both spin species in blocked order: num_modes() is
+   * 2*rows*cols and the register has 4*rows*cols qubits (one auxiliary
+   * qubit per physical mode).  Bilinears between vertically adjacent
+   * sites are dressed with auxiliary-mode stabilizers, which cancels the
+   * Jordan-Wigner string: every nearest-neighbour hopping term maps to a
+   * Pauli operator of weight at most 4, independent of lattice size.
+   * Restricted to the joint +1 eigenspace of the stabilizers, the mapped
+   * Hamiltonian is isospectral to the Jordan-Wigner one.
    *
-   * @param num_modes Number of fermionic modes N; the mapping uses 2*N
-   *        qubits (N physical at even indices, N auxiliary at odd indices).
+   * Since the encoding is bilinear-only, ``majorana(k)`` is unavailable;
+   * consumers must use ``bilinear(j, k)`` (the QDK qubit mapper does).
+   *
+   * @param rows Number of lattice rows (>= 2).
+   * @param cols Number of lattice columns (>= 2).
    * @return MajoranaMapping with name ``"verstraete-cirac"``.
-   * @throws std::invalid_argument If num_modes < 2.
+   * @throws std::invalid_argument If rows < 2 or cols < 2.
    */
-  static MajoranaMapping verstraete_cirac(std::size_t num_modes);
+  static MajoranaMapping verstraete_cirac(std::size_t rows, std::size_t cols);
 
  private:
   MajoranaMapping(
