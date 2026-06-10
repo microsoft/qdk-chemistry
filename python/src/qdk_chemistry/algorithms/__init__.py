@@ -62,7 +62,6 @@ from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
 __all__ = [
-    # Classes
     "ActiveSpaceSelector",
     "CircuitExecutor",
     "ControlledCircuitMapper",
@@ -97,9 +96,8 @@ __all__ = [
     "StatePreparation",
     "TimeEvolutionBuilder",
     "VerstraeteCiracQubitMapper",
-    "build_vc_majorana_mapping",
-    # Factory functions
     "available",
+    "build_vc_majorana_mapping",
     "create",
     "inspect_settings",
     "print_settings",
