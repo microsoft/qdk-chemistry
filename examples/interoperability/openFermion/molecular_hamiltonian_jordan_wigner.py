@@ -21,6 +21,7 @@ import numpy as np
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 
 # OpenFermion must be installed to run this example.
@@ -74,8 +75,10 @@ Logger.info(f"  SCF total energy: {scf_energy: .8f} Hartree")
 ########################################################################################
 # 3. QDK → OpenFermion: map to qubits via the plugin, then exact-diagonalise
 ########################################################################################
-mapper = create("qubit_mapper", "openfermion", encoding="jordan-wigner")
-qdk_qubit_ham = mapper.run(active_hamiltonian)
+mapper = create("qubit_mapper", "openfermion")
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
+mapping = MajoranaMapping.jordan_wigner(n_spin_orbitals)
+qdk_qubit_ham = mapper.run(active_hamiltonian, mapping)
 
 Logger.info("=== QDK → OpenFermion (Jordan-Wigner) ===")
 Logger.info(f"  Pauli terms: {len(qdk_qubit_ham.pauli_strings)}")

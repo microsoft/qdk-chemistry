@@ -94,6 +94,35 @@ class SciWavefunctionContainer : public WavefunctionContainer {
       const OrbitalEntropies& entropies = OrbitalEntropies{},
       WavefunctionType type = WavefunctionType::SelfDual);
 
+  /**
+   * @brief Constructs a wavefunction from preconstructed RDM storage.
+   *
+   * Used by the serialization layer to hand reconstructed @ref
+   * SymmetryBlockedTensorVariant objects to the container without going
+   * through the per-block construction path.
+   *
+   * @param coeffs The vector of CI coefficients (real or complex).
+   * @param dets The vector of determinants.
+   * @param orbitals Shared pointer to orbital basis set.
+   * @param one_rdm_spin_traced Spin-traced 1-RDM (may be @c nullptr).
+   * @param two_rdm_spin_traced Spin-traced 2-RDM (may be @c nullptr).
+   * @param active_one_rdm Spin-dependent active-space 1-RDM (may be
+   *        @c nullptr).
+   * @param active_two_rdm Spin-dependent active-space 2-RDM (may be
+   *        @c nullptr).
+   * @param entropies Orbital entropies.
+   * @param type Wavefunction type (SelfDual or NotSelfDual).
+   */
+  SciWavefunctionContainer(
+      const VectorVariant& coeffs, const DeterminantVector& dets,
+      std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
+      std::shared_ptr<VectorVariant> two_rdm_spin_traced,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
+      const OrbitalEntropies& entropies = OrbitalEntropies{},
+      WavefunctionType type = WavefunctionType::SelfDual);
+
   /** @brief Destructor */
   ~SciWavefunctionContainer() override = default;
 
@@ -228,7 +257,7 @@ class SciWavefunctionContainer : public WavefunctionContainer {
 
  private:
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
   // Coefficients of the wavefunction
   const VectorVariant _coefficients;
   // Configuration set (contains determinants and orbital information)

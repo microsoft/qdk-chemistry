@@ -120,11 +120,6 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     // Restricted case
-    std::optional<Eigen::VectorXd> energies;
-    if (orbitals->has_energies()) {
-      energies = orbitals->get_energies().first;
-    }
-
     std::optional<Eigen::MatrixXd> ao_overlap;
     if (orbitals->has_overlap_matrix()) {
       ao_overlap = orbitals->get_overlap_matrix();
@@ -136,8 +131,11 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     return std::make_shared<data::Orbitals>(
-        orbitals->get_coefficients().first, energies, ao_overlap, basis_set,
-        std::make_tuple(active_space_indices_a, inactive_indices));
+        orbitals->coefficients(),
+        orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
+        basis_set,
+        std::make_pair(active_space_indices_a, active_space_indices_a),
+        std::make_pair(inactive_indices, inactive_indices));
   } else {
     // get inactive indices
     size_t nelec_a = wavefunction->get_total_num_electrons().first;
@@ -170,15 +168,6 @@ std::shared_ptr<data::Orbitals> new_orbitals(
     }
 
     // Unrestricted case
-    auto coeffs_pair = orbitals->get_coefficients();
-    std::optional<Eigen::VectorXd> alpha_energies, beta_energies;
-
-    if (orbitals->has_energies()) {
-      auto energies_pair = orbitals->get_energies();
-      alpha_energies = energies_pair.first;
-      beta_energies = energies_pair.second;
-    }
-
     std::optional<Eigen::MatrixXd> ao_overlap;
     if (orbitals->has_overlap_matrix()) {
       ao_overlap = orbitals->get_overlap_matrix();
@@ -189,10 +178,11 @@ std::shared_ptr<data::Orbitals> new_orbitals(
       basis_set = orbitals->get_basis_set();
     }
     return std::make_shared<data::Orbitals>(
-        coeffs_pair.first, coeffs_pair.second, alpha_energies, beta_energies,
-        ao_overlap, basis_set,
-        std::make_tuple(active_space_indices_a, active_space_indices_b.value(),
-                        inactive_indices_a, inactive_indices_b));
+        orbitals->coefficients(),
+        orbitals->has_energies() ? orbitals->energies() : nullptr, ao_overlap,
+        basis_set,
+        std::make_pair(active_space_indices_a, active_space_indices_b.value()),
+        std::make_pair(inactive_indices_a, inactive_indices_b));
   }
 }
 

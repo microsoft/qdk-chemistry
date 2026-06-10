@@ -14,31 +14,54 @@ parameters:
 - name: macBuild
   type: string
   default: OFF
-- name: pyenvVersion
-  type: string
-  default: 2.6.31
+- name: runSlowTests
+  type: boolean
+  default: true
 
 steps:
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
-      echo "Running wheel tests (Docker)..."
+      echo "Running wheel tests (Docker linux/amd64)..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
         -e PIP_INDEX_URL \
+        -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
         -v ${{ parameters.agentBuildDirectory }}:/workspace \
         -w /workspace/qdk-chemistry/python \
         ${{ parameters.dockerImage }} \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                          ${{ parameters.macBuild }} \
-                                                          ${{ parameters.pyenvVersion }}
-    displayName: Test wheel (Docker)
+                                                          ${{ parameters.macBuild }}
+    displayName: Test wheel (Docker linux/amd64)
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
+  - script: |
+      echo "Running wheel tests (Docker ${{ parameters.imageTag }})..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -e PIP_INDEX_URL \
+        -e SYSTEM_ACCESSTOKEN \
+        -e QSHARP_PYTHON_TELEMETRY=false \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace \
+        -w /workspace/qdk-chemistry/python \
+        ${{ parameters.dockerImage }} \
+        bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+                                                          ${{ parameters.macBuild }}
+    displayName: Test wheel (Docker ${{ parameters.imageTag }})
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
       echo "Running wheel tests (native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
+      export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                        ${{ parameters.macBuild }} \
-                                                        ${{ parameters.pyenvVersion }}
+                                                        ${{ parameters.macBuild }}
     displayName: Test wheel (native)
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)

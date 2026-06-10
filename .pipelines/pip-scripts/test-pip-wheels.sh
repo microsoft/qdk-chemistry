@@ -2,7 +2,6 @@
 set -ex
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
-PYENV_VERSION=${3:-2.6.31}
 export MAC_BUILD
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,14 +11,6 @@ if [ -d "/workspace/qdk-chemistry/python" ]; then
     PYTHON_DIR="/workspace/qdk-chemistry/python"
 else
     PYTHON_DIR="$REPO_ROOT/python"
-fi
-
-if [ "$MAC_BUILD" == "OFF" ] && [ -d "/workspace" ]; then
-    export PYENV_ROOT="/workspace/.pyenv"
-    VENV_DIR="/workspace/test_wheel_env"
-else
-    export PYENV_ROOT="$REPO_ROOT/.pyenv"
-    VENV_DIR="$REPO_ROOT/.test_wheel_env"
 fi
 
 export DEBIAN_FRONTEND=noninteractive
@@ -49,6 +40,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         libxml2-dev \
         libxmlsec1-dev \
         make \
+        python3 \
+        python3-pip \
+        python3-venv \
         tk-dev \
         unzip \
         wget \
@@ -61,37 +55,21 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew install \
         curl \
         ncurses \
+        python \
         unzip \
         wget
+    # Make sure Homebrew's python3 is preferred when bootstrapping conda.
+    export PATH="/opt/homebrew/bin:$PATH"
 fi
 
-# Install pyenv to use non-system python3 versions
-if [ ! -d "$PYENV_ROOT" ]; then
-    echo "Installing pyenv ${PYENV_VERSION}..."
-    PYENV_CHECKSUM=7435b8c1481043e48c838ba40d5c8bc724c23d4c94e531adc283a7c121757ad4
-    wget -q https://github.com/pyenv/pyenv/archive/refs/tags/v${PYENV_VERSION}.zip -O pyenv.zip
-    echo "${PYENV_CHECKSUM}  pyenv.zip" | shasum -a 256 -c || exit 1
-    unzip -q pyenv.zip
-    mv pyenv-${PYENV_VERSION} "$PYENV_ROOT"
-    rm pyenv.zip
-    "$PYENV_ROOT/bin/pyenv" install ${PYTHON_VERSION}
-    "$PYENV_ROOT/bin/pyenv" global ${PYTHON_VERSION}
-    export PATH="$PYENV_ROOT/versions/${PYTHON_VERSION}/bin:$PATH"
-    export PATH="$PYENV_ROOT/shims:$PATH"
-fi
-
-# Install and activate the specific Python version
-"$PYENV_ROOT/bin/pyenv" install $PYTHON_VERSION --skip-existing
-"$PYENV_ROOT/bin/pyenv" global $PYTHON_VERSION
-export PATH="$PYENV_ROOT/versions/$PYTHON_VERSION/bin:$PATH"
-export PATH="$PYENV_ROOT/shims:$PATH"
+# Bootstrap Anaconda's `conda` and create the test env. See header of the
+# sourced script for full rationale (CFSClean / ms-ensureconda platform gaps /
+# Azure Artifacts feed auth).
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/bootstrap-conda.sh" testenv
+conda activate testenv
 
 python3 --version
-
-# Create a clean virtual environment for testing the wheel
-rm -rf "$VENV_DIR"
-python3 -m venv "$VENV_DIR"
-. "$VENV_DIR/bin/activate"
 
 python3 -m pip install --upgrade pip
 
@@ -106,10 +84,22 @@ if [ ${#WHEEL[@]} -ne 1 ] || [ ! -f "${WHEEL[0]}" ]; then
 fi
 python3 -m pip install "${WHEEL[0]}[test]"
 
-# Print installed packages for debugging
-echo "------------------ Installed Python packages ------------------"
-python3 -m pip freeze
-echo "---------------------------------------------------------------"
+# Snapshot the full env and feed it to a dry-run `pip install --report` so
+# Component Governance's PipReportDetector sees every package in testenv.
+# The report is auto-discovered when it sits next to a setup.py or
+# requirements.txt in a non-hidden directory (the detector skips dotdirs
+# like .pipelines/). The locally-built qdk_chemistry wheel is excluded
+# because it is not resolvable from any index. See:
+#   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
+#   https://github.com/microsoft/component-detection/issues/243
+mkdir -p "$PYTHON_DIR/build/test-manifest"
+echo "------------------ Installed Python packages (testenv) ------------------"
+python3 -m pip list --format=freeze --exclude qdk_chemistry \
+    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
+echo "-------------------------------------------------------------------------"
+python3 -m pip install --dry-run --ignore-installed --quiet \
+    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
+    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
@@ -117,5 +107,3 @@ export QSHARP_PYTHON_TELEMETRY=false
 # Run pytest suite
 echo '=== Running pytest suite ==='
 python3 -m pytest -v ./tests
-
-deactivate

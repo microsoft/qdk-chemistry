@@ -117,6 +117,10 @@ find_package(pybind11 REQUIRED)
 # Create the Python extension module
 pybind11_add_module(_core
     src/pybind11/data/data_class.cpp
+    src/pybind11/data/symmetry/symmetry.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_tensor.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
     src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
     src/pybind11/data/wavefunction.cpp
@@ -129,6 +133,7 @@ pybind11_add_module(_core
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
+    src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
     src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp

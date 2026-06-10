@@ -34,6 +34,7 @@ except ImportError as ex:
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import QpeResult, Structure
+from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import (
     iterative_phase_feedback_update,
@@ -215,8 +216,11 @@ Logger.info(f"  CASCI total energy: {casci_energy: .8f} Hartree")
 ########################################################################################
 # 3. Preparing the qubit Hamiltonian and sparse-isometry trial state
 ########################################################################################
-qubit_mapper = create("qubit_mapper", "qiskit", encoding="jordan-wigner")
-qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+qubit_mapper = create("qubit_mapper", "qiskit")
+n_spin_orbitals = 2 * active_hamiltonian.get_orbitals().get_num_molecular_orbitals()
+qubit_hamiltonian = qubit_mapper.run(
+    active_hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
+)
 qubit_pauli_op = SparsePauliOp(
     qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients
 )

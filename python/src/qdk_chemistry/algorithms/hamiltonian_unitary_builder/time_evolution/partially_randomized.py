@@ -104,7 +104,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
             "string",
             "general",
             "Commutation check for merging: 'qubit_wise' (per-qubit) or 'general' (standard Pauli).",
-            ("qubit_wise", "general"),
+            ["qubit_wise", "general"],
         )
 
 
