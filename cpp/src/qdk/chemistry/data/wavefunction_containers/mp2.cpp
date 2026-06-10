@@ -161,7 +161,8 @@ void MP2Container::_compute_t2_amplitudes() const {
 
   if (use_unrestricted) {
     // Unrestricted MP2
-    const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+    const auto& eps_alpha = get_orbitals()->energies()->block({axes::alpha()});
+    const auto& eps_beta = get_orbitals()->energies()->block({axes::beta()});
     Eigen::VectorXd eps_active_alpha(active_space_size);
     Eigen::VectorXd eps_active_beta(active_space_size);
     Eigen::Index active_size_idx = static_cast<Eigen::Index>(active_space_size);
@@ -228,7 +229,8 @@ void MP2Container::_compute_t2_amplitudes() const {
           "Restricted MP2 requires equal alpha and beta electrons");
     }
 
-    const auto& [eps_alpha, eps_beta] = get_orbitals()->get_energies();
+    const auto& eps_alpha = get_orbitals()->energies()->block({axes::alpha()});
+    const auto& eps_beta = get_orbitals()->energies()->block({axes::beta()});
 
     Eigen::VectorXd eps_active_alpha(active_space_size);
 
@@ -975,8 +977,8 @@ void MP2Container::_generate_rdms_from_ci_expansion() const {
         "computation");
   }
 
-  // Store in base class RDM member variables
-  // Scale 2-RDMs by 2.0 to match convention (MACIS uses 0.5 prefactor)
+  // Store via SBT setters. Scale 2-RDMs by 2.0 to match convention
+  // (MACIS uses 0.5 prefactor).
   Eigen::MatrixXd one_aa_mat =
       Eigen::Map<Eigen::MatrixXd>(one_rdm_aa.data(), norb, norb);
   Eigen::MatrixXd one_bb_mat =
@@ -988,22 +990,22 @@ void MP2Container::_generate_rdms_from_ci_expansion() const {
   Eigen::VectorXd two_aabb_vec =
       Eigen::Map<Eigen::VectorXd>(two_rdm_aabb.data(), norb4) * 2.0;
 
-  _one_rdm_spin_dependent_aa =
-      std::make_shared<MatrixVariant>(std::move(one_aa_mat));
-  _one_rdm_spin_dependent_bb =
-      std::make_shared<MatrixVariant>(std::move(one_bb_mat));
-  _two_rdm_spin_dependent_aaaa =
-      std::make_shared<VectorVariant>(std::move(two_aaaa_vec));
-  _two_rdm_spin_dependent_bbbb =
-      std::make_shared<VectorVariant>(std::move(two_bbbb_vec));
-  _two_rdm_spin_dependent_aabb =
-      std::make_shared<VectorVariant>(std::move(two_aabb_vec));
+  // MP2 amplitudes are built against a single-determinant HF reference;
+  // restricted orbitals always produce restricted RDMs.
+  const bool restricted = get_orbitals()->is_restricted();
+
+  _active_one_rdm = std::make_shared<const SymmetryBlockedTensorVariant<2>>(
+      std::in_place_type<SymmetryBlockedTensor<2, double>>,
+      make_spin_diagonal_rank2_sbt(one_aa_mat, one_bb_mat, restricted));
+  _active_two_rdm = std::make_shared<const SymmetryBlockedTensorVariant<4>>(
+      std::in_place_type<SymmetryBlockedTensor<4, double>>,
+      make_spin_diagonal_rank4_sbt(two_aaaa_vec, two_aabb_vec, two_bbbb_vec,
+                                   restricted));
 }
 
 bool MP2Container::has_one_rdm_spin_dependent() const {
   // RDMs available if explicitly set OR if we have amplitudes to compute them
-  if (_one_rdm_spin_dependent_aa != nullptr &&
-      _one_rdm_spin_dependent_bb != nullptr) {
+  if (_active_one_rdm != nullptr) {
     return true;
   }
   // Can compute from amplitudes if available (always have Hamiltonian)
@@ -1018,9 +1020,7 @@ bool MP2Container::has_one_rdm_spin_traced() const {
 }
 
 bool MP2Container::has_two_rdm_spin_dependent() const {
-  if (_two_rdm_spin_dependent_aabb != nullptr &&
-      _two_rdm_spin_dependent_aaaa != nullptr &&
-      _two_rdm_spin_dependent_bbbb != nullptr) {
+  if (_active_two_rdm != nullptr) {
     return true;
   }
   // Can compute from amplitudes if available (always have Hamiltonian)
@@ -1034,71 +1034,40 @@ bool MP2Container::has_two_rdm_spin_traced() const {
   return has_two_rdm_spin_dependent();
 }
 
-std::tuple<const MP2Container::MatrixVariant&,
-           const MP2Container::MatrixVariant&>
-MP2Container::get_active_one_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<2>& MP2Container::active_one_rdm() const {
   // If not already computed, generate from CI expansion
-  if (_one_rdm_spin_dependent_aa == nullptr ||
-      _one_rdm_spin_dependent_bb == nullptr) {
+  if (!_active_one_rdm) {
     _generate_rdms_from_ci_expansion();
   }
-  return std::make_tuple(std::cref(*_one_rdm_spin_dependent_aa),
-                         std::cref(*_one_rdm_spin_dependent_bb));
+  return WavefunctionContainer::active_one_rdm();
 }
 
-std::tuple<const MP2Container::VectorVariant&,
-           const MP2Container::VectorVariant&,
-           const MP2Container::VectorVariant&>
-MP2Container::get_active_two_rdm_spin_dependent() const {
+const SymmetryBlockedTensorVariant<4>& MP2Container::active_two_rdm() const {
   // If not already computed, generate from CI expansion
-  if (_two_rdm_spin_dependent_aabb == nullptr ||
-      _two_rdm_spin_dependent_aaaa == nullptr ||
-      _two_rdm_spin_dependent_bbbb == nullptr) {
+  if (!_active_two_rdm) {
     _generate_rdms_from_ci_expansion();
   }
-  return std::make_tuple(std::cref(*_two_rdm_spin_dependent_aabb),
-                         std::cref(*_two_rdm_spin_dependent_aaaa),
-                         std::cref(*_two_rdm_spin_dependent_bbbb));
+  return WavefunctionContainer::active_two_rdm();
 }
 
 const MP2Container::MatrixVariant&
 MP2Container::get_active_one_rdm_spin_traced() const {
-  // If spin-traced already available, return it
   if (_one_rdm_spin_traced != nullptr) {
     return *_one_rdm_spin_traced;
   }
-
-  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
-  get_active_one_rdm_spin_dependent();
-
-  // Now compute spin-traced from spin-dependent
-  _one_rdm_spin_traced = detail::add_matrix_variants(
-      *_one_rdm_spin_dependent_aa, *_one_rdm_spin_dependent_bb);
-  return *_one_rdm_spin_traced;
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval).
+  active_one_rdm();
+  return WavefunctionContainer::get_active_one_rdm_spin_traced();
 }
 
 const MP2Container::VectorVariant&
 MP2Container::get_active_two_rdm_spin_traced() const {
-  // If spin-traced already available, return it
   if (_two_rdm_spin_traced != nullptr) {
     return *_two_rdm_spin_traced;
   }
-
-  // Ensure spin-dependent RDMs are computed (this triggers lazy eval)
+  // Ensure spin-dependent RDMs are computed (this triggers lazy eval).
   get_active_two_rdm_spin_dependent();
-
-  // Compute spin-traced from spin-dependent components
-  // spin-traced = aaaa + bbbb + aabb + bbaa
-  auto two_rdm_ss_part = detail::add_vector_variants(
-      *_two_rdm_spin_dependent_aaaa, *_two_rdm_spin_dependent_bbbb);
-  auto two_rdm_spin_bbaa = detail::transpose_ijkl_klij_vector_variant(
-      *_two_rdm_spin_dependent_aabb,
-      get_orbitals()->get_num_molecular_orbitals());
-  auto two_rdm_os_part = detail::add_vector_variants(
-      *_two_rdm_spin_dependent_aabb, *two_rdm_spin_bbaa);
-  _two_rdm_spin_traced =
-      detail::add_vector_variants(*two_rdm_os_part, *two_rdm_ss_part);
-  return *_two_rdm_spin_traced;
+  return WavefunctionContainer::get_active_two_rdm_spin_traced();
 }
 
 }  // namespace qdk::chemistry::data
