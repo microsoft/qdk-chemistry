@@ -8,9 +8,14 @@ Overview
 --------
 
 Quantum Phase Estimation (:term:`QPE`) is one of the foundational quantum algorithms for chemistry.
-Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has significant overlap with an eigenstate of :math:`U`, :term:`QPE` measures the eigenphase :math:`\phi` such that :math:`U|\psi\rangle = e^{2\pi i \phi}|\psi\rangle`.
-For chemistry applications the unitary is typically the Hamiltonian time-evolution operator :math:`U = e^{-iHt}`, in which case the energy eigenvalue is recovered as :math:`E = 2\pi\phi / t`.
-However, the algorithm itself is agnostic to how the unitary is constructed — any operator whose eigenvalues encode the quantity of interest can be used.
+Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has significant overlap with an eigenstate of :math:`U`, :term:`QPE` measures the eigenphase :math:`\varphi` such that :math:`U|\psi\rangle = e^{2\pi i \varphi}|\psi\rangle`.
+
+QDK/Chemistry supports two types of unitaries for QPE:
+
+- **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = \theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
+- **Qubitization** — The walk operator :math:`W` constructed via :ref:`LCU block encoding <lcu-builder>`. Energy is recovered as :math:`E = \lambda \cos(\theta)` where :math:`\lambda` is the L1 norm of the Hamiltonian.
+
+The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
 QDK/Chemistry provides two :term:`QPE` approaches, each suited to different hardware constraints:
 
@@ -36,7 +41,7 @@ The most common path starts from a molecular system:
 1. Prepare a reference :class:`~qdk_chemistry.data.Wavefunction` from a :doc:`multi-configuration calculation <mc_calculator>`
 2. Generate a state-preparation :class:`~qdk_chemistry.data.Circuit` using :doc:`StatePreparation <state_preparation>`
 3. Map the molecular :class:`~qdk_chemistry.data.Hamiltonian` to qubit operators using :doc:`QubitMapper <qubit_mapper>`
-4. Choose a method for constructing the target unitary (currently, QDK/Chemistry provides :doc:`time-evolution builders <hamiltonian_unitary_builder>` for Hamiltonian simulation)
+4. Choose a method for constructing the target unitary — either :ref:`Trotter time-evolution <trotter-builder>` or :ref:`LCU block encoding <lcu-builder>` (qubitization)
 5. Run phase estimation to obtain the energy eigenvalue
 
 Alternatively, phase estimation can be used with :doc:`model Hamiltonians <../model_hamiltonians>` (e.g., Hubbard, Heisenberg, or Ising spin models) or with a user-supplied :class:`~qdk_chemistry.data.Circuit` and :class:`~qdk_chemistry.data.QubitHamiltonian` directly — the full molecular-structure pipeline is not required.
@@ -177,7 +182,8 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_bits`` — Number of phase bits to extract
-- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}`
+- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}` (Trotter)
+- ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
 
 
@@ -218,22 +224,60 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_bits`` — Number of ancilla qubits (phase register size)
-- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}`
+- ``unitary_builder`` → ``time`` — Time parameter :math:`t` in :math:`U = e^{-iHt}` (Trotter)
+- ``unitary_builder`` → ``quantum_walk`` — Enable walk operator for qubitization (LCU)
 - ``qft_do_swaps`` — Whether to include swap gates in the inverse QFT (Qiskit only)
 - ``controlled_circuit_mapper`` — Circuit synthesis strategy
 
 
-Phase aliasing and energy resolution
--------------------------------------
+Phase-to-energy extraction
+---------------------------
 
-Because phase estimation measures a phase :math:`\phi \in [0, 1)`, the reconstructed energy :math:`E = 2\pi\phi / t` is only unique modulo :math:`2\pi / t`.
-This means several energy values — called *aliases* — can produce the same measured phase.
+The method for converting a measured phase :math:`\varphi \in [0, 1)` to energy depends on the type of unitary used.
 
-QDK/Chemistry handles this automatically in the :class:`~qdk_chemistry.data.QpeResult` data class:
+Time evolution (Trotter)
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-- ``branching`` contains the full list of alias energy candidates :math:`E + k \cdot 2\pi/t` for :math:`k \in \{-2, -1, 0, 1, 2\}` by default
+When QPE acts on :math:`U = e^{-iHt}`, the phase angle :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]` and energy is:
+
+.. math::
+
+   E = \frac{\theta}{t}
+
+Because the phase is periodic, multiple energy values — called *aliases* — differing by :math:`2\pi / t` can produce the same measured phase.
+QDK/Chemistry handles this automatically:
+
+- ``branching`` contains all alias energy candidates :math:`E + k \cdot 2\pi/t` for :math:`k \in \{-2, -1, 0, 1, 2\}` by default
 - If a ``reference_energy`` is provided (e.g., the :term:`CASCI` energy), the alias closest to the reference is selected as ``resolved_energy``
 - ``canonical_phase_fraction`` and ``canonical_phase_angle`` reflect the alias-resolved phase
+
+.. tab:: Python API (Time evolution configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-iqpe
+      :end-before: # end-cell-configure-iqpe
+
+Qubitization (LCU block encoding)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :math:`e^{\pm i \arccos(E/\lambda)}` and energy is recovered as:
+
+.. math::
+
+   E = \lambda \cos(\theta)
+
+where :math:`\lambda = \sum_j |\alpha_j|` is the L1 norm of the Hamiltonian coefficients.
+No alias resolution is needed because the cosine maps the full phase range to a unique energy in :math:`[-\lambda, \lambda]`.
+
+For qubitization, ``branching`` is a single-element tuple and ``resolved_energy`` is ``None``.
+
+.. tab:: Python API (Qubitization configuration)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-qubitization
+      :end-before: # end-cell-configure-qubitization
 
 See :doc:`../data/qpe_result` for the full data class documentation.
 
