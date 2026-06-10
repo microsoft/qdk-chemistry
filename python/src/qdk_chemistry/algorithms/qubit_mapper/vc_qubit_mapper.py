@@ -70,7 +70,7 @@ def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
         P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1}  for all j
 
     (see Verstraete & Cirac, arXiv:cond-mat/0508353).
-    The general codespace satisfies (i * Gamma_j * Gamma_j) = +1.
+    The codespace is defined by P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1} = +1 for all j.
     In this sector the mapped Hamiltonian equals the Jordan-Wigner form.
 
     Args:
@@ -202,6 +202,11 @@ class VerstraeteCiracQubitMapper(QubitMapper):
                 "VerstraeteCiracQubitMapper only supports real-valued "
                 "hopping matrices. Complex off-diagonal elements such as "
                 "Peierls phases are not currently supported."
+            )
+        if not np.allclose(h1_alpha.real, h1_alpha.real.T, atol=self._integral_threshold):
+            raise ValueError(
+                "h1_alpha must be symmetric (Hermitian for real matrices). "
+                "The provided matrix is not close to its transpose."
             )
 
         n_sites = h1_alpha.shape[0]

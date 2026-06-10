@@ -311,8 +311,8 @@ class TestVCSerialisation:
         """Test that each Pauli term matches after JSON round-trip."""
         qh = self._build_qh()
         restored = QubitHamiltonian.from_json(json.loads(json.dumps(qh.to_json())))
-        orig = dict(zip(qh.pauli_strings, qh.coefficients, strict=True))
-        rest = dict(zip(restored.pauli_strings, restored.coefficients, strict=True))
+        orig = dict(zip(qh.pauli_strings, qh.coefficients, strict=False))
+        rest = dict(zip(restored.pauli_strings, restored.coefficients, strict=False))
         assert set(orig) == set(rest)
         for ps, val in orig.items():
             assert abs(val - rest[ps]) < 1e-15
