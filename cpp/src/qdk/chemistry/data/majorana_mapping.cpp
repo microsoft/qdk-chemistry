@@ -16,6 +16,35 @@
 #include <vector>
 
 namespace qdk::chemistry::data {
+namespace detail {
+
+nlohmann::json stabilizers_to_json(
+    const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+        stabilizers) {
+  nlohmann::json stab_array = nlohmann::json::array();
+  for (const auto& [coeff, word] : stabilizers) {
+    stab_array.push_back(
+        {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
+  }
+  return stab_array;
+}
+
+std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+stabilizers_from_json(const nlohmann::json& data) {
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  if (data.is_array()) {
+    for (const auto& entry : data) {
+      double real = entry.at("real").get<double>();
+      double imag = entry.at("imag").get<double>();
+      auto word = entry.at("word").get<SparsePauliWord>();
+      stabilizers.emplace_back(std::complex<double>(real, imag),
+                               std::move(word));
+    }
+  }
+  return stabilizers;
+}
+
+}  // namespace detail
 
 static void hash_sparse_pauli_word(qdk::chemistry::utils::HashContext& ctx,
                                    const SparsePauliWord& word) {
@@ -196,12 +225,7 @@ nlohmann::json MajoranaMapping::to_json() const {
     data["tapering"] = tapering_->to_json();
   }
   if (!stabilizers_.empty()) {
-    nlohmann::json stab_array = nlohmann::json::array();
-    for (const auto& [coeff, word] : stabilizers_) {
-      stab_array.push_back(
-          {{"real", coeff.real()}, {"imag", coeff.imag()}, {"word", word}});
-    }
-    data["stabilizers"] = stab_array;
+    data["stabilizers"] = detail::stabilizers_to_json(stabilizers_);
   }
   // Bilinear-only mappings: persist the bilinear entries so the mapping can
   // round-trip even when the Majorana table is empty.
@@ -238,13 +262,7 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   }
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
   if (data.contains("stabilizers") && !data.at("stabilizers").is_null()) {
-    for (const auto& entry : data.at("stabilizers")) {
-      double real = entry.at("real").get<double>();
-      double imag = entry.at("imag").get<double>();
-      auto word = entry.at("word").get<SparsePauliWord>();
-      stabilizers.emplace_back(std::complex<double>(real, imag),
-                               std::move(word));
-    }
+    stabilizers = detail::stabilizers_from_json(data.at("stabilizers"));
   }
 
   // Bilinear-only mapping: table is empty, bilinears stored explicitly.
@@ -259,6 +277,9 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     }
     auto mapping = MajoranaMapping::from_bilinears(
         num_modes, std::move(bilinears), base_encoding);
+    if (name == base_encoding && !tapering && stabilizers.empty()) {
+      return mapping;
+    }
     return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
                            mapping.num_modes_, mapping.num_qubits_,
                            std::move(base_encoding), std::move(tapering),
@@ -266,6 +287,9 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   }
 
   auto mapping = MajoranaMapping::from_table(std::move(table), base_encoding);
+  if (name == base_encoding && !tapering && stabilizers.empty()) {
+    return mapping;
+  }
   return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
                          mapping.num_modes_, mapping.num_qubits_,
                          std::move(base_encoding), std::move(tapering),
