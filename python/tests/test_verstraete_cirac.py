@@ -134,26 +134,28 @@ class TestVerstraeteCiracMapping:
             lattice = LatticeGraph.square(nx, ny)
             ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
 
-            mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
-            assert len(mapping.stabilizers) == nx * ny - nx - ny + 1
+            # Verify stabilizer properties for both spinless (nss=1) and spinful (nss=2) cases
+            for nss in [1, 2]:
+                mapping = MajoranaMapping.verstraete_cirac(lattice, nss)
+                assert len(mapping.stabilizers) == nss * nx * ny
 
-            qh_vc = mapper.run(ham, mapping)
+                qh_vc = mapper.run(ham, mapping)
 
-            # Convert stabilizers to Pauli labels
-            stabs = []
-            for _, word in mapping.stabilizers:
-                label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
-                stabs.append(label)
+                # Convert stabilizers to Pauli labels
+                stabs = []
+                for _, word in mapping.stabilizers:
+                    label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
+                    stabs.append(label)
 
-            # Check mutual commutation of stabilizers: [S_i, S_j] = 0
-            for i in range(len(stabs)):
-                for j in range(i + 1, len(stabs)):
-                    assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
+                # Check mutual commutation of stabilizers: [S_i, S_j] = 0
+                for i in range(len(stabs)):
+                    for j in range(i + 1, len(stabs)):
+                        assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
 
-            # Check commutation with Hamiltonian: [H, S_i] = 0
-            for i, stab in enumerate(stabs):
-                for p_term in qh_vc.pauli_strings:
-                    assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
+                # Check commutation with Hamiltonian: [H, S_i] = 0
+                for i, stab in enumerate(stabs):
+                    for p_term in qh_vc.pauli_strings:
+                        assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
 
     def test_pauli_weight_scaling(self) -> None:
         """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
@@ -196,85 +198,83 @@ class TestVerstraeteCiracMapping:
 class TestVerstraeteCiracSpectral:
     """Tests covering the spectral validation of the Verstraete-Cirac mapping."""
 
-    @pytest.mark.slow
     def test_spectral_validation_2x2_hubbard(self) -> None:
-        """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and Jordan-Wigner mappings.
+        """Compare eigenvalues of 2x2 periodic Fermi-Hubbard model under VC and JW mappings.
 
         Model parameters: t = 1.0, U = 4.0, half-filling (epsilon = -U/2 = -2.0).
         """
         lattice = LatticeGraph.square(2, 2, periodic_x=True)
-
-        # 4 sites in lattice, each with 2 spin species -> 8 spin-orbitals / modes
-        n_modes = 8
-
-        hubbard_ham = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
-
+        n_modes = 8  # 4 spatial sites * 2 spin species
+        hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
         mapper = create("qubit_mapper", "qdk")
+
         jw_mapping = MajoranaMapping.jordan_wigner(num_modes=n_modes)
-        qh_jw = mapper.run(hubbard_ham, jw_mapping)
-
-        # Solve JW eigenvalues using sparse solver
-        h_jw = qh_jw.to_matrix(sparse=True)
-        eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
-        eigs_jw = np.sort(eigs_jw)
-        unique_jw = np.unique(np.round(eigs_jw, 6))
-
-        vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
-        qh_vc = mapper.run(hubbard_ham, vc_mapping)
-
-        assert qh_vc.num_qubits == 2 * n_modes
-        h_vc = qh_vc.to_matrix(sparse=True)
-
-        # Solve for 128 eigenvalues to cover the 64-fold degeneracy of the ground state and first excited state
-        eigs_vc, _ = eigsh(h_vc, k=128, which="SA")
-        eigs_vc = np.sort(eigs_vc)
-        unique_vc = np.unique(np.round(eigs_vc, 6))
-
-        # We check the 2 lowest unique eigenvalues.
-        np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
-
-    @pytest.mark.slow
-    def test_spectral_validation_3x3_huckel(self) -> None:
-        """Compare eigenvalues of 3x3 Hückel model under VC and Jordan-Wigner mappings."""
-        lattice = LatticeGraph.square(3, 3)
-
-        # 9 sites in lattice, each with 1 spin species -> 9 spin-orbitals / modes
-        n_modes = 9
-
-        huckel_ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
-
-        mapper = create("qubit_mapper", "qdk")
-        jw_mapping = MajoranaMapping.jordan_wigner(num_modes=n_modes)
-        qh_jw = mapper.run(huckel_ham, jw_mapping)
+        qh_jw = mapper.run(hamiltonian, jw_mapping)
         h_jw = qh_jw.to_matrix(sparse=True)
         eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
         unique_jw = np.unique(np.round(np.sort(eigs_jw), 6))
 
-        mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
-        qh_vc = mapper.run(huckel_ham, mapping)
+        vc_mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=2)
+        qh_vc = mapper.run(hamiltonian, vc_mapping)
+
+        # Verify system size and extract lowest unique eigenvalues
+        assert qh_vc.num_qubits == 2 * n_modes
         h_vc = qh_vc.to_matrix(sparse=True)
+        eigs_vc, _ = eigsh(h_vc, k=10, which="SA")
+        unique_vc = np.unique(np.round(np.sort(eigs_vc), 6))
 
-        # We solve for a few eigenvalues of H_vc and project into the code space (+1 eigenstate of all stabilizers)
-        eigs_vc, vecs_vc = eigsh(h_vc, k=40, which="SA")
+        # Ensure lowest physical energy levels match baseline
+        np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
+    def test_spectral_validation_3x3_huckel(self) -> None:
+        """Compare eigenvalues of 3x3 Hückel model under VC and JW mappings.
+
+        Validates that the lowest eigenstates of the penalized Hamiltonian are
+        in the +1 codespace sector of the generated loop-plaquette stabilizers.
+        """
+        lattice = LatticeGraph.square(3, 3)
+        n_modes = 9  # 9 spatial sites * 1 spin species (spinless)
+        hamiltonian = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
+        mapper = create("qubit_mapper", "qdk")
+
+        jw_mapping = MajoranaMapping.jordan_wigner(num_modes=n_modes)
+        qh_jw = mapper.run(hamiltonian, jw_mapping)
+        h_jw = qh_jw.to_matrix(sparse=True)
+        eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
+        unique_jw = np.unique(np.round(np.sort(eigs_jw), 6))
+
+        vc_mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
+        qh_vc = mapper.run(hamiltonian, vc_mapping)
+
+        # Extract lowest eigenstates and their respective eigenstates
+        assert qh_vc.num_qubits == 2 * n_modes
+        h_vc = qh_vc.to_matrix(sparse=True)
+        eigs_vc, vecs_vc = eigsh(h_vc, k=10, which="SA")
+
+        # Construct sparse matrices for each generated loop-plaquette stabilizer
         stabs = []
-        for coeff, word in mapping.stabilizers:
+        for coeff, word in vc_mapping.stabilizers:
             label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
             qh_stab = QubitHamiltonian([label], np.array([coeff]))
             stabs.append(qh_stab.to_matrix(sparse=True))
 
+        # Project and filter out any unphysical states (out-of-codespace)
         code_space_eigs = []
         for idx in range(len(eigs_vc)):
             vec = vecs_vc[:, idx]
             is_in_code_space = True
+
             for stab in stabs:
-                exp = np.real(vec.conj().T @ (stab @ vec))
-                if not np.isclose(exp, 1.0, atol=1e-4):
+                # Only a simultaneous +1 eigenstate belongs to the physical codespace
+                expectation_value = np.real(vec.conj().T @ (stab @ vec))
+                if not np.isclose(expectation_value, 1.0, atol=1e-4):
                     is_in_code_space = False
                     break
+
             if is_in_code_space:
                 code_space_eigs.append(eigs_vc[idx])
 
+        # Assert that physical states were found and unique energy levels match baseline
         assert len(code_space_eigs) >= 2
         unique_vc = np.unique(np.round(np.sort(code_space_eigs), 6))
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)

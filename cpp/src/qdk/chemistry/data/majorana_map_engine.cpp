@@ -512,6 +512,9 @@ MajoranaMapResult majorana_map_impl(
         }
       }
     }
+    // If stabilizers are included in the mapping, our total Hamiltonian becomes
+    // H_total = H_physical + H_aux. We add H_aux = λ · Σ_i (I − S_i) to
+    // penalize unphysical codespace sectors.
     double aux_ham_coefficient = 1.0 + h1_sum;
 
     PackedPauliWord<NW> identity{};

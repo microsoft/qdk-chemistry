@@ -258,9 +258,9 @@ class MajoranaMapping : public DataClass {
   /**
    * @brief Verstraete-Cirac encoding.
    *
-   * Maps fermionic modes on a 2D square lattice to qubits.
+   * Maps fermionic modes on a `LatticeGraph` to qubits.
    *
-   * @param lattice The 2D square lattice connectivity.
+   * @param lattice The `LatticeGraph` connectivity.
    * @param num_spin_species Number of spin species (usually 2 for spinful, 1
    *        for spinless). Default: 2.
    * @return MajoranaMapping with name ``"verstraete-cirac"``.
