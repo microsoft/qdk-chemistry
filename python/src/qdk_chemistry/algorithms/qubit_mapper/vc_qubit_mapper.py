@@ -101,11 +101,8 @@ class VerstraeteCiracQubitMapper(QubitMapper):
     Correct fermionic anticommutation {Gamma_a, Gamma_b} = 2 delta_{ab}
     is guaranteed in the full 2N-qubit Hilbert space.
 
-    The codespace is the +1 eigenspace of the site stabilisers::
-
-        P_{j,j} = i * Gamma_{2j} * Gamma_{2j+1}  for all j
-
-    (Verstraete & Cirac, arXiv:cond-mat/0508353).
+    Codespace: the +1 eigenspace of the auxiliary Z operators
+    (Z_{an} = +1 for all n, auxiliary qubits in state |0>).
     Physical eigenvalues are recovered by restricting to this sector.
 
     Note: This is a Python-level prototype. A C++ backend implementation

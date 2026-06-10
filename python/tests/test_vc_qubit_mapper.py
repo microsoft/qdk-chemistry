@@ -34,7 +34,8 @@ from .test_helpers import create_test_orbitals
 
 def _make_hamiltonian(one_body, two_body, orbitals, core_energy=0.0):
     """Construct a Hamiltonian from integrals."""
-    fock = np.eye(0)
+    n_modes = one_body.shape[0]
+    fock = np.zeros((n_modes, n_modes))
     return Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, core_energy, fock))
 
 
