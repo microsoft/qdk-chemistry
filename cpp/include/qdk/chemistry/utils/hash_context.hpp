@@ -298,23 +298,27 @@ concept HashComplexScalar = std::same_as<T, float> || std::same_as<T, double> ||
 template <typename T>
 concept HashEnum = std::is_enum_v<T>;
 
-template <HashSignedIntegral T>
+template <typename T>
+  requires qdk::chemistry::utils::HashSignedIntegral<T>
 void hash_value(HashContext& ctx, T value) {
   hash_value(ctx, static_cast<int64_t>(value));
 }
 
-template <HashUnsignedIntegral T>
+template <typename T>
+  requires qdk::chemistry::utils::HashUnsignedIntegral<T>
 void hash_value(HashContext& ctx, T value) {
   hash_value(ctx, static_cast<uint64_t>(value));
 }
 
-template <HashEnum T>
+template <typename T>
+  requires qdk::chemistry::utils::HashEnum<T>
 void hash_value(HashContext& ctx, T value) {
   using UnderlyingType = std::underlying_type_t<T>;
   hash_value(ctx, static_cast<UnderlyingType>(value));
 }
 
-template <HashComplexScalar T>
+template <typename T>
+  requires qdk::chemistry::utils::HashComplexScalar<T>
 void hash_value(HashContext& ctx, const std::complex<T>& value) {
   hash_value(ctx, value.real());
   hash_value(ctx, value.imag());

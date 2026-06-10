@@ -180,7 +180,7 @@ class Job:
         for p in directory.glob("*.job.json"):
             try:
                 jobs.append(cls.load(p))
-            except (json.JSONDecodeError, KeyError, OSError):
+            except (ValueError, KeyError, OSError):
                 continue  # skip corrupt files
         jobs.sort(key=lambda j: j.submitted_at or "")
         return jobs

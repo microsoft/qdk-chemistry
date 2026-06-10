@@ -119,6 +119,19 @@ class TestFolderCacheJobs:
         data = json.loads(job_path.read_text())
         assert data["job_id"] == "test123"
 
+    def test_discover_skips_unsupported_job_file_version(self, cache_dir, sample_job):
+        """Discovery skips future-version job files and returns supported jobs."""
+        sample_job.save(cache_dir / "supported.job.json")
+
+        unsupported_job = sample_job.to_dict()
+        unsupported_job["version"] = 999
+        unsupported_job["job_id"] = "future"
+        (cache_dir / "unsupported.job.json").write_text(json.dumps(unsupported_job))
+
+        jobs = Job.discover(cache_dir)
+
+        assert [job.job_id for job in jobs] == ["test123"]
+
     def test_delete_job_existing(self, folder_cache, sample_job):
         """Deleting an existing job returns True and removes the file."""
         folder_cache.put_job("hash1", sample_job)

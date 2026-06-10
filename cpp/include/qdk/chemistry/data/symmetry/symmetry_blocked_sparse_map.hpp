@@ -280,7 +280,7 @@ class SymmetryBlockedSparseMap
         for (unsigned component : idx) {
           hash_value(ctx, static_cast<uint64_t>(component));
         }
-        hash_value(ctx, static_cast<double>(value));
+        hash_value(ctx, value);
       }
     }
   }
