@@ -605,9 +605,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
 
   // Verify RDMs are in JSON
   EXPECT_TRUE(j.contains("rdms"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
+  EXPECT_TRUE(j["rdms"].contains("active_one_rdm"));
+  EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
   auto restored = std::unique_ptr<SciWavefunctionContainer>(
@@ -690,11 +689,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
 
   // Verify RDMs are in JSON
   EXPECT_TRUE(j.contains("rdms"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_bb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_bbbb"));
+  EXPECT_TRUE(j["rdms"].contains("active_one_rdm"));
+  EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
   auto restored = std::unique_ptr<SciWavefunctionContainer>(

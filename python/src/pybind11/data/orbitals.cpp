@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
 #include "path_utils.hpp"
@@ -189,7 +190,44 @@ Examples:
           std::tuple<std::vector<size_t>, std::vector<size_t>,
                      std::vector<size_t>, std::vector<size_t>>>{});
 
-  // Coefficient access (read-only)
+  // SBT-native constructor (symmetry-blocked tensors)
+  orbitals.def(
+      py::init<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+               std::shared_ptr<const SymmetryBlockedTensor<1>>,
+               const std::optional<Eigen::MatrixXd> &,
+               std::shared_ptr<qdk::chemistry::data::BasisSet>>(),
+      R"(
+Construct from symmetry-blocked tensors.
+
+This is the preferred (non-deprecated) construction path. The orbital
+coefficients and energies are supplied as SymmetryBlockedTensor objects.
+
+Args:
+    coefficients (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2): Rank-2 coefficient tensor [AO x MO]
+    energies (qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank1 | None): Rank-1 energy tensor, can be None
+    ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix, can be None
+    basis_set (BasisSet | None): The basis set, can be None
+)",
+      py::arg("coefficients"), py::arg("energies"),
+      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+      py::arg("basis_set") = std::shared_ptr<qdk::chemistry::data::BasisSet>{});
+
+  // SBT-native accessors
+  orbitals.def("coefficients", &Orbitals::coefficients,
+               "The molecular-orbital coefficients as a rank-2 "
+               "SymmetryBlockedTensor.");
+  orbitals.def("energies", &Orbitals::energies,
+               "The orbital energies as a rank-1 "
+               "SymmetryBlockedTensor.");
+  orbitals.def(
+      "symmetries", &Orbitals::symmetries,
+      "SymmetryProduct the molecular-orbital modes are blocked under.");
+  orbitals.def("mo_extents", &Orbitals::mo_extents,
+               "Per-label mode extents (number of molecular orbitals carrying "
+               "each label).");
+  orbitals.def("num_modes", &Orbitals::num_modes,
+               "Total number of molecular-orbital modes across all symmetry "
+               "blocks.");
   orbitals.def("get_coefficients", &Orbitals::get_coefficients,
                R"(
 Get orbital coefficients as pair of (alpha, beta) matrices.

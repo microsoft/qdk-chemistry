@@ -19,6 +19,9 @@ target_sources(chemistry PRIVATE
     settings.cpp
     stability_result.cpp
     structure.cpp
+    symmetry/symmetry.cpp
+    symmetry/symmetry_blocked_tensor.cpp
+    symmetry/symmetry_blocked_index_set.cpp
     tapering.cpp
     wavefunction.cpp
     wavefunction_containers/cas.cpp
