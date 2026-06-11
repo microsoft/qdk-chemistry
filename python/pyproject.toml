@@ -34,7 +34,7 @@ dependencies = [
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter, qre]>=1.28.0",
+  "qdk[jupyter]>=1.29.1",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0"
 ]
@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,test]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
 ]
 coverage = [
   "coverage",
@@ -97,6 +97,9 @@ qiskit-extras = [
   "qiskit-qasm3-import; python_version < '3.14'",
   "pylatexenc==2.10; python_version < '3.14'",
   "requests>=2.33.0; python_version < '3.14'"
+]
+qre = [
+  "qdk[qre]>=1.29.1"
 ]
 test = [
   "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
