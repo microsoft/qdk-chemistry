@@ -33,8 +33,8 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-$BuildDir = "$RepoRoot\cpp\build"
-$InstallDir = "$RepoRoot\install"
+$BuildDir = "$RepoRoot\cpp\build-clang-cl"
+$InstallDir = "$RepoRoot\install-clang-cl"
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
 # Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
@@ -334,7 +334,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 6 2>&1 *> cpp/build/build.log
+    cmake --build "$BuildDir" --parallel 6 2>&1 *> "$BuildDir\build.log"
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
     Write-Host "C++ build succeeded." -ForegroundColor Green
 

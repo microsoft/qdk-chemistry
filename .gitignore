@@ -12,12 +12,14 @@ docs/*.txt
 # Distribution / packaging
 .Python
 build/
+build-*/
 develop-eggs/
 dist/
 downloads/
 eggs/
 .eggs/
 install/
+install-*/
 lib/
 lib64/
 parts/

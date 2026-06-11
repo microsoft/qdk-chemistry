@@ -82,7 +82,7 @@ endif()
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/lorisercole/gauxc.git
-  GIT_TAG 4e18eb1c4fc3b7bc1d2f91c59d8a4826b0997a4f
+  GIT_TAG cf6f34853774fb909b49aa7389cb3856550b66c1
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
