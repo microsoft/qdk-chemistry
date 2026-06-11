@@ -46,18 +46,18 @@ AmplitudeType amplitude_type_from_string(const std::string& s) {
 }
 
 AmplitudeContainer::AmplitudeContainer(
-    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Orbitals> orbitals, std::string sector,
     std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes,
     const std::optional<VectorVariant>& t2_amplitudes)
-    : AmplitudeContainer(orbitals, wavefunction, amplitude_type, t1_amplitudes,
-                         std::nullopt, t2_amplitudes, std::nullopt,
-                         std::nullopt) {
+    : AmplitudeContainer(orbitals, std::move(sector), wavefunction,
+                         amplitude_type, t1_amplitudes, std::nullopt,
+                         t2_amplitudes, std::nullopt, std::nullopt) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 AmplitudeContainer::AmplitudeContainer(
-    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Orbitals> orbitals, std::string sector,
     std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
@@ -68,6 +68,7 @@ AmplitudeContainer::AmplitudeContainer(
           WavefunctionType::NotSelfDual),  // Amplitude wavefunctions are
                                            // always NotSelfDual
       _orbitals(orbitals),
+      _sector(std::move(sector)),
       _wavefunction(wavefunction),
       _amplitude_type(amplitude_type) {
   QDK_LOG_TRACE_ENTERING();
@@ -223,14 +224,29 @@ std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
     return p ? std::optional<VectorVariant>(*p) : std::nullopt;
   };
   return std::make_unique<AmplitudeContainer>(
-      _orbitals, _wavefunction, _amplitude_type, as_optional(_t1_amplitudes_aa),
-      as_optional(_t1_amplitudes_bb), as_optional(_t2_amplitudes_abab),
-      as_optional(_t2_amplitudes_aaaa), as_optional(_t2_amplitudes_bbbb));
+      _orbitals, _sector, _wavefunction, _amplitude_type,
+      as_optional(_t1_amplitudes_aa), as_optional(_t1_amplitudes_bb),
+      as_optional(_t2_amplitudes_abab), as_optional(_t2_amplitudes_aaaa),
+      as_optional(_t2_amplitudes_bbbb));
 }
 
 std::shared_ptr<Orbitals> AmplitudeContainer::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
   return _orbitals;
+}
+
+std::vector<std::string> AmplitudeContainer::sectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  return {_sector};
+}
+
+std::shared_ptr<const Orbitals> AmplitudeContainer::sector_basis(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  if (name == _sector) {
+    return _orbitals;
+  }
+  throw std::out_of_range("Container has no sector named '" + name + "'");
 }
 
 std::shared_ptr<Wavefunction> AmplitudeContainer::get_wavefunction() const {
@@ -382,6 +398,7 @@ nlohmann::json AmplitudeContainer::to_json() const {
   j["version"] = SERIALIZATION_VERSION;
   j["container_type"] = get_container_type();
   j["amplitude_type"] = amplitude_type_to_string(_amplitude_type);
+  j["sector"] = _sector;
 
   if (_orbitals) {
     j["orbitals"] = _orbitals->to_json();
@@ -429,6 +446,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
       wavefunction = Wavefunction::from_json(j.at("wavefunction"));
     }
 
+    // Sector name; legacy files predating sectors are migrated as electronic.
+    std::string sector = j.value("sector", std::string("electrons"));
+
     // Determine the amplitude expansion type. New "amplitude" files store an
     // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
     // encode it in the container tag, and anything else is left unspecified.
@@ -449,7 +469,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     // amplitudes.
     if (container_tag == "mp2") {
       return std::make_unique<AmplitudeContainer>(
-          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt);
+          orbitals, sector, wavefunction, amplitude_type, std::nullopt,
+          std::nullopt);
     }
 
     bool is_complex = j.value("is_complex", false);
@@ -459,9 +480,10 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
                              : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
-        load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
-        load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"));
+        orbitals, sector, wavefunction, amplitude_type,
+        load("t1_amplitudes_aa"), load("t1_amplitudes_bb"),
+        load("t2_amplitudes_abab"), load("t2_amplitudes_aaaa"),
+        load("t2_amplitudes_bbbb"));
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse AmplitudeContainer from JSON: " +
                              std::string(e.what()));
@@ -488,6 +510,10 @@ void AmplitudeContainer::to_hdf5(H5::Group& group) const {
     H5::Attribute amplitude_type_attr = group.createAttribute(
         "amplitude_type", string_type, H5::DataSpace(H5S_SCALAR));
     amplitude_type_attr.write(string_type, amplitude_type_str);
+
+    H5::Attribute sector_attr = group.createAttribute(
+        "sector", string_type, H5::DataSpace(H5S_SCALAR));
+    sector_attr.write(string_type, _sector);
 
     bool is_complex = this->is_complex();
     H5::Attribute is_complex_attr = group.createAttribute(
@@ -545,6 +571,12 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
       wavefunction = Wavefunction::from_hdf5(wavefunction_group);
     }
 
+    // Sector name; legacy files predating sectors are migrated as electronic.
+    std::string sector = "electrons";
+    if (group.attrExists("sector")) {
+      group.openAttribute("sector").read(string_type, sector);
+    }
+
     // Determine the amplitude expansion type. New "amplitude" files store an
     // explicit "amplitude_type" attribute; legacy "coupled_cluster"/"mp2"
     // files encode it in the container tag, and anything else is unspecified.
@@ -571,7 +603,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
         orbitals = hamiltonian->get_orbitals();
       }
       return std::make_unique<AmplitudeContainer>(
-          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt);
+          orbitals, sector, wavefunction, amplitude_type, std::nullopt,
+          std::nullopt);
     }
 
     bool is_complex = false;
@@ -589,9 +622,10 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
                  : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
-        load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
-        load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"));
+        orbitals, sector, wavefunction, amplitude_type,
+        load("t1_amplitudes_aa"), load("t1_amplitudes_bb"),
+        load("t2_amplitudes_abab"), load("t2_amplitudes_aaaa"),
+        load("t2_amplitudes_bbbb"));
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }

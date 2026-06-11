@@ -722,6 +722,28 @@ class WavefunctionContainer {
         "Configuration set not available for this container type");
   }
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this container spans.
+   *
+   * A sector is a named single-particle basis; every container owns its own
+   * sector-to-basis binding (see @ref sector_basis) and must report it. The
+   * current single-species containers report one electronic sector.
+   *
+   * @return Names of the container's sectors.
+   */
+  virtual std::vector<std::string> sectors() const = 0;
+
+  /**
+   * @brief Single-particle basis bound to a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if this container has no sector named @p name.
+   */
+  virtual std::shared_ptr<const Orbitals> sector_basis(
+      const std::string& name) const = 0;
+
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
@@ -844,8 +866,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Construct wavefunction with container (orbitals are stored in
-   * container)
-   * @param container Wavefunction container implementation
+   * container).
+   * @param container Wavefunction container implementation.
    */
   Wavefunction(std::unique_ptr<WavefunctionContainer> container);
 
@@ -908,6 +930,45 @@ class Wavefunction : public DataClass,
   bool has_container_type() const {
     return dynamic_cast<const T*>(_container.get()) != nullptr;
   }
+
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this wavefunction spans.
+   *
+   * A sector is a named single-particle basis; the sector inherits that
+   * basis's single-particle symmetries (see @ref sector_symmetries). Sectors
+   * are owned by the underlying container (which binds each name to a basis);
+   * these accessors surface that binding. The current single-species data
+   * model reports the sole @ref DEFAULT_SECTOR.
+   *
+   * @return Names of the wavefunction's sectors.
+   */
+  std::vector<std::string> sectors() const;
+
+  /**
+   * @brief Whether a sector with the given name is present.
+   * @param name Sector name to look up.
+   * @return @c true iff the container binds a basis under @p name.
+   */
+  bool has_sector(const std::string& name) const;
+
+  /**
+   * @brief Single-particle basis associated with a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const Orbitals> sector_basis(const std::string& name) const;
+
+  /**
+   * @brief Single-particle symmetries inherited from a sector's basis.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref SymmetryProduct of the sector's basis.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const SymmetryProduct> sector_symmetries(
+      const std::string& name) const;
 
   /**
    * @brief Number of electrons (active + inactive) as a symmetry-blocked

@@ -80,12 +80,13 @@ class AmplitudeContainer : public WavefunctionContainer {
    * T1/T2 amplitudes are stored if provided.
    *
    * @param orbitals Shared pointer to orbitals
+   * @param sector Name of the single-particle sector the orbitals belong to
    * @param wavefunction Shared pointer to the reference wavefunction
    * @param amplitude_type Correlated method that produced the amplitudes
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    */
-  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals, std::string sector,
                      std::shared_ptr<Wavefunction> wavefunction,
                      AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes,
@@ -97,6 +98,7 @@ class AmplitudeContainer : public WavefunctionContainer {
    * T1/T2 amplitudes are stored if provided.
    *
    * @param orbitals Shared pointer to orbitals
+   * @param sector Name of the single-particle sector the orbitals belong to
    * @param wavefunction Shared pointer to the reference wavefunction
    * @param amplitude_type Correlated method that produced the amplitudes
    * @param t1_amplitudes_aa Alpha T1 amplitudes (optional)
@@ -105,7 +107,7 @@ class AmplitudeContainer : public WavefunctionContainer {
    * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
    * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
    */
-  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals, std::string sector,
                      std::shared_ptr<Wavefunction> wavefunction,
                      AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes_aa,
@@ -128,6 +130,21 @@ class AmplitudeContainer : public WavefunctionContainer {
    * @return Shared pointer to orbitals
    */
   std::shared_ptr<Orbitals> get_orbitals() const override;
+
+  /**
+   * @brief Names of the single-particle sectors this container spans.
+   * @return The container's sector names (the sector supplied at construction).
+   */
+  std::vector<std::string> sectors() const override;
+
+  /**
+   * @brief Single-particle basis bound to a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if this container has no sector named @p name.
+   */
+  std::shared_ptr<const Orbitals> sector_basis(
+      const std::string& name) const override;
 
   /**
    * @brief Get the reference wavefunction
@@ -289,6 +306,8 @@ class AmplitudeContainer : public WavefunctionContainer {
  private:
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
+  // Single-particle sector the orbitals belong to
+  std::string _sector;
   // Reference wavefunction
   std::shared_ptr<Wavefunction> _wavefunction;
   // Correlated method that produced the amplitudes

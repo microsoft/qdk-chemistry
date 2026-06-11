@@ -110,13 +110,15 @@ Examples:
 
   // Constructors
   configuration_set.def(
-      py::init<const std::vector<Configuration>&, std::shared_ptr<Orbitals>>(),
+      py::init<const std::vector<Configuration>&, std::shared_ptr<Orbitals>,
+               std::string>(),
       R"(
 Construct a ConfigurationSet from configurations and orbital information.
 
 Args:
     configurations (list[Configuration]): List of Configuration objects representing the active space
     orbitals (Orbitals): Orbitals object defining the single-particle basis
+    sector (str): Name of the single-particle sector the orbitals belong to
 
 Raises:
     ValueError: If configurations are inconsistent with active space or if orbitals is None
@@ -128,10 +130,10 @@ Note:
 
 Examples:
     >>> configs = [Configuration("2200"), Configuration("22ud")]
-    >>> config_set = ConfigurationSet(configs, orbitals)
+    >>> config_set = ConfigurationSet(configs, orbitals, "electrons")
 
 )",
-      py::arg("configurations"), py::arg("orbitals"));
+      py::arg("configurations"), py::arg("orbitals"), py::arg("sector"));
 
   // Copy constructor
   configuration_set.def(py::init<const ConfigurationSet&>(), "Copy constructor",

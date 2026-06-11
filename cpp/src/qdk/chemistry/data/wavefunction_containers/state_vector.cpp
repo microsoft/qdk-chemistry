@@ -27,8 +27,9 @@ using ScalarVariant = ContainerTypes::ScalarVariant;
 StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
                                            const DeterminantVector& dets,
                                            std::shared_ptr<Orbitals> orbitals,
+                                           const std::string& sector,
                                            WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals,
+    : StateVectorContainer(coeffs, dets, orbitals, sector,
                            std::nullopt,        // one_rdm_spin_traced
                            std::nullopt,        // one_rdm_aa
                            std::nullopt,        // one_rdm_bb
@@ -43,10 +44,11 @@ StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
 
 StateVectorContainer::StateVectorContainer(const Configuration& det,
                                            std::shared_ptr<Orbitals> orbitals,
+                                           const std::string& sector,
                                            WavefunctionType type)
     : WavefunctionContainer(type),
       _coefficients(Eigen::VectorXd(Eigen::VectorXd::Ones(1))),
-      _configuration_set(DeterminantVector{det}, orbitals) {
+      _configuration_set(DeterminantVector{det}, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
 
   // Validate that the configuration represents the active space correctly.
@@ -84,11 +86,11 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
     const OrbitalEntropies& entropies, WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals, one_rdm_spin_traced,
+    : StateVectorContainer(coeffs, dets, orbitals, sector, one_rdm_spin_traced,
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
                            two_rdm_spin_traced,
@@ -101,7 +103,7 @@ StateVectorContainer::StateVectorContainer(
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<MatrixVariant>& one_rdm_aa,
     const std::optional<MatrixVariant>& one_rdm_bb,
@@ -114,13 +116,13 @@ StateVectorContainer::StateVectorContainer(
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
                             two_rdm_bbbb, entropies, type),
       _coefficients(coeffs),
-      _configuration_set(dets, orbitals) {
+      _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals,
+    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
     std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
     std::shared_ptr<VectorVariant> two_rdm_spin_traced,
     std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
@@ -131,7 +133,7 @@ StateVectorContainer::StateVectorContainer(
                             std::move(active_one_rdm),
                             std::move(active_two_rdm), entropies, type),
       _coefficients(coeffs),
-      _configuration_set(dets, orbitals) {
+      _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -148,13 +150,34 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::clone() const {
 
   return std::make_unique<StateVectorContainer>(
       _coefficients, _configuration_set.get_configurations(),
-      this->get_orbitals(), _one_rdm_spin_traced, _two_rdm_spin_traced,
-      _active_one_rdm, _active_two_rdm, _entropies, this->get_type());
+      this->get_orbitals(), _configuration_set.sector_layout().front().first,
+      _one_rdm_spin_traced, _two_rdm_spin_traced, _active_one_rdm,
+      _active_two_rdm, _entropies, this->get_type());
 }
 
 std::shared_ptr<Orbitals> StateVectorContainer::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
   return _configuration_set.get_orbitals();
+}
+
+std::vector<std::string> StateVectorContainer::sectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  std::vector<std::string> names;
+  for (const auto& [name, basis] : _configuration_set.sector_layout()) {
+    names.push_back(name);
+  }
+  return names;
+}
+
+std::shared_ptr<const Orbitals> StateVectorContainer::sector_basis(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  for (const auto& [sector_name, basis] : _configuration_set.sector_layout()) {
+    if (sector_name == name) {
+      return basis;
+    }
+  }
+  throw std::out_of_range("Container has no sector named '" + name + "'");
 }
 
 ScalarVariant StateVectorContainer::get_coefficient(
@@ -848,8 +871,9 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_json(
       }
       Configuration determinant = Configuration::from_json(j["determinant"]);
 
+      // Legacy "sd" files predate sectors; migrate as electronic.
       return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    type);
+                                                    "electrons", type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the
@@ -906,8 +930,9 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_hdf5(
       Configuration determinant = Configuration::from_hdf5(det_group);
       det_group.close();
 
+      // Legacy "sd" files predate sectors; migrate as electronic.
       return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    type);
+                                                    "electrons", type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the

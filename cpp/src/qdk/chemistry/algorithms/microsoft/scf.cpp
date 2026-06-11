@@ -497,7 +497,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
   // Create StateVectorContainer
   auto container =
-      std::make_unique<data::StateVectorContainer>(hf_det, orbitals);
+      std::make_unique<data::StateVectorContainer>(hf_det, orbitals,
+                                                   "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

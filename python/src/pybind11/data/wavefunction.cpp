@@ -346,6 +346,68 @@ Examples:
 )",
       py::return_value_policy::reference_internal);
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  wavefunction.def("sectors", &Wavefunction::sectors,
+                   R"(
+Names of the single-particle sectors this wavefunction spans.
+
+A sector is a named single-particle basis (Orbitals); the sector inherits that
+basis's single-particle symmetries. Sectors are owned by the underlying
+container. The current single-species data model reports a single sector.
+
+Returns:
+    list[str]: The wavefunction's sector names
+
+Examples:
+    >>> wf.sectors()
+)");
+
+  wavefunction.def("has_sector", &Wavefunction::has_sector,
+                   R"(
+Check whether a sector with the given name is present.
+
+Args:
+    name (str): Sector name to look up
+
+Returns:
+    bool: True if the container binds a basis under ``name``
+)",
+                   py::arg("name"));
+
+  wavefunction.def("sector_basis", &Wavefunction::sector_basis,
+                   R"(
+Single-particle basis associated with a sector.
+
+Args:
+    name (str): Sector name to resolve
+
+Returns:
+    Orbitals: The basis bound to ``name``
+
+Raises:
+    IndexError: If no sector named ``name`` is present
+
+Examples:
+    >>> basis = wf.sector_basis(wf.sectors()[0])
+)",
+                   py::arg("name"));
+
+  wavefunction.def("sector_symmetries", &Wavefunction::sector_symmetries,
+                   R"(
+Single-particle symmetries inherited from a sector's basis.
+
+Args:
+    name (str): Sector name to resolve
+
+Returns:
+    SymmetryProduct: The symmetries of the sector's basis
+
+Raises:
+    IndexError: If no sector named ``name`` is present
+)",
+                   py::arg("name"));
+
   // Electron and occupation methods
   wavefunction.def("get_active_num_electrons",
                    &Wavefunction::get_active_num_electrons,
@@ -1089,25 +1151,27 @@ one-determinant expansion with coefficient 1.0.
 )")
       // Single Slater-determinant convenience constructor
       .def(py::init<const Configuration&, std::shared_ptr<Orbitals>,
-                    WavefunctionType>(),
+                    const std::string&, WavefunctionType>(),
            R"(
 Constructs a single Slater-determinant state vector.
 
 Args:
     det (Configuration): The single determinant configuration
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> det = qdk_chemistry.Configuration("33221100")
-    >>> container = qdk_chemistry.StateVectorContainer(det, orbitals)
+    >>> container = qdk_chemistry.StateVectorContainer(det, orbitals, "electrons")
 )",
-           py::arg("det"), py::arg("orbitals"),
+           py::arg("det"), py::arg("orbitals"), py::arg("sector"),
            py::arg("type") = WavefunctionType::SelfDual)
-      // Basic constructor: coeffs, dets, orbitals, type
+      // Basic constructor: coeffs, dets, orbitals, sector, type
       .def(py::init<const ContainerTypes::VectorVariant&,
                     const ContainerTypes::DeterminantVector&,
-                    std::shared_ptr<Orbitals>, WavefunctionType>(),
+                    std::shared_ptr<Orbitals>, const std::string&,
+                    WavefunctionType>(),
            R"(
 Constructs a basic state-vector wavefunction container.
 
@@ -1115,27 +1179,29 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals)
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons")
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("type") = WavefunctionType::SelfDual)
+           py::arg("sector"), py::arg("type") = WavefunctionType::SelfDual)
       // Constructor with spin-traced RDMs and optional entropies dict
       .def(py::init([](const ContainerTypes::VectorVariant& coeffs,
                        const ContainerTypes::DeterminantVector& dets,
                        std::shared_ptr<Orbitals> orbitals,
+                       const std::string& sector,
                        std::optional<ContainerTypes::MatrixVariant>
                            one_rdm_spin_traced,
                        std::optional<ContainerTypes::VectorVariant>
                            two_rdm_spin_traced,
                        py::object entropies, WavefunctionType type) {
              return StateVectorContainer(
-                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                 coeffs, dets, std::move(orbitals), sector, one_rdm_spin_traced,
                  two_rdm_spin_traced, parse_entropies(entropies), type);
            }),
            R"(
@@ -1145,6 +1211,7 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
     entropies (dict | None): Orbital entropies, with optional keys
@@ -1157,13 +1224,13 @@ Examples:
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> one_rdm = np.eye(4)  # Example 1-RDM
-    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, one_rdm, None)
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons", one_rdm, None)
     >>> # With entropies:
-    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons",
     ...     one_rdm, None, entropies={"single_orbital": s1_vec})
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("one_rdm_spin_traced") = std::nullopt,
+           py::arg("sector"), py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
            py::arg("entropies") = py::none(),
            py::arg("type") = WavefunctionType::SelfDual)
@@ -1172,6 +1239,7 @@ Examples:
           py::init([](const ContainerTypes::VectorVariant& coeffs,
                       const ContainerTypes::DeterminantVector& dets,
                       std::shared_ptr<Orbitals> orbitals,
+                      const std::string& sector,
                       std::optional<ContainerTypes::MatrixVariant>
                           one_rdm_spin_traced,
                       std::optional<ContainerTypes::MatrixVariant> one_rdm_aa,
@@ -1183,7 +1251,7 @@ Examples:
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
             return StateVectorContainer(
-                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                coeffs, dets, std::move(orbitals), sector, one_rdm_spin_traced,
                 one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
                 two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
@@ -1194,6 +1262,7 @@ Args:
     coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
     dets (list[Configuration]): The vector of determinants
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
     one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
     one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
@@ -1210,12 +1279,12 @@ Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
-    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons",
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
     ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
 )",
           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-          py::arg("one_rdm_spin_traced") = std::nullopt,
+          py::arg("sector"), py::arg("one_rdm_spin_traced") = std::nullopt,
           py::arg("one_rdm_aa") = std::nullopt,
           py::arg("one_rdm_bb") = std::nullopt,
           py::arg("two_rdm_spin_traced") = std::nullopt,
@@ -1272,8 +1341,8 @@ restricted and unrestricted amplitudes (optionally spin-separated). The
 amplitude type (see :class:`AmplitudeType`) records which correlated method
 produced the amplitudes.
     )")
-      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
-                    AmplitudeType,
+      .def(py::init<std::shared_ptr<Orbitals>, std::string,
+                    std::shared_ptr<Wavefunction>, AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&>(),
            R"(
@@ -1281,6 +1350,7 @@ Constructs an amplitude wavefunction container with spatial (restricted) amplitu
 
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     wavefunction (Wavefunction): Shared pointer to the reference wavefunction
     amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
     t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (both alpha, beta spin)
@@ -1289,13 +1359,13 @@ Args:
 Examples:
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
-    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, AmplitudeType.CCSD, t1, t2)
+    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, "electrons", wfn, AmplitudeType.CCSD, t1, t2)
         )",
-           py::arg("orbitals"), py::arg("wavefunction"),
+           py::arg("orbitals"), py::arg("sector"), py::arg("wavefunction"),
            py::arg("amplitude_type"), py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt)
-      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
-                    AmplitudeType,
+      .def(py::init<std::shared_ptr<Orbitals>, std::string,
+                    std::shared_ptr<Wavefunction>, AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
@@ -1306,6 +1376,7 @@ Constructs an amplitude wavefunction container with spin-separated amplitudes.
 
 Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
     wavefunction (Wavefunction): Shared pointer to the reference wavefunction
     amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
     t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
@@ -1316,9 +1387,9 @@ Args:
 
 Examples:
     >>> container = qdk_chemistry.AmplitudeContainer(
-    ...     orbitals, wfn, AmplitudeType.CCSD, t1_aa, t1_bb, t2_abab, None, None)
+    ...     orbitals, "electrons", wfn, AmplitudeType.CCSD, t1_aa, t1_bb, t2_abab, None, None)
         )",
-           py::arg("orbitals"), py::arg("wavefunction"),
+           py::arg("orbitals"), py::arg("sector"), py::arg("wavefunction"),
            py::arg("amplitude_type"),
            py::arg("t1_amplitudes_aa") = std::nullopt,
            py::arg("t1_amplitudes_bb") = std::nullopt,

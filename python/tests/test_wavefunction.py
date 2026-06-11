@@ -152,6 +152,45 @@ class TestWavefunction:
         alpha = SymmetryLabel([axes.alpha()])
         assert restored.value(alpha) == count.value(alpha)
 
+    # ---- Single-particle sectors ------------------------------------------
+
+    def test_reports_single_electron_sector(self, cas_wavefunction):
+        """Sectors are container-owned; today a single electronic sector is reported."""
+        wf = cas_wavefunction
+        assert wf.sectors() == ["electrons"]
+        assert wf.has_sector("electrons")
+
+        # The sector resolves to the container's basis; symmetries are inherited.
+        assert wf.sector_basis("electrons") is not None
+        assert wf.sector_symmetries("electrons") is not None
+
+    def test_sector_basis_unknown_raises(self, cas_wavefunction):
+        """Resolving an absent sector raises."""
+        wf = cas_wavefunction
+        assert not wf.has_sector("missing")
+        with pytest.raises(IndexError):
+            wf.sector_basis("missing")
+        with pytest.raises(IndexError):
+            wf.sector_symmetries("missing")
+
+    def test_sector_survives_json_round_trip(self, basic_orbitals, tmp_path):
+        """Sectors are derived from the container, so they reappear after a JSON reload."""
+        wf = Wavefunction(StateVectorContainer(Configuration("20"), basic_orbitals))
+        path = tmp_path / "sectors.wavefunction.json"
+        wf.to_json_file(path)
+        restored = Wavefunction.from_json_file(path)
+
+        assert restored.sectors() == ["electrons"]
+
+    def test_sector_survives_hdf5_round_trip(self, basic_orbitals, tmp_path):
+        """Sectors are derived from the container, so they reappear after an HDF5 reload."""
+        wf = Wavefunction(StateVectorContainer(Configuration("20"), basic_orbitals))
+        path = tmp_path / "sectors.wavefunction.h5"
+        wf.to_hdf5_file(path)
+        restored = Wavefunction.from_hdf5_file(path)
+
+        assert restored.sectors() == ["electrons"]
+
     def test_wavefunction_coefficient_access(self, cas_wavefunction):
         """Test accessing coefficients through wavefunction."""
         wf = cas_wavefunction

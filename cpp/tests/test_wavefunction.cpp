@@ -49,10 +49,9 @@ class WavefunctionCoreTest : public ::testing::Test {
     dets[2] = config3;
 
     // Create a test wavefunction
-    wf = std::make_unique<Wavefunction>(
-        std::make_unique<StateVectorContainer>(
-            coeffs, dets, orbitals, std::nullopt, std::nullopt, std::nullopt,
-            std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+    wf = std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
+        coeffs, dets, orbitals, std::nullopt, std::nullopt, std::nullopt,
+        std::nullopt, std::nullopt, std::nullopt, std::nullopt));
   }
 
   std::unique_ptr<Wavefunction> wf;
@@ -190,12 +189,12 @@ TEST_F(WavefunctionCoreTest, OverlapCalculation) {
 
   // Create first wavefunction
   auto original_dets = wf->get_active_determinants();
-  Wavefunction wf1(std::make_unique<StateVectorContainer>(
-      coeffs1, original_dets, orbitals));
+  Wavefunction wf1(
+      std::make_unique<StateVectorContainer>(coeffs1, original_dets, orbitals));
 
   // Create second wavefunction using same determinants
-  Wavefunction wf2(std::make_unique<StateVectorContainer>(
-      coeffs2, original_dets, orbitals));
+  Wavefunction wf2(
+      std::make_unique<StateVectorContainer>(coeffs2, original_dets, orbitals));
 
   // Calculate overlap: conj(coeffs1) dot coeffs2
   // conj([1+0i, 0+i, 0]) dot [0+i, 1+0i, 0] =
@@ -414,6 +413,54 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
                                                       testing::wf_tolerance));
 }
 
+// ---- Single-particle sectors ----------------------------------------------
+
+TEST_F(WavefunctionCoreTest, ReportsSingleElectronSectorFromContainer) {
+  // The container owns the sector->basis binding; the wavefunction surfaces it.
+  // Today's single-species model reports the sole electronic sector.
+  EXPECT_EQ(wf->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
+  EXPECT_TRUE(wf->has_sector(DEFAULT_SECTOR));
+
+  // The sector resolves to the container's own basis, and symmetries are
+  // inherited from that basis.
+  EXPECT_EQ(wf->sector_basis(DEFAULT_SECTOR), wf->get_orbitals());
+  EXPECT_EQ(wf->sector_symmetries(DEFAULT_SECTOR),
+            wf->get_orbitals()->symmetries());
+}
+
+TEST_F(WavefunctionCoreTest, SectorBasisThrowsForUnknownSector) {
+  EXPECT_FALSE(wf->has_sector("missing"));
+  EXPECT_THROW(wf->sector_basis("missing"), std::out_of_range);
+  EXPECT_THROW(wf->sector_symmetries("missing"), std::out_of_range);
+}
+
+TEST_F(WavefunctionCoreTest, SectorSurvivesJsonRoundTrip) {
+  // Sectors are derived from the container, so they reappear after a reload
+  // without any wavefunction-level sector serialization.
+  auto reconstructed = Wavefunction::from_json(wf->to_json());
+  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
+}
+
+TEST_F(WavefunctionCoreTest, SectorSurvivesHdf5RoundTrip) {
+  std::string filename = "test_wavefunction_sectors.wavefunction.h5";
+  wf->to_hdf5_file(filename);
+  auto reconstructed = Wavefunction::from_hdf5_file(filename);
+  std::remove(filename.c_str());
+
+  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
+}
+
+TEST_F(WavefunctionCoreTest,
+       ConfigurationSetSectorLayoutIsSingleElectronSegment) {
+  // The slot-partition seam: today one segment covering all slots, named the
+  // electronic sector and backed by the set's orbitals.
+  ConfigurationSet cs({Configuration("ud2000")}, orbitals);
+  const auto& layout = cs.sector_layout();
+  ASSERT_EQ(layout.size(), 1u);
+  EXPECT_EQ(layout[0].name, DEFAULT_SECTOR);
+  EXPECT_EQ(layout[0].basis, orbitals);
+}
+
 // Test wavefunction serialization
 class WavefunctionSerializationTest : public ::testing::Test {
  protected:
@@ -443,18 +490,16 @@ class WavefunctionSerializationTest : public ::testing::Test {
     entropies.mutual_information = mutual_info;
 
     // Create test wavefunctions
-    cas_real = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(coeffs_real, dets, orbitals,
-                                                   std::nullopt, std::nullopt,
-                                                   entropies));
+    cas_real =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            coeffs_real, dets, orbitals, std::nullopt, std::nullopt,
+            entropies));
 
     cas_complex = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(coeffs_complex, dets,
-                                                   orbitals));
+        std::make_unique<StateVectorContainer>(coeffs_complex, dets, orbitals));
 
     sd_wavefunction = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration("20"),
-                                                     orbitals));
+        std::make_unique<StateVectorContainer>(Configuration("20"), orbitals));
 
     // Create SCI wavefunctions with 4 configurations (2 orbitals each)
     // All must have same electron count (2 electrons)
@@ -471,13 +516,13 @@ class WavefunctionSerializationTest : public ::testing::Test {
         std::complex<double>(0.4, -0.2), std::complex<double>(0.3, 0.3),
         std::complex<double>(0.2, 0.1);
 
-    sci_real = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(sci_coeffs_real, sci_dets,
-                                                   orbitals));
+    sci_real =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            sci_coeffs_real, sci_dets, orbitals));
 
-    sci_complex = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(sci_coeffs_complex, sci_dets,
-                                                   orbitals));
+    sci_complex =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            sci_coeffs_complex, sci_dets, orbitals));
   }
 
   std::shared_ptr<Orbitals> orbitals;
@@ -931,9 +976,8 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantsMultiple) {
   Wavefunction::DeterminantVector active_dets = {active_det1, active_det2,
                                                  active_det3};
 
-  auto wf =
-      std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
-          coeffs, active_dets, orbitals));
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<StateVectorContainer>(coeffs, active_dets, orbitals));
 
   // Get all total determinants
   auto total_dets = wf->get_total_determinants();
@@ -962,9 +1006,8 @@ TEST_F(WavefunctionActiveSpaceConversionTest,
   Wavefunction::DeterminantVector active_dets = {active_det1, active_det2,
                                                  active_det3};
 
-  auto wf =
-      std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
-          coeffs, active_dets, orbitals));
+  auto wf = std::make_unique<Wavefunction>(
+      std::make_unique<StateVectorContainer>(coeffs, active_dets, orbitals));
 
   // Get active determinants (should be unchanged)
   const auto& retrieved_active = wf->get_active_determinants();

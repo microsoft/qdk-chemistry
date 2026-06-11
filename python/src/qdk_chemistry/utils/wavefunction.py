@@ -76,7 +76,9 @@ def calculate_sparse_wavefunction(
     ranked = reference_wavefunction.get_top_determinants(max_determinants=max_determinants)
     if not ranked:
         Logger.warn("No determinants found; returning an empty wavefunction.")
-        return Wavefunction(StateVectorContainer(np.array([]), [], reference_wavefunction.get_orbitals()))
+        return Wavefunction(
+            StateVectorContainer(np.array([]), [], reference_wavefunction.get_orbitals(), "electrons")
+        )
 
     projector = create("projected_multi_configuration_calculator", pmc_calculator)
 
@@ -114,5 +116,6 @@ def calculate_sparse_wavefunction(
         np.array(coeffs),
         determinants,
         best_wavefunction.get_orbitals(),
+        "electrons",
     )
     return best_energy, Wavefunction(sci_container)

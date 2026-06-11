@@ -221,7 +221,7 @@ class PyscfAVAS(ActiveSpaceSelector):
                     new_config_chars.append("0")
 
             active_config = Configuration("".join(new_config_chars))
-            return Wavefunction(StateVectorContainer(active_config, active_orbitals))
+            return Wavefunction(StateVectorContainer(active_config, active_orbitals, "electrons"))
         raise NotImplementedError(
             "PySCF AVAS active space selector currently only supports single-determinant wavefunctions."
         )

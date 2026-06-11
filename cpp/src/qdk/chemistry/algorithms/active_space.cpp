@@ -362,7 +362,7 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
   // Create a new container with the truncated/aufbau determinant
   std::unique_ptr<data::WavefunctionContainer> new_container;
   new_container = std::make_unique<data::StateVectorContainer>(
-      truncated_det, new_orbitals, wavefunction_type);
+      truncated_det, new_orbitals, "electrons", wavefunction_type);
 
   return std::make_shared<data::Wavefunction>(std::move(new_container));
 }

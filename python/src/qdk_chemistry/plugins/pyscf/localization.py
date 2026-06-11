@@ -252,7 +252,9 @@ class PyscfLocalizer(OrbitalLocalizer):
                 else None,
             )
         # Only single-determinant wavefunctions reach this point (guarded above).
-        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals))
+        return Wavefunction(
+            StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals, "electrons")
+        )
 
     def name(self) -> str:
         """Return the settings for the localizer."""

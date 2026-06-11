@@ -336,7 +336,7 @@ class PyscfScfSolver(ScfSolver):
         # Create HF ground state configuration using canonical method
         hf_config = Configuration.canonical_hf_configuration(n_alpha, n_beta, n_orbitals)
 
-        wfn = Wavefunction(StateVectorContainer(hf_config, orbitals))
+        wfn = Wavefunction(StateVectorContainer(hf_config, orbitals, "electrons"))
 
         return energy, wfn
 

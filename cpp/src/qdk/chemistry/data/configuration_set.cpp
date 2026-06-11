@@ -13,7 +13,7 @@ namespace qdk::chemistry::data {
 
 ConfigurationSet::ConfigurationSet(
     const std::vector<Configuration>& configurations,
-    std::shared_ptr<Orbitals> orbitals)
+    std::shared_ptr<Orbitals> orbitals, std::string sector)
     : _configurations(configurations), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -21,11 +21,13 @@ ConfigurationSet::ConfigurationSet(
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
   }
+  _sector_layout = {{std::move(sector), _orbitals}};
   _validate_configurations();
 }
 
 ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
-                                   std::shared_ptr<Orbitals> orbitals)
+                                   std::shared_ptr<Orbitals> orbitals,
+                                   std::string sector)
     : _configurations(std::move(configurations)), _orbitals(orbitals) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -33,6 +35,7 @@ ConfigurationSet::ConfigurationSet(std::vector<Configuration>&& configurations,
     throw std::invalid_argument(
         "ConfigurationSet: orbitals pointer cannot be null");
   }
+  _sector_layout = {{std::move(sector), _orbitals}};
   _validate_configurations();
 }
 
@@ -46,6 +49,13 @@ std::shared_ptr<Orbitals> ConfigurationSet::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
 
   return _orbitals;
+}
+
+const std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>>&
+ConfigurationSet::sector_layout() const {
+  QDK_LOG_TRACE_ENTERING();
+
+  return _sector_layout;
 }
 
 size_t ConfigurationSet::size() const {
@@ -224,6 +234,9 @@ nlohmann::json ConfigurationSet::to_json() const {
   // Store orbitals
   j["orbitals"] = _orbitals->to_json();
 
+  // Store the sector name (single-particle sector the orbitals belong to)
+  j["sector"] = _sector_layout.front().first;
+
   // Store configurations array
   j["configurations"] = nlohmann::json::array();
   for (const auto& config : _configurations) {
@@ -242,6 +255,9 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
     orbs = Orbitals::from_json(j["orbitals"]);
   }
 
+  // Sector name; legacy files predating sectors are migrated as electronic.
+  std::string sector = j.value("sector", std::string("electrons"));
+
   std::vector<Configuration> configurations;
   if (!j.contains("configurations")) {
     throw std::runtime_error("JSON missing required 'configurations' field");
@@ -255,7 +271,7 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
     configurations.push_back(std::move(config));
   }
 
-  return ConfigurationSet(std::move(configurations), orbs);
+  return ConfigurationSet(std::move(configurations), orbs, std::move(sector));
 }
 
 void ConfigurationSet::to_hdf5(H5::Group& group) const {
@@ -266,6 +282,12 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
     H5::Group orbitals_group = group.createGroup("orbitals");
     _orbitals->to_hdf5(orbitals_group);
     orbitals_group.close();
+
+    // Store the sector name (single-particle sector the orbitals belong to)
+    H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::Attribute sector_attr = group.createAttribute(
+        "sector", sector_str_type, H5::DataSpace(H5S_SCALAR));
+    sector_attr.write(sector_str_type, _sector_layout.front().first);
 
     if (_configurations.empty()) {
       // Store empty flag
@@ -345,13 +367,20 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
       orbitals_group.close();
     }
 
+    // Sector name; legacy files predating sectors are migrated as electronic.
+    std::string sector = "electrons";
+    if (group.attrExists("sector")) {
+      H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
+      group.openAttribute("sector").read(sector_str_type, sector);
+    }
+
     // Check for empty set
     if (group.attrExists("is_empty")) {
       H5::Attribute empty_attr = group.openAttribute("is_empty");
       hbool_t empty_flag;
       empty_attr.read(H5::PredType::NATIVE_HBOOL, &empty_flag);
       if (empty_flag) {
-        return ConfigurationSet(std::vector<Configuration>(), orbs);
+        return ConfigurationSet(std::vector<Configuration>(), orbs, sector);
       }
     }
 
@@ -395,7 +424,7 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
       configurations.push_back(std::move(config));
     }
 
-    return ConfigurationSet(std::move(configurations), orbs);
+    return ConfigurationSet(std::move(configurations), orbs, sector);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in ConfigurationSet::from_hdf5: " +
                              std::string(e.getCDetailMsg()));

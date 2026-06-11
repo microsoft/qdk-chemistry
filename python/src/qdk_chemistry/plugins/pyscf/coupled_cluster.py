@@ -198,6 +198,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create AmplitudeContainer with spin-separated amplitudes
                 cc_container = AmplitudeContainer(
                     orbitals,
+                    "electrons",
                     original_wavefunction,
                     AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                     t1_aa,  # Alpha T1 amplitudes
@@ -210,6 +211,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create AmplitudeContainer without storing amplitudes
                 cc_container = AmplitudeContainer(
                     orbitals,
+                    "electrons",
                     original_wavefunction,
                     AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                     None,  # No T1 alpha amplitudes
@@ -231,6 +233,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create AmplitudeContainer with spatial amplitudes
                 cc_container = AmplitudeContainer(
                     orbitals,
+                    "electrons",
                     original_wavefunction,
                     AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                     t1,  # T1 amplitudes (used for both alpha and beta in restricted case)
@@ -240,6 +243,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 # Create AmplitudeContainer without storing amplitudes
                 cc_container = AmplitudeContainer(
                     orbitals,
+                    "electrons",
                     original_wavefunction,
                     AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                     None,  # No T1 amplitudes
@@ -274,6 +278,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     # Create AmplitudeContainer for bra with lambda amplitudes
                     bra_container = AmplitudeContainer(
                         orbitals,
+                        "electrons",
                         original_wavefunction,
                         AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                         l1_aa,  # Alpha L1 (gamma) amplitudes
@@ -286,6 +291,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     # Create AmplitudeContainer without storing amplitudes
                     bra_container = AmplitudeContainer(
                         orbitals,
+                        "electrons",
                         original_wavefunction,
                         AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                         None,
@@ -307,6 +313,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     # Create AmplitudeContainer for bra with lambda amplitudes
                     bra_container = AmplitudeContainer(
                         orbitals,
+                        "electrons",
                         original_wavefunction,
                         AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                         l1,  # L1 (gamma) amplitudes
@@ -316,6 +323,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     # Create AmplitudeContainer without storing amplitudes
                     bra_container = AmplitudeContainer(
                         orbitals,
+                        "electrons",
                         original_wavefunction,
                         AmplitudeType.CCSD,  # Coupled cluster (CCSD) amplitudes
                         None,

@@ -17,6 +17,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <tuple>
 #include <variant>
 
@@ -771,10 +772,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
+    std::string sector = "electrons";
     if (j.contains("configuration_set")) {
       auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
       determinants = config_set.get_configurations();
       orbitals = config_set.get_orbitals();
+      if (!config_set.sector_layout().empty()) {
+        sector = config_set.sector_layout().front().first;
+      }
     } else {
       determinants = {};
       orbitals = nullptr;
@@ -857,7 +862,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
         if (container_type == "state_vector" || container_type == "cas" ||
             container_type == "sci") {
           return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals,
+              coefficients, determinants, orbitals, sector,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
               std::move(active_one_rdm), std::move(active_two_rdm), entropies,
               type);
@@ -873,8 +878,8 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci") {
       return std::make_unique<StateVectorContainer>(
-          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
+          coefficients, determinants, orbitals, sector, std::nullopt,
+          std::nullopt, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
@@ -939,6 +944,29 @@ Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
     _container = other._container->clone();
   }
   return *this;
+}
+
+std::vector<std::string> Wavefunction::sectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->sectors();
+}
+
+bool Wavefunction::has_sector(const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto names = _container->sectors();
+  return std::find(names.begin(), names.end(), name) != names.end();
+}
+
+std::shared_ptr<const Orbitals> Wavefunction::sector_basis(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->sector_basis(name);
+}
+
+std::shared_ptr<const SymmetryProduct> Wavefunction::sector_symmetries(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  return sector_basis(name)->symmetries();
 }
 
 std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
@@ -1172,9 +1200,13 @@ std::shared_ptr<Wavefunction> Wavefunction::truncate(
       },
       top_coeffs);
 
-  // Create new wavefunction with a StateVectorContainer
+  // Create new wavefunction with a StateVectorContainer, preserving the
+  // source wavefunction's sector.
+  const auto sector_names = sectors();
+  const std::string sector =
+      sector_names.empty() ? std::string("electrons") : sector_names.front();
   return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
-      normalized_coeffs, top_configs, get_orbitals(), get_type()));
+      normalized_coeffs, top_configs, get_orbitals(), sector, get_type()));
 }
 
 double Wavefunction::norm() const {
@@ -1749,11 +1781,15 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
+    std::string sector = "electrons";
     if (group.nameExists("configuration_set")) {
       H5::Group config_set_group = group.openGroup("configuration_set");
       auto config_set = ConfigurationSet::from_hdf5(config_set_group);
       determinants = config_set.get_configurations();
       orbitals = config_set.get_orbitals();
+      if (!config_set.sector_layout().empty()) {
+        sector = config_set.sector_layout().front().first;
+      }
     } else {
       determinants = {};
       orbitals = nullptr;
@@ -1851,7 +1887,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         if (container_type == "state_vector" || container_type == "cas" ||
             container_type == "sci") {
           return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals,
+              coefficients, determinants, orbitals, sector,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
               std::move(active_one_rdm), std::move(active_two_rdm), entropies,
               type);
@@ -1862,8 +1898,8 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci") {
       return std::make_unique<StateVectorContainer>(
-          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
+          coefficients, determinants, orbitals, sector, std::nullopt,
+          std::nullopt, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
