@@ -32,7 +32,7 @@ namespace QDKChemistry.Utils.BinaryEncoding {
 
     /// Parameters for the binary-encoding state preparation.
     struct BinaryEncodingStatePreparationParams {
-        /// Qubit indices for the dense state preparation (row map, reversed).
+        /// Qubit indices for the dense state preparation (row map).
         rowMap : Int[],
         /// Amplitudes of the reduced-space statevector.
         stateVector : Double[],

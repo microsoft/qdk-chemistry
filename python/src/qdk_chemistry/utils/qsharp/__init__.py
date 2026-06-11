@@ -26,9 +26,10 @@ _target_profile = qdk.TargetProfile.Adaptive_RIF
 def _init_qsharp():
     """Initialize the Q# interpreter with the chemistry project root."""
     qdk_config = get_qdk_profile_config()
-    if qdk_config.get_target_profile() != "adaptive_rif":
+    current_profile = qdk_config.get_target_profile()
+    if current_profile != "adaptive_rif":
         Logger.debug(
-            f"QDK interpreter profile set to '{_target_profile}'. "
+            f"QDK interpreter profile was '{current_profile}'. Initializing to '{_target_profile}'. "
             "If you imported Q# code before this module was loaded, please re-import it, "
             "or set your target profile before importing qdk_chemistry."
         )

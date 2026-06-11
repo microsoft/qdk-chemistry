@@ -141,7 +141,7 @@ class SparseIsometryStatePreparation(StatePreparation):
         if self._settings.get("dense_preparation_method") == "qiskit":
             return self._qiskit_dense_preparation(gf2x_operation_results, statevector_data, n_qubits)
 
-        params = self._build_qsharp_state_prep_params(wavefunction)
+        params = self._build_qsharp_state_prep_params(gf2x_operation_results, statevector_data, n_qubits)
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
@@ -172,23 +172,20 @@ class SparseIsometryStatePreparation(StatePreparation):
             bitstrings.append(bitstring)
         return bitstrings, coeffs
 
-    def _build_qsharp_state_prep_params(self, wavefunction: Wavefunction) -> dict:
-        """Build state preparation parameters from a wavefunction.
-
-        Extracts coefficients and determinants, performs GF2+X elimination,
-        and returns the parameter dict for Q# circuit construction.
+    def _build_qsharp_state_prep_params(
+        self, gf2x_operation_results: "GF2XEliminationResult", statevector_data: np.ndarray, n_qubits: int
+    ) -> dict:
+        """Build state preparation parameters from pre-computed GF2+X results.
 
         Args:
-            wavefunction: The target wavefunction to prepare.
+            gf2x_operation_results: The result of GF2+X elimination.
+            statevector_data: The statevector corresponding to the reduced matrix.
+            n_qubits: The total number of qubits in the original space.
 
         Returns:
             A parameter dict for Q# circuit construction.
 
         """
-        bitstrings, coeffs = self._wavefunction_to_bitstrings_and_coeffs(wavefunction)
-        n_qubits = len(bitstrings[0])
-        gf2x_operation_results, statevector_data = self._perform_gf2x(bitstrings, coeffs)
-        # Use QDK dense state preparation
         expansion_ops: list[MatrixCompressionOp] = []
         for operation in reversed(gf2x_operation_results.operations):
             if operation[0] == "cx":
