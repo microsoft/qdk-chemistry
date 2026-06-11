@@ -2490,10 +2490,10 @@ void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, _name);
   hash_value(ctx, static_cast<int64_t>(_atomic_orbital_type));
   if (_structure) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _structure->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   // Hash all shells per atom
   hash_value(ctx, static_cast<uint64_t>(_shells_per_atom.size()));

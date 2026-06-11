@@ -498,10 +498,10 @@ void CanonicalFourCenterHamiltonianContainer::hash_update(
   HamiltonianContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   if (_two_body) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _two_body->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
 }
 

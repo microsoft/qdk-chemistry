@@ -2190,22 +2190,22 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
 void Orbitals::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, get_data_type_name());
   if (_coefficients) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _coefficients->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   if (_energies) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _energies->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   if (_ao_overlap) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, *_ao_overlap);
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   // Active/inactive space indices
   hash_value(ctx, _active_space_indices.first);
@@ -2214,10 +2214,10 @@ void Orbitals::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, _inactive_space_indices.second);
   // Fold in basis set hash
   if (_basis_set) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _basis_set->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
 }
 

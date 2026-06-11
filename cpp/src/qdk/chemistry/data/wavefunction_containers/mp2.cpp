@@ -1074,16 +1074,16 @@ void MP2Container::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   if (_hamiltonian) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _hamiltonian->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   if (_wavefunction) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _wavefunction->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   // NEVER access lazy amplitude caches
 }

@@ -603,10 +603,10 @@ class SymmetryBlocked : public DataClass {
     hash_value(ctx, static_cast<uint64_t>(Rank));
     for (const auto& sym : _symmetries) {
       if (sym) {
-        hash_value(ctx, uint8_t(1));
+        hash_field_presence(ctx, true);
         hash_value(ctx, sym->content_hash());
       } else {
-        hash_value(ctx, uint8_t(0));
+        hash_field_presence(ctx, false);
       }
     }
     for (const auto& slot : _extents) {

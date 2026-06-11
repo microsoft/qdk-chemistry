@@ -347,7 +347,8 @@ class SymmetryBlockedTensor
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override {
     hash_value(ctx, this->get_data_type_name());
     hash_value(ctx, static_cast<uint64_t>(Rank));
-    hash_value(ctx, uint8_t(utils::is_complex_scalar_v<Scalar> ? 1 : 0));
+    // Distinguish real and complex scalar encodings.
+    hash_value(ctx, utils::is_complex_scalar_v<Scalar>);
     this->_hash_symmetry_blocked_metadata(ctx);
     auto groups = this->_sorted_pointer_groups();
     hash_value(ctx, static_cast<uint64_t>(groups.size()));

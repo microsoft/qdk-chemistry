@@ -163,6 +163,16 @@ inline void hash_value(HashContext& ctx, HashValueTag tag) {
 void hash_value(HashContext& ctx, bool value);
 
 /**
+ * @brief Hash whether a nullable field is present before its payload.
+ *
+ * @param ctx Hash context to update
+ * @param present Whether the field is present
+ */
+inline void hash_field_presence(HashContext& ctx, bool present) {
+  hash_value(ctx, present);
+}
+
+/**
  * @brief Hash a string value with a length prefix.
  *
  * @param ctx Hash context to update
@@ -328,10 +338,10 @@ template <typename T>
 void hash_value(HashContext& ctx, const std::shared_ptr<T>& value) {
   hash_value(ctx, HashValueTag::SharedPtr);
   if (value) {
-    hash_value(ctx, true);
+    hash_field_presence(ctx, true);
     hash_value(ctx, *value);
   } else {
-    hash_value(ctx, false);
+    hash_field_presence(ctx, false);
   }
 }
 
@@ -339,10 +349,10 @@ template <typename T>
 void hash_value(HashContext& ctx, const std::optional<T>& value) {
   hash_value(ctx, HashValueTag::Optional);
   if (value) {
-    hash_value(ctx, true);
+    hash_field_presence(ctx, true);
     hash_value(ctx, *value);
   } else {
-    hash_value(ctx, false);
+    hash_field_presence(ctx, false);
   }
 }
 

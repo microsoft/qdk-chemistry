@@ -1513,16 +1513,16 @@ void CoupledClusterContainer::hash_update(
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   if (_orbitals) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _orbitals->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   if (_wavefunction) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _wavefunction->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
   // Hash amplitudes (constructor-supplied, not lazy)
   hash_value(ctx, _t1_amplitudes_aa);

@@ -691,10 +691,10 @@ void SlaterDeterminantContainer::hash_update(
   hash_value(ctx, get_container_type());
   hash_value(ctx, _determinant.content_hash());
   if (_orbitals) {
-    hash_value(ctx, uint8_t(1));
+    hash_field_presence(ctx, true);
     hash_value(ctx, _orbitals->content_hash());
   } else {
-    hash_value(ctx, uint8_t(0));
+    hash_field_presence(ctx, false);
   }
 }
 
