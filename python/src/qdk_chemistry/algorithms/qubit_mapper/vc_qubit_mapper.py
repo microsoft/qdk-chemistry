@@ -177,10 +177,14 @@ class VerstraeteCiracQubitMapper(QubitMapper):
         """
         Logger.trace_entering()
 
-        if mapping is not None and mapping is not self._mapping:
+        if mapping is not None and (
+            mapping.name != self._mapping.name or mapping.num_qubits != self._mapping.num_qubits
+        ):
             raise ValueError(
-                "The supplied mapping does not match the mapper's internal "
-                "VC mapping. Pass mapper.mapping or omit the argument."
+                f"Supplied mapping '{mapping.name}' "
+                f"({mapping.num_qubits} qubits) does not match "
+                f"the internal VC mapping '{self._mapping.name}' "
+                f"({self._mapping.num_qubits} qubits)."
             )
 
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
