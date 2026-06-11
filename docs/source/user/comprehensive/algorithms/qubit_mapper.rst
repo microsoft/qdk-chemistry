@@ -214,12 +214,11 @@ compressed form:
   the zero entries are ever touched.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
-  :math:`O(N^2 \cdot n_\text{aux})` form and each ``(pq|rs)`` value is recovered
-  on the fly. This is a **memory optimization only**: it avoids building the
-  dense four-center tensor (useful when it does not fit in memory), but it is
-  *not* a runtime speed-up — every integral access costs an
-  :math:`O(n_\text{aux})` contraction, so the mapping cost scales as
-  :math:`O(N^4 \cdot n_\text{aux})`.
+  :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
+  in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
+  product per orbital pair). The dense four-center tensor is never built and
+  peak additional memory is a single :math:`N^2`-length row, making this path
+  suitable for systems whose dense ERI tensor does not fit in memory.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitHamiltonian` that
 is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense

@@ -6,8 +6,8 @@ These tests verify that mapping a Hamiltonian stored in a
 ``QubitHamiltonian`` that is numerically equivalent, term-by-term, to the
 dense (:class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer`)
 path for the *same* underlying integrals.  The fast paths never materialize a
-dense N^4 two-body tensor (see ``QdkQubitMapper._run_impl`` and the C++
-``majorana_map_hamiltonian_container_aware`` dispatcher), so this is the primary
+dense N^4 two-body tensor (the C++ ``majorana_map_hamiltonian`` overload taking
+a ``Hamiltonian`` dispatches on the container type), so this is the primary
 correctness bar from issue #474.
 """
 
@@ -210,6 +210,7 @@ class TestCholeskyFastPathRestricted:
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize(("n", "naux"), SYSTEMS)
     def test_cholesky_matches_dense(self, n: int, naux: int, encoding: str) -> None:
+        """Cholesky and dense containers map to the same operator."""
         dense, cholesky = _build_restricted_cholesky_pair(n, naux, seed=100 + n)
         assert cholesky.get_container_type() == "cholesky"
         assert dense.get_container_type() == "canonical_four_center"
@@ -233,6 +234,7 @@ class TestCholeskyFastPathUnrestricted:
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize(("n", "naux"), SYSTEMS)
     def test_cholesky_matches_dense(self, n: int, naux: int, encoding: str) -> None:
+        """Unrestricted Cholesky and dense containers map identically."""
         dense, cholesky = _build_unrestricted_cholesky_pair(n, naux, seed=200 + n)
         assert cholesky.get_container_type() == "cholesky"
 
@@ -296,6 +298,7 @@ class TestCholeskyFastPathMolecular:
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize(("atom", "basis"), [(m[1], m[2]) for m in MOLECULES], ids=[m[0] for m in MOLECULES])
     def test_molecular_cholesky_matches_dense(self, atom: str, basis: str, encoding: str) -> None:
+        """Molecular Cholesky and dense containers map identically."""
         dense, cholesky, norb = _molecular_cholesky_pair(atom, basis)
         assert cholesky.get_container_type() == "cholesky"
 
@@ -311,14 +314,17 @@ class TestCholeskyFastPathMolecular:
 
 
 def _hubbard_2x2() -> Hamiltonian:
+    """Hubbard model on a 2x2 square lattice (sparse container)."""
     return create_hubbard_hamiltonian(LatticeGraph.square(2, 2), epsilon=0.0, t=1.0, U=4.0)
 
 
 def _hubbard_1x4() -> Hamiltonian:
+    """Hubbard model on a 4-site chain (sparse container)."""
     return create_hubbard_hamiltonian(LatticeGraph.chain(4), epsilon=0.0, t=1.0, U=4.0)
 
 
 def _ppp_1x4() -> Hamiltonian:
+    """Pariser-Parr-Pople model on a 4-site chain (sparse container)."""
     return create_ppp_hamiltonian(LatticeGraph.chain(4), epsilon=0.0, t=1.0, U=4.0, V=1.5, z=1.0)
 
 
@@ -335,6 +341,7 @@ class TestSparseFastPath:
     @pytest.mark.parametrize("encoding", ENCODINGS)
     @pytest.mark.parametrize("factory", [s[1] for s in SPARSE_SYSTEMS], ids=[s[0] for s in SPARSE_SYSTEMS])
     def test_sparse_matches_dense(self, factory, encoding: str) -> None:
+        """Sparse and densified containers map to the same operator."""
         sparse = factory()
         assert sparse.get_container_type() == "sparse"
 

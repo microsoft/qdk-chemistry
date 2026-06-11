@@ -197,8 +197,8 @@ class PackedAccumulator {
 // formats without ever materializing a dense N^4 tensor:
 //
 //   * DenseEriProvider     — flat row-major N^4 array (canonical storage)
-//   * CholeskyEriProvider  — three-center factors L, eri computed on the
-//                            fly as (pq|rs) = sum_Q L_pq,Q L_rs,Q
+//   * CholeskyEriProvider  — three-center factors L; the aux index is
+//                            contracted one (pq|·) row at a time
 //   * SparseEriProvider    — sparse (p,q,r,s) -> value map, zeros implied
 //
 // Because the loop structure, ordering, thresholds, and accumulation are
@@ -208,6 +208,14 @@ class PackedAccumulator {
 // Index convention matches the dense layout used throughout the engine:
 //   eri(p,q,r,s) -> ((p*N + q)*N + r)*N + s   (chemist notation (pq|rs)).
 
+// Providers expose two access granularities:
+//   * aaaa(p,q,r,s)   — scalar access; used only by the one-body delta
+//                       fold, which touches O(N^3) integrals.
+//   * row_xxxx(p,q)   — the entire (pq|·) row of N^2 integrals; used by
+//                       the two-body mapping loops, which fix (p,q) in
+//                       their outer loops and sweep (r,s) in the inner
+//                       ones.  Returning whole rows lets each provider
+//                       amortize its access cost across the inner sweep.
 struct DenseEriProvider {
   // Dense storage is traversed with the standard symmetric quad loop.
   static constexpr bool kSparse = false;
@@ -223,34 +231,43 @@ struct DenseEriProvider {
               std::size_t s) const {
     return aaaa_[idx4(p, q, r, s)];
   }
-  double aabb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return aabb_[idx4(p, q, r, s)];
+  // Rows are contiguous in the dense layout, so row access is zero-copy
+  // and the dense path reads exactly the same memory as before.
+  const double* row_aaaa(std::size_t p, std::size_t q) const {
+    return aaaa_ + (p * n_ + q) * n_ * n_;
   }
-  double bbbb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return bbbb_[idx4(p, q, r, s)];
+  const double* row_aabb(std::size_t p, std::size_t q) const {
+    return aabb_ + (p * n_ + q) * n_ * n_;
+  }
+  const double* row_bbbb(std::size_t p, std::size_t q) const {
+    return bbbb_ + (p * n_ + q) * n_ * n_;
   }
 };
 
 // Three-center (Cholesky/density-fitted) provider.  The factor matrices
 // are column-major Eigen storage of shape [N^2 x naux] with the orbital
 // pair index in row-major order, so element (pair, Q) lives at
-// L[pair + Q * N^2].  (pq|rs) is recovered as the dot product of the two
-// pair rows over the auxiliary index.
+// L[pair + Q * N^2].
 //
-// This is a *memory* optimization: it avoids materializing the dense N^4
-// four-center tensor (the factors are O(N^2 * naux)).  It is not a runtime
-// fast path — each integral access costs an O(naux) dot product, so the
-// surrounding O(N^4) loop becomes O(N^4 * naux).  It is intended for cases
-// where the dense tensor does not fit in memory.
+// The aux index is contracted in integral space, one orbital pair at a
+// time: for a fixed (pq), the matrix-vector product L2 * l1.row(pq)^T
+// yields the entire (pq|·) row, which the mapping loops then consume as
+// plain scalars.  The contraction streams sequentially through the factor
+// columns (vectorizable axpy updates) instead of issuing a strided
+// O(naux) dot product per integral, and peak additional memory is a
+// single N^2 row — the dense N^4 tensor is never materialized.
 struct CholeskyEriProvider {
-  // Recovered on the fly via the standard symmetric quad loop.
   static constexpr bool kSparse = false;
   const double* La_;
   const double* Lb_;
   std::size_t n_;
   std::size_t naux_;
+  // Scratch row for the aux contraction; the engine is single-threaded
+  // and each row is fully consumed before the next one is requested.
+  mutable std::vector<double> row_buf_{};
+
+  // Scalar access for the one-body delta fold only (O(N^3) accesses, far
+  // below the cost of the two-body row contractions).
   double dot(const double* l1, std::size_t pair1, const double* l2,
              std::size_t pair2) const {
     const std::size_t n2 = n_ * n_;
@@ -264,13 +281,33 @@ struct CholeskyEriProvider {
               std::size_t s) const {
     return dot(La_, p * n_ + q, La_, r * n_ + s);
   }
-  double aabb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return dot(La_, p * n_ + q, Lb_, r * n_ + s);
+
+  // row[rs] = sum_Q l1[pq + Q*N^2] * l2[rs + Q*N^2] for all rs at once.
+  // The per-element accumulation order over Q matches the scalar dot, so
+  // results are identical to the element-wise reconstruction.
+  const double* build_row(const double* l1, std::size_t pair1,
+                          const double* l2) const {
+    const std::size_t n2 = n_ * n_;
+    row_buf_.assign(n2, 0.0);
+    double* out = row_buf_.data();
+    for (std::size_t Q = 0; Q < naux_; ++Q) {
+      const double w = l1[pair1 + Q * n2];
+      if (w == 0.0) continue;
+      const double* col = l2 + Q * n2;
+      for (std::size_t rs = 0; rs < n2; ++rs) {
+        out[rs] += w * col[rs];
+      }
+    }
+    return out;
   }
-  double bbbb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return dot(Lb_, p * n_ + q, Lb_, r * n_ + s);
+  const double* row_aaaa(std::size_t p, std::size_t q) const {
+    return build_row(La_, p * n_ + q, La_);
+  }
+  const double* row_aabb(std::size_t p, std::size_t q) const {
+    return build_row(La_, p * n_ + q, Lb_);
+  }
+  const double* row_bbbb(std::size_t p, std::size_t q) const {
+    return build_row(Lb_, p * n_ + q, Lb_);
   }
 };
 
@@ -294,36 +331,50 @@ struct SparseEriProvider {
   // Stored non-zero (p,q,r,s) -> value entries of the restricted ERI tensor.
   std::vector<Entry> entries_;
   std::size_t n_ = 0;
+  // Scratch row for the unrestricted branch (sparse containers are always
+  // restricted in practice, but the engine must stay correct if reached).
+  mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
                     std::size_t s) const {
     return static_cast<std::uint64_t>(((p * n_ + q) * n_ + r) * n_ + s);
   }
-  static double lookup(const std::unordered_map<std::uint64_t, double>& m,
-                       std::uint64_t k) {
-    auto it = m.find(k);
-    return it == m.end() ? 0.0 : it->second;
-  }
   double aaaa(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    return lookup(aaaa_map_, key(p, q, r, s));
+    auto it = aaaa_map_.find(key(p, q, r, s));
+    return it == aaaa_map_.end() ? 0.0 : it->second;
   }
-  double aabb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return lookup(aabb_map_, key(p, q, r, s));
+  // Build the (pq|·) row by scanning the stored entries once; missing
+  // positions are implicitly zero, exactly as in the dense layout.
+  const double* build_row(const std::unordered_map<std::uint64_t, double>& m,
+                          std::size_t p, std::size_t q) const {
+    const std::size_t n2 = n_ * n_;
+    row_buf_.assign(n2, 0.0);
+    const std::uint64_t pair = static_cast<std::uint64_t>(p * n_ + q);
+    for (const auto& [k, v] : m) {
+      if (k / n2 == pair) row_buf_[k % n2] = v;
+    }
+    return row_buf_.data();
   }
-  double bbbb(std::size_t p, std::size_t q, std::size_t r,
-              std::size_t s) const {
-    return lookup(bbbb_map_, key(p, q, r, s));
+  const double* row_aaaa(std::size_t p, std::size_t q) const {
+    return build_row(aaaa_map_, p, q);
+  }
+  const double* row_aabb(std::size_t p, std::size_t q) const {
+    return build_row(aabb_map_, p, q);
+  }
+  const double* row_bbbb(std::size_t p, std::size_t q) const {
+    return build_row(bbbb_map_, p, q);
   }
 };
 
 template <std::size_t NW, class EriProvider>
-MajoranaMapResult majorana_map_impl(
-    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const EriProvider& eri_provider,
-    std::size_t n_spatial, bool spin_symmetric, double threshold,
-    double integral_threshold) {
+MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
+                                    double core_energy, const double* h1_alpha,
+                                    const double* h1_beta,
+                                    const EriProvider& eri_provider,
+                                    std::size_t n_spatial, bool spin_symmetric,
+                                    double threshold,
+                                    double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
 
   PackedAccumulator<NW> acc;
@@ -533,11 +584,14 @@ MajoranaMapResult majorana_map_impl(
       for (std::size_t p = 0; p < n_spatial; ++p) {
         for (std::size_t q = p; q < n_spatial; ++q) {
           std::size_t pq_idx = sym_map[p * n_spatial + q];
+          // One (pq|·) row per outer pair: zero-copy for dense, a single
+          // vectorized aux contraction for Cholesky.
+          const double* row = eri_provider.row_aaaa(p, q);
           for (std::size_t r = 0; r < n_spatial; ++r) {
             for (std::size_t s = r; s < n_spatial; ++s) {
               std::size_t rs_idx = sym_map[r * n_spatial + s];
               if (pq_idx > rs_idx) continue;
-              process_pair(pq_idx, rs_idx, eri_provider.aaaa(p, q, r, s));
+              process_pair(pq_idx, rs_idx, row[r * n_spatial + s]);
             }
           }
         }
@@ -579,9 +633,10 @@ MajoranaMapResult majorana_map_impl(
     // αα channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        const double* row = eri_provider.row_aaaa(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_provider.aaaa(p, q, r, s);
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_alpha(r), mode_alpha(s), eri);
@@ -596,9 +651,10 @@ MajoranaMapResult majorana_map_impl(
     // ββ channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        const double* row = eri_provider.row_bbbb(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_provider.bbbb(p, q, r, s);
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -613,9 +669,10 @@ MajoranaMapResult majorana_map_impl(
     // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        const double* row = eri_provider.row_aabb(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_provider.aabb(p, q, r, s);
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -654,15 +711,14 @@ MajoranaMapResult dispatch_by_words(
     const double* h1_beta, const EriProvider& eri_provider,
     std::size_t n_spatial, bool spin_symmetric, double threshold,
     double integral_threshold) {
-  using Fn = MajoranaMapResult (*)(const MajoranaMapping&, double,
-                                   const double*, const double*,
-                                   const EriProvider&, std::size_t, bool,
-                                   double, double);
+  using Fn = MajoranaMapResult (*)(
+      const MajoranaMapping&, double, const double*, const double*,
+      const EriProvider&, std::size_t, bool, double, double);
   static const std::array<Fn, sizeof...(Is)> table = {
       {&majorana_map_impl<Is + 1, EriProvider>...}};
   return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta,
-                              eri_provider, n_spatial, spin_symmetric, threshold,
-                              integral_threshold);
+                              eri_provider, n_spatial, spin_symmetric,
+                              threshold, integral_threshold);
 }
 
 template <class EriProvider>

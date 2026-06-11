@@ -335,10 +335,12 @@ MajoranaMapResult majorana_map_hamiltonian(
  *        three-center (Cholesky/density-fitted) two-body factors.
  *
  * Equivalent to ::majorana_map_hamiltonian but consumes the low-rank
- * factors instead of a dense N^4 tensor.  Each two-body integral is
- * recovered on the fly as (pq|rs) = sum_Q L_pq,Q L_rs,Q, so a dense
- * four-center tensor is never materialized.  The result is numerically
- * equivalent to the dense path for the same integrals.
+ * factors instead of a dense N^4 tensor.  The auxiliary index is
+ * contracted in integral space one (pq|.) row at a time — a vectorized
+ * matrix-vector product per orbital pair — so the dense four-center
+ * tensor is never materialized and peak additional memory is a single
+ * N^2 row.  The result is numerically equivalent to the dense path for
+ * the same integrals.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
