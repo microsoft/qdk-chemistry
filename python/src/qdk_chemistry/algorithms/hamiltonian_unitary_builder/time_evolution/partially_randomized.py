@@ -41,15 +41,10 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.definitions import ACCURACY_SPLIT_MAX, ACCURACY_SPLIT_MIN
 from qdk_chemistry.utils.pauli_commutation import get_commutation_checker
 
 __all__: list[str] = ["PartiallyRandomized", "PartiallyRandomizedSettings"]
-
-# Clamp bounds for the deterministic/random accuracy split, keeping both
-# sub-budgets strictly positive so neither the Trotter step count r nor the
-# qDRIFT sample count N diverges at the extremes.
-_ACCURACY_SPLIT_MIN = 1e-6
-_ACCURACY_SPLIT_MAX = 1.0 - 1e-6
 
 
 class PartiallyRandomizedSettings(TimeEvolutionSettings):
@@ -473,7 +468,7 @@ class PartiallyRandomized(QDrift):
         if target_accuracy <= 0.0:
             return 0.0, 0.0
         split: float = self._settings.get("accuracy_split")
-        split = min(max(split, _ACCURACY_SPLIT_MIN), _ACCURACY_SPLIT_MAX)
+        split = min(max(split, ACCURACY_SPLIT_MIN), ACCURACY_SPLIT_MAX)
         eps_d = math.sqrt(split) * target_accuracy
         eps_r = math.sqrt(1.0 - split) * target_accuracy
         return eps_d, eps_r
