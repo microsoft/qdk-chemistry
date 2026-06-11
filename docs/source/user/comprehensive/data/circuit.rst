@@ -166,23 +166,6 @@ Serialization
    Q# callables and factories are not directly serializable — they are reconstructed when the producing algorithm re-creates the circuit.
 
 
-Resource estimation with QRE v3
--------------------------------
-
-The :term:`QIR`, Q#, or OpenQASM output of a :class:`~qdk_chemistry.data.Circuit` can be passed directly to the `QRE v3 <https://github.com/microsoft/qdk/tree/main/samples/qre>`_ resource estimator (``qdk.qre``) for Pareto-optimal physical resource estimation on fault-tolerant architectures.
-
-The workflow wraps the circuit's QIR in a ``QIRApplication``, selects a hardware architecture and QEC code model, then calls ``estimate()`` to compute the Pareto frontier of physical qubits vs. runtime:
-
-.. tab:: Python API
-
-   .. literalinclude:: ../../../_static/examples/python/circuit.py
-      :language: python
-      :start-after: # start-cell-qre-v3
-      :end-before: # end-cell-qre-v3
-
-See the `QRE v3 samples <https://github.com/microsoft/qdk/tree/main/samples/qre>`_ for advanced configuration options.
-
-
 Related classes
 ---------------
 

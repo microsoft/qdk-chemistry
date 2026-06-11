@@ -143,30 +143,3 @@ circuit.to_hdf5_file("example_circuit.circuit.h5")
 loaded_h5 = Circuit.from_hdf5_file("example_circuit.circuit.h5")
 # end-cell-serialization
 ################################################################################
-
-################################################################################
-# start-cell-qre-v3
-# Resource estimation using QRE v3 (qdk.qre)
-from qdk.qre import estimate
-from qdk.qre.models import GateBased, SurfaceCode, RoundBasedFactory
-from qdk.qre.application import QIRApplication
-
-# Wrap a Circuit's QIR output as a QRE v3 application
-app = QIRApplication(str(circuit.get_qir()))
-
-# Define target architecture
-arch = GateBased(gate_time=100, measurement_time=500)
-
-# Run Pareto-optimal resource estimation with 1% error budget
-results = estimate(
-    app,
-    arch,
-    isa_query=SurfaceCode.q() * RoundBasedFactory.q(),
-    max_error=0.01,
-    name="H2 state preparation",
-)
-
-results.add_factory_summary_column()
-print(results.as_frame())
-# end-cell-qre-v3
-################################################################################
