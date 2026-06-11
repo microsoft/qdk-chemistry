@@ -263,12 +263,9 @@ class MajoranaMapping : public DataClass {
    * Maps fermionic modes on a `LatticeGraph` to qubits.
    *
    * @param lattice The `LatticeGraph` connectivity.
-   * @param num_spin_species Number of spin species (usually 2 for spinful, 1
-   *        for spinless). Default: 2.
    * @return MajoranaMapping with name ``"verstraete-cirac"``.
    */
-  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice,
-                                          std::size_t num_spin_species = 2);
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
 
  private:
   MajoranaMapping(
