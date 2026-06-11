@@ -197,9 +197,12 @@ MajoranaMapResult majorana_map_impl(
     const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold) {
-  const std::size_t n_modes = 2 * n_spatial;
-  const std::size_t num_spin_species =
-      (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
+  if (mapping.num_modes() != 2 * n_spatial) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: mapping num_modes (" +
+        std::to_string(mapping.num_modes()) + ") must match 2 * n_spatial (" +
+        std::to_string(2 * n_spatial) + ")");
+  }
 
   PackedAccumulator<NW> acc;
 
@@ -235,10 +238,7 @@ MajoranaMapResult majorana_map_impl(
   };
 
   auto ppair_alpha = build_pair_cache(alpha_offset);
-  std::vector<PackedPairProduct> ppair_beta;
-  if (num_spin_species == 2) {
-    ppair_beta = build_pair_cache(beta_offset);
-  }
+  auto ppair_beta = build_pair_cache(beta_offset);
 
   auto alpha_pair = [&](std::size_t i,
                         std::size_t j) -> const PackedPairProduct& {
@@ -306,11 +306,9 @@ MajoranaMapResult majorana_map_impl(
       if (std::abs(h_pq_a) > integral_threshold) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
-      if (num_spin_species == 2) {
-        double h_pq_b = h1_eff_beta[p * n_spatial + q];
-        if (std::abs(h_pq_b) > integral_threshold) {
-          accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
-        }
+      double h_pq_b = h1_eff_beta[p * n_spatial + q];
+      if (std::abs(h_pq_b) > integral_threshold) {
+        accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
       }
     }
   }
@@ -331,11 +329,9 @@ MajoranaMapResult majorana_map_impl(
             const auto& [coeff_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
             sse.terms.emplace_back(coeff_a * 0.25 * excitation_coeff[a][b],
                                    word_a);
-            if (num_spin_species == 2) {
-              const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
-              sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
-                                     word_b);
-            }
+            const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
+            sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
+                                   word_b);
           }
         }
       }
@@ -461,18 +457,16 @@ MajoranaMapResult majorana_map_impl(
     }
 
     // ββ channel
-    if (num_spin_species == 2) {
-      for (std::size_t p = 0; p < n_spatial; ++p) {
-        for (std::size_t q = 0; q < n_spatial; ++q) {
-          for (std::size_t r = 0; r < n_spatial; ++r) {
-            for (std::size_t s = 0; s < n_spatial; ++s) {
-              double eri = eri_bbbb[idx4(p, q, r, s)];
-              if (std::abs(eri) < integral_threshold) continue;
-              accumulate_two_body_product(mode_beta(p), mode_beta(q),
-                                          mode_beta(r), mode_beta(s), eri);
-              if (q == r) {
-                accumulate_epq(mode_beta(p), mode_beta(s), -0.5 * eri);
-              }
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = 0; q < n_spatial; ++q) {
+        for (std::size_t r = 0; r < n_spatial; ++r) {
+          for (std::size_t s = 0; s < n_spatial; ++s) {
+            double eri = eri_bbbb[idx4(p, q, r, s)];
+            if (std::abs(eri) < integral_threshold) continue;
+            accumulate_two_body_product(mode_beta(p), mode_beta(q),
+                                        mode_beta(r), mode_beta(s), eri);
+            if (q == r) {
+              accumulate_epq(mode_beta(p), mode_beta(s), -0.5 * eri);
             }
           }
         }
@@ -480,18 +474,16 @@ MajoranaMapResult majorana_map_impl(
     }
 
     // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
-    if (num_spin_species == 2) {
-      for (std::size_t p = 0; p < n_spatial; ++p) {
-        for (std::size_t q = 0; q < n_spatial; ++q) {
-          for (std::size_t r = 0; r < n_spatial; ++r) {
-            for (std::size_t s = 0; s < n_spatial; ++s) {
-              double eri = eri_aabb[idx4(p, q, r, s)];
-              if (std::abs(eri) < integral_threshold) continue;
-              accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
-                                          mode_beta(r), mode_beta(s), eri);
-              accumulate_two_body_product(mode_beta(r), mode_beta(s),
-                                          mode_alpha(p), mode_alpha(q), eri);
-            }
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = 0; q < n_spatial; ++q) {
+        for (std::size_t r = 0; r < n_spatial; ++r) {
+          for (std::size_t s = 0; s < n_spatial; ++s) {
+            double eri = eri_aabb[idx4(p, q, r, s)];
+            if (std::abs(eri) < integral_threshold) continue;
+            accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
+                                        mode_beta(r), mode_beta(s), eri);
+            accumulate_two_body_product(mode_beta(r), mode_beta(s),
+                                        mode_alpha(p), mode_alpha(q), eri);
           }
         }
       }
@@ -503,12 +495,10 @@ MajoranaMapResult majorana_map_impl(
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
-        if (num_spin_species == 2) {
-          if (!spin_symmetric) {
-            h1_sum += std::abs(h1_beta[p * n_spatial + q]);
-          } else {
-            h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
-          }
+        if (!spin_symmetric) {
+          h1_sum += std::abs(h1_beta[p * n_spatial + q]);
+        } else {
+          h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
         }
       }
     }

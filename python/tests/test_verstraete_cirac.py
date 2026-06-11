@@ -43,19 +43,35 @@ class TestVerstraeteCiracMapping:
         mapping_4x4 = MajoranaMapping.verstraete_cirac(lattice_4x4)
         assert len(mapping_4x4.stabilizers) > 0
 
-        # Invalid spin species count should raise ValueError / invalid_argument
-        with pytest.raises(ValueError, match="spin"):
-            MajoranaMapping.verstraete_cirac(lattice_2x2, num_spin_species=0)
-
     def test_general_lattices(self) -> None:
-        """Verify that QubitMapper consumes VC mapping for general 2D lattices."""
+        """Verify that QubitMapper consumes VC mapping for general lattices."""
         mapper = create("qubit_mapper", "qdk")
-        for nx, ny in [(2, 2), (2, 3), (3, 3), (4, 4)]:
-            lattice = LatticeGraph.square(nx, ny)
+        lattices = [
+            LatticeGraph.square(2, 2),
+            LatticeGraph.square(3, 3),
+            LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True),
+            LatticeGraph.triangular(2, 2),
+        ]
+        for lattice in lattices:
             ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
-            mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
+            mapping = MajoranaMapping.verstraete_cirac(lattice)
             qh = mapper.run(ham, mapping)
-            assert qh.num_qubits == 2 * nx * ny
+            assert qh.num_qubits == mapping.num_qubits
+            assert mapping.num_qubits - len(mapping.stabilizers) == 2 * lattice.num_sites
+
+    def test_honeycomb_and_higher_connectivity(self) -> None:
+        """Verify honeycomb (degree 3) and triangular/kagome (higher degree up to 6) lattices work."""
+        lattice_honeycomb = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
+        mapping_honeycomb = MajoranaMapping.verstraete_cirac(lattice_honeycomb)
+        assert len(mapping_honeycomb.stabilizers) > 0
+        
+        lattice_triangular = LatticeGraph.triangular(2, 2)
+        mapping_triangular = MajoranaMapping.verstraete_cirac(lattice_triangular)
+        assert len(mapping_triangular.stabilizers) > 0
+
+        lattice_kagome = LatticeGraph.kagome(2, 2, periodic_x=True, periodic_y=True)
+        mapping_kagome = MajoranaMapping.verstraete_cirac(lattice_kagome)
+        assert len(mapping_kagome.stabilizers) > 0
 
     def test_majorana_raises_error(self) -> None:
         """Verstraete-Cirac mapping is bilinear-only and majorana(k) should raise ValueError."""
@@ -134,28 +150,26 @@ class TestVerstraeteCiracMapping:
             lattice = LatticeGraph.square(nx, ny)
             ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
 
-            # Verify stabilizer properties for both spinless (nss=1) and spinful (nss=2) cases
-            for nss in [1, 2]:
-                mapping = MajoranaMapping.verstraete_cirac(lattice, nss)
-                assert len(mapping.stabilizers) == nss * nx * ny
+            mapping = MajoranaMapping.verstraete_cirac(lattice)
+            assert mapping.num_qubits - len(mapping.stabilizers) == 2 * lattice.num_sites
 
-                qh_vc = mapper.run(ham, mapping)
+            qh_vc = mapper.run(ham, mapping)
 
-                # Convert stabilizers to Pauli labels
-                stabs = []
-                for _, word in mapping.stabilizers:
-                    label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
-                    stabs.append(label)
+            # Convert stabilizers to Pauli labels
+            stabs = []
+            for _, word in mapping.stabilizers:
+                label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
+                stabs.append(label)
 
-                # Check mutual commutation of stabilizers: [S_i, S_j] = 0
-                for i in range(len(stabs)):
-                    for j in range(i + 1, len(stabs)):
-                        assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
+            # Check mutual commutation of stabilizers: [S_i, S_j] = 0
+            for i in range(len(stabs)):
+                for j in range(i + 1, len(stabs)):
+                    assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
 
-                # Check commutation with Hamiltonian: [H, S_i] = 0
-                for i, stab in enumerate(stabs):
-                    for p_term in qh_vc.pauli_strings:
-                        assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
+            # Check commutation with Hamiltonian: [H, S_i] = 0
+            for i, stab in enumerate(stabs):
+                for p_term in qh_vc.pauli_strings:
+                    assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
 
     def test_pauli_weight_scaling(self) -> None:
         """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
@@ -204,7 +218,7 @@ class TestVerstraeteCiracSpectral:
         Model parameters: t = 1.0, U = 4.0, half-filling (epsilon = -U/2 = -2.0).
         """
         lattice = LatticeGraph.square(2, 2, periodic_x=True)
-        n_modes = 8  # 4 spatial sites * 2 spin species
+        n_modes = 8  # 4 spatial sites * 2 spins
         hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
         mapper = create("qubit_mapper", "qdk")
 
@@ -214,11 +228,11 @@ class TestVerstraeteCiracSpectral:
         eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
         unique_jw = np.unique(np.round(np.sort(eigs_jw), 6))
 
-        vc_mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=2)
+        vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
         qh_vc = mapper.run(hamiltonian, vc_mapping)
 
         # Verify system size and extract lowest unique eigenvalues
-        assert qh_vc.num_qubits == 2 * n_modes
+        assert qh_vc.num_qubits == vc_mapping.num_qubits
         h_vc = qh_vc.to_matrix(sparse=True)
         eigs_vc, _ = eigsh(h_vc, k=10, which="SA")
         unique_vc = np.unique(np.round(np.sort(eigs_vc), 6))
@@ -226,14 +240,14 @@ class TestVerstraeteCiracSpectral:
         # Ensure lowest physical energy levels match baseline
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
-    def test_spectral_validation_3x3_huckel(self) -> None:
-        """Compare eigenvalues of 3x3 Hückel model under VC and JW mappings.
+    def test_spectral_validation_3x2_huckel(self) -> None:
+        """Compare eigenvalues of 3x2 Hückel model under VC and JW mappings.
 
         Validates that the lowest eigenstates of the penalized Hamiltonian are
         in the +1 codespace sector of the generated loop-plaquette stabilizers.
         """
-        lattice = LatticeGraph.square(3, 3)
-        n_modes = 9  # 9 spatial sites * 1 spin species (spinless)
+        lattice = LatticeGraph.square(3, 2)
+        n_modes = 12  # 6 spatial sites * 2 spins
         hamiltonian = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
         mapper = create("qubit_mapper", "qdk")
 
@@ -243,11 +257,11 @@ class TestVerstraeteCiracSpectral:
         eigs_jw, _ = eigsh(h_jw, k=10, which="SA")
         unique_jw = np.unique(np.round(np.sort(eigs_jw), 6))
 
-        vc_mapping = MajoranaMapping.verstraete_cirac(lattice, num_spin_species=1)
+        vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
         qh_vc = mapper.run(hamiltonian, vc_mapping)
 
         # Extract lowest eigenstates and their respective eigenstates
-        assert qh_vc.num_qubits == 2 * n_modes
+        assert qh_vc.num_qubits == vc_mapping.num_qubits
         h_vc = qh_vc.to_matrix(sparse=True)
         eigs_vc, vecs_vc = eigsh(h_vc, k=10, which="SA")
 

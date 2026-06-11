@@ -374,16 +374,9 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
 
 // ── Factory: Verstraete-Cirac ──────────────────────────────────────────
 
-MajoranaMapping MajoranaMapping::verstraete_cirac(
-    const LatticeGraph& lattice, std::size_t num_spin_species) {
+MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
   using namespace detail;
   const std::string name = "verstraete-cirac";
-
-  // Support spinless or fermions with spin-½
-  if (num_spin_species != 1 && num_spin_species != 2) {
-    throw std::invalid_argument(name +
-                                " requires num_spin_species to be 1 or 2.");
-  }
 
   std::uint64_t V = lattice.num_sites();
   if (V < 3) {
@@ -407,35 +400,6 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
     site_to_path_idx[hamiltonian_path[k]] = k;
   }
 
-  std::size_t num_modes = num_spin_species * V;
-  std::size_t base_modes = 2 * num_modes;
-  auto jw_base = MajoranaMapping::jordan_wigner(base_modes);
-
-  auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
-                              std::size_t offset) -> std::size_t {
-    std::size_t path_idx = site_to_path_idx[site];
-    return 2 * (2 * (spin * V + path_idx)) + offset;
-  };
-
-  auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
-                              std::size_t offset) -> std::size_t {
-    std::size_t path_idx = site_to_path_idx[site];
-    return 2 * (2 * (spin * V + path_idx) + 1) + offset;
-  };
-
-  // Get a Pauli representation of the antisymmetric Majorana bilinear iγ_pγ_q
-  auto get_bilinear =
-      [&](std::size_t p,
-          std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
-    if (p < q) {
-      auto b = jw_base.bilinear(p, q);
-      return {b.first, b.second};
-    } else {
-      auto b = jw_base.bilinear(q, p);
-      return {-b.first, b.second};
-    }
-  };
-
   // Find all non-path edges incident to each vertex
   std::vector<std::vector<std::uint64_t>> non_path_incident(V);
   for (int k = 0; k < adj.outerSize(); ++k) {
@@ -455,22 +419,64 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
     }
   }
 
-  // Ensure that we have no more than 2 aux Majorana modes per site
+  // Count aux fermionic modes per site
+  std::vector<std::size_t> n_aux(V);
+  std::size_t total_n_aux = 0;
   for (std::uint64_t u = 0; u < V; ++u) {
-    if (non_path_incident[u].size() > 2) {
-      throw std::runtime_error(
-          name +
-          " requires no more than 2 aux Majorana modes per "
-          "site. Found vertex with " +
-          std::to_string(non_path_incident[u].size()) + " non-path edges.");
-    }
+    n_aux[u] = (non_path_incident[u].size() + 1) / 2;
+    total_n_aux += n_aux[u];
   }
+
+  std::size_t modes_per_spin = V + total_n_aux;
+  std::size_t num_modes = 2 * V;                 // 2 spin species
+  std::size_t base_qubits = 2 * modes_per_spin;  // total qubits in jw_base
+  std::size_t base_modes = 2 * base_qubits;      // total Majoranas in jw_base
+
+  auto jw_base = MajoranaMapping::jordan_wigner(base_qubits);
+
+  // Precompute mode offsets along the Hamiltonian path
+  std::vector<std::size_t> path_idx_to_mode_offset(V);
+  path_idx_to_mode_offset[0] = 0;
+  for (std::size_t k = 1; k < V; ++k) {
+    std::uint64_t prev_site = hamiltonian_path[k - 1];
+    path_idx_to_mode_offset[k] =
+        path_idx_to_mode_offset[k - 1] + 1 + n_aux[prev_site];
+  }
+
+  auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t offset) -> std::size_t {
+    std::size_t path_idx = site_to_path_idx[site];
+    std::size_t mode_idx =
+        spin * modes_per_spin + path_idx_to_mode_offset[path_idx];
+    return 2 * mode_idx + offset;
+  };
+
+  auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
+                              std::size_t offset) -> std::size_t {
+    std::size_t path_idx = site_to_path_idx[site];
+    std::size_t mode_idx =
+        spin * modes_per_spin + path_idx_to_mode_offset[path_idx];
+    return 2 * (mode_idx + 1) + offset;
+  };
+
+  // Get a Pauli representation of the antisymmetric Majorana bilinear iγ_pγ_q
+  auto get_bilinear =
+      [&](std::size_t p,
+          std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
+    if (p < q) {
+      auto b = jw_base.bilinear(p, q);
+      return {b.first, b.second};
+    } else {
+      auto b = jw_base.bilinear(q, p);
+      return {-b.first, b.second};
+    }
+  };
 
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
   std::vector<std::map<std::pair<std::uint64_t, std::uint64_t>, std::size_t>>
-      edge_to_stab_idx(num_spin_species);
+      edge_to_stab_idx(2);
 
-  for (std::size_t spin = 0; spin < num_spin_species; ++spin) {
+  for (std::size_t spin = 0; spin < 2; ++spin) {
     // Add 2-body link stabilizers for non-path edges on the lattice
     for (std::uint64_t u = 0; u < V; ++u) {
       for (std::uint64_t v : non_path_incident[u]) {
@@ -497,15 +503,14 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
     // lift boundary/corner codespace degeneracy
     std::vector<std::size_t> unpaired_modes;
     for (std::uint64_t u = 0; u < V; ++u) {
-      if (non_path_incident[u].size() == 1) {
-        unpaired_modes.push_back(get_aux_majorana(u, spin, 1));
-      } else if (non_path_incident[u].size() == 0) {
-        unpaired_modes.push_back(get_aux_majorana(u, spin, 0));
-        unpaired_modes.push_back(get_aux_majorana(u, spin, 1));
+      std::size_t A_u = non_path_incident[u].size();
+      if (A_u % 2 != 0) {
+        unpaired_modes.push_back(get_aux_majorana(u, spin, A_u));
       }
     }
 
     // Unused aux Majorana modes become trivial stabilizers
+    // (we are guaranteed an even number due to the handshaking lemma)
     for (std::size_t i = 0; i < unpaired_modes.size(); i += 2) {
       if (i + 1 < unpaired_modes.size()) {
         auto [coeff, word] =
@@ -516,12 +521,15 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
   }
 
   // Build a lookup table of VC bilinears by dressing non-local JW bilinears
-  // with their stabilizer to make everything local.
+  // with their stabilizer to make everything local
+  std::size_t num_physical_modes = 2 * V;
+  std::size_t num_physical_majoranas = 2 * num_physical_modes;
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
-  upper_triangle.reserve(base_modes * (base_modes - 1) / 2);
+  upper_triangle.reserve(num_physical_majoranas * (num_physical_majoranas - 1) /
+                         2);
 
-  for (std::size_t u = 0; u < base_modes; ++u) {
-    for (std::size_t v = u + 1; v < base_modes; ++v) {
+  for (std::size_t u = 0; u < num_physical_majoranas; ++u) {
+    for (std::size_t v = u + 1; v < num_physical_majoranas; ++v) {
       std::size_t u_mode = u / 2;
       std::size_t v_mode = v / 2;
       std::size_t s_u = u_mode / V;
@@ -529,7 +537,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
       std::size_t i = u_mode % V;
       std::size_t j = v_mode % V;
       std::size_t a = u % 2;
-      std::size_t b_idx = v % 2;
+      std::size_t b = v % 2;
 
       bool connected = (s_u == s_v) && lattice.are_connected(i, j);
 
@@ -540,7 +548,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
         std::size_t path_max = std::max(path_i, path_j);
 
         std::size_t p = get_sys_majorana(i, s_u, a);
-        std::size_t q = get_sys_majorana(j, s_v, b_idx);
+        std::size_t q = get_sys_majorana(j, s_v, b);
         auto [coeff, word] = get_bilinear(p, q);
 
         // For non-local paths, the raw JW bilinear iγ_pγ_q loses its long
@@ -559,7 +567,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
         upper_triangle.emplace_back(coeff, std::move(word));
       } else {
         std::size_t p = get_sys_majorana(i, s_u, a);
-        std::size_t q = get_sys_majorana(j, s_v, b_idx);
+        std::size_t q = get_sys_majorana(j, s_v, b);
         auto [coeff, word] = get_bilinear(p, q);
         upper_triangle.emplace_back(coeff, std::move(word));
       }
@@ -567,8 +575,9 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(
   }
 
   return MajoranaMapping(std::vector<SparsePauliWord>{},
-                         std::move(upper_triangle), name, num_modes, base_modes,
-                         name, std::nullopt, std::move(stabilizers));
+                         std::move(upper_triangle), name, num_physical_modes,
+                         base_qubits, name, std::nullopt,
+                         std::move(stabilizers));
 }
 
 }  // namespace qdk::chemistry::data
