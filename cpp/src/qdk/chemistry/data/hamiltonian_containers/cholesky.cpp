@@ -23,27 +23,27 @@
 
 namespace qdk::chemistry::data {
 
+// Forward declaration of the file-local three-center SBT builder; defined
+// after the constructors that delegate to the SBT-native overload.
+static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
+    const Eigen::MatrixXd& aa, const Eigen::MatrixXd& bb,
+    const Orbitals& orbitals);
+
 CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& one_body_integrals,
     const Eigen::MatrixXd& three_center_integrals,
     std::shared_ptr<Orbitals> orbitals, double core_energy,
     const Eigen::MatrixXd& inactive_fock_matrix,
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals, orbitals, core_energy,
-                           inactive_fock_matrix, type),
-      _three_center_integrals(
-          make_restricted_three_center_integrals(three_center_integrals)),
-      _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
+    : CholeskyHamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals, one_body_integrals,
+                                       /*restricted=*/true),
+          *make_three_center_sbt(three_center_integrals, Eigen::MatrixXd{},
+                                 *orbitals),
+          orbitals, core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix, Eigen::MatrixXd{}),
+          std::move(ao_cholesky_vectors), type) {
   QDK_LOG_TRACE_ENTERING();
-
-  validate_integral_dimensions();
-  validate_restrictedness_consistency();
-  validate_active_space_dimensions();
-
-  if (!is_valid()) {
-    throw std::invalid_argument(
-        "Tried to generate invalid Hamiltonian object.");
-  }
 }
 
 CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
@@ -55,12 +55,28 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
     const Eigen::MatrixXd& inactive_fock_matrix_alpha,
     const Eigen::MatrixXd& inactive_fock_matrix_beta,
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
-    : HamiltonianContainer(one_body_integrals_alpha, one_body_integrals_beta,
-                           orbitals, core_energy, inactive_fock_matrix_alpha,
-                           inactive_fock_matrix_beta, type),
-      _three_center_integrals(
-          std::make_unique<Eigen::MatrixXd>(three_center_integrals_aa),
-          std::make_unique<Eigen::MatrixXd>(three_center_integrals_bb)),
+    : CholeskyHamiltonianContainer(
+          make_spin_diagonal_rank2_sbt(one_body_integrals_alpha,
+                                       one_body_integrals_beta,
+                                       /*restricted=*/false),
+          *make_three_center_sbt(three_center_integrals_aa,
+                                 three_center_integrals_bb, *orbitals),
+          orbitals, core_energy,
+          make_spin_diagonal_rank2_sbt(inactive_fock_matrix_alpha,
+                                       inactive_fock_matrix_beta),
+          std::move(ao_cholesky_vectors), type) {
+  QDK_LOG_TRACE_ENTERING();
+}
+
+CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
+    SymmetryBlockedTensor<2> one_body, SymmetryBlockedTensor<3> three_center,
+    std::shared_ptr<Orbitals> orbitals, double core_energy,
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock,
+    std::optional<Eigen::MatrixXd> ao_cholesky_vectors, HamiltonianType type)
+    : HamiltonianContainer(std::move(one_body), orbitals, core_energy,
+                           std::move(inactive_fock), type),
+      _three_center(std::make_shared<const SymmetryBlockedTensor<3>>(
+          std::move(three_center))),
       _ao_cholesky_vectors(std::move(ao_cholesky_vectors)) {
   QDK_LOG_TRACE_ENTERING();
 
@@ -77,17 +93,11 @@ CholeskyHamiltonianContainer::CholeskyHamiltonianContainer(
 std::unique_ptr<HamiltonianContainer> CholeskyHamiltonianContainer::clone()
     const {
   QDK_LOG_TRACE_ENTERING();
-  if (is_restricted()) {
-    return std::make_unique<CholeskyHamiltonianContainer>(
-        *_one_body_integrals.first, *_three_center_integrals.first, _orbitals,
-        _core_energy, *_inactive_fock_matrix.first, _ao_cholesky_vectors,
-        _type);
-  }
+  // SBT is immutable and shared via shared_ptr; pass the existing containers
+  // straight through (no per-block copy or v1 round-trip needed).
   return std::make_unique<CholeskyHamiltonianContainer>(
-      *_one_body_integrals.first, *_one_body_integrals.second,
-      *_three_center_integrals.first, *_three_center_integrals.second,
-      _orbitals, _core_energy, *_inactive_fock_matrix.first,
-      *_inactive_fock_matrix.second, _ao_cholesky_vectors, _type);
+      *_one_body, *_three_center, _orbitals, _core_energy, _inactive_fock,
+      _ao_cholesky_vectors, _type);
 }
 
 std::string CholeskyHamiltonianContainer::get_container_type() const {
@@ -121,38 +131,33 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
 
-  // Helper lambda to build 4-center from 3-center: (ij|kl) = sum_Q L_ij,Q *
-  // R_Q,kl, where L and R are column-major, and (ij|kl) is row-major
-  auto build_four_center =
-      [&](std::shared_ptr<const Eigen::MatrixXd> three_center_left,
-          std::shared_ptr<const Eigen::MatrixXd> three_center_right)
+  // 4-center build from 3-center: (ij|kl) = sum_Q L_ij,Q * R_Q,kl.
+  // The two reshaped dense matrices have shape [norb*norb, naux] in
+  // column-major order; the resulting 4-center has shape [norb2, norb2] in
+  // column-major (= row-major (ij|kl)).
+  auto build_four_center = [&](const Eigen::MatrixXd& three_left,
+                               const Eigen::MatrixXd& three_right)
       -> std::shared_ptr<Eigen::VectorXd> {
-    // Allocate output vector
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
-
-    size_t naux = three_center_left->cols();
-
-    // To make the resulting four-center integrals compatible with the row major
-    // storage, we calculate (kl|ij) = sum_Q R_kl,Q * L_Q,ij and store the
-    // result in col-major order, effectively (ij|kl) in row-major order.
+    size_t naux = three_left.cols();
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               norb2, norb2, naux, 1.0, three_center_right->data(), norb2,
-               three_center_left->data(), norb2, 0.0, four_center->data(),
-               norb2);
+               norb2, norb2, naux, 1.0, three_right.data(), norb2,
+               three_left.data(), norb2, 0.0, four_center->data(), norb2);
     return four_center;
   };
 
-  // Build four-center integrals from three-center
-  auto aaaa = build_four_center(_three_center_integrals.first,
-                                _three_center_integrals.first);
+  const auto& tc = three_center();
+  const auto& aa = tc.block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+  const auto& bb = tc.has_block({axes::beta(), axes::beta(), SymmetryLabel{}})
+                       ? tc.block({axes::beta(), axes::beta(), SymmetryLabel{}})
+                       : aa;
+  auto aaaa = build_four_center(aa, aa);
 
   if (is_restricted()) {
     _cached_four_center_integrals = std::make_tuple(aaaa, aaaa, aaaa);
   } else {
-    auto aabb = build_four_center(_three_center_integrals.first,
-                                  _three_center_integrals.second);
-    auto bbbb = build_four_center(_three_center_integrals.second,
-                                  _three_center_integrals.second);
+    auto aabb = build_four_center(aa, bb);
+    auto bbbb = build_four_center(bb, bb);
     _cached_four_center_integrals =
         std::make_tuple(std::move(aaaa), std::move(aabb), std::move(bbbb));
   }
@@ -164,8 +169,17 @@ CholeskyHamiltonianContainer::get_three_center_integrals() const {
   if (!has_two_body_integrals()) {
     throw std::runtime_error("Three-center two-body integrals are not set");
   }
-  return std::make_pair(std::cref(*_three_center_integrals.first),
-                        std::cref(*_three_center_integrals.second));
+  const auto& alpha =
+      _three_center->block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+  // Beta partner may not be stored (restricted case: aux axis is trivial-
+  // symmetry so SBT orbit-aliasing does not fire). Fall back to alpha.
+  if (!_three_center->has_block(
+          {axes::beta(), axes::beta(), SymmetryLabel{}})) {
+    return {alpha, alpha};
+  }
+  const auto& beta =
+      _three_center->block({axes::beta(), axes::beta(), SymmetryLabel{}});
+  return {alpha, beta};
 }
 
 const std::optional<Eigen::MatrixXd>&
@@ -213,18 +227,24 @@ double CholeskyHamiltonianContainer::get_two_body_element(
 
 bool CholeskyHamiltonianContainer::has_two_body_integrals() const {
   QDK_LOG_TRACE_ENTERING();
-  return _three_center_integrals.first != nullptr &&
-         _three_center_integrals.first->size() > 0;
+  return _three_center != nullptr;
 }
 
 bool CholeskyHamiltonianContainer::is_restricted() const {
   QDK_LOG_TRACE_ENTERING();
-  // Hamiltonian is restricted if alpha and beta components point to the same
-  // data
-  return (_one_body_integrals.first == _one_body_integrals.second) &&
-         (_three_center_integrals.first == _three_center_integrals.second) &&
-         (_inactive_fock_matrix.first == _inactive_fock_matrix.second ||
-          (!_inactive_fock_matrix.first && !_inactive_fock_matrix.second));
+  bool h1_restricted =
+      !_one_body || _one_body->all_aliased({{{axes::alpha(), axes::alpha()},
+                                             {axes::beta(), axes::beta()}}});
+  bool three_center_restricted =
+      !_three_center || _three_center->all_aliased(
+                            {{{axes::alpha(), axes::alpha(), SymmetryLabel{}},
+                              {axes::beta(), axes::beta(), SymmetryLabel{}}}});
+  bool fock_restricted =
+      !_inactive_fock ||
+      _inactive_fock->all_aliased(
+          {{{axes::alpha(), axes::alpha()}, {axes::beta(), axes::beta()}}});
+
+  return h1_restricted && three_center_restricted && fock_restricted;
 }
 
 bool CholeskyHamiltonianContainer::is_valid() const {
@@ -246,48 +266,107 @@ bool CholeskyHamiltonianContainer::is_valid() const {
 
 void CholeskyHamiltonianContainer::validate_integral_dimensions() const {
   QDK_LOG_TRACE_ENTERING();
-  // Check alpha one-body integrals
   HamiltonianContainer::validate_integral_dimensions();
 
   if (!has_two_body_integrals()) {
     return;
   }
 
-  // Check two-body integrals dimensions
-  // Three-center integrals have shape [n_orb_pairs x n_aux] where n_orb_pairs =
-  // norb^2
-  auto norb_alpha = _one_body_integrals.first->rows();
-  auto orb_pair_size = norb_alpha * norb_alpha;
+  auto norb_alpha = _one_body->block({axes::alpha(), axes::alpha()}).rows();
+  auto naux = _three_center->extents()[2].at(SymmetryLabel{});
+  auto expected_size = static_cast<size_t>(norb_alpha * norb_alpha) * naux;
 
-  // Check alpha-alpha integrals - rows should equal orb_pair_size
-  if (static_cast<size_t>(_three_center_integrals.first->rows()) !=
-      orb_pair_size) {
-    throw std::invalid_argument(
-        "Alpha-alpha three-center integrals rows (" +
-        std::to_string(_three_center_integrals.first->rows()) +
-        ") does not match expected orb_pair size (" +
-        std::to_string(orb_pair_size) + " for " + std::to_string(norb_alpha) +
-        " orbitals)");
+  const auto& aa =
+      _three_center->block({axes::alpha(), axes::alpha(), SymmetryLabel{}});
+  if (static_cast<size_t>(aa.size()) != expected_size) {
+    throw std::invalid_argument("Alpha-alpha three-center integrals size (" +
+                                std::to_string(aa.size()) +
+                                ") does not match expected norb^2 * naux (" +
+                                std::to_string(expected_size) + " for " +
+                                std::to_string(norb_alpha) + " orbitals and " +
+                                std::to_string(naux) + " auxiliaries)");
   }
 
-  // Check beta-beta integrals (if different from alpha-alpha)
-  if (_three_center_integrals.second != _three_center_integrals.first) {
-    if (static_cast<size_t>(_three_center_integrals.second->rows()) !=
-            orb_pair_size ||
-        static_cast<size_t>(_three_center_integrals.second->cols()) !=
-            static_cast<size_t>(_three_center_integrals.first->cols())) {
+  if (!_three_center->all_aliased(
+          {{{axes::alpha(), axes::alpha(), SymmetryLabel{}},
+            {axes::beta(), axes::beta(), SymmetryLabel{}}}})) {
+    const auto& bb =
+        _three_center->block({axes::beta(), axes::beta(), SymmetryLabel{}});
+    if (static_cast<size_t>(bb.size()) != expected_size) {
       throw std::invalid_argument(
-          "Beta three-center integrals size does not match with Alpha");
+          "Beta three-center integrals size does not match Alpha");
     }
   }
 }
 
-std::pair<std::shared_ptr<Eigen::MatrixXd>, std::shared_ptr<Eigen::MatrixXd>>
-CholeskyHamiltonianContainer::make_restricted_three_center_integrals(
-    const Eigen::MatrixXd& integrals) {
+// ---- SBT-canonical container builders --------------------------------------
+
+// Build the canonical rank-3 three-center SBT from dense alpha (and optional
+// beta) blocks, sharing MO symmetry/extents with @p orbitals' active space.
+// Returns @c nullptr when @p aa is empty (no data supplied). When @p bb is
+// empty the spin axis is restricted and the alpha block is aliased into the
+// beta slot via partner-block aliasing in @ref SymmetryBlockedTensor.
+static std::shared_ptr<const SymmetryBlockedTensor<3>> make_three_center_sbt(
+    const Eigen::MatrixXd& aa, const Eigen::MatrixXd& bb,
+    const Orbitals& orbitals) {
+  if (aa.size() == 0) {
+    return nullptr;
+  }
+  auto mo_sym = orbitals.symmetries();
+  auto active_indices = orbitals.get_active_space_indices();
+  std::size_t n_active_alpha = active_indices.first.size();
+  std::size_t n_active_beta = active_indices.second.size();
+  std::size_t naux = static_cast<std::size_t>(aa.cols());
+
+  std::unordered_map<SymmetryLabel, std::size_t> mo_ext;
+  mo_ext[axes::alpha()] = n_active_alpha;
+  mo_ext[axes::beta()] = n_active_beta;
+
+  auto aux_sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> aux_ext;
+  aux_ext[SymmetryLabel{}] = naux;
+
+  SymmetryBlockedTensor<3>::SymmetriesArray symmetries = {mo_sym, mo_sym,
+                                                          aux_sym};
+  SymmetryBlockedTensor<3>::ExtentsArray extents = {mo_ext, mo_ext, aux_ext};
+
+  if (static_cast<std::size_t>(aa.rows()) != n_active_alpha * n_active_alpha) {
+    throw std::invalid_argument(
+        "Alpha three-center rows does not match n_active_alpha^2");
+  }
+
+  // Rank-3 SBT block is the dense [orb_pair, aux] MatrixXd verbatim — no
+  // copy or reshape needed.
+  auto aa_block = std::make_shared<const Eigen::MatrixXd>(aa);
+  SymmetryBlockedTensor<3>::BlockMap blocks;
+  blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] = aa_block;
+
+  if (bb.size() != 0) {
+    if (static_cast<std::size_t>(bb.rows()) != n_active_beta * n_active_beta) {
+      throw std::invalid_argument(
+          "Beta three-center rows does not match n_active_beta^2");
+    }
+    if (static_cast<std::size_t>(bb.cols()) != naux) {
+      throw std::invalid_argument(
+          "Beta three-center cols does not match alpha naux");
+    }
+    auto bb_block = std::make_shared<const Eigen::MatrixXd>(bb);
+    blocks[{axes::beta(), axes::beta(), SymmetryLabel{}}] = bb_block;
+  }
+
+  return std::make_shared<const SymmetryBlockedTensor<3>>(
+      std::move(symmetries), std::move(extents), std::move(blocks));
+}
+
+const SymmetryBlockedTensor<3>& CholeskyHamiltonianContainer::three_center()
+    const {
   QDK_LOG_TRACE_ENTERING();
-  auto shared_integrals = std::make_shared<Eigen::MatrixXd>(integrals);
-  return std::make_pair(shared_integrals, shared_integrals);
+  if (!_three_center) {
+    throw std::runtime_error(
+        "Three-center symmetry-blocked tensor is not set.");
+  }
+  return *_three_center;
 }
 
 nlohmann::json CholeskyHamiltonianContainer::to_json() const {
@@ -304,119 +383,25 @@ nlohmann::json CholeskyHamiltonianContainer::to_json() const {
   j["core_energy"] = _core_energy;
   j["type"] =
       (_type == HamiltonianType::Hermitian) ? "Hermitian" : "NonHermitian";
-
-  // Store restrictedness information
   j["is_restricted"] = is_restricted();
 
-  // Store one-body integrals
-  if (has_one_body_integrals()) {
-    j["has_one_body_integrals"] = true;
-
-    // Store alpha one-body integrals
-    std::vector<std::vector<double>> one_body_alpha_vec;
-    for (int i = 0; i < _one_body_integrals.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _one_body_integrals.first->cols(); ++j_idx) {
-        row.push_back((*_one_body_integrals.first)(i, j_idx));
-      }
-      one_body_alpha_vec.push_back(row);
-    }
-    j["one_body_integrals_alpha"] = one_body_alpha_vec;
-
-    // Store beta one-body integrals (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> one_body_beta_vec;
-      for (int i = 0; i < _one_body_integrals.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _one_body_integrals.second->cols();
-             ++j_idx) {
-          row.push_back((*_one_body_integrals.second)(i, j_idx));
-        }
-        one_body_beta_vec.push_back(row);
-      }
-      j["one_body_integrals_beta"] = one_body_beta_vec;
-    }
-  } else {
-    j["has_one_body_integrals"] = false;
+  // Store integrals via SBT-direct serialization
+  if (_one_body) {
+    j["one_body_integrals"] = _one_body->to_json();
   }
-
-  // Store two-body integrals
-  if (has_two_body_integrals()) {
-    j["has_two_body_integrals"] = true;
-
-    // Store as object {"aa": [...], "bb": [...]}
-    nlohmann::json two_body_obj;
-
-    // Store aa
-    std::vector<std::vector<double>> three_center_aa_vec;
-    for (int i = 0; i < _three_center_integrals.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _three_center_integrals.first->cols();
-           ++j_idx) {
-        row.push_back((*_three_center_integrals.first)(i, j_idx));
-      }
-      three_center_aa_vec.push_back(row);
-    }
-    two_body_obj["aa"] = three_center_aa_vec;
-
-    if (is_unrestricted()) {
-      // Store bb
-      std::vector<std::vector<double>> three_center_bb_vec;
-      for (int i = 0; i < _three_center_integrals.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _three_center_integrals.second->cols();
-             ++j_idx) {
-          row.push_back((*_three_center_integrals.second)(i, j_idx));
-        }
-        three_center_bb_vec.push_back(row);
-      }
-      two_body_obj["bb"] = three_center_bb_vec;
-    }
-    j["three_center_integrals"] = two_body_obj;
-  } else {
-    j["has_two_body_integrals"] = false;
+  if (_three_center) {
+    j["three_center_integrals"] = _three_center->to_json();
   }
-
-  // Store inactive Fock matrix
-  if (has_inactive_fock_matrix()) {
-    j["has_inactive_fock_matrix"] = true;
-    // Store alpha inactive Fock matrix
-    std::vector<std::vector<double>> inactive_fock_alpha_vec;
-    for (int i = 0; i < _inactive_fock_matrix.first->rows(); ++i) {
-      std::vector<double> row;
-      for (int j_idx = 0; j_idx < _inactive_fock_matrix.first->cols();
-           ++j_idx) {
-        row.push_back((*_inactive_fock_matrix.first)(i, j_idx));
-      }
-      inactive_fock_alpha_vec.push_back(row);
-    }
-    j["inactive_fock_matrix_alpha"] = inactive_fock_alpha_vec;
-
-    // Store beta inactive Fock matrix (only if unrestricted)
-    if (is_unrestricted()) {
-      std::vector<std::vector<double>> inactive_fock_beta_vec;
-      for (int i = 0; i < _inactive_fock_matrix.second->rows(); ++i) {
-        std::vector<double> row;
-        for (int j_idx = 0; j_idx < _inactive_fock_matrix.second->cols();
-             ++j_idx) {
-          row.push_back((*_inactive_fock_matrix.second)(i, j_idx));
-        }
-        inactive_fock_beta_vec.push_back(row);
-      }
-      j["inactive_fock_matrix_beta"] = inactive_fock_beta_vec;
-    }
-  } else {
-    j["has_inactive_fock_matrix"] = false;
+  if (_inactive_fock) {
+    j["inactive_fock_matrix"] = _inactive_fock->to_json();
   }
 
   // Store orbital data
   if (has_orbitals()) {
-    j["has_orbitals"] = true;
     j["orbitals"] = _orbitals->to_json();
-  } else {
-    j["has_orbitals"] = false;
   }
 
+  // Store AO Cholesky vectors (if available)
   if (_ao_cholesky_vectors) {
     std::vector<std::vector<double>> ao_cholesky_vectors_vec;
     for (int i = 0; i < _ao_cholesky_vectors->rows(); ++i) {
@@ -446,147 +431,67 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
 
     // Load Hamiltonian type
     HamiltonianType type = HamiltonianType::Hermitian;
-    if (j.contains("type")) {
-      std::string type_str = j["type"].get<std::string>();
-      if (type_str == "NonHermitian") {
-        type = HamiltonianType::NonHermitian;
-      }
-    }
-
-    // Determine if the saved Hamiltonian was restricted or unrestricted
-    bool is_restricted_data = j.value("is_restricted", true);
-
-    // Helper function to load matrix from JSON
-    auto load_matrix =
-        [](const nlohmann::json& matrix_json) -> Eigen::MatrixXd {
-      auto matrix_vec = matrix_json.get<std::vector<std::vector<double>>>();
-      int rows = matrix_vec.size();
-      int cols = rows > 0 ? matrix_vec[0].size() : 0;
-      Eigen::MatrixXd matrix(rows, cols);
-      for (int i = 0; i < rows; ++i) {
-        if (static_cast<int>(matrix_vec[i].size()) != cols) {
-          throw std::runtime_error(
-              "Matrix rows have inconsistent column counts");
-        }
-        for (int j_idx = 0; j_idx < cols; ++j_idx) {
-          matrix(i, j_idx) = matrix_vec[i][j_idx];
-        }
-      }
-      return matrix;
-    };
-
-    // Load one-body integrals
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    if (j.value("has_one_body_integrals", false)) {
-      if (j.contains("one_body_integrals_alpha")) {
-        one_body_alpha = load_matrix(j["one_body_integrals_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        one_body_beta = one_body_alpha;
-      } else if (j.contains("one_body_integrals_beta")) {
-        one_body_beta = load_matrix(j["one_body_integrals_beta"]);
-      } else {
-        throw std::runtime_error("Should have beta integrals, if unrestricted");
-      }
-    }
-
-    // Load two-body integrals
-    Eigen::MatrixXd three_center_aa, three_center_bb;
-    bool has_two_body = j.value("has_two_body_integrals", false);
-    if (has_two_body) {
-      if (!j.contains("three_center_integrals")) {
-        throw std::runtime_error("Two-body integrals data not found in JSON");
-      }
-
-      auto two_body_obj = j["three_center_integrals"];
-      if (!two_body_obj.is_object()) {
-        throw std::runtime_error(
-            "three_center_integrals must be an object with aa, bb "
-            "keys");
-      }
-
-      if (!two_body_obj.contains("aa")) {
-        throw std::runtime_error(
-            "three_center_integrals must contain at least aa key");
-      }
-
-      three_center_aa = load_matrix(two_body_obj["aa"]);
-      if (!is_restricted_data) {
-        if (!two_body_obj.contains("bb")) {
-          throw std::runtime_error(
-              "three_center_integrals must contain bb key for unrestricted "
-              "Hamiltonian");
-        }
-        three_center_bb = load_matrix(two_body_obj["bb"]);
-      }
-    }
-
-    // Load inactive Fock matrix
-
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
-    bool has_inactive_fock = j.value("has_inactive_fock_matrix", false);
-    if (has_inactive_fock) {
-      if (j.contains("inactive_fock_matrix_alpha")) {
-        inactive_fock_alpha = load_matrix(j["inactive_fock_matrix_alpha"]);
-      }
-
-      if (is_restricted_data) {
-        inactive_fock_beta = inactive_fock_alpha;
-      } else if (j.contains("inactive_fock_matrix_beta")) {
-        inactive_fock_beta = load_matrix(j["inactive_fock_matrix_beta"]);
-      }
+    if (j.contains("type") && j["type"].get<std::string>() == "NonHermitian") {
+      type = HamiltonianType::NonHermitian;
     }
 
     // Load orbital data
-    if (!j.value("has_orbitals", false)) {
+    if (!j.contains("orbitals")) {
       throw std::runtime_error("Hamiltonian JSON must include orbitals data");
     }
     auto orbitals = Orbitals::from_json(j["orbitals"]);
 
-    // Validate consistency: if orbitals have inactive indices,
-    // then inactive fock matrix must be present
+    // Load integrals via SBT-direct deserialization
+    if (!j.contains("one_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian JSON must include one_body_integrals");
+    }
+    auto one_body =
+        SymmetryBlockedTensor<2>::from_json(j["one_body_integrals"]);
+
+    if (!j.contains("three_center_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian JSON must include three_center_integrals");
+    }
+    auto three_center =
+        SymmetryBlockedTensor<3>::from_json(j["three_center_integrals"]);
+
     if (orbitals->has_inactive_space()) {
-      if (!has_inactive_fock) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
+      if (!j.contains("inactive_fock_matrix")) {
         throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no inactive Fock matrix is provided");
+            "Hamiltonian JSON: orbitals have inactive indices but no "
+            "inactive Fock matrix is provided");
       }
-      // Core energy should be explicitly set when there are inactive orbitals
       if (!j.contains("core_energy")) {
-        auto inactive_indices = orbitals->get_inactive_space_indices();
-        size_t total_inactive =
-            inactive_indices.first.size() + inactive_indices.second.size();
         throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have " +
-            std::to_string(total_inactive) +
-            " inactive indices but no core energy is provided");
+            "Hamiltonian JSON: orbitals have inactive indices but no core "
+            "energy is provided");
       }
     }
+
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock =
+        j.contains("inactive_fock_matrix")
+            ? SymmetryBlockedTensor<2>::from_json(j["inactive_fock_matrix"])
+            : nullptr;
 
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
     if (j.contains("ao_cholesky_vectors")) {
-      ao_cholesky_vectors = load_matrix(j["ao_cholesky_vectors"]);
+      auto matrix_vec =
+          j["ao_cholesky_vectors"].get<std::vector<std::vector<double>>>();
+      int rows = matrix_vec.size();
+      int cols = rows > 0 ? matrix_vec[0].size() : 0;
+      Eigen::MatrixXd matrix(rows, cols);
+      for (int i = 0; i < rows; ++i) {
+        for (int jj = 0; jj < cols; ++jj) {
+          matrix(i, jj) = matrix_vec[i][jj];
+        }
+      }
+      ao_cholesky_vectors = std::move(matrix);
     }
 
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      // so alpha and beta point to the same data
-      return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
-          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
-          std::move(ao_cholesky_vectors), type);
-    }
+    return std::make_unique<CholeskyHamiltonianContainer>(
+        std::move(*one_body), std::move(*three_center), orbitals, core_energy,
+        std::move(inactive_fock), std::move(ao_cholesky_vectors), type);
 
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse Hamiltonian from JSON: " +
@@ -634,41 +539,27 @@ void CholeskyHamiltonianContainer::to_hdf5(H5::Group& group) const {
         "is_restricted", H5::PredType::NATIVE_HBOOL, scalar_space);
     restricted_attr.write(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
 
-    // Save integrals data
-    if (has_one_body_integrals()) {
-      save_matrix_to_group(group, "one_body_integrals_alpha",
-                           *_one_body_integrals.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "one_body_integrals_beta",
-                             *_one_body_integrals.second);
-      }
+    // Save integrals via SBT-direct serialization
+    if (_one_body) {
+      H5::Group sub = group.createGroup("one_body_integrals");
+      _one_body->to_hdf5(sub);
+    }
+    if (_three_center) {
+      H5::Group sub = group.createGroup("three_center_integrals");
+      _three_center->to_hdf5(sub);
+    }
+    if (_inactive_fock) {
+      H5::Group sub = group.createGroup("inactive_fock_matrix");
+      _inactive_fock->to_hdf5(sub);
     }
 
-    if (has_two_body_integrals()) {
-      save_matrix_to_group(group, "three_center_integrals_aa",
-                           *_three_center_integrals.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "three_center_integrals_bb",
-                             *_three_center_integrals.second);
-      }
-    }
-
-    // Save inactive Fock matrix
-    if (has_inactive_fock_matrix()) {
-      save_matrix_to_group(group, "inactive_fock_matrix_alpha",
-                           *_inactive_fock_matrix.first);
-      if (is_unrestricted()) {
-        save_matrix_to_group(group, "inactive_fock_matrix_beta",
-                             *_inactive_fock_matrix.second);
-      }
-    }
-
-    // Save nested orbitals data using HDF5 group
-    if (_orbitals) {
+    // Save nested orbitals data
+    if (has_orbitals()) {
       H5::Group orbitals_group = group.createGroup("orbitals");
       _orbitals->to_hdf5(orbitals_group);
     }
 
+    // Save AO Cholesky vectors (if available)
     if (_ao_cholesky_vectors) {
       save_matrix_to_group(group, "ao_cholesky_vectors", *_ao_cholesky_vectors);
     }
@@ -699,107 +590,58 @@ CholeskyHamiltonianContainer::from_hdf5(H5::Group& group) {
 
     // Load core energy
     double core_energy;
-    H5::Attribute core_energy_attr =
-        metadata_group.openAttribute("core_energy");
-    core_energy_attr.read(H5::PredType::NATIVE_DOUBLE, &core_energy);
+    metadata_group.openAttribute("core_energy")
+        .read(H5::PredType::NATIVE_DOUBLE, &core_energy);
 
     // Load Hamiltonian type
     HamiltonianType type = HamiltonianType::Hermitian;
     if (metadata_group.attrExists("type")) {
       H5::Attribute type_attr = metadata_group.openAttribute("type");
-      H5::StrType string_type = type_attr.getStrType();
       std::string type_str;
-      type_attr.read(string_type, type_str);
+      type_attr.read(type_attr.getStrType(), type_str);
       if (type_str == "NonHermitian") {
         type = HamiltonianType::NonHermitian;
       }
     }
 
-    // Load restrictedness information
-    bool is_restricted_data = true;  // default to restricted
-    if (metadata_group.attrExists("is_restricted")) {
-      H5::Attribute restricted_attr =
-          metadata_group.openAttribute("is_restricted");
-      hbool_t is_restricted_flag;
-      restricted_attr.read(H5::PredType::NATIVE_HBOOL, &is_restricted_flag);
-      is_restricted_data = (is_restricted_flag != 0);
-    }
-
-    // Load orbitals data from nested group
-    std::shared_ptr<Orbitals> orbitals;
-    if (group.nameExists("orbitals")) {
-      H5::Group orbitals_group = group.openGroup("orbitals");
-      orbitals = Orbitals::from_hdf5(orbitals_group);
-    }
-
-    if (!orbitals) {
+    // Load orbital data
+    if (!group.nameExists("orbitals")) {
       throw std::runtime_error("Hamiltonian HDF5 must include orbitals data");
     }
+    H5::Group orbitals_group = group.openGroup("orbitals");
+    auto orbitals = Orbitals::from_hdf5(orbitals_group);
 
-    // Load integral data based on restrictedness
-    Eigen::MatrixXd one_body_alpha, one_body_beta;
-    Eigen::MatrixXd three_center_aa, three_center_bb;
-    Eigen::MatrixXd inactive_fock_alpha, inactive_fock_beta;
+    // Load integrals via SBT-direct deserialization
+    if (!group.nameExists("one_body_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian HDF5 must include one_body_integrals");
+    }
+    H5::Group one_body_group = group.openGroup("one_body_integrals");
+    auto one_body = SymmetryBlockedTensor<2>::from_hdf5(one_body_group);
 
-    // Load one-body integrals
-    if (dataset_exists_in_group(group, "one_body_integrals_alpha")) {
-      one_body_alpha =
-          load_matrix_from_group(group, "one_body_integrals_alpha");
+    if (!group.nameExists("three_center_integrals")) {
+      throw std::runtime_error(
+          "Hamiltonian HDF5 must include three_center_integrals");
+    }
+    H5::Group tc_group = group.openGroup("three_center_integrals");
+    auto three_center = SymmetryBlockedTensor<3>::from_hdf5(tc_group);
+
+    std::shared_ptr<const SymmetryBlockedTensor<2>> inactive_fock;
+    if (group.nameExists("inactive_fock_matrix")) {
+      H5::Group fock_group = group.openGroup("inactive_fock_matrix");
+      inactive_fock = SymmetryBlockedTensor<2>::from_hdf5(fock_group);
     }
 
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "one_body_integrals_beta")) {
-      one_body_beta = load_matrix_from_group(group, "one_body_integrals_beta");
-    }
-
-    // Load two-body integrals
-    if (dataset_exists_in_group(group, "three_center_integrals_aa")) {
-      three_center_aa =
-          load_matrix_from_group(group, "three_center_integrals_aa");
-    }
-
-    // For unrestricted, load bb separately
-    if (!is_restricted_data) {
-      if (dataset_exists_in_group(group, "three_center_integrals_bb")) {
-        three_center_bb =
-            load_matrix_from_group(group, "three_center_integrals_bb");
-      }
-    }
-
-    // Load inactive Fock matrix
-    if (dataset_exists_in_group(group, "inactive_fock_matrix_alpha")) {
-      inactive_fock_alpha =
-          load_matrix_from_group(group, "inactive_fock_matrix_alpha");
-    }
-
-    // For unrestricted, load beta separately
-    if (!is_restricted_data &&
-        dataset_exists_in_group(group, "inactive_fock_matrix_beta")) {
-      inactive_fock_beta =
-          load_matrix_from_group(group, "inactive_fock_matrix_beta");
-    }
-
-    // Load AO Cholesky vectors
+    // Load AO Cholesky vectors (if available)
     std::optional<Eigen::MatrixXd> ao_cholesky_vectors;
     if (dataset_exists_in_group(group, "ao_cholesky_vectors")) {
       ao_cholesky_vectors =
           load_matrix_from_group(group, "ao_cholesky_vectors");
     }
 
-    // Create and return appropriate Hamiltonian using the correct constructor
-    if (is_restricted_data) {
-      // Use restricted constructor - it will create shared pointers internally
-      return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, three_center_aa, orbitals, core_energy,
-          inactive_fock_alpha, std::move(ao_cholesky_vectors), type);
-    } else {
-      // Use unrestricted constructor with separate alpha and beta data
-      return std::make_unique<CholeskyHamiltonianContainer>(
-          one_body_alpha, one_body_beta, three_center_aa, three_center_bb,
-          orbitals, core_energy, inactive_fock_alpha, inactive_fock_beta,
-          std::move(ao_cholesky_vectors), type);
-    }
+    return std::make_unique<CholeskyHamiltonianContainer>(
+        std::move(*one_body), std::move(*three_center), orbitals, core_energy,
+        std::move(inactive_fock), std::move(ao_cholesky_vectors), type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
