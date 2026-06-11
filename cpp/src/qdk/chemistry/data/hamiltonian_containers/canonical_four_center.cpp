@@ -493,4 +493,16 @@ CanonicalFourCenterHamiltonianContainer::from_hdf5(H5::Group& group) {
   }
 }
 
+void CanonicalFourCenterHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  HamiltonianContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  if (_two_body) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _two_body->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+}
+
 }  // namespace qdk::chemistry::data

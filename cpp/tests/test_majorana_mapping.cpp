@@ -214,3 +214,43 @@ TEST(MajoranaMapEngineTest, RejectsZeroQubitMappings) {
                                /*integral_threshold=*/1e-12),
       std::invalid_argument);
 }
+
+TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {
+  auto first = MajoranaMapping::jordan_wigner(4);
+  auto second = MajoranaMapping::jordan_wigner(4);
+
+  EXPECT_EQ(first.content_hash(), second.content_hash());
+  EXPECT_EQ(first.content_hash(32), second.content_hash(32));
+}
+
+TEST(MajoranaMappingHashTest, HashIncludesMappingAndTaperingData) {
+  auto jw = MajoranaMapping::jordan_wigner(4);
+  auto parity = MajoranaMapping::parity(4);
+  auto reduced = MajoranaMapping::parity(4, 1, 1);
+
+  EXPECT_NE(jw.content_hash(), parity.content_hash());
+  EXPECT_NE(parity.content_hash(), reduced.content_hash());
+  EXPECT_NE(reduced.content_hash(), reduced.without_tapering().content_hash());
+}
+
+TEST(MajoranaMappingHashTest, BilinearOnlyMappingsHashTheirCoefficients) {
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears = {
+      {{1.0, 0.0}, {{0, 3}}}};
+  auto first = MajoranaMapping::from_bilinears(1, bilinears, "custom");
+
+  bilinears[0].first = {0.0, 1.0};
+  auto second = MajoranaMapping::from_bilinears(1, bilinears, "custom");
+
+  EXPECT_NE(first.content_hash(), second.content_hash());
+}
+
+TEST(TaperingSpecificationHashTest, HashIncludesIndicesAndEigenvalues) {
+  TaperingSpecification first({0, 3}, {1, -1});
+  TaperingSpecification same({0, 3}, {1, -1});
+  TaperingSpecification different_index({1, 3}, {1, -1});
+  TaperingSpecification different_eigenvalue({0, 3}, {-1, -1});
+
+  EXPECT_EQ(first.content_hash(), same.content_hash());
+  EXPECT_NE(first.content_hash(), different_index.content_hash());
+  EXPECT_NE(first.content_hash(), different_eigenvalue.content_hash());
+}
