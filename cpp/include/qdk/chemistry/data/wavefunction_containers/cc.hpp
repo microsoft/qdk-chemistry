@@ -354,6 +354,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
   // Wfn

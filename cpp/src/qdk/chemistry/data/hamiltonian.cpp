@@ -918,4 +918,33 @@ bool Hamiltonian::is_unrestricted() const {
   return !_container->is_restricted();
 }
 
+void HamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, _core_energy);
+  hash_value(ctx, static_cast<int64_t>(_type));
+  if (_one_body) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _one_body->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_inactive_fock) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _inactive_fock->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_orbitals) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _orbitals->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+}
+
+void Hamiltonian::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  // Delegate to the container which has all the data
+  _container->hash_update(ctx);
+}
+
 }  // namespace qdk::chemistry::data

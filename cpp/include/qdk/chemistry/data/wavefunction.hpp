@@ -625,6 +625,12 @@ class WavefunctionContainer {
         "Configuration set not available for this container type");
   }
 
+  /**
+   * @brief Feed identifying data into a hash context.
+   * Subclasses override to add their container-specific data.
+   */
+  virtual void hash_update(qdk::chemistry::utils::HashContext& ctx) const;
+
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
@@ -1156,6 +1162,8 @@ class Wavefunction : public DataClass,
   bool is_complex() const;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Container holding the wavefunction implementation
   std::unique_ptr<const WavefunctionContainer> _container;
 

@@ -451,4 +451,12 @@ nlohmann::json SciWavefunctionContainer::to_json() const {
   return j;
 }
 
+void SciWavefunctionContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _coefficients);
+  hash_value(ctx, _configuration_set.content_hash());
+}
+
 }  // namespace qdk::chemistry::data
