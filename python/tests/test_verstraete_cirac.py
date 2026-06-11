@@ -64,7 +64,7 @@ class TestVerstraeteCiracMapping:
         lattice_honeycomb = LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True)
         mapping_honeycomb = MajoranaMapping.verstraete_cirac(lattice_honeycomb)
         assert len(mapping_honeycomb.stabilizers) > 0
-        
+
         lattice_triangular = LatticeGraph.triangular(2, 2)
         mapping_triangular = MajoranaMapping.verstraete_cirac(lattice_triangular)
         assert len(mapping_triangular.stabilizers) > 0
