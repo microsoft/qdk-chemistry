@@ -233,8 +233,7 @@ bilinear(j, k) is available on both forms.
           py::arg("num_modes"), py::arg("symmetries"),
           "Construct a symmetry-conserving Bravyi-Kitaev encoding.")
       .def_static("verstraete_cirac", &MajoranaMapping::verstraete_cirac,
-                  py::arg("lattice"),
-                  "Construct a Verstraete-Cirac encoding.");
+                  py::arg("lattice"), "Construct a Verstraete-Cirac encoding.");
 
   mapping
       .def(
