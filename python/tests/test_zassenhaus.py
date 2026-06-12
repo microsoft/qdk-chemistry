@@ -37,7 +37,6 @@ from qdk_chemistry.utils.zassenhaus_generation import (
     zassenhaus_commutator_plan,
 )
 from .reference_tolerances import (
-    float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
 )
 
@@ -421,6 +420,7 @@ class TestZassenhausPhaseEstimation:
         )
         state_preparation = create("state_prep", "sparse_isometry_gf2x").run(casci_wavefunction)
 
+        # Configure the Zassenhaus evolution builder reference
         evolution_time = 1.0
         zassenhaus_order = 2
         zassenhaus_num_divisions = 2
@@ -432,6 +432,7 @@ class TestZassenhausPhaseEstimation:
             num_divisions=zassenhaus_num_divisions,
         )
 
+        # Configure the iterative phase estimation (IQPE) circuit builder with Zassenhaus evolution
         qpe_builder_ref = AlgorithmRef(
             "qpe_circuit_builder",
             "qdk_iterative",
@@ -451,6 +452,7 @@ class TestZassenhausPhaseEstimation:
             qubit_hamiltonian=qubit_hamiltonian,
         )
 
+        # Resolve 2pi phase periodic alias candidates to find the physical energy
         estimated_electronic_energy = resolve_energy_aliases(
             result.raw_energy,
             evolution_time=evolution_time,
@@ -459,6 +461,7 @@ class TestZassenhausPhaseEstimation:
         )
         estimated_total_energy = estimated_electronic_energy + active_hamiltonian.get_core_energy()
 
+        # Assert that total energy is within chemical accuracy of CASCI energy
         assert np.isclose(
             estimated_total_energy,
             casci_total_energy,
