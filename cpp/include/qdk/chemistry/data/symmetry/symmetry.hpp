@@ -352,6 +352,9 @@ class SymmetryAxis : public DataClass {
   static std::shared_ptr<SymmetryAxis> from_file(const std::string& filename,
                                                  const std::string& type);
 
+ protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   /// On-disk serialization format version. Bump on any change to the JSON
   /// or HDF5 shape produced by @ref to_json / @ref to_hdf5.
@@ -536,6 +539,9 @@ class SymmetryProduct : public DataClass {
   static std::shared_ptr<SymmetryProduct> from_file(const std::string& filename,
                                                     const std::string& type);
 
+ protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   /// On-disk serialization format version. Bump on any change to the JSON
   /// or HDF5 shape produced by @ref to_json / @ref to_hdf5.
@@ -559,7 +565,7 @@ class SymmetryLabel {
 
  public:
   /** @brief Construct a trivial (empty) label with no axis values. */
-  SymmetryLabel() : _hash(0) {}
+  SymmetryLabel() : _hash(_compute_hash(_values)) {}
 
   /**
    * @brief Construct from a brace-enclosed list of axis values.
@@ -689,6 +695,24 @@ class SymmetryLabel {
  */
 std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
     const nlohmann::json& j);
+
+/**
+ * @brief Hash a symmetry axis value without routing through JSON.
+ *
+ * @param ctx Hash context to update.
+ * @param value Axis value to hash.
+ */
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryAxisValue& value);
+
+/**
+ * @brief Hash a symmetry label without routing through JSON.
+ *
+ * @param ctx Hash context to update.
+ * @param label Label to hash.
+ */
+void hash_value(qdk::chemistry::utils::HashContext& ctx,
+                const SymmetryLabel& label);
 
 namespace axes {
 

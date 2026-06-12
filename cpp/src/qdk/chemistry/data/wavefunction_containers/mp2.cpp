@@ -1070,4 +1070,22 @@ MP2Container::get_active_two_rdm_spin_traced() const {
   return WavefunctionContainer::get_active_two_rdm_spin_traced();
 }
 
+void MP2Container::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  if (_hamiltonian) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _hamiltonian->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  // NEVER access lazy amplitude caches
+}
+
 }  // namespace qdk::chemistry::data

@@ -4,13 +4,14 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
-#include <qdk/chemistry/utils/hash.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -34,15 +35,16 @@ struct LabelsHash {
    *
    * @param labels Per-slot symmetry labels keying one block.
    * @return Hash value derived from the concatenation of per-slot label
-   *         hashes via @ref qdk::chemistry::utils::hash_combine.
+   *         hashes via @ref qdk::chemistry::utils::HashContext.
    */
-  std::size_t operator()(
-      const std::array<SymmetryLabel, Rank>& labels) const noexcept {
-    std::size_t seed = 0;
+  std::size_t operator()(const std::array<SymmetryLabel, Rank>& labels) const {
+    utils::HashContext ctx;
+    hash_value(ctx, "symmetry_labels");
+    hash_value(ctx, static_cast<uint64_t>(Rank));
     for (const auto& label : labels) {
-      seed = utils::hash_combine(seed, label.hash());
+      hash_value(ctx, label);
     }
-    return seed;
+    return ctx.hash_code();
   }
 };
 
@@ -575,6 +577,71 @@ class SymmetryBlocked : public DataClass {
         }
       }
     }
+    return groups;
+  }
+
+  static std::string _labels_sort_key(const Labels& labels) {
+    qdk::chemistry::utils::HashContext ctx;
+    hash_value(ctx, "symmetry_blocked_labels_sort_key");
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    for (const auto& label : labels) {
+      hash_value(ctx, label);
+    }
+    return ctx.hexdigest(0);
+  }
+
+  static void _hash_labels(qdk::chemistry::utils::HashContext& ctx,
+                           const Labels& labels) {
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    for (const auto& label : labels) {
+      hash_value(ctx, label);
+    }
+  }
+
+  void _hash_symmetry_blocked_metadata(
+      qdk::chemistry::utils::HashContext& ctx) const {
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    for (const auto& sym : _symmetries) {
+      if (sym) {
+        hash_field_presence(ctx, true);
+        hash_value(ctx, sym->content_hash());
+      } else {
+        hash_field_presence(ctx, false);
+      }
+    }
+    for (const auto& slot : _extents) {
+      std::vector<std::pair<std::string, std::size_t>> extents;
+      extents.reserve(slot.size());
+      for (const auto& [label, extent] : slot) {
+        qdk::chemistry::utils::HashContext label_ctx;
+        hash_value(label_ctx, label);
+        extents.emplace_back(label_ctx.hexdigest(0), extent);
+      }
+      std::sort(extents.begin(), extents.end(),
+                [](const auto& lhs, const auto& rhs) {
+                  return lhs.first < rhs.first;
+                });
+      hash_value(ctx, static_cast<uint64_t>(extents.size()));
+      for (const auto& [label_json, extent] : extents) {
+        hash_value(ctx, label_json);
+        hash_value(ctx, static_cast<uint64_t>(extent));
+      }
+    }
+  }
+
+  std::vector<PointerGroup> _sorted_pointer_groups() const {
+    auto groups = _group_by_pointer();
+    for (auto& group : groups) {
+      std::sort(group.keys.begin(), group.keys.end(),
+                [](const Labels& lhs, const Labels& rhs) {
+                  return _labels_sort_key(lhs) < _labels_sort_key(rhs);
+                });
+    }
+    std::sort(groups.begin(), groups.end(),
+              [](const PointerGroup& lhs, const PointerGroup& rhs) {
+                return _labels_sort_key(lhs.keys.front()) <
+                       _labels_sort_key(rhs.keys.front());
+              });
     return groups;
   }
 
