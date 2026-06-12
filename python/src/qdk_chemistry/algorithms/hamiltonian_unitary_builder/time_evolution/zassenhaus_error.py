@@ -18,7 +18,6 @@ Two bounds are offered:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from __future__ import annotations
 
 import math
@@ -66,10 +65,7 @@ def _zassenhaus_coefficient_sum(
         )
 
     if omitted_order not in commutator_exponents:
-        raise ValueError(
-            f"commutator_exponents must include Zassenhaus exponent C_{omitted_order} "
-            f"for order {order}."
-        )
+        raise ValueError(f"commutator_exponents must include Zassenhaus exponent C_{omitted_order} for order {order}.")
 
     return float(sum(abs(coeff) for coeff in commutator_exponents[omitted_order].values()))
 
@@ -280,9 +276,5 @@ def zassenhaus_steps_commutator(
 
     return max(
         1,
-        math.ceil(
-            omitted_norm ** (1 / order)
-            * abs(time) ** (1 + 1 / order)
-            / (target_accuracy ** (1 / order))
-        ),
+        math.ceil(omitted_norm ** (1 / order) * abs(time) ** (1 + 1 / order) / (target_accuracy ** (1 / order))),
     )

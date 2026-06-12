@@ -11,7 +11,6 @@ caching and linear-time evaluation of the commutator DAG.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-
 from __future__ import annotations
 
 from collections import defaultdict
@@ -58,7 +57,7 @@ def _clean(expr: Expr) -> Expr:
 
 
 def _add(*exprs: Expr) -> Expr:
-    out = defaultdict(Fraction)
+    out: defaultdict[Term, Fraction] = defaultdict(Fraction)
 
     for expr in exprs:
         for x, coeff in expr.items():
@@ -93,7 +92,7 @@ def _commutator_term(x: Term, y: Term) -> tuple[Term | None, Fraction]:
 
 
 def _commutator(expr_a: Expr, expr_b: Expr) -> Expr:
-    out = defaultdict(Fraction)
+    out: defaultdict[Term, Fraction] = defaultdict(Fraction)
 
     for x, coeff_x in expr_a.items():
         for y, coeff_y in expr_b.items():
@@ -198,19 +197,19 @@ def _compute_exponent(
             raise ValueError(f"Missing previous exponent C_{k}.")
 
         max_degree = order - k
-        transformed: Series = {0: previous_exponents[k]}
+        transformed_k: Series = {0: previous_exponents[k]}
         generators: list[tuple[Expr, int]] = [(leaf_expr, 1) for leaf_expr in leaf_terms]
         generators += [(previous_exponents[j], j) for j in range(2, k)]
 
         for generator, q in reversed(generators):
-            transformed = _apply_exp_ad_to_series(
-                transformed,
+            transformed_k = _apply_exp_ad_to_series(
+                transformed_k,
                 generator,
                 q,
                 max_degree=max_degree,
             )
 
-        residual = _add(residual, _scale(transformed.get(max_degree, {}), k))
+        residual = _add(residual, _scale(transformed_k.get(max_degree, {}), k))
 
     return _scale(residual, Fraction(-1, order))
 
@@ -257,7 +256,7 @@ def _plan_expr(
     primitive_leaves: set[Hashable],
     term_nodes: dict[Term, CommutatorNode],
 ) -> PlanExpr:
-    out = defaultdict(Fraction)
+    out: defaultdict[PlanTerm, Fraction] = defaultdict(Fraction)
 
     for x, coeff in expr.items():
         ref = _add_term_dependencies(x, plan, primitive_leaves, term_nodes)

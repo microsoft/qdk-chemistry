@@ -5,9 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
 from collections.abc import Hashable
 from fractions import Fraction
+
 import numpy as np
 import pytest
 import scipy.linalg
@@ -36,6 +36,7 @@ from qdk_chemistry.utils.zassenhaus_generation import (
     PlanTerm,
     zassenhaus_commutator_plan,
 )
+
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
 )
@@ -49,8 +50,10 @@ class TestZassenhausGeneration:
         if ref not in plan:
             return ref
         left, right = plan[ref]
-        return (TestZassenhausGeneration._expand_plan_term(left, plan),
-                TestZassenhausGeneration._expand_plan_term(right, plan))
+        return (
+            TestZassenhausGeneration._expand_plan_term(left, plan),
+            TestZassenhausGeneration._expand_plan_term(right, plan),
+        )
 
     @staticmethod
     def _expand_plan_expr(expr: PlanExpr, plan: CommutatorPlan) -> dict:
@@ -126,13 +129,16 @@ class TestZassenhausGeneration:
         times = np.logspace(-2, -1, 5)
 
         for order in (2, 3, 4):
-            errors = np.array([
-                np.linalg.norm(
-                    self._zassenhaus_matrix_product(leaves, order=order, time=time)
-                    - scipy.linalg.expm(time * exact_generator),
-                    ord=2,
-                ) for time in times
-            ])
+            errors = np.array(
+                [
+                    np.linalg.norm(
+                        self._zassenhaus_matrix_product(leaves, order=order, time=time)
+                        - scipy.linalg.expm(time * exact_generator),
+                        ord=2,
+                    )
+                    for time in times
+                ]
+            )
             slope = np.polyfit(np.log(times), np.log(errors), deg=1)[0]
             assert np.isclose(slope, order + 1, atol=0.1)
 
@@ -176,8 +182,12 @@ class TestZassenhausStepEstimation:
         assert zassenhaus_steps_commutator(h_commuting, 4.0, 1e-6, order=2) == 1
 
         # Commutator-aware is tighter than naive
-        h_dense = QubitHamiltonian(pauli_strings=["XI", "ZI", "IX", "IZ", "ZZ"], coefficients=[0.7, -0.2, 0.5, 0.3, -0.4])
-        assert zassenhaus_steps_commutator(h_dense, 1.0, 0.01, order=2) < zassenhaus_steps_naive(h_dense, 1.0, 0.01, order=2)
+        h_dense = QubitHamiltonian(
+            pauli_strings=["XI", "ZI", "IX", "IZ", "ZZ"], coefficients=[0.7, -0.2, 0.5, 0.3, -0.4]
+        )
+        assert zassenhaus_steps_commutator(h_dense, 1.0, 0.01, order=2) < zassenhaus_steps_naive(
+            h_dense, 1.0, 0.01, order=2
+        )
 
         # Verify computed steps bounds the actual operator-norm error
         steps = zassenhaus_steps_commutator(h_anticommuting, 0.7, 0.01, order=1)
@@ -205,7 +215,9 @@ class TestZassenhausTimeEvolution:
 
         step_unitary = np.eye(2**hamiltonian.num_qubits, dtype=complex)
         for term in container.step_terms:
-            pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(term.pauli_term, num_qubits=hamiltonian.num_qubits)
+            pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
+                term.pauli_term, num_qubits=hamiltonian.num_qubits
+            )
             pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
             step_unitary = scipy.linalg.expm(-1j * term.angle * pauli_matrix) @ step_unitary
 
@@ -215,13 +227,16 @@ class TestZassenhausTimeEvolution:
     def _fit_zassenhaus_error_slope(hamiltonian: QubitHamiltonian, *, order: int) -> float:
         times = np.logspace(-3, -1, 5)
         ham_mat = hamiltonian.to_matrix()
-        errors = np.array([
-            np.linalg.norm(
-                TestZassenhausTimeEvolution._zassenhaus_unitary_matrix(hamiltonian, order=order, time=t)
-                - scipy.linalg.expm(-1j * t * ham_mat),
-                ord=2,
-            ) for t in times
-        ])
+        errors = np.array(
+            [
+                np.linalg.norm(
+                    TestZassenhausTimeEvolution._zassenhaus_unitary_matrix(hamiltonian, order=order, time=t)
+                    - scipy.linalg.expm(-1j * t * ham_mat),
+                    ord=2,
+                )
+                for t in times
+            ]
+        )
         resolved = errors > 1e-13
         assert np.count_nonzero(resolved) >= 3
         return float(np.polyfit(np.log(times[resolved]), np.log(errors[resolved]), deg=1)[0])
@@ -230,7 +245,8 @@ class TestZassenhausTimeEvolution:
     def _open_heisenberg_chain_4_site() -> QubitHamiltonian:
         labels = [
             TestZassenhausTimeEvolution._pauli_label_from_qubit_ops(4, {site: pauli, site + 1: pauli})
-            for site in range(3) for pauli in ("X", "Y", "Z")
+            for site in range(3)
+            for pauli in ("X", "Y", "Z")
         ]
         return QubitHamiltonian(pauli_strings=labels, coefficients=[1.0] * len(labels))
 
@@ -268,7 +284,9 @@ class TestZassenhausTimeEvolution:
         assert builder.name() == "zassenhaus"
         assert builder.type_name() == "hamiltonian_unitary_builder"
 
-        builder_registry = create("hamiltonian_unitary_builder", "zassenhaus", order=4, num_divisions=3, time=0.2, weight_threshold=1e-10)
+        builder_registry = create(
+            "hamiltonian_unitary_builder", "zassenhaus", order=4, num_divisions=3, time=0.2, weight_threshold=1e-10
+        )
         assert isinstance(builder_registry, Zassenhaus)
         assert builder_registry.settings().get("order") == 4
         assert builder_registry.settings().get("num_divisions") == 3
@@ -311,7 +329,7 @@ class TestZassenhausTimeEvolution:
         assert container_steps.step_reps == 4
         assert len(container_steps.step_terms) == 3
         sorted_terms = sorted(container_steps.step_terms, key=lambda t: abs(t.angle))
-        
+
         # Commutator correction term (C2 angle = coeff * dt^2 = 2 * 0.05^2 = 0.005)
         assert sorted_terms[0].pauli_term == {0: "Z", 1: "Y"}
         assert np.isclose(abs(sorted_terms[0].angle), 0.005, atol=1e-12)
@@ -325,7 +343,7 @@ class TestZassenhausTimeEvolution:
         # Order 1 & 2 X-Z simulation comparison against scipy expm
         ham_sim = QubitHamiltonian(pauli_strings=["X", "Z"], coefficients=[1.5, 0.5])
         t_sim = 0.1
-        
+
         # Order 1 comparison
         u_z1 = np.eye(2, dtype=complex)
         container1 = Zassenhaus(num_divisions=1, order=1, time=t_sim).run(ham_sim).get_container()

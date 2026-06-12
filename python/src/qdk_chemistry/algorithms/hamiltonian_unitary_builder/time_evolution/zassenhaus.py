@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import math
 from itertools import product
+
 import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
@@ -138,9 +139,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         order = self._settings.get("order")
 
         if order == 0:
-            resolved_order, num_divisions = self._resolve_optimal_order_and_divisions(
-                qubit_hamiltonian, effective_time
-            )
+            resolved_order, num_divisions = self._resolve_optimal_order_and_divisions(qubit_hamiltonian, effective_time)
         elif order >= 1:
             resolved_order = order
             num_divisions = self._resolve_num_divisions(qubit_hamiltonian, effective_time, order=order)
@@ -162,7 +161,9 @@ class Zassenhaus(TimeEvolutionBuilder):
 
         return UnitaryRepresentation(container=container)
 
-    def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float, *, order: int = None) -> int:
+    def _resolve_num_divisions(
+        self, qubit_hamiltonian: QubitHamiltonian, time: float, *, order: int | None = None
+    ) -> int:
         """Determine the number of Zassenhaus divisions to use.
 
         When both *num_divisions* and *target_accuracy* are provided, the
@@ -203,9 +204,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             )
         return max(manual, auto)
 
-    def _resolve_optimal_order_and_divisions(
-        self, qubit_hamiltonian: QubitHamiltonian, time: float
-    ) -> tuple[int, int]:
+    def _resolve_optimal_order_and_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> tuple[int, int]:
         """Determine the optimal Zassenhaus order and the corresponding number of divisions.
 
         Sweeps orders 2, 3, and 4, computes the required divisions for each order
@@ -236,7 +235,7 @@ class Zassenhaus(TimeEvolutionBuilder):
                     min_total_terms = total_terms
                     best_order = p
                     best_divisions = divisions
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass
 
         return best_order, best_divisions
@@ -247,7 +246,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         time: float,
         *,
         atol: float = 1e-12,
-        order: int = None,
+        order: int | None = None,
     ) -> list[ExponentiatedPauliTerm]:
         """Decompose a single Zassenhaus step into exponentiated Pauli terms.
 
