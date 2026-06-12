@@ -107,35 +107,17 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         if num_iteration >= num_bits:
             raise ValueError(f"num_iteration ({num_iteration}) must be less than num_bits ({num_bits}).")
 
-        if num_iteration >= 0:
-            # Single iteration: build just that one circuit
+        iterations = [num_iteration] if num_iteration >= 0 else range(num_bits)
+        circuits: list[Circuit] = []
+        for iteration in iterations:
             circuit = self._create_iteration_circuit(
                 state_preparation=state_preparation,
                 qubit_hamiltonian=qubit_hamiltonian,
-                iteration=num_iteration,
+                iteration=iteration,
                 total_iterations=num_bits,
                 phase_correction=phase_correction,
             )
-            Logger.info(f"Built 1 iteration circuit with phase_correction={phase_correction}.")
-            return [circuit]
-
-        # All iterations: use batch build for the controlled circuits
-        powers = [2 ** (num_bits - 1 - k) for k in range(num_bits)]
-        ctrl_unitary_circuits = self._build_controlled_circuits(qubit_hamiltonian, powers)
-
-        circuits: list[Circuit] = []
-        for ctrl_unitary_circuit in ctrl_unitary_circuits:
-            if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
-                num_system_qubits = qubit_hamiltonian.num_qubits
-                circuit = self._create_circuit_from_qsharp_op(
-                    state_preparation, ctrl_unitary_circuit, phase_correction, num_system_qubits
-                )
-                circuits.append(circuit)
-            else:
-                raise RuntimeError(
-                    "Failed to create iteration circuit: Q# operations are not available. "
-                    "For Qiskit support, use QiskitIterativeQpeCircuitBuilder from the qiskit plugin."
-                )
+            circuits.append(circuit)
 
         Logger.info(f"Built {len(circuits)} iteration circuit(s) with phase_correction={phase_correction}.")
         return circuits
