@@ -284,6 +284,62 @@ def _project_to_active_ci(op, active_so, n_elec, nso_full):
     return evals, evecs
 
 
+def _project_to_active_ci_slater_condon(op, active_so, n_elec, nso_full):
+    """Build the active-space CI matrix restricted to ≤2-excitation matrix elements.
+
+    Like :func:`_project_to_active_ci` but only accumulates matrix elements
+    between determinants that differ by at most 2 orbitals (the Slater-Condon
+    selection rule for ≤2-body operators).  This isolates the contribution of
+    many-body operators to the ≤2-excitation block of the CI matrix, which is
+    the part that a 2-body effective Hamiltonian should reproduce.
+
+    Args:
+        op: Normal-ordered FermionOperator on the full spin-orbital space.
+        active_so: Sorted list of active spin-orbital indices.
+        n_elec: Number of electrons in the active space.
+        nso_full: Total number of spin-orbitals (for sign conventions).
+
+    Returns:
+        (evals, evecs) from diagonalizing the projected CI matrix.
+
+    """
+    dets = [frozenset(c) for c in combinations(active_so, n_elec)]
+    det_index = {d: i for i, d in enumerate(dets)}
+    n = len(dets)
+    H_ci = np.zeros((n, n))
+
+    for j, ket in enumerate(dets):
+        for term, c in op.terms.items():
+            occ = set(ket)
+            sgn = 1.0
+            ok = True
+            for idx, dag in reversed(term):
+                below = sum(1 for o in occ if o < idx)
+                if dag:
+                    if idx in occ:
+                        ok = False
+                        break
+                    sgn *= (-1) ** below
+                    occ.add(idx)
+                else:
+                    if idx not in occ:
+                        ok = False
+                        break
+                    sgn *= (-1) ** below
+                    occ.discard(idx)
+            if not ok:
+                continue
+            res = frozenset(occ)
+            i = det_index.get(res)
+            if i is not None:
+                # Only keep if ≤2 orbitals differ (Slater-Condon)
+                if len(ket ^ res) <= 4:  # symmetric difference ≤ 4 indices = ≤ 2 excitations
+                    H_ci[i, j] += c * sgn
+
+    evals, evecs = np.linalg.eigh(H_ci)
+    return evals, evecs
+
+
 # ---------------------------------------------------------------------------
 # Factory and Algorithm
 # ---------------------------------------------------------------------------
