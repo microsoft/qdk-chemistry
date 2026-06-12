@@ -479,7 +479,7 @@ class TestGetQreApplication:
 
     def test_get_qre_application_from_factory(self):
         """Test that get_qre_application works with Q# factory data."""
-        from qdk.qre.application import QSharpApplication
+        from qdk.qre.application import QSharpApplication  # noqa: PLC0415
 
         state_prep_params = {
             "rowMap": [1, 0],
@@ -497,7 +497,7 @@ class TestGetQreApplication:
 
     def test_get_qre_application_from_qasm(self):
         """Test that get_qre_application works with QASM-only circuit."""
-        from qdk.qre.application import OpenQASMApplication
+        from qdk.qre.application import OpenQASMApplication  # noqa: PLC0415
 
         qasm = """
             OPENQASM 3.0;
@@ -515,7 +515,7 @@ class TestGetQreApplication:
 
     def test_get_qre_application_from_qir(self):
         """Test that get_qre_application works with QIR-only circuit."""
-        from qdk.qre.application import QIRApplication
+        from qdk.qre.application import QIRApplication  # noqa: PLC0415
 
         qir = openqasm_compile("""
             OPENQASM 3.0;
