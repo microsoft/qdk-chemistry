@@ -69,6 +69,12 @@ if(MSVC AND TARGET libint2_cxx)
   # uses Boost.Preprocessor macros that require correct expansion order (the
   # legacy preprocessor concatenates tokens incorrectly). Available since VS 2019 16.5.
   target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+  # Suppress warnings in auto-generated libint2 headers included by consumers.
+  target_compile_options(libint2_cxx INTERFACE /wd4100 /wd4701 /wd4703)
+endif()
+if(MSVC AND TARGET libint2)
+  # Suppress warnings in auto-generated libint2 compiled sources.
+  target_compile_options(libint2 PRIVATE /wd4100 /wd4101)
 endif()
 
 # ecpint for ECP-related integral evaluation
@@ -91,6 +97,10 @@ handle_dependency(ecpint
   ${_ecpint_patch_args}
   REQUIRED
 )
+if(MSVC AND TARGET ecpint)
+  # Suppress warnings in upstream ecpint sources.
+  target_compile_options(ecpint PRIVATE /wd4100 /wd4101)
+endif()
 
 # gauxc for XC evaluation
 set(EXCHCXX_ENABLE_LIBXC OFF CACHE BOOL "Enable LibXC Support"         FORCE)
@@ -115,6 +125,15 @@ handle_dependency(gauxc
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )
+if(MSVC)
+  # blaspp and lapackpp are fetched transitively by gauxc.
+  if(TARGET blaspp)
+    target_compile_options(blaspp PRIVATE /wd4100 /wd4244)
+  endif()
+  if(TARGET lapackpp)
+    target_compile_options(lapackpp PRIVATE /wd4100 /wd4244)
+  endif()
+endif()
 
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
