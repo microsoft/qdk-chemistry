@@ -449,9 +449,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     Eigen::VectorXd energies_alpha = eps.row(0);
     Eigen::VectorXd energies_beta = eps.row(1);
 
-    orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_raw_basis_set);
+    orbitals = std::make_shared<data::Orbitals>(C_alpha, C_beta, energies_alpha,
+                                                energies_beta, ao_overlap,
+                                                qdk_raw_basis_set);
 
   } else {
     // Restricted case - store matrices first to avoid
@@ -463,8 +463,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
-    orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_raw_basis_set);
+    orbitals = std::make_shared<data::Orbitals>(coefficients, energies,
+                                                ao_overlap, qdk_raw_basis_set);
   }
 
   // Create canonical Hartree-Fock Configuration
@@ -486,9 +486,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   data::Configuration hf_det(config_str);
 
   // Create StateVectorContainer
-  auto container =
-      std::make_unique<data::StateVectorContainer>(hf_det, orbitals,
-                                                   "electrons");
+  auto container = std::make_unique<data::StateVectorContainer>(
+      hf_det, orbitals, "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

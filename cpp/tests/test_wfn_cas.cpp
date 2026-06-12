@@ -337,15 +337,14 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
   one_rdm.setIdentity();
   one_rdm *= 2.0;
 
-  StateVectorContainer original(coeffs, dets, orbitals, one_rdm,
-                                    std::nullopt);
+  StateVectorContainer original(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Also test base Wavefunction::from_json() by wrapping container in
@@ -400,8 +399,7 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
   one_rdm.setIdentity();
   one_rdm *= 2.0;
 
-  StateVectorContainer original(coeffs, dets, orbitals, one_rdm,
-                                    std::nullopt);
+  StateVectorContainer original(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   std::string filename = "test_cas_serialization.h5";
   {
@@ -440,9 +438,9 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
   std::string wf_filename = "test_cas_wavefunction_serialization.h5";
   {
     // Create and serialize a Wavefunction wrapping the container
-    auto original_wf = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals,
-                                                   one_rdm, std::nullopt));
+    auto original_wf =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            coeffs, dets, orbitals, one_rdm, std::nullopt));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
     original_wf->to_hdf5(root);
@@ -493,8 +491,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
 
   // Test JSON
   nlohmann::json j = original.to_json();
-  auto restored_json = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored_json =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   const auto& orig_coeffs =
@@ -546,8 +544,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   two_rdm_aaaa *= 0.25;
 
   StateVectorContainer original(coeffs, dets, orbitals, std::nullopt,
-                                    one_rdm_aa, one_rdm_aa, std::nullopt,
-                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
+                                one_rdm_aa, one_rdm_aa, std::nullopt,
+                                two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
@@ -558,8 +556,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify RDMs are available after deserialization
@@ -606,9 +604,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(
-          orbitals->get_num_molecular_orbitals(),
-          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
           orbitals->get_inactive_space_indices().first));
@@ -642,8 +639,8 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify rdms are still there
@@ -856,9 +853,8 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(
-          orbitals->get_num_molecular_orbitals(),
-          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
           orbitals->get_inactive_space_indices().first));

@@ -47,8 +47,7 @@ class TestSCF : public ScfSolver {
     auto orbitals = std::make_shared<Orbitals>(coefficients, energies,
                                                std::nullopt, nullptr);
     auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration("000"),
-                                                     orbitals));
+        std::make_unique<StateVectorContainer>(Configuration("000"), orbitals));
     return {0.0, wfn};
   }
 };
@@ -751,8 +750,8 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
 
   // Create orbitals with the deserialized basis set - this validates
   // that the basis set is fully functional
-  auto orbitals2 = std::make_shared<Orbitals>(
-      coeff_alpha, energies_alpha, overlap, basis_set2);
+  auto orbitals2 = std::make_shared<Orbitals>(coeff_alpha, energies_alpha,
+                                              overlap, basis_set2);
 
   EXPECT_TRUE(orbitals2->has_basis_set());
   EXPECT_EQ(orbitals2->get_basis_set()->get_name(), "def2-svp");

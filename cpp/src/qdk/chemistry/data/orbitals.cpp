@@ -34,12 +34,12 @@ v1_indices_from_index_set(const SymmetryBlockedIndexSet& index_set) {
   };
   auto symmetries = index_set.symmetries();
   if (symmetries && symmetries->has_axis(AxisName::Spin)) {
-    std::vector<size_t> alpha =
-        index_set.has(axes::alpha()) ? to_vec(index_set.indices(axes::alpha()))
-                                     : std::vector<size_t>{};
-    std::vector<size_t> beta =
-        index_set.has(axes::beta()) ? to_vec(index_set.indices(axes::beta()))
+    std::vector<size_t> alpha = index_set.has(axes::alpha())
+                                    ? to_vec(index_set.indices(axes::alpha()))
                                     : std::vector<size_t>{};
+    std::vector<size_t> beta = index_set.has(axes::beta())
+                                   ? to_vec(index_set.indices(axes::beta()))
+                                   : std::vector<size_t>{};
     return {std::move(alpha), std::move(beta)};
   }
   std::vector<size_t> modes = index_set.has(SymmetryLabel{})
@@ -1306,18 +1306,16 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     if (coefficients_sbt) {
       auto mo_symmetries = coefficients_sbt->symmetries()[1];
       const auto& mo_extents = coefficients_sbt->extents()[1];
-      auto active_set =
-          has_active_indices
-              ? index_set_from_v1_indices(mo_symmetries, mo_extents,
-                                          active_indices_alpha,
-                                          active_indices_beta)
-              : nullptr;
-      auto inactive_set =
-          has_inactive_indices
-              ? index_set_from_v1_indices(mo_symmetries, mo_extents,
-                                          inactive_indices_alpha,
-                                          inactive_indices_beta)
-              : nullptr;
+      auto active_set = has_active_indices
+                            ? index_set_from_v1_indices(
+                                  mo_symmetries, mo_extents,
+                                  active_indices_alpha, active_indices_beta)
+                            : nullptr;
+      auto inactive_set = has_inactive_indices ? index_set_from_v1_indices(
+                                                     mo_symmetries, mo_extents,
+                                                     inactive_indices_alpha,
+                                                     inactive_indices_beta)
+                                               : nullptr;
       return std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
                                         ao_overlap, basis_set, active_set,
                                         inactive_set);
@@ -1350,27 +1348,25 @@ std::shared_ptr<Orbitals> Orbitals::from_hdf5(H5::Group& group) {
     std::unordered_map<SymmetryLabel, std::size_t> dense_extents{
         {axes::alpha(), static_cast<std::size_t>(coeffs_alpha.cols())},
         {axes::beta(), static_cast<std::size_t>(coeffs_alpha.cols())}};
-    auto active_set =
-        has_active_indices
-            ? index_set_from_v1_indices(dense_symmetries, dense_extents,
-                                        active_indices_alpha,
-                                        active_indices_beta)
-            : nullptr;
-    auto inactive_set =
-        has_inactive_indices
-            ? index_set_from_v1_indices(dense_symmetries, dense_extents,
-                                        inactive_indices_alpha,
-                                        inactive_indices_beta)
-            : nullptr;
+    auto active_set = has_active_indices
+                          ? index_set_from_v1_indices(
+                                dense_symmetries, dense_extents,
+                                active_indices_alpha, active_indices_beta)
+                          : nullptr;
+    auto inactive_set = has_inactive_indices
+                            ? index_set_from_v1_indices(
+                                  dense_symmetries, dense_extents,
+                                  inactive_indices_alpha, inactive_indices_beta)
+                            : nullptr;
 
     if (restricted || !coeffs_beta_opt) {
-      return std::make_shared<Orbitals>(
-          coeffs_alpha, energies_alpha, ao_overlap, basis_set, active_set,
-          inactive_set);
+      return std::make_shared<Orbitals>(coeffs_alpha, energies_alpha,
+                                        ao_overlap, basis_set, active_set,
+                                        inactive_set);
     }
-    return std::make_shared<Orbitals>(
-        coeffs_alpha, *coeffs_beta_opt, energies_alpha, energies_beta,
-        ao_overlap, basis_set, active_set, inactive_set);
+    return std::make_shared<Orbitals>(coeffs_alpha, *coeffs_beta_opt,
+                                      energies_alpha, energies_beta, ao_overlap,
+                                      basis_set, active_set, inactive_set);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -1511,18 +1507,16 @@ std::shared_ptr<Orbitals> Orbitals::from_json(const nlohmann::json& j) {
     }
     auto mo_symmetries = coefficients_sbt->symmetries()[1];
     const auto& mo_extents = coefficients_sbt->extents()[1];
-    auto active_set =
-        has_active_indices
-            ? index_set_from_v1_indices(mo_symmetries, mo_extents,
-                                        active_indices_alpha,
-                                        active_indices_beta)
-            : nullptr;
-    auto inactive_set =
-        has_inactive_indices
-            ? index_set_from_v1_indices(mo_symmetries, mo_extents,
-                                        inactive_indices_alpha,
-                                        inactive_indices_beta)
-            : nullptr;
+    auto active_set = has_active_indices
+                          ? index_set_from_v1_indices(mo_symmetries, mo_extents,
+                                                      active_indices_alpha,
+                                                      active_indices_beta)
+                          : nullptr;
+    auto inactive_set = has_inactive_indices
+                            ? index_set_from_v1_indices(
+                                  mo_symmetries, mo_extents,
+                                  inactive_indices_alpha, inactive_indices_beta)
+                            : nullptr;
     return std::make_shared<Orbitals>(coefficients_sbt, energies_sbt,
                                       ao_overlap, basis_set, active_set,
                                       inactive_set);
@@ -1758,18 +1752,16 @@ void Orbitals::_build_space_index_sets() {
                                                    space_indices.first.end()));
       }
       if (!space_indices.second.empty()) {
-        indices.emplace(
-            axes::beta(),
-            std::vector<std::uint32_t>(space_indices.second.begin(),
-                                       space_indices.second.end()));
+        indices.emplace(axes::beta(),
+                        std::vector<std::uint32_t>(space_indices.second.begin(),
+                                                   space_indices.second.end()));
       }
     } else {
       // No declared symmetry: a single trivial-label segment over the modes.
       if (!space_indices.first.empty()) {
-        indices.emplace(
-            SymmetryLabel{},
-            std::vector<std::uint32_t>(space_indices.first.begin(),
-                                       space_indices.first.end()));
+        indices.emplace(SymmetryLabel{},
+                        std::vector<std::uint32_t>(space_indices.first.begin(),
+                                                   space_indices.first.end()));
       }
     }
     return std::make_shared<const SymmetryBlockedIndexSet>(
@@ -2042,8 +2034,8 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_json(
     if (!has_active) {
       return std::make_shared<ModelOrbitals>(num_orbitals, symmetries);
     }
-    auto active_set =
-        model_make_index_set(symmetries, num_orbitals, active_alpha, active_beta);
+    auto active_set = model_make_index_set(symmetries, num_orbitals,
+                                           active_alpha, active_beta);
     std::shared_ptr<const SymmetryBlockedIndexSet> inactive_set =
         has_inactive ? model_make_index_set(symmetries, num_orbitals,
                                             inactive_alpha, inactive_beta)
@@ -2182,14 +2174,13 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     if (!has_active) {
       return std::make_shared<ModelOrbitals>(num_orbitals, symmetries);
     }
-    auto active_set = model_make_index_set(symmetries, num_orbitals,
-                                           active_indices_alpha,
-                                           active_indices_beta);
+    auto active_set = model_make_index_set(
+        symmetries, num_orbitals, active_indices_alpha, active_indices_beta);
     std::shared_ptr<const SymmetryBlockedIndexSet> inactive_set =
-        has_inactive
-            ? model_make_index_set(symmetries, num_orbitals,
-                                   inactive_indices_alpha, inactive_indices_beta)
-            : nullptr;
+        has_inactive ? model_make_index_set(symmetries, num_orbitals,
+                                            inactive_indices_alpha,
+                                            inactive_indices_beta)
+                     : nullptr;
     return std::make_shared<ModelOrbitals>(active_set, inactive_set);
 
   } catch (const H5::Exception& e) {

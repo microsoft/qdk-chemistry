@@ -608,7 +608,9 @@ def test_active_space_management():
     )
     active_indices = [1, 2]
     basis_set = create_test_basis_set(4, "test-active-space-management")
-    orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(4, active_indices, active_indices), spin_index_set(4, [], []))
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(4, active_indices, active_indices), spin_index_set(4, [], [])
+    )
 
     assert orb.has_active_space()
     alpha_indices, beta_indices = orb.get_active_space_indices()
@@ -628,7 +630,9 @@ def test_inactive_space_management():
     )
     inactive_indices = [0, 1]
     basis_set = create_test_basis_set(4, "test-inactive-space-management")
-    orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(4, [], []), spin_index_set(4, inactive_indices, inactive_indices))
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(4, [], []), spin_index_set(4, inactive_indices, inactive_indices)
+    )
 
     alpha_indices, beta_indices = orb.get_inactive_space_indices()
     assert np.array_equal(alpha_indices, inactive_indices)
@@ -663,7 +667,9 @@ def test_active_space_serialization():
     coeffs = np.array([[0.9, 0.1, 0.0], [0.1, -0.9, 0.0], [0.0, 0.0, 1.0]])
     active_indices = [0, 2]
     basis_set = create_test_basis_set(3, "test-active-space-serialization")
-    orb = Orbitals(coeffs, None, None, basis_set, spin_index_set(3, active_indices, active_indices), spin_index_set(3, [], []))
+    orb = Orbitals(
+        coeffs, None, None, basis_set, spin_index_set(3, active_indices, active_indices), spin_index_set(3, [], [])
+    )
 
     # Test JSON serialization
     with tempfile.NamedTemporaryFile(suffix=".orbitals.json") as tmp_json:

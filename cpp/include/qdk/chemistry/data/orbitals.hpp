@@ -49,14 +49,14 @@ class Orbitals : public DataClass,
    * @param active_indices Active-space index set (default: all orbitals)
    * @param inactive_indices Inactive-space index set (default: empty)
    */
-  Orbitals(const Eigen::MatrixXd& coefficients,
-           const std::optional<Eigen::VectorXd>& energies,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           std::shared_ptr<const SymmetryBlockedIndexSet> active_indices =
-               nullptr,
-           std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
-               nullptr);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients,
+      const std::optional<Eigen::VectorXd>& energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
 
   /**
    * @brief Constructor for unrestricted orbitals with shared pointer to basis
@@ -70,16 +70,16 @@ class Orbitals : public DataClass,
    * @param active_indices Active-space index set (default: all orbitals)
    * @param inactive_indices Inactive-space index set (default: empty)
    */
-  Orbitals(const Eigen::MatrixXd& coefficients_alpha,
-           const Eigen::MatrixXd& coefficients_beta,
-           const std::optional<Eigen::VectorXd>& energies_alpha,
-           const std::optional<Eigen::VectorXd>& energies_beta,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           std::shared_ptr<const SymmetryBlockedIndexSet> active_indices =
-               nullptr,
-           std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
-               nullptr);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients_alpha,
+      const Eigen::MatrixXd& coefficients_beta,
+      const std::optional<Eigen::VectorXd>& energies_alpha,
+      const std::optional<Eigen::VectorXd>& energies_beta,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
 
   /**
    * @brief Constructor from symmetry-blocked storage primitives
@@ -97,14 +97,14 @@ class Orbitals : public DataClass,
    * @param inactive_indices Inactive-space index set (default: empty)
    * @throws std::runtime_error if the containers are inconsistent
    */
-  Orbitals(std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
-           std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           std::shared_ptr<const SymmetryBlockedIndexSet> active_indices =
-               nullptr,
-           std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
-               nullptr);
+  Orbitals(
+      std::shared_ptr<const SymmetryBlockedTensor<2>> coefficients,
+      std::shared_ptr<const SymmetryBlockedTensor<1>> energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      std::shared_ptr<const SymmetryBlockedIndexSet> active_indices = nullptr,
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
 
   /**
    * @brief Destructor
@@ -714,7 +714,8 @@ class ModelOrbitals : public Orbitals {
    */
   explicit ModelOrbitals(
       std::shared_ptr<const SymmetryBlockedIndexSet> active_indices,
-      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices = nullptr);
+      std::shared_ptr<const SymmetryBlockedIndexSet> inactive_indices =
+          nullptr);
 
   // Copy constructor and assignment operator
   ModelOrbitals(const ModelOrbitals& other);

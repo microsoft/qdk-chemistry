@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/constants.hpp>
@@ -13,7 +14,6 @@
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
-#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -70,7 +70,7 @@ inline std::shared_ptr<const SymmetryBlockedIndexSet> spin_index_set(
     size_t num_modes, const std::vector<size_t>& alpha,
     const std::vector<size_t>& beta, bool equivalent = true) {
   std::unordered_map<SymmetryLabel, size_t> extents{{axes::alpha(), num_modes},
-                                                   {axes::beta(), num_modes}};
+                                                    {axes::beta(), num_modes}};
   std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
       {axes::alpha(), std::vector<std::uint32_t>(alpha.begin(), alpha.end())},
       {axes::beta(), std::vector<std::uint32_t>(beta.begin(), beta.end())}};
@@ -225,8 +225,9 @@ inline std::shared_ptr<Orbitals> with_active_space(
   } else {
     return std::make_shared<Orbitals>(
         alpha_coeffs, beta_coeffs, alpha_energies, beta_energies, ao_overlap,
-        basis_set, unrestricted_index_set(alpha_coeffs.cols(), active_indices,
-                                          active_indices),
+        basis_set,
+        unrestricted_index_set(alpha_coeffs.cols(), active_indices,
+                               active_indices),
         unrestricted_index_set(alpha_coeffs.cols(), inactive_indices,
                                inactive_indices));
   }

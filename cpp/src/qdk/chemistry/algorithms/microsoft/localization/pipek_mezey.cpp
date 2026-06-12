@@ -109,9 +109,9 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
 
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_alpha, C_beta, std::nullopt,
-        std::nullopt,           // no energies for localized orbitals
-        ao_overlap,             // Atomic Orbital overlap
-        basis_set,              // basis set
+        std::nullopt,  // no energies for localized orbitals
+        ao_overlap,    // Atomic Orbital overlap
+        basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
     return detail::new_wavefunction(wavefunction, new_orbitals);
   } else {
@@ -120,9 +120,9 @@ std::shared_ptr<data::Wavefunction> PipekMezeyLocalizer::_run_impl(
 
     auto new_orbitals = std::make_shared<data::Orbitals>(
         C_lmo,
-        std::nullopt,         // no energies for localized orbitals
-        ao_overlap,           // Atomic Orbital overlap
-        basis_set,            // basis set
+        std::nullopt,  // no energies for localized orbitals
+        ao_overlap,    // Atomic Orbital overlap
+        basis_set,     // basis set
         orbitals->active_indices(), orbitals->inactive_indices());
     return detail::new_wavefunction(wavefunction, new_orbitals);
   }

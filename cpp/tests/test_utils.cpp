@@ -80,15 +80,15 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
     // Create configuration for 8 electrons (4 doubly occupied orbitals)
     Configuration config_ohp("222200000");  // 4 doubly occupied orbitals
-    auto ohp_wfn_container = std::make_unique<StateVectorContainer>(
-        config_ohp, base_orbitals_oh);
+    auto ohp_wfn_container =
+        std::make_unique<StateVectorContainer>(config_ohp, base_orbitals_oh);
     ohp_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohp_wfn_container));
 
     // Create configuration for 10 electrons (5 doubly occupied orbitals)
     Configuration config_ohn("222220000");  // 4 doubly occupied orbitals
-    auto ohn_wfn_container = std::make_unique<StateVectorContainer>(
-        config_ohn, base_orbitals_oh);
+    auto ohn_wfn_container =
+        std::make_unique<StateVectorContainer>(config_ohn, base_orbitals_oh);
     ohn_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohn_wfn_container));
   }
@@ -250,9 +250,8 @@ std::shared_ptr<Wavefunction> make_minimal_wavefunction(
   for (size_t i = 0; i < single_count; ++i)
     config_str[pair_count + i] = unpaired;
 
-  return std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(Configuration(config_str),
-                                                   orbitals));
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      Configuration(config_str), orbitals));
 }
 
 // Single-atom row: element + spin split + expected sizing for both toggle

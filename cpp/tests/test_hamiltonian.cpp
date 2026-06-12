@@ -42,7 +42,8 @@ static std::shared_ptr<const SymmetryProduct> model_spin_symmetry(
 // for model orbitals that declare an explicit active/inactive space.
 static std::shared_ptr<const SymmetryBlockedIndexSet> trivial_index_set(
     size_t num_modes, const std::vector<size_t>& indices) {
-  auto sym = std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
   std::unordered_map<SymmetryLabel, std::size_t> extents{
       {SymmetryLabel{}, num_modes}};
   std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> idx{
@@ -63,8 +64,7 @@ class HamiltonianTest : public ::testing::Test {
     two_body = 2 * Eigen::VectorXd::Ones(16);
 
     // Create a test Orbitals object using ModelOrbitals for model systems
-    orbitals =
-        std::make_shared<ModelOrbitals>(2);  // 2 orbitals, restricted
+    orbitals = std::make_shared<ModelOrbitals>(2);  // 2 orbitals, restricted
 
     num_electrons = 2;
     core_energy = 1.5;
@@ -176,8 +176,9 @@ TEST_F(HamiltonianTest, ConstructorWithInactiveFock) {
   // For this test specifically, create ModelOrbitals with inactive space
   std::vector<size_t> active_indices = {1, 2};  // Only orbital 1 is active
   std::vector<size_t> inactive_indices = {0};   // Orbital 0 is inactive
-  auto orbitals_with_inactive = std::make_shared<ModelOrbitals>(
-      trivial_index_set(4, active_indices), trivial_index_set(4, inactive_indices));
+  auto orbitals_with_inactive =
+      std::make_shared<ModelOrbitals>(trivial_index_set(4, active_indices),
+                                      trivial_index_set(4, inactive_indices));
 
   // Create a non-empty inactive Fock matrix
   Eigen::MatrixXd non_empty_inactive_fock = Eigen::MatrixXd::Identity(4, 4);
@@ -629,54 +630,55 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
             testing::restricted_index_set(coeffs.cols(), empty_active_indices),
-            testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::runtime_error);
 
   // Test that unrestricted orbitals throw when alpha is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{};  // Empty alpha
-                 std::vector<size_t> beta_active_indices{0, 1};
-                 std::vector<size_t> alpha_inactive_indices{};
-                 std::vector<size_t> beta_inactive_indices{2};
-                 // Create unrestricted orbitals with only beta active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     testing::unrestricted_index_set(
-                         coeffs_alpha.cols(), alpha_active_indices,
-                         beta_active_indices),
-                     testing::unrestricted_index_set(
-                         coeffs_alpha.cols(), alpha_inactive_indices,
-                         beta_inactive_indices));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  EXPECT_THROW(
+      ({
+        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> alpha_active_indices{};  // Empty alpha
+        std::vector<size_t> beta_active_indices{0, 1};
+        std::vector<size_t> alpha_inactive_indices{};
+        std::vector<size_t> beta_inactive_indices{2};
+        // Create unrestricted orbitals with only beta active space
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+            basis_set,
+            testing::unrestricted_index_set(
+                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+            testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                            alpha_inactive_indices,
+                                            beta_inactive_indices));
+        hc->run(orbitals);
+      }),
+      std::runtime_error);
 
   // Test that unrestricted orbitals throw when beta is empty
-  EXPECT_THROW(({
-                 Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
-                 Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
-                 std::vector<size_t> alpha_active_indices{0, 1};
-                 std::vector<size_t> beta_active_indices{};  // Empty beta
-                 std::vector<size_t> alpha_inactive_indices{2};
-                 std::vector<size_t> beta_inactive_indices{};
-                 // Create unrestricted orbitals with only alpha active space
-                 auto orbitals = std::make_shared<Orbitals>(
-                     coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt,
-                     std::nullopt, basis_set,
-                     testing::unrestricted_index_set(
-                         coeffs_alpha.cols(), alpha_active_indices,
-                         beta_active_indices),
-                     testing::unrestricted_index_set(
-                         coeffs_alpha.cols(), alpha_inactive_indices,
-                         beta_inactive_indices));
-                 hc->run(orbitals);
-               }),
-               std::runtime_error);
+  EXPECT_THROW(
+      ({
+        Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(3, 3);
+        Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(3, 3);
+        std::vector<size_t> alpha_active_indices{0, 1};
+        std::vector<size_t> beta_active_indices{};  // Empty beta
+        std::vector<size_t> alpha_inactive_indices{2};
+        std::vector<size_t> beta_inactive_indices{};
+        // Create unrestricted orbitals with only alpha active space
+        auto orbitals = std::make_shared<Orbitals>(
+            coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
+            basis_set,
+            testing::unrestricted_index_set(
+                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
+            testing::unrestricted_index_set(coeffs_alpha.cols(),
+                                            alpha_inactive_indices,
+                                            beta_inactive_indices));
+        hc->run(orbitals);
+      }),
+      std::runtime_error);
 
   // Throw if the active space is larger than the MO set
   EXPECT_THROW(
@@ -688,7 +690,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
             testing::restricted_index_set(coeffs.cols(), active_indices),
-            testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::out_of_range);
@@ -703,7 +706,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
             testing::restricted_index_set(coeffs.cols(), active_indices),
-            testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::out_of_range);
@@ -717,7 +721,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
             testing::restricted_index_set(coeffs.cols(), active_indices),
-            testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::invalid_argument);
@@ -731,7 +736,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::nullopt, basis_set,
             testing::restricted_index_set(coeffs.cols(), active_indices),
-            testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
+            testing::restricted_index_set(coeffs.cols(),
+                                          std::vector<size_t>{}));
         hc->run(orbitals);
       },
       std::invalid_argument);
@@ -749,9 +755,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
         auto orbitals = std::make_shared<Orbitals>(
             coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
             basis_set,
-            testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                            alpha_active_indices,
-                                            beta_active_indices),
+            testing::unrestricted_index_set(
+                coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
             testing::unrestricted_index_set(coeffs_alpha.cols(),
                                             alpha_inactive_indices,
                                             beta_inactive_indices));
@@ -790,9 +795,8 @@ TEST_F(HamiltonianConstructorTest, Default_EdgeCases) {
     auto orbitals = std::make_shared<Orbitals>(
         coeffs_alpha, coeffs_beta, std::nullopt, std::nullopt, std::nullopt,
         large_basis_set,
-        testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                        alpha_active_indices,
-                                        beta_active_indices),
+        testing::unrestricted_index_set(
+            coeffs_alpha.cols(), alpha_active_indices, beta_active_indices),
         testing::unrestricted_index_set(coeffs_alpha.cols(),
                                         alpha_inactive_indices,
                                         beta_inactive_indices));
@@ -991,8 +995,7 @@ TEST_F(HamiltonianTest, CholeskyContainerConstruction) {
 
   Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
 
-  auto orbitals =
-      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
 
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
@@ -1050,8 +1053,7 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   // Create test data
   Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
   Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
-  auto orbitals =
-      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
@@ -1081,8 +1083,7 @@ TEST_F(HamiltonianTest, CholeskyContainerHDF5Serialization) {
   // Create test data
   Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
   Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
-  auto orbitals =
-      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
@@ -1110,8 +1111,7 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   // Create test data
   Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(2, 2);
   Eigen::VectorXd two_body = 2 * Eigen::VectorXd::Ones(16);
-  auto orbitals =
-      std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
   double core_energy = 1.5;
   Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
   Eigen::MatrixXd L_mo = Eigen::MatrixXd::Random(4, 3);
@@ -1761,9 +1761,9 @@ TEST_F(HamiltonianTest, FCIDUMPActiveSpaceConsistency) {
                                         1};    // Use first 2 orbitals as active
   std::vector<size_t> inactive_indices = {2};  // Third orbital is inactive
 
-  auto orbitals_with_active_space = std::make_shared<ModelOrbitals>(
-      trivial_index_set(3, active_indices),
-      trivial_index_set(3, inactive_indices));
+  auto orbitals_with_active_space =
+      std::make_shared<ModelOrbitals>(trivial_index_set(3, active_indices),
+                                      trivial_index_set(3, inactive_indices));
 
   // Create 2x2 matrices for the active space
   Eigen::MatrixXd one_body_2x2 = Eigen::MatrixXd::Identity(2, 2);
@@ -2438,10 +2438,10 @@ TEST_F(CholeskyTest, N2_Restricted_Comparison) {
         full_orbitals->get_coefficients().first,
         full_orbitals->get_energies().first,
         full_orbitals->get_overlap_matrix(), full_orbitals->get_basis_set(),
-        testing::restricted_index_set(full_orbitals->get_num_molecular_orbitals(),
-                                      active_alpha),
-        testing::restricted_index_set(full_orbitals->get_num_molecular_orbitals(),
-                                      inactive_alpha));
+        testing::restricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), active_alpha),
+        testing::restricted_index_set(
+            full_orbitals->get_num_molecular_orbitals(), inactive_alpha));
 
     // 3. Run Hamiltonian with Incore (Exact)
     auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");

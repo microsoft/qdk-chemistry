@@ -224,10 +224,10 @@ std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
     return p ? std::optional<VectorVariant>(*p) : std::nullopt;
   };
   return std::make_unique<AmplitudeContainer>(
-      _orbitals, _wavefunction, _amplitude_type,
-      as_optional(_t1_amplitudes_aa), as_optional(_t1_amplitudes_bb),
-      as_optional(_t2_amplitudes_abab), as_optional(_t2_amplitudes_aaaa),
-      as_optional(_t2_amplitudes_bbbb), _sector);
+      _orbitals, _wavefunction, _amplitude_type, as_optional(_t1_amplitudes_aa),
+      as_optional(_t1_amplitudes_bb), as_optional(_t2_amplitudes_abab),
+      as_optional(_t2_amplitudes_aaaa), as_optional(_t2_amplitudes_bbbb),
+      _sector);
 }
 
 std::shared_ptr<Orbitals> AmplitudeContainer::get_orbitals() const {
@@ -468,9 +468,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     // Hamiltonian). Such files load as an amplitude container with no
     // amplitudes.
     if (container_tag == "mp2") {
-      return std::make_unique<AmplitudeContainer>(
-          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt,
-          sector);
+      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
+                                                  amplitude_type, std::nullopt,
+                                                  std::nullopt, sector);
     }
 
     bool is_complex = j.value("is_complex", false);
@@ -510,8 +510,8 @@ void AmplitudeContainer::to_hdf5(H5::Group& group) const {
         "amplitude_type", string_type, H5::DataSpace(H5S_SCALAR));
     amplitude_type_attr.write(string_type, amplitude_type_str);
 
-    H5::Attribute sector_attr = group.createAttribute(
-        "sector", string_type, H5::DataSpace(H5S_SCALAR));
+    H5::Attribute sector_attr =
+        group.createAttribute("sector", string_type, H5::DataSpace(H5S_SCALAR));
     sector_attr.write(string_type, _sector);
 
     bool is_complex = this->is_complex();
@@ -601,9 +601,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
         auto hamiltonian = Hamiltonian::from_hdf5(hamiltonian_group);
         orbitals = hamiltonian->get_orbitals();
       }
-      return std::make_unique<AmplitudeContainer>(
-          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt,
-          sector);
+      return std::make_unique<AmplitudeContainer>(orbitals, wavefunction,
+                                                  amplitude_type, std::nullopt,
+                                                  std::nullopt, sector);
     }
 
     bool is_complex = false;

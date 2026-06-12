@@ -218,8 +218,12 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies=orbitals.get_energies()[0] if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha)) if active_alpha is not None else None,
-                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha)) if active_alpha is not None else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha))
+                if active_alpha is not None
+                else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha))
+                if active_alpha is not None
+                else None,
             )
         else:
             # Unrestricted case - handle alpha and beta separately
@@ -244,13 +248,15 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies_beta=energies_beta,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                active_indices=spin_index_set(nmo, list(active_alpha), list(active_beta), equivalent=False) if active_alpha is not None else None,
-                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_beta), equivalent=False) if active_alpha is not None else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_beta), equivalent=False)
+                if active_alpha is not None
+                else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_beta), equivalent=False)
+                if active_alpha is not None
+                else None,
             )
         # Only single-determinant wavefunctions reach this point (guarded above).
-        return Wavefunction(
-            StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals, "electrons")
-        )
+        return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], loc_orbitals, "electrons"))
 
     def name(self) -> str:
         """Return the settings for the localizer."""

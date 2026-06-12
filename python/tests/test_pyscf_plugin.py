@@ -2207,7 +2207,9 @@ class TestPyscfPlugin:
         # 3. Non-rerouting for valid model Hamiltonian
 
         # Create a model Hamiltonian (restricted, closed-shell, full active space)
-        model_orbitals_proper = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))  # All orbitals are active by default
+        model_orbitals_proper = data.ModelOrbitals(
+            4, SymmetryProduct([axes.spin(1, True)])
+        )  # All orbitals are active by default
         one_body_model = np.eye(4) * 0.5
         two_body_model = np.zeros(4**4)
         h_model = data.Hamiltonian(

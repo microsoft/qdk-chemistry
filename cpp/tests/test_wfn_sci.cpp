@@ -322,8 +322,8 @@ TEST_F(SciWavefunctionTest, JsonSerialization) {
   nlohmann::json j = original.to_json();
 
   // Deserialize from JSON using container-specific method
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Also test base Wavefunction::from_json() by wrapping container in
@@ -599,8 +599,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
   two_rdm_aaaa *= 0.25;
 
   StateVectorContainer original(coeffs, dets, orbitals, std::nullopt,
-                                    one_rdm_aa, one_rdm_aa, std::nullopt,
-                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
+                                one_rdm_aa, one_rdm_aa, std::nullopt,
+                                two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
@@ -611,8 +611,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify RDMs are available after deserialization
@@ -660,9 +660,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(
-          orbitals->get_num_molecular_orbitals(),
-          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
           orbitals->get_inactive_space_indices().first));
@@ -699,8 +698,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
-  auto restored = std::unique_ptr<StateVectorContainer>(
-      dynamic_cast<StateVectorContainer*>(
+  auto restored =
+      std::unique_ptr<StateVectorContainer>(dynamic_cast<StateVectorContainer*>(
           WavefunctionContainer::from_json(j).release()));
 
   // Verify rdms are still there
@@ -801,9 +800,8 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      testing::restricted_index_set(
-          orbitals->get_num_molecular_orbitals(),
-          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
+                                    orbitals->get_active_space_indices().first),
       testing::restricted_index_set(
           orbitals->get_num_molecular_orbitals(),
           orbitals->get_inactive_space_indices().first));

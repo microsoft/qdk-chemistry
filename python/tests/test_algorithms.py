@@ -37,9 +37,9 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data.symmetry import spin_index_set
 
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
-from qdk_chemistry.data.symmetry import spin_index_set
 
 
 class MockLocalizationPy(OrbitalLocalizer):

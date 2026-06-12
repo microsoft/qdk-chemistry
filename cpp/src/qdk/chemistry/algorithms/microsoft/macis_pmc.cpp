@@ -152,17 +152,15 @@ struct pmc_helper {
                 num_molecular_orbitals * num_molecular_orbitals);
 
         // Create wavefunction with RDMs
-        return data::Wavefunction(
-            std::make_unique<data::StateVectorContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), std::move(one_rdm),
-                std::move(two_rdm), "electrons"));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), std::move(one_rdm), std::move(two_rdm),
+            "electrons"));
       } else {
         // Create wavefunction without RDMs
-        return data::Wavefunction(
-            std::make_unique<data::StateVectorContainer>(
-                std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), "electrons"));
+        return data::Wavefunction(std::make_unique<data::StateVectorContainer>(
+            std::move(C_vector), std::move(dets_configs),
+            hamiltonian.get_orbitals(), "electrons"));
       }
     }();
 

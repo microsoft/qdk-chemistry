@@ -104,6 +104,7 @@ def spin_index_set(
 
     Returns:
         A SymmetryBlockedIndexSet carrying the spin symmetry and per-channel indices.
+
     """
     sym = SymmetryProduct([axes.spin(1, equivalent)])
     alpha_label = SymmetryLabel([axes.alpha()])

@@ -257,8 +257,7 @@ class ConfigurationSet : public DataClass {
   std::shared_ptr<Orbitals> _orbitals;
 
   /// Ordered sector layout (slot partition across single-particle sectors).
-  std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>>
-      _sector_layout;
+  std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>> _sector_layout;
 
   /**
    * @brief Validate that all configurations are consistent with active space

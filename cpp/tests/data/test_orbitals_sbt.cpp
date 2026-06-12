@@ -23,7 +23,7 @@ static std::shared_ptr<const SymmetryBlockedIndexSet> spin_index_set(
   auto sym = std::make_shared<const SymmetryProduct>(
       SymmetryProduct({axes::spin(1, equivalent)}));
   std::unordered_map<SymmetryLabel, size_t> extents{{axes::alpha(), num_modes},
-                                                   {axes::beta(), num_modes}};
+                                                    {axes::beta(), num_modes}};
   std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
       {axes::alpha(), std::vector<std::uint32_t>(alpha.begin(), alpha.end())},
       {axes::beta(), std::vector<std::uint32_t>(beta.begin(), beta.end())}};
@@ -82,10 +82,9 @@ TEST(OrbitalsSbtTest, ActiveInactiveVectorsReflectIndices) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(5, 5);
   // active = {1, 2}, inactive = {0}
   auto basis = testing::create_random_basis_set(c.rows());
-  auto orbitals =
-      std::make_shared<Orbitals>(c, std::nullopt, std::nullopt, basis,
-                                 spin_index_set(5, {1, 2}, {1, 2}),
-                                 spin_index_set(5, {0}, {0}));
+  auto orbitals = std::make_shared<Orbitals>(
+      c, std::nullopt, std::nullopt, basis, spin_index_set(5, {1, 2}, {1, 2}),
+      spin_index_set(5, {0}, {0}));
   auto [active_alpha, active_beta] = orbitals->get_active_space_indices();
   auto [inactive_alpha, inactive_beta] = orbitals->get_inactive_space_indices();
   EXPECT_EQ(active_alpha, std::vector<size_t>({1, 2}));
@@ -101,11 +100,10 @@ TEST(OrbitalsSbtTest, ActiveInactiveVectorsReflectIndices) {
 TEST(OrbitalsSbtTest, ActiveInactiveIndexSetsAreBuiltLazilyFromDenseVectors) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(5, 5);
   auto basis = testing::create_random_basis_set(c.rows());
-  auto orbitals =
-      std::make_shared<Orbitals>(c, c, std::nullopt, std::nullopt, std::nullopt,
-                                 basis,
-                                 spin_index_set(5, {1, 3}, {0, 4}, false),
-                                 spin_index_set(5, {0}, {2}, false));
+  auto orbitals = std::make_shared<Orbitals>(
+      c, c, std::nullopt, std::nullopt, std::nullopt, basis,
+      spin_index_set(5, {1, 3}, {0, 4}, false),
+      spin_index_set(5, {0}, {2}, false));
 
   auto active = orbitals->active_indices();
   auto inactive = orbitals->inactive_indices();
@@ -136,10 +134,9 @@ TEST(OrbitalsSbtTest, ActiveInactiveIndexSetsAreBuiltLazilyFromDenseVectors) {
 TEST(OrbitalsSbtTest, IndexSetsRebuildFromSerializedDenseIndices) {
   Eigen::MatrixXd c = Eigen::MatrixXd::Identity(4, 4);
   auto basis = testing::create_random_basis_set(c.rows());
-  auto orbitals =
-      std::make_shared<Orbitals>(c, std::nullopt, std::nullopt, basis,
-                                 spin_index_set(4, {1, 2}, {1, 2}),
-                                 spin_index_set(4, {0}, {0}));
+  auto orbitals = std::make_shared<Orbitals>(
+      c, std::nullopt, std::nullopt, basis, spin_index_set(4, {1, 2}, {1, 2}),
+      spin_index_set(4, {0}, {0}));
 
   auto restored_from_json = Orbitals::from_json(orbitals->to_json());
   auto active_from_json = restored_from_json->active_indices();

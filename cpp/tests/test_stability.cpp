@@ -77,8 +77,8 @@ TEST_F(StabilityCheckerTest, StabilityResult) {
 
   // Create a dummy wavefunction for testing using StateVectorContainer
   auto wavefunction = std::make_shared<qdk::chemistry::data::Wavefunction>(
-      std::make_unique<StateVectorContainer>(
-          Configuration("200000"), testing::create_test_orbitals()));
+      std::make_unique<StateVectorContainer>(Configuration("200000"),
+                                             testing::create_test_orbitals()));
 
   // Get the result
   auto [is_stable, result] = checker.run(wavefunction);

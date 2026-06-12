@@ -245,9 +245,8 @@ TEST_F(OrbitalsEdgeCasesTest, MemoryStress) {
     energies.setRandom();
 
     auto memory_basis = testing::create_random_basis_set(n_basis);
-    auto orb =
-        std::make_unique<Orbitals>(coeffs, std::make_optional(energies),
-                                   std::nullopt, memory_basis);
+    auto orb = std::make_unique<Orbitals>(coeffs, std::make_optional(energies),
+                                          std::nullopt, memory_basis);
     orbital_objects.push_back(std::move(orb));
   }
 
@@ -385,10 +384,9 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
   // Verify that modifications to original don't affect copy (deep copy test).
   // Since objects are immutable, we'll create a new object with modified data.
   alpha_coeffs(0, 0) = 999.0;
-  Orbitals orb1_modified(alpha_coeffs, beta_coeffs,
-                         std::make_optional(alpha_energies),
-                         std::make_optional(beta_energies), std::nullopt,
-                         unrestricted_basis);
+  Orbitals orb1_modified(
+      alpha_coeffs, beta_coeffs, std::make_optional(alpha_energies),
+      std::make_optional(beta_energies), std::nullopt, unrestricted_basis);
 
   const auto& [unchanged_alpha_coeffs, unchanged_beta_coeffs] =
       orb2.get_coefficients();

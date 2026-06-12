@@ -1346,8 +1346,8 @@ restricted and unrestricted amplitudes (optionally spin-separated). The
 amplitude type (see :class:`AmplitudeType`) records which correlated method
 produced the amplitudes.
     )")
-      .def(py::init<std::shared_ptr<Orbitals>,
-                    std::shared_ptr<Wavefunction>, AmplitudeType,
+      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     std::string>(),
@@ -1371,8 +1371,8 @@ Examples:
            py::arg("amplitude_type"), py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt,
            py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR)
-      .def(py::init<std::shared_ptr<Orbitals>,
-                    std::shared_ptr<Wavefunction>, AmplitudeType,
+      .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
                     const std::optional<AmplitudeContainer::VectorVariant>&,

@@ -234,9 +234,9 @@ TEST_F(OrbitalsTest, Validation) {
   // Empty orbitals should throw exception during construction
   Eigen::MatrixXd empty_coeffs(0, 0);
   auto empty_basis_val = testing::create_random_basis_set(1);
-  EXPECT_THROW(Orbitals(empty_coeffs, std::nullopt, std::nullopt,
-                        empty_basis_val),
-               std::runtime_error);
+  EXPECT_THROW(
+      Orbitals(empty_coeffs, std::nullopt, std::nullopt, empty_basis_val),
+      std::runtime_error);
 
   // Set minimal valid data
   Eigen::MatrixXd coeffs(2, 2);
@@ -555,10 +555,10 @@ TEST_F(OrbitalsTest, ActiveSpaceManagement) {
   energies << -1.0, -0.5, 0.5, 1.0;
   std::vector<size_t> active_indices = {1, 2};
   auto active_basis = testing::create_random_basis_set(4);
-  Orbitals orb(coeffs, energies, std::nullopt, active_basis,
-               testing::restricted_index_set(coeffs.cols(), active_indices),
-               testing::restricted_index_set(coeffs.cols(),
-                                             std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, active_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Check active space is set
   EXPECT_TRUE(orb.has_active_space());
@@ -579,10 +579,10 @@ TEST_F(OrbitalsTest, InactiveSpaceManagement) {
   energies << -1.0, -0.5, 0.5, 1.0;
   std::vector<size_t> inactive_indices = {0, 1};
   auto basis_set = testing::create_random_basis_set(4);
-  Orbitals orb(coeffs, energies, std::nullopt, basis_set,
-               testing::restricted_index_set(coeffs.cols(),
-                                             std::vector<size_t>{}),
-               testing::restricted_index_set(coeffs.cols(), inactive_indices));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, basis_set,
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}),
+      testing::restricted_index_set(coeffs.cols(), inactive_indices));
 
   // Check inactive space is set
   EXPECT_TRUE(orb.has_inactive_space());
@@ -603,10 +603,10 @@ TEST_F(OrbitalsTest, ActiveSpaceSerialization) {
   energies << -1.0, 0.5;
   std::vector<size_t> active_indices = {0, 1};
   auto active_serial_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, std::nullopt, active_serial_basis,
-               testing::restricted_index_set(coeffs.cols(), active_indices),
-               testing::restricted_index_set(coeffs.cols(),
-                                             std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, energies, std::nullopt, active_serial_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Test JSON serialization
   orb.to_json_file("test.orbitals.json");
@@ -644,14 +644,13 @@ TEST_F(OrbitalsTest, UnrestrictedActiveSpaceSerialization) {
   std::vector<size_t> alpha_active_indices = {0};
   std::vector<size_t> beta_active_indices = {1};
   auto unrestricted_active_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs_alpha, coeffs_beta, energies_alpha, energies_beta,
-               std::nullopt, unrestricted_active_basis,
-               testing::unrestricted_index_set(coeffs_alpha.cols(),
-                                               alpha_active_indices,
-                                               beta_active_indices),
-               testing::unrestricted_index_set(
-                   coeffs_alpha.cols(), std::vector<size_t>{},
-                   std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs_alpha, coeffs_beta, energies_alpha, energies_beta, std::nullopt,
+      unrestricted_active_basis,
+      testing::unrestricted_index_set(coeffs_alpha.cols(), alpha_active_indices,
+                                      beta_active_indices),
+      testing::unrestricted_index_set(
+          coeffs_alpha.cols(), std::vector<size_t>{}, std::vector<size_t>{}));
 
   // Test JSON round-trip
   orb.to_json_file("test.orbitals.json");
@@ -683,10 +682,10 @@ TEST_F(OrbitalsTest, CopyConstructorWithActiveSpace) {
   coeffs << 0.9, 0.1, 0.1, -0.9, 0.0, 0.0;
   std::vector<size_t> active_indices = {0, 1};
   auto copy_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, Eigen::VectorXd::Random(2), std::nullopt, copy_basis,
-               testing::restricted_index_set(coeffs.cols(), active_indices),
-               testing::restricted_index_set(coeffs.cols(),
-                                             std::vector<size_t>{}));
+  Orbitals orb(
+      coeffs, Eigen::VectorXd::Random(2), std::nullopt, copy_basis,
+      testing::restricted_index_set(coeffs.cols(), active_indices),
+      testing::restricted_index_set(coeffs.cols(), std::vector<size_t>{}));
 
   // Create a copy via copy constructor
   Orbitals orb_copy(orb);

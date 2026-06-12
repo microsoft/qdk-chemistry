@@ -34,13 +34,13 @@ StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
                                            const std::string& sector,
                                            WavefunctionType type)
     : StateVectorContainer(coeffs, dets, orbitals,
-                           std::nullopt,        // one_rdm_spin_traced
-                           std::nullopt,        // one_rdm_aa
-                           std::nullopt,        // one_rdm_bb
-                           std::nullopt,        // two_rdm_spin_traced
-                           std::nullopt,        // two_rdm_aabb
-                           std::nullopt,        // two_rdm_aaaa
-                           std::nullopt,        // two_rdm_bbbb
+                           std::nullopt,  // one_rdm_spin_traced
+                           std::nullopt,  // one_rdm_aa
+                           std::nullopt,  // one_rdm_bb
+                           std::nullopt,  // two_rdm_spin_traced
+                           std::nullopt,  // two_rdm_aabb
+                           std::nullopt,  // two_rdm_aaaa
+                           std::nullopt,  // two_rdm_bbbb
                            sector, OrbitalEntropies{}, type) {
   QDK_LOG_TRACE_ENTERING();
 }
@@ -423,7 +423,8 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     if (!sym || !sym->has_axis(AxisName::Spin)) {
       throw std::runtime_error(
           "Active 1-RDM is unavailable: the orbital basis declares no spin "
-          "(S_z) axis, so a spin-blocked active-space 1-RDM cannot be generated "
+          "(S_z) axis, so a spin-blocked active-space 1-RDM cannot be "
+          "generated "
           "on the fly. Attach an explicit spin symmetry to the orbitals to "
           "compute spin-resolved RDMs.");
     }
@@ -471,7 +472,8 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
     if (!sym || !sym->has_axis(AxisName::Spin)) {
       throw std::runtime_error(
           "Active 2-RDM is unavailable: the orbital basis declares no spin "
-          "(S_z) axis, so a spin-blocked active-space 2-RDM cannot be generated "
+          "(S_z) axis, so a spin-blocked active-space 2-RDM cannot be "
+          "generated "
           "on the fly. Attach an explicit spin symmetry to the orbitals to "
           "compute spin-resolved RDMs.");
     }

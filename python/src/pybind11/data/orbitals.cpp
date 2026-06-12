@@ -134,15 +134,14 @@ Examples:
           std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // Constructor for unrestricted orbitals
-  orbitals.def(
-      py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::MatrixXd> &,
-               std::shared_ptr<qdk::chemistry::data::BasisSet>,
-               std::shared_ptr<const SymmetryBlockedIndexSet>,
-               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
-      R"(
+  orbitals.def(py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::MatrixXd> &,
+                        std::shared_ptr<qdk::chemistry::data::BasisSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+               R"(
 Constructor for unrestricted orbitals.
 
 ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
@@ -183,15 +182,15 @@ Examples:
     >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set)
 
 )",
-      py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
-      py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
-      py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
-      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
-      py::arg("basis_set"),
-      py::arg("active_indices") =
-          std::shared_ptr<const SymmetryBlockedIndexSet>(),
-      py::arg("inactive_indices") =
-          std::shared_ptr<const SymmetryBlockedIndexSet>());
+               py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
+               py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
+               py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
+               py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+               py::arg("basis_set"),
+               py::arg("active_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>(),
+               py::arg("inactive_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // SBT-native constructor (symmetry-blocked tensors)
   orbitals.def(
@@ -918,10 +917,9 @@ Examples:
       py::arg("symmetries") = std::shared_ptr<const SymmetryProduct>());
 
   // Active (+ optional inactive) spaces as symmetry-blocked index sets.
-  model_orbitals.def(
-      py::init<std::shared_ptr<const SymmetryBlockedIndexSet>,
-               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
-      R"(
+  model_orbitals.def(py::init<std::shared_ptr<const SymmetryBlockedIndexSet>,
+                              std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+                     R"(
 Construct model orbitals from symmetry-blocked active/inactive index sets.
 
 The single-particle symmetries, per-mode extents, and restricted-ness are taken
@@ -931,9 +929,9 @@ Args:
     active_indices (SymmetryBlockedIndexSet): Active-space index set.
     inactive_indices (SymmetryBlockedIndexSet, optional): Inactive-space index set; defaults to none.
 )",
-      py::arg("active_indices"),
-      py::arg("inactive_indices") =
-          std::shared_ptr<const SymmetryBlockedIndexSet>());
+                     py::arg("active_indices"),
+                     py::arg("inactive_indices") =
+                         std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // Static from_json method
   model_orbitals

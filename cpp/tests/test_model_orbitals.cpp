@@ -32,15 +32,18 @@ std::shared_ptr<const SymmetryProduct> spin_sym(bool equivalent) {
 // statistics-generic block.
 std::shared_ptr<const SymmetryBlockedIndexSet> trivial_iset(
     size_t num_modes, const std::vector<size_t>& idx) {
-  auto sym = std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
-  std::unordered_map<SymmetryLabel, std::size_t> ext{{SymmetryLabel{}, num_modes}};
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> ext{
+      {SymmetryLabel{}, num_modes}};
   std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
       {SymmetryLabel{}, std::vector<std::uint32_t>(idx.begin(), idx.end())}};
   return std::make_shared<const SymmetryBlockedIndexSet>(sym, ext,
                                                          std::move(indices));
 }
 
-// Spin-resolved index set over `num_modes` with per-spin alpha/beta index lists.
+// Spin-resolved index set over `num_modes` with per-spin alpha/beta index
+// lists.
 std::shared_ptr<const SymmetryBlockedIndexSet> spin_iset(
     size_t num_modes, const std::vector<size_t>& alpha,
     const std::vector<size_t>& beta, bool equivalent) {
@@ -49,8 +52,8 @@ std::shared_ptr<const SymmetryBlockedIndexSet> spin_iset(
   std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
       {axes::alpha(), std::vector<std::uint32_t>(alpha.begin(), alpha.end())},
       {axes::beta(), std::vector<std::uint32_t>(beta.begin(), beta.end())}};
-  return std::make_shared<const SymmetryBlockedIndexSet>(spin_sym(equivalent),
-                                                         ext, std::move(indices));
+  return std::make_shared<const SymmetryBlockedIndexSet>(
+      spin_sym(equivalent), ext, std::move(indices));
 }
 
 }  // namespace
@@ -347,7 +350,8 @@ TEST_F(ModelOrbitalsTest, EdgeCaseEmptySpaces) {
   EXPECT_NO_THROW(ModelOrbitals(trivial_iset(basis_size, {}),
                                 trivial_iset(basis_size, {})));
 
-  ModelOrbitals model(trivial_iset(basis_size, {}), trivial_iset(basis_size, {}));
+  ModelOrbitals model(trivial_iset(basis_size, {}),
+                      trivial_iset(basis_size, {}));
 
   // With empty active/inactive spaces, all modes are virtual.
   auto [alpha_virtual, beta_virtual] = model.get_virtual_space_indices();

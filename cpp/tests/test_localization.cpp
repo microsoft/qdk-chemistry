@@ -311,7 +311,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
         // Provide different indices for alpha and beta to trigger the exception
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -332,7 +332,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -417,7 +417,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -432,7 +432,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2000"),
-                                                         orbitals));
+                                                   orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -447,7 +447,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("0000"),
-                                                         orbitals));
+                                                   orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -462,7 +462,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2u00"),
-                                                         orbitals));
+                                                   orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -480,7 +480,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -496,7 +496,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -521,7 +521,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         vvhv_localizer->run(wfn, incomplete_indices_a, all_indices_b);
       },
       std::invalid_argument);
@@ -538,7 +538,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         vvhv_localizer->run(wfn, all_indices_a, incomplete_indices_b);
       },
       std::invalid_argument);
@@ -556,7 +556,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         vvhv_localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -572,7 +572,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         vvhv_localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -590,7 +590,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
-                                                         orbitals));
+                                                   orbitals));
         vvhv_localizer->run(wfn, out_of_bounds_indices, valid_indices);
       },
       std::invalid_argument);
@@ -1062,8 +1062,8 @@ TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
       testing::unrestricted_index_set(num_molecular_orbitals, inactive_alpha,
                                       inactive_beta));
 
-  auto active_wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto active_wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           wfn->get_active_determinants()[0], active_orbitals));
 
   // Localize only the active orbitals
@@ -1142,8 +1142,8 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
       testing::unrestricted_index_set(num_molecular_orbitals, inactive_alpha,
                                       inactive_beta));
 
-  auto active_wfn = std::make_shared<Wavefunction>(
-      std::make_unique<StateVectorContainer>(
+  auto active_wfn =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
           wfn->get_active_determinants()[0], active_orbitals));
 
   // Get virtual indices for VVHV

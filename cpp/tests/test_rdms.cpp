@@ -112,12 +112,12 @@ class WavefunctionRDMTest : public ::testing::Test {
     }
 
     // Create basic wavefunctions without RDMs
-    wf_restricted = std::make_unique<Wavefunction>(
-        std::make_unique<StateVectorContainer>(dummy_coeffs, dummy_dets,
-                                                   base_orbitals));
-    wf_unrestricted = std::make_unique<Wavefunction>(
-        std::make_unique<StateVectorContainer>(dummy_coeffs, dummy_dets,
-                                                   base_orbitals));
+    wf_restricted =
+        std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
+            dummy_coeffs, dummy_dets, base_orbitals));
+    wf_unrestricted =
+        std::make_unique<Wavefunction>(std::make_unique<StateVectorContainer>(
+            dummy_coeffs, dummy_dets, base_orbitals));
 
     // entropies
     entropies_restricted = Eigen::VectorXd::Zero(norbs);
@@ -600,22 +600,19 @@ TEST_F(WavefunctionRDMTest, HasMethodsRestrictedEdgeCases) {
 
   // Create wavefunction with spin-dependent RDM (both alpha and beta will be
   // the same)
-  auto restricted_test =
-      Wavefunction(std::make_unique<StateVectorContainer>(
-          coeffs, dets, base_orbitals, std::nullopt,
-          std::make_optional(test_rdm), std::make_optional(test_rdm),
-          std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+  auto restricted_test = Wavefunction(std::make_unique<StateVectorContainer>(
+      coeffs, dets, base_orbitals, std::nullopt, std::make_optional(test_rdm),
+      std::make_optional(test_rdm), std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt));
 
   // This should return true through the normal path
   EXPECT_TRUE(restricted_test.has_one_rdm_spin_dependent());
   EXPECT_TRUE(restricted_test.has_one_rdm_spin_traced());
 
   // Create wavefunction with only spin-traced RDM set
-  auto restricted_traced =
-      Wavefunction(std::make_unique<StateVectorContainer>(
-          coeffs, dets, base_orbitals, std::make_optional(test_rdm),
-          std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-          std::nullopt));
+  auto restricted_traced = Wavefunction(std::make_unique<StateVectorContainer>(
+      coeffs, dets, base_orbitals, std::make_optional(test_rdm), std::nullopt,
+      std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt));
 
   EXPECT_TRUE(restricted_traced.has_one_rdm_spin_dependent());
   EXPECT_TRUE(restricted_traced.has_one_rdm_spin_traced());
@@ -637,11 +634,10 @@ TEST_F(WavefunctionRDMTest, HasMethodsTwoRDMEdgeCases) {
 
   // Create wavefunction with two-RDM using two arguments (bbbb will be set to
   // aaaa for restricted)
-  auto restricted_two_rdm =
-      Wavefunction(std::make_unique<StateVectorContainer>(
-          coeffs, dets, base_orbitals, std::nullopt, std::nullopt, std::nullopt,
-          std::nullopt, std::make_optional(test_aabb),
-          std::make_optional(test_aaaa), std::make_optional(test_aaaa)));
+  auto restricted_two_rdm = Wavefunction(std::make_unique<StateVectorContainer>(
+      coeffs, dets, base_orbitals, std::nullopt, std::nullopt, std::nullopt,
+      std::nullopt, std::make_optional(test_aabb),
+      std::make_optional(test_aaaa), std::make_optional(test_aaaa)));
 
   // This should return true through normal path
   EXPECT_TRUE(restricted_two_rdm.has_two_rdm_spin_dependent());

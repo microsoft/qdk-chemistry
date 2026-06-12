@@ -520,9 +520,8 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
       testing::unrestricted_index_set(alpha_coeffs.cols(), alpha_indices,
                                       beta_indices),
-      testing::unrestricted_index_set(alpha_coeffs.cols(),
-                                      alpha_inactive_indices,
-                                      beta_inactive_indices));
+      testing::unrestricted_index_set(
+          alpha_coeffs.cols(), alpha_inactive_indices, beta_inactive_indices));
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
