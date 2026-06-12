@@ -110,11 +110,11 @@ Constructs circuits for Kitaev's iterative phase estimation algorithm, which ext
 Standard QFT-based Phase Estimation Circuit Builder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. rubric:: Class: ``QiskitStandardQpeCircuitBuilder`` (Qiskit implementation)
+.. rubric:: Class: ``QdkStandardQpeCircuitBuilder`` (base) and ``QiskitStandardQpeCircuitBuilder`` (Qiskit implementation)
 
-.. rubric:: Factory name: ``"qiskit_standard"`` (Qiskit implementation)
+.. rubric:: Factory name: ``"qdk_standard"`` (base), ``"qiskit_standard"`` (Qiskit implementation)
 
-Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously.
+Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously using ``num_bits`` ancilla qubits, applying controlled-:math:`U^{2^k}` for each ancilla and finishing with the inverse QFT.
 
 **Additional settings (Qiskit implementation):**
 
