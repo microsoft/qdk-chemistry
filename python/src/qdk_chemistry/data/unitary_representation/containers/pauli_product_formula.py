@@ -10,6 +10,8 @@ from typing import Any
 
 import h5py
 
+from qdk_chemistry.data._hashing import _hash_float, _hash_int, _hash_str, _hash_uint
+
 from .base import UnitaryContainer
 
 __all__ = ["ExponentiatedPauliTerm", "PauliProductFormulaContainer"]
@@ -71,6 +73,19 @@ class PauliProductFormulaContainer(UnitaryContainer):
         self.step_reps = step_reps
         self._num_qubits = num_qubits
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "pauli_product_formula")
+        _hash_uint(h, len(self.step_terms))
+        for term in self.step_terms:
+            _hash_uint(h, len(term.pauli_term))
+            for qubit_idx in sorted(term.pauli_term.keys()):
+                _hash_int(h, qubit_idx)
+                _hash_str(h, term.pauli_term[qubit_idx])
+            _hash_float(h, term.angle)
+        _hash_int(h, self.step_reps)
+        _hash_int(h, self._num_qubits)
 
     @property
     def type(self) -> str:

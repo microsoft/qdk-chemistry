@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
-#include <qdk/chemistry/utils/hash.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -48,14 +48,16 @@ struct PackedPauliWord {
 template <std::size_t NW>
 struct PackedPauliWordHash {
   std::size_t operator()(const PackedPauliWord<NW>& w) const noexcept {
-    std::size_t seed = NW;
+    utils::HashContext ctx;
+    hash_value(ctx, "packed_pauli_word");
+    hash_value(ctx, static_cast<uint64_t>(NW));
     for (std::size_t i = 0; i < NW; ++i) {
-      seed = utils::hash_combine(seed, w.x[i]);
+      hash_value(ctx, static_cast<uint64_t>(w.x[i]));
     }
     for (std::size_t i = 0; i < NW; ++i) {
-      seed = utils::hash_combine(seed, w.z[i]);
+      hash_value(ctx, static_cast<uint64_t>(w.z[i]));
     }
-    return seed;
+    return ctx.hash_code();
   }
 };
 

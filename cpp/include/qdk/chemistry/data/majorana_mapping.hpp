@@ -276,6 +276,9 @@ class MajoranaMapping : public DataClass {
   /// Optional tapering metadata for post-mapping qubit reduction.
   std::optional<TaperingSpecification> tapering_;
 
+  /// Feed the mapping's identifying data into a content hash.
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
     const std::size_t M = 2 * num_modes_;

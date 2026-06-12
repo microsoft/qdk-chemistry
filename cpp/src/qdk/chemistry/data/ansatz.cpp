@@ -947,4 +947,20 @@ std::shared_ptr<Ansatz> Ansatz::_from_hdf5_file(const std::string& filename) {
   }
 }
 
+void Ansatz::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  if (_hamiltonian) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _hamiltonian->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+}
+
 }  // namespace qdk::chemistry::data
