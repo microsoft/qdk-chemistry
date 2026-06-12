@@ -428,6 +428,11 @@ void MajoranaMapping::hash_update(
     hash_bilinear_entry(ctx, entry);
   }
 
+  hash_value(ctx, static_cast<std::uint64_t>(stabilizers_.size()));
+  for (const auto& entry : stabilizers_) {
+    hash_bilinear_entry(ctx, entry);
+  }
+
   if (tapering_) {
     hash_value(ctx, std::uint8_t{1});
     hash_value(ctx, tapering_->content_hash());

@@ -429,86 +429,76 @@ std::vector<std::pair<int, int>> vc_nn_cells(int x, int y) {
   return cells;
 }
 
-/// One propagation attempt: seed `corner` at (0,0) with axis neighbours
-/// `a0` -> (1,0) and `b0` -> (0,1), then recover the remaining site
-/// coordinates by intersecting nearest-neighbour constraints from every
-/// already-placed graph neighbour.  No lattice-type-specific rules are
-/// used — square, rectangular, and triangular layouts are all instances of
-/// the same embedding problem.  Returns an empty vector when the attempt
-/// does not produce a complete rectangular layout whose edges are all
-/// (axis or diagonal) nearest neighbours.
-std::vector<std::pair<int, int>> vc_try_layout(
-    const std::vector<std::set<std::size_t>>& adj, std::size_t corner,
-    std::size_t a0, std::size_t b0) {
-  const std::size_t n = adj.size();
-  std::vector<std::pair<int, int>> coord(n, {-1, -1});
-  std::map<std::pair<int, int>, std::size_t> pos;
-  bool ok = true;
-
-  auto assigned = [&](std::size_t v) { return coord[v].first >= 0; };
-  auto assign = [&](std::size_t v, int x, int y) {
-    if (assigned(v) || pos.count({x, y}) != 0) {
-      ok = false;
-      return;
-    }
-    coord[v] = {x, y};
-    pos[{x, y}] = v;
-  };
-
-  assign(corner, 0, 0);
-  assign(a0, 1, 0);
-  assign(b0, 0, 1);
-
-  // Constraint propagation: an unassigned vertex w with at least one placed
-  // neighbour must sit on a king's-move neighbour of every placed neighbour.
-  // When the intersection leaves exactly one free cell, w is forced there.
-  bool changed = true;
-  while (changed && ok) {
-    changed = false;
-    for (std::size_t w = 0; w < n && ok; ++w) {
-      if (assigned(w)) continue;
-
-      std::vector<std::pair<int, int>> candidates;
-      bool have_candidates = false;
-      for (std::size_t v : adj[w]) {
-        if (!assigned(v)) continue;
-        const auto nn = vc_nn_cells(coord[v].first, coord[v].second);
-        if (!have_candidates) {
-          candidates = nn;
-          have_candidates = true;
-        } else {
-          std::vector<std::pair<int, int>> inter;
-          for (const auto& cell : candidates) {
-            if (std::find(nn.begin(), nn.end(), cell) != nn.end()) {
-              inter.push_back(cell);
-            }
-          }
-          candidates = std::move(inter);
-        }
-      }
-      if (!have_candidates) continue;
-      if (candidates.empty()) {
-        ok = false;
-        break;
-      }
-
-      std::vector<std::pair<int, int>> free_cells;
+/// Free grid cells where vertex `w` may sit given the partial layout.
+std::vector<std::pair<int, int>> vc_free_candidates(
+    const std::vector<std::set<std::size_t>>& adj, std::size_t w,
+    const std::vector<std::pair<int, int>>& coord,
+    const std::map<std::pair<int, int>, std::size_t>& pos) {
+  std::vector<std::pair<int, int>> candidates;
+  bool have_candidates = false;
+  for (std::size_t v : adj[w]) {
+    if (coord[v].first < 0) continue;
+    const auto nn = vc_nn_cells(coord[v].first, coord[v].second);
+    if (!have_candidates) {
+      candidates = nn;
+      have_candidates = true;
+    } else {
+      std::vector<std::pair<int, int>> inter;
       for (const auto& cell : candidates) {
-        if (pos.count(cell) == 0) {
-          free_cells.push_back(cell);
+        if (std::find(nn.begin(), nn.end(), cell) != nn.end()) {
+          inter.push_back(cell);
         }
+      }
+      candidates = std::move(inter);
+    }
+  }
+  if (!have_candidates) return {};
+  std::vector<std::pair<int, int>> free_cells;
+  for (const auto& cell : candidates) {
+    if (pos.count(cell) == 0) {
+      free_cells.push_back(cell);
+    }
+  }
+  return free_cells;
+}
+
+/// Apply forced placements: any vertex whose candidate set is a single free
+/// cell is assigned immediately.  Returns false when a placed neighbour
+/// leaves no consistent candidate cell.
+bool vc_propagate_forced(const std::vector<std::set<std::size_t>>& adj,
+                         std::vector<std::pair<int, int>>& coord,
+                         std::map<std::pair<int, int>, std::size_t>& pos) {
+  const std::size_t n = adj.size();
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    for (std::size_t w = 0; w < n; ++w) {
+      if (coord[w].first >= 0) continue;
+
+      bool has_placed_neighbor = false;
+      for (std::size_t v : adj[w]) {
+        if (coord[v].first >= 0) has_placed_neighbor = true;
+      }
+      if (!has_placed_neighbor) continue;
+
+      const auto free_cells = vc_free_candidates(adj, w, coord, pos);
+      if (free_cells.empty()) {
+        return false;
       }
       if (free_cells.size() == 1) {
-        assign(w, free_cells[0].first, free_cells[0].second);
+        const auto [x, y] = free_cells[0];
+        coord[w] = {x, y};
+        pos[{x, y}] = w;
         changed = true;
       }
     }
   }
+  return true;
+}
 
-  if (!ok || pos.size() != n) {
-    return {};
-  }
-
+bool vc_layout_valid(const std::vector<std::set<std::size_t>>& adj,
+                     const std::vector<std::pair<int, int>>& coord) {
+  const std::size_t n = adj.size();
   int nx = 0;
   int ny = 0;
   for (const auto& [x, y] : coord) {
@@ -516,19 +506,93 @@ std::vector<std::pair<int, int>> vc_try_layout(
     ny = std::max(ny, y + 1);
   }
   if (static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny) != n) {
-    return {};
+    return false;
   }
-
-  // Every edge must connect (axis or diagonal) nearest neighbours.
   for (std::size_t v = 0; v < n; ++v) {
     for (std::size_t w : adj[v]) {
       if (w <= v) continue;
       const int dx = std::abs(coord[v].first - coord[w].first);
       const int dy = std::abs(coord[v].second - coord[w].second);
       if (dx > 1 || dy > 1) {
-        return {};
+        return false;
       }
     }
+  }
+  return true;
+}
+
+/// Backtracking search after forced propagation stalls with ambiguous cells.
+bool vc_search_layout(const std::vector<std::set<std::size_t>>& adj,
+                      std::vector<std::pair<int, int>>& coord,
+                      std::map<std::pair<int, int>, std::size_t>& pos) {
+  if (!vc_propagate_forced(adj, coord, pos)) {
+    return false;
+  }
+  const std::size_t n = adj.size();
+  if (pos.size() == n) {
+    return vc_layout_valid(adj, coord);
+  }
+
+  std::size_t best_w = n;
+  std::size_t best_placed = 0;
+  std::vector<std::pair<int, int>> best_cells;
+  for (std::size_t w = 0; w < n; ++w) {
+    if (coord[w].first >= 0) continue;
+    std::size_t placed = 0;
+    for (std::size_t v : adj[w]) {
+      if (coord[v].first >= 0) ++placed;
+    }
+    if (placed == 0) continue;
+    const auto free_cells = vc_free_candidates(adj, w, coord, pos);
+    if (free_cells.empty()) {
+      return false;
+    }
+    if (placed > best_placed) {
+      best_placed = placed;
+      best_w = w;
+      best_cells = free_cells;
+    }
+  }
+  if (best_w == n) {
+    return false;
+  }
+
+  for (const auto& [x, y] : best_cells) {
+    coord[best_w] = {x, y};
+    pos[{x, y}] = best_w;
+    if (vc_search_layout(adj, coord, pos)) {
+      return true;
+    }
+    pos.erase({x, y});
+    coord[best_w] = {-1, -1};
+  }
+  return false;
+}
+
+/// One embedding attempt: seed `corner` at (0,0) with axis neighbours
+/// `a0` -> (1,0) and `b0` -> (0,1), then recover coordinates by
+/// intersecting king's-move constraints from placed graph neighbours.
+/// Forced placements are applied first; when several cells remain
+/// ambiguous, backtracking picks among them.  No lattice-type-specific
+/// rules are used.  Returns an empty vector when this seed does not
+/// produce a complete rectangular layout whose edges are all (axis or
+/// diagonal) nearest neighbours.
+std::vector<std::pair<int, int>> vc_try_layout(
+    const std::vector<std::set<std::size_t>>& adj, std::size_t corner,
+    std::size_t a0, std::size_t b0) {
+  const std::size_t n = adj.size();
+  std::vector<std::pair<int, int>> coord(n, {-1, -1});
+  std::map<std::pair<int, int>, std::size_t> pos;
+
+  coord[corner] = {0, 0};
+  pos[{0, 0}] = corner;
+  coord[a0] = {1, 0};
+  pos[{1, 0}] = a0;
+  coord[b0] = {0, 1};
+  pos[{0, 1}] = b0;
+
+  if (!vc_search_layout(adj, coord, pos)) {
+    return {};
   }
   return coord;
 }
