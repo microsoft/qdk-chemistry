@@ -685,4 +685,17 @@ SlaterDeterminantContainer::from_hdf5(H5::Group& group) {
   }
 }
 
+void SlaterDeterminantContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _determinant.content_hash());
+  if (_orbitals) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _orbitals->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+}
+
 }  // namespace qdk::chemistry::data

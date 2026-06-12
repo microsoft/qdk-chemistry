@@ -73,9 +73,9 @@ class CasWavefunctionContainer : public WavefunctionContainer {
    * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
    * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
-   * orbitals (optional)
    * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
@@ -90,8 +90,8 @@ class CasWavefunctionContainer : public WavefunctionContainer {
       const std::optional<MatrixVariant>& one_rdm_aa,
       const std::optional<MatrixVariant>& one_rdm_bb,
       const std::optional<VectorVariant>& two_rdm_spin_traced,
-      const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_aaaa,
+      const std::optional<VectorVariant>& two_rdm_aabb,
       const std::optional<VectorVariant>& two_rdm_bbbb,
       const OrbitalEntropies& entropies = OrbitalEntropies{},
       WavefunctionType type = WavefunctionType::SelfDual);
@@ -258,6 +258,8 @@ class CasWavefunctionContainer : public WavefunctionContainer {
   bool has_configuration_set() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
   // Coefficients of the wavefunction

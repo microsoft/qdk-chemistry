@@ -477,6 +477,8 @@ class LatticeGraph : public DataClass {
   static LatticeGraph from_hdf5(H5::Group& group);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * @brief Private constructor from a sparse adjacency matrix.
    *
