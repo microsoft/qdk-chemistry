@@ -133,7 +133,8 @@ Examples:
     >>> config_set = ConfigurationSet(configs, orbitals, "electrons")
 
 )",
-      py::arg("configurations"), py::arg("orbitals"), py::arg("sector"));
+      py::arg("configurations"), py::arg("orbitals"),
+      py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR);
 
   // Copy constructor
   configuration_set.def(py::init<const ConfigurationSet&>(), "Copy constructor",

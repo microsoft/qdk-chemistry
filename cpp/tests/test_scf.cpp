@@ -752,7 +752,7 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
   // Create orbitals with the deserialized basis set - this validates
   // that the basis set is fully functional
   auto orbitals2 = std::make_shared<Orbitals>(
-      coeff_alpha, energies_alpha, overlap, basis_set2, std::nullopt);
+      coeff_alpha, energies_alpha, overlap, basis_set2);
 
   EXPECT_TRUE(orbitals2->has_basis_set());
   EXPECT_EQ(orbitals2->get_basis_set()->get_name(), "def2-svp");

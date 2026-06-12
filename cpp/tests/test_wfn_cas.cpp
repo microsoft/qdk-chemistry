@@ -606,8 +606,12 @@ TEST_F(CasWavefunctionTest, JsonSerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      std::make_tuple(orbitals->get_active_space_indices().first,
-                      orbitals->get_inactive_space_indices().first));
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          orbitals->get_inactive_space_indices().first));
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();
@@ -852,8 +856,12 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
   auto restricted_orbitals = std::make_shared<Orbitals>(
       orbitals->get_coefficients().first, orbitals->get_energies().first,
       orbitals->get_overlap_matrix(), orbitals->get_basis_set(),
-      std::make_tuple(orbitals->get_active_space_indices().first,
-                      orbitals->get_inactive_space_indices().first));
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          orbitals->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals->get_num_molecular_orbitals(),
+          orbitals->get_inactive_space_indices().first));
 
   // build hamiltonian
   auto ham_gen = HamiltonianConstructorFactory::create();

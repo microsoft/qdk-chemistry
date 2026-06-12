@@ -94,7 +94,7 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(2, 2);
   auto basis = testing::create_random_basis_set(2);
   auto dummy_orbitals = std::make_shared<Orbitals>(
-      coeffs, std::nullopt, std::nullopt, basis, std::nullopt);
+      coeffs, std::nullopt, std::nullopt, basis);
 
   // Create a dummy Hamiltonian for testing
   Eigen::MatrixXd empty_one_body = Eigen::MatrixXd::Zero(2, 2);

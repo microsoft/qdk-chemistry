@@ -16,6 +16,9 @@
 
 namespace qdk::chemistry::data {
 
+/// Canonical name of the default (electronic) single-particle sector.
+inline constexpr const char* DEFAULT_SECTOR = "electrons";
+
 /**
  * @class ConfigurationSet
  * @brief Associates a collection of Configuration objects with orbital
@@ -52,7 +55,8 @@ class ConfigurationSet : public DataClass {
    * virtual orbitals are not included in the configuration representation.
    */
   ConfigurationSet(const std::vector<Configuration>& configurations,
-                   std::shared_ptr<Orbitals> orbitals, std::string sector);
+                   std::shared_ptr<Orbitals> orbitals,
+                   std::string sector = DEFAULT_SECTOR);
 
   /**
    * @brief Construct a ConfigurationSet from configurations and orbital
@@ -70,7 +74,8 @@ class ConfigurationSet : public DataClass {
    * virtual orbitals are not included in the configuration representation.
    */
   ConfigurationSet(std::vector<Configuration>&& configurations,
-                   std::shared_ptr<Orbitals> orbitals, std::string sector);
+                   std::shared_ptr<Orbitals> orbitals,
+                   std::string sector = DEFAULT_SECTOR);
 
   /**
    * @brief Get the configurations

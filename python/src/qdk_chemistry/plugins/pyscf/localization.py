@@ -31,6 +31,7 @@ from pyscf import lo
 
 from qdk_chemistry.algorithms import OrbitalLocalizer
 from qdk_chemistry.data import Orbitals, Settings, StateVectorContainer, Wavefunction
+from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import basis_to_pyscf_mol
 from qdk_chemistry.utils import Logger
 
@@ -192,8 +193,6 @@ class PyscfLocalizer(OrbitalLocalizer):
             raise ValueError(f"Unknown localization method: {loc_method}")
 
         # Preserve active/inactive space indices from input orbitals if they exist
-        # For restricted: indices = (active, inactive)
-        # For unrestricted: indices = (active_alpha, active_beta, inactive_alpha, inactive_beta)
         if orbitals.has_active_space():
             active_alpha, active_beta = orbitals.get_active_space_indices()
             inactive_alpha, inactive_beta = orbitals.get_inactive_space_indices()
@@ -213,12 +212,14 @@ class PyscfLocalizer(OrbitalLocalizer):
             for i, idx in enumerate(loc_indices_a):
                 mo_loc[:, idx] = localized_mos[:, i]
 
+            nmo = mo_loc.shape[1]
             loc_orbitals = Orbitals(
                 coefficients=mo_loc,
                 energies=orbitals.get_energies()[0] if orbitals.has_energies() else None,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(list(active_alpha), list(inactive_alpha)) if active_alpha is not None else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha)) if active_alpha is not None else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha)) if active_alpha is not None else None,
             )
         else:
             # Unrestricted case - handle alpha and beta separately
@@ -234,6 +235,7 @@ class PyscfLocalizer(OrbitalLocalizer):
             for i, idx in enumerate(loc_indices_b):
                 mo_b[:, idx] = localized_b[:, i]
 
+            nmo = mo_a.shape[1]
             energies_alpha, energies_beta = orbitals.get_energies() if orbitals.has_energies() else (None, None)
             loc_orbitals = Orbitals(
                 coefficients_alpha=mo_a,
@@ -242,14 +244,8 @@ class PyscfLocalizer(OrbitalLocalizer):
                 energies_beta=energies_beta,
                 ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 basis_set=orbitals.get_basis_set(),
-                indices=(
-                    list(active_alpha),
-                    list(active_beta),
-                    list(inactive_alpha),
-                    list(inactive_beta),
-                )
-                if active_alpha is not None
-                else None,
+                active_indices=spin_index_set(nmo, list(active_alpha), list(active_beta), equivalent=False) if active_alpha is not None else None,
+                inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_beta), equivalent=False) if active_alpha is not None else None,
             )
         # Only single-determinant wavefunctions reach this point (guarded above).
         return Wavefunction(

@@ -8,6 +8,7 @@
 from pathlib import Path
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Structure, ModelOrbitals
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
 
 ################################################################################
 # start-cell-create
@@ -34,9 +35,9 @@ beta_active = [2, 3, 4]
 alpha_inactive = [0, 3, 4, 5]
 beta_inactive = [0, 1, 5]
 
-model_orbitals = ModelOrbitals(
-    basis_size, (alpha_active, beta_active, alpha_inactive, beta_inactive)
-)
+active_indices = spin_index_set(basis_size, alpha_active, beta_active, equivalent=False)
+inactive_indices = spin_index_set(basis_size, alpha_inactive, beta_inactive, equivalent=False)
+model_orbitals = ModelOrbitals(active_indices, inactive_indices)
 
 # We can then pass this object to a custom Hamiltonian constructor
 # end-cell-model-orbitals-create

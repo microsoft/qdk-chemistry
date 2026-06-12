@@ -38,6 +38,7 @@ from qdk_chemistry.data import (
 )
 
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from qdk_chemistry.data.symmetry import spin_index_set
 
 
 class MockLocalizationPy(OrbitalLocalizer):
@@ -251,6 +252,7 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
                 energies_alpha, energies_beta = energies_data
             else:
                 energies_alpha, energies_beta = None, None
+            nmo = coeffs_alpha.shape[1]
             new_orbitals = Orbitals(
                 coeffs_alpha,
                 coeffs_beta,
@@ -258,16 +260,19 @@ class MockActiveSpaceSelector(ActiveSpaceSelector):
                 energies_beta,
                 None,
                 orbitals.get_basis_set(),
-                [indices, indices, [], []],
+                spin_index_set(nmo, indices, indices, equivalent=False),
+                spin_index_set(nmo, [], [], equivalent=False),
             )
             return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
         # Restricted case - use restricted constructor
+        nmo = coeffs_data[0].shape[1] if isinstance(coeffs_data, tuple) else coeffs_data.shape[1]
         new_orbitals = Orbitals(
             coeffs_data,
             energies_data,
             None,
             orbitals.get_basis_set(),
-            [indices, []],
+            spin_index_set(nmo, indices, indices),
+            spin_index_set(nmo, [], []),
         )
         return Wavefunction(StateVectorContainer(wavefunction.get_active_determinants()[0], new_orbitals))
 

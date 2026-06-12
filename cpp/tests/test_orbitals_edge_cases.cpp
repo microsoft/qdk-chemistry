@@ -48,7 +48,7 @@ TEST_F(OrbitalsEdgeCasesTest, ErrorHandling) {
 
   // Create orbitals object with minimal required data
   auto error_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, energies, std::nullopt, error_basis, std::nullopt);
+  Orbitals orb(coeffs, energies, std::nullopt, error_basis);
 
   // Test invalid JSON file
   EXPECT_THROW(Orbitals::from_json_file("nonexistent.orbitals.json"),
@@ -71,7 +71,7 @@ TEST_F(OrbitalsEdgeCasesTest, EmptyDataHandling) {
   // Test with valid basis set but empty coefficients
   auto valid_basis = testing::create_random_basis_set(1);
   EXPECT_THROW(Orbitals(empty_coeffs, std::make_optional(empty_energies),
-                        std::nullopt, valid_basis, std::nullopt),
+                        std::nullopt, valid_basis),
                std::runtime_error);
 }
 
@@ -83,8 +83,8 @@ TEST_F(OrbitalsEdgeCasesTest, SingleOrbitalSingleBasis) {
   energies(0) = -1.0;
 
   auto single_basis = testing::create_random_basis_set(1);
-  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, single_basis,
-               std::nullopt);
+  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt,
+               single_basis);
 
   EXPECT_EQ(1, orb.get_num_atomic_orbitals());
   EXPECT_EQ(1, orb.get_num_molecular_orbitals());
@@ -106,8 +106,7 @@ TEST_F(OrbitalsEdgeCasesTest, AsymmetricDimensions) {
   energies.setRandom();
 
   auto asym_basis = testing::create_random_basis_set(n_basis);
-  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, asym_basis,
-               std::nullopt);
+  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, asym_basis);
 
   EXPECT_EQ(n_basis, orb.get_num_atomic_orbitals());
   EXPECT_EQ(n_orbitals, orb.get_num_molecular_orbitals());
@@ -127,7 +126,7 @@ TEST_F(OrbitalsEdgeCasesTest, ExtremeValues) {
 
   auto extreme_basis = testing::create_random_basis_set(2);
   Orbitals orb(coeffs, std::make_optional(energies), std::nullopt,
-               extreme_basis, std::nullopt);
+               extreme_basis);
 
   // Test preservation of extreme values
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
@@ -148,7 +147,7 @@ TEST_F(OrbitalsEdgeCasesTest, SpecialMatrices) {
 
   auto special_basis = testing::create_random_basis_set(n);
   Orbitals orb(identity, std::make_optional(energies), std::nullopt,
-               special_basis, std::nullopt);
+               special_basis);
 
   // Check orthogonality
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
@@ -198,8 +197,7 @@ TEST_F(OrbitalsEdgeCasesTest, LargeSystemPerformance) {
   energies.setRandom();
 
   auto large_basis = testing::create_random_basis_set(n_basis);
-  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, large_basis,
-               std::nullopt);
+  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, large_basis);
 
   auto end = std::chrono::high_resolution_clock::now();
   auto duration =
@@ -222,7 +220,7 @@ TEST_F(OrbitalsEdgeCasesTest, SerializationEdgeCases) {
 
   auto serialization_basis = testing::create_random_basis_set(2);
   Orbitals orb(coeffs, std::make_optional(energies), std::nullopt,
-               serialization_basis, std::nullopt);
+               serialization_basis);
 
   // JSON serialization should handle special values appropriately
   auto json_data = orb.to_json();
@@ -249,7 +247,7 @@ TEST_F(OrbitalsEdgeCasesTest, MemoryStress) {
     auto memory_basis = testing::create_random_basis_set(n_basis);
     auto orb =
         std::make_unique<Orbitals>(coeffs, std::make_optional(energies),
-                                   std::nullopt, memory_basis, std::nullopt);
+                                   std::nullopt, memory_basis);
     orbital_objects.push_back(std::move(orb));
   }
 
@@ -273,7 +271,7 @@ TEST_F(OrbitalsEdgeCasesTest, UnrestrictedEdgeCases) {
   // This should be rejected by the constructor
   auto basis = testing::create_random_basis_set(3);
   EXPECT_THROW(Orbitals(alpha_coeffs, beta_coeffs, std::nullopt, std::nullopt,
-                        std::nullopt, basis, std::nullopt),
+                        std::nullopt, basis),
                std::runtime_error);
 }
 
@@ -285,8 +283,7 @@ TEST_F(OrbitalsEdgeCasesTest, SpinComponentConsistency) {
   energies.setRandom();
 
   auto spin_basis = testing::create_random_basis_set(3);
-  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, spin_basis,
-               std::nullopt);
+  Orbitals orb(coeffs, std::make_optional(energies), std::nullopt, spin_basis);
 
   // For restricted calculation, alpha and beta should be identical
   const auto& [alpha_coeffs, beta_coeffs] = orb.get_coefficients();
@@ -306,7 +303,7 @@ TEST_F(OrbitalsEdgeCasesTest, EmptySpinChannels) {
   // This should either be handled gracefully or throw an exception
   auto basis = testing::create_random_basis_set(3);
   EXPECT_THROW(Orbitals(empty_matrix, empty_matrix, std::nullopt, std::nullopt,
-                        std::nullopt, basis, std::nullopt),
+                        std::nullopt, basis),
                std::runtime_error);
 }
 
@@ -316,8 +313,7 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
   minimal_coeffs(0, 0) = 1.0;
 
   auto minimal_basis = testing::create_random_basis_set(1);
-  Orbitals orb1(minimal_coeffs, std::nullopt, std::nullopt, minimal_basis,
-                std::nullopt);
+  Orbitals orb1(minimal_coeffs, std::nullopt, std::nullopt, minimal_basis);
 
   // Test copying
   Orbitals orb2(orb1);
@@ -328,7 +324,7 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorWithNullPointers) {
   Eigen::MatrixXd coeffs(2, 2);
   coeffs.setIdentity();
   auto copy_basis = testing::create_random_basis_set(2);
-  Orbitals orb3(coeffs, std::nullopt, std::nullopt, copy_basis, std::nullopt);
+  Orbitals orb3(coeffs, std::nullopt, std::nullopt, copy_basis);
 
   Orbitals orb4(orb3);
   EXPECT_EQ(2, orb4.get_num_atomic_orbitals());
@@ -361,7 +357,7 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
   auto unrestricted_basis = testing::create_random_basis_set(n_basis);
   Orbitals orb1(alpha_coeffs, beta_coeffs, std::make_optional(alpha_energies),
                 std::make_optional(beta_energies), std::nullopt,
-                unrestricted_basis, std::nullopt);
+                unrestricted_basis);
 
   EXPECT_FALSE(orb1.is_restricted());
 
@@ -392,7 +388,7 @@ TEST_F(OrbitalsEdgeCasesTest, CopyConstructorUnrestrictedPaths) {
   Orbitals orb1_modified(alpha_coeffs, beta_coeffs,
                          std::make_optional(alpha_energies),
                          std::make_optional(beta_energies), std::nullopt,
-                         unrestricted_basis, std::nullopt);
+                         unrestricted_basis);
 
   const auto& [unchanged_alpha_coeffs, unchanged_beta_coeffs] =
       orb2.get_coefficients();
@@ -419,8 +415,7 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorWithNullPointers) {
   Eigen::MatrixXd coeffs(2, 2);
   coeffs.setIdentity();
   auto partial_basis = testing::create_random_basis_set(2);
-  Orbitals orb3(coeffs, std::nullopt, std::nullopt, partial_basis,
-                std::nullopt);
+  Orbitals orb3(coeffs, std::nullopt, std::nullopt, partial_basis);
 
   orb2 = orb3;
   EXPECT_EQ(2, orb2.get_num_atomic_orbitals());
@@ -451,7 +446,7 @@ TEST_F(OrbitalsEdgeCasesTest, AssignmentOperatorUnrestrictedPaths) {
   auto unrestricted_assign_basis = testing::create_random_basis_set(n_basis);
   Orbitals orb1(alpha_coeffs, beta_coeffs, std::make_optional(alpha_energies),
                 std::make_optional(beta_energies), std::nullopt,
-                unrestricted_assign_basis, std::nullopt);
+                unrestricted_assign_basis);
 
   EXPECT_FALSE(orb1.is_restricted());
 

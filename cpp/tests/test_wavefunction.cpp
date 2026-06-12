@@ -369,7 +369,8 @@ TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
   entropies.two_orbital = s2;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, DEFAULT_SECTOR,
+      entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
   EXPECT_TRUE(wf.has_two_orbital_entropies());
@@ -403,7 +404,8 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   entropies.mutual_information = mi;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, entropies));
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, DEFAULT_SECTOR,
+      entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
   EXPECT_TRUE(wf.has_mutual_information());
@@ -457,8 +459,8 @@ TEST_F(WavefunctionCoreTest,
   ConfigurationSet cs({Configuration("ud2000")}, orbitals);
   const auto& layout = cs.sector_layout();
   ASSERT_EQ(layout.size(), 1u);
-  EXPECT_EQ(layout[0].name, DEFAULT_SECTOR);
-  EXPECT_EQ(layout[0].basis, orbitals);
+  EXPECT_EQ(layout[0].first, DEFAULT_SECTOR);
+  EXPECT_EQ(layout[0].second, orbitals);
 }
 
 // Test wavefunction serialization
@@ -493,7 +495,7 @@ class WavefunctionSerializationTest : public ::testing::Test {
     cas_real =
         std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
             coeffs_real, dets, orbitals, std::nullopt, std::nullopt,
-            entropies));
+            DEFAULT_SECTOR, entropies));
 
     cas_complex = std::make_shared<Wavefunction>(
         std::make_unique<StateVectorContainer>(coeffs_complex, dets, orbitals));
@@ -1032,7 +1034,7 @@ TEST_F(WavefunctionActiveSpaceConversionTest, NoActiveSpacePassthrough) {
 
   auto orbitals_no_active = std::make_shared<Orbitals>(
       coeffs_no_active, std::nullopt, std::nullopt,
-      testing::create_random_basis_set(num_molecular_orbitals), std::nullopt);
+      testing::create_random_basis_set(num_molecular_orbitals));
 
   Configuration det = Configuration("2ud0ud");
 

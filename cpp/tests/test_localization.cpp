@@ -307,7 +307,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
         // Create restricted orbitals (only alpha coefficients provided)
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         // Provide different indices for alpha and beta to trigger the exception
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
@@ -329,7 +329,7 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
         Eigen::MatrixXd fake_ao_overlap = Eigen::MatrixXd::Identity(4, 4);
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -414,7 +414,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -429,7 +429,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, coeffs_beta, fake_energies, fake_energies,
-            std::make_optional(fake_ao_overlap), fake_basis_set, std::nullopt);
+            std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2000"),
                                                          orbitals));
@@ -444,7 +444,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("0000"),
                                                          orbitals));
@@ -459,7 +459,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2u00"),
                                                          orbitals));
@@ -477,7 +477,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -493,7 +493,7 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
         auto localizer = LocalizerFactory::create("qdk_mp2_natural_orbitals");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -518,7 +518,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
         auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -535,7 +535,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
         auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, coeffs, std::nullopt, std::nullopt,
-            std::make_optional(fake_ao_overlap), fake_basis_set, std::nullopt);
+            std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -553,7 +553,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
         auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -569,7 +569,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
         auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -587,7 +587,7 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
         auto vvhv_localizer = LocalizerFactory::create("qdk_vvhv");
         auto orbitals = std::make_shared<Orbitals>(
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
-            fake_basis_set, std::nullopt);
+            fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
             std::make_unique<StateVectorContainer>(Configuration("2200"),
                                                          orbitals));
@@ -1057,8 +1057,10 @@ TEST_F(LocalizationTest, PipekMezeyPreservesActiveSpaceUnrestricted) {
       orbitals->get_coefficients().first, orbitals->get_coefficients().second,
       std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
       orbitals->get_basis_set(),
-      std::make_tuple(active_alpha, active_beta, inactive_alpha,
-                      inactive_beta));
+      testing::unrestricted_index_set(num_molecular_orbitals, active_alpha,
+                                      active_beta),
+      testing::unrestricted_index_set(num_molecular_orbitals, inactive_alpha,
+                                      inactive_beta));
 
   auto active_wfn = std::make_shared<Wavefunction>(
       std::make_unique<StateVectorContainer>(
@@ -1135,8 +1137,10 @@ TEST_F(LocalizationTest, VVHVPreservesActiveSpaceUnrestricted) {
       orbitals->get_coefficients().first, orbitals->get_coefficients().second,
       std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
       orbitals->get_basis_set(),
-      std::make_tuple(active_alpha, active_beta, inactive_alpha,
-                      inactive_beta));
+      testing::unrestricted_index_set(num_molecular_orbitals, active_alpha,
+                                      active_beta),
+      testing::unrestricted_index_set(num_molecular_orbitals, inactive_alpha,
+                                      inactive_beta));
 
   auto active_wfn = std::make_shared<Wavefunction>(
       std::make_unique<StateVectorContainer>(

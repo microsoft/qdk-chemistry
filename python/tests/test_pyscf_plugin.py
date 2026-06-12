@@ -10,6 +10,7 @@ import pytest
 
 from qdk_chemistry import algorithms, data
 from qdk_chemistry.data import AlgorithmRef, Ansatz, Settings, Structure
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
@@ -1420,7 +1421,8 @@ class TestPyscfPlugin:
             coefficients_beta=coeffs_beta,
             ao_overlap=orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
             basis_set=orbitals.get_basis_set(),
-            indices=(active_alpha, active_beta, inactive_alpha, inactive_beta),
+            active_indices=spin_index_set(num_mo, active_alpha, active_beta, equivalent=False),
+            inactive_indices=spin_index_set(num_mo, inactive_alpha, inactive_beta, equivalent=False),
         )
 
         active_wfn = data.Wavefunction(
@@ -2176,7 +2178,7 @@ class TestPyscfPlugin:
         )
 
         # 2. Unrestricted model Hamiltonian should throw
-        model_orbitals_unrestricted = data.ModelOrbitals(4, False)  # unrestricted
+        model_orbitals_unrestricted = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))  # unrestricted
         one_body_alpha = np.eye(4)
         one_body_beta = np.eye(4) * 1.1
         two_body_aaaa = np.zeros(4**4)
@@ -2205,7 +2207,7 @@ class TestPyscfPlugin:
         # 3. Non-rerouting for valid model Hamiltonian
 
         # Create a model Hamiltonian (restricted, closed-shell, full active space)
-        model_orbitals_proper = data.ModelOrbitals(4, True)  # All orbitals are active by default
+        model_orbitals_proper = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))  # All orbitals are active by default
         one_body_model = np.eye(4) * 0.5
         two_body_model = np.zeros(4**4)
         h_model = data.Hamiltonian(

@@ -50,7 +50,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
     Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
         water_orbitals->get_num_molecular_orbitals(), 5);
     Orbitals water_orbitals_truncated(coeffs, std::nullopt, std::nullopt,
-                                      basis_set, std::nullopt);
+                                      basis_set);
     std::shared_ptr<Orbitals> water_orbitals_truncated_ptr =
         std::make_shared<Orbitals>(water_orbitals_truncated);
     auto wfn_container_truncated = std::make_unique<StateVectorContainer>(

@@ -62,14 +62,15 @@ DynamicalCorrelationResult MP2Calculator::_run_impl(
   using VV = data::ContainerTypes::VectorVariant;
   if (amps.restricted) {
     amplitude_container = std::make_unique<data::AmplitudeContainer>(
-        orbitals, "electrons", wavefunction, data::AmplitudeType::MP2,
-        std::optional<VV>(amps.t1_aa), std::optional<VV>(amps.t2_abab));
+        orbitals, wavefunction, data::AmplitudeType::MP2,
+        std::optional<VV>(amps.t1_aa), std::optional<VV>(amps.t2_abab),
+        "electrons");
   } else {
     amplitude_container = std::make_unique<data::AmplitudeContainer>(
-        orbitals, "electrons", wavefunction, data::AmplitudeType::MP2,
+        orbitals, wavefunction, data::AmplitudeType::MP2,
         std::optional<VV>(amps.t1_aa), std::optional<VV>(amps.t1_bb),
         std::optional<VV>(amps.t2_abab), std::optional<VV>(amps.t2_aaaa),
-        std::optional<VV>(amps.t2_bbbb));
+        std::optional<VV>(amps.t2_bbbb), "electrons");
   }
 
   auto mp2_wavefunction =

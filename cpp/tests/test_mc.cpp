@@ -306,8 +306,11 @@ TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
@@ -347,8 +350,11 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 

@@ -471,8 +471,10 @@ TEST_F(MacisAsciTest, DifferentActiveElectronConfigurations) {
           ? std::make_optional(orbitals_scf->get_overlap_matrix())
           : std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(active_indices,  // alpha active space
-                      active_indices, inactive_indices, inactive_indices));
+      testing::unrestricted_index_set(alpha_coeffs.cols(), active_indices,
+                                      active_indices),
+      testing::unrestricted_index_set(alpha_coeffs.cols(), inactive_indices,
+                                      inactive_indices));
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
@@ -516,10 +518,11 @@ TEST_F(MacisAsciTest, MixedAlphaBetaActiveSpaces) {
           ? std::make_optional(orbitals_scf->get_overlap_matrix())
           : std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(std::move(alpha_indices),  // alpha active space
-                      std::move(beta_indices),
-                      std::move(alpha_inactive_indices),   // alpha active space
-                      std::move(beta_inactive_indices)));  // beta active space
+      testing::unrestricted_index_set(alpha_coeffs.cols(), alpha_indices,
+                                      beta_indices),
+      testing::unrestricted_index_set(alpha_coeffs.cols(),
+                                      alpha_inactive_indices,
+                                      beta_inactive_indices));
 
   auto calculator = MultiConfigurationCalculatorFactory::create("macis_asci");
   auto& settings = calculator->settings();
@@ -1302,7 +1305,8 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
       alpha_coeffs, beta_coeffs_mod, std::make_optional(alpha_energies),
       std::make_optional(beta_energies_mod), std::nullopt,
       orbitals_scf->has_basis_set() ? orbitals_scf->get_basis_set() : nullptr,
-      std::make_tuple(active, active, inactive, inactive));
+      testing::unrestricted_index_set(alpha_coeffs.cols(), active, active),
+      testing::unrestricted_index_set(alpha_coeffs.cols(), inactive, inactive));
 
   auto hamiltonian = hamiltonian_constructor_->run(
       std::make_shared<Orbitals>(unrestricted_orbitals));

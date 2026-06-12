@@ -338,7 +338,15 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
 }
 
 bool WavefunctionContainer::_is_restricted_closed_shell() const {
-  auto [n_alpha, n_beta] = get_active_num_electrons();
+  // "Restricted closed shell" is a spin (S_z) concept: it only applies when the
+  // single-particle basis explicitly declares a spin axis. Absent a spin axis
+  // the spin-dependent quantities are not derived from this property, so report
+  // false rather than consulting the spin-resolved (throwing) accessors.
+  auto symmetries = get_orbitals()->symmetries();
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    return false;
+  }
+  auto [n_alpha, n_beta] = _read_spin_count(*active_num_electrons());
   return get_orbitals()->is_restricted() && (n_alpha == n_beta);
 }
 
@@ -862,10 +870,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
         if (container_type == "state_vector" || container_type == "cas" ||
             container_type == "sci") {
           return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals, sector,
+              coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
+              std::move(active_one_rdm), std::move(active_two_rdm), sector,
+              entropies, type);
         } else {
           throw std::runtime_error(
               "RDMs are only supported for state-vector containers in "
@@ -878,8 +886,8 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci") {
       return std::make_unique<StateVectorContainer>(
-          coefficients, determinants, orbitals, sector, std::nullopt,
-          std::nullopt, entropies, type);
+          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+          sector, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
@@ -1887,10 +1895,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
         if (container_type == "state_vector" || container_type == "cas" ||
             container_type == "sci") {
           return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals, sector,
+              coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
+              std::move(active_one_rdm), std::move(active_two_rdm), sector,
+              entropies, type);
         }
       }
     }
@@ -1898,8 +1906,8 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci") {
       return std::make_unique<StateVectorContainer>(
-          coefficients, determinants, orbitals, sector, std::nullopt,
-          std::nullopt, entropies, type);
+          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
+          sector, entropies, type);
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "

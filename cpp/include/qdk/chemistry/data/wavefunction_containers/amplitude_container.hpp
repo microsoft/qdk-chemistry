@@ -86,11 +86,12 @@ class AmplitudeContainer : public WavefunctionContainer {
    * @param t1_amplitudes T1 amplitudes (optional)
    * @param t2_amplitudes T2 amplitudes (optional)
    */
-  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals, std::string sector,
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
                      std::shared_ptr<Wavefunction> wavefunction,
                      AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes,
-                     const std::optional<VectorVariant>& t2_amplitudes);
+                     const std::optional<VectorVariant>& t2_amplitudes,
+                     std::string sector = DEFAULT_SECTOR);
 
   /**
    * @brief Constructs an amplitude wavefunction with spin-separated amplitudes.
@@ -107,14 +108,15 @@ class AmplitudeContainer : public WavefunctionContainer {
    * @param t2_amplitudes_aaaa Alpha-alpha T2 amplitudes (optional)
    * @param t2_amplitudes_bbbb Beta-beta T2 amplitudes (optional)
    */
-  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals, std::string sector,
+  AmplitudeContainer(std::shared_ptr<Orbitals> orbitals,
                      std::shared_ptr<Wavefunction> wavefunction,
                      AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes_aa,
                      const std::optional<VectorVariant>& t1_amplitudes_bb,
                      const std::optional<VectorVariant>& t2_amplitudes_abab,
                      const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-                     const std::optional<VectorVariant>& t2_amplitudes_bbbb);
+                     const std::optional<VectorVariant>& t2_amplitudes_bbbb,
+                     std::string sector = DEFAULT_SECTOR);
 
   /** @brief Destructor */
   ~AmplitudeContainer() override = default;

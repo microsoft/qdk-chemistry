@@ -20,6 +20,10 @@ using MatrixVariant = ContainerTypes::MatrixVariant;
 using VectorVariant = ContainerTypes::VectorVariant;
 using ScalarVariant = ContainerTypes::ScalarVariant;
 
+// Serialization version of the deleted single-determinant ("sd") container,
+// retained so legacy "sd" files round-trip through StateVectorContainer.
+static constexpr const char* LEGACY_SD_SERIALIZATION_VERSION = "0.1.0";
+
 // ---------------------------------------------------------------------------
 // Constructors
 // ---------------------------------------------------------------------------
@@ -29,7 +33,7 @@ StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
                                            std::shared_ptr<Orbitals> orbitals,
                                            const std::string& sector,
                                            WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals, sector,
+    : StateVectorContainer(coeffs, dets, orbitals,
                            std::nullopt,        // one_rdm_spin_traced
                            std::nullopt,        // one_rdm_aa
                            std::nullopt,        // one_rdm_bb
@@ -37,8 +41,7 @@ StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
                            std::nullopt,        // two_rdm_aabb
                            std::nullopt,        // two_rdm_aaaa
                            std::nullopt,        // two_rdm_bbbb
-                           OrbitalEntropies{},  // entropies
-                           type) {
+                           sector, OrbitalEntropies{}, type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
@@ -86,31 +89,32 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
+    std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const OrbitalEntropies& entropies, WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals, sector, one_rdm_spin_traced,
+    const std::string& sector, const OrbitalEntropies& entropies,
+    WavefunctionType type)
+    : StateVectorContainer(coeffs, dets, orbitals, one_rdm_spin_traced,
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
                            two_rdm_spin_traced,
                            std::nullopt,  // two_rdm_aabb
                            std::nullopt,  // two_rdm_aaaa
                            std::nullopt,  // two_rdm_bbbb
-                           entropies, type) {
+                           sector, entropies, type) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
+    std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<MatrixVariant>& one_rdm_aa,
     const std::optional<MatrixVariant>& one_rdm_bb,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
-    const std::optional<VectorVariant>& two_rdm_bbbb,
+    const std::optional<VectorVariant>& two_rdm_bbbb, const std::string& sector,
     const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
                             two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
@@ -122,12 +126,13 @@ StateVectorContainer::StateVectorContainer(
 
 StateVectorContainer::StateVectorContainer(
     const VectorVariant& coeffs, const DeterminantVector& dets,
-    std::shared_ptr<Orbitals> orbitals, const std::string& sector,
+    std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
     std::shared_ptr<VectorVariant> two_rdm_spin_traced,
     std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
     std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
-    const OrbitalEntropies& entropies, WavefunctionType type)
+    const std::string& sector, const OrbitalEntropies& entropies,
+    WavefunctionType type)
     : WavefunctionContainer(std::move(one_rdm_spin_traced),
                             std::move(two_rdm_spin_traced),
                             std::move(active_one_rdm),
@@ -150,9 +155,10 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::clone() const {
 
   return std::make_unique<StateVectorContainer>(
       _coefficients, _configuration_set.get_configurations(),
-      this->get_orbitals(), _configuration_set.sector_layout().front().first,
-      _one_rdm_spin_traced, _two_rdm_spin_traced, _active_one_rdm,
-      _active_two_rdm, _entropies, this->get_type());
+      this->get_orbitals(), _one_rdm_spin_traced, _two_rdm_spin_traced,
+      _active_one_rdm, _active_two_rdm,
+      _configuration_set.sector_layout().front().first, _entropies,
+      this->get_type());
 }
 
 std::shared_ptr<Orbitals> StateVectorContainer::get_orbitals() const {
@@ -374,8 +380,15 @@ bool StateVectorContainer::is_complex() const {
 
 bool StateVectorContainer::has_one_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  return _is_single_determinant() ||
-         WavefunctionContainer::has_one_rdm_spin_dependent();
+  // A single determinant can generate its spin-dependent RDM on the fly only
+  // when the basis declares a spin (S_z) axis to block it by.
+  if (_is_single_determinant()) {
+    auto sym = get_orbitals()->symmetries();
+    if (sym && sym->has_axis(AxisName::Spin)) {
+      return true;
+    }
+  }
+  return WavefunctionContainer::has_one_rdm_spin_dependent();
 }
 
 bool StateVectorContainer::has_one_rdm_spin_traced() const {
@@ -386,8 +399,14 @@ bool StateVectorContainer::has_one_rdm_spin_traced() const {
 
 bool StateVectorContainer::has_two_rdm_spin_dependent() const {
   QDK_LOG_TRACE_ENTERING();
-  return _is_single_determinant() ||
-         WavefunctionContainer::has_two_rdm_spin_dependent();
+  // See has_one_rdm_spin_dependent: lazy generation needs a spin axis.
+  if (_is_single_determinant()) {
+    auto sym = get_orbitals()->symmetries();
+    if (sym && sym->has_axis(AxisName::Spin)) {
+      return true;
+    }
+  }
+  return WavefunctionContainer::has_two_rdm_spin_dependent();
 }
 
 bool StateVectorContainer::has_two_rdm_spin_traced() const {
@@ -400,6 +419,14 @@ const SymmetryBlockedTensorVariant<2>& StateVectorContainer::active_one_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_one_rdm && _is_single_determinant()) {
+    auto sym = get_orbitals()->symmetries();
+    if (!sym || !sym->has_axis(AxisName::Spin)) {
+      throw std::runtime_error(
+          "Active 1-RDM is unavailable: the orbital basis declares no spin "
+          "(S_z) axis, so a spin-blocked active-space 1-RDM cannot be generated "
+          "on the fly. Attach an explicit spin symmetry to the orbitals to "
+          "compute spin-resolved RDMs.");
+    }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     if (get_orbitals()->get_active_space_indices().first.size() !=
         get_orbitals()->get_active_space_indices().second.size()) {
@@ -440,6 +467,14 @@ const SymmetryBlockedTensorVariant<4>& StateVectorContainer::active_two_rdm()
     const {
   QDK_LOG_TRACE_ENTERING();
   if (!_active_two_rdm && _is_single_determinant()) {
+    auto sym = get_orbitals()->symmetries();
+    if (!sym || !sym->has_axis(AxisName::Spin)) {
+      throw std::runtime_error(
+          "Active 2-RDM is unavailable: the orbital basis declares no spin "
+          "(S_z) axis, so a spin-blocked active-space 2-RDM cannot be generated "
+          "on the fly. Attach an explicit spin symmetry to the orbitals to "
+          "compute spin-resolved RDMs.");
+    }
     auto [alpha_occupations, beta_occupations] = _active_occupations_pair();
     if (get_orbitals()->get_active_space_indices().first.size() !=
         get_orbitals()->get_active_space_indices().second.size()) {
@@ -852,7 +887,8 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_json(
       if (!j.contains("version")) {
         throw std::runtime_error("Invalid JSON: missing version field");
       }
-      validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+      validate_serialization_version(LEGACY_SD_SERIALIZATION_VERSION,
+                                     j["version"]);
 
       if (!j.contains("orbitals")) {
         throw std::runtime_error("JSON missing required 'orbitals' field");
@@ -904,7 +940,7 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_hdf5(
       H5::Attribute version_attr = group.openAttribute("version");
       std::string version;
       version_attr.read(string_type, version);
-      validate_serialization_version(SERIALIZATION_VERSION, version);
+      validate_serialization_version(LEGACY_SD_SERIALIZATION_VERSION, version);
 
       if (!group.nameExists("orbitals")) {
         throw std::runtime_error(

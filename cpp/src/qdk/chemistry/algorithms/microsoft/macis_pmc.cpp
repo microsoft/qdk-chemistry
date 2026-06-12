@@ -155,8 +155,8 @@ struct pmc_helper {
         return data::Wavefunction(
             std::make_unique<data::StateVectorContainer>(
                 std::move(C_vector), std::move(dets_configs),
-                hamiltonian.get_orbitals(), "electrons", std::move(one_rdm),
-                std::move(two_rdm)));
+                hamiltonian.get_orbitals(), std::move(one_rdm),
+                std::move(two_rdm), "electrons"));
       } else {
         // Create wavefunction without RDMs
         return data::Wavefunction(

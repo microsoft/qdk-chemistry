@@ -61,6 +61,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -129,7 +130,7 @@ class _QdkMcSolverWrapper:
             n_alpha = nelec - n_beta
 
         # Create ModelOrbitals for the active space and use real orbitals only after the calculation
-        orbitals = ModelOrbitals(norb, True)
+        orbitals = ModelOrbitals(norb)
 
         # eri needs to be completely filled and then flattened to a vector for QDK
         eri = ao2mo.restore(1, eri, norb)
@@ -413,12 +414,16 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         # Create Orbitals with restricted arguments (coeffs, occupations, energies)
         wfn = pyscf_mcscf.fcisolver.wavefunction
 
+        nmo = pyscf_mcscf.mo_coeff.shape[1]
+        active_alpha = orbitals.get_active_space_indices()[0]
+        inactive_alpha = orbitals.get_inactive_space_indices()[0]
         orbitals = Orbitals(
             pyscf_mcscf.mo_coeff,
             pyscf_mcscf.mo_energy,
             ao_overlap=_ovlp,
             basis_set=orbitals.get_basis_set(),
-            indices=(orbitals.get_active_space_indices()[0], orbitals.get_inactive_space_indices()[0]),
+            active_indices=spin_index_set(nmo, list(active_alpha), list(active_alpha)),
+            inactive_indices=spin_index_set(nmo, list(inactive_alpha), list(inactive_alpha)),
         )
 
         container = None
@@ -440,9 +445,9 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                     wfn.get_container().get_coefficients(),
                     wfn.get_active_determinants(),
                     orbitals,
-                    "electrons",
                     one_rdm_spin_traced=wfn.get_active_one_rdm_spin_traced(),
                     two_rdm_spin_traced=wfn.get_active_two_rdm_spin_traced(),
+                    sector="electrons",
                     type=wfn.get_type(),
                 )
             else:
@@ -450,14 +455,12 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
                     wfn.get_container().get_coefficients(),
                     wfn.get_active_determinants(),
                     orbitals,
-                    "electrons",
-                    one_rdm_spin_traced=None,
                     one_rdm_aa=one_rdm_aa,
                     one_rdm_bb=one_rdm_bb,
-                    two_rdm_spin_traced=None,
                     two_rdm_aabb=two_rdm_aabb,
                     two_rdm_aaaa=two_rdm_aaaa,
                     two_rdm_bbbb=two_rdm_bbbb,
+                    sector="electrons",
                     type=wfn.get_type(),
                 )
         else:

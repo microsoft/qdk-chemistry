@@ -33,6 +33,7 @@ from pyscf.mcscf import avas
 
 from qdk_chemistry.algorithms import ActiveSpaceSelector
 from qdk_chemistry.data import Configuration, Orbitals, Settings, StateVectorContainer, Wavefunction
+from qdk_chemistry.data.symmetry import spin_index_set
 from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
@@ -176,6 +177,10 @@ class PyscfAVAS(ActiveSpaceSelector):
         active_indices = [n_inactive_occ + i for i in range(norb_act)]
         inactive_indices = list(range(n_inactive_occ))
 
+        nmo = mo_coeff.shape[1]
+        active_sbid = spin_index_set(nmo, active_indices, active_indices, equivalent=not open_shell)
+        inactive_sbid = spin_index_set(nmo, inactive_indices, inactive_indices, equivalent=not open_shell)
+
         if open_shell:
             # Create active orbitals
             active_orbitals = Orbitals(
@@ -185,7 +190,8 @@ class PyscfAVAS(ActiveSpaceSelector):
                 None,
                 orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 orbitals.get_basis_set(),
-                [active_indices, active_indices, inactive_indices, inactive_indices],
+                active_sbid,
+                inactive_sbid,
             )
         else:
             # Create active orbitals
@@ -194,7 +200,8 @@ class PyscfAVAS(ActiveSpaceSelector):
                 None,
                 orbitals.get_overlap_matrix() if orbitals.has_overlap_matrix() else None,
                 orbitals.get_basis_set(),
-                [active_indices, inactive_indices],
+                active_sbid,
+                inactive_sbid,
             )
         if len(wavefunction.get_active_determinants()) == 1:
             # Single determinant case - return new wavefunction with localized orbitals

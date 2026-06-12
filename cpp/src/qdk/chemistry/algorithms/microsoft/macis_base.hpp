@@ -246,9 +246,9 @@ inline data::Wavefunction build_wavefunction(
   if (one_aa || one_bb || two_aabb || two_aaaa || two_bbbb ||
       computed_entropies.has_any()) {
     container = std::make_unique<Container>(
-        C_vector, dets_configs, hamiltonian.get_orbitals(), "electrons",
-        std::nullopt, to_mv(one_aa), to_mv(one_bb), std::nullopt,
-        to_vv(two_aabb), to_vv(two_aaaa), to_vv(two_bbbb), computed_entropies,
+        C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
+        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aabb),
+        to_vv(two_aaaa), to_vv(two_bbbb), "electrons", computed_entropies,
         data::WavefunctionType::SelfDual);
   } else {
     container = std::make_unique<Container>(

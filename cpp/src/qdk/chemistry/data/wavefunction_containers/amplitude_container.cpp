@@ -46,24 +46,24 @@ AmplitudeType amplitude_type_from_string(const std::string& s) {
 }
 
 AmplitudeContainer::AmplitudeContainer(
-    std::shared_ptr<Orbitals> orbitals, std::string sector,
+    std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes,
-    const std::optional<VectorVariant>& t2_amplitudes)
-    : AmplitudeContainer(orbitals, std::move(sector), wavefunction,
-                         amplitude_type, t1_amplitudes, std::nullopt,
-                         t2_amplitudes, std::nullopt, std::nullopt) {
+    const std::optional<VectorVariant>& t2_amplitudes, std::string sector)
+    : AmplitudeContainer(orbitals, wavefunction, amplitude_type, t1_amplitudes,
+                         std::nullopt, t2_amplitudes, std::nullopt,
+                         std::nullopt, std::move(sector)) {
   QDK_LOG_TRACE_ENTERING();
 }
 
 AmplitudeContainer::AmplitudeContainer(
-    std::shared_ptr<Orbitals> orbitals, std::string sector,
+    std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<Wavefunction> wavefunction, AmplitudeType amplitude_type,
     const std::optional<VectorVariant>& t1_amplitudes_aa,
     const std::optional<VectorVariant>& t1_amplitudes_bb,
     const std::optional<VectorVariant>& t2_amplitudes_abab,
     const std::optional<VectorVariant>& t2_amplitudes_aaaa,
-    const std::optional<VectorVariant>& t2_amplitudes_bbbb)
+    const std::optional<VectorVariant>& t2_amplitudes_bbbb, std::string sector)
     : WavefunctionContainer(
           WavefunctionType::NotSelfDual),  // Amplitude wavefunctions are
                                            // always NotSelfDual
@@ -224,10 +224,10 @@ std::unique_ptr<WavefunctionContainer> AmplitudeContainer::clone() const {
     return p ? std::optional<VectorVariant>(*p) : std::nullopt;
   };
   return std::make_unique<AmplitudeContainer>(
-      _orbitals, _sector, _wavefunction, _amplitude_type,
+      _orbitals, _wavefunction, _amplitude_type,
       as_optional(_t1_amplitudes_aa), as_optional(_t1_amplitudes_bb),
       as_optional(_t2_amplitudes_abab), as_optional(_t2_amplitudes_aaaa),
-      as_optional(_t2_amplitudes_bbbb));
+      as_optional(_t2_amplitudes_bbbb), _sector);
 }
 
 std::shared_ptr<Orbitals> AmplitudeContainer::get_orbitals() const {
@@ -469,8 +469,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     // amplitudes.
     if (container_tag == "mp2") {
       return std::make_unique<AmplitudeContainer>(
-          orbitals, sector, wavefunction, amplitude_type, std::nullopt,
-          std::nullopt);
+          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt,
+          sector);
     }
 
     bool is_complex = j.value("is_complex", false);
@@ -480,10 +480,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
                              : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, sector, wavefunction, amplitude_type,
-        load("t1_amplitudes_aa"), load("t1_amplitudes_bb"),
-        load("t2_amplitudes_abab"), load("t2_amplitudes_aaaa"),
-        load("t2_amplitudes_bbbb"));
+        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
+        load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
+        load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"), sector);
   } catch (const std::exception& e) {
     throw std::runtime_error("Failed to parse AmplitudeContainer from JSON: " +
                              std::string(e.what()));
@@ -603,8 +602,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
         orbitals = hamiltonian->get_orbitals();
       }
       return std::make_unique<AmplitudeContainer>(
-          orbitals, sector, wavefunction, amplitude_type, std::nullopt,
-          std::nullopt);
+          orbitals, wavefunction, amplitude_type, std::nullopt, std::nullopt,
+          sector);
     }
 
     bool is_complex = false;
@@ -622,10 +621,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
                  : std::nullopt;
     };
     return std::make_unique<AmplitudeContainer>(
-        orbitals, sector, wavefunction, amplitude_type,
-        load("t1_amplitudes_aa"), load("t1_amplitudes_bb"),
-        load("t2_amplitudes_abab"), load("t2_amplitudes_aaaa"),
-        load("t2_amplitudes_bbbb"));
+        orbitals, wavefunction, amplitude_type, load("t1_amplitudes_aa"),
+        load("t1_amplitudes_bb"), load("t2_amplitudes_abab"),
+        load("t2_amplitudes_aaaa"), load("t2_amplitudes_bbbb"), sector);
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
   }
