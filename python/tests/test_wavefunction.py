@@ -1059,7 +1059,7 @@ class TestWavefunctionRdmIntegraion:
         one_rdm = wfn.get_active_one_rdm_spin_traced()
         two_rdm = wfn.get_active_two_rdm_spin_traced()
         one_rdm_aa, one_rdm_bb = wfn.get_active_one_rdm_spin_dependent()
-        two_rdm_ab, two_rdm_aa, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
+        two_rdm_aa, two_rdm_ab, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
 
         two_rdm = np.reshape(two_rdm, (norb, norb, norb, norb))
         two_rdm_aa = np.reshape(two_rdm_aa, (norb, norb, norb, norb))
@@ -1139,7 +1139,7 @@ class TestWavefunctionRdmIntegraion:
         one_rdm = wfn.get_active_one_rdm_spin_traced()
         two_rdm = wfn.get_active_two_rdm_spin_traced()
         one_rdm_aa, one_rdm_bb = wfn.get_active_one_rdm_spin_dependent()
-        two_rdm_ab, two_rdm_aa, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
+        two_rdm_aa, two_rdm_ab, two_rdm_bb = wfn.get_active_two_rdm_spin_dependent()
 
         two_rdm = np.reshape(two_rdm, (norb, norb, norb, norb))
         two_rdm_aa = np.reshape(two_rdm_aa, (norb, norb, norb, norb))
@@ -1225,7 +1225,7 @@ class TestWavefunctionRdmIntegraion:
 
         # Verify RDMs exist before save
         original_1rdm_aa, _ = wfn_sci.get_active_one_rdm_spin_dependent()
-        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_sci.get_active_two_rdm_spin_dependent()
+        original_2rdm_aaaa, original_2rdm_aabb, _ = wfn_sci.get_active_two_rdm_spin_dependent()
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
@@ -1237,7 +1237,7 @@ class TestWavefunctionRdmIntegraion:
         after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
 
         assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
-        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+        after_2rdm_aaaa, after_2rdm_aabb, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
 
         assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
         assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)
@@ -1272,7 +1272,7 @@ class TestWavefunctionRdmIntegraion:
 
         # Verify RDMs exist before save
         original_1rdm_aa, _ = wfn_cas.get_active_one_rdm_spin_dependent()
-        original_2rdm_aabb, original_2rdm_aaaa, _ = wfn_cas.get_active_two_rdm_spin_dependent()
+        original_2rdm_aaaa, original_2rdm_aabb, _ = wfn_cas.get_active_two_rdm_spin_dependent()
 
         # Save and reload using tmp_path
         h5_file = tmp_path / "test_wavefunction.wavefunction.h5"
@@ -1284,7 +1284,7 @@ class TestWavefunctionRdmIntegraion:
         after_1rdm_aa, _ = wfn_loaded.get_active_one_rdm_spin_dependent()
 
         assert wfn_loaded.has_two_rdm_spin_dependent(), "two rdm is not available"
-        after_2rdm_aabb, after_2rdm_aaaa, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
+        after_2rdm_aaaa, after_2rdm_aabb, _ = wfn_loaded.get_active_two_rdm_spin_dependent()
 
         assert np.allclose(original_1rdm_aa, after_1rdm_aa, atol=rdm_tolerance)
         assert np.allclose(original_2rdm_aaaa, after_2rdm_aaaa, atol=rdm_tolerance)

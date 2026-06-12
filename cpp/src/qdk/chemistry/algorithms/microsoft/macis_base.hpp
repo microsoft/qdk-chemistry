@@ -113,7 +113,7 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  *    (coeffs, dets, orbitals)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, two_rdm_spin_traced)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
- *       two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
+ *       two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb,
  *       single_orbital_entropies, mutual_information, type)
  *
  * @tparam Container Concrete wavefunction container class.
@@ -247,8 +247,8 @@ inline data::Wavefunction build_wavefunction(
       computed_entropies.has_any()) {
     container = std::make_unique<Container>(
         C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
-        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aabb),
-        to_vv(two_aaaa), to_vv(two_bbbb), "electrons", computed_entropies,
+        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aaaa),
+        to_vv(two_aabb), to_vv(two_bbbb), "electrons", computed_entropies,
         data::WavefunctionType::SelfDual);
   } else {
     container = std::make_unique<Container>(

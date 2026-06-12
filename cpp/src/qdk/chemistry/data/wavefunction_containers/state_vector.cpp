@@ -38,8 +38,8 @@ StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
                            std::nullopt,  // two_rdm_spin_traced
-                           std::nullopt,  // two_rdm_aabb
                            std::nullopt,  // two_rdm_aaaa
+                           std::nullopt,  // two_rdm_aabb
                            std::nullopt,  // two_rdm_bbbb
                            sector, OrbitalEntropies{}, type) {
   QDK_LOG_TRACE_ENTERING();
@@ -98,8 +98,8 @@ StateVectorContainer::StateVectorContainer(
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
                            two_rdm_spin_traced,
-                           std::nullopt,  // two_rdm_aabb
                            std::nullopt,  // two_rdm_aaaa
+                           std::nullopt,  // two_rdm_aabb
                            std::nullopt,  // two_rdm_bbbb
                            sector, entropies, type) {
   QDK_LOG_TRACE_ENTERING();
@@ -112,12 +112,12 @@ StateVectorContainer::StateVectorContainer(
     const std::optional<MatrixVariant>& one_rdm_aa,
     const std::optional<MatrixVariant>& one_rdm_bb,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
+    const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_bbbb, const std::string& sector,
     const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
-                            two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+                            two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb,
                             two_rdm_bbbb, entropies, type),
       _coefficients(coeffs),
       _configuration_set(dets, orbitals, sector) {

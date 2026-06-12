@@ -162,8 +162,8 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,        // one_rdm_aa
                             std::nullopt,        // one_rdm_bb
                             std::nullopt,        // two_rdm_spin_traced
-                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_aaaa
+                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_bbbb
                             OrbitalEntropies{},  // entropies
                             type) {
@@ -178,8 +178,8 @@ WavefunctionContainer::WavefunctionContainer(
                             std::nullopt,  // one_rdm_aa
                             std::nullopt,  // one_rdm_bb
                             two_rdm_spin_traced,
-                            std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
+                            std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_bbbb
                             entropies, type) {
   QDK_LOG_TRACE_ENTERING();
@@ -190,8 +190,8 @@ WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_aa,
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_bb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
-    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_aaaa,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
     const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(
@@ -279,9 +279,9 @@ WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
                                          ContainerTypes::VectorVariant> {
         return std::make_tuple(
             ContainerTypes::VectorVariant{sbt.block(
-                {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})},
-            ContainerTypes::VectorVariant{sbt.block(
                 {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})},
+            ContainerTypes::VectorVariant{sbt.block(
+                {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})},
             ContainerTypes::VectorVariant{sbt.block(
                 {axes::beta(), axes::beta(), axes::beta(), axes::beta()})});
       },
