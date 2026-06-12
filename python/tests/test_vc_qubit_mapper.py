@@ -114,7 +114,11 @@ def _jw_eigenvalues_spinless(n_rows: int, n_cols: int, t: float = 1.0) -> np.nda
             h_jw += h_nm / 2 * kron_term({n: "X", m: "X", **z_ops})
             h_jw += h_nm / 2 * kron_term({n: "Y", m: "Y", **z_ops})
 
-    return np.sort(np.real(np.linalg.eigvalsh(h_jw)))
+    single = np.real(np.linalg.eigvalsh(h_jw))
+    # VC mapper produces two decoupled copies (alpha + beta blocks);
+    # the combined spectrum is all pairwise sums of the single-block spectrum.
+    pairwise = np.add.outer(single, single).ravel()
+    return np.sort(pairwise)
 
 
 def _vc_codespace_eigenvalues(qh: QubitHamiltonian, n_sites: int) -> np.ndarray:
@@ -132,11 +136,12 @@ def _vc_codespace_eigenvalues(qh: QubitHamiltonian, n_sites: int) -> np.ndarray:
         "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
         "Z": np.array([[1, 0], [0, -1]], dtype=complex),
     }
-    dim_phys = 2**n_sites
+    n_phys = 2 * n_sites
+    dim_phys = 2**n_phys
     h_cs = np.zeros((dim_phys, dim_phys), dtype=complex)
     for ps, coeff in zip(qh.pauli_strings, qh.coefficients, strict=False):
-        aux_chars = ps[:n_sites]
-        phys_chars = ps[n_sites:]
+        aux_chars = ps[:n_phys]
+        phys_chars = ps[n_phys:]
         if any(ch in ("X", "Y") for ch in aux_chars):
             continue
         mat = np.array([[1.0 + 0j]])
@@ -175,13 +180,13 @@ class TestVCMappingConstruction:
         """Test that mapper.run returns a valid QubitHamiltonian."""
         ham = _spinless_fh_hamiltonian(n_rows, n_cols)
         qh = _vc_run(n_rows, n_cols, ham)
-        n_modes = n_rows * n_cols
+        n_sites = n_rows * n_cols
         assert isinstance(qh, QubitHamiltonian)
-        assert qh.num_qubits == 2 * n_modes
+        assert qh.num_qubits == 4 * n_sites
         assert qh.encoding == "verstraete-cirac"
         assert len(qh.pauli_strings) > 0
         for ps in qh.pauli_strings:
-            assert len(ps) == 2 * n_modes
+            assert len(ps) == 4 * n_sites
 
     def test_invalid_lattice_raises(self):
         """Test that invalid lattice shapes raise ValueError."""
@@ -348,10 +353,15 @@ class TestVCCorrectness:
         np.testing.assert_array_equal(qh1.coefficients, qh2.coefficients)
 
     def test_qubit_count_formula(self):
-        """Test that qubit count equals 2 * n_rows * n_cols."""
+        """Test that qubit count equals 4 * n_rows * n_cols.
+
+        The mapper builds its MajoranaMapping with N = 2 * n_sites modes
+        (alpha + beta spin-orbital blocks for the C++ engine), giving
+        num_qubits = 2 * N = 4 * n_sites.
+        """
         for n_rows, n_cols in [(2, 2), (2, 3), (3, 3), (4, 4)]:
             qh = _vc_run(n_rows, n_cols, _spinless_fh_hamiltonian(n_rows, n_cols))
-            assert qh.num_qubits == 2 * n_rows * n_cols
+            assert qh.num_qubits == 4 * n_rows * n_cols
 
     def test_threshold_prunes_small_terms(self):
         """Test that a large threshold removes Pauli terms."""

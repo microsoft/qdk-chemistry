@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry._core.data import majorana_map_hamiltonian, sparse_pauli_word_to_label
 from qdk_chemistry.algorithms.qubit_mapper.qubit_mapper import QubitMapper
 from qdk_chemistry.data import MajoranaMapping
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
@@ -29,20 +30,6 @@ if TYPE_CHECKING:
     from qdk_chemistry.data import Hamiltonian
 
 __all__ = ["VerstraeteCiracQubitMapper", "build_vc_majorana_mapping"]
-
-
-def _pauli_str(n_qubits: int, ops: dict) -> str:
-    """Build a Pauli string in QDK/Chemistry little-endian convention.
-
-    String position 0 (leftmost) = qubit n_qubits-1 (most significant).
-    String position -1 (rightmost) = qubit 0 (least significant).
-    Qubit index qi maps to string position n_qubits - 1 - qi.
-    This matches the convention used by QubitHamiltonian.to_matrix().
-    """
-    chars = ["I"] * n_qubits
-    for qi, op in ops.items():
-        chars[n_qubits - 1 - qi] = op
-    return "".join(chars)
 
 
 def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
@@ -95,18 +82,18 @@ def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
 class VerstraeteCiracQubitMapper(QubitMapper):
     """Fermion-to-qubit mapper using the Verstraete-Cirac encoding.
 
-    Introduces one auxiliary qubit per physical mode on a 2-D lattice.
-    The Majorana operators use Jordan-Wigner on physical qubits combined
-    with a stabilising Z gate on the corresponding auxiliary qubit.
-    Correct fermionic anticommutation {Gamma_a, Gamma_b} = 2 delta_{ab}
-    is guaranteed in the full 2N-qubit Hilbert space.
+    For an n_rows x n_cols lattice with N = 2 * n_rows * n_cols modes
+    (covering both spin-orbital blocks expected by the C++ engine), this
+    mapper builds a MajoranaMapping via ``build_vc_majorana_mapping(N)``
+    and delegates to the C++ Majorana-loop engine
+    (``majorana_map_hamiltonian``) -- the same backend used by
+    :class:`QdkQubitMapper` for Jordan-Wigner and Bravyi-Kitaev. The
+    resulting QubitHamiltonian acts on 2N = 4 * n_rows * n_cols qubits.
 
     Codespace: the +1 eigenspace of the auxiliary Z operators
     (Z_{an} = +1 for all n, auxiliary qubits in state |0>).
-    Physical eigenvalues are recovered by restricting to this sector.
-
-    Note: This is a Python-level prototype. A C++ backend implementation
-    following the pattern of QdkQubitMapper is a planned follow-up.
+    Restricting to this 2N/2-qubit sector recovers the Jordan-Wigner
+    Hamiltonian for the (decoupled alpha + beta) spin-orbital blocks.
 
     Args:
         lattice_shape: (n_rows, n_cols) of the open 2-D lattice.
@@ -127,7 +114,8 @@ class VerstraeteCiracQubitMapper(QubitMapper):
         if lattice_shape[0] < 2 or lattice_shape[1] < 2:
             raise ValueError(f"VC encoding requires at least a 2x2 lattice, got {lattice_shape[0]}x{lattice_shape[1]}.")
         self._lattice_shape = lattice_shape
-        self._mapping = build_vc_majorana_mapping(lattice_shape[0] * lattice_shape[1])
+        n_sites = lattice_shape[0] * lattice_shape[1]
+        self._mapping = build_vc_majorana_mapping(2 * n_sites)
         self._threshold = float(threshold)
         self._integral_threshold = float(integral_threshold)
 
@@ -150,20 +138,19 @@ class VerstraeteCiracQubitMapper(QubitMapper):
         hamiltonian: Hamiltonian,
         mapping: MajoranaMapping | None = None,
     ) -> QubitHamiltonian:
-        """Build the VC qubit Hamiltonian.
+        """Map a fermionic Hamiltonian to a VC qubit Hamiltonian.
 
-        For VC Majorana Gamma_{2n} = JW_{2n} . Z_{an}:
-
-            h_{nm}(a†_n a_m + h.c.)
-              = h/2 * (Xn Z_{n+1}..Z_{m-1} Xm + Yn Z_{n+1}..Z_{m-1} Ym)
-                    * Z_{an} Z_{am}
-
-        In codespace (Z_{an}=+1) this equals the JW Hamiltonian exactly.
+        Delegates to the generic C++ Majorana-loop engine
+        (``majorana_map_hamiltonian``), passing the VC
+        ``MajoranaMapping`` produced by ``build_vc_majorana_mapping``.
+        This automatically handles one-body integrals, two-body
+        integrals, and core energy via the standard fermion-to-Majorana
+        substitution -- the same engine used by ``QdkQubitMapper`` for
+        Jordan-Wigner and Bravyi-Kitaev.
 
         Args:
-            hamiltonian: Fermionic Hamiltonian. Alpha one-body integrals
-                must be (N, N) with N = n_rows * n_cols. Only restricted
-                real-valued one-body Hamiltonians are supported.
+            hamiltonian: Fermionic Hamiltonian. One-body integrals must
+                be (N, N) with N = n_rows * n_cols (single spin species).
             mapping: Optional mapping for API compatibility. Must match
                 self.mapping if supplied.
 
@@ -171,8 +158,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
             QubitHamiltonian on 2N qubits with encoding "verstraete-cirac".
 
         Raises:
-            ValueError: On mapping mismatch, beta-spin channel, complex
-                hoppings, or mode count mismatch.
+            ValueError: On mapping mismatch or mode count mismatch.
 
         """
         Logger.trace_entering()
@@ -187,89 +173,63 @@ class VerstraeteCiracQubitMapper(QubitMapper):
                 f"({self._mapping.num_qubits} qubits)."
             )
 
-        h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
-
-        if h1_beta is not None and not np.allclose(h1_beta, h1_alpha, atol=self._integral_threshold):
-            raise ValueError(
-                "VerstraeteCiracQubitMapper only supports restricted "
-                "(spin-symmetric) one-body Hamiltonians. A non-trivial "
-                "beta-spin channel was detected."
-            )
-
-        if not np.allclose(h1_alpha.imag, 0, atol=self._integral_threshold):
-            raise ValueError(
-                "VerstraeteCiracQubitMapper only supports real-valued "
-                "hopping matrices. Complex off-diagonal elements such as "
-                "Peierls phases are not currently supported."
-            )
-        if not np.allclose(h1_alpha.real, h1_alpha.real.T, atol=self._integral_threshold):
-            raise ValueError(
-                "h1_alpha must be symmetric (Hermitian for real matrices). "
-                "The provided matrix is not close to its transpose."
-            )
-
-        n_sites = h1_alpha.shape[0]
-        n_rows, n_cols = self._lattice_shape
-
-        if n_sites != n_rows * n_cols:
-            raise ValueError(
-                f"Hamiltonian has {n_sites} modes but the {n_rows}x{n_cols} lattice has {n_rows * n_cols} sites."
-            )
-
-        n_modes = n_sites
-        n_qubits = 2 * n_modes
-        identity = "I" * n_qubits
-        pauli_strs: list[str] = []
-        coeffs: list[complex] = []
-
+        base_mapping = self._mapping
         threshold = self._threshold
         integral_threshold = self._integral_threshold
 
-        def _add(ops: dict, coeff: complex) -> None:
-            if abs(coeff) < threshold:
-                return
-            pauli_strs.append(_pauli_str(n_qubits, ops))
-            coeffs.append(coeff)
+        h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+        h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
+        n_spatial = h1_alpha.shape[0]
+        n_rows, n_cols = self._lattice_shape
 
-        # Include constant/core energy contribution to the identity term
-        try:
-            core_energy = float(getattr(hamiltonian, "core_energy", 0.0) or 0.0)
-        except (AttributeError, TypeError):
-            core_energy = 0.0
+        if n_spatial != n_rows * n_cols:
+            raise ValueError(
+                f"Hamiltonian has {n_spatial} modes but the {n_rows}x{n_cols} lattice has {n_rows * n_cols} sites."
+            )
 
-        # Diagonal: h_{nn} * n_n = h_{nn}/2 * (I - Z_{pn})
-        const = core_energy
-        for n in range(n_modes):
-            h_nn = float(h1_alpha[n, n].real)
-            if abs(h_nn) < integral_threshold:
-                continue
-            const += h_nn / 2.0
-            _add({n: "Z"}, complex(-h_nn / 2.0))
+        if base_mapping.num_modes != 2 * n_spatial:
+            raise ValueError(
+                f"MajoranaMapping has {base_mapping.num_modes} modes but "
+                f"the Hamiltonian has {n_spatial} spatial orbitals "
+                f"({2 * n_spatial} spin-orbitals required)."
+            )
 
-        if abs(const) >= threshold:
-            pauli_strs.append(identity)
-            coeffs.append(complex(const))
+        spin_symmetric = hamiltonian.get_orbitals().is_restricted()
 
-        # Off-diagonal hopping with JW Z-string + auxiliary Z's
-        for n in range(n_modes):
-            for m in range(n + 1, n_modes):
-                h_nm = float(h1_alpha[n, m].real + h1_alpha[m, n].real) / 2.0
-                if abs(h_nm) < integral_threshold:
-                    continue
-                scale = h_nm / 2.0
-                z_mid = dict.fromkeys(range(n + 1, m), "Z")
-                _add({n: "X", m: "X", n_modes + n: "Z", n_modes + m: "Z"} | z_mid, scale)
-                _add({n: "Y", m: "Y", n_modes + n: "Z", n_modes + m: "Z"} | z_mid, scale)
+        h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
+        h1_b_flat = h1_a_flat if spin_symmetric else np.ascontiguousarray(h1_beta).ravel()
+        h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
+        h2_aabb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_aabb).ravel()
+        h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
 
-        if not pauli_strs:
-            pauli_strs = [identity]
-            coeffs = [0.0 + 0j]
+        core_energy = float(hamiltonian.get_core_energy())
 
-        Logger.debug(f"VC mapper: {len(pauli_strs)} Pauli terms on {n_qubits} qubits")
+        words, coefficients = majorana_map_hamiltonian(
+            base_mapping,
+            core_energy,
+            h1_a_flat,
+            h1_b_flat,
+            h2_aaaa_flat,
+            h2_aabb_flat,
+            h2_bbbb_flat,
+            n_spatial,
+            spin_symmetric,
+            threshold,
+            integral_threshold,
+        )
+
+        n_qubits = base_mapping.num_qubits
+        pauli_strings = [sparse_pauli_word_to_label(word, n_qubits) for word in words]
+
+        if not pauli_strings:
+            pauli_strings = ["I" * n_qubits]
+            coefficients = [0.0 + 0j]
+
+        Logger.debug(f"VC mapper: {len(pauli_strings)} Pauli terms on {n_qubits} qubits")
 
         return QubitHamiltonian(
-            pauli_strings=pauli_strs,
-            coefficients=np.array(coeffs, dtype=complex),
+            pauli_strings=pauli_strings,
+            coefficients=np.array(coefficients, dtype=complex),
             encoding="verstraete-cirac",
             fermion_mode_order=None,
         )
