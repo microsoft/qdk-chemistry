@@ -27,6 +27,11 @@ namespace data {
 // Project a symmetry-blocked index set onto the legacy (alpha, beta) index
 // vectors used by v1 accessors. A spin axis maps to its alpha/beta segments; no
 // spin axis maps the single trivial-label segment onto both channels.
+//
+// NOTE: the trivial-symmetry path intentionally duplicates the mode indices
+// into both alpha and beta. This keeps Orbitals construction/serialization
+// working for spinless ModelOrbitals. Sz-only semantics are guarded at the
+// Wavefunction level (see _read_spin_count / _read_spin_occupations).
 static std::pair<std::vector<size_t>, std::vector<size_t>>
 v1_indices_from_index_set(const SymmetryBlockedIndexSet& index_set) {
   auto to_vec = [](std::span<const std::uint32_t> s) {

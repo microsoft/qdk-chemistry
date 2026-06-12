@@ -883,6 +883,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       }
     }
 
+    // Legacy container_type values "cas" and "sci" are accepted here to
+    // support forward-looking back-compat: once the deferred 0.1.0 reader is
+    // implemented (bypassing the version gate above), existing cas/sci files
+    // will load through this path without additional changes.
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci") {
       return std::make_unique<StateVectorContainer>(
@@ -890,9 +894,9 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
           sector, entropies, type);
     } else {
       throw std::runtime_error(
-          "Did not expect to get here for containers other than "
-          "state_vector/cas/sci. Expected delegation to container-specific "
-          "methods.");
+          "Unrecognized container_type '" + container_type +
+          "' in WavefunctionContainer::from_json. Expected 'state_vector', "
+          "'cas', or 'sci'.");
     }
   } catch (const std::exception& e) {
     throw std::runtime_error("JSON error: " + std::string(e.what()));

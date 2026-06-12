@@ -214,9 +214,8 @@ TEST_F(WavefunctionCoreTest, ExplicitElectronAndOccupationFunctions) {
   // Create a CAS wavefunction for testing
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> dets = {Configuration("2200")};
-  Eigen::VectorXcd coeffs(3);
-  coeffs << std::complex<double>(0.5, 0.0), std::complex<double>(0.5, 0.0),
-      std::complex<double>(1.0 / sqrt(2), 0.0);
+  Eigen::VectorXcd coeffs(1);
+  coeffs << std::complex<double>(1.0, 0.0);
 
   // one rdm for occupation
   Eigen::MatrixXd one_rdm = Eigen::MatrixXd::Zero(4, 4);

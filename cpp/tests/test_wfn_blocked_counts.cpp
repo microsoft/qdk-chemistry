@@ -74,3 +74,36 @@ TEST_F(WavefunctionBlockedCountsTest, TotalCountMatchesV1) {
   EXPECT_EQ(total->value(axes::alpha()), n_alpha);
   EXPECT_EQ(total->value(axes::beta()), n_beta);
 }
+
+// --------------------------------------------------------------------------
+// Generic (spinless) wavefunction — trivial symmetry, no spin axis.
+// --------------------------------------------------------------------------
+
+TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
+  // ModelOrbitals with no symmetry arg → trivial (spinless) single-particle
+  // basis. This demonstrates the "generic wavefunction" construction path:
+  // a linear combination of bitstrings with no spin structure.
+  auto orbitals = std::make_shared<ModelOrbitals>(4);
+
+  // Two-determinant expansion over 4 modes.
+  // Occupation characters use the fermionic alphabet, but with trivial
+  // symmetry the container aggregates into a single block.
+  Configuration det1("ud00");  // 2 occupied modes
+  Configuration det2("u0d0");  // 2 occupied modes
+  Eigen::VectorXd coeffs(2);
+  coeffs << 0.9, 0.1;
+  StateVectorContainer sv(
+      ContainerTypes::VectorVariant{coeffs},
+      ContainerTypes::DeterminantVector{det1, det2}, orbitals);
+
+  // Active electron count is a single trivial block (no spin axis).
+  auto count = sv.active_num_electrons();
+  ASSERT_NE(count, nullptr);
+  EXPECT_FALSE(count->symmetries()[0]->has_axis(AxisName::Spin));
+
+  // Sz-dependent v1 accessors must throw — there is no spin axis.
+  EXPECT_THROW(sv.get_active_num_electrons(), std::runtime_error);
+  EXPECT_THROW(sv.get_total_num_electrons(), std::runtime_error);
+  EXPECT_THROW(sv.get_active_orbital_occupations(), std::runtime_error);
+  EXPECT_THROW(sv.get_total_orbital_occupations(), std::runtime_error);
+}

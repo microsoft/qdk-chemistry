@@ -123,24 +123,14 @@ void ConfigurationSet::_validate_configurations() const {
   QDK_LOG_TRACE_ENTERING();
 
   if (_configurations.empty()) {
-    // Empty set is valid
     return;
   }
 
-  // Validate internal consistency by checking that all configurations
-  // in the set have the same number of orbitals.
-  // Access _num_orbitals directly through friend class relationship.
-
+  // Structural check: all configurations must have the same orbital capacity.
   size_t first_config_orbitals = _configurations[0].get_orbital_capacity();
-
-  // Check that all configurations have the same electron count
-  auto [first_n_alpha, first_n_beta] = _configurations[0].get_n_electrons();
-  size_t first_total_electrons = first_n_alpha + first_n_beta;
 
   for (size_t i = 1; i < _configurations.size(); ++i) {
     size_t config_num_orbitals = _configurations[i].get_orbital_capacity();
-
-    // Check consistency within the set - all configs should have same size
     if (config_num_orbitals != first_config_orbitals) {
       throw std::invalid_argument(
           "ConfigurationSet: configuration at index " + std::to_string(i) +
@@ -149,36 +139,19 @@ void ConfigurationSet::_validate_configurations() const {
           std::to_string(first_config_orbitals) + " orbitals. " +
           "All configurations in a set must have the same number of orbitals.");
     }
-
-    // Check that all configurations have the same electron count
-    auto [n_alpha, n_beta] = _configurations[i].get_n_electrons();
-    size_t total_electrons = n_alpha + n_beta;
-    if (total_electrons != first_total_electrons) {
-      throw std::invalid_argument(
-          "ConfigurationSet: configuration at index " + std::to_string(i) +
-          " has " + std::to_string(total_electrons) +
-          " electrons (α=" + std::to_string(n_alpha) +
-          ", β=" + std::to_string(n_beta) + "), but configuration 0 has " +
-          std::to_string(first_total_electrons) +
-          " electrons (α=" + std::to_string(first_n_alpha) +
-          ", β=" + std::to_string(first_n_beta) +
-          "). All configurations in a set must have the same number of "
-          "electrons.");
-    }
   }
 
-  // If orbitals are provided with active space, validate configurations against
-  // active space requirements Note: Configurations only represent the active
-  // space, not the full orbital space (inactive and virtual orbitals are not
-  // included in the configuration representation)
+  // If orbitals define an active space, validate that configurations fit
+  // within it (capacity sufficient, no occupation beyond the active window).
+  // NOTE: particle-number and spin-conservation checks are intentionally
+  // omitted here — they are many-body symmetry constraints that will be
+  // enforced by an optional many-body SymmetryProduct parameter in a future
+  // PR.  Keeping them out avoids baking Sz assumptions into the structural
+  // validation layer.
   if (_orbitals && _orbitals->has_active_space()) {
     auto [alpha_active, beta_active] = _orbitals->get_active_space_indices();
-
-    // For restricted calculations, use alpha indices (they should be the same)
     const auto& active_indices = alpha_active;
 
-    // Validate that configuration has sufficient orbital capacity for the
-    // active space
     if (!active_indices.empty()) {
       size_t active_space_size = active_indices.size();
 
@@ -186,8 +159,6 @@ void ConfigurationSet::_validate_configurations() const {
         const auto& config = _configurations[i];
         const std::string config_str = config.to_string();
 
-        // The configuration must have at least as many orbitals as the active
-        // space size
         if (config.get_orbital_capacity() < active_space_size) {
           throw std::invalid_argument(
               "ConfigurationSet: configuration at index " + std::to_string(i) +
@@ -197,8 +168,6 @@ void ConfigurationSet::_validate_configurations() const {
               std::to_string(active_space_size) + " orbitals).");
         }
 
-        // Validate that any orbitals beyond the active space size are
-        // unoccupied (no "overhanging" electrons)
         for (size_t orbital_idx = active_space_size;
              orbital_idx < config.get_orbital_capacity(); ++orbital_idx) {
           if (orbital_idx < config_str.length() &&

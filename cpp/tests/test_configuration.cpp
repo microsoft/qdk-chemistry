@@ -299,16 +299,16 @@ TEST_F(ConfigurationSetTest, RejectDifferentOrbitalCapacity) {
                std::invalid_argument);
 }
 
-TEST_F(ConfigurationSetTest, RejectDifferentElectronCount) {
-  // Configurations with same orbital capacity but different electron counts
+TEST_F(ConfigurationSetTest, AcceptDifferentElectronCount) {
+  // Particle-number conservation is a many-body symmetry constraint, not a
+  // structural one. ConfigurationSet accepts mixed-N expansions; conservation
+  // will be enforced by an optional many-body SymmetryProduct in a future PR.
   std::vector<Configuration> configs = {
-      Configuration("2ud0"),  // 4 electrons (2+1+1+0)
-      Configuration("2u00")   // 3 electrons (2+1+0+0) - different!
+      Configuration("2ud0"),  // 4 electrons
+      Configuration("2u00")   // 3 electrons
   };
 
-  // Should throw - different electron counts
-  EXPECT_THROW(ConfigurationSet(configs, orbitals_with_active),
-               std::invalid_argument);
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
 }
 
 TEST_F(ConfigurationSetTest, RejectOverhangingElectrons) {

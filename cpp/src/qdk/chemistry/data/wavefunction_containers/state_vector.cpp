@@ -122,6 +122,16 @@ StateVectorContainer::StateVectorContainer(
       _coefficients(coeffs),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
+  auto n_coeffs = detail::is_vector_variant_complex(coeffs)
+                      ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
+                      : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
+  if (n_coeffs != dets.size()) {
+    throw std::invalid_argument(
+        "StateVectorContainer: coefficient vector size (" +
+        std::to_string(n_coeffs) +
+        ") does not match the number of determinants (" +
+        std::to_string(dets.size()) + ").");
+  }
 }
 
 StateVectorContainer::StateVectorContainer(
@@ -140,6 +150,16 @@ StateVectorContainer::StateVectorContainer(
       _coefficients(coeffs),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
+  auto n_coeffs = detail::is_vector_variant_complex(coeffs)
+                      ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
+                      : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
+  if (n_coeffs != dets.size()) {
+    throw std::invalid_argument(
+        "StateVectorContainer: coefficient vector size (" +
+        std::to_string(n_coeffs) +
+        ") does not match the number of determinants (" +
+        std::to_string(dets.size()) + ").");
+  }
 }
 
 // ---------------------------------------------------------------------------
