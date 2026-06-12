@@ -194,6 +194,8 @@ class CanonicalFourCenterHamiltonianContainer : public HamiltonianContainer {
   bool is_valid() const override final;
 
  protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// two-body integrals
   std::shared_ptr<const SymmetryBlockedTensor<4>> _two_body;
 

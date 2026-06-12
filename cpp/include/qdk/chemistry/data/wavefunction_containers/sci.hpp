@@ -256,6 +256,8 @@ class SciWavefunctionContainer : public WavefunctionContainer {
   bool has_configuration_set() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
   // Coefficients of the wavefunction
