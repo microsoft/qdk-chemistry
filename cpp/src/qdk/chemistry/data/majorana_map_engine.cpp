@@ -551,10 +551,11 @@ MajoranaMapResult majorana_map_hamiltonian(
   // Redundant encodings (e.g. Verstraete-Cirac) expose stabilizers S that
   // equal +1 on the physical subspace.  Adding lambda*(I - S) per stabilizer
   // leaves codespace eigenvalues unchanged (I - S = 0 there) while lifting
-  // non-codespace states by >= 2*lambda.  Choosing lambda above the physical
-  // operator's 1-norm guarantees the physical spectrum stays lowest.  This is
-  // applied uniformly for any mapping; mappings without stabilizers (the
-  // common case) skip it entirely.
+  // non-codespace states by >= 2*lambda.  lambda is set from the 1-norm of
+  // the mapped terms returned above (post-threshold), plus a unit margin;
+  // penalty terms are protected from thresholding below, so this separates
+  // the codespace from lifted states in practice.  Mappings without
+  // stabilizers (the common case) skip this block entirely.
   const auto& stabilizers = mapping.stabilizers();
   if (stabilizers.empty()) {
     return result;

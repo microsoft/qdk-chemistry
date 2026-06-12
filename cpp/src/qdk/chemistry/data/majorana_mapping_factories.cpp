@@ -347,10 +347,12 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
 // operators.  The construction is fully general over the input graph — no
 // lattice type is pattern-matched:
 //
-//   1. Recover a 2D layout from connectivity alone with a single
-//      corner-seeded propagation that accepts both axis-aligned and
-//      diagonal nearest-neighbour bonds (squares, rectangles, and
-//      triangular lattices are all instances, not special cases).
+//   1. Recover a 2D layout from connectivity alone: corner seed plus
+//      king's-move constraint propagation, with backtracking when several
+//      grid cells remain ambiguous.  Axis-aligned and diagonal nearest-
+//      neighbour bonds are both accepted (square, rectangular, and
+//      triangular lattices are instances of the same embedding problem, not
+//      separate code paths).
 //   2. Order sites along a boustrophedon ("snake") path; combined qubit
 //      2*s carries the physical mode and 2*s+1 its auxiliary partner.
 //   3. Build the auxiliary coupling graph as a vertex-disjoint cover of
@@ -639,6 +641,19 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
   if (n == 0) {
     throw std::invalid_argument(
         "MajoranaMapping::verstraete_cirac requires a non-empty lattice");
+  }
+  // The factory materializes O(M^2) Majorana bilinears (M = 4*n_sites).  Cap
+  // the lattice size so oversized inputs fail fast with a clear message instead
+  // of exhausting memory (acceptance tests exercise up to 4x4 sites).
+  constexpr std::size_t kMaxVcSitesPerSpecies = 25;
+  if (n > kMaxVcSitesPerSpecies) {
+    throw std::invalid_argument(
+        "MajoranaMapping::verstraete_cirac: lattice has " + std::to_string(n) +
+        " sites per spin species, which exceeds the "
+        "supported maximum of " +
+        std::to_string(kMaxVcSitesPerSpecies) +
+        " (the factory precomputes all Majorana bilinears and is intended "
+        "for modest 2D lattices)");
   }
 
   // Build undirected adjacency from the sparse matrix.

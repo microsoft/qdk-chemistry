@@ -268,15 +268,16 @@ class MajoranaMapping : public DataClass {
    *
    * Builds a locality-preserving fermion-to-qubit encoding directly from the
    * edges of a 2D ``LatticeGraph``.  The 2D site layout is recovered from
-   * connectivity alone by one general algorithm that accepts axis-aligned
-   * and diagonal nearest-neighbour bonds, so square, rectangular, and
-   * triangular lattices are all handled uniformly rather than as special
-   * cases.  Each lattice site is paired with one auxiliary qubit;
-   * horizontal and vertical hopping terms map to constant-weight Pauli
-   * operators independent of system size (diagonal bonds are decorated by
-   * products of auxiliary bilinears along the auxiliary coupling graph and
-   * may carry larger weight).  The encoding acts on the physical subspace
-   * defined by the returned ``stabilizers()``.
+   * connectivity alone by one general embedding algorithm (king's-move
+   * constraint propagation with backtracking on ambiguous cells).  Axis-
+   * aligned and diagonal nearest-neighbour bonds are both accepted, so
+   * square, rectangular, and triangular lattices are handled uniformly
+   * rather than as special cases.  Each lattice site is paired with one
+   * auxiliary qubit; horizontal and vertical hopping terms map to
+   * constant-weight Pauli operators independent of system size (diagonal bonds
+   * are decorated by products of auxiliary bilinears along the auxiliary
+   * coupling graph and may carry larger weight).  The encoding acts on the
+   * physical subspace defined by the returned ``stabilizers()``.
    *
    * The lattice describes a single spin species (``n_sites`` sites); the
    * factory produces a mapping with ``num_modes == 2 * n_sites`` (one
@@ -293,7 +294,8 @@ class MajoranaMapping : public DataClass {
    * @param lattice A single connected 2D nearest-neighbour lattice (e.g.
    *        ``LatticeGraph::square`` or ``LatticeGraph::triangular``).
    * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
-   * @throws std::invalid_argument If the lattice is empty, is effectively
+   * @throws std::invalid_argument If the lattice is empty, exceeds the
+   *         supported site count (25 per spin species), is effectively
    *         one-dimensional, or its connectivity cannot be embedded as a 2D
    *         nearest-neighbour layout on a rectangular site grid.
    *

@@ -253,14 +253,11 @@ nlohmann::json MajoranaMapping::to_json() const {
     }
     data["bilinears"] = bl_array;
   }
-  // Persist the qubit count whenever stabilizers are present: an auxiliary
-  // qubit referenced only by stabilizers (not by the table or bilinears) would
-  // otherwise be lost on reload.
+  // Codespace stabilizers (redundant encodings only).  Persist num_qubits too:
+  // an auxiliary qubit referenced only by stabilizers would otherwise be lost
+  // on reload.
   if (!stabilizers_.empty()) {
     data["num_qubits"] = num_qubits_;
-  }
-  // Codespace stabilizers (redundant encodings only).
-  if (!stabilizers_.empty()) {
     nlohmann::json stab_array = nlohmann::json::array();
     for (const auto& [coeff, word] : stabilizers_) {
       stab_array.push_back(

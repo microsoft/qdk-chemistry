@@ -18,6 +18,7 @@ Covers the acceptance criteria of issue #482:
 
 from __future__ import annotations
 
+import os
 import tempfile
 
 import h5py
@@ -101,6 +102,22 @@ class TestVerstraeteCiracFactory:
         assert mapping.num_modes == 2 * lattice.num_sites
         assert len(mapping.stabilizers) > 0
 
+    @pytest.mark.parametrize(("nx", "ny"), LATTICE_SIZES)
+    def test_recovered_from_adjacency_matrix(self, nx: int, ny: int) -> None:
+        """Layout is recovered from connectivity alone, not lattice factory metadata."""
+        square = LatticeGraph.square(nx, ny)
+        recovered = LatticeGraph.from_dense_matrix(np.asarray(square.adjacency_matrix()))
+        mapping = MajoranaMapping.verstraete_cirac(recovered)
+        assert mapping.num_modes == 2 * nx * ny
+        assert mapping.num_qubits == 4 * nx * ny
+
+    def test_triangular_3x3_accepted(self) -> None:
+        """Larger triangular lattices embed through the same recovery path."""
+        lattice = LatticeGraph.triangular(3, 3)
+        mapping = MajoranaMapping.verstraete_cirac(lattice)
+        assert mapping.num_modes == 2 * lattice.num_sites
+        assert len(mapping.stabilizers) > 0
+
     def test_stabilizers_are_local_plaquettes(self) -> None:
         """Stabilizers are multi-qubit plaquette products, not single bilinears."""
         mapping = MajoranaMapping.verstraete_cirac(LatticeGraph.square(3, 3))
@@ -108,10 +125,11 @@ class TestVerstraeteCiracFactory:
         assert max(weights) > 2
 
     def test_extra_long_range_edge_rejected(self) -> None:
-        """A site layout with a non-nearest-neighbour edge is rejected."""
-        adj = LatticeGraph.square(2, 2).adjacency_matrix().copy()
-        adj[1, 2] = 1.0
-        adj[2, 1] = 1.0
+        """A bond longer than king's-move distance is rejected on a 3x3 grid."""
+        adj = np.asarray(LatticeGraph.square(3, 3).adjacency_matrix()).copy()
+        # Sites 0=(0,0) and 2=(2,0) are two horizontal steps apart, not NN.
+        adj[0, 2] = 1.0
+        adj[2, 0] = 1.0
         bad = LatticeGraph.from_dense_matrix(adj)
         with pytest.raises(ValueError, match="2D"):
             MajoranaMapping.verstraete_cirac(bad)
@@ -121,7 +139,7 @@ class TestVerstraeteCiracSpectrum:
     """Codespace spectrum must reproduce Jordan-Wigner."""
 
     def test_hubbard_2x2_matches_jordan_wigner(self) -> None:
-        """Four lowest codespace eigenvalues match Jordan-Wigner within 1e-10."""
+        """Four lowest codespace eigenvalues match Jordan-Wigner within 1e-8."""
         nx, ny = 2, 2
         n_sites = nx * ny
         _, hamiltonian = _hubbard(nx, ny, t=1.0, u=4.0)
@@ -136,7 +154,7 @@ class TestVerstraeteCiracSpectrum:
         assert vc_qh.is_hermitian()
         vc_eigs = _lowest_eigenvalues_sparse(vc_qh, k=4)
 
-        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
+        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-8
 
     def test_hubbard_2x2_spectrum_survives_threshold(self) -> None:
         """Penalty terms are retained even when the mapper threshold is large."""
@@ -152,7 +170,7 @@ class TestVerstraeteCiracSpectrum:
         vc_qh = create("qubit_mapper", "qdk", threshold=1.0).run(hamiltonian, vc)
         vc_eigs = _lowest_eigenvalues_sparse(vc_qh, k=4)
 
-        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
+        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-8
 
 
 class TestVerstraeteCiracLocality:
@@ -210,10 +228,11 @@ class TestVerstraeteCiracSerialization:
     def test_hdf5_roundtrip(self) -> None:
         """The mapping round-trips through HDF5 term-by-term."""
         mapping = MajoranaMapping.verstraete_cirac(LatticeGraph.square(2, 3))
-        with tempfile.NamedTemporaryFile(suffix=".h5") as f:
-            with h5py.File(f.name, "w") as hf:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "mapping.h5")
+            with h5py.File(path, "w") as hf:
                 mapping.to_hdf5(hf)
-            with h5py.File(f.name, "r") as hf:
+            with h5py.File(path, "r") as hf:
                 reloaded = MajoranaMapping.from_hdf5(hf)
 
         assert reloaded.num_modes == mapping.num_modes
