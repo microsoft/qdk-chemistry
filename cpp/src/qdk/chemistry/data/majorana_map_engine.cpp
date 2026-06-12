@@ -351,8 +351,10 @@ struct SparseEriProvider {
   // Canonical representatives, sorted lexicographically.
   std::vector<Entry> entries_;
   std::size_t n_ = 0;
-  // Scratch row for the unrestricted branch (sparse containers are always
-  // restricted in practice, but the engine must stay correct if reached).
+  // Scratch row for the unrestricted branch.  The sparse entry point
+  // enforces spin_symmetric=true, so this branch is never reached at
+  // runtime; the row accessors below only keep the provider conforming to
+  // the engine's compile-time interface.
   mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
@@ -796,6 +798,18 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     const double* two_body_values, std::size_t num_entries,
     std::size_t n_spatial, bool spin_symmetric, double threshold,
     double integral_threshold) {
+  // The sparse fast path is spin-summed: SparseHamiltonianContainer is
+  // restricted-only, so all spin channels share the same integrals and the
+  // unrestricted branch would only redo identical work per channel.  Callers
+  // with unrestricted orbitals must use the dense entry point instead.
+  if (!spin_symmetric) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian_sparse: the sparse fast path requires "
+        "spin_symmetric=true (restricted orbitals); use "
+        "majorana_map_hamiltonian with dense integrals for unrestricted "
+        "Hamiltonians.");
+  }
+
   detail::SparseEriProvider provider;
   provider.n_ = n_spatial;
 
@@ -832,6 +846,17 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
   };
   std::map<Key4, Partner> partners;
   for (std::size_t e = 0; e < num_entries; ++e) {
+    // Validate before the int -> size_t cast: a negative index would wrap
+    // to a huge value and read out of bounds downstream (e.g. in sym_map).
+    for (std::size_t component = 0; component < 4; ++component) {
+      const int idx = two_body_indices[4 * e + component];
+      if (idx < 0 || static_cast<std::size_t>(idx) >= n_spatial) {
+        throw std::invalid_argument(
+            "majorana_map_hamiltonian_sparse: two-body index " +
+            std::to_string(idx) + " of entry " + std::to_string(e) +
+            " is outside [0, " + std::to_string(n_spatial) + ").");
+      }
+    }
     const Key4 k{static_cast<std::size_t>(two_body_indices[4 * e + 0]),
                  static_cast<std::size_t>(two_body_indices[4 * e + 1]),
                  static_cast<std::size_t>(two_body_indices[4 * e + 2]),
@@ -861,8 +886,11 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
 
   // Symmetry-expand into the position -> value map (all 8 index
   // permutations of each canonical entry), so scalar lookups and row
-  // builds behave like a fully symmetric dense tensor.  Symmetry classes
-  // partition the index space, so expansions never collide.
+  // builds behave like a fully symmetric dense tensor.  Distinct symmetry
+  // classes partition the index space, so they never write to the same
+  // position; within one class, repeated indices (p==q and/or r==s) make
+  // some permutations coincide, which is benign because every write of a
+  // class carries the same value.
   provider.map_.reserve(canon.size() * 8);
   for (const auto& [c, v] : canon) {
     const std::size_t pq[2][2] = {{c[0], c[1]}, {c[1], c[0]}};

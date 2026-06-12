@@ -348,17 +348,13 @@ Pauli words.
         const Eigen::MatrixXd& h1b = std::get<1>(one_body);
         const std::size_t n = static_cast<std::size_t>(h1a.rows());
 
-        // Flatten one-body integrals to row-major [n*n] as the engine expects.
-        std::vector<double> h1a_flat(n * n);
-        std::vector<double> h1b_flat(n * n);
-        for (std::size_t p = 0; p < n; ++p) {
-          for (std::size_t s = 0; s < n; ++s) {
-            h1a_flat[p * n + s] =
-                h1a(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(s));
-            h1b_flat[p * n + s] =
-                h1b(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(s));
-          }
-        }
+        // Flatten one-body integrals to row-major [n*n] as the engine
+        // expects.  A single Eigen layout-converting copy avoids
+        // per-element access into the column-major source.
+        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic,
+                                             Eigen::Dynamic, Eigen::RowMajor>;
+        const RowMajorMatrix h1a_flat = h1a;
+        const RowMajorMatrix h1b_flat = h1b;
 
         MajoranaMapResult result;
         if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {

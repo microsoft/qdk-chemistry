@@ -386,14 +386,19 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
  * @param h1_alpha One-body integrals, alpha spin (row-major).
  * @param h1_beta One-body integrals, beta spin (row-major).
- * @param two_body_indices Flattened (p,q,r,s) indices, 4 ints per entry.
+ * @param two_body_indices Flattened (p,q,r,s) indices, 4 ints per entry;
+ *        each index must lie in [0, n_spatial).
  * @param two_body_values Integral values, one per entry.
  * @param num_entries Number of stored non-zero two-body integrals.
  * @param n_spatial Number of spatial orbitals.
- * @param spin_symmetric If true, use the spin-summed restricted fast path.
+ * @param spin_symmetric Must be true: the sparse fast path is spin-summed
+ *        (SparseHamiltonianContainer is restricted-only).  Unrestricted
+ *        Hamiltonians must use ::majorana_map_hamiltonian.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
+ * @throws std::invalid_argument If spin_symmetric is false or any two-body
+ *         index is outside [0, n_spatial).
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
