@@ -307,6 +307,21 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
                                 ". Supported types are: json, hdf5");
   }
 
+ protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override {
+    hash_value(ctx, this->get_data_type_name());
+    this->_hash_symmetry_blocked_metadata(ctx);
+    auto groups = this->_sorted_pointer_groups();
+    hash_value(ctx, static_cast<uint64_t>(groups.size()));
+    for (const auto& group : groups) {
+      hash_value(ctx, static_cast<uint64_t>(group.keys.size()));
+      for (const auto& key : group.keys) {
+        this->_hash_labels(ctx, key);
+      }
+      hash_value(ctx, *group.ptr);
+    }
+  }
+
  private:
   /// On-disk serialization format version. Bump on any change to the JSON or
   /// HDF5 shape produced by @ref to_json / @ref to_hdf5.

@@ -248,6 +248,8 @@ class ConfigurationSet : public DataClass {
   static ConfigurationSet from_hdf5_file(const std::string& filename);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Configurations in the set
   std::vector<Configuration> _configurations;
 

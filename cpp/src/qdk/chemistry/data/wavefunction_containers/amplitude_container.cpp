@@ -629,4 +629,27 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
   }
 }
 
+void AmplitudeContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  if (_orbitals) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _orbitals->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  hash_value(ctx, _t1_amplitudes_aa);
+  hash_value(ctx, _t1_amplitudes_bb);
+  hash_value(ctx, _t2_amplitudes_abab);
+  hash_value(ctx, _t2_amplitudes_aaaa);
+  hash_value(ctx, _t2_amplitudes_bbbb);
+}
+
 }  // namespace qdk::chemistry::data

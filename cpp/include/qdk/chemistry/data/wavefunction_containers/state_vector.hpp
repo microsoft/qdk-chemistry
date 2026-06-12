@@ -412,6 +412,11 @@ class StateVectorContainer : public WavefunctionContainer {
    */
   bool has_configuration_set() const override;
 
+  /**
+   * @brief Feed identifying data into a hash context.
+   */
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";

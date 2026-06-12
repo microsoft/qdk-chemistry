@@ -507,6 +507,8 @@ class Orbitals : public DataClass,
   static std::shared_ptr<Orbitals> from_json(const nlohmann::json& j);
 
  protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /**
    * Canonical symmetry-blocked coefficient/energy storage. Both are null for
    * @ref ModelOrbitals, which carries no basis.

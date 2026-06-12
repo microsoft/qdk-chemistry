@@ -305,6 +305,11 @@ class AmplitudeContainer : public WavefunctionContainer {
    */
   bool is_complex() const override;
 
+  /**
+   * @brief Feed identifying data into a hash context.
+   */
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
  private:
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;

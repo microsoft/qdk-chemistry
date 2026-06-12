@@ -34,6 +34,7 @@ from __future__ import annotations
 import json as _json
 from typing import Any
 
+from qdk_chemistry.data._hashing import _hash_int, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 
 __all__ = ["FlatPartition", "LayeredPartition", "TermPartition"]
@@ -155,6 +156,16 @@ class FlatPartition(TermPartition):
         # Freeze after all attributes are set.
         DataClass.__init__(self)
 
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "flat_partition")
+        _hash_str(h, self.strategy)
+        _hash_uint(h, len(self.groups))
+        for group in self.groups:
+            _hash_uint(h, len(group))
+            for idx in group:
+                _hash_int(h, idx)
+
     @property
     def num_groups(self) -> int:
         """Return the number of groups."""
@@ -217,6 +228,18 @@ class LayeredPartition(TermPartition):
         )
         # Freeze after all attributes are set.
         DataClass.__init__(self)
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "layered_partition")
+        _hash_str(h, self.strategy)
+        _hash_uint(h, len(self.groups))
+        for group in self.groups:
+            _hash_uint(h, len(group))
+            for layer in group:
+                _hash_uint(h, len(layer))
+                for idx in layer:
+                    _hash_int(h, idx)
 
     @property
     def num_groups(self) -> int:

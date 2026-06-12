@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms import (
     StabilityChecker,
     StatePreparation,
 )
+from qdk_chemistry.algorithms.hashing import run_content_hash
 from qdk_chemistry.data import (
     AmplitudeContainer,
     AmplitudeType,
@@ -845,6 +846,23 @@ class TestAlgorithmClasses:
             # Test list settings
             settings["list_param"] = [1, 2, 3]
             assert settings["list_param"] == [1, 2, 3]
+
+    def test_run_content_hash_rejects_unsupported_argument_type(self):
+        """Test algorithm hashing rejects non-deterministic unsupported argument types."""
+
+        class UnsupportedArgument:
+            pass
+
+        with pytest.raises(TypeError, match="Unsupported hash argument type"):
+            run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
+
+    def test_run_content_hash_disambiguates_argument_types(self):
+        """Test algorithm hashing tags argument types to avoid cache collisions."""
+        values = [None, False, 0, 0.0, "", b"", [], (), {}, np.array([], dtype=np.float64)]
+
+        hashes = [run_content_hash("test_type", "test_name", Settings(), value) for value in values]
+
+        assert len(set(hashes)) == len(values)
 
     def test_abstract_methods_required(self):
         """Test that abstract methods must be implemented."""
