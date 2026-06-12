@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -10,7 +11,7 @@
 #include <cstdint>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
-#include <qdk/chemistry/utils/hash.hpp>
+#include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -50,14 +51,16 @@ struct PackedPauliWord {
 template <std::size_t NW>
 struct PackedPauliWordHash {
   std::size_t operator()(const PackedPauliWord<NW>& w) const noexcept {
-    std::size_t seed = NW;
+    utils::HashContext ctx;
+    hash_value(ctx, "packed_pauli_word");
+    hash_value(ctx, static_cast<uint64_t>(NW));
     for (std::size_t i = 0; i < NW; ++i) {
-      seed = utils::hash_combine(seed, w.x[i]);
+      hash_value(ctx, static_cast<uint64_t>(w.x[i]));
     }
     for (std::size_t i = 0; i < NW; ++i) {
-      seed = utils::hash_combine(seed, w.z[i]);
+      hash_value(ctx, static_cast<uint64_t>(w.z[i]));
     }
-    return seed;
+    return ctx.hash_code();
   }
 };
 
@@ -557,6 +560,24 @@ MajoranaMapResult majorana_map_hamiltonian(
     return result;
   }
 
+  // Each stabilizer S must be Hermitian with eigenvalues +-1 (coefficient
+  // real and of unit modulus) so that I - S is PSD and vanishes on the
+  // codespace.  Reject malformed mappings up front instead of silently
+  // producing a non-Hermitian penalized Hamiltonian.
+  constexpr double kHermTol = 1e-12;
+  for (const auto& [coeff, word] : stabilizers) {
+    (void)word;
+    if (std::abs(coeff.imag()) > kHermTol ||
+        std::abs(std::abs(coeff.real()) - 1.0) > kHermTol) {
+      throw std::invalid_argument(
+          "majorana_map: codespace stabilizers must be Hermitian "
+          "involutions (real coefficient of unit modulus); got coefficient "
+          "(" +
+          std::to_string(coeff.real()) + ", " + std::to_string(coeff.imag()) +
+          ")");
+    }
+  }
+
   double one_norm = 0.0;
   for (const auto& c : result.coefficients) {
     one_norm += std::abs(c);
@@ -586,14 +607,27 @@ MajoranaMapResult majorana_map_hamiltonian(
     merged[word] += -lambda * coeff;
   }
 
-  MajoranaMapResult penalized;
-  penalized.words.reserve(merged.size());
-  penalized.coefficients.reserve(merged.size());
-  for (auto& [word, coeff] : merged) {
+  // Emit terms in a deterministic (lexicographic Pauli-word) order so the
+  // penalized result is reproducible across runs and platforms instead of
+  // following unordered_map iteration order.
+  std::vector<const SparsePauliWord*> ordered;
+  ordered.reserve(merged.size());
+  for (const auto& [word, coeff] : merged) {
     if (protected_words.count(word) || std::abs(coeff) >= threshold) {
-      penalized.words.push_back(word);
-      penalized.coefficients.push_back(coeff);
+      ordered.push_back(&word);
     }
+  }
+  std::sort(ordered.begin(), ordered.end(),
+            [](const SparsePauliWord* a, const SparsePauliWord* b) {
+              return *a < *b;
+            });
+
+  MajoranaMapResult penalized;
+  penalized.words.reserve(ordered.size());
+  penalized.coefficients.reserve(ordered.size());
+  for (const SparsePauliWord* word : ordered) {
+    penalized.words.push_back(*word);
+    penalized.coefficients.push_back(merged[*word]);
   }
   return penalized;
 }

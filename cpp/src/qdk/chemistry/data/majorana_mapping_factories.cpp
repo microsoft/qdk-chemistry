@@ -6,6 +6,7 @@
 #include <cmath>
 #include <complex>
 #include <cstdint>
+#include <limits>
 #include <map>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
@@ -343,125 +344,41 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
 //
 // The Verstraete-Cirac encoding pairs each lattice site with one auxiliary
 // qubit so that nearest-neighbour hopping maps to constant-weight Pauli
-// operators.  The construction is built from the lattice *edges*:
+// operators.  The construction is fully general over the input graph — no
+// lattice type is pattern-matched:
 //
-//   1. Recognise a 2D site layout (square/triangular grid labelling, or
-//      recover coordinates from connectivity for other planar graphs).
-//   2. Order sites along a boustrophedon ("snake") path; combined qubit 2*s
-//      carries the physical mode and 2*s+1 carries its auxiliary partner.
-//   3. The mapping is the combined Jordan-Wigner transform over the snake,
-//      with every non-path lattice edge decorated by an auxiliary bilinear.
-//   4. Codespace stabilizers are *local* products of auxiliary Majorana
-//      bilinears along the auxiliary-fermion graph (Verstraete-Cirac 2005,
-//      eqs. 80–84; OpenFermion stabilizer_local_2d_square).  Individual
-//      bilinears would JW-map to non-local penalties; the products do not.
+//   1. Recover a 2D layout from connectivity alone with a single
+//      corner-seeded propagation that accepts both axis-aligned and
+//      diagonal nearest-neighbour bonds (squares, rectangles, and
+//      triangular lattices are all instances, not special cases).
+//   2. Order sites along a boustrophedon ("snake") path; combined qubit
+//      2*s carries the physical mode and 2*s+1 its auxiliary partner.
+//   3. Build the auxiliary coupling graph as a vertex-disjoint cover of
+//      directed cycles (column pairs by default).  Whenever a lattice
+//      edge straddles two cycles they are spliced into one, so every
+//      edge's endpoints are always connected in the auxiliary graph.
+//      Because each vertex appears exactly once as a tail (c-Majorana)
+//      and once as a head (d-Majorana), all elementary auxiliary
+//      bilinears P_e = i*c_a*d_b commute pairwise.
+//   4. Every lattice edge that is not snake-adjacent is decorated with
+//      the product of P_e along an auxiliary path between its endpoints.
+//      The decoration is a member of the stabilizer group, hence acts as
+//      +1 on the codespace: the encoded Hamiltonian restricted to the
+//      codespace equals the bare Jordan-Wigner one for *any* lattice.
+//      Vertical bonds use a single auxiliary edge, giving weight-4
+//      hopping terms independent of system size.
+//   5. Codespace stabilizers are *local* products of auxiliary Majorana
+//      bilinears (Verstraete-Cirac 2005, eqs. 80–84): per cycle, one
+//      snake-local seed edge plus all consecutive-edge products.  These
+//      generate the full per-cycle group (unique auxiliary state) while
+//      avoiding the non-local JW images individual long-range bilinears
+//      would have.
 //
-// The lattice describes one spin species; the factory emits two independent
-// Verstraete-Cirac blocks (alpha, then beta) so the result has
-// num_modes = 2 * n_sites and is consumed exactly like a Jordan-Wigner
-// mapping over 2 * n_sites modes.
+// The lattice describes one spin species; the factory emits two
+// independent Verstraete-Cirac blocks (alpha, then beta) so the result
+// has num_modes = 2 * n_sites and is consumed exactly like a
+// Jordan-Wigner mapping over 2 * n_sites modes.
 namespace detail {
-
-enum class VcGridKind { SQUARE, TRIANGULAR, RECOVERED };
-
-struct VcGridLayout {
-  int nx;
-  int ny;
-  VcGridKind kind;
-  std::vector<std::pair<int, int>> coord;
-};
-
-bool vc_has_edge(const std::vector<std::set<std::size_t>>& adj, std::size_t u,
-                 std::size_t v) {
-  return adj[u].count(v) != 0;
-}
-
-std::size_t vc_grid_index(int x, int y, int nx) {
-  return static_cast<std::size_t>(y * nx + x);
-}
-
-bool vc_matches_square_grid(int nx, int ny,
-                            const std::vector<std::set<std::size_t>>& adj) {
-  const std::size_t n = adj.size();
-  if (static_cast<std::size_t>(nx * ny) != n) {
-    return false;
-  }
-  for (int y = 0; y < ny; ++y) {
-    for (int x = 0; x < nx; ++x) {
-      const std::size_t v = vc_grid_index(x, y, nx);
-      if (x + 1 < nx && !vc_has_edge(adj, v, vc_grid_index(x + 1, y, nx))) {
-        return false;
-      }
-      if (y + 1 < ny && !vc_has_edge(adj, v, vc_grid_index(x, y + 1, nx))) {
-        return false;
-      }
-      if (x + 1 < nx && y + 1 < ny &&
-          vc_has_edge(adj, v, vc_grid_index(x + 1, y + 1, nx))) {
-        return false;
-      }
-    }
-  }
-  for (std::size_t v = 0; v < n; ++v) {
-    for (auto w : adj[v]) {
-      if (w <= v) {
-        continue;
-      }
-      const int dx =
-          std::abs(static_cast<int>(v % nx) - static_cast<int>(w % nx));
-      const int dy =
-          std::abs(static_cast<int>(v / nx) - static_cast<int>(w / nx));
-      if (!((dx == 1 && dy == 0) || (dx == 0 && dy == 1))) {
-        return false;
-      }
-      if (dx == 1 && dy == 1) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
-
-bool vc_matches_triangular_grid(int nx, int ny,
-                                const std::vector<std::set<std::size_t>>& adj) {
-  const std::size_t n = adj.size();
-  if (static_cast<std::size_t>(nx * ny) != n) {
-    return false;
-  }
-  for (int y = 0; y < ny; ++y) {
-    for (int x = 0; x < nx; ++x) {
-      const std::size_t v = vc_grid_index(x, y, nx);
-      if (x + 1 < nx && !vc_has_edge(adj, v, vc_grid_index(x + 1, y, nx))) {
-        return false;
-      }
-      if (y + 1 < ny && !vc_has_edge(adj, v, vc_grid_index(x, y + 1, nx))) {
-        return false;
-      }
-      if (x + 1 < nx && y + 1 < ny &&
-          !vc_has_edge(adj, v, vc_grid_index(x + 1, y + 1, nx))) {
-        return false;
-      }
-    }
-  }
-  for (std::size_t v = 0; v < n; ++v) {
-    for (auto w : adj[v]) {
-      if (w <= v) {
-        continue;
-      }
-      const int x0 = static_cast<int>(v % nx);
-      const int y0 = static_cast<int>(v / nx);
-      const int x1 = static_cast<int>(w % nx);
-      const int y1 = static_cast<int>(w / nx);
-      const int dx = std::abs(x0 - x1);
-      const int dy = std::abs(y0 - y1);
-      const bool square_edge = (dx == 1 && dy == 0) || (dx == 0 && dy == 1);
-      const bool diag_edge = (dx == 1 && dy == 1 && x0 < x1 && y0 < y1);
-      if (!square_edge && !diag_edge) {
-        return false;
-      }
-    }
-  }
-  return true;
-}
 
 /// Combined Jordan-Wigner Majorana on `Q`: Z on all qubits < Q, then op on Q
 /// (op = X for the "c" Majorana, Y for the "d" Majorana).
@@ -484,7 +401,8 @@ std::pair<std::complex<double>, SparsePauliWord> vc_pstab(std::size_t a,
   return {std::complex<double>(0.0, 1.0) * phase, std::move(word)};
 }
 
-void vc_multiply_stabilizer(
+/// In-place (coeff, word) *= factor.
+void vc_multiply_term(
     std::complex<double>& coeff, SparsePauliWord& word,
     const std::pair<std::complex<double>, SparsePauliWord>& factor) {
   auto prod = PauliTermAccumulator::multiply_uncached(word, factor.second);
@@ -492,259 +410,161 @@ void vc_multiply_stabilizer(
   word = std::move(prod.second);
 }
 
-int vc_snake_index(int col, int row, int nx) {
-  return row % 2 == 0 ? row * nx + col : (row + 1) * nx - 1 - col;
-}
+struct VcLayout {
+  int nx = 0;
+  int ny = 0;
+  std::vector<std::pair<int, int>> coord;  // (column, row) per site
+};
 
-std::pair<int, int> vc_snake_to_coord(int site, int nx, int ny) {
-  for (int row = 0; row < ny; ++row) {
-    for (int col = 0; col < nx; ++col) {
-      if (vc_snake_index(col, row, nx) == site) {
-        return {col, row};
-      }
+/// Collect grid cells within king's-move distance 1 of (x, y), excluding
+/// (x, y) itself.
+std::vector<std::pair<int, int>> vc_nn_cells(int x, int y) {
+  std::vector<std::pair<int, int>> cells;
+  for (int dx = -1; dx <= 1; ++dx) {
+    for (int dy = -1; dy <= 1; ++dy) {
+      if (dx == 0 && dy == 0) continue;
+      cells.emplace_back(x + dx, y + dy);
     }
   }
-  throw std::invalid_argument(
-      "MajoranaMapping::verstraete_cirac: invalid snake site index");
+  return cells;
 }
 
-/// Local auxiliary stabilizer for a directed edge on the auxiliary graph.
-/// Follows OpenFermion ``stabilizer_local_2d_square`` (products of P_ij).
-std::pair<std::complex<double>, SparsePauliWord> vc_stabilizer_local_edge(
-    int site_from, int site_to, int nx, int ny, std::size_t block_off) {
-  const auto [col_i, row_i] = vc_snake_to_coord(site_from, nx, ny);
-  const auto [col_j, row_j] = vc_snake_to_coord(site_to, nx, ny);
-
-  const std::size_t aux_from =
-      2 * (block_off + static_cast<std::size_t>(site_from)) + 1;
-  const std::size_t aux_to =
-      2 * (block_off + static_cast<std::size_t>(site_to)) + 1;
-
-  auto result = (col_i % 2 == 0) ? vc_pstab(aux_from, aux_to)
-                                 : vc_pstab(aux_to, aux_from);
-
-  if (col_i == col_j && std::abs(row_i - row_j) == 1) {
-    const int top_row = std::min(row_i, row_j);
-    const int col = col_i;
-    if (top_row % 2 == 0) {
-      if (col + 1 < nx) {
-        const int et = vc_snake_index(col + 1, top_row, nx);
-        const int eb = vc_snake_index(col + 1, top_row + 1, nx);
-        const std::size_t aux_et =
-            2 * (block_off + static_cast<std::size_t>(et)) + 1;
-        const std::size_t aux_eb =
-            2 * (block_off + static_cast<std::size_t>(eb)) + 1;
-        const auto extra = ((col + 1) % 2 == 0) ? vc_pstab(aux_et, aux_eb)
-                                                : vc_pstab(aux_eb, aux_et);
-        vc_multiply_stabilizer(result.first, result.second, extra);
-      }
-    } else if (col > 0) {
-      const int et = vc_snake_index(col - 1, top_row, nx);
-      const int eb = vc_snake_index(col - 1, top_row + 1, nx);
-      const std::size_t aux_et =
-          2 * (block_off + static_cast<std::size_t>(et)) + 1;
-      const std::size_t aux_eb =
-          2 * (block_off + static_cast<std::size_t>(eb)) + 1;
-      const auto extra = ((col - 1) % 2 == 0) ? vc_pstab(aux_et, aux_eb)
-                                              : vc_pstab(aux_eb, aux_et);
-      vc_multiply_stabilizer(result.first, result.second, extra);
-    }
-  }
-  return result;
-}
-
-/// Directed edges of the auxiliary-fermion graph (OpenFermion layout).
-std::vector<std::pair<int, int>> vc_auxiliary_graph_edges(int nx, int ny) {
-  std::vector<std::pair<int, int>> edges;
-  for (int k = 0; k < nx; k += 2) {
-    if (k + 1 >= nx) {
-      for (int row = 0; row + 1 < ny; ++row) {
-        edges.emplace_back(vc_snake_index(k, row, nx),
-                           vc_snake_index(k, row + 1, nx));
-      }
-      if (nx > 1) {
-        edges.emplace_back(vc_snake_index(k, ny - 1, nx),
-                           vc_snake_index(0, 0, nx));
-      }
-      continue;
-    }
-    edges.emplace_back(vc_snake_index(k + 1, 0, nx), vc_snake_index(k, 0, nx));
-    edges.emplace_back(vc_snake_index(k, ny - 1, nx),
-                       vc_snake_index(k + 1, ny - 1, nx));
-    for (int row = 0; row + 1 < ny; ++row) {
-      edges.emplace_back(vc_snake_index(k, row, nx),
-                         vc_snake_index(k, row + 1, nx));
-      edges.emplace_back(vc_snake_index(k + 1, row + 1, nx),
-                         vc_snake_index(k + 1, row, nx));
-    }
-  }
-  return edges;
-}
-
-std::vector<std::pair<std::complex<double>, SparsePauliWord>>
-vc_build_local_stabilizers(int nx, int ny, std::size_t block_off) {
-  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
-  for (const auto& [from, to] : vc_auxiliary_graph_edges(nx, ny)) {
-    stabilizers.push_back(
-        vc_stabilizer_local_edge(from, to, nx, ny, block_off));
-  }
-  return stabilizers;
-}
-
-/// Recover (column, row) coordinates of each vertex from edges alone.
-/// Returns coord[v] = (x, y); throws if the graph is not one rectangular grid.
-std::vector<std::pair<int, int>> vc_recover_coords(
-    const std::vector<std::set<std::size_t>>& adj) {
+/// One propagation attempt: seed `corner` at (0,0) with axis neighbours
+/// `a0` -> (1,0) and `b0` -> (0,1), then recover the remaining site
+/// coordinates by intersecting nearest-neighbour constraints from every
+/// already-placed graph neighbour.  No lattice-type-specific rules are
+/// used — square, rectangular, and triangular layouts are all instances of
+/// the same embedding problem.  Returns an empty vector when the attempt
+/// does not produce a complete rectangular layout whose edges are all
+/// (axis or diagonal) nearest neighbours.
+std::vector<std::pair<int, int>> vc_try_layout(
+    const std::vector<std::set<std::size_t>>& adj, std::size_t corner,
+    std::size_t a0, std::size_t b0) {
   const std::size_t n = adj.size();
-  std::size_t corner = n;
-  for (std::size_t v = 0; v < n; ++v) {
-    if (adj[v].size() == 2) {
-      corner = v;
-      break;
-    }
-  }
-  if (corner == n) {
-    throw std::invalid_argument(
-        "MajoranaMapping::verstraete_cirac: lattice has no degree-2 corner; "
-        "connectivity is not a rectangular grid");
-  }
-  auto it = adj[corner].begin();
-  std::size_t a0 = *it++;
-  std::size_t b0 = *it;
-  if (a0 > b0) std::swap(a0, b0);
-
   std::vector<std::pair<int, int>> coord(n, {-1, -1});
   std::map<std::pair<int, int>, std::size_t> pos;
+  bool ok = true;
+
+  auto assigned = [&](std::size_t v) { return coord[v].first >= 0; };
   auto assign = [&](std::size_t v, int x, int y) {
-    const auto key = std::make_pair(x, y);
-    const auto existing = pos.find(key);
-    if (existing != pos.end() && existing->second != v) {
-      throw std::invalid_argument(
-          "MajoranaMapping::verstraete_cirac: coordinate recovery assigned "
-          "multiple vertices to the same grid position");
+    if (assigned(v) || pos.count({x, y}) != 0) {
+      ok = false;
+      return;
     }
-    coord[v] = key;
-    pos[key] = v;
+    coord[v] = {x, y};
+    pos[{x, y}] = v;
   };
+
   assign(corner, 0, 0);
   assign(a0, 1, 0);
   assign(b0, 0, 1);
-  auto assigned = [&](std::size_t v) { return coord[v].first >= 0; };
 
-  auto common_unassigned = [&](std::size_t u, std::size_t w) -> long long {
-    long long found = -1;
-    int cnt = 0;
-    for (std::size_t x : adj[u]) {
-      if (adj[w].count(x) && !assigned(x)) {
-        found = static_cast<long long>(x);
-        ++cnt;
-      }
-    }
-    return cnt == 1 ? found : -1;
-  };
-
+  // Constraint propagation: an unassigned vertex w with at least one placed
+  // neighbour must sit on a king's-move neighbour of every placed neighbour.
+  // When the intersection leaves exactly one free cell, w is forced there.
   bool changed = true;
-  while (changed) {
+  while (changed && ok) {
     changed = false;
-    std::vector<std::pair<std::pair<int, int>, std::size_t>> items(pos.begin(),
-                                                                   pos.end());
-    for (const auto& [xy, v] : items) {
-      (void)v;
-      int x = xy.first, y = xy.second;
-      if (pos.count({x + 1, y}) && pos.count({x, y + 1}) &&
-          !pos.count({x + 1, y + 1})) {
-        long long t = common_unassigned(pos[{x + 1, y}], pos[{x, y + 1}]);
-        if (t >= 0) {
-          assign(static_cast<std::size_t>(t), x + 1, y + 1);
-          changed = true;
+    for (std::size_t w = 0; w < n && ok; ++w) {
+      if (assigned(w)) continue;
+
+      std::vector<std::pair<int, int>> candidates;
+      bool have_candidates = false;
+      for (std::size_t v : adj[w]) {
+        if (!assigned(v)) continue;
+        const auto nn = vc_nn_cells(coord[v].first, coord[v].second);
+        if (!have_candidates) {
+          candidates = nn;
+          have_candidates = true;
+        } else {
+          std::vector<std::pair<int, int>> inter;
+          for (const auto& cell : candidates) {
+            if (std::find(nn.begin(), nn.end(), cell) != nn.end()) {
+              inter.push_back(cell);
+            }
+          }
+          candidates = std::move(inter);
         }
       }
-    }
-    for (int x = 1; pos.count({x, 0}); ++x) {
-      if (!pos.count({x + 1, 0}) && pos.count({x, 1})) {
-        std::size_t excl_a = pos[{x - 1, 0}], excl_b = pos[{x, 1}];
-        long long cand = -1;
-        int cnt = 0;
-        for (std::size_t w : adj[pos[{x, 0}]]) {
-          if (!assigned(w) && w != excl_a && w != excl_b) {
-            cand = static_cast<long long>(w);
-            ++cnt;
-          }
-        }
-        if (cnt == 1) {
-          assign(static_cast<std::size_t>(cand), x + 1, 0);
-          changed = true;
+      if (!have_candidates) continue;
+      if (candidates.empty()) {
+        ok = false;
+        break;
+      }
+
+      std::vector<std::pair<int, int>> free_cells;
+      for (const auto& cell : candidates) {
+        if (pos.count(cell) == 0) {
+          free_cells.push_back(cell);
         }
       }
-    }
-    for (int y = 1; pos.count({0, y}); ++y) {
-      if (!pos.count({0, y + 1}) && pos.count({1, y})) {
-        std::size_t excl_a = pos[{0, y - 1}], excl_b = pos[{1, y}];
-        long long cand = -1;
-        int cnt = 0;
-        for (std::size_t w : adj[pos[{0, y}]]) {
-          if (!assigned(w) && w != excl_a && w != excl_b) {
-            cand = static_cast<long long>(w);
-            ++cnt;
-          }
-        }
-        if (cnt == 1) {
-          assign(static_cast<std::size_t>(cand), 0, y + 1);
-          changed = true;
-        }
+      if (free_cells.size() == 1) {
+        assign(w, free_cells[0].first, free_cells[0].second);
+        changed = true;
       }
     }
   }
+
+  if (!ok || pos.size() != n) {
+    return {};
+  }
+
+  int nx = 0;
+  int ny = 0;
+  for (const auto& [x, y] : coord) {
+    nx = std::max(nx, x + 1);
+    ny = std::max(ny, y + 1);
+  }
+  if (static_cast<std::size_t>(nx) * static_cast<std::size_t>(ny) != n) {
+    return {};
+  }
+
+  // Every edge must connect (axis or diagonal) nearest neighbours.
   for (std::size_t v = 0; v < n; ++v) {
-    if (!assigned(v)) {
-      throw std::invalid_argument(
-          "MajoranaMapping::verstraete_cirac: lattice connectivity is not a "
-          "single rectangular grid");
+    for (std::size_t w : adj[v]) {
+      if (w <= v) continue;
+      const int dx = std::abs(coord[v].first - coord[w].first);
+      const int dy = std::abs(coord[v].second - coord[w].second);
+      if (dx > 1 || dy > 1) {
+        return {};
+      }
     }
   }
   return coord;
 }
 
-VcGridLayout vc_detect_grid_layout(
-    const std::vector<std::set<std::size_t>>& adj) {
+/// Recover a 2D layout from connectivity alone.  A single general
+/// algorithm covers every supported lattice: corner candidates are tried
+/// in deterministic (degree, index) order, each seeded with a pair of
+/// mutually non-adjacent neighbours as the two axis directions.
+VcLayout vc_recover_layout(const std::vector<std::set<std::size_t>>& adj) {
   const std::size_t n = adj.size();
-  for (int nx = 1; nx <= static_cast<int>(std::sqrt(static_cast<double>(n)));
-       ++nx) {
-    if (static_cast<std::size_t>(nx) > n ||
-        n % static_cast<std::size_t>(nx) != 0) {
-      continue;
-    }
-    const int ny = static_cast<int>(n / nx);
-    if (vc_matches_triangular_grid(nx, ny, adj)) {
-      VcGridLayout layout{nx, ny, VcGridKind::TRIANGULAR, {}};
-      layout.coord.reserve(n);
-      for (std::size_t v = 0; v < n; ++v) {
-        layout.coord.emplace_back(static_cast<int>(v % nx),
-                                  static_cast<int>(v / nx));
+  std::vector<std::size_t> order(n);
+  for (std::size_t v = 0; v < n; ++v) order[v] = v;
+  std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b) {
+    return std::make_pair(adj[a].size(), a) < std::make_pair(adj[b].size(), b);
+  });
+
+  for (std::size_t corner : order) {
+    for (std::size_t a : adj[corner]) {
+      for (std::size_t b : adj[corner]) {
+        if (b <= a || adj[a].count(b) != 0) continue;
+        auto coord = vc_try_layout(adj, corner, a, b);
+        if (coord.empty()) continue;
+        VcLayout layout;
+        layout.coord = std::move(coord);
+        for (const auto& [x, y] : layout.coord) {
+          layout.nx = std::max(layout.nx, x + 1);
+          layout.ny = std::max(layout.ny, y + 1);
+        }
+        return layout;
       }
-      return layout;
-    }
-    if (vc_matches_square_grid(nx, ny, adj)) {
-      VcGridLayout layout{nx, ny, VcGridKind::SQUARE, {}};
-      layout.coord.reserve(n);
-      for (std::size_t v = 0; v < n; ++v) {
-        layout.coord.emplace_back(static_cast<int>(v % nx),
-                                  static_cast<int>(v / nx));
-      }
-      return layout;
     }
   }
-  VcGridLayout layout{0, 0, VcGridKind::RECOVERED, vc_recover_coords(adj)};
-  for (const auto& [x, y] : layout.coord) {
-    layout.nx = std::max(layout.nx, x + 1);
-    layout.ny = std::max(layout.ny, y + 1);
-  }
-  if (static_cast<std::size_t>(layout.nx * layout.ny) != n) {
-    throw std::invalid_argument(
-        "MajoranaMapping::verstraete_cirac: lattice connectivity is not a "
-        "recognised 2D nearest-neighbour layout");
-  }
-  return layout;
+  throw std::invalid_argument(
+      "MajoranaMapping::verstraete_cirac: lattice connectivity is not a 2D "
+      "nearest-neighbour layout (could not recover a rectangular site grid "
+      "from the edges)");
 }
 
 }  // namespace detail
@@ -771,90 +591,252 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     }
   }
 
-  const auto layout = vc_detect_grid_layout(adj);
+  const VcLayout layout = vc_recover_layout(adj);
   const auto& coord = layout.coord;
   const int rnx = layout.nx;
   const int rny = layout.ny;
+  if (rnx < 2 || rny < 2) {
+    throw std::invalid_argument(
+        "MajoranaMapping::verstraete_cirac requires a genuinely 2D lattice "
+        "(at least 2 sites along each direction); 1D chains are already "
+        "local under Jordan-Wigner");
+  }
 
-  if (layout.kind == VcGridKind::RECOVERED) {
-    for (std::size_t v = 0; v < n; ++v) {
-      for (auto w : adj[v]) {
-        if (w <= v) {
-          continue;
-        }
-        const int dx =
-            std::abs(coord[v].first - coord[static_cast<std::size_t>(w)].first);
-        const int dy = std::abs(coord[v].second -
-                                coord[static_cast<std::size_t>(w)].second);
-        if (dx + dy != 1) {
-          throw std::invalid_argument(
-              "MajoranaMapping::verstraete_cirac: lattice edge does not "
-              "connect nearest neighbours on the recovered 2D layout");
-        }
+  // Snake position of every site and its O(1) inverse.
+  std::vector<std::size_t> sigma(n);
+  std::vector<std::size_t> site_of(n);
+  std::map<std::pair<int, int>, std::size_t> site_at;
+  for (std::size_t v = 0; v < n; ++v) {
+    site_at[coord[v]] = v;
+  }
+  for (std::size_t v = 0; v < n; ++v) {
+    const int x = coord[v].first;
+    const int y = coord[v].second;
+    const std::size_t s = y % 2 == 0
+                              ? static_cast<std::size_t>(y * rnx + x)
+                              : static_cast<std::size_t>((y + 1) * rnx - 1 - x);
+    sigma[v] = s;
+    site_of[s] = v;
+  }
+
+  // ── Auxiliary coupling graph: vertex-disjoint directed cycles ──
+  //
+  // nxt[v] is the successor of site v in its cycle; every site has
+  // in-degree and out-degree exactly one, so the elementary auxiliary
+  // bilinears P_v = i * c~(v) * d~(nxt[v]) all commute pairwise.
+  // Column-pair cycles (down the left column, across the bottom, up the
+  // right column, across the top) keep every vertical lattice bond a
+  // single auxiliary edge; an odd trailing column forms its own cycle.
+  std::vector<std::size_t> nxt(n);
+  for (int k = 0; k < rnx; k += 2) {
+    if (k + 1 < rnx) {
+      for (int y = 0; y + 1 < rny; ++y) {
+        nxt[site_at[{k, y}]] = site_at[{k, y + 1}];
+      }
+      nxt[site_at[{k, rny - 1}]] = site_at[{k + 1, rny - 1}];
+      for (int y = rny - 1; y > 0; --y) {
+        nxt[site_at[{k + 1, y}]] = site_at[{k + 1, y - 1}];
+      }
+      nxt[site_at[{k + 1, 0}]] = site_at[{k, 0}];
+    } else {
+      for (int y = 0; y + 1 < rny; ++y) {
+        nxt[site_at[{k, y}]] = site_at[{k, y + 1}];
+      }
+      nxt[site_at[{k, rny - 1}]] = site_at[{k, 0}];
+    }
+  }
+
+  // Decorated lattice edges: every bond whose endpoints are not adjacent
+  // on the snake path needs an auxiliary decoration.
+  std::vector<std::pair<std::size_t, std::size_t>> decorated;
+  for (std::size_t v = 0; v < n; ++v) {
+    for (std::size_t w : adj[v]) {
+      if (w <= v) continue;
+      const long long d =
+          static_cast<long long>(sigma[v]) - static_cast<long long>(sigma[w]);
+      if (d != 1 && d != -1) {
+        decorated.emplace_back(v, w);
       }
     }
   }
-  auto snake = [rnx](int c, int r) -> std::size_t {
-    return r % 2 == 0 ? static_cast<std::size_t>(r * rnx + c)
-                      : static_cast<std::size_t>((r + 1) * rnx - 1 - c);
+
+  // Splice cycles together whenever a decorated edge straddles two of
+  // them, so an auxiliary path always exists between its endpoints.
+  // Swapping the successors of the two endpoints merges their cycles
+  // while preserving in/out-degree one everywhere.
+  auto cycle_ids = [&]() {
+    std::vector<long long> id(n, -1);
+    long long next_id = 0;
+    for (std::size_t v = 0; v < n; ++v) {
+      if (id[v] >= 0) continue;
+      std::size_t w = v;
+      while (id[w] < 0) {
+        id[w] = next_id;
+        w = nxt[w];
+      }
+      ++next_id;
+    }
+    return id;
+  };
+  auto ids = cycle_ids();
+  for (const auto& [u, v] : decorated) {
+    if (ids[u] != ids[v]) {
+      std::swap(nxt[u], nxt[v]);
+      ids = cycle_ids();
+    }
+  }
+
+  // Undirected auxiliary neighbours for path finding.
+  std::vector<std::size_t> prv(n);
+  for (std::size_t v = 0; v < n; ++v) prv[nxt[v]] = v;
+  auto aux_path_edges = [&](std::size_t from,
+                            std::size_t to) -> std::vector<std::size_t> {
+    // BFS on the undirected cycle graph; returns the tail site of every
+    // directed auxiliary edge along the path.
+    std::vector<long long> parent(n, -1);
+    std::vector<std::size_t> queue{from};
+    parent[from] = static_cast<long long>(from);
+    for (std::size_t head = 0; head < queue.size(); ++head) {
+      const std::size_t v = queue[head];
+      if (v == to) break;
+      for (std::size_t w : {nxt[v], prv[v]}) {
+        if (parent[w] < 0) {
+          parent[w] = static_cast<long long>(v);
+          queue.push_back(w);
+        }
+      }
+    }
+    if (parent[to] < 0) {
+      throw std::logic_error(
+          "MajoranaMapping::verstraete_cirac: internal error — no auxiliary "
+          "path between decorated edge endpoints");
+    }
+    std::vector<std::size_t> edges;
+    for (std::size_t v = to; v != from;
+         v = static_cast<std::size_t>(parent[v])) {
+      const auto p = static_cast<std::size_t>(parent[v]);
+      edges.push_back(nxt[p] == v ? p : v);
+    }
+    return edges;
   };
 
-  // Per-block (spin) layout: block b occupies snake positions b*n .. b*n+n-1.
+  // Per-block (spin) layout: block b occupies snake positions
+  // b*n .. b*n + n - 1; the auxiliary qubit of site v in block b is
+  // 2*(b*n + sigma(v)) + 1.
   const std::size_t num_modes = 2 * n;
   const std::size_t M = 2 * num_modes;  // total Majorana / qubit count
-
-  // s(mode): combined snake position of the physical qubit for a given mode.
-  auto sigma = [&](std::size_t mode) -> std::size_t {
-    std::size_t block = mode / n;
-    std::size_t v = mode % n;
-    return block * n + snake(coord[v].first, coord[v].second);
+  auto aux_qubit = [&](std::size_t block, std::size_t v) {
+    return 2 * (block * n + sigma[v]) + 1;
   };
 
+  // Elementary auxiliary bilinears and decorations, per spin block.
+  std::vector<std::vector<std::pair<std::complex<double>, SparsePauliWord>>>
+      edge_p(2);
+  using DecorationMap =
+      std::map<std::pair<std::size_t, std::size_t>,
+               std::pair<std::complex<double>, SparsePauliWord>>;
+  std::vector<DecorationMap> decoration(2);
+  for (std::size_t block = 0; block < 2; ++block) {
+    edge_p[block].reserve(n);
+    for (std::size_t v = 0; v < n; ++v) {
+      edge_p[block].push_back(
+          vc_pstab(aux_qubit(block, v), aux_qubit(block, nxt[v])));
+    }
+    for (const auto& [u, v] : decorated) {
+      // Product of P_e along an auxiliary path between the endpoints: a
+      // stabilizer-group element, so it acts as +1 on the codespace and
+      // the encoded operator equals the bare one there.  The P_e commute
+      // pairwise, so the multiplication order is irrelevant.
+      std::complex<double> coeff(1.0, 0.0);
+      SparsePauliWord word;
+      for (std::size_t tail : aux_path_edges(u, v)) {
+        vc_multiply_term(coeff, word, edge_p[block][tail]);
+      }
+      decoration[block].emplace(std::make_pair(u, v),
+                                std::make_pair(coeff, std::move(word)));
+    }
+  }
+
   // ── Bilinear table: i * gamma_J * gamma_K for all J < K in [0, M) ──
+  //
+  // Materializes the full upper triangle (O(M^2) Pauli words).  Practical for
+  // modest lattices (acceptance tests up to 4x4 sites); larger systems should
+  // use a different encoding or a lazily-built mapping.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
   bilinears.reserve(M * (M - 1) / 2);
   for (std::size_t J = 0; J < M; ++J) {
-    std::size_t p = J / 2, ap = J % 2;
-    std::size_t qp_qubit = 2 * sigma(p);
+    const std::size_t p = J / 2;
+    const std::size_t ap = J % 2;
+    const std::size_t qp_qubit = 2 * ((p / n) * n + sigma[p % n]);
     auto gamma_J = vc_jw_majorana(qp_qubit, ap == 0 ? op_x : op_y);
     for (std::size_t K = J + 1; K < M; ++K) {
-      std::size_t q = K / 2, bq = K % 2;
-      std::size_t qq_qubit = 2 * sigma(q);
+      const std::size_t q = K / 2;
+      const std::size_t bq = K % 2;
+      const std::size_t qq_qubit = 2 * ((q / n) * n + sigma[q % n]);
       auto gamma_K = vc_jw_majorana(qq_qubit, bq == 0 ? op_x : op_y);
 
       auto bare = PauliTermAccumulator::multiply_uncached(gamma_J, gamma_K);
       std::complex<double> coeff = std::complex<double>(0.0, 1.0) * bare.first;
       SparsePauliWord word = std::move(bare.second);
 
-      // Decorate non-path edges within the same spin block.
+      // Decorate non-path lattice edges within the same spin block.
       if (p != q && (p / n) == (q / n)) {
-        std::size_t vp = p % n, vq = q % n;
-        if (adj[vp].count(vq)) {
-          std::size_t sp = sigma(p), sq = sigma(q);
-          long long d = static_cast<long long>(sp) - static_cast<long long>(sq);
-          if (d != 1 && d != -1) {
-            // top = endpoint with the smaller row (vertical bond).
-            bool p_is_top = coord[vp].second < coord[vq].second;
-            std::size_t s_top = p_is_top ? sp : sq;
-            std::size_t s_bot = p_is_top ? sq : sp;
-            auto dec = vc_pstab(2 * s_top + 1, 2 * s_bot + 1);
-            auto prod =
-                PauliTermAccumulator::multiply_uncached(word, dec.second);
-            coeff = coeff * dec.first * prod.first;
-            word = std::move(prod.second);
-          }
+        const std::size_t block = p / n;
+        const std::size_t vp = std::min(p % n, q % n);
+        const std::size_t vq = std::max(p % n, q % n);
+        auto dec = decoration[block].find({vp, vq});
+        if (dec != decoration[block].end()) {
+          vc_multiply_term(coeff, word, dec->second);
         }
       }
       bilinears.emplace_back(coeff, std::move(word));
     }
   }
 
-  // ── Stabilizers: local plaquette products on the auxiliary graph ──
+  // ── Stabilizers: local products along each auxiliary cycle ──
+  //
+  // Per cycle of length L: one "seed" elementary bilinear on the most
+  // snake-local edge plus the L-1 consecutive-edge products.  Together
+  // they generate every elementary P_e of the cycle (rank L), fixing a
+  // unique auxiliary state, while each stored generator stays local —
+  // individual bilinears along a long cycle would JW-map to non-local
+  // penalties (Verstraete-Cirac 2005, eqs. 80–84).
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
+  ids = cycle_ids();
+  std::vector<std::size_t> cycle_start;
+  for (std::size_t v = 0; v < n; ++v) {
+    if (static_cast<std::size_t>(ids[v]) == cycle_start.size()) {
+      cycle_start.push_back(v);
+    }
+  }
   for (std::size_t block = 0; block < 2; ++block) {
-    auto block_stabs = vc_build_local_stabilizers(rnx, rny, block * n);
-    stabilizers.insert(stabilizers.end(), block_stabs.begin(),
-                       block_stabs.end());
+    for (std::size_t start : cycle_start) {
+      std::vector<std::size_t> tails;  // directed edges of this cycle
+      std::size_t v = start;
+      do {
+        tails.push_back(v);
+        v = nxt[v];
+      } while (v != start);
+
+      std::size_t seed = 0;
+      std::size_t best_span = std::numeric_limits<std::size_t>::max();
+      for (std::size_t i = 0; i < tails.size(); ++i) {
+        const std::size_t a = sigma[tails[i]];
+        const std::size_t b = sigma[nxt[tails[i]]];
+        const std::size_t span = a < b ? b - a : a - b;
+        if (span < best_span) {
+          best_span = span;
+          seed = i;
+        }
+      }
+      stabilizers.push_back(edge_p[block][tails[seed]]);
+      for (std::size_t i = 0; i + 1 < tails.size(); ++i) {
+        auto product = edge_p[block][tails[i]];
+        vc_multiply_term(product.first, product.second,
+                         edge_p[block][tails[i + 1]]);
+        stabilizers.push_back(std::move(product));
+      }
+    }
   }
 
   return MajoranaMapping({}, std::move(bilinears), "verstraete-cirac",

@@ -267,11 +267,16 @@ class MajoranaMapping : public DataClass {
    * @brief Verstraete-Cirac (auxiliary-qubit) encoding for a 2D lattice.
    *
    * Builds a locality-preserving fermion-to-qubit encoding directly from the
-   * edges of a 2D ``LatticeGraph`` (square, triangular, or other planar
-   * nearest-neighbour layouts).  Each lattice site is paired with one
-   * auxiliary qubit; nearest-neighbour hopping terms map to constant-weight
-   * Pauli operators independent of system size.  The encoding acts on the
-   * physical subspace defined by the returned ``stabilizers()``.
+   * edges of a 2D ``LatticeGraph``.  The 2D site layout is recovered from
+   * connectivity alone by one general algorithm that accepts axis-aligned
+   * and diagonal nearest-neighbour bonds, so square, rectangular, and
+   * triangular lattices are all handled uniformly rather than as special
+   * cases.  Each lattice site is paired with one auxiliary qubit;
+   * horizontal and vertical hopping terms map to constant-weight Pauli
+   * operators independent of system size (diagonal bonds are decorated by
+   * products of auxiliary bilinears along the auxiliary coupling graph and
+   * may carry larger weight).  The encoding acts on the physical subspace
+   * defined by the returned ``stabilizers()``.
    *
    * The lattice describes a single spin species (``n_sites`` sites); the
    * factory produces a mapping with ``num_modes == 2 * n_sites`` (one
@@ -279,11 +284,18 @@ class MajoranaMapping : public DataClass {
    * ``QubitMapper`` exactly like ``jordan_wigner(num_modes=2*n_sites)`` and
    * uses ``2 * num_modes`` qubits.
    *
+   * The factory precomputes the full upper-triangle of Majorana bilinears
+   * (``O(num_modes^2)`` entries, each a potentially long JW Pauli word), so
+   * memory and build time grow quickly with lattice size.  It is intended
+   * for modest 2D lattices (e.g. up to ``4 x 4`` sites per spin species as
+   * exercised in the test suite), not large-scale production runs.
+   *
    * @param lattice A single connected 2D nearest-neighbour lattice (e.g.
    *        ``LatticeGraph::square`` or ``LatticeGraph::triangular``).
    * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
-   * @throws std::invalid_argument If the lattice is empty or its connectivity
-   *         is not a recognised 2D nearest-neighbour layout.
+   * @throws std::invalid_argument If the lattice is empty, is effectively
+   *         one-dimensional, or its connectivity cannot be embedded as a 2D
+   *         nearest-neighbour layout on a rectangular site grid.
    *
    * @see F. Verstraete and J. I. Cirac, J. Stat. Mech. (2005) P09012.
    * @see J. D. Whitfield, V. Havlicek, M. Troyer, Phys. Rev. A 94, 030301(R).
@@ -327,6 +339,9 @@ class MajoranaMapping : public DataClass {
 
   /// Codespace stabilizers for redundant encodings (empty otherwise).
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers_;
+
+  /// Feed the mapping's identifying data into a content hash.
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {
