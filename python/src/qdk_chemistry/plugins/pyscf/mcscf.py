@@ -431,7 +431,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
         except RuntimeError:
             use_spin_traced = True
         try:
-            two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb = wfn.get_active_two_rdm_spin_dependent()
+            two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb = wfn.get_active_two_rdm_spin_dependent()
         except RuntimeError:
             use_spin_traced = True
 
