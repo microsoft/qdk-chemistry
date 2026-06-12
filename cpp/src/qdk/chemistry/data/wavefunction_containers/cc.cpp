@@ -1508,4 +1508,29 @@ CoupledClusterContainer::get_active_two_rdm_spin_traced() const {
       "amplitudes.");
 }
 
+void CoupledClusterContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  if (_orbitals) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _orbitals->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  if (_wavefunction) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _wavefunction->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  // Hash amplitudes (constructor-supplied, not lazy)
+  hash_value(ctx, _t1_amplitudes_aa);
+  hash_value(ctx, _t1_amplitudes_bb);
+  hash_value(ctx, _t2_amplitudes_abab);
+  hash_value(ctx, _t2_amplitudes_aaaa);
+  hash_value(ctx, _t2_amplitudes_bbbb);
+  // NEVER access _determinant_vector_cache or _coefficients_cache
+}
+
 }  // namespace qdk::chemistry::data

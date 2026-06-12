@@ -1114,14 +1114,14 @@ Examples:
                       std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
                       std::optional<ContainerTypes::VectorVariant>
                           two_rdm_spin_traced,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
             return SciWavefunctionContainer(
                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aaaa,
+                two_rdm_aabb, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
           R"(
 Constructs a SCI wavefunction container with full RDM data.
@@ -1134,8 +1134,8 @@ Args:
     one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
     one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
@@ -1148,15 +1148,15 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
-    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)
 )",
           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
           py::arg("one_rdm_spin_traced") = std::nullopt,
           py::arg("one_rdm_aa") = std::nullopt,
           py::arg("one_rdm_bb") = std::nullopt,
           py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_bbbb") = std::nullopt,
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)
@@ -1246,14 +1246,14 @@ Examples:
                       std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
                       std::optional<ContainerTypes::VectorVariant>
                           two_rdm_spin_traced,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
             return CasWavefunctionContainer(
                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aaaa,
+                two_rdm_aabb, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
           R"(
 Constructs a CAS wavefunction container with full RDM data.
@@ -1266,8 +1266,8 @@ Args:
     one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
     one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
@@ -1280,15 +1280,15 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
-    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)
 )",
           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
           py::arg("one_rdm_spin_traced") = std::nullopt,
           py::arg("one_rdm_aa") = std::nullopt,
           py::arg("one_rdm_bb") = std::nullopt,
           py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_bbbb") = std::nullopt,
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)

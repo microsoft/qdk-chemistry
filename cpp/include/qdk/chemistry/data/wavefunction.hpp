@@ -224,9 +224,9 @@ class WavefunctionContainer {
    * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
    * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_aabb Alpha-beta-alpha-beta block of 2-RDM for active
-   * orbitals (optional)
    * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
@@ -237,8 +237,8 @@ class WavefunctionContainer {
                         const std::optional<MatrixVariant>& one_rdm_aa,
                         const std::optional<MatrixVariant>& one_rdm_bb,
                         const std::optional<VectorVariant>& two_rdm_spin_traced,
-                        const std::optional<VectorVariant>& two_rdm_aabb,
                         const std::optional<VectorVariant>& two_rdm_aaaa,
+                        const std::optional<VectorVariant>& two_rdm_aabb,
                         const std::optional<VectorVariant>& two_rdm_bbbb,
                         const OrbitalEntropies& entropies = OrbitalEntropies{},
                         WavefunctionType type = WavefunctionType::SelfDual);
@@ -329,7 +329,7 @@ class WavefunctionContainer {
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
    *
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals,
+   * @return Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals,
    * constructed from the canonical symmetry-blocked tensor.
    */
   virtual std::tuple<VectorVariant, VectorVariant, VectorVariant>
@@ -625,6 +625,12 @@ class WavefunctionContainer {
         "Configuration set not available for this container type");
   }
 
+  /**
+   * @brief Feed identifying data into a hash context.
+   * Subclasses override to add their container-specific data.
+   */
+  virtual void hash_update(qdk::chemistry::utils::HashContext& ctx) const;
+
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
@@ -904,7 +910,7 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Get spin-dependent two-particle RDMs
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   * @return Tuple of (aaaa, aabb, bbbb) two-particle RDMs
    */
   std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const;
@@ -1156,6 +1162,8 @@ class Wavefunction : public DataClass,
   bool is_complex() const;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Container holding the wavefunction implementation
   std::unique_ptr<const WavefunctionContainer> _container;
 

@@ -31,8 +31,8 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                                std::nullopt,        // one_rdm_aa
                                std::nullopt,        // one_rdm_bb
                                std::nullopt,        // two_rdm_spin_traced
-                               std::nullopt,        // two_rdm_aabb
                                std::nullopt,        // two_rdm_aaaa
+                               std::nullopt,        // two_rdm_aabb
                                std::nullopt,        // two_rdm_bbbb
                                OrbitalEntropies{},  // entropies
                                type) {
@@ -49,8 +49,8 @@ SciWavefunctionContainer::SciWavefunctionContainer(
                                std::nullopt,  // one_rdm_aa
                                std::nullopt,  // one_rdm_bb
                                two_rdm_spin_traced,
-                               std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_aaaa
+                               std::nullopt,  // two_rdm_aabb
                                std::nullopt,  // two_rdm_bbbb
                                entropies, type) {
   QDK_LOG_TRACE_ENTERING();
@@ -63,12 +63,12 @@ SciWavefunctionContainer::SciWavefunctionContainer(
     const std::optional<MatrixVariant>& one_rdm_aa,
     const std::optional<MatrixVariant>& one_rdm_bb,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
-    const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_aaaa,
+    const std::optional<VectorVariant>& two_rdm_aabb,
     const std::optional<VectorVariant>& two_rdm_bbbb,
     const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
-                            two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa,
+                            two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb,
                             two_rdm_bbbb, entropies, type),
       _coefficients(coeffs),
       _configuration_set(dets, orbitals) {
@@ -449,6 +449,14 @@ nlohmann::json SciWavefunctionContainer::to_json() const {
   _serialize_entropies_to_json(j);
 
   return j;
+}
+
+void SciWavefunctionContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  WavefunctionContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _coefficients);
+  hash_value(ctx, _configuration_set.content_hash());
 }
 
 }  // namespace qdk::chemistry::data

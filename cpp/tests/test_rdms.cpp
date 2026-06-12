@@ -412,19 +412,19 @@ TEST_F(WavefunctionRDMTest, TwoRDMSpinDependent) {
 
   auto wf_r_dependent = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, base_orbitals, std::nullopt, std::nullopt, std::nullopt,
-      std::nullopt, std::make_optional(two_rdm_aabb),
-      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aaaa)));
+      std::nullopt, std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa)));
   auto wf_u_dependent = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, base_orbitals, std::nullopt, std::nullopt, std::nullopt,
-      std::nullopt, std::make_optional(two_rdm_aabb),
-      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_bbbb)));
+      std::nullopt, std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_bbbb)));
 
   EXPECT_TRUE(wf_r_dependent.has_two_rdm_spin_dependent());
   EXPECT_TRUE(wf_u_dependent.has_two_rdm_spin_dependent());
 
-  auto [aabb_r, aaaa_r, bbbb_r] =
+  auto [aaaa_r, aabb_r, bbbb_r] =
       wf_r_dependent.get_active_two_rdm_spin_dependent();
-  auto [aabb_u, aaaa_u, bbbb_u] =
+  auto [aaaa_u, aabb_u, bbbb_u] =
       wf_u_dependent.get_active_two_rdm_spin_dependent();
 
   // For restricted case, bbbb should be equal to aaaa
@@ -452,12 +452,12 @@ TEST_F(WavefunctionRDMTest, TwoRDMSpinDependentTwoArguments) {
 
   auto wf_with_rdm = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, base_orbitals, std::nullopt, std::nullopt, std::nullopt,
-      std::nullopt, std::make_optional(two_rdm_aabb),
-      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aaaa)));
+      std::nullopt, std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa)));
 
   EXPECT_TRUE(wf_with_rdm.has_two_rdm_spin_dependent());
 
-  auto [aabb, aaaa, bbbb] = wf_with_rdm.get_active_two_rdm_spin_dependent();
+  auto [aaaa, aabb, bbbb] = wf_with_rdm.get_active_two_rdm_spin_dependent();
 
   // aabb and aaaa should match input, bbbb should equal aaaa for restricted
   EXPECT_EQ(std::get<Eigen::VectorXd>(aabb), two_rdm_aabb);
@@ -483,12 +483,12 @@ TEST_F(WavefunctionRDMTest, TwoRDMConversions) {
   auto wf_r_dependent = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets_r, testing::create_test_orbitals(3, norbs, true),
       std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
       std::nullopt));
   auto wf_u_dependent = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets_u, testing::create_test_orbitals(3, norbs, true),
       std::nullopt, std::nullopt, std::nullopt, std::nullopt,
-      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
       std::make_optional(two_rdm_bbbb)));
 
   EXPECT_TRUE(wf_r_dependent.has_two_rdm_spin_traced());
@@ -558,13 +558,13 @@ TEST_F(WavefunctionRDMTest, OrbitalEntropies) {
   auto wf_r_full = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, base_orbitals, std::nullopt, std::make_optional(one_rdm_aa),
       std::make_optional(one_rdm_aa), std::nullopt,
-      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
       std::make_optional(two_rdm_aaaa)));
 
   auto wf_u_full = Wavefunction(std::make_unique<CasWavefunctionContainer>(
       coeffs, dets, base_orbitals, std::nullopt, std::make_optional(one_rdm_aa),
       std::make_optional(one_rdm_bb), std::nullopt,
-      std::make_optional(two_rdm_aabb), std::make_optional(two_rdm_aaaa),
+      std::make_optional(two_rdm_aaaa), std::make_optional(two_rdm_aabb),
       std::make_optional(two_rdm_bbbb)));
 
   // Get the entropies
@@ -787,7 +787,7 @@ TEST_F(WavefunctionRealRDMsTest, N2_Singlet) {
   auto rdm1 = wavefunction->get_active_one_rdm_spin_traced();
   auto [aa, bb] = wavefunction->get_active_one_rdm_spin_dependent();
   auto rdm2 = wavefunction->get_active_two_rdm_spin_traced();
-  auto [aabb, aaaa, bbbb] = wavefunction->get_active_two_rdm_spin_dependent();
+  auto [aaaa, aabb, bbbb] = wavefunction->get_active_two_rdm_spin_dependent();
 
   // transpose aabb to get bbaa
   auto bbaa = transpose_two_rdm_indices(std::get<Eigen::VectorXd>(aabb), norb,
@@ -975,9 +975,9 @@ TEST_F(WavefunctionRDMTest, ActiveTwoRdmSbtComplexVariant) {
           ContainerTypes::MatrixVariant{one_bb_c}),
       std::nullopt,
       std::optional<ContainerTypes::VectorVariant>(
-          ContainerTypes::VectorVariant{two_aabb_c}),
-      std::optional<ContainerTypes::VectorVariant>(
           ContainerTypes::VectorVariant{two_aaaa_c}),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant{two_aabb_c}),
       std::optional<ContainerTypes::VectorVariant>(
           ContainerTypes::VectorVariant{two_bbbb_c})));
 

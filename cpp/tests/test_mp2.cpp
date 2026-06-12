@@ -709,7 +709,7 @@ TEST_F(MP2Test, LazyRDMComputationFromAmplitudes) {
       << "Trace: " << rdm1_trace << ", N_electrons: " << n_electrons;
 
   // Verify 2-RDMs are available and have non-zero values
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+  auto [two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb] =
       mp2_container->get_active_two_rdm_spin_dependent();
   std::visit(
       [](const auto& rdm) {

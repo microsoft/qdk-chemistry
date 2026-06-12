@@ -647,6 +647,19 @@ SparseHamiltonianContainer::TwoBodyMap SparseHamiltonianContainer::_to_map(
   return m;
 }
 
+void SparseHamiltonianContainer::hash_update(
+    qdk::chemistry::utils::HashContext& ctx) const {
+  HamiltonianContainer::hash_update(ctx);
+  hash_value(ctx, get_container_type());
+  hash_value(ctx, _one_body_sparse);
+  if (_two_body_sparse) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _two_body_sparse->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+}
+
 const SymmetryBlockedSparseMap<4>&
 SparseHamiltonianContainer::two_body_integrals_sparse() const {
   if (!_two_body_sparse) {
