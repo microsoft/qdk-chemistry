@@ -633,6 +633,8 @@ void AmplitudeContainer::hash_update(
     qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
+  hash_value(ctx, _sector);
+  hash_value(ctx, amplitude_type_to_string(_amplitude_type));
   if (_orbitals) {
     hash_field_presence(ctx, true);
     hash_value(ctx, _orbitals->content_hash());

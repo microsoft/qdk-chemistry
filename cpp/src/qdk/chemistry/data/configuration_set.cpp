@@ -575,11 +575,15 @@ void ConfigurationSet::hash_update(
   for (const auto& config : _configurations) {
     hash_value(ctx, config.content_hash());
   }
-  if (_orbitals) {
-    hash_field_presence(ctx, true);
-    hash_value(ctx, _orbitals->content_hash());
-  } else {
-    hash_field_presence(ctx, false);
+  hash_value(ctx, static_cast<uint64_t>(_sector_layout.size()));
+  for (const auto& [name, orbs] : _sector_layout) {
+    hash_value(ctx, name);
+    if (orbs) {
+      hash_field_presence(ctx, true);
+      hash_value(ctx, orbs->content_hash());
+    } else {
+      hash_field_presence(ctx, false);
+    }
   }
 }
 

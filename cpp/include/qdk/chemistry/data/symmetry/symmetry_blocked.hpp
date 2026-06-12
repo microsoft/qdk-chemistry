@@ -11,6 +11,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/utils/hash.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
@@ -35,16 +36,15 @@ struct LabelsHash {
    *
    * @param labels Per-slot symmetry labels keying one block.
    * @return Hash value derived from the concatenation of per-slot label
-   *         hashes via @ref qdk::chemistry::utils::HashContext.
+   *         hashes via @ref qdk::chemistry::utils::hash_combine.
    */
-  std::size_t operator()(const std::array<SymmetryLabel, Rank>& labels) const {
-    utils::HashContext ctx;
-    hash_value(ctx, "symmetry_labels");
-    hash_value(ctx, static_cast<uint64_t>(Rank));
-    for (const auto& label : labels) {
-      hash_value(ctx, label);
-    }
-    return ctx.hash_code();
+  std::size_t operator()(
+     const std::array<SymmetryLabel, Rank>& labels) const noexcept {
+   std::size_t seed = 0;
+   for (const auto& label : labels) {
+     seed = utils::hash_combine(seed, label.hash());
+   }
+   return seed;
   }
 };
 
