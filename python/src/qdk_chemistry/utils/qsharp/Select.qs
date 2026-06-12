@@ -38,7 +38,7 @@ namespace QDKChemistry.Utils.Select {
                     // Flip bits so |ctrlState⟩ → |1…1⟩, apply multi-controlled Z, then unflip.
                     within {
                         for k in 0..Length(selectRegister) - 1 {
-                            if (ctrlState >>> k) &&& 1 == 0 {
+                            if (((ctrlState >>> k) &&& 1) == 0) {
                                 X(selectRegister[k]);
                             }
                         }
