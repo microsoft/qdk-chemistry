@@ -154,7 +154,7 @@ iqpe_circuit_builder = AlgorithmRef(
     "qdk_iterative",
     num_bits=10,
     controlled_circuit_mapper=AlgorithmRef(
-        "controlled_circuit_mapper", "prep_sel_prep"
+        "controlled_circuit_mapper", "prepare_select_prepare"
     ),
     unitary_builder=AlgorithmRef(
         "hamiltonian_unitary_builder", "lcu", quantum_walk=True

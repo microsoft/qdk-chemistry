@@ -83,7 +83,6 @@ class QpeResult(DataClass):
         """Feed identifying data into the hasher."""
         _hash_str(h, "qpe_result")
         _hash_str(h, self.method)
-        _hash_float(h, self.evolution_time)
         _hash_float(h, self.phase_fraction)
         _hash_float(h, self.phase_angle)
         _hash_float(h, self.canonical_phase_fraction)
