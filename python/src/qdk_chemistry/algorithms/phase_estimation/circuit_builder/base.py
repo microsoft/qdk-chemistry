@@ -14,7 +14,9 @@ from qdk_chemistry.data import (
     ControlledUnitary,
     QubitHamiltonian,
     Settings,
+    UnitaryRepresentation,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 __all__: list[str] = [
     "IterativeQpeCircuitBuilder",
@@ -119,6 +121,57 @@ class QpeCircuitBuilder(Algorithm):
         controlled_unitary = ControlledUnitary(unitary=unitary_rep, control_indices=[0])
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         return circuit_mapper.run(controlled_unitary=controlled_unitary)
+
+    def _build_controlled_circuits(
+        self,
+        qubit_hamiltonian: QubitHamiltonian,
+        powers: list[int],
+    ) -> list[Circuit]:
+        r"""Build controlled circuits for a list of powers.
+
+        When the unitary builder uses the ``"repeat"`` power strategy and produces
+        a :class:`PauliProductFormulaContainer`, the Trotter decomposition is
+        computed only once (at power=1) and reused with scaled ``step_reps`` for
+        each requested power. This avoids redundant recomputation.
+
+        For other strategies (e.g. ``"rescale"``) or non-PPF containers, each
+        power is built independently.
+
+        Args:
+            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            powers: List of powers, one per controlled circuit to build.
+
+        Returns:
+            List of controlled circuits, one per entry in ``powers``.
+
+        """
+        unitary_builder = self._create_nested("unitary_builder")
+        settings = unitary_builder.settings()
+        power_strategy = settings.get("power_strategy") if "power_strategy" in settings else None
+
+        if power_strategy == "repeat":
+            # Compute the base unitary once with power=1
+            unitary_builder.settings().update("power", 1)
+            base_unitary_rep = unitary_builder.run(qubit_hamiltonian)
+            base_container = base_unitary_rep.get_container()
+
+            if isinstance(base_container, PauliProductFormulaContainer):
+                base_step_reps = base_container.step_reps
+                circuits = []
+                for power in powers:
+                    scaled_container = PauliProductFormulaContainer(
+                        step_terms=base_container.step_terms,
+                        step_reps=base_step_reps * power,
+                        num_qubits=base_container.num_qubits,
+                    )
+                    scaled_unitary_rep = UnitaryRepresentation(container=scaled_container)
+                    controlled_unitary = ControlledUnitary(unitary=scaled_unitary_rep, control_indices=[0])
+                    circuit_mapper = self._create_nested("controlled_circuit_mapper")
+                    circuits.append(circuit_mapper.run(controlled_unitary=controlled_unitary))
+                return circuits
+
+        # Fallback: build each power independently
+        return [self._create_controlled_circuit(qubit_hamiltonian, power=p) for p in powers]
 
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):
