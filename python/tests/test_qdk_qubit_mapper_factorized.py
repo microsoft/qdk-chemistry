@@ -265,7 +265,9 @@ def _molecular_cholesky_pair(atom: str, basis: str):
     """
     mol = pyscf.gto.M(atom=atom, basis=basis, verbose=0)
     mf = pyscf.scf.RHF(mol)
+    mf.conv_tol = 1e-12
     mf.kernel()
+    assert mf.converged, f"SCF did not converge for {atom} / {basis}"
 
     coeff = mf.mo_coeff
     norb = coeff.shape[1]

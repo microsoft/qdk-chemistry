@@ -381,8 +381,9 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the
  * mapped operator does not depend on which symmetry-related permutation(s)
  * of an integral the caller stored, nor on the order of the entry list.
- * Duplicate entries for the same position must agree in value; conflicting
- * duplicates are rejected rather than resolved in encounter order.
+ * Duplicate entries for the same position must agree exactly (bitwise
+ * floating-point equality); conflicting duplicates are rejected rather
+ * than resolved in encounter order.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.

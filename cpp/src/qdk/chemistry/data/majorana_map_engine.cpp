@@ -864,8 +864,11 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     const Key4 c = canonical(k);
     const double v = two_body_values[e];
     // Duplicate entries for the same position are tolerated only when they
-    // agree; conflicting values would make the result depend on input
-    // order, so they are rejected instead.
+    // agree exactly (bitwise): duplicates can only originate from a caller
+    // re-emitting the same stored value, so exact comparison is the right
+    // contract.  A tolerance would silently keep one of two genuinely
+    // different values — and which one would depend on input order, the
+    // very non-determinism this path is designed to exclude.
     auto reject_conflict = [&](double existing) {
       if (existing != v) {
         throw std::invalid_argument(

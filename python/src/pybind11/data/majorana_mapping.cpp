@@ -358,6 +358,10 @@ Pauli words.
         const RowMajorMatrix h1a_flat = h1a;
         const RowMajorMatrix h1b_flat = h1b;
 
+        // core_energy is 0.0 in every branch on purpose: the constant
+        // (nuclear repulsion / frozen core) shift is excluded from the
+        // mapped operator, exactly as in the buffer-based overload as
+        // invoked by QdkQubitMapper.
         MajoranaMapResult result;
         if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
           const auto& container =
@@ -430,6 +434,12 @@ read directly without materializing the dense N^4 two-body tensor; any
 other container uses the dense path.  The returned ``(words,
 coefficients)`` are numerically equivalent to the dense path for the same
 underlying integrals.
+
+The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
+is intentionally **not** included in the mapped operator, matching the
+buffer-based overload as invoked by ``QdkQubitMapper`` (which always
+passes ``core_energy=0.0``); callers that need the constant term must add
+it separately.
 
 Args:
     mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
