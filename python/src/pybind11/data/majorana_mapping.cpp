@@ -377,6 +377,10 @@ Pauli words.
                        .has_container_type<SparseHamiltonianContainer>()) {
           const auto& container =
               hamiltonian.get_container<SparseHamiltonianContainer>();
+          // TwoBodyMap is an ordered std::map, so this iteration is
+          // already deterministic; the engine additionally canonicalizes
+          // and sorts the entries before accumulating, so the mapped
+          // operator is reproducible for any input ordering.
           const auto& two_body_map = container.sparse_two_body_integrals();
           std::vector<int> indices;
           std::vector<double> values;

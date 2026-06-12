@@ -8,12 +8,14 @@
 #include <complex>
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -201,7 +203,9 @@ class PackedAccumulator {
 //   * DenseEriProvider     — flat row-major N^4 array (canonical storage)
 //   * CholeskyEriProvider  — three-center factors L; the aux index is
 //                            contracted one (pq|·) row at a time
-//   * SparseEriProvider    — sparse (p,q,r,s) -> value map, zeros implied
+//   * SparseEriProvider    — sparse (p,q,r,s) -> value entries, zeros
+//                            implied; canonicalized under the 8-fold ERI
+//                            symmetry at ingestion
 //
 // Because the loop structure, ordering, thresholds, and accumulation are
 // untouched, every provider produces results numerically equivalent to
@@ -313,13 +317,25 @@ struct CholeskyEriProvider {
   }
 };
 
-// Sparse provider backed by hash maps keyed on the flattened idx4 index.
-// Missing entries are implicitly zero, exactly as in the dense layout.
+// Sparse provider for restricted model Hamiltonians.  All spin channels
+// share the same integrals (SparseHamiltonianContainer is always
+// restricted), so a single channel backs the aaaa/aabb/bbbb accessors.
 //
-// In addition to the maps (used for the unrestricted fallback and the
-// one-body delta fold), the explicit list of stored non-zero entries is
-// kept so the restricted two-body loop can iterate only the non-zeros
-// instead of enumerating the full O(N^4) index space.
+// Ingestion (majorana_map_hamiltonian_sparse) canonicalizes every stored
+// entry under the 8-fold ERI symmetry and symmetry-expands the
+// position -> value map, so the provider behaves like a fully symmetric
+// dense tensor regardless of which permutation(s) of an integral the
+// container chose to store:
+//   * entries_ — exactly one canonical (p<=q, r<=s, (p,q)<=(r,s))
+//                representative per symmetry class, lexicographically
+//                sorted so accumulation order is deterministic for any
+//                input ordering.  Consumed directly by the restricted
+//                two-body loop.
+//   * map_     — every symmetry-related position of every entry; used by
+//                the one-body delta fold's scalar lookups.
+//   * rows_    — map_ bucketed by the (p,q) pair index, so building one
+//                (pq|·) row costs O(non-zeros in that row) instead of a
+//                scan over all stored entries.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -327,10 +343,12 @@ struct SparseEriProvider {
     std::size_t p, q, r, s;
     double value;
   };
-  std::unordered_map<std::uint64_t, double> aaaa_map_;
-  std::unordered_map<std::uint64_t, double> aabb_map_;
-  std::unordered_map<std::uint64_t, double> bbbb_map_;
-  // Stored non-zero (p,q,r,s) -> value entries of the restricted ERI tensor.
+  // Symmetry-expanded flattened position -> value.
+  std::unordered_map<std::uint64_t, double> map_;
+  // (p*N + q) -> list of (r*N + s, value) for that row.
+  std::unordered_map<std::uint64_t, std::vector<std::pair<std::size_t, double>>>
+      rows_;
+  // Canonical representatives, sorted lexicographically.
   std::vector<Entry> entries_;
   std::size_t n_ = 0;
   // Scratch row for the unrestricted branch (sparse containers are always
@@ -343,29 +361,28 @@ struct SparseEriProvider {
   }
   double aaaa(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    auto it = aaaa_map_.find(key(p, q, r, s));
-    return it == aaaa_map_.end() ? 0.0 : it->second;
+    auto it = map_.find(key(p, q, r, s));
+    return it == map_.end() ? 0.0 : it->second;
   }
-  // Build the (pq|·) row by scanning the stored entries once; missing
-  // positions are implicitly zero, exactly as in the dense layout.
-  const double* build_row(const std::unordered_map<std::uint64_t, double>& m,
-                          std::size_t p, std::size_t q) const {
-    const std::size_t n2 = n_ * n_;
-    row_buf_.assign(n2, 0.0);
-    const std::uint64_t pair = static_cast<std::uint64_t>(p * n_ + q);
-    for (const auto& [k, v] : m) {
-      if (k / n2 == pair) row_buf_[k % n2] = v;
+  // Build the (pq|·) row from the per-pair bucket; missing positions are
+  // implicitly zero.  Values are assigned (not accumulated), so the result
+  // is independent of the bucket's internal order.
+  const double* build_row(std::size_t p, std::size_t q) const {
+    row_buf_.assign(n_ * n_, 0.0);
+    auto it = rows_.find(static_cast<std::uint64_t>(p * n_ + q));
+    if (it != rows_.end()) {
+      for (const auto& [rs, v] : it->second) row_buf_[rs] = v;
     }
     return row_buf_.data();
   }
   const double* row_aaaa(std::size_t p, std::size_t q) const {
-    return build_row(aaaa_map_, p, q);
+    return build_row(p, q);
   }
   const double* row_aabb(std::size_t p, std::size_t q) const {
-    return build_row(aabb_map_, p, q);
+    return build_row(p, q);
   }
   const double* row_bbbb(std::size_t p, std::size_t q) const {
-    return build_row(bbbb_map_, p, q);
+    return build_row(p, q);
   }
 };
 
@@ -569,18 +586,15 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     };
 
     if constexpr (EriProvider::kSparse) {
-      // Fast path: visit only the stored non-zero entries.  An entry is
-      // processed iff it sits at a canonical position (p<=q, r<=s,
-      // sym(pq)<=sym(rs)) — exactly the positions the dense symmetric loop
-      // reads.  Stored entries at non-canonical positions are redundant under
-      // the 8-fold ERI symmetry and are never read by the dense path either,
-      // so skipping them keeps the result identical while touching no zeros.
+      // Fast path: visit only the stored non-zero entries.  Entries are
+      // canonicalized (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated at
+      // ingestion, so each maps to exactly one canonical (pq, rs) pair of
+      // the symmetric quad loop below — no stored integral is skipped, no
+      // zeros are touched, and process_pair's pq_idx <= rs_idx
+      // pre-condition holds by construction.
       for (const auto& e : eri_provider.entries()) {
-        if (e.p > e.q || e.r > e.s) continue;
-        std::size_t pq_idx = sym_map[e.p * n_spatial + e.q];
-        std::size_t rs_idx = sym_map[e.r * n_spatial + e.s];
-        if (pq_idx > rs_idx) continue;
-        process_pair(pq_idx, rs_idx, e.value);
+        process_pair(sym_map[e.p * n_spatial + e.q],
+                     sym_map[e.r * n_spatial + e.s], e.value);
       }
     } else {
       for (std::size_t p = 0; p < n_spatial; ++p) {
@@ -784,23 +798,90 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     double integral_threshold) {
   detail::SparseEriProvider provider;
   provider.n_ = n_spatial;
-  provider.aaaa_map_.reserve(num_entries);
-  provider.entries_.reserve(num_entries);
+
+  // ── Canonicalize the stored entries under the 8-fold ERI symmetry ──
+  //
+  // The engine's symmetric two-body loop reads only canonical positions
+  // (p<=q, r<=s, (p,q)<=(r,s) lexicographically), so every stored entry
+  // is reduced to its canonical representative here.  This makes the
+  // result independent of which symmetry-related permutation(s) a
+  // container chose to store — unique representatives, partially
+  // redundant storage (e.g. both (ii|jj) and (jj|ii) as the PPP builder
+  // emits), or a fully expanded tensor all map to the same operator.
+  //
+  // When several stored permutations fall into the same symmetry class,
+  // the value at the exact canonical position wins (this is the position
+  // a dense materialization of the container would expose to the
+  // engine's symmetric loop); among non-canonical partners, the smallest
+  // flattened position wins, so the outcome never depends on input order.
+  using Key4 = std::array<std::size_t, 4>;
+  auto canonical = [](Key4 k) {
+    if (k[0] > k[1]) std::swap(k[0], k[1]);
+    if (k[2] > k[3]) std::swap(k[2], k[3]);
+    if (k[0] > k[2] || (k[0] == k[2] && k[1] > k[3])) {
+      std::swap(k[0], k[2]);
+      std::swap(k[1], k[3]);
+    }
+    return k;
+  };
+
+  std::map<Key4, double> canon;
+  struct Partner {
+    std::uint64_t position;
+    double value;
+  };
+  std::map<Key4, Partner> partners;
   for (std::size_t e = 0; e < num_entries; ++e) {
-    const auto p = static_cast<std::size_t>(two_body_indices[4 * e + 0]);
-    const auto q = static_cast<std::size_t>(two_body_indices[4 * e + 1]);
-    const auto r = static_cast<std::size_t>(two_body_indices[4 * e + 2]);
-    const auto s = static_cast<std::size_t>(two_body_indices[4 * e + 3]);
-    provider.aaaa_map_[provider.key(p, q, r, s)] = two_body_values[e];
-    provider.entries_.push_back({p, q, r, s, two_body_values[e]});
+    const Key4 k{static_cast<std::size_t>(two_body_indices[4 * e + 0]),
+                 static_cast<std::size_t>(two_body_indices[4 * e + 1]),
+                 static_cast<std::size_t>(two_body_indices[4 * e + 2]),
+                 static_cast<std::size_t>(two_body_indices[4 * e + 3])};
+    const Key4 c = canonical(k);
+    const double v = two_body_values[e];
+    if (k == c) {
+      canon[c] = v;
+    } else {
+      const std::uint64_t position = provider.key(k[0], k[1], k[2], k[3]);
+      auto [it, inserted] = partners.try_emplace(c, Partner{position, v});
+      if (!inserted && position < it->second.position) {
+        it->second = {position, v};
+      }
+    }
   }
-  // Model Hamiltonians are restricted, so the spin-summed (spin_symmetric)
-  // path only reads the aaaa channel.  Mirror the data into the cross/beta
-  // channels for the rare unrestricted dispatch so the provider is complete.
-  if (!spin_symmetric) {
-    provider.aabb_map_ = provider.aaaa_map_;
-    provider.bbbb_map_ = provider.aaaa_map_;
+  for (const auto& [c, partner] : partners) {
+    canon.emplace(c, partner.value);  // no-op if the canonical position won
   }
+
+  // Canonical entries in lexicographic (std::map) order, so the two-body
+  // accumulation order is deterministic for any input ordering.
+  provider.entries_.reserve(canon.size());
+  for (const auto& [c, v] : canon) {
+    provider.entries_.push_back({c[0], c[1], c[2], c[3], v});
+  }
+
+  // Symmetry-expand into the position -> value map (all 8 index
+  // permutations of each canonical entry), so scalar lookups and row
+  // builds behave like a fully symmetric dense tensor.  Symmetry classes
+  // partition the index space, so expansions never collide.
+  provider.map_.reserve(canon.size() * 8);
+  for (const auto& [c, v] : canon) {
+    const std::size_t pq[2][2] = {{c[0], c[1]}, {c[1], c[0]}};
+    const std::size_t rs[2][2] = {{c[2], c[3]}, {c[3], c[2]}};
+    for (auto& a : pq) {
+      for (auto& b : rs) {
+        provider.map_[provider.key(a[0], a[1], b[0], b[1])] = v;
+        provider.map_[provider.key(b[0], b[1], a[0], a[1])] = v;
+      }
+    }
+  }
+
+  // Bucket the expanded map by (p,q) pair so building one (pq|·) row
+  // costs O(non-zeros in that row).
+  const std::size_t n2 = n_spatial * n_spatial;
+  for (const auto& [k, v] : provider.map_) {
+    provider.rows_[k / n2].emplace_back(static_cast<std::size_t>(k % n2), v);
+  }
+
   return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
                                    provider, n_spatial, spin_symmetric,
                                    threshold, integral_threshold);

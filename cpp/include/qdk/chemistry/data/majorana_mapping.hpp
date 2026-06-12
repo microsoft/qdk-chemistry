@@ -377,6 +377,11 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * the dense layout, so the result is numerically equivalent to the dense
  * path for the same integrals.
  *
+ * Entries are canonicalized under the 8-fold ERI symmetry at ingestion
+ * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the
+ * mapped operator does not depend on which symmetry-related permutation(s)
+ * of an integral the caller stored, nor on the order of the entry list.
+ *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
  * @param h1_alpha One-body integrals, alpha spin (row-major).
