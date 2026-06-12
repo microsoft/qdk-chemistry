@@ -109,68 +109,154 @@ def _poly_clean(poly: GradedPoly, tol: float = 1e-14) -> GradedPoly:
     return cleaned
 
 
-def _poly_multiply(left: GradedPoly, right: GradedPoly, max_degree: int) -> GradedPoly:
-    """Multiply two graded Pauli polynomials, truncating contributions above ``max_degree``."""
+# ----------------------------------------------------------------------------------
+# Commutator-based log of a product (avoids materialising the dense product)
+# ----------------------------------------------------------------------------------
+
+# Dexpinv coefficients c_k = (-1)**k * B_k / k!  (B_k = Bernoulli numbers), from
+#   log(e^Z e^f) = Z + integral_0^1  sum_k c_k ad_{Omega(s)}^k (f)  ds.
+# Odd k > 1 vanish.  Tabulated through k = 8 (covers expansion orders well past use).
+_DEXPINV_COEFFS: dict[int, float] = {
+    0: 1.0,
+    1: 0.5,
+    2: 1.0 / 12.0,
+    4: -1.0 / 720.0,
+    6: 1.0 / 30240.0,
+    8: -1.0 / 1209600.0,
+}
+
+# An operator carrying an explicit power of the BCH integration variable ``s``:
+# s_power -> graded Pauli polynomial.
+SPoly = dict[int, GradedPoly]
+
+
+def _word_commutator(word_a: PauliWord, word_b: PauliWord) -> tuple[complex, PauliWord] | None:
+    r"""Commutator of two Pauli words: ``(coeff, word)`` for :math:`[P_a, P_b]`, or ``None`` if they commute.
+
+    For Pauli strings, :math:`P_a P_b = \phi_{ab} Q` and :math:`P_b P_a = \phi_{ba} Q`
+    (the same word :math:`Q`), so :math:`[P_a, P_b] = (\phi_{ab} - \phi_{ba}) Q`, which
+    vanishes exactly when the two strings commute.  This is what keeps the corrections
+    sparse: every commutator is a single Pauli word, and commuting pairs cost nothing.
+    """
+    list_a, list_b = list(word_a), list(word_b)
+    phase_ab, product = PauliTermAccumulator.multiply_uncached(list_a, list_b)
+    phase_ba, _ = PauliTermAccumulator.multiply_uncached(list_b, list_a)
+    coeff = phase_ab - phase_ba
+    if abs(coeff) < 1e-15:
+        return None
+    return coeff, _canonical_word(product)
+
+
+def _poly_commutator(left: GradedPoly, right: GradedPoly, max_degree: int, tol: float = 1e-14) -> GradedPoly:
+    """Graded commutator ``[left, right]``, computed term by term.
+
+    Only anticommuting word pairs contribute; commuting pairs are skipped, so the
+    result stays as sparse as the generated Lie algebra allows (no dense intermediate).
+    """
     out: GradedPoly = {}
     for word_a, deg_a in left.items():
-        list_a = list(word_a)
         for word_b, deg_b in right.items():
-            phase, product = PauliTermAccumulator.multiply_uncached(list_a, list(word_b))
-            result_word = _canonical_word(product)
-            bucket = out.setdefault(result_word, {})
+            commuted = _word_commutator(word_a, word_b)
+            if commuted is None:
+                continue
+            comm_coeff, word = commuted
+            bucket = out.setdefault(word, {})
             for da, ca in deg_a.items():
                 for db, cb in deg_b.items():
                     degree = da + db
                     if degree > max_degree:
                         continue
-                    bucket[degree] = bucket.get(degree, 0j) + phase * ca * cb
+                    bucket[degree] = bucket.get(degree, 0j) + comm_coeff * ca * cb
+    return _poly_clean(out, tol)
+
+
+def _sop_add_inplace(target: SPoly, other: SPoly, scale: complex = 1.0) -> SPoly:
+    """Accumulate ``scale * other`` into an s-power-indexed operator ``target`` (in place)."""
+    for s_power, poly in other.items():
+        _poly_add_inplace(target.setdefault(s_power, {}), poly, scale)
+    return target
+
+
+def _sop_to_poly(sop: SPoly) -> GradedPoly:
+    """Evaluate an s-power operator at ``s = 1`` by summing over its s-powers."""
+    total: GradedPoly = {}
+    for poly in sop.values():
+        _poly_add_inplace(total, poly)
+    return total
+
+
+def _sop_ad(omega: SPoly, term: SPoly, max_degree: int) -> SPoly:
+    """Apply the adjoint action ``[Omega, .]`` to an s-power operator (s-powers add)."""
+    out: SPoly = {}
+    for i, op_i in omega.items():
+        for j, op_j in term.items():
+            comm = _poly_commutator(op_i, op_j, max_degree)
+            if comm:
+                _poly_add_inplace(out.setdefault(i + j, {}), comm)
     return out
 
 
-def _poly_identity() -> GradedPoly:
-    """Return the identity element of the graded Pauli algebra."""
-    return {(): {0: 1 + 0j}}
+def _polys_close(a: GradedPoly, b: GradedPoly, tol: float) -> bool:
+    """Whether two graded polynomials agree to within ``tol`` on every coefficient."""
+    for word in set(a) | set(b):
+        da, db = a.get(word, {}), b.get(word, {})
+        for degree in set(da) | set(db):
+            if abs(da.get(degree, 0j) - db.get(degree, 0j)) > tol:
+                return False
+    return True
 
 
-def _poly_exp(generator: GradedPoly, max_degree: int) -> GradedPoly:
-    r"""Return the truncated series :math:`\exp(generator)`.
+def _bch_merge(z_poly: GradedPoly, f_poly: GradedPoly, max_degree: int, tol: float = 1e-14) -> GradedPoly:
+    r"""Return ``log(e^Z e^f)`` truncated to t-degree ``max_degree`` using commutators only.
 
-    ``generator`` must have minimum degree :math:`\ge 1` so the Taylor series
-    truncates: the :math:`k`-th power has minimum degree :math:`k`.
+    Solves the dexpinv ODE :math:`\Omega'(s) = \sum_k c_k\,\mathrm{ad}_{\Omega(s)}^k(f)`
+    with :math:`\Omega(0)=Z` for :math:`\Omega(1)`, by Picard iteration that tracks the
+    integration variable ``s`` as an explicit polynomial degree.  ``e^Z`` (the dense
+    product) is never formed; the only non-sparse object is the log itself.
     """
-    result = _poly_identity()
-    term = _poly_identity()
-    for k in range(1, max_degree + 1):
-        term = _poly_multiply(term, generator, max_degree)
-        if not term:
+    seed = {w: dict(dm) for w, dm in z_poly.items()}
+    omega: SPoly = {0: {w: dict(dm) for w, dm in seed.items()}}
+    previous = _poly_clean(_sop_to_poly(omega), tol)
+    for _ in range(max_degree + 3):
+        # integrand(s) = sum_k c_k ad_{Omega(s)}^k (f)
+        integrand: SPoly = {}
+        term: SPoly = {0: {w: dict(dm) for w, dm in f_poly.items()}}
+        _sop_add_inplace(integrand, term, _DEXPINV_COEFFS[0])
+        for k in range(1, max_degree + 1):
+            term = _sop_ad(omega, term, max_degree)
+            if not term:
+                break
+            ck = _DEXPINV_COEFFS.get(k, 0.0)
+            if ck != 0.0:
+                _sop_add_inplace(integrand, term, ck)
+        # Omega(s) = Z + integral_0^s integrand d(sigma):  s_power j -> j+1, divide by j+1
+        new_omega: SPoly = {0: {w: dict(dm) for w, dm in seed.items()}}
+        for s_power, poly in integrand.items():
+            integrated = {word: {deg: c / (s_power + 1) for deg, c in dm.items()} for word, dm in poly.items()}
+            _poly_add_inplace(new_omega.setdefault(s_power + 1, {}), integrated)
+        omega = {sp: cleaned for sp, p in new_omega.items() if (cleaned := _poly_clean(p, tol))}
+        current = _poly_clean(_sop_to_poly(omega), tol)
+        converged = _polys_close(current, previous, tol)
+        previous = current
+        if converged:
             break
-        term = {word: {degree: coeff / k for degree, coeff in degree_map.items()} for word, degree_map in term.items()}
-        _poly_add_inplace(result, term)
-    return _poly_clean(result)
+    return previous
 
 
-def _poly_log(unitary: GradedPoly, max_degree: int) -> GradedPoly:
-    r"""Return the truncated series :math:`\log(unitary)` for ``unitary = I + M``.
+def _log_of_product(
+    factors: list[tuple[PauliWord, int, complex]], max_degree: int, tol: float = 1e-14
+) -> GradedPoly:
+    r"""Compute ``log(prod_m exp(f_m))`` to t-degree ``max_degree`` via incremental BCH merges.
 
-    Uses :math:`\log(I + M) = \sum_{k \ge 1} (-1)^{k+1} M^{k}/k`, where
-    :math:`M` has minimum degree :math:`\ge 1`.
+    Each ``f_m`` is a single Pauli term ``(word, degree, coeff)``.  The factors are
+    folded left to right, merging each into the running log with :func:`_bch_merge`,
+    so the dense product is never materialised and commuting pairs are skipped.
     """
-    residual = _poly_add_inplace({word: dict(dm) for word, dm in unitary.items()}, {(): {0: -1 + 0j}})
-    residual = _poly_clean(residual)
-
-    result: GradedPoly = {}
-    power = _poly_identity()
-    for k in range(1, max_degree + 1):
-        power = _poly_multiply(power, residual, max_degree)
-        if not power:
-            break
-        sign = 1.0 if k % 2 == 1 else -1.0
-        scaled = {
-            word: {degree: sign * coeff / k for degree, coeff in degree_map.items()}
-            for word, degree_map in power.items()
-        }
-        _poly_add_inplace(result, scaled)
-    return _poly_clean(result)
+    running: GradedPoly = {}
+    for word, degree, coeff in factors:
+        f_poly: GradedPoly = {word: {degree: coeff}}
+        running = f_poly if not running else _bch_merge(running, f_poly, max_degree, tol)
+    return _poly_clean(running, tol)
 
 
 # ----------------------------------------------------------------------------------
@@ -194,16 +280,20 @@ def zassenhaus_factors(
     The factors are built order by order.  Starting from the bare first-order
     Lie-Trotter product :math:`\prod_k \exp(-i\alpha_k t P_k)`, the routine repeatedly
 
-    1. forms the truncated unitary series :math:`U = \prod_m \exp(f_m)`,
-    2. computes its logarithm :math:`L = \log U` as a graded Pauli polynomial,
-    3. extracts the degree-:math:`n` residual :math:`R_n` of :math:`L - (-iHt)`, and
-    4. appends single-Pauli factors realising :math:`-R_n`.
+    1. computes :math:`L = \log\bigl(\prod_m \exp(f_m)\bigr)` as a graded Pauli polynomial,
+    2. extracts the degree-:math:`n` residual :math:`R_n` of :math:`L - (-iHt)`, and
+    3. appends single-Pauli factors realising :math:`-R_n`.
 
     Appending degree-:math:`n` factors cancels the order-:math:`n` term of
     :math:`\log U` exactly (their mutual cross terms are of degree :math:`\ge n+1`),
     and recomputing :math:`L` at every step folds all splitting errors into later
     corrections.  After processing :math:`n = 2, \dots, \text{order}` the logarithm
     equals :math:`-iHt + O(t^{\,\text{order}+1})`.
+
+    The logarithm :math:`L = \log\prod_m \exp(f_m)` is computed directly via nested
+    commutators (the BCH/dexpinv recursion in :func:`_log_of_product`) -- each commutator
+    of Pauli words is a single word and commuting pairs are skipped, so the dense
+    :math:`4^n` product is never materialised.
 
     Args:
         terms: ``(pauli_label, coefficient)`` pairs for the Hermitian Hamiltonian.
@@ -235,10 +325,7 @@ def zassenhaus_factors(
     target = _poly_clean(target, tol)
 
     for degree in range(2, order + 1):
-        unitary = _poly_identity()
-        for word, factor_degree, coeff in factors:
-            unitary = _poly_multiply(unitary, _poly_exp({word: {factor_degree: coeff}}, order), order)
-        log_unitary = _poly_log(_poly_clean(unitary, tol), order)
+        log_unitary = _log_of_product(factors, order, tol)
 
         difference = _poly_add_inplace({w: dict(dm) for w, dm in log_unitary.items()}, target, scale=-1.0)
         residual = _poly_clean(difference, tol)
