@@ -119,7 +119,7 @@ def _make_iterative_circuit_builder_ref(builder_name: str, num_bits: int, evolut
         builder_name,
         num_bits=num_bits,
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=evolution_time),
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", unitary_builder_name, time=evolution_time),
     )
 
 
@@ -283,6 +283,50 @@ def test_iterative_phase_estimation_four_qubit_phase_and_energy(
     )
     assert np.isclose(
         resolved_energy,
+        four_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+def test_iterative_phase_estimation_with_zassenhaus_examples(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+    four_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Verify iterative phase estimation with Zassenhaus builder on two-qubit and four-qubit examples."""
+    # two-qubit problem
+    res2 = _run_iterative(two_qubit_phase_problem, unitary_builder_name="zassenhaus")
+    phase2, energy2 = _resolve_phase_ambiguity(
+        res2.phase_fraction, two_qubit_phase_problem.evolution_time, two_qubit_phase_problem.expected_energy
+    )
+    assert list(res2.bits_msb_first or []) == two_qubit_phase_problem.expected_bits
+    assert np.isclose(
+        phase2,
+        two_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        energy2,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+    # four-qubit problem
+    res4 = _run_iterative(four_qubit_phase_problem, unitary_builder_name="zassenhaus")
+    phase4, energy4 = _resolve_phase_ambiguity(
+        res4.phase_fraction, four_qubit_phase_problem.evolution_time, four_qubit_phase_problem.expected_energy
+    )
+    assert list(res4.bits_msb_first or []) == four_qubit_phase_problem.expected_bits
+    assert np.isclose(
+        phase4,
+        four_qubit_phase_problem.expected_phase,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_phase_fraction_tolerance,
+    )
+    assert np.isclose(
+        energy4,
         four_qubit_phase_problem.expected_energy,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
