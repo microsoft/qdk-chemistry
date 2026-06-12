@@ -122,33 +122,44 @@ def _jw_eigenvalues_spinless(n_rows: int, n_cols: int, t: float = 1.0) -> np.nda
 
 
 def _vc_codespace_eigenvalues(qh: QubitHamiltonian, n_sites: int) -> np.ndarray:
-    """Compute codespace eigenvalues without materialising the full dense matrix.
+    """Compute codespace eigenvalues with sparse intermediate construction.
 
-    Builds the 2**n_sites codespace matrix directly from Pauli strings.
+    The mapper builds its MajoranaMapping with N = 2 * n_sites modes
+    (alpha + beta spin-orbital blocks for the underlying C++ engine),
+    giving num_qubits = 4 * n_sites: 2*n_sites physical + 2*n_sites
+    auxiliary qubits. The codespace matrix has dimension
+    2**(2*n_sites) = 2**n_phys with n_phys = 2*n_sites.
+
     In the little-endian QDK convention:
-      - ps[0..n_sites-1]         = auxiliary qubit ops
-      - ps[n_sites..2*n_sites-1] = physical qubit ops
+      - ps[0 : n_phys]  = auxiliary qubit ops (n_phys = 2*n_sites)
+      - ps[n_phys :]    = physical qubit ops (n_phys qubits)
     A term contributes iff every auxiliary op is I or Z.
+
+    Each term is accumulated as a sparse matrix to avoid materialising
+    O(num_terms) dense 2**n_phys x 2**n_phys arrays during construction;
+    the dense matrix is built only once, immediately before eigvalsh.
     """
+    import scipy.sparse as sp  # noqa: PLC0415
+
     _p = {
-        "I": np.eye(2, dtype=complex),
-        "X": np.array([[0, 1], [1, 0]], dtype=complex),
-        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
-        "Z": np.array([[1, 0], [0, -1]], dtype=complex),
+        "I": sp.eye(2, format="csr", dtype=complex),
+        "X": sp.csr_matrix(np.array([[0, 1], [1, 0]], dtype=complex)),
+        "Y": sp.csr_matrix(np.array([[0, -1j], [1j, 0]], dtype=complex)),
+        "Z": sp.csr_matrix(np.diag([1, -1]).astype(complex)),
     }
     n_phys = 2 * n_sites
     dim_phys = 2**n_phys
-    h_cs = np.zeros((dim_phys, dim_phys), dtype=complex)
+    h_cs = sp.csr_matrix((dim_phys, dim_phys), dtype=complex)
     for ps, coeff in zip(qh.pauli_strings, qh.coefficients, strict=False):
         aux_chars = ps[:n_phys]
         phys_chars = ps[n_phys:]
         if any(ch in ("X", "Y") for ch in aux_chars):
             continue
-        mat = np.array([[1.0 + 0j]])
+        mat = sp.csr_matrix(np.array([[1.0 + 0j]]))
         for ch in phys_chars:
-            mat = np.kron(mat, _p[ch])
-        h_cs += coeff * mat
-    return np.sort(np.real(np.linalg.eigvalsh(h_cs)))
+            mat = sp.kron(mat, _p[ch], format="csr")
+        h_cs = h_cs + coeff * mat
+    return np.sort(np.real(np.linalg.eigvalsh(h_cs.toarray())))
 
 
 # ---------------------------------------------------------------------------
@@ -192,7 +203,7 @@ class TestVCMappingConstruction:
         """Test that invalid lattice shapes raise ValueError."""
         with pytest.raises(ValueError, match="2x2"):
             VerstraeteCiracQubitMapper(lattice_shape=(1, 4))
-        with pytest.raises(ValueError, match="n_sites"):
+        with pytest.raises(ValueError, match="n_modes"):
             build_vc_majorana_mapping(0)
 
     def test_mode_count_mismatch_raises(self):

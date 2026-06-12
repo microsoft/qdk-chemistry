@@ -32,17 +32,17 @@ if TYPE_CHECKING:
 __all__ = ["VerstraeteCiracQubitMapper", "build_vc_majorana_mapping"]
 
 
-def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
+def build_vc_majorana_mapping(n_modes: int) -> MajoranaMapping:
     """Return a MajoranaMapping for the Verstraete-Cirac encoding.
 
-    Works for any 2D lattice geometry with n_sites fermionic modes.
-    Introduces n_sites auxiliary qubits (one per physical mode), giving
-    2 * n_sites qubits total.
+    Works for any 2D lattice geometry with n_modes fermionic modes.
+    Introduces n_modes auxiliary qubits (one per physical mode), giving
+    2 * n_modes qubits total.
 
     Qubit layout::
 
-        Qubits 0..n_sites-1          physical modes (any site ordering)
-        Qubits n_sites..2*n_sites-1  auxiliary (qubit n_sites+n for site n)
+        Qubits 0..n_modes-1          physical modes (any site ordering)
+        Qubits n_modes..2*n_modes-1  auxiliary (qubit n_modes+n for site n)
 
     Majorana operators (JW on physical + stabilising Z on auxiliary)::
 
@@ -59,18 +59,17 @@ def build_vc_majorana_mapping(n_sites: int) -> MajoranaMapping:
     (arXiv:cond-mat/0508353) is a planned follow-up.
 
     Args:
-        n_sites: Total number of fermionic modes. Must be >= 1.
+        n_modes: Total number of fermionic modes. Must be >= 1.
 
     Returns:
-        A MajoranaMapping on 2 * n_sites qubits named "verstraete-cirac".
+        A MajoranaMapping on 2 * n_modes qubits named "verstraete-cirac".
 
     Raises:
-        ValueError: If n_sites < 1.
+        ValueError: If n_modes < 1.
 
     """
-    if n_sites < 1:
-        raise ValueError(f"n_sites must be >= 1, got {n_sites}.")
-    n_modes = n_sites
+    if n_modes < 1:
+        raise ValueError(f"n_modes must be >= 1, got {n_modes}.")
     table = []
     for n in range(n_modes):
         z_string = [(k, 3) for k in range(n)]
@@ -136,7 +135,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
     def _run_impl(
         self,
         hamiltonian: Hamiltonian,
-        mapping: MajoranaMapping | None = None,
+        mapping: MajoranaMapping,
     ) -> QubitHamiltonian:
         """Map a fermionic Hamiltonian to a VC qubit Hamiltonian.
 
@@ -151,29 +150,21 @@ class VerstraeteCiracQubitMapper(QubitMapper):
         Args:
             hamiltonian: Fermionic Hamiltonian. One-body integrals must
                 be (N, N) with N = n_rows * n_cols (single spin species).
-            mapping: Optional mapping for API compatibility. Must match
-                self.mapping if supplied.
+            mapping: The VC MajoranaMapping (typically ``self.mapping``),
+                with ``num_modes == 2 * N``. May include tapering, which
+                is applied to the result via ``_taper_result``.
 
         Returns:
-            QubitHamiltonian on 2N qubits with encoding "verstraete-cirac".
+            QubitHamiltonian with encoding "verstraete-cirac" on
+            2 * mapping.num_modes = 4 * N qubits (before tapering).
 
         Raises:
-            ValueError: On mapping mismatch or mode count mismatch.
+            ValueError: On mode count mismatch.
 
         """
         Logger.trace_entering()
 
-        if mapping is not None and (
-            mapping.name != self._mapping.name or mapping.num_qubits != self._mapping.num_qubits
-        ):
-            raise ValueError(
-                f"Supplied mapping '{mapping.name}' "
-                f"({mapping.num_qubits} qubits) does not match "
-                f"the internal VC mapping '{self._mapping.name}' "
-                f"({self._mapping.num_qubits} qubits)."
-            )
-
-        base_mapping = self._mapping
+        base_mapping = mapping.without_tapering() if mapping.tapering else mapping
         threshold = self._threshold
         integral_threshold = self._integral_threshold
 
@@ -227,9 +218,10 @@ class VerstraeteCiracQubitMapper(QubitMapper):
 
         Logger.debug(f"VC mapper: {len(pauli_strings)} Pauli terms on {n_qubits} qubits")
 
-        return QubitHamiltonian(
+        qh = QubitHamiltonian(
             pauli_strings=pauli_strings,
             coefficients=np.array(coefficients, dtype=complex),
             encoding="verstraete-cirac",
             fermion_mode_order=None,
         )
+        return self._taper_result(qh, mapping)
