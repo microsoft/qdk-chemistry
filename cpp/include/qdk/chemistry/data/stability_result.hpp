@@ -441,6 +441,8 @@ class StabilityResult : public DataClass,
   static std::shared_ptr<StabilityResult> from_hdf5(H5::Group& group);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// True if internal stability is satisfied (default: true)
   bool internal_stable_ = true;
 

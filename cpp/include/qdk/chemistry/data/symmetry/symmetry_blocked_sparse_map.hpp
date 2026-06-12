@@ -263,6 +263,29 @@ class SymmetryBlockedSparseMap
     }
   }
 
+ protected:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override {
+    hash_value(ctx, this->get_data_type_name());
+    hash_value(ctx, static_cast<uint64_t>(Rank));
+    this->_hash_symmetry_blocked_metadata(ctx);
+    auto groups = this->_sorted_pointer_groups();
+    hash_value(ctx, static_cast<uint64_t>(groups.size()));
+    for (const auto& group : groups) {
+      hash_value(ctx, static_cast<uint64_t>(group.keys.size()));
+      for (const auto& key : group.keys) {
+        this->_hash_labels(ctx, key);
+      }
+      hash_value(ctx, static_cast<uint64_t>(group.ptr->size()));
+      for (const auto& [idx, value] : *group.ptr) {
+        for (unsigned component : idx) {
+          hash_value(ctx, static_cast<uint64_t>(component));
+        }
+        hash_value(ctx, value);
+      }
+    }
+  }
+
+ public:
   /**
    * @brief Reconstruct a @ref SymmetryBlockedSparseMap from a JSON object
    * produced by @ref to_json.

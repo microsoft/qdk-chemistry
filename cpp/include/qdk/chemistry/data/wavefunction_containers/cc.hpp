@@ -335,7 +335,7 @@ class CoupledClusterContainer : public WavefunctionContainer {
    *       Coupled cluster RDM computation requires the adjoint (bra)
    *       wavefunction with lambda amplitudes.
    *
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   * @return Tuple of (aaaa, aabb, bbbb) two-particle RDMs
    * @throws std::runtime_error Always throws - requires adjoint wavefunction
    */
   std::tuple<VectorVariant, VectorVariant, VectorVariant>
@@ -354,6 +354,8 @@ class CoupledClusterContainer : public WavefunctionContainer {
   const VectorVariant& get_active_two_rdm_spin_traced() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Orbital information
   std::shared_ptr<Orbitals> _orbitals;
   // Wfn

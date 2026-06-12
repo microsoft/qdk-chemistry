@@ -186,6 +186,8 @@ nitpick_ignore_regex = [
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
+    (r"cpp:identifier", r"HashComplexScalar<.*>"),
+    (r"cpp:identifier", r"HashSignedIntegral<.*>"),
     (r"cpp:identifier", r"NonIntegralBool"),
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
@@ -212,6 +214,8 @@ nitpick_ignore_regex = [
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
     (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
+    (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
 
 # Configure output for to-dos
