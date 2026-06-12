@@ -863,13 +863,30 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
                  static_cast<std::size_t>(two_body_indices[4 * e + 3])};
     const Key4 c = canonical(k);
     const double v = two_body_values[e];
+    // Duplicate entries for the same position are tolerated only when they
+    // agree; conflicting values would make the result depend on input
+    // order, so they are rejected instead.
+    auto reject_conflict = [&](double existing) {
+      if (existing != v) {
+        throw std::invalid_argument(
+            "majorana_map_hamiltonian_sparse: conflicting duplicate values "
+            "for two-body entry (" +
+            std::to_string(k[0]) + ", " + std::to_string(k[1]) + ", " +
+            std::to_string(k[2]) + ", " + std::to_string(k[3]) + ").");
+      }
+    };
     if (k == c) {
-      canon[c] = v;
+      auto [it, inserted] = canon.try_emplace(c, v);
+      if (!inserted) reject_conflict(it->second);
     } else {
       const std::uint64_t position = provider.key(k[0], k[1], k[2], k[3]);
       auto [it, inserted] = partners.try_emplace(c, Partner{position, v});
-      if (!inserted && position < it->second.position) {
-        it->second = {position, v};
+      if (!inserted) {
+        if (position == it->second.position) {
+          reject_conflict(it->second.value);
+        } else if (position < it->second.position) {
+          it->second = {position, v};
+        }
       }
     }
   }

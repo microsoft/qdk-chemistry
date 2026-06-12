@@ -16,6 +16,8 @@
 #include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -378,6 +380,14 @@ Pauli words.
           // and sorts the entries before accumulating, so the mapped
           // operator is reproducible for any input ordering.
           const auto& two_body_map = container.sparse_two_body_integrals();
+          // The container's index components are int by definition, so the
+          // pushes below involve no narrowing; this assert turns any future
+          // widening of the index type into a build error instead of a
+          // silent truncation.
+          static_assert(
+              std::is_same_v<SparseHamiltonianContainer::TwoBodyIndex,
+                             std::tuple<int, int, int, int>>,
+              "sparse two-body indices must be int to match the engine API");
           std::vector<int> indices;
           std::vector<double> values;
           indices.reserve(two_body_map.size() * 4);

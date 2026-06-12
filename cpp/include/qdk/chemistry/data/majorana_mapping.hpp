@@ -381,6 +381,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the
  * mapped operator does not depend on which symmetry-related permutation(s)
  * of an integral the caller stored, nor on the order of the entry list.
+ * Duplicate entries for the same position must agree in value; conflicting
+ * duplicates are rejected rather than resolved in encounter order.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -397,8 +399,9 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If spin_symmetric is false or any two-body
- *         index is outside [0, n_spatial).
+ * @throws std::invalid_argument If spin_symmetric is false, any two-body
+ *         index is outside [0, n_spatial), or duplicate entries for the
+ *         same position carry conflicting values.
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
