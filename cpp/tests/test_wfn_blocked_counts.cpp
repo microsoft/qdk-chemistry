@@ -107,3 +107,81 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
   EXPECT_THROW(sv.get_active_orbital_occupations(), std::runtime_error);
   EXPECT_THROW(sv.get_total_orbital_occupations(), std::runtime_error);
 }
+
+// --------------------------------------------------------------------------
+// Generic (bitstring) wavefunction construction — from_bitstring + inactive.
+// --------------------------------------------------------------------------
+
+TEST_F(WavefunctionBlockedCountsTest, BitstringWithInactiveSpaceCountsCorrectly) {
+  // 5 modes: inactive {0}, active {1,2,3}, virtual {4}
+  auto active_idx = std::make_shared<const SymmetryBlockedIndexSet>(
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial()),
+      std::unordered_map<SymmetryLabel, std::size_t>{{SymmetryLabel{}, 5}},
+      std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>{
+          {SymmetryLabel{}, {1, 2, 3}}});
+  auto inactive_idx = std::make_shared<const SymmetryBlockedIndexSet>(
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial()),
+      std::unordered_map<SymmetryLabel, std::size_t>{{SymmetryLabel{}, 5}},
+      std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>{
+          {SymmetryLabel{}, {0}}});
+  auto orbitals = std::make_shared<ModelOrbitals>(active_idx, inactive_idx);
+
+  // Active-space determinant: 2 of 3 active modes occupied.
+  auto det = Configuration::from_bitstring("110");
+  EXPECT_EQ(det.bits_per_mode(), 1);
+
+  StateVectorContainer sv(det, orbitals);
+
+  // Active particles: 2 (bits set in the bitstring).
+  auto active_count = sv.active_num_particles();
+  ASSERT_NE(active_count, nullptr);
+  EXPECT_FALSE(active_count->symmetries()[0]->has_axis(AxisName::Spin));
+  EXPECT_EQ(active_count->value(SymmetryLabel{}), 2u);
+
+  // Total particles: 2 active + 1 inactive = 3.
+  auto total_count = sv.total_num_particles();
+  ASSERT_NE(total_count, nullptr);
+  EXPECT_EQ(total_count->value(SymmetryLabel{}), 3u);
+
+  // Total occupations: inactive mode 0 = 1.0, active modes 1,2 = 1.0, rest 0.
+  auto total_occ = sv.total_orbital_occupations();
+  ASSERT_NE(total_occ, nullptr);
+  const auto& occ_vec = total_occ->block({SymmetryLabel{}});
+  EXPECT_EQ(occ_vec.size(), 5);
+  EXPECT_DOUBLE_EQ(occ_vec(0), 1.0);  // inactive
+  EXPECT_DOUBLE_EQ(occ_vec(1), 1.0);  // active, occupied
+  EXPECT_DOUBLE_EQ(occ_vec(2), 1.0);  // active, occupied
+  EXPECT_DOUBLE_EQ(occ_vec(3), 0.0);  // active, unoccupied
+  EXPECT_DOUBLE_EQ(occ_vec(4), 0.0);  // virtual
+
+  // Spin-resolved v1 accessors must throw.
+  EXPECT_THROW(sv.get_total_num_electrons(), std::runtime_error);
+  EXPECT_THROW(sv.get_total_orbital_occupations(), std::runtime_error);
+}
+
+TEST_F(WavefunctionBlockedCountsTest, BitstringFullActiveCountsCorrectly) {
+  // Full active space (no inactive), pure bitstring construction.
+  auto orbitals = std::make_shared<ModelOrbitals>(4);
+
+  auto det1 = Configuration::from_bitstring("1010");
+  auto det2 = Configuration::from_bitstring("0110");
+  Eigen::VectorXd coeffs(2);
+  coeffs << 0.8, 0.6;
+  StateVectorContainer sv(
+      ContainerTypes::VectorVariant{coeffs},
+      ContainerTypes::DeterminantVector{det1, det2}, orbitals);
+
+  auto active_count = sv.active_num_particles();
+  ASSERT_NE(active_count, nullptr);
+  EXPECT_EQ(active_count->value(SymmetryLabel{}), 2u);
+
+  auto total_count = sv.total_num_particles();
+  EXPECT_EQ(total_count->value(SymmetryLabel{}), 2u);
+
+  // Spin-resolved v1 accessors must throw — no spin axis.
+  EXPECT_THROW(sv.get_active_num_electrons(), std::runtime_error);
+
+  // Multi-determinant occupations require a 1-RDM; without one the
+  // container correctly reports unavailability.
+  EXPECT_FALSE(sv.has_one_rdm_spin_dependent());
+}

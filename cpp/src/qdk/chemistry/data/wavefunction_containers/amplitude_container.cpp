@@ -326,16 +326,18 @@ void AmplitudeContainer::clear_caches() const {
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
 AmplitudeContainer::total_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = _wavefunction->get_total_determinants();
+  const auto& determinants = _wavefunction->get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
   }
   if (determinants[0].bits_per_mode() != 2) {
+    // Generic (non-spin-½): aggregate count, no spin decomposition.
+    // Use only one channel of inactive indices — for spinless bases
+    // v1_indices_from_index_set duplicates the trivial-label indices into
+    // both alpha and beta, so summing both would double-count.
     std::size_t active = determinants[0].total_occupation();
-    auto [alpha_inactive, beta_inactive] =
-        get_orbitals()->get_inactive_space_indices();
-    return _make_particle_count(
-        active + alpha_inactive.size() + beta_inactive.size(), 0);
+    auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
+    return _make_particle_count(active + alpha_inactive.size(), 0);
   }
   auto [n_alpha, n_beta] = _total_electron_counts();
   return _make_particle_count(n_alpha, n_beta);
@@ -344,7 +346,7 @@ AmplitudeContainer::total_num_particles() const {
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
 AmplitudeContainer::active_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = _wavefunction->get_total_determinants();
+  const auto& determinants = _wavefunction->get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
   }
@@ -369,7 +371,7 @@ std::pair<std::size_t, std::size_t> AmplitudeContainer::_total_electron_counts()
 std::pair<std::size_t, std::size_t>
 AmplitudeContainer::_active_electron_counts() const {
   QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = _wavefunction->get_total_determinants();
+  const auto& determinants = _wavefunction->get_active_determinants();
   if (determinants.empty()) {
     throw std::runtime_error("No determinants available");
   }

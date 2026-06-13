@@ -348,11 +348,12 @@ StateVectorContainer::total_num_particles() const {
   }
   if (dets[0].bits_per_mode() != 2) {
     // Generic (non-spin-½): aggregate count, no spin decomposition.
+    // Use only one channel of inactive indices — for spinless bases
+    // v1_indices_from_index_set duplicates the trivial-label indices into
+    // both alpha and beta, so summing both would double-count.
     std::size_t active = dets[0].total_occupation();
-    auto [alpha_inactive, beta_inactive] =
-        get_orbitals()->get_inactive_space_indices();
-    return _make_particle_count(
-        active + alpha_inactive.size() + beta_inactive.size(), 0);
+    auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
+    return _make_particle_count(active + alpha_inactive.size(), 0);
   }
   auto [n_alpha, n_beta] = _total_electron_counts();
   return _make_particle_count(n_alpha, n_beta);
@@ -834,7 +835,12 @@ StateVectorContainer::_total_occupations_pair() const {
   Eigen::VectorXd alpha_occupations = Eigen::VectorXd::Zero(num_orbitals);
   Eigen::VectorXd beta_occupations = Eigen::VectorXd::Zero(num_orbitals);
 
-  // Inactive orbitals are doubly occupied.
+  // Inactive orbitals are doubly occupied (for spin-½) or singly occupied
+  // (for spinless). For spinless bases v1_indices_from_index_set duplicates
+  // trivial-label indices into both alpha and beta channels; filling both
+  // would double-count after _make_orbital_occupations sums them.
+  auto sym = get_orbitals()->symmetries();
+  bool has_spin = sym && sym->has_axis(AxisName::Spin);
   auto [alpha_inactive_indices, beta_inactive_indices] =
       get_orbitals()->get_inactive_space_indices();
   for (size_t inactive_idx : alpha_inactive_indices) {
@@ -842,9 +848,11 @@ StateVectorContainer::_total_occupations_pair() const {
       alpha_occupations(inactive_idx) = 1.0;
     }
   }
-  for (size_t inactive_idx : beta_inactive_indices) {
-    if (inactive_idx < static_cast<size_t>(num_orbitals)) {
-      beta_occupations(inactive_idx) = 1.0;
+  if (has_spin) {
+    for (size_t inactive_idx : beta_inactive_indices) {
+      if (inactive_idx < static_cast<size_t>(num_orbitals)) {
+        beta_occupations(inactive_idx) = 1.0;
+      }
     }
   }
 
