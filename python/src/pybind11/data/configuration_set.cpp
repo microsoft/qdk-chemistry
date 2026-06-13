@@ -60,7 +60,7 @@ void bind_configuration_set(pybind11::module& data) {
 
   py::class_<ConfigurationSet, DataClass, py::smart_holder> configuration_set(
       data, "ConfigurationSet", R"(
-Represents a collection of electronic configurations with associated orbital information.
+Represents a collection of configurations with associated single-particle basis information.
 
 This class manages a set of Configuration objects that share the same single-particle
 basis (specifically the active space of an Orbitals object). By storing the orbital

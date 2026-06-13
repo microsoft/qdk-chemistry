@@ -22,14 +22,17 @@ void bind_configuration(pybind11::module &data) {
   py::class_<Configuration, DataClass, py::smart_holder> configuration(
       data, "Configuration",
       R"(
-Represents a molecular electronic configuration.
+Represents a single-particle occupation pattern with efficient bit-packing.
 
-This class efficiently stores the occupation pattern of molecular orbitals using a compact representation where each orbital can be in one of four states:
+For spin-½ systems (``bits_per_mode=2``), each mode can be in one of four states:
 
-- UNOCCUPIED ('0'): No electrons
-- ALPHA ('u'): One alpha electron
-- BETA ('d'): One beta electron
-- DOUBLY ('2'): Both alpha and beta electrons
+- UNOCCUPIED ('0'): Empty
+- ALPHA ('u'): One alpha particle
+- BETA ('d'): One beta particle
+- DOUBLY ('2'): Both alpha and beta particles
+
+For generic systems (``bits_per_mode=1``), each mode is either '0' (empty)
+or '1' (occupied).
 
 The class provides methods for constructing, manipulating, and querying configurations.
 )");

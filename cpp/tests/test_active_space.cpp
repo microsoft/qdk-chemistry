@@ -509,13 +509,13 @@ class MockWavefunctionContainer : public WavefunctionContainer {
   }
 
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  total_num_electrons() const override {
-    return _make_num_electrons(2, 2);
+  total_num_particles() const override {
+    return _make_particle_count(2, 2);
   }
 
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  active_num_electrons() const override {
-    return _make_num_electrons(2, 2);
+  active_num_particles() const override {
+    return _make_particle_count(2, 2);
   }
 
   std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()

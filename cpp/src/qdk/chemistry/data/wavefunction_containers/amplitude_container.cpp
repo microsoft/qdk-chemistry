@@ -324,17 +324,35 @@ void AmplitudeContainer::clear_caches() const {
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-AmplitudeContainer::total_num_electrons() const {
+AmplitudeContainer::total_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
+  const auto& determinants = _wavefunction->get_total_determinants();
+  if (determinants.empty()) {
+    throw std::runtime_error("No determinants available");
+  }
+  if (determinants[0].bits_per_mode() != 2) {
+    std::size_t active = determinants[0].total_occupation();
+    auto [alpha_inactive, beta_inactive] =
+        get_orbitals()->get_inactive_space_indices();
+    return _make_particle_count(
+        active + alpha_inactive.size() + beta_inactive.size(), 0);
+  }
   auto [n_alpha, n_beta] = _total_electron_counts();
-  return _make_num_electrons(n_alpha, n_beta);
+  return _make_particle_count(n_alpha, n_beta);
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-AmplitudeContainer::active_num_electrons() const {
+AmplitudeContainer::active_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
+  const auto& determinants = _wavefunction->get_total_determinants();
+  if (determinants.empty()) {
+    throw std::runtime_error("No determinants available");
+  }
+  if (determinants[0].bits_per_mode() != 2) {
+    return _make_particle_count(determinants[0].total_occupation(), 0);
+  }
   auto [n_alpha, n_beta] = _active_electron_counts();
-  return _make_num_electrons(n_alpha, n_beta);
+  return _make_particle_count(n_alpha, n_beta);
 }
 
 std::pair<std::size_t, std::size_t> AmplitudeContainer::_total_electron_counts()
@@ -447,7 +465,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = j.value("sector", std::string("electrons"));
+    std::string sector = j.value("sector", std::string(DEFAULT_SECTOR));
 
     // Determine the amplitude expansion type. New "amplitude" files store an
     // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
@@ -571,7 +589,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = "electrons";
+    std::string sector = DEFAULT_SECTOR;
     if (group.attrExists("sector")) {
       group.openAttribute("sector").read(string_type, sector);
     }

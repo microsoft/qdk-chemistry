@@ -225,7 +225,7 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
   }
 
   // Sector name; legacy files predating sectors are migrated as electronic.
-  std::string sector = j.value("sector", std::string("electrons"));
+  std::string sector = j.value("sector", std::string(DEFAULT_SECTOR));
 
   std::vector<Configuration> configurations;
   if (!j.contains("configurations")) {
@@ -344,7 +344,7 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = "electrons";
+    std::string sector = DEFAULT_SECTOR;
     if (group.attrExists("sector")) {
       H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
       group.openAttribute("sector").read(sector_str_type, sector);

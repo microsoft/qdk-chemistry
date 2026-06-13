@@ -424,7 +424,7 @@ class WavefunctionContainer {
   virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
-   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
    * scalar.
    *
    * The block structure is induced by the single-particle basis: when the
@@ -432,21 +432,21 @@ class WavefunctionContainer {
    * independent @f$\alpha@f$ and @f$\beta@f$ count; when they carry no spin
    * axis the result holds a single trivial block with the aggregate count.
    *
-   * @return Shared pointer to the symmetry-blocked total electron count.
+   * @return Shared pointer to the symmetry-blocked total particle count.
    */
   virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  total_num_electrons() const = 0;
+  total_num_particles() const = 0;
 
   /**
-   * @brief Number of active-space electrons as a symmetry-blocked scalar.
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
    *
-   * Blocked the same way as @ref total_num_electrons; see that method for the
+   * Blocked the same way as @ref total_num_particles; see that method for the
    * basis-induced block structure.
    *
-   * @return Shared pointer to the symmetry-blocked active electron count.
+   * @return Shared pointer to the symmetry-blocked active particle count.
    */
   virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  active_num_electrons() const = 0;
+  active_num_particles() const = 0;
 
   /**
    * @brief Orbital occupations for all orbitals (total = active + inactive +
@@ -479,22 +479,22 @@ class WavefunctionContainer {
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
    *
-   * Spin-resolved view of @ref total_num_electrons.
+   * Spin-resolved view of @ref total_num_particles.
    *
    * @return Pair of (n_alpha_total, n_beta_total) electrons
    * @throws std::runtime_error if the single-particle basis carries no spin
-   *         (@f$S_z@f$) axis; use @ref total_num_electrons instead.
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
    *
-   * Spin-resolved view of @ref active_num_electrons.
+   * Spin-resolved view of @ref active_num_particles.
    *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
    * @throws std::runtime_error if the single-particle basis carries no spin
-   *         (@f$S_z@f$) axis; use @ref active_num_electrons instead.
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
@@ -766,7 +766,7 @@ class WavefunctionContainer {
   bool _is_restricted_closed_shell() const;
 
   /**
-   * @brief Build a symmetry-blocked electron count from per-spin counts.
+   * @brief Build a symmetry-blocked particle count from per-spin counts.
    *
    * The block structure is induced by the associated @ref Orbitals. A spin
    * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
@@ -777,7 +777,7 @@ class WavefunctionContainer {
    * @param n_beta Number of beta electrons.
    * @return Shared pointer to the symmetry-blocked count.
    */
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> _make_num_electrons(
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> _make_particle_count(
       std::size_t n_alpha, std::size_t n_beta) const;
 
   /**
@@ -977,27 +977,27 @@ class Wavefunction : public DataClass,
       const std::string& name) const;
 
   /**
-   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
    * scalar.
    *
    * Forwards to the underlying container's @ref
-   * WavefunctionContainer::total_num_electrons.
+   * WavefunctionContainer::total_num_particles.
    *
-   * @return Shared pointer to the symmetry-blocked total electron count.
+   * @return Shared pointer to the symmetry-blocked total particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  total_num_electrons() const;
+  total_num_particles() const;
 
   /**
-   * @brief Number of active-space electrons as a symmetry-blocked scalar.
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
    *
    * Forwards to the underlying container's @ref
-   * WavefunctionContainer::active_num_electrons.
+   * WavefunctionContainer::active_num_particles.
    *
-   * @return Shared pointer to the symmetry-blocked active electron count.
+   * @return Shared pointer to the symmetry-blocked active particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  active_num_electrons() const;
+  active_num_particles() const;
 
   /**
    * @brief Orbital occupations for all orbitals as a rank-1 symmetry-blocked
@@ -1026,22 +1026,22 @@ class Wavefunction : public DataClass,
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
    *
-   * Spin-resolved view of @ref total_num_electrons.
+   * Spin-resolved view of @ref total_num_particles.
    *
    * @return Pair of (n_alpha_total, n_beta_total) electrons
    * @throws std::runtime_error if the single-particle basis carries no spin
-   *         (@f$S_z@f$) axis; use @ref total_num_electrons instead.
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
    *
-   * Spin-resolved view of @ref active_num_electrons.
+   * Spin-resolved view of @ref active_num_particles.
    *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
    * @throws std::runtime_error if the single-particle basis carries no spin
-   *         (@f$S_z@f$) axis; use @ref active_num_electrons instead.
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 

@@ -232,13 +232,13 @@ It uses variant types to support both real and complex arithmetic.
            "True if the active-space 2-RDM symmetry-blocked tensor is "
            "available (real or complex).")
       // Symmetry-blocked count / occupation accessors
-      .def("active_num_electrons", &WavefunctionContainer::active_num_electrons,
-           "Number of active-space electrons as a SymmetryBlockedScalarCount. "
+      .def("active_num_particles", &WavefunctionContainer::active_num_particles,
+           "Number of active-space particles as a SymmetryBlockedScalarCount. "
            "Carries an independent alpha/beta count when the basis has a spin "
            "axis, otherwise a single trivial block with the aggregate count.")
-      .def("total_num_electrons", &WavefunctionContainer::total_num_electrons,
-           "Number of electrons (active + inactive) as a "
-           "SymmetryBlockedScalarCount, blocked like active_num_electrons.")
+      .def("total_num_particles", &WavefunctionContainer::total_num_particles,
+           "Number of particles (active + inactive) as a "
+           "SymmetryBlockedScalarCount, blocked like active_num_particles.")
       .def("active_orbital_occupations",
            &WavefunctionContainer::active_orbital_occupations,
            "Active orbital occupations as a rank-1 SymmetryBlockedTensor "
@@ -458,26 +458,26 @@ Examples:
 )");
 
   // Symmetry-blocked count / occupation accessors
-  wavefunction.def("active_num_electrons", &Wavefunction::active_num_electrons,
+  wavefunction.def("active_num_particles", &Wavefunction::active_num_particles,
                    R"(
-Number of active-space electrons as a symmetry-blocked scalar.
+Number of active-space particles as a symmetry-blocked scalar.
 
 The block structure is induced by the single-particle basis: an alpha/beta
 count when the associated orbitals carry a spin axis, otherwise a single
 trivial block carrying the aggregate count.
 
 Returns:
-    SymmetryBlockedScalarCount: The symmetry-blocked active electron count.
+    SymmetryBlockedScalarCount: The symmetry-blocked active particle count.
 )");
 
-  wavefunction.def("total_num_electrons", &Wavefunction::total_num_electrons,
+  wavefunction.def("total_num_particles", &Wavefunction::total_num_particles,
                    R"(
-Number of electrons (active + inactive) as a symmetry-blocked scalar.
+Number of particles (active + inactive) as a symmetry-blocked scalar.
 
-Blocked like :func:`active_num_electrons`.
+Blocked like :func:`active_num_particles`.
 
 Returns:
-    SymmetryBlockedScalarCount: The symmetry-blocked total electron count.
+    SymmetryBlockedScalarCount: The symmetry-blocked total particle count.
 )");
 
   wavefunction.def("total_orbital_occupations",
@@ -1215,7 +1215,7 @@ Args:
     orbitals (Orbitals): Shared pointer to orbital basis set
     one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    sector (str): Name of the single-particle sector the orbitals belong to (default: "electrons")
+    sector (str): Name of the single-particle sector the orbitals belong to (default: "__default__")
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
         and ``"mutual_information"`` (2-D)
@@ -1273,7 +1273,7 @@ Args:
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
     two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
-    sector (str): Name of the single-particle sector the orbitals belong to (default: "electrons")
+    sector (str): Name of the single-particle sector the orbitals belong to (default: "__default__")
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
         and ``"mutual_information"`` (2-D)

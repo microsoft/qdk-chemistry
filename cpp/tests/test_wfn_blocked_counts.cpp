@@ -22,7 +22,7 @@ TEST_F(WavefunctionBlockedCountsTest, ActiveElectronCountIsSpinBlocked) {
   auto det = Configuration::from_spin_half_string("2u00");  // 2 alpha, 1 beta
   StateVectorContainer sd(det, orbitals);
 
-  auto count = sd.active_num_electrons();
+  auto count = sd.active_num_particles();
   ASSERT_NE(count, nullptr);
   EXPECT_TRUE(count->symmetries()[0]->has_axis(AxisName::Spin));
   EXPECT_EQ(count->value(axes::alpha()), 2u);
@@ -69,7 +69,7 @@ TEST_F(WavefunctionBlockedCountsTest, TotalCountMatchesV1) {
   auto det = Configuration::from_spin_half_string("2200");  // 2 alpha, 2 beta
   StateVectorContainer sd(det, orbitals);
 
-  auto total = sd.total_num_electrons();
+  auto total = sd.total_num_particles();
   auto [n_alpha, n_beta] = sd.get_total_num_electrons();
   EXPECT_EQ(total->value(axes::alpha()), n_alpha);
   EXPECT_EQ(total->value(axes::beta()), n_beta);
@@ -97,7 +97,7 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
       ContainerTypes::DeterminantVector{det1, det2}, orbitals);
 
   // Active electron count is a single trivial block (no spin axis).
-  auto count = sv.active_num_electrons();
+  auto count = sv.active_num_particles();
   ASSERT_NE(count, nullptr);
   EXPECT_FALSE(count->symmetries()[0]->has_axis(AxisName::Spin));
 

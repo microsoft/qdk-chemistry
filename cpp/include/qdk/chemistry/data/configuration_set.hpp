@@ -16,8 +16,10 @@
 
 namespace qdk::chemistry::data {
 
-/// Canonical name of the default (electronic) single-particle sector.
-inline constexpr const char* DEFAULT_SECTOR = "electrons";
+/// Sentinel sector name used when no explicit sector is supplied.
+/// Internal callers should pass an explicit sector name; this default exists
+/// only for backward compatibility with legacy serialization formats.
+inline constexpr const char* DEFAULT_SECTOR = "__default__";
 
 /**
  * @class ConfigurationSet
@@ -264,11 +266,12 @@ class ConfigurationSet : public DataClass {
    * @throws std::invalid_argument if validation fails
    *
    * Checks that:
-   * - All configurations have the same number of orbitals
-   * - All configurations have the same electron count (both alpha and beta)
-   * - Configurations have sufficient orbital capacity for the active space size
-   * - Any orbitals beyond the active space size are unoccupied (no
-   * "overhanging" electrons)
+   * - All configurations have the same number of modes
+   * - All configurations have the same particle count (for spin-½: both alpha
+   *   and beta)
+   * - Configurations have sufficient mode capacity for the active space size
+   * - Any modes beyond the active space size are unoccupied (no "overhanging"
+   *   particles)
    *
    * Note: Configurations only represent the active space orbitals. Inactive
    * and virtual orbitals are not included in

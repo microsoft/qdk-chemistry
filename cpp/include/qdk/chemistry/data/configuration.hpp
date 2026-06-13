@@ -20,11 +20,12 @@ namespace qdk::chemistry::data {
 /**
  * @class Configuration
  * @brief Represents a configuration (or occupation number vector) with
- * efficient bit-packing
+ * efficient bit-packing.
  * @details The Configuration class provides a memory-efficient representation
- * of orbital occupations for calculations. Each orbital can be in one of four
- * states: unoccupied, alpha-occupied, beta-occupied, or doubly-occupied. The
- * implementation uses bit-packing (2 bits per orbital) for memory efficiency.
+ * of single-particle mode occupations. For spin-½ systems (2 bits per mode),
+ * each mode can be unoccupied, alpha-occupied, beta-occupied, or doubly
+ * occupied. For generic systems (1 bit per mode), each mode is simply occupied
+ * or unoccupied.
  */
 
 class Configuration : public DataClass {

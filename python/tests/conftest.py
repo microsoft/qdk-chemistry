@@ -137,7 +137,7 @@ def wavefunction_4e4o():
     dets = [det1, det2]
     coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
 
-    container = StateVectorContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals, "electrons")
     return Wavefunction(container)
 
 
@@ -151,7 +151,7 @@ def wavefunction_10e6o():
     dets = [det1, det2, det3]
     coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
 
-    container = StateVectorContainer(coeffs, dets, test_orbitals)
+    container = StateVectorContainer(coeffs, dets, test_orbitals, "electrons")
     return Wavefunction(container)
 
 

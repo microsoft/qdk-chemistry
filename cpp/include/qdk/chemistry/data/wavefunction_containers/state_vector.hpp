@@ -261,19 +261,19 @@ class StateVectorContainer : public WavefunctionContainer {
   bool contains_determinant(const Configuration& det) const;
 
   /**
-   * @brief Number of electrons (active + inactive) as a symmetry-blocked
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
    * scalar.
-   * @return Shared pointer to the symmetry-blocked total electron count.
+   * @return Shared pointer to the symmetry-blocked total particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  total_num_electrons() const override;
+  total_num_particles() const override;
 
   /**
-   * @brief Number of active-space electrons as a symmetry-blocked scalar.
-   * @return Shared pointer to the symmetry-blocked active electron count.
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
+   * @return Shared pointer to the symmetry-blocked active particle count.
    */
   std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  active_num_electrons() const override;
+  active_num_particles() const override;
 
   /**
    * @brief Orbital occupations for all orbitals (total = active + inactive +

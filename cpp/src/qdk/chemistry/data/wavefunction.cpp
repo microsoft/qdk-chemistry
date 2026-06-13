@@ -346,12 +346,12 @@ bool WavefunctionContainer::_is_restricted_closed_shell() const {
   if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
     return false;
   }
-  auto [n_alpha, n_beta] = _read_spin_count(*active_num_electrons());
+  auto [n_alpha, n_beta] = _read_spin_count(*active_num_particles());
   return get_orbitals()->is_restricted() && (n_alpha == n_beta);
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-WavefunctionContainer::_make_num_electrons(std::size_t n_alpha,
+WavefunctionContainer::_make_particle_count(std::size_t n_alpha,
                                            std::size_t n_beta) const {
   auto symmetries = get_orbitals()->symmetries();
   if (symmetries && symmetries->has_axis(AxisName::Spin)) {
@@ -399,8 +399,8 @@ std::pair<std::size_t, std::size_t> WavefunctionContainer::_read_spin_count(
   if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
     throw std::runtime_error(
         "Spin-resolved electron counts are unavailable: the single-particle "
-        "basis carries no spin (S_z) axis. Use active_num_electrons() / "
-        "total_num_electrons() for the symmetry-blocked count instead.");
+        "basis carries no spin (S_z) axis. Use active_num_particles() / "
+        "total_num_particles() for the symmetry-blocked count instead.");
   }
   return {scalar.value(axes::alpha()), scalar.value(axes::beta())};
 }
@@ -422,13 +422,13 @@ WavefunctionContainer::_read_spin_occupations(
 std::pair<size_t, size_t> WavefunctionContainer::get_total_num_electrons()
     const {
   QDK_LOG_TRACE_ENTERING();
-  return _read_spin_count(*total_num_electrons());
+  return _read_spin_count(*total_num_particles());
 }
 
 std::pair<size_t, size_t> WavefunctionContainer::get_active_num_electrons()
     const {
   QDK_LOG_TRACE_ENTERING();
-  return _read_spin_count(*active_num_electrons());
+  return _read_spin_count(*active_num_particles());
 }
 
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
@@ -780,7 +780,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
-    std::string sector = "electrons";
+    std::string sector = DEFAULT_SECTOR;
     if (j.contains("configuration_set")) {
       auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
       determinants = config_set.get_configurations();
@@ -992,15 +992,15 @@ std::string Wavefunction::get_container_type() const {
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-Wavefunction::total_num_electrons() const {
+Wavefunction::total_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->total_num_electrons();
+  return _container->total_num_particles();
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-Wavefunction::active_num_electrons() const {
+Wavefunction::active_num_particles() const {
   QDK_LOG_TRACE_ENTERING();
-  return _container->active_num_electrons();
+  return _container->active_num_particles();
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
@@ -1216,7 +1216,7 @@ std::shared_ptr<Wavefunction> Wavefunction::truncate(
   // source wavefunction's sector.
   const auto sector_names = sectors();
   const std::string sector =
-      sector_names.empty() ? std::string("electrons") : sector_names.front();
+      sector_names.empty() ? std::string(DEFAULT_SECTOR) : sector_names.front();
   return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
       normalized_coeffs, top_configs, get_orbitals(), sector, get_type()));
 }
@@ -1793,7 +1793,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
-    std::string sector = "electrons";
+    std::string sector = DEFAULT_SECTOR;
     if (group.nameExists("configuration_set")) {
       H5::Group config_set_group = group.openGroup("configuration_set");
       auto config_set = ConfigurationSet::from_hdf5(config_set_group);
@@ -1975,15 +1975,25 @@ std::string Wavefunction::get_summary() const {
       << (get_type() == WavefunctionType::SelfDual ? "SelfDual" : "NotSelfDual")
       << "\n";
   oss << "  Complex: " << (is_complex() ? "yes" : "no") << "\n";
-  oss << "  Norm: " << norm() << "\n";
 
-  auto [n_alpha_total, n_beta_total] = get_total_num_electrons();
-  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
+  // Particle counts: use v2 APIs and format conditionally on spin axis.
+  auto total_count = total_num_particles();
+  auto active_count = active_num_particles();
+  auto symmetries = get_orbitals()->symmetries();
+  bool has_spin = symmetries && symmetries->has_axis(AxisName::Spin);
 
-  oss << "  Total electrons (α,β): (" << n_alpha_total << "," << n_beta_total
-      << ")\n";
-  oss << "  Active electrons (α,β): (" << n_alpha_active << "," << n_beta_active
-      << ")\n";
+  if (has_spin) {
+    auto alpha_label = axes::alpha();
+    auto beta_label = axes::beta();
+    oss << "  Total electrons (α,β): (" << total_count->value(alpha_label)
+        << "," << total_count->value(beta_label) << ")\n";
+    oss << "  Active electrons (α,β): (" << active_count->value(alpha_label)
+        << "," << active_count->value(beta_label) << ")\n";
+  } else {
+    oss << "  Total particles: " << total_count->value(SymmetryLabel{}) << "\n";
+    oss << "  Active particles: " << active_count->value(SymmetryLabel{})
+        << "\n";
+  }
 
   // RDM availability
   oss << "  1-RDM available: " << (has_one_rdm_spin_dependent() ? "yes" : "no")
@@ -1992,8 +2002,10 @@ std::string Wavefunction::get_summary() const {
       << "\n";
 
   if (auto orbitals = get_orbitals()) {
-    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs, "
-        << (orbitals->is_restricted() ? "restricted" : "unrestricted");
+    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs";
+    if (has_spin) {
+      oss << ", " << (orbitals->is_restricted() ? "restricted" : "unrestricted");
+    }
   } else {
     oss << "  Orbitals: none";
   }

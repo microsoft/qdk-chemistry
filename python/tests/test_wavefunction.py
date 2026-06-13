@@ -76,14 +76,14 @@ class TestWavefunction:
         rdm_aa = np.array([[1.0, 0.0], [0.0, 0.0]])
         rdm_bb = np.array([[1.0, 0.0], [0.0, 0.0]])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals, None, rdm_aa, rdm_bb)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, None, rdm_aa, rdm_bb, sector="electrons")
         return Wavefunction(container)
 
     @pytest.fixture
     def slater_wavefunction(self, basic_orbitals):
         """Create a single Slater determinant wavefunction for testing."""
         det = Configuration.from_spin_half_string("20")
-        container = StateVectorContainer(det, basic_orbitals)
+        container = StateVectorContainer(det, basic_orbitals, "electrons")
         return Wavefunction(container)
 
     def test_wavefunction_construction(self, cas_wavefunction):
@@ -127,7 +127,7 @@ class TestWavefunction:
         wf = slater_wavefunction
         n_alpha, n_beta = wf.get_active_num_electrons()
 
-        count = wf.active_num_electrons()
+        count = wf.active_num_particles()
         assert count.symmetries()[0].has_axis(AxisName.Spin)
         assert count.value(SymmetryLabel([axes.alpha()])) == n_alpha
         assert count.value(SymmetryLabel([axes.beta()])) == n_beta
@@ -143,7 +143,7 @@ class TestWavefunction:
 
     def test_symmetry_blocked_count_json_round_trip(self, slater_wavefunction):
         """A symmetry-blocked count survives a JSON round-trip."""
-        count = slater_wavefunction.active_num_electrons()
+        count = slater_wavefunction.active_num_particles()
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "count.json"
             count.to_json_file(path)
@@ -175,7 +175,7 @@ class TestWavefunction:
 
     def test_sector_survives_json_round_trip(self, basic_orbitals, tmp_path):
         """Sectors are derived from the container, so they reappear after a JSON reload."""
-        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals))
+        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals, "electrons"))
         path = tmp_path / "sectors.wavefunction.json"
         wf.to_json_file(path)
         restored = Wavefunction.from_json_file(path)
@@ -184,7 +184,7 @@ class TestWavefunction:
 
     def test_sector_survives_hdf5_round_trip(self, basic_orbitals, tmp_path):
         """Sectors are derived from the container, so they reappear after an HDF5 reload."""
-        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals))
+        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals, "electrons"))
         path = tmp_path / "sectors.wavefunction.h5"
         wf.to_hdf5_file(path)
         restored = Wavefunction.from_hdf5_file(path)
@@ -243,8 +243,8 @@ class TestWavefunction:
         coeffs1 = np.array([0.9, 0.1])
         coeffs2 = np.array([0.8, 0.2])
 
-        container1 = StateVectorContainer(coeffs1, dets, basic_orbitals)
-        container2 = StateVectorContainer(coeffs2, dets, basic_orbitals)
+        container1 = StateVectorContainer(coeffs1, dets, basic_orbitals, "electrons")
+        container2 = StateVectorContainer(coeffs2, dets, basic_orbitals, "electrons")
 
         wf1 = Wavefunction(container1)
         wf2 = Wavefunction(container2)
@@ -330,7 +330,6 @@ class TestWavefunction:
         assert "Number of determinants: 2" in summary
         assert "Wavefunction type: SelfDual" in summary
         assert "Complex: no" in summary
-        assert "Norm:" in summary
         assert "Total electrons" in summary
         assert "Active electrons" in summary
         assert "1-RDM available:" in summary
@@ -411,7 +410,7 @@ class TestWavefunctionRDMs:
         one_rdm_aa = np.array([[1.0, 0.0], [0.0, 0.0]])
         one_rdm_bb = np.array([[1.0, 0.0], [0.0, 0.0]])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb, sector="electrons")
         return Wavefunction(container)
 
     def test_one_rdm_spin_traced_access(self, cas_wavefunction_with_rdms):
@@ -442,7 +441,7 @@ class TestWavefunctionRDMs:
         dets = [det]
         coeffs = np.array([1.0])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         # These should raise RuntimeError if not available
@@ -482,7 +481,7 @@ class TestWavefunctionComplexSupport:
         # Complex coefficients
         coeffs = np.array([0.8 + 0.2j, 0.3 - 0.4j])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         # Test coefficient retrieval
@@ -510,8 +509,8 @@ class TestWavefunctionComplexSupport:
         coeffs1 = np.array([0.8 + 0.2j, 0.3 - 0.4j])
         coeffs2 = np.array([0.7 - 0.1j, 0.2 + 0.3j])
 
-        container1 = StateVectorContainer(coeffs1, dets, basic_orbitals)
-        container2 = StateVectorContainer(coeffs2, dets, basic_orbitals)
+        container1 = StateVectorContainer(coeffs1, dets, basic_orbitals, "electrons")
+        container2 = StateVectorContainer(coeffs2, dets, basic_orbitals, "electrons")
 
         wf1 = Wavefunction(container1)
         wf2 = Wavefunction(container2)
@@ -539,7 +538,7 @@ class TestWavefunctionEdgeCases:
         dets: list[Configuration] = []
         coeffs = np.array([])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         assert wf.size() == 0
@@ -551,7 +550,7 @@ class TestWavefunctionEdgeCases:
         dets = [det]
         coeffs = np.array([0.7])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         assert wf.size() == 1
@@ -571,7 +570,7 @@ class TestWavefunctionEdgeCases:
         dets = [det1, det2]
         coeffs = np.array([1.0, 0.0])  # Second coefficient is zero
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         assert wf.size() == 2  # Still contains both determinants
@@ -595,7 +594,7 @@ class TestWavefunctionEdgeCases:
         dets: list[Configuration] = []
         coeffs = np.array([])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         # These methods should raise RuntimeError for empty wavefunctions
@@ -619,7 +618,7 @@ class TestWavefunctionEdgeCases:
         coeffs = np.array([1.0 / np.sqrt(2), 1.0 / np.sqrt(2)])
 
         # Create wavefunction without RDMs
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         wf = Wavefunction(container)
 
         # Should raise RuntimeError when trying to calculate entropies without RDMs
@@ -648,6 +647,7 @@ class TestWavefunctionEdgeCases:
             coeffs,
             dets,
             basic_orbitals,
+            sector="electrons",
             entropies={"single_orbital": s1, "two_orbital": s2},
         )
         wf = Wavefunction(container)
@@ -688,6 +688,7 @@ class TestWavefunctionEdgeCases:
             coeffs,
             dets,
             basic_orbitals,
+            sector="electrons",
             entropies={"single_orbital": s1, "mutual_information": mi},
         )
         wf = Wavefunction(container)
@@ -732,6 +733,7 @@ class TestWavefunctionSerialization:
             coeffs,
             dets,
             basic_orbitals,
+            sector="electrons",
             entropies={"single_orbital": s1, "mutual_information": mi},
         )
         return Wavefunction(container)
@@ -744,14 +746,14 @@ class TestWavefunctionSerialization:
         dets = [det1, det2]
         coeffs = np.array([0.8 + 0.1j, 0.6 - 0.2j])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals)
+        container = StateVectorContainer(coeffs, dets, basic_orbitals, "electrons")
         return Wavefunction(container)
 
     @pytest.fixture
     def sd_wavefunction(self, basic_orbitals):
         """Create a Slater determinant wavefunction for testing."""
         det = Configuration.from_spin_half_string("20")
-        container = StateVectorContainer(det, basic_orbitals)
+        container = StateVectorContainer(det, basic_orbitals, "electrons")
         return Wavefunction(container)
 
     def test_json_serialization_cas_real(self, cas_wavefunction_real):
@@ -1348,7 +1350,7 @@ class TestMP2Container:
     def reference_wavefunction(self, basic_orbitals):
         """Create a reference wavefunction for MP2/CC tests."""
         ref = Configuration.from_spin_half_string("220")  # Two electrons in first two orbitals
-        sd_container = StateVectorContainer(ref, basic_orbitals)
+        sd_container = StateVectorContainer(ref, basic_orbitals, "electrons")
         return Wavefunction(sd_container)
 
     def test_mp2_container_construction(self, basic_orbitals, reference_wavefunction):
@@ -1393,7 +1395,7 @@ class TestCCContainer:
     def reference_wavefunction(self, basic_orbitals):
         """Create a reference wavefunction for CC tests."""
         ref = Configuration.from_spin_half_string("220")  # Two electrons in first two orbitals
-        sd_container = StateVectorContainer(ref, basic_orbitals)
+        sd_container = StateVectorContainer(ref, basic_orbitals, "electrons")
         return Wavefunction(sd_container)
 
     def test_cc_container_construction(self, basic_orbitals, reference_wavefunction):
@@ -1496,7 +1498,7 @@ class TestWavefunctionTruncate:
         ]
         coeffs = np.array([0.8, 0.4, 0.3, 0.1])  # Not normalized
 
-        container = StateVectorContainer(coeffs, dets, orbitals)
+        container = StateVectorContainer(coeffs, dets, orbitals, "electrons")
         return Wavefunction(container)
 
     def test_truncate_to_n_determinants(self, sci_wavefunction):
