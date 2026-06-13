@@ -295,7 +295,8 @@ Examples:
     >>> ring = LatticeGraph.chain(6, periodic=True)
 )",
                            py::arg("n"), py::arg("periodic") = false,
-                           py::arg("t") = 1.0);
+                           py::arg("t") = 1.0,
+                           py::arg("optimal_ordering") = false);
 
   lattice_graph.def_static("square", &LatticeGraph::square, R"(
 Create a two-dimensional square lattice.
@@ -332,9 +333,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("optimal_ordering") = false);
 
-  lattice_graph.def_static("triangular", &LatticeGraph::triangular, R"(
+  lattice_graph.def_static(
+      "triangular", &LatticeGraph::triangular, R"(
 Create a two-dimensional triangular lattice.
 
 Sites are indexed in row-major order: site index = y * nx + x.
@@ -371,10 +374,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("coloring_seed") = 0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("optimal_ordering") = false);
 
   lattice_graph.def_static("honeycomb", &LatticeGraph::honeycomb, R"(
 Create a two-dimensional honeycomb lattice.
@@ -417,9 +419,11 @@ Raises:
 )",
                            py::arg("nx"), py::arg("ny"),
                            py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0);
+                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
+                           py::arg("optimal_ordering") = false);
 
-  lattice_graph.def_static("kagome", &LatticeGraph::kagome, R"(
+  lattice_graph.def_static(
+      "kagome", &LatticeGraph::kagome, R"(
 Create a two-dimensional kagome lattice.
 
 The kagome lattice has three sites per unit cell, arranged as
@@ -467,10 +471,9 @@ Returns:
 Raises:
     ValueError: If nx or ny is 0.
 )",
-                           py::arg("nx"), py::arg("ny"),
-                           py::arg("periodic_x") = false,
-                           py::arg("periodic_y") = false, py::arg("t") = 1.0,
-                           py::arg("coloring_seed") = 0);
+      py::arg("nx"), py::arg("ny"), py::arg("periodic_x") = false,
+      py::arg("periodic_y") = false, py::arg("t") = 1.0,
+      py::arg("coloring_seed") = 0, py::arg("optimal_ordering") = false);
 
   lattice_graph.def("__repr__", [](const LatticeGraph &self) {
     return "<LatticeGraph sites=" + std::to_string(self.num_sites()) +
