@@ -109,43 +109,6 @@ constexpr std::uint8_t op_x = 1;
 constexpr std::uint8_t op_y = 2;
 constexpr std::uint8_t op_z = 3;
 
-bool find_hamiltonian_path_dfs(std::uint64_t curr,
-                               const Eigen::SparseMatrix<double>& adj,
-                               std::vector<bool>& visited,
-                               std::vector<std::uint64_t>& path) {
-  path.push_back(curr);
-  if (path.size() == static_cast<std::size_t>(adj.rows())) {
-    return true;
-  }
-  visited[curr] = true;
-
-  // Iterate directly over the sparse matrix columns/rows for neighbors
-  for (Eigen::SparseMatrix<double>::InnerIterator it(adj, curr); it; ++it) {
-    std::uint64_t neighbor = it.row();
-    if (neighbor != curr && !visited[neighbor]) {
-      if (find_hamiltonian_path_dfs(neighbor, adj, visited, path)) {
-        return true;
-      }
-    }
-  }
-  visited[curr] = false;
-  path.pop_back();
-  return false;
-}
-
-std::vector<std::uint64_t> find_hamiltonian_path(
-    const Eigen::SparseMatrix<double>& adj) {
-  std::uint64_t V = adj.rows();
-  std::vector<bool> visited(V, false);
-  std::vector<std::uint64_t> path;
-  for (std::uint64_t start = 0; start < V; ++start) {
-    if (find_hamiltonian_path_dfs(start, adj, visited, path)) {
-      return path;
-    }
-  }
-  return {};
-}
-
 }  // namespace detail
 
 // ── Factory: Jordan-Wigner ───────────────────────────────────────────
@@ -384,36 +347,21 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
         name + " requires a lattice graph with at least 3 sites");
   }
 
-  // Construct a Hamiltonian path from the graph adjacency matrix
+  // Since the lattice graph is pre-ordered optimally (if requested) or
+  // processed in default ordering, the node sequence/path is simply 0, 1, ...,
+  // V-1. Identify all non-adjacent edges incident to each vertex.
   const auto& adj = lattice.sparse_adjacency_matrix();
-  std::vector<std::uint64_t> hamiltonian_path = find_hamiltonian_path(adj);
-  if (hamiltonian_path.empty()) {
-    throw std::runtime_error(
-        name +
-        ": No Hamiltonian path found in the lattice graph. A Hamiltonian path "
-        "is required to construct commuting stabilizers.");
-  }
-
-  // Map row-major site index to its position in the Hamiltonian path
-  std::vector<std::uint64_t> site_to_path_idx(V);
-  for (std::uint64_t k = 0; k < V; ++k) {
-    site_to_path_idx[hamiltonian_path[k]] = k;
-  }
-
-  // Find all non-path edges incident to each vertex
-  std::vector<std::vector<std::uint64_t>> non_path_incident(V);
+  std::vector<std::vector<std::uint64_t>> non_adjacent_incident(V);
   for (int k = 0; k < adj.outerSize(); ++k) {
     for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
       std::uint64_t u = it.row();
       std::uint64_t v = it.col();
-      // Since the matrix is symmetric, only process the upper-triangle
+      // Since the matrix is symmetric, only process the upper-triangle (u < v)
       if (u < v) {
-        std::size_t s_u = site_to_path_idx[u];
-        std::size_t s_v = site_to_path_idx[v];
-        std::size_t diff = (s_u > s_v) ? (s_u - s_v) : (s_v - s_u);
+        std::size_t diff = v - u;
         if (diff > 1) {
-          non_path_incident[u].push_back(v);
-          non_path_incident[v].push_back(u);
+          non_adjacent_incident[u].push_back(v);
+          non_adjacent_incident[v].push_back(u);
         }
       }
     }
@@ -423,7 +371,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
   std::vector<std::size_t> n_aux(V);
   std::size_t total_n_aux = 0;
   for (std::uint64_t u = 0; u < V; ++u) {
-    n_aux[u] = (non_path_incident[u].size() + 1) / 2;
+    n_aux[u] = (non_adjacent_incident[u].size() + 1) / 2;
     total_n_aux += n_aux[u];
   }
 
@@ -434,28 +382,23 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
 
   auto jw_base = MajoranaMapping::jordan_wigner(base_qubits);
 
-  // Precompute mode offsets along the Hamiltonian path
-  std::vector<std::size_t> path_idx_to_mode_offset(V);
-  path_idx_to_mode_offset[0] = 0;
+  // Precompute mode offsets along the sequence of sites
+  std::vector<std::size_t> site_to_mode_offset(V);
+  site_to_mode_offset[0] = 0;
   for (std::size_t k = 1; k < V; ++k) {
-    std::uint64_t prev_site = hamiltonian_path[k - 1];
-    path_idx_to_mode_offset[k] =
-        path_idx_to_mode_offset[k - 1] + 1 + n_aux[prev_site];
+    std::uint64_t prev_site = k - 1;
+    site_to_mode_offset[k] = site_to_mode_offset[k - 1] + 1 + n_aux[prev_site];
   }
 
   auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
                               std::size_t offset) -> std::size_t {
-    std::size_t path_idx = site_to_path_idx[site];
-    std::size_t mode_idx =
-        spin * modes_per_spin + path_idx_to_mode_offset[path_idx];
+    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
     return 2 * mode_idx + offset;
   };
 
   auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
                               std::size_t offset) -> std::size_t {
-    std::size_t path_idx = site_to_path_idx[site];
-    std::size_t mode_idx =
-        spin * modes_per_spin + path_idx_to_mode_offset[path_idx];
+    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
     return 2 * (mode_idx + 1) + offset;
   };
 
@@ -477,16 +420,16 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
       edge_to_stab_idx(2);
 
   for (std::size_t spin = 0; spin < 2; ++spin) {
-    // Add 2-body link stabilizers for non-path edges on the lattice
+    // Add 2-body link stabilizers for non-adjacent edges on the lattice
     for (std::uint64_t u = 0; u < V; ++u) {
-      for (std::uint64_t v : non_path_incident[u]) {
+      for (std::uint64_t v : non_adjacent_incident[u]) {
         if (u < v) {
-          auto it_u = std::find(non_path_incident[u].begin(),
-                                non_path_incident[u].end(), v);
-          auto it_v = std::find(non_path_incident[v].begin(),
-                                non_path_incident[v].end(), u);
-          std::size_t a = std::distance(non_path_incident[u].begin(), it_u);
-          std::size_t b = std::distance(non_path_incident[v].begin(), it_v);
+          auto it_u = std::find(non_adjacent_incident[u].begin(),
+                                non_adjacent_incident[u].end(), v);
+          auto it_v = std::find(non_adjacent_incident[v].begin(),
+                                non_adjacent_incident[v].end(), u);
+          std::size_t a = std::distance(non_adjacent_incident[u].begin(), it_u);
+          std::size_t b = std::distance(non_adjacent_incident[v].begin(), it_v);
 
           std::size_t p = get_aux_majorana(u, spin, a);
           std::size_t q = get_aux_majorana(v, spin, b);
@@ -503,7 +446,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     // lift boundary/corner codespace degeneracy
     std::vector<std::size_t> unpaired_modes;
     for (std::uint64_t u = 0; u < V; ++u) {
-      std::size_t A_u = non_path_incident[u].size();
+      std::size_t A_u = non_adjacent_incident[u].size();
       if (A_u % 2 != 0) {
         unpaired_modes.push_back(get_aux_majorana(u, spin, A_u));
       }
@@ -542,10 +485,8 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
       bool connected = (s_u == s_v) && lattice.are_connected(i, j);
 
       if (connected) {
-        std::size_t path_i = site_to_path_idx[i];
-        std::size_t path_j = site_to_path_idx[j];
-        std::size_t path_min = std::min(path_i, path_j);
-        std::size_t path_max = std::max(path_i, path_j);
+        std::size_t path_min = std::min(i, j);
+        std::size_t path_max = std::max(i, j);
 
         std::size_t p = get_sys_majorana(i, s_u, a);
         std::size_t q = get_sys_majorana(j, s_v, b);
