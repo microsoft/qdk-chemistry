@@ -27,7 +27,7 @@ class CasWavefunctionTest : public ::testing::Test {
 TEST_F(CasWavefunctionTest, BasicProperties) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1 / sqrt(2);  // Normalized coefficients
 
@@ -41,14 +41,14 @@ TEST_F(CasWavefunctionTest, BasicProperties) {
   StateVectorContainer cas(coeffs, dets, orbitals, one_rdm, std::nullopt);
 
   EXPECT_EQ(cas.size(), 3);
-  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2200"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration::from_spin_half_string("2200"))),
                    0.5);
-  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2020"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration::from_spin_half_string("2020"))),
                    0.5);
-  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2002"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration::from_spin_half_string("2002"))),
                    1.0 / sqrt(2));
   // A determinant absent from the expansion has zero amplitude.
-  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration("2000"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(cas.get_coefficient(Configuration::from_spin_half_string("2000"))),
                    0.0);
   EXPECT_EQ(cas.get_active_determinants().size(), 3);
   EXPECT_EQ(cas.get_active_determinants()[0].to_string(), "2200");
@@ -108,7 +108,7 @@ TEST_F(CasWavefunctionTest, EmptyDeterminantsThrows) {
   StateVectorContainer cas(empty_coeffs, empty_dets, orbitals);
 
   // All these methods should throw when determinants are empty
-  EXPECT_THROW(cas.get_coefficient(Configuration("2200")), std::runtime_error);
+  EXPECT_THROW(cas.get_coefficient(Configuration::from_spin_half_string("2200")), std::runtime_error);
   EXPECT_THROW(cas.get_total_num_electrons(), std::runtime_error);
   EXPECT_THROW(cas.get_active_num_electrons(), std::runtime_error);
   EXPECT_THROW(cas.get_total_orbital_occupations(), std::runtime_error);
@@ -138,8 +138,8 @@ TEST_F(CasWavefunctionTest, ErrorMessagesAreDescriptive) {
 // Test entropy calculation with missing RDMs
 TEST_F(CasWavefunctionTest, EntropyWithMissingRDMs) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  std::vector<Configuration> dets = {Configuration("2200"),
-                                     Configuration("2020")};
+  std::vector<Configuration> dets = {Configuration::from_spin_half_string("2200"),
+                                     Configuration::from_spin_half_string("2020")};
   Eigen::VectorXd coeffs(2);
   coeffs << 1.0 / sqrt(2), 1.0 / sqrt(2);
 
@@ -161,7 +161,7 @@ TEST_F(CasWavefunctionTest, WithInactiveOrbitals) {
 
   // Create determinants using only the active space (4 orbitals)
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1 / sqrt(2);  // Normalized coefficients
 
@@ -240,7 +240,7 @@ TEST_F(CasWavefunctionTest, WithNonContinuousActiveSpace) {
 
   // Create determinants using only the active space (4 orbitals)
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1 / sqrt(2);
 
@@ -329,7 +329,7 @@ TEST_F(CasWavefunctionTest, WithNonContinuousActiveSpace) {
 TEST_F(CasWavefunctionTest, JsonSerialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1.0 / sqrt(2);
 
@@ -391,7 +391,7 @@ TEST_F(CasWavefunctionTest, JsonSerialization) {
 TEST_F(CasWavefunctionTest, Hdf5Serialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1.0 / sqrt(2);
 
@@ -482,8 +482,8 @@ TEST_F(CasWavefunctionTest, Hdf5Serialization) {
 // Test serialization with complex coefficients
 TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  std::vector<Configuration> dets = {Configuration("2200"),
-                                     Configuration("2020")};
+  std::vector<Configuration> dets = {Configuration::from_spin_half_string("2200"),
+                                     Configuration::from_spin_half_string("2020")};
   Eigen::VectorXcd coeffs(2);
   coeffs << std::complex<double>(0.5, 0.3), std::complex<double>(0.6, -0.2);
 
@@ -522,7 +522,7 @@ TEST_F(CasWavefunctionTest, Hdf5SerializationComplex) {
 TEST_F(CasWavefunctionTest, JsonSerializationRDMs) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> dets = {
-      Configuration("2200"), Configuration("2020"), Configuration("2002")};
+      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
   Eigen::VectorXd coeffs(3);
   coeffs << 0.5, 0.5, 1.0 / sqrt(2);
 

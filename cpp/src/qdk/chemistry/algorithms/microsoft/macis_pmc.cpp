@@ -117,7 +117,7 @@ struct pmc_helper {
     std::vector<data::Configuration> dets_configs;
     for (auto det : dets) {
       // Convert macis::wfn_t to data::Configuration
-      dets_configs.emplace_back(det, num_molecular_orbitals);
+      dets_configs.push_back(data::Configuration::from_spin_half_bitset(det, num_molecular_orbitals));
     }
     std::copy(C_pmc.begin(), C_pmc.end(), C_vector.data());
 

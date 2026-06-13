@@ -43,8 +43,8 @@ int main() {
 
   // Define configurations
   std::vector<Configuration> configurations = {
-      Configuration("20"),  // Ground state (both electrons in lowest orbital)
-      Configuration("02"),  // Excited state (both electrons in higher orbital)
+      Configuration::from_spin_half_string("20"),  // Ground state (both electrons in lowest orbital)
+      Configuration::from_spin_half_string("02"),  // Excited state (both electrons in higher orbital)
   };
 
   // Run the PMC calculation

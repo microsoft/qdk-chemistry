@@ -105,7 +105,7 @@ def test_sparse_isometry_gf2x_single_reference_state():
     # Create a wavefunction with coefficients that will be filtered out
     test_orbitals = create_test_orbitals(2)
 
-    det = Configuration("du00")
+    det = Configuration.from_spin_half_string("du00")
     dets = [det]
     coeffs = [1.0]
 
@@ -333,7 +333,7 @@ def test_asymmetric_active_space_error():
 
         def get_active_determinants(self):
             """Return mock determinants."""
-            return [Configuration("2020000"), Configuration("2200000")]
+            return [Configuration.from_spin_half_string("2020000"), Configuration.from_spin_half_string("2200000")]
 
         def get_coefficient(self, _):
             """Return mock coefficient."""

@@ -311,7 +311,7 @@ data::Configuration _extract_active_orbitals(
     }
   }
 
-  return data::Configuration(active_det_string);
+  return data::Configuration::from_spin_half_string(active_det_string);
 }
 
 std::shared_ptr<data::Wavefunction> new_wavefunction(
@@ -379,7 +379,7 @@ std::shared_ptr<data::Wavefunction> new_wavefunction(
       }
     }
 
-    data::Configuration aufbau_det(aufbau_string);
+    auto aufbau_det = data::Configuration::from_spin_half_string(aufbau_string);
     // Now truncate the aufbau determinant to the new active space
     truncated_det = _extract_active_orbitals(aufbau_det, old_active_indices_a,
                                              new_active_indices_a);

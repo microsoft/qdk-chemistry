@@ -42,7 +42,7 @@ class WavefunctionRDMTest : public ::testing::Test {
     Wavefunction::DeterminantVector dummy_dets(size);
     for (int i = 0; i < size; ++i) {
       // Use 3-orbital configurations to match active space size
-      dummy_dets[i] = Configuration("ud0");
+      dummy_dets[i] = Configuration::from_spin_half_string("ud0");
     }
 
     // Create sample RDMs
@@ -205,7 +205,7 @@ TEST_F(WavefunctionRDMTest, OneRDMSpinTraced) {
   coeffs(0) = 1.0;
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_traced = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -234,7 +234,7 @@ TEST_F(WavefunctionRDMTest, OneRDMSpinDependent) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_dependent = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -270,7 +270,7 @@ TEST_F(WavefunctionRDMTest, OneRDMSpinDependentSingleArgument) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_with_rdm = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -294,7 +294,7 @@ TEST_F(WavefunctionRDMTest, OneRDMConversionsFromSpinTraced) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_traced = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -332,7 +332,7 @@ TEST_F(WavefunctionRDMTest, OneRDMConversionsFromSpinDependent) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_dependent = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -374,7 +374,7 @@ TEST_F(WavefunctionRDMTest, TwoRDMSpinTraced) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_traced = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -405,7 +405,7 @@ TEST_F(WavefunctionRDMTest, TwoRDMSpinDependent) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_r_dependent = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -445,7 +445,7 @@ TEST_F(WavefunctionRDMTest, TwoRDMSpinDependentTwoArguments) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf_with_rdm = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -471,11 +471,11 @@ TEST_F(WavefunctionRDMTest, TwoRDMConversions) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets_r(10);
   for (int i = 0; i < 10; ++i) {
-    dets_r[i] = Configuration("200");
+    dets_r[i] = Configuration::from_spin_half_string("200");
   }
   Wavefunction::DeterminantVector dets_u(10);
   for (int i = 0; i < 10; ++i) {
-    dets_u[i] = Configuration("2u0");
+    dets_u[i] = Configuration::from_spin_half_string("2u0");
   }
 
   auto wf_r_dependent = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -548,7 +548,7 @@ TEST_F(WavefunctionRDMTest, OrbitalEntropies) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   // Create wavefunctions with both 1-RDM and 2-RDM data for entropy
@@ -593,8 +593,8 @@ TEST_F(WavefunctionRDMTest, HasMethodsRestrictedEdgeCases) {
   coeffs.setZero();
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(2);
-  dets[0] = Configuration("ud");
-  dets[1] = Configuration("du");
+  dets[0] = Configuration::from_spin_half_string("ud0");
+  dets[1] = Configuration::from_spin_half_string("du0");
 
   Eigen::MatrixXd test_rdm = Eigen::MatrixXd::Random(2, 2);
 
@@ -626,8 +626,8 @@ TEST_F(WavefunctionRDMTest, HasMethodsTwoRDMEdgeCases) {
   coeffs.setZero();
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(2);
-  dets[0] = Configuration("ud");
-  dets[1] = Configuration("du");
+  dets[0] = Configuration::from_spin_half_string("ud0");
+  dets[1] = Configuration::from_spin_half_string("du0");
 
   Eigen::VectorXd test_aabb = Eigen::VectorXd::Random(16);
   Eigen::VectorXd test_aaaa = Eigen::VectorXd::Random(16);
@@ -664,8 +664,8 @@ TEST_F(WavefunctionRDMTest, OrbitEntropyErrorHandling) {
   coeffs.setZero();
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(2);
-  dets[0] = Configuration("ud");
-  dets[1] = Configuration("du");
+  dets[0] = Configuration::from_spin_half_string("ud0");
+  dets[1] = Configuration::from_spin_half_string("du0");
 
   // Test case 1: Missing one-body RDMs
   Wavefunction empty_one_rdm(std::make_unique<StateVectorContainer>(
@@ -846,7 +846,7 @@ TEST_F(WavefunctionRDMTest, ActiveOneRdmSbtRealVariant) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   auto wf = Wavefunction(std::make_unique<StateVectorContainer>(
@@ -884,7 +884,7 @@ TEST_F(WavefunctionRDMTest, ActiveOneRdmSbtComplexVariant) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   // Build complex spin-dependent 1-RDMs: real diagonal + small imaginary
@@ -936,7 +936,7 @@ TEST_F(WavefunctionRDMTest, ActiveTwoRdmSbtComplexVariant) {
   coeffs(0) = std::complex<double>(1.0, 0.0);
   Wavefunction::DeterminantVector dets(10);
   for (int i = 0; i < 10; ++i) {
-    dets[i] = Configuration("ud0");
+    dets[i] = Configuration::from_spin_half_string("ud0");
   }
 
   // Complex 1-RDMs (required so the spin-dependent path is populated).

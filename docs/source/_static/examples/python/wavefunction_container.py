@@ -90,7 +90,7 @@ orbitals = make_minimal_orbitals()
 
 # Create a simple Slater determinant wavefunction for H2 ground state
 # 2 electrons in bonding sigma orbital
-det = Configuration("20")
+det = Configuration.from_spin_half_string("20")
 
 # Constructor takes single determinant and orbitals as input
 sd_container = StateVectorContainer(det, orbitals)
@@ -104,10 +104,10 @@ sd_wavefunction = Wavefunction(sd_container)
 # CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
 # All possible configurations:
 cas_dets = [
-    Configuration("20"),  # both electrons in bonding MO (ground state)
-    Configuration("ud"),  # alpha in bonding, beta in antibonding
-    Configuration("du"),  # beta in bonding, alpha in antibonding
-    Configuration("02"),  # both electrons in antibonding
+    Configuration.from_spin_half_string("20"),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string("ud"),  # alpha in bonding, beta in antibonding
+    Configuration.from_spin_half_string("du"),  # beta in bonding, alpha in antibonding
+    Configuration.from_spin_half_string("02"),  # both electrons in antibonding
 ]
 
 # Coefficients (normalized later by container)
@@ -125,9 +125,9 @@ cas_wavefunction = Wavefunction(cas_container)
 # Create an SCI wavefunction for H2
 # SCI selects only the most important configurations/determinants from the full space
 sci_dets = [
-    Configuration("20"),  # both electrons in bonding MO (ground state)
-    Configuration("du"),  # alpha in bonding, beta in antibonding
-    Configuration("ud"),  # beta in bonding, alpha in antibonding
+    Configuration.from_spin_half_string("20"),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string("du"),  # alpha in bonding, beta in antibonding
+    Configuration.from_spin_half_string("ud"),  # beta in bonding, alpha in antibonding
 ]
 
 # Coefficients for selected determinants
@@ -148,7 +148,7 @@ sci_wavefunction = Wavefunction(sci_container)
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-ref_det = Configuration("20")
+ref_det = Configuration.from_spin_half_string("20")
 sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 
@@ -169,7 +169,7 @@ mp2_wavefunction = Wavefunction(mp2_container)
 
 # Use the Slater determinant as reference
 orbitals = make_minimal_orbitals()
-ref_det = Configuration("20")
+ref_det = Configuration.from_spin_half_string("20")
 sd_container = StateVectorContainer(ref_det, orbitals)
 ref_wavefunction = Wavefunction(sd_container)
 

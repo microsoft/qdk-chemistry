@@ -44,21 +44,37 @@ Examples:
 
 )");
 
-  configuration.def(py::init<const std::string &>(),
-                    R"(
-Constructs a configuration from a string representation.
+  configuration.def_static("from_spin_half_string",
+                           &Configuration::from_spin_half_string,
+                           R"(
+Construct a spin-½ configuration from a string representation.
 
 Args:
-    str (str): String representation of the configuration
+    str (str): String with alphabet '0'/'u'/'d'/'2'.
 
-        Where '0' = unoccupied orbital, 'u' = alpha-occupied orbital,
-        'd' = beta-occupied orbital, '2' = doubly-occupied orbital
+Returns:
+    Configuration: A configuration with bits_per_mode == 2.
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")  # 7 orbitals with different occupations
-
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
 )",
-                    py::arg("str"));
+                           py::arg("str"));
+
+  configuration.def_static("from_bitstring",
+                           &Configuration::from_bitstring,
+                           R"(
+Construct a bitstring configuration (1 bit per mode) from a string representation.
+
+Args:
+    str (str): String with alphabet '0'/'1'.
+
+Returns:
+    Configuration: A configuration with bits_per_mode == 1.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("01100")
+)",
+                           py::arg("str"));
 
   // Configuration methods
   configuration.def("to_string", &Configuration::to_string,
@@ -72,7 +88,7 @@ Returns:
         'd' = beta-occupied orbital, '2' = doubly-occupied orbital
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> print(config.to_string())
     22ud0ud
 
@@ -95,7 +111,7 @@ Returns:
         and '0' indicates unoccupied for each spin channel
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("2du0")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("2du0")
     >>> print(config.to_binary_strings(4))
     ("1010", "1100")
 
@@ -110,7 +126,7 @@ Returns:
     tuple: A tuple containing (n_alpha, n_beta)
 
 Examples:
-    >>> config = qdk_chemistry.Configuration("22ud0ud")
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> n_alpha, n_beta = config.get_n_electrons()
     >>> print(f"Alpha electrons: {n_alpha}, Beta electrons: {n_beta}")
 
@@ -127,8 +143,8 @@ Returns:
     bool: True if configurations are identical, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
-    >>> config2 = qdk_chemistry.Configuration("22ud0ud")
+    >>> config1 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
     >>> print(config1 == config2)
     True
 
@@ -146,8 +162,8 @@ Returns:
     bool: True if configurations are different, False otherwise
 
 Examples:
-    >>> config1 = qdk_chemistry.Configuration("22ud0ud")
-    >>> config2 = qdk_chemistry.Configuration("22ud0u0")
+    >>> config1 = qdk_chemistry.Configuration.from_spin_half_string("22ud0ud")
+    >>> config2 = qdk_chemistry.Configuration.from_spin_half_string("22ud0u0")
     >>> print(config1 != config2)
     True
 

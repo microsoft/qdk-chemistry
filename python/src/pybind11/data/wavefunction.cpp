@@ -517,7 +517,7 @@ Returns:
     complex | float: The coefficient for the determinant if found, zero otherwise
 
 Examples:
-    >>> coeff = wf.get_coefficient(qdk_chemistry.Configuration("33221100"))
+    >>> coeff = wf.get_coefficient(qdk_chemistry.Configuration.from_spin_half_string("33221100"))
 )",
       py::arg("det"));
 
@@ -585,7 +585,7 @@ Notes:
     Removes inactive and virtual orbital information, keeping only the active space orbitals.
 
 Examples:
-    >>> total_det = qdk_chemistry.Configuration("2222uudd0000")  # 4 inactive, 4 active, 4 virtual
+    >>> total_det = qdk_chemistry.Configuration.from_spin_half_string("2222uudd0000")  # 4 inactive, 4 active, 4 virtual
     >>> active_det = wf.get_active_determinant(total_det)
     >>> # active_det now contains only "uudd" (the 4 active orbitals)
 )",
@@ -606,7 +606,7 @@ Notes:
     Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
 
 Examples:
-    >>> active_det = qdk_chemistry.Configuration("uudd")  # 4 active orbitals
+    >>> active_det = qdk_chemistry.Configuration.from_spin_half_string("uudd")  # 4 active orbitals
     >>> total_det = wf.get_total_determinant(active_det)
     >>> # If there are 4 inactive and 4 virtual orbitals, total_det will be "2222uudd0000"
 )",
@@ -1162,7 +1162,7 @@ Args:
     type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
 
 Examples:
-    >>> det = qdk_chemistry.Configuration("33221100")
+    >>> det = qdk_chemistry.Configuration.from_spin_half_string("33221100")
     >>> container = qdk_chemistry.StateVectorContainer(det, orbitals, "electrons")
 )",
            py::arg("det"), py::arg("orbitals"),
@@ -1186,7 +1186,7 @@ Args:
 Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
     >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons")
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
@@ -1224,7 +1224,7 @@ Args:
 Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
     >>> one_rdm = np.eye(4)  # Example 1-RDM
     >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, one_rdm, None)
     >>> # With entropies:
@@ -1282,7 +1282,7 @@ Args:
 Examples:
     >>> import numpy as np
     >>> coeffs = np.array([0.9, 0.1])
-    >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
     >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
     ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)

@@ -86,7 +86,7 @@ int main() {
   std::shared_ptr<Orbitals> orbitals = make_minimal_orbitals();
   // Create a simple Slater determinant wavefunction for H2 ground state
   // 2 electrons in bonding sigma orbital
-  Configuration det("20");
+  auto det = Configuration::from_spin_half_string("20");
 
   // Constructor takes single determinant and orbitals as input
   auto sd_container = std::make_unique<StateVectorContainer>(det, orbitals);
@@ -100,10 +100,10 @@ int main() {
   // CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
   // All possible configurations:
   std::vector<Configuration> cas_dets = {
-      Configuration("20"),  // Both electrons in bonding (ground state)
-      Configuration("ud"),  // Alpha in bonding, beta in antibonding
-      Configuration("du"),  // Beta in bonding, alpha in antibonding
-      Configuration("02")   // Both electrons in antibonding
+      Configuration::from_spin_half_string("20"),  // Both electrons in bonding (ground state)
+      Configuration::from_spin_half_string("ud"),  // Alpha in bonding, beta in antibonding
+      Configuration::from_spin_half_string("du"),  // Beta in bonding, alpha in antibonding
+      Configuration::from_spin_half_string("02")   // Both electrons in antibonding
   };
 
   // Coefficients
@@ -124,9 +124,9 @@ int main() {
   // SCI selects only the most important configurations/determinants from the
   // full space
   std::vector<Configuration> sci_dets = {
-      Configuration("20"),  // Ground state
-      Configuration("ud"),  // Mixed state
-      Configuration("du")   // Mixed state
+      Configuration::from_spin_half_string("20"),  // Ground state
+      Configuration::from_spin_half_string("ud"),  // Mixed state
+      Configuration::from_spin_half_string("du")   // Mixed state
   };
 
   // Coefficients for selected determinants
@@ -149,7 +149,7 @@ int main() {
 
   // Use the Slater determinant as reference
   auto orbitals_mp2 = make_minimal_orbitals();
-  Configuration ref_det("20");
+  auto ref_det = Configuration::from_spin_half_string("20");
   auto sd_container_mp2 =
       std::make_unique<StateVectorContainer>(ref_det, orbitals_mp2);
   auto ref_wavefunction =
@@ -173,7 +173,7 @@ int main() {
 
   // Use the Slater determinant as reference
   auto orbitals_cc = make_minimal_orbitals();
-  Configuration ref_det_cc("20");
+  auto ref_det_cc = Configuration::from_spin_half_string("20");
   auto sd_container_cc =
       std::make_unique<StateVectorContainer>(ref_det_cc, orbitals_cc);
   auto ref_wavefunction_cc =

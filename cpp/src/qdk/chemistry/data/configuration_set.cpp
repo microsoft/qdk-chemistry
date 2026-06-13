@@ -309,13 +309,20 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
     hsize_t packed_size_val = packed_size;
     packed_attr.write(H5::PredType::NATIVE_HSIZE, &packed_size_val);
 
-    // Store orbital capacity (number of orbitals each configuration can
+    // Store orbital capacity (number of modes each configuration can
     // represent)
     hsize_t orbital_capacity = _configurations[0].get_orbital_capacity();
     H5::Attribute orb_attr =
         dataset.createAttribute("orbital_capacity", H5::PredType::NATIVE_HSIZE,
                                 H5::DataSpace(H5S_SCALAR));
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
+
+    // Store bits_per_mode for statistics-generic reconstruction.
+    uint8_t bpm = _configurations[0].bits_per_mode();
+    H5::Attribute bpm_attr =
+        dataset.createAttribute("bits_per_mode", H5::PredType::NATIVE_UINT8,
+                                H5::DataSpace(H5S_SCALAR));
+    bpm_attr.write(H5::PredType::NATIVE_UINT8, &bpm);
 
     dataset.close();
   } catch (const H5::Exception& e) {
@@ -375,6 +382,22 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
           "Dimension mismatch in ConfigurationSet HDF5 data");
     }
 
+    // Read orbital_capacity and bits_per_mode for proper reconstruction.
+    hsize_t orbital_capacity = 0;
+    uint8_t bpm = 2;
+    if (dataset.attrExists("orbital_capacity")) {
+      dataset.openAttribute("orbital_capacity")
+          .read(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
+    }
+    if (dataset.attrExists("bits_per_mode")) {
+      dataset.openAttribute("bits_per_mode")
+          .read(H5::PredType::NATIVE_UINT8, &bpm);
+    }
+    // Legacy files lack orbital_capacity — infer from packed size and bpm.
+    if (orbital_capacity == 0 && packed_size > 0) {
+      orbital_capacity = packed_size * (8 / bpm);
+    }
+
     // Pre-allocate flat_data vector before reading
     std::vector<uint8_t> flat_data;
     flat_data.resize(num_configs * packed_size);
@@ -383,13 +406,12 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
 
     // Reconstruct configurations from flat data
     std::vector<Configuration> configurations;
-    configurations.reserve(num_configs);  // Pre-allocate
+    configurations.reserve(num_configs);
     for (size_t i = 0; i < num_configs; ++i) {
       Configuration config;
-      // Access _packed_orbs through friend relationship
-      config._packed_orbs.resize(packed_size);
       config._packed_orbs.assign(flat_data.begin() + i * packed_size,
                                  flat_data.begin() + (i + 1) * packed_size);
+      config._bits_per_mode = bpm;
       configurations.push_back(std::move(config));
     }
 

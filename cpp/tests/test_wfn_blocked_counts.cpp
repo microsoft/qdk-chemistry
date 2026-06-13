@@ -19,7 +19,7 @@ class WavefunctionBlockedCountsTest : public ::testing::Test {};
 
 TEST_F(WavefunctionBlockedCountsTest, ActiveElectronCountIsSpinBlocked) {
   auto orbitals = testing::create_test_orbitals(4, 4, /*restricted=*/false);
-  Configuration det("2u00");  // 2 alpha, 1 beta
+  auto det = Configuration::from_spin_half_string("2u00");  // 2 alpha, 1 beta
   StateVectorContainer sd(det, orbitals);
 
   auto count = sd.active_num_electrons();
@@ -40,7 +40,7 @@ TEST_F(WavefunctionBlockedCountsTest, ActiveElectronCountIsSpinBlocked) {
 
 TEST_F(WavefunctionBlockedCountsTest, ActiveOccupationsAreSpinBlocked) {
   auto orbitals = testing::create_test_orbitals(4, 4, /*restricted=*/true);
-  Configuration det("2u00");
+  auto det = Configuration::from_spin_half_string("2u00");
   StateVectorContainer sd(det, orbitals);
 
   auto occ = sd.active_orbital_occupations();
@@ -66,7 +66,7 @@ TEST_F(WavefunctionBlockedCountsTest, ActiveOccupationsAreSpinBlocked) {
 
 TEST_F(WavefunctionBlockedCountsTest, TotalCountMatchesV1) {
   auto orbitals = testing::create_test_orbitals(4, 4, /*restricted=*/true);
-  Configuration det("2200");  // 2 alpha, 2 beta
+  auto det = Configuration::from_spin_half_string("2200");  // 2 alpha, 2 beta
   StateVectorContainer sd(det, orbitals);
 
   auto total = sd.total_num_electrons();
@@ -88,8 +88,8 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
   // Two-determinant expansion over 4 modes.
   // Occupation characters use the fermionic alphabet, but with trivial
   // symmetry the container aggregates into a single block.
-  Configuration det1("ud00");  // 2 occupied modes
-  Configuration det2("u0d0");  // 2 occupied modes
+  auto det1 = Configuration::from_spin_half_string("ud00");  // 2 occupied modes
+  auto det2 = Configuration::from_spin_half_string("u0d0");  // 2 occupied modes
   Eigen::VectorXd coeffs(2);
   coeffs << 0.9, 0.1;
   StateVectorContainer sv(

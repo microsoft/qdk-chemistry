@@ -67,8 +67,8 @@ class TestWavefunction:
     @pytest.fixture
     def cas_wavefunction(self, basic_orbitals):
         """Create a SCI-based wavefunction for testing."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
         coeffs = np.array([0.9, 0.436])  # Roughly normalized
 
@@ -82,7 +82,7 @@ class TestWavefunction:
     @pytest.fixture
     def slater_wavefunction(self, basic_orbitals):
         """Create a single Slater determinant wavefunction for testing."""
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         container = StateVectorContainer(det, basic_orbitals)
         return Wavefunction(container)
 
@@ -175,7 +175,7 @@ class TestWavefunction:
 
     def test_sector_survives_json_round_trip(self, basic_orbitals, tmp_path):
         """Sectors are derived from the container, so they reappear after a JSON reload."""
-        wf = Wavefunction(StateVectorContainer(Configuration("20"), basic_orbitals))
+        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals))
         path = tmp_path / "sectors.wavefunction.json"
         wf.to_json_file(path)
         restored = Wavefunction.from_json_file(path)
@@ -184,7 +184,7 @@ class TestWavefunction:
 
     def test_sector_survives_hdf5_round_trip(self, basic_orbitals, tmp_path):
         """Sectors are derived from the container, so they reappear after an HDF5 reload."""
-        wf = Wavefunction(StateVectorContainer(Configuration("20"), basic_orbitals))
+        wf = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), basic_orbitals))
         path = tmp_path / "sectors.wavefunction.h5"
         wf.to_hdf5_file(path)
         restored = Wavefunction.from_hdf5_file(path)
@@ -195,7 +195,7 @@ class TestWavefunction:
         """Test accessing coefficients through wavefunction."""
         wf = cas_wavefunction
 
-        det1 = Configuration("20")
+        det1 = Configuration.from_spin_half_string("20")
         coeff1 = wf.get_coefficient(det1)
         assert np.isclose(
             coeff1, 0.9, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
@@ -236,8 +236,8 @@ class TestWavefunction:
     def test_wavefunction_overlap(self, basic_orbitals):
         """Test overlap calculation between wavefunctions."""
         # Create two similar wavefunctions
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
 
         coeffs1 = np.array([0.9, 0.1])
@@ -402,7 +402,7 @@ class TestWavefunctionRDMs:
     @pytest.fixture
     def cas_wavefunction_with_rdms(self, basic_orbitals):
         """Create CAS wavefunction with RDMs for testing."""
-        det = Configuration("20")  # Closed shell
+        det = Configuration.from_spin_half_string("20")  # Closed shell
         dets = [det]
         coeffs = np.array([1.0])
 
@@ -438,7 +438,7 @@ class TestWavefunctionRDMs:
     def test_rdm_error_handling(self, basic_orbitals):
         """Test that appropriate errors are raised when RDMs are not available."""
         # Create simple SCI wavefunction without RDMs
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([1.0])
 
@@ -475,8 +475,8 @@ class TestWavefunctionComplexSupport:
 
     def test_complex_wavefunction(self, basic_orbitals):
         """Test complex coefficient wavefunctions."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
 
         # Complex coefficients
@@ -503,8 +503,8 @@ class TestWavefunctionComplexSupport:
 
     def test_complex_overlap(self, basic_orbitals):
         """Test overlap with complex wavefunctions."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
 
         coeffs1 = np.array([0.8 + 0.2j, 0.3 - 0.4j])
@@ -547,7 +547,7 @@ class TestWavefunctionEdgeCases:
 
     def test_single_determinant_wavefunction(self, basic_orbitals):
         """Test wavefunction with single determinant."""
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([0.7])
 
@@ -566,8 +566,8 @@ class TestWavefunctionEdgeCases:
 
     def test_zero_coefficient_handling(self, basic_orbitals):
         """Test handling of zero coefficients."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
         coeffs = np.array([1.0, 0.0])  # Second coefficient is zero
 
@@ -609,13 +609,13 @@ class TestWavefunctionEdgeCases:
             wf.get_active_orbital_occupations()
 
         with pytest.raises(RuntimeError, match="No determinants available"):
-            wf.get_coefficient(Configuration("20"))
+            wf.get_coefficient(Configuration.from_spin_half_string("20"))
 
     def test_entropy_bounds_checking(self, basic_orbitals):
         """Test that entropy calculation fails gracefully when RDMs are missing."""
         # A multi-determinant expansion without RDMs cannot compute entropies
         # (a single determinant would instead yield zero entropy).
-        dets = [Configuration("20"), Configuration("02")]
+        dets = [Configuration.from_spin_half_string("20"), Configuration.from_spin_half_string("02")]
         coeffs = np.array([1.0 / np.sqrt(2), 1.0 / np.sqrt(2)])
 
         # Create wavefunction without RDMs
@@ -629,7 +629,7 @@ class TestWavefunctionEdgeCases:
     def test_lazy_mutual_information_from_s1_and_s2(self, basic_orbitals):
         """Test that mutual information is lazily derived from s1 and s2 entropies."""
         norb = 2
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([1.0])
 
@@ -669,7 +669,7 @@ class TestWavefunctionEdgeCases:
     def test_lazy_two_orbital_entropy_from_s1_and_mutual_info(self, basic_orbitals):
         """Test that s2 entropies are lazily derived from s1 and mutual information."""
         norb = 2
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([1.0])
 
@@ -720,8 +720,8 @@ class TestWavefunctionSerialization:
     @pytest.fixture
     def cas_wavefunction_real(self, basic_orbitals):
         """Create a real CAS wavefunction for testing, with s1 entropies and mutual information."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8, 0.6])
 
@@ -739,8 +739,8 @@ class TestWavefunctionSerialization:
     @pytest.fixture
     def cas_wavefunction_complex(self, basic_orbitals):
         """Create a complex CAS wavefunction for testing."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8 + 0.1j, 0.6 - 0.2j])
 
@@ -750,7 +750,7 @@ class TestWavefunctionSerialization:
     @pytest.fixture
     def sd_wavefunction(self, basic_orbitals):
         """Create a Slater determinant wavefunction for testing."""
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         container = StateVectorContainer(det, basic_orbitals)
         return Wavefunction(container)
 
@@ -1347,7 +1347,7 @@ class TestMP2Container:
     @pytest.fixture
     def reference_wavefunction(self, basic_orbitals):
         """Create a reference wavefunction for MP2/CC tests."""
-        ref = Configuration("220")  # Two electrons in first two orbitals
+        ref = Configuration.from_spin_half_string("220")  # Two electrons in first two orbitals
         sd_container = StateVectorContainer(ref, basic_orbitals)
         return Wavefunction(sd_container)
 
@@ -1392,7 +1392,7 @@ class TestCCContainer:
     @pytest.fixture
     def reference_wavefunction(self, basic_orbitals):
         """Create a reference wavefunction for CC tests."""
-        ref = Configuration("220")  # Two electrons in first two orbitals
+        ref = Configuration.from_spin_half_string("220")  # Two electrons in first two orbitals
         sd_container = StateVectorContainer(ref, basic_orbitals)
         return Wavefunction(sd_container)
 
@@ -1489,10 +1489,10 @@ class TestWavefunctionTruncate:
         orbitals = Orbitals(coeffs, None, None, basis_set)
 
         dets = [
-            Configuration("2200"),  # largest coeff
-            Configuration("2020"),  # second largest
-            Configuration("2002"),  # third largest
-            Configuration("0220"),  # smallest
+            Configuration.from_spin_half_string("2200"),  # largest coeff
+            Configuration.from_spin_half_string("2020"),  # second largest
+            Configuration.from_spin_half_string("2002"),  # third largest
+            Configuration.from_spin_half_string("0220"),  # smallest
         ]
         coeffs = np.array([0.8, 0.4, 0.3, 0.1])  # Not normalized
 

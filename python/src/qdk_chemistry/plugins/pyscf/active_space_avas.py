@@ -227,7 +227,7 @@ class PyscfAVAS(ActiveSpaceSelector):
                     # This orbital wasn't in the old active space, so it's unoccupied
                     new_config_chars.append("0")
 
-            active_config = Configuration("".join(new_config_chars))
+            active_config = Configuration.from_spin_half_string("".join(new_config_chars))
             return Wavefunction(StateVectorContainer(active_config, active_orbitals, "electrons"))
         raise NotImplementedError(
             "PySCF AVAS active space selector currently only supports single-determinant wavefunctions."

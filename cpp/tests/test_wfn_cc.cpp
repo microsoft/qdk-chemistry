@@ -36,7 +36,7 @@ TEST_F(AmplitudeContainerTest, BasicProperties) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
@@ -71,7 +71,7 @@ TEST_F(AmplitudeContainerTest, InvalidAmplitudeSizesThrow) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   // Correct sizes: T1 = nocc * nvirt = 4, T2 = nocc * nocc * nvirt * nvirt = 16
@@ -119,7 +119,7 @@ TEST_F(AmplitudeContainerTest, JsonSerializationSpatial) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
@@ -200,7 +200,7 @@ TEST_F(AmplitudeContainerTest, JsonSerializationSpin) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);
@@ -252,7 +252,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpatial) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Random(nocc * nvirt);
@@ -366,7 +366,7 @@ TEST_F(AmplitudeContainerTest, RdmsAndExpansionNotAvailable) {
   size_t nvirt = 2;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   // Use small but non-zero amplitudes
@@ -402,7 +402,7 @@ TEST_F(AmplitudeContainerTest, WavefunctionExpansionAccessorsThrow) {
   size_t nvirt = 2;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto reference = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_amplitudes = Eigen::VectorXd::Ones(nocc * nvirt) * 0.1;
@@ -437,7 +437,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpin) {
   size_t nmo = nocc + nvirt;
 
   auto orbitals = testing::create_test_orbitals(nocc + nvirt, 4, true);
-  Configuration ref("2200");
+  auto ref = Configuration::from_spin_half_string("2200");
   auto wavefunction = create_test_wavefunction(ref, orbitals);
 
   Eigen::VectorXd t1_aa = Eigen::VectorXd::Random(nocc * nvirt);

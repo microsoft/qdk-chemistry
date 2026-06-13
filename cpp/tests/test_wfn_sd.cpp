@@ -22,15 +22,15 @@ class SlaterdeterminantTest : public ::testing::Test {
 
 TEST_F(SlaterdeterminantTest, BasicProperties) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  Configuration det("2200");
+  auto det = Configuration::from_spin_half_string("2200");
   StateVectorContainer sd(det, orbitals);
 
   EXPECT_EQ(sd.size(), 1);
   EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(det)), 1.0);
-  EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(Configuration("2000"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(Configuration::from_spin_half_string("2000"))),
                    0.0);
   EXPECT_TRUE(sd.contains_determinant(det));
-  EXPECT_FALSE(sd.contains_determinant(Configuration("2000")));
+  EXPECT_FALSE(sd.contains_determinant(Configuration::from_spin_half_string("2000")));
   EXPECT_EQ(sd.get_active_determinants().size(), 1);
   EXPECT_EQ(sd.get_active_determinants()[0].to_string(), "2200");
   EXPECT_DOUBLE_EQ(sd.norm(), 1.0);
@@ -90,7 +90,7 @@ TEST_F(SlaterdeterminantTest, WithInactiveOrbitals) {
                                              inactive_indices);
 
   // Create determinant using only the active space (4 orbitals)
-  Configuration det("2200");  // 2 alpha electrons in first 2 active orbitals
+  auto det = Configuration::from_spin_half_string("2200");  // 2 alpha electrons in first 2 active orbitals
   StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with inactive orbitals
@@ -158,7 +158,7 @@ TEST_F(SlaterdeterminantTest, WithNonContinuousActiveSpace) {
                                              inactive_indices);
 
   // Create determinant using only the active space (4 orbitals)
-  Configuration det("2200");  // 2 alpha electrons in first 2 active orbitals
+  auto det = Configuration::from_spin_half_string("2200");  // 2 alpha electrons in first 2 active orbitals
   StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with non-continuous active space
@@ -223,7 +223,7 @@ TEST_F(SlaterdeterminantTest, WithNonContinuousActiveSpace) {
 // Test JSON serialization/deserialization
 TEST_F(SlaterdeterminantTest, JsonSerialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  Configuration det("2200");
+  auto det = Configuration::from_spin_half_string("2200");
 
   StateVectorContainer original(det, orbitals);
 
@@ -261,7 +261,7 @@ TEST_F(SlaterdeterminantTest, JsonSerialization) {
 // Test HDF5 serialization/deserialization
 TEST_F(SlaterdeterminantTest, Hdf5Serialization) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  Configuration det("2200");
+  auto det = Configuration::from_spin_half_string("2200");
 
   StateVectorContainer original(det, orbitals);
 
@@ -331,7 +331,7 @@ TEST_F(SlaterdeterminantTest, ClosedShellReducedDensityMatrices) {
   // get slater determinant
   size_t norb = 4;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
-  Configuration det("2200");
+  auto det = Configuration::from_spin_half_string("2200");
   StateVectorContainer sd(det, orbitals);
 
   // get RDMs
@@ -374,7 +374,7 @@ TEST_F(SlaterdeterminantTest, OpenShellReducedDensityMatrices) {
   // get slater determinant
   size_t norb = 4;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
-  Configuration det("2uu0");
+  auto det = Configuration::from_spin_half_string("2uu0");
   StateVectorContainer sd(det, orbitals);
 
   // get RDMs
@@ -418,7 +418,7 @@ TEST_F(SlaterdeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
   // get slater determinant
   size_t norb = 12;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
-  Configuration det("2ud0200u0u2d");
+  auto det = Configuration::from_spin_half_string("2ud0200u0u2d");
   StateVectorContainer sd(det, orbitals);
 
   // get RDMs
@@ -474,7 +474,7 @@ TEST_F(SlaterdeterminantTest, EntropiesTest) {
   // get slater determinant
   size_t norb = 12;
   auto orbitals = testing::create_test_orbitals(norb, norb, true);
-  Configuration det("2ud0200u0u2d");
+  auto det = Configuration::from_spin_half_string("2ud0200u0u2d");
   StateVectorContainer sd(det, orbitals);
   sd.get_active_one_rdm_spin_dependent();
   auto [aaaa, aabb, bbbb] = sd.get_active_two_rdm_spin_dependent();

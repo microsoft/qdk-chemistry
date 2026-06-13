@@ -1362,7 +1362,7 @@ class TestPyscfPlugin:
         active_orbitals = active_wfn.get_orbitals()
 
         # Build a two-determinant expansion over the active space
-        dets = [data.Configuration("22200"), data.Configuration("22020")]
+        dets = [data.Configuration.from_spin_half_string("22200"), data.Configuration.from_spin_half_string("22020")]
         coeffs = np.array([0.96, np.sqrt(1.0 - 0.96**2)])
         multi_wfn = data.Wavefunction(data.StateVectorContainer(coeffs, dets, active_orbitals))
         assert len(multi_wfn.get_active_determinants()) == 2

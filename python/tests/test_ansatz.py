@@ -63,7 +63,7 @@ class TestAnsatzSerialization:
     @pytest.fixture
     def test_wavefunction(self, basic_orbitals):
         """Create a test wavefunction."""
-        det1 = Configuration("20")
+        det1 = Configuration.from_spin_half_string("20")
         coeffs = np.array([1.0])  # Single determinant with coefficient 1.0
 
         container = StateVectorContainer(coeffs, [det1], basic_orbitals)

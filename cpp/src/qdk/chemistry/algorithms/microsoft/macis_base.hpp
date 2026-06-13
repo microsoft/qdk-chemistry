@@ -141,7 +141,7 @@ inline data::Wavefunction build_wavefunction(
   std::copy(coeffs.begin(), coeffs.end(), C_vector.data());
   std::vector<data::Configuration> dets_configs;
   dets_configs.reserve(dets.size());
-  for (auto det : dets) dets_configs.emplace_back(det, nmo);
+  for (auto det : dets) dets_configs.push_back(data::Configuration::from_spin_half_bitset(det, nmo));
 
   const bool eval_one_rdm = settings.get<bool>("calculate_one_rdm");
   const bool eval_two_rdm = settings.get<bool>("calculate_two_rdm");

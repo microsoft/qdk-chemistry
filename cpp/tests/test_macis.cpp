@@ -1096,13 +1096,13 @@ class MacisPmcTest : public ::testing::Test {
 
     // Add some simple configurations for 6 orbitals, 3 alpha, 3 beta electrons
     // Configuration 1: "222000" (first 3 orbitals doubly occupied)
-    configs.emplace_back("222000");
+    configs.push_back(Configuration::from_spin_half_string("222000"));
 
     // Configuration 2: "22u0d0" (mixed occupation)
-    configs.emplace_back("22u0d0");
+    configs.push_back(Configuration::from_spin_half_string("22u0d0"));
 
     // Configuration 3: "220020" (different pattern)
-    configs.emplace_back("22020");
+    configs.push_back(Configuration::from_spin_half_string("22020"));
 
     return configs;
   }
@@ -1182,7 +1182,7 @@ TEST_F(MacisPmcTest, SingleConfiguration) {
   ASSERT_NE(calculator, nullptr);
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
-  std::vector<Configuration> single_config = {Configuration("222000")};
+  std::vector<Configuration> single_config = {Configuration::from_spin_half_string("222000")};
 
   // Should work with single configuration
   auto [energy, wavefunction] = calculator->run(hamiltonian, single_config);
@@ -1257,7 +1257,7 @@ TEST_F(MacisPmcTest, InvalidConfigurationHandling) {
   // or throw meaningful error)
   std::vector<Configuration> wrong_length_configs;
 
-  wrong_length_configs.emplace_back("22");  // Too short for 6-orbital system
+  wrong_length_configs.push_back(Configuration::from_spin_half_string("22"));  // Too short for 6-orbital system
   EXPECT_THROW(calculator->run(hamiltonian, wrong_length_configs),
                std::exception);
 }
@@ -1314,9 +1314,9 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
     auto calculator =
         ProjectedMultiConfigurationCalculatorFactory::create(calc_name);
     std::vector<Configuration> configs;
-    configs.emplace_back("222000");
-    configs.emplace_back("22u0d0");
-    configs.emplace_back("22020");
+    configs.push_back(Configuration::from_spin_half_string("222000"));
+    configs.push_back(Configuration::from_spin_half_string("22u0d0"));
+    configs.push_back(Configuration::from_spin_half_string("22020"));
     EXPECT_THROW(calculator->run(hamiltonian, configs), std::runtime_error);
   } else {
     auto calculator = MultiConfigurationCalculatorFactory::create(calc_name);

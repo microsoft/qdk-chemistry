@@ -85,7 +85,7 @@ Examples:
     Create a ConfigurationSet from configurations and orbitals:
 
     >>> import qdk_chemistry.data as data
-    >>> configs = [data.Configuration("2200"), data.Configuration("22ud")]
+    >>> configs = [data.Configuration.from_spin_half_string("2200"), data.Configuration.from_spin_half_string("22ud")]
     >>> config_set = data.ConfigurationSet(configs, orbitals)
 
     Access configurations:
@@ -129,7 +129,7 @@ Note:
     represent the active space; inactive and virtual orbitals are not included.
 
 Examples:
-    >>> configs = [Configuration("2200"), Configuration("22ud")]
+    >>> configs = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("22ud")]
     >>> config_set = ConfigurationSet(configs, orbitals, "electrons")
 
 )",

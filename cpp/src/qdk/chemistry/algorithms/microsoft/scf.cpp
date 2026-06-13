@@ -483,7 +483,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   }
   // Create Configuration object
-  data::Configuration hf_det(config_str);
+  auto hf_det = data::Configuration::from_spin_half_string(config_str);
 
   // Create StateVectorContainer
   auto container = std::make_unique<data::StateVectorContainer>(

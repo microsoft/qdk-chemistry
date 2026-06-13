@@ -1082,7 +1082,7 @@ Configuration Wavefunction::get_active_determinant(
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
-    return Configuration("");
+    return Configuration::from_spin_half_string("");
   }
 
   const std::string total_str = total_determinant.to_string();
@@ -1098,7 +1098,7 @@ Configuration Wavefunction::get_active_determinant(
     }
   }
 
-  return Configuration(active_str);
+  return Configuration::from_spin_half_string(active_str);
 }
 
 Configuration Wavefunction::get_total_determinant(
@@ -1139,7 +1139,7 @@ Configuration Wavefunction::get_total_determinant(
     }
   }
 
-  return Configuration(total_str);
+  return Configuration::from_spin_half_string(total_str);
 }
 
 size_t Wavefunction::size() const {

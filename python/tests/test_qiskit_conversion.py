@@ -40,13 +40,13 @@ class TestConfigurationToStatevectorIndex:
                 0 1 0 1 | 0 0 1 1
         Binary: 01010011 = 64 + 16 + 2 + 1 = 83
         """
-        config = Configuration("2ud0")
+        config = Configuration.from_spin_half_string("2ud0")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 83
 
     def test_empty_configuration(self):
         """Test that empty configuration maps to index 0."""
-        config = Configuration("0000")
+        config = Configuration.from_spin_half_string("0000")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 0
 
@@ -56,7 +56,7 @@ class TestConfigurationToStatevectorIndex:
         All alpha bits set (0-3) and all beta bits set (4-7)
         Binary: 11111111 = 255
         """
-        config = Configuration("2222")
+        config = Configuration.from_spin_half_string("2222")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 255
 
@@ -66,7 +66,7 @@ class TestConfigurationToStatevectorIndex:
         Alpha bits set (0-3), beta bits clear
         Binary: 00001111 = 15
         """
-        config = Configuration("uuuu")
+        config = Configuration.from_spin_half_string("uuuu")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 15
 
@@ -76,7 +76,7 @@ class TestConfigurationToStatevectorIndex:
         Alpha bits clear, beta bits set (4-7)
         Binary: 11110000 = 240
         """
-        config = Configuration("dddd")
+        config = Configuration.from_spin_half_string("dddd")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 240
 
@@ -93,13 +93,13 @@ class TestConfigurationToStatevectorIndex:
                 1 0 1 | 0 1 1
         Binary: 101011 = 32 + 8 + 2 + 1 = 43
         """
-        config = Configuration("2ud000")
+        config = Configuration.from_spin_half_string("2ud000")
         index = _configuration_to_statevector_index(config, 3)
         assert index == 43
 
     def test_single_orbital_empty(self):
         """Test single empty orbital."""
-        config = Configuration("0")
+        config = Configuration.from_spin_half_string("0")
         index = _configuration_to_statevector_index(config, 1)
         assert index == 0
 
@@ -108,7 +108,7 @@ class TestConfigurationToStatevectorIndex:
 
         Bit 0 set, bit 1 clear: Binary 01 = 1
         """
-        config = Configuration("u")
+        config = Configuration.from_spin_half_string("u")
         index = _configuration_to_statevector_index(config, 1)
         assert index == 1
 
@@ -117,7 +117,7 @@ class TestConfigurationToStatevectorIndex:
 
         Bit 0 clear, bit 1 set: Binary 10 = 2
         """
-        config = Configuration("d")
+        config = Configuration.from_spin_half_string("d")
         index = _configuration_to_statevector_index(config, 1)
         assert index == 2
 
@@ -126,7 +126,7 @@ class TestConfigurationToStatevectorIndex:
 
         Bits 0 and 1 set: Binary 11 = 3
         """
-        config = Configuration("2")
+        config = Configuration.from_spin_half_string("2")
         index = _configuration_to_statevector_index(config, 1)
         assert index == 3
 
@@ -139,13 +139,13 @@ class TestConfigurationToStatevectorIndex:
                 0 1 0 0 | 0 0 0 1
         Binary: 01000001 = 64 + 1 = 65
         """
-        config = Configuration("u0d0")
+        config = Configuration.from_spin_half_string("u0d0")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 65
 
     def test_error_on_too_many_orbitals(self):
         """Test that requesting more orbitals than available raises error."""
-        config = Configuration("ud")
+        config = Configuration.from_spin_half_string("ud")
         with pytest.raises(RuntimeError):
             _configuration_to_statevector_index(config, 10)
 
@@ -163,8 +163,8 @@ class TestCreateStatevectorFromWavefunction:
     @pytest.fixture
     def simple_wavefunction(self, basic_orbitals):
         """Create a simple wavefunction with two determinants."""
-        det1 = Configuration("20")  # Doubly occupied first orbital
-        det2 = Configuration("ud")  # Singly occupied each orbital
+        det1 = Configuration.from_spin_half_string("20")  # Doubly occupied first orbital
+        det2 = Configuration.from_spin_half_string("ud")  # Singly occupied each orbital
         dets = [det1, det2]
         coeffs = np.array([0.9, 0.436])
 
@@ -188,8 +188,8 @@ class TestCreateStatevectorFromWavefunction:
         """Test that determinants map to correct indices."""
         sv = create_statevector_from_wavefunction(simple_wavefunction, normalize=False)
 
-        det1_index = _configuration_to_statevector_index(Configuration("20"), 2)
-        det2_index = _configuration_to_statevector_index(Configuration("ud"), 2)
+        det1_index = _configuration_to_statevector_index(Configuration.from_spin_half_string("20"), 2)
+        det2_index = _configuration_to_statevector_index(Configuration.from_spin_half_string("ud"), 2)
 
         # Check coefficients are in the right places
         assert np.isclose(
@@ -232,8 +232,8 @@ class TestCreateStatevectorFromWavefunction:
 
     def test_complex_wavefunction(self, basic_orbitals):
         """Test statevector creation with complex coefficients."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
         dets = [det1, det2]
         coeffs = np.array([0.8 + 0.2j, 0.3 - 0.4j])
 
@@ -261,7 +261,7 @@ class TestCreateStatevectorFromWavefunction:
 
     def test_single_determinant_wavefunction(self, basic_orbitals):
         """Test statevector for wavefunction with single determinant."""
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([0.7])
 
@@ -289,7 +289,7 @@ class TestCreateStatevectorFromWavefunction:
 
             # Create simple wavefunction
             config_str = "2" + "0" * (num_orbs - 1)
-            det = Configuration(config_str)
+            det = Configuration.from_spin_half_string(config_str)
             dets = [det]
             coeffs_wf = np.array([1.0])
 
@@ -304,7 +304,7 @@ class TestCreateStatevectorFromWavefunction:
 
     def test_zero_norm_handling(self, basic_orbitals):
         """Test handling of zero-norm wavefunctions."""
-        det = Configuration("20")
+        det = Configuration.from_spin_half_string("20")
         dets = [det]
         coeffs = np.array([0.0])
 
@@ -317,10 +317,10 @@ class TestCreateStatevectorFromWavefunction:
 
     def test_multiple_determinants(self, basic_orbitals):
         """Test wavefunction with multiple determinants."""
-        det1 = Configuration("20")
-        det2 = Configuration("ud")
-        det3 = Configuration("du")
-        det4 = Configuration("02")
+        det1 = Configuration.from_spin_half_string("20")
+        det2 = Configuration.from_spin_half_string("ud")
+        det3 = Configuration.from_spin_half_string("du")
+        det4 = Configuration.from_spin_half_string("02")
         dets = [det1, det2, det3, det4]
         coeffs = np.array([0.5, 0.3, 0.2, 0.1])
 
@@ -350,19 +350,19 @@ class TestStatevectorIndexBinaryEncoding:
     def test_alpha_beta_separation(self):
         """Test that alpha and beta electrons are in separate bit ranges."""
         # Pure alpha configuration
-        config_alpha = Configuration("uuuu")
+        config_alpha = Configuration.from_spin_half_string("uuuu")
         index_alpha = _configuration_to_statevector_index(config_alpha, 4)
         # Should have bits 0-3 set, bits 4-7 clear
         assert index_alpha == 0b00001111  # 15
 
         # Pure beta configuration
-        config_beta = Configuration("dddd")
+        config_beta = Configuration.from_spin_half_string("dddd")
         index_beta = _configuration_to_statevector_index(config_beta, 4)
         # Should have bits 0-3 clear, bits 4-7 set
         assert index_beta == 0b11110000  # 240
 
         # Doubly occupied should be sum
-        config_doubly = Configuration("2222")
+        config_doubly = Configuration.from_spin_half_string("2222")
         index_doubly = _configuration_to_statevector_index(config_doubly, 4)
         assert index_doubly == index_alpha + index_beta
 
@@ -373,14 +373,14 @@ class TestStatevectorIndexBinaryEncoding:
         for orb_idx in range(num_orbs):
             # Test alpha electron in orbital i
             config_str = "0" * orb_idx + "u" + "0" * (num_orbs - orb_idx - 1)
-            config = Configuration(config_str)
+            config = Configuration.from_spin_half_string(config_str)
             index = _configuration_to_statevector_index(config, num_orbs)
             # Should have only bit orb_idx set
             assert index == (1 << orb_idx)
 
             # Test beta electron in orbital i
             config_str = "0" * orb_idx + "d" + "0" * (num_orbs - orb_idx - 1)
-            config = Configuration(config_str)
+            config = Configuration.from_spin_half_string(config_str)
             index = _configuration_to_statevector_index(config, num_orbs)
             # Should have only bit (num_orbs + orb_idx) set
             assert index == (1 << (num_orbs + orb_idx))
@@ -388,6 +388,6 @@ class TestStatevectorIndexBinaryEncoding:
     def test_superposition_of_occupations(self):
         """Test that multiple occupied orbitals create correct bit patterns."""
         # Orbitals 0 and 2 with alpha, orbital 1 with beta
-        config = Configuration("udu0")
+        config = Configuration.from_spin_half_string("udu0")
         index = _configuration_to_statevector_index(config, 4)
         assert index == 37

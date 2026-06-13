@@ -208,7 +208,7 @@ def create_test_wavefunction(num_orbitals: int = 2):
 
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
@@ -239,7 +239,7 @@ def create_test_ansatz(num_orbitals: int = 2):
     # Create wavefunction using the same shared orbitals
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])

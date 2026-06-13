@@ -67,7 +67,7 @@ def make_minimal_wavefunction(symbols, coords, n_alpha, n_beta, num_molecular_or
     for i in range(single_count):
         chars[pair_count + i] = unpaired
 
-    config = Configuration("".join(chars))
+    config = Configuration.from_spin_half_string("".join(chars))
     container = StateVectorContainer(config, orbitals)
     return Wavefunction(container)
 
@@ -100,7 +100,7 @@ class TestValenceParameters:
         water = Structure(symbols, coords)
         wavefunction_sd = solve_wavefunction(water, 0, 1)
 
-        det_truncated = Configuration("22222")
+        det_truncated = Configuration.from_spin_half_string("22222")
         initial_orbitals = wavefunction_sd.get_orbitals()
         basis_set = initial_orbitals.get_basis_set()
         coeffs_truncated = np.eye(10, 5)
