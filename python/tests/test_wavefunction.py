@@ -410,7 +410,9 @@ class TestWavefunctionRDMs:
         one_rdm_aa = np.array([[1.0, 0.0], [0.0, 0.0]])
         one_rdm_bb = np.array([[1.0, 0.0], [0.0, 0.0]])
 
-        container = StateVectorContainer(coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb, sector="electrons")
+        container = StateVectorContainer(
+            coeffs, dets, basic_orbitals, one_rdm_traced, one_rdm_aa, one_rdm_bb, sector="electrons"
+        )
         return Wavefunction(container)
 
     def test_one_rdm_spin_traced_access(self, cas_wavefunction_with_rdms):

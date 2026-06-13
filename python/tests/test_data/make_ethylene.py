@@ -44,7 +44,9 @@ if __name__ == "__main__":
     sci_energy, sci_wfn = sci.run(active_space_h, 2, 2)
 
     pmc = create("projected_multi_configuration_calculator", "macis_pmc")
-    pmc_energy, pmc_wfn = pmc.run(active_space_h, [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2020")])
+    pmc_energy, pmc_wfn = pmc.run(
+        active_space_h, [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2020")]
+    )
     Logger.info(f"PMC energy: {pmc_energy}")
     Logger.info(f"PMC correction: {pmc_energy - active_space_h.get_core_energy()}")
     Logger.info("Leading configurations and coefficients:")

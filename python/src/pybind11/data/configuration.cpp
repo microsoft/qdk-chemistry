@@ -63,8 +63,7 @@ Examples:
 )",
                            py::arg("str"));
 
-  configuration.def_static("from_bitstring",
-                           &Configuration::from_bitstring,
+  configuration.def_static("from_bitstring", &Configuration::from_bitstring,
                            R"(
 Construct a bitstring configuration (1 bit per mode) from a string representation.
 
@@ -113,8 +112,7 @@ Examples:
 
 )");
 
-  bind_getter_as_property(configuration, "num_modes",
-                          &Configuration::num_modes,
+  bind_getter_as_property(configuration, "num_modes", &Configuration::num_modes,
                           R"(
 Number of single-particle modes in the configuration.
 

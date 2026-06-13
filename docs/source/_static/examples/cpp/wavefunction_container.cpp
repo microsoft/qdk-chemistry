@@ -100,10 +100,14 @@ int main() {
   // CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
   // All possible configurations:
   std::vector<Configuration> cas_dets = {
-      Configuration::from_spin_half_string("20"),  // Both electrons in bonding (ground state)
-      Configuration::from_spin_half_string("ud"),  // Alpha in bonding, beta in antibonding
-      Configuration::from_spin_half_string("du"),  // Beta in bonding, alpha in antibonding
-      Configuration::from_spin_half_string("02")   // Both electrons in antibonding
+      Configuration::from_spin_half_string(
+          "20"),  // Both electrons in bonding (ground state)
+      Configuration::from_spin_half_string(
+          "ud"),  // Alpha in bonding, beta in antibonding
+      Configuration::from_spin_half_string(
+          "du"),  // Beta in bonding, alpha in antibonding
+      Configuration::from_spin_half_string(
+          "02")  // Both electrons in antibonding
   };
 
   // Coefficients

@@ -319,9 +319,8 @@ void ConfigurationSet::to_hdf5(H5::Group& group) const {
 
     // Store bits_per_mode for statistics-generic reconstruction.
     uint8_t bpm = _configurations[0].bits_per_mode();
-    H5::Attribute bpm_attr =
-        dataset.createAttribute("bits_per_mode", H5::PredType::NATIVE_UINT8,
-                                H5::DataSpace(H5S_SCALAR));
+    H5::Attribute bpm_attr = dataset.createAttribute(
+        "bits_per_mode", H5::PredType::NATIVE_UINT8, H5::DataSpace(H5S_SCALAR));
     bpm_attr.write(H5::PredType::NATIVE_UINT8, &bpm);
 
     dataset.close();

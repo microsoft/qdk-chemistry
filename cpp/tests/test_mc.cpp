@@ -32,7 +32,8 @@ class TestMultiConfigurationCalculator : public MultiConfigurationCalculator {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration::from_spin_half_string("2000000")};
+    Wavefunction::DeterminantVector dets{
+        Configuration::from_spin_half_string("2000000")};
     auto container = std::make_unique<StateVectorContainer>(
         coeffs, dets, hamiltonian->get_orbitals());
     Wavefunction wfn(std::move(container));

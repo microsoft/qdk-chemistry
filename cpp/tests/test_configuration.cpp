@@ -35,9 +35,12 @@ TEST_F(ConfigurationTest, ConstructFromString) {
   EXPECT_NO_THROW(Configuration::from_spin_half_string("2duu0d20"));
 
   // Test that invalid characters throw an exception
-  EXPECT_THROW(Configuration::from_spin_half_string("4"), std::invalid_argument);
-  EXPECT_THROW(Configuration::from_spin_half_string("A"), std::invalid_argument);
-  EXPECT_THROW(Configuration::from_spin_half_string("2dux"), std::invalid_argument);
+  EXPECT_THROW(Configuration::from_spin_half_string("4"),
+               std::invalid_argument);
+  EXPECT_THROW(Configuration::from_spin_half_string("A"),
+               std::invalid_argument);
+  EXPECT_THROW(Configuration::from_spin_half_string("2dux"),
+               std::invalid_argument);
 }
 
 // Test conversion to string
@@ -85,7 +88,8 @@ TEST_F(ConfigurationTest, BitsetConversion) {
   // Test with a 8-bit bitset (4 spatial orbitals)
   // Bits: 0101|0011 (beta|alpha) little-endian
   std::bitset<8> test_bitset("01010011");
-  auto config_from_bitset = Configuration::from_spin_half_bitset(test_bitset, 4);
+  auto config_from_bitset =
+      Configuration::from_spin_half_bitset(test_bitset, 4);
 
   EXPECT_EQ(config_from_bitset.to_string().substr(0, 4), "2ud0");
 
@@ -326,8 +330,10 @@ TEST_F(ConfigurationSetTest, RejectOverhangingElectrons) {
 TEST_F(ConfigurationSetTest, AllowOverhangingUnoccupied) {
   // Configurations with extra unoccupied orbitals beyond active space
   std::vector<Configuration> configs = {
-      Configuration::from_spin_half_string("2ud00"),  // 5 orbitals, 5th is unoccupied - OK
-      Configuration::from_spin_half_string("u2d00")   // 5 orbitals, 5th is unoccupied - OK
+      Configuration::from_spin_half_string(
+          "2ud00"),  // 5 orbitals, 5th is unoccupied - OK
+      Configuration::from_spin_half_string(
+          "u2d00")  // 5 orbitals, 5th is unoccupied - OK
   };
 
   // Should not throw - overhanging orbitals are unoccupied
@@ -342,7 +348,8 @@ TEST_F(ConfigurationSetTest, EmptyConfigurationSet) {
 
 TEST_F(ConfigurationSetTest, SingleConfiguration) {
   // Single configuration should be valid
-  std::vector<Configuration> configs = {Configuration::from_spin_half_string("2ud0")};
+  std::vector<Configuration> configs = {
+      Configuration::from_spin_half_string("2ud0")};
   EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
 
   ConfigurationSet config_set(configs, orbitals_with_active);
@@ -352,8 +359,9 @@ TEST_F(ConfigurationSetTest, SingleConfiguration) {
 
 TEST_F(ConfigurationSetTest, NoActiveSpaceNoValidation) {
   // Without active space, only basic validation applies
-  std::vector<Configuration> configs = {Configuration::from_spin_half_string("2ud0"),
-                                        Configuration::from_spin_half_string("u2d0")};
+  std::vector<Configuration> configs = {
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0")};
 
   // Should not throw even without active space
   EXPECT_THROW(ConfigurationSet(configs, orbitals_without_active),
@@ -362,7 +370,9 @@ TEST_F(ConfigurationSetTest, NoActiveSpaceNoValidation) {
 
 TEST_F(ConfigurationSetTest, AccessOperators) {
   std::vector<Configuration> configs = {
-      Configuration::from_spin_half_string("2ud0"), Configuration::from_spin_half_string("u2d0"), Configuration::from_spin_half_string("ud20")};
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0"),
+      Configuration::from_spin_half_string("ud20")};
 
   ConfigurationSet config_set(configs, orbitals_with_active);
 
@@ -380,7 +390,9 @@ TEST_F(ConfigurationSetTest, AccessOperators) {
 
 TEST_F(ConfigurationSetTest, Iteration) {
   std::vector<Configuration> configs = {
-      Configuration::from_spin_half_string("2ud0"), Configuration::from_spin_half_string("u2d0"), Configuration::from_spin_half_string("ud20")};
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0"),
+      Configuration::from_spin_half_string("ud20")};
 
   ConfigurationSet config_set(configs, orbitals_with_active);
 
@@ -394,11 +406,13 @@ TEST_F(ConfigurationSetTest, Iteration) {
 }
 
 TEST_F(ConfigurationSetTest, Equality) {
-  std::vector<Configuration> configs1 = {Configuration::from_spin_half_string("2ud0"),
-                                         Configuration::from_spin_half_string("u2d0")};
+  std::vector<Configuration> configs1 = {
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0")};
 
-  std::vector<Configuration> configs2 = {Configuration::from_spin_half_string("2ud0"),
-                                         Configuration::from_spin_half_string("u2d0")};
+  std::vector<Configuration> configs2 = {
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0")};
 
   std::vector<Configuration> configs3 = {
       Configuration::from_spin_half_string("2ud0"),
@@ -420,7 +434,9 @@ TEST_F(ConfigurationSetTest, Equality) {
 
 TEST_F(ConfigurationSetTest, GetSummary) {
   std::vector<Configuration> configs = {
-      Configuration::from_spin_half_string("2ud0"), Configuration::from_spin_half_string("u2d0"), Configuration::from_spin_half_string("ud20")};
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0"),
+      Configuration::from_spin_half_string("ud20")};
 
   ConfigurationSet config_set(configs, orbitals_with_active);
 
@@ -433,15 +449,17 @@ TEST_F(ConfigurationSetTest, GetSummary) {
 }
 
 TEST_F(ConfigurationSetTest, MoveSemantics) {
-  std::vector<Configuration> configs = {Configuration::from_spin_half_string("2ud0"),
-                                        Configuration::from_spin_half_string("u2d0")};
+  std::vector<Configuration> configs = {
+      Configuration::from_spin_half_string("2ud0"),
+      Configuration::from_spin_half_string("u2d0")};
 
   // Test move constructor
   EXPECT_NO_THROW(ConfigurationSet(std::move(configs), orbitals_with_active));
 }
 
 TEST_F(ConfigurationSetTest, NullOrbitalsRejected) {
-  std::vector<Configuration> configs = {Configuration::from_spin_half_string("2ud0")};
+  std::vector<Configuration> configs = {
+      Configuration::from_spin_half_string("2ud0")};
 
   // Should throw - null orbitals pointer
   EXPECT_THROW(ConfigurationSet(configs, nullptr), std::invalid_argument);
@@ -455,7 +473,8 @@ TEST_F(ConfigurationTest, DataTypeName) {
 
 TEST_F(ConfigurationSetTest, DataTypeName) {
   // Test that ConfigurationSet has the correct data type name
-  std::vector<Configuration> configs = {Configuration::from_spin_half_string("2ud0")};
+  std::vector<Configuration> configs = {
+      Configuration::from_spin_half_string("2ud0")};
   ConfigurationSet config_set(configs, orbitals_with_active);
 
   EXPECT_EQ(config_set.get_data_type_name(), "configuration_set");

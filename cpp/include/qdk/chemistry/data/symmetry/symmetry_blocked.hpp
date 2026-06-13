@@ -39,12 +39,12 @@ struct LabelsHash {
    *         hashes via @ref qdk::chemistry::utils::hash_combine.
    */
   std::size_t operator()(
-     const std::array<SymmetryLabel, Rank>& labels) const noexcept {
-   std::size_t seed = 0;
-   for (const auto& label : labels) {
-     seed = utils::hash_combine(seed, label.hash());
-   }
-   return seed;
+      const std::array<SymmetryLabel, Rank>& labels) const noexcept {
+    std::size_t seed = 0;
+    for (const auto& label : labels) {
+      seed = utils::hash_combine(seed, label.hash());
+    }
+    return seed;
   }
 };
 

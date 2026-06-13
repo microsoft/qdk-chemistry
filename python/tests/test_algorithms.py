@@ -455,7 +455,9 @@ class TestAlgorithmClasses:
         assert isinstance(settings, Settings)
 
         # Test prepare_state method
-        wavefunction = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), create_test_orbitals(2)))
+        wavefunction = Wavefunction(
+            StateVectorContainer(Configuration.from_spin_half_string("20"), create_test_orbitals(2))
+        )
         circuit = state_prep.run(wavefunction)
         assert isinstance(circuit, str)
         assert circuit == "mock_circuit_representation"

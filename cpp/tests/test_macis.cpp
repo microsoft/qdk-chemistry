@@ -1182,7 +1182,8 @@ TEST_F(MacisPmcTest, SingleConfiguration) {
   ASSERT_NE(calculator, nullptr);
 
   auto hamiltonian = hamiltonian_constructor_->run(orbitals_);
-  std::vector<Configuration> single_config = {Configuration::from_spin_half_string("222000")};
+  std::vector<Configuration> single_config = {
+      Configuration::from_spin_half_string("222000")};
 
   // Should work with single configuration
   auto [energy, wavefunction] = calculator->run(hamiltonian, single_config);
@@ -1257,7 +1258,8 @@ TEST_F(MacisPmcTest, InvalidConfigurationHandling) {
   // or throw meaningful error)
   std::vector<Configuration> wrong_length_configs;
 
-  wrong_length_configs.push_back(Configuration::from_spin_half_string("22"));  // Too short for 6-orbital system
+  wrong_length_configs.push_back(Configuration::from_spin_half_string(
+      "22"));  // Too short for 6-orbital system
   EXPECT_THROW(calculator->run(hamiltonian, wrong_length_configs),
                std::exception);
 }

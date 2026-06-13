@@ -352,7 +352,7 @@ bool WavefunctionContainer::_is_restricted_closed_shell() const {
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
 WavefunctionContainer::_make_particle_count(std::size_t n_alpha,
-                                           std::size_t n_beta) const {
+                                            std::size_t n_beta) const {
   auto symmetries = get_orbitals()->symmetries();
   if (symmetries && symmetries->has_axis(AxisName::Spin)) {
     return std::make_shared<const SymmetryBlockedScalar<std::size_t>>(
@@ -2004,7 +2004,8 @@ std::string Wavefunction::get_summary() const {
   if (auto orbitals = get_orbitals()) {
     oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs";
     if (has_spin) {
-      oss << ", " << (orbitals->is_restricted() ? "restricted" : "unrestricted");
+      oss << ", "
+          << (orbitals->is_restricted() ? "restricted" : "unrestricted");
     }
   } else {
     oss << "  Orbitals: none";

@@ -34,8 +34,9 @@ class AnsatzSerializationTest : public ::testing::Test {
     Eigen::VectorXd coeffs(2);
     coeffs << 0.8, 0.6;
 
-    Wavefunction::DeterminantVector dets = {Configuration::from_spin_half_string("200000"),
-                                            Configuration::from_spin_half_string("ud0000")};
+    Wavefunction::DeterminantVector dets = {
+        Configuration::from_spin_half_string("200000"),
+        Configuration::from_spin_half_string("ud0000")};
 
     auto wf_container =
         std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);

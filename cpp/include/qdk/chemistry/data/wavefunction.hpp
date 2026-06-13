@@ -777,8 +777,8 @@ class WavefunctionContainer {
    * @param n_beta Number of beta electrons.
    * @return Shared pointer to the symmetry-blocked count.
    */
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>> _make_particle_count(
-      std::size_t n_alpha, std::size_t n_beta) const;
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  _make_particle_count(std::size_t n_alpha, std::size_t n_beta) const;
 
   /**
    * @brief Build symmetry-blocked orbital occupations from per-spin vectors.

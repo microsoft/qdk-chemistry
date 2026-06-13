@@ -104,7 +104,9 @@ sd_wavefunction = Wavefunction(sd_container)
 # CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
 # All possible configurations:
 cas_dets = [
-    Configuration.from_spin_half_string("20"),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string(
+        "20"
+    ),  # both electrons in bonding MO (ground state)
     Configuration.from_spin_half_string("ud"),  # alpha in bonding, beta in antibonding
     Configuration.from_spin_half_string("du"),  # beta in bonding, alpha in antibonding
     Configuration.from_spin_half_string("02"),  # both electrons in antibonding
@@ -125,7 +127,9 @@ cas_wavefunction = Wavefunction(cas_container)
 # Create an SCI wavefunction for H2
 # SCI selects only the most important configurations/determinants from the full space
 sci_dets = [
-    Configuration.from_spin_half_string("20"),  # both electrons in bonding MO (ground state)
+    Configuration.from_spin_half_string(
+        "20"
+    ),  # both electrons in bonding MO (ground state)
     Configuration.from_spin_half_string("du"),  # alpha in bonding, beta in antibonding
     Configuration.from_spin_half_string("ud"),  # beta in bonding, alpha in antibonding
 ]

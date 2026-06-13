@@ -122,9 +122,10 @@ StateVectorContainer::StateVectorContainer(
       _coefficients(coeffs),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
-  auto n_coeffs = detail::is_vector_variant_complex(coeffs)
-                      ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
-                      : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
+  auto n_coeffs =
+      detail::is_vector_variant_complex(coeffs)
+          ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
+          : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
   if (n_coeffs != dets.size()) {
     throw std::invalid_argument(
         "StateVectorContainer: coefficient vector size (" +
@@ -150,9 +151,10 @@ StateVectorContainer::StateVectorContainer(
       _coefficients(coeffs),
       _configuration_set(dets, orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
-  auto n_coeffs = detail::is_vector_variant_complex(coeffs)
-                      ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
-                      : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
+  auto n_coeffs =
+      detail::is_vector_variant_complex(coeffs)
+          ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
+          : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
   if (n_coeffs != dets.size()) {
     throw std::invalid_argument(
         "StateVectorContainer: coefficient vector size (" +
@@ -741,8 +743,8 @@ StateVectorContainer::_active_occupations_pair() const {
 
     const auto& det = determinants[0];
     if (det.bits_per_mode() == 2) {
-      for (size_t active_idx = 0; active_idx < num_active_orbitals &&
-                                   active_idx < det.num_modes();
+      for (size_t active_idx = 0;
+           active_idx < num_active_orbitals && active_idx < det.num_modes();
            ++active_idx) {
         if (det.has_alpha_electron(active_idx))
           alpha_occupations(active_idx) = 1.0;
@@ -750,8 +752,8 @@ StateVectorContainer::_active_occupations_pair() const {
           beta_occupations(active_idx) = 1.0;
       }
     } else {
-      for (size_t active_idx = 0; active_idx < num_active_orbitals &&
-                                   active_idx < det.num_modes();
+      for (size_t active_idx = 0;
+           active_idx < num_active_orbitals && active_idx < det.num_modes();
            ++active_idx) {
         alpha_occupations(active_idx) =
             det.get_mode_state(active_idx) ? 1.0 : 0.0;

@@ -83,12 +83,20 @@ class TestPMCCalculator:
 
         # Perform MC calculation
         e_pmc, wfn_pmc = projected_multi_configuration_calculator.run(
-            ham, [Configuration.from_spin_half_string("222000"), Configuration.from_spin_half_string("220200"), Configuration.from_spin_half_string("220020"), Configuration.from_spin_half_string("220002")]
+            ham,
+            [
+                Configuration.from_spin_half_string("222000"),
+                Configuration.from_spin_half_string("220200"),
+                Configuration.from_spin_half_string("220020"),
+                Configuration.from_spin_half_string("220002"),
+            ],
         )
 
         assert e_pmc < e_hf
         assert wfn_pmc.size() == 4
-        e_pmc, wfn_pmc = projected_multi_configuration_calculator.run(ham, [Configuration.from_spin_half_string("222000")])
+        e_pmc, wfn_pmc = projected_multi_configuration_calculator.run(
+            ham, [Configuration.from_spin_half_string("222000")]
+        )
 
         assert np.isclose(e_pmc, e_hf, rtol=float_comparison_relative_tolerance, atol=ci_energy_tolerance)
         assert wfn_pmc.size() == 1
@@ -117,7 +125,12 @@ class TestPMCCalculator:
 
         # Perform MC calculation
         e_pmc, wfn_pmc = projected_multi_configuration_calculator.run(
-            ham, [Configuration.from_spin_half_string("222000"), Configuration.from_spin_half_string("22ud00"), Configuration.from_spin_half_string("222000")]
+            ham,
+            [
+                Configuration.from_spin_half_string("222000"),
+                Configuration.from_spin_half_string("22ud00"),
+                Configuration.from_spin_half_string("222000"),
+            ],
         )
 
         assert e_pmc < e_hf

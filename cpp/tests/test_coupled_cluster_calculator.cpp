@@ -105,8 +105,8 @@ TEST(CoupledClusterCalculatorTest, Calculate) {
           empty_one_body, empty_two_body, dummy_orbitals, 0.0, empty_fock));
 
   // Perform calculation with electron counts
-  Wavefunction wfn(std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("20"),
-                                                          dummy_orbitals));
+  Wavefunction wfn(std::make_unique<StateVectorContainer>(
+      Configuration::from_spin_half_string("20"), dummy_orbitals));
   auto ansatz_ptr =
       std::make_shared<Ansatz>(std::move(hamiltonian), std::move(wfn));
   auto [energy, result_wavefunction, bra_wavefunction] =

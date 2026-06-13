@@ -46,8 +46,9 @@ class TestSCF : public ScfSolver {
 
     auto orbitals = std::make_shared<Orbitals>(coefficients, energies,
                                                std::nullopt, nullptr);
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("000"), orbitals));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("000"), orbitals));
     return {0.0, wfn};
   }
 };

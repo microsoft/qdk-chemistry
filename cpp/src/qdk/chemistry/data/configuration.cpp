@@ -148,9 +148,9 @@ uint8_t Configuration::bits_per_mode() const { return _bits_per_mode; }
 
 uint8_t Configuration::get_mode_state(size_t idx) const {
   if (idx >= num_modes()) {
-    throw std::out_of_range("Mode index " + std::to_string(idx) +
-                            " out of range (num_modes=" +
-                            std::to_string(num_modes()) + ")");
+    throw std::out_of_range(
+        "Mode index " + std::to_string(idx) +
+        " out of range (num_modes=" + std::to_string(num_modes()) + ")");
   }
   return _get_mode_raw(idx);
 }
@@ -304,9 +304,8 @@ void Configuration::to_hdf5(H5::Group& group) const {
     hsize_t capacity = num_modes();
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &capacity);
 
-    H5::Attribute bpm_attr =
-        dataset.createAttribute("bits_per_mode", H5::PredType::NATIVE_UINT8,
-                                H5::DataSpace(H5S_SCALAR));
+    H5::Attribute bpm_attr = dataset.createAttribute(
+        "bits_per_mode", H5::PredType::NATIVE_UINT8, H5::DataSpace(H5S_SCALAR));
     bpm_attr.write(H5::PredType::NATIVE_UINT8, &_bits_per_mode);
 
     dataset.close();

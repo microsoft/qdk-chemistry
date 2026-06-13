@@ -33,7 +33,8 @@ class TestMultiConfigurationScfSolver : public MultiConfigurationScf {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration::from_spin_half_string("2")};
+    Wavefunction::DeterminantVector dets{
+        Configuration::from_spin_half_string("2")};
     auto container =
         std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
     Wavefunction wfn(std::move(container));
@@ -56,7 +57,8 @@ class TestMultiConfigurationScfSolverAlternative
     coeffs(0) = std::complex<double>(1.0, 0.0);
 
     Wavefunction::DeterminantVector dets;
-    dets.push_back(Configuration::from_spin_half_string("2"));  // Simple single determinant
+    dets.push_back(Configuration::from_spin_half_string(
+        "2"));  // Simple single determinant
 
     auto ham_ctor =
         this->template _create_nested<HamiltonianConstructorFactory>(

@@ -213,7 +213,8 @@ TEST_F(WavefunctionCoreTest, OverlapCalculation) {
 TEST_F(WavefunctionCoreTest, ExplicitElectronAndOccupationFunctions) {
   // Create a CAS wavefunction for testing
   auto orbitals = testing::create_test_orbitals(4, 4, true);
-  std::vector<Configuration> dets = {Configuration::from_spin_half_string("2200")};
+  std::vector<Configuration> dets = {
+      Configuration::from_spin_half_string("2200")};
   Eigen::VectorXcd coeffs(1);
   coeffs << std::complex<double>(1.0, 0.0);
 
@@ -275,7 +276,9 @@ TEST_F(WavefunctionCoreTest, ExplicitFunctionsWithInactiveOrbitals) {
 
   // Create determinants using only the active space (4 orbitals)
   std::vector<Configuration> dets = {
-      Configuration::from_spin_half_string("2200"), Configuration::from_spin_half_string("2020"), Configuration::from_spin_half_string("2002")};
+      Configuration::from_spin_half_string("2200"),
+      Configuration::from_spin_half_string("2020"),
+      Configuration::from_spin_half_string("2002")};
   Eigen::VectorXcd coeffs(3);
   coeffs << std::complex<double>(0.5, 0.0), std::complex<double>(0.5, 0.0),
       std::complex<double>(1.0 / sqrt(2), 0.0);
@@ -348,7 +351,8 @@ TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
   // Provide s1 and s2 entropies, verify MI is lazily derived
   constexpr int norb = 2;
   auto test_orbitals = testing::create_test_orbitals();
-  Wavefunction::DeterminantVector dets = {Configuration::from_spin_half_string("20")};
+  Wavefunction::DeterminantVector dets = {
+      Configuration::from_spin_half_string("20")};
   Eigen::VectorXd coeffs(1);
   coeffs << 1.0;
 
@@ -383,7 +387,8 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   // Provide s1 and mutual information, verify s2 is lazily derived
   constexpr int norb = 2;
   auto test_orbitals = testing::create_test_orbitals();
-  Wavefunction::DeterminantVector dets = {Configuration::from_spin_half_string("20")};
+  Wavefunction::DeterminantVector dets = {
+      Configuration::from_spin_half_string("20")};
   Eigen::VectorXd coeffs(1);
   coeffs << 1.0;
 
@@ -455,7 +460,8 @@ TEST_F(WavefunctionCoreTest,
        ConfigurationSetSectorLayoutIsSingleElectronSegment) {
   // The slot-partition seam: today one segment covering all slots, named the
   // electronic sector and backed by the set's orbitals.
-  ConfigurationSet cs({Configuration::from_spin_half_string("ud2000")}, orbitals);
+  ConfigurationSet cs({Configuration::from_spin_half_string("ud2000")},
+                      orbitals);
   const auto& layout = cs.sector_layout();
   ASSERT_EQ(layout.size(), 1u);
   EXPECT_EQ(layout[0].first, DEFAULT_SECTOR);
@@ -478,7 +484,9 @@ class WavefunctionSerializationTest : public ::testing::Test {
 
     // Configurations must match active space size (2 orbitals by default)
     Wavefunction::DeterminantVector dets = {
-        Configuration::from_spin_half_string("20"), Configuration::from_spin_half_string("ud"), Configuration::from_spin_half_string("02")};
+        Configuration::from_spin_half_string("20"),
+        Configuration::from_spin_half_string("ud"),
+        Configuration::from_spin_half_string("02")};
 
     // Create entropy data for cas_real
     s1_entropies = Eigen::VectorXd(2);
@@ -499,13 +507,16 @@ class WavefunctionSerializationTest : public ::testing::Test {
     cas_complex = std::make_shared<Wavefunction>(
         std::make_unique<StateVectorContainer>(coeffs_complex, dets, orbitals));
 
-    sd_wavefunction = std::make_shared<Wavefunction>(
-        std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("20"), orbitals));
+    sd_wavefunction =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("20"), orbitals));
 
     // Create SCI wavefunctions with 4 configurations (2 orbitals each)
     // All must have same electron count (2 electrons)
     Wavefunction::DeterminantVector sci_dets = {
-        Configuration::from_spin_half_string("20"), Configuration::from_spin_half_string("ud"), Configuration::from_spin_half_string("02"),
+        Configuration::from_spin_half_string("20"),
+        Configuration::from_spin_half_string("ud"),
+        Configuration::from_spin_half_string("02"),
         Configuration::from_spin_half_string("du")};
 
     // Create SCI coefficients with proper size
@@ -885,9 +896,12 @@ class WavefunctionActiveSpaceConversionTest : public ::testing::Test {
 
     // Create active space determinants (4 orbitals in active space)
     // Format: 4 active orbitals
-    active_det1 = Configuration::from_spin_half_string("2ud0");  // doubly, up, down, empty
-    active_det2 = Configuration::from_spin_half_string("u2d0");  // up, doubly, down, empty
-    active_det3 = Configuration::from_spin_half_string("ud20");  // up, down, doubly, empty
+    active_det1 = Configuration::from_spin_half_string(
+        "2ud0");  // doubly, up, down, empty
+    active_det2 = Configuration::from_spin_half_string(
+        "u2d0");  // up, doubly, down, empty
+    active_det3 = Configuration::from_spin_half_string(
+        "ud20");  // up, down, doubly, empty
 
     // Expected total determinants (10 orbitals: 3 inactive + 4 active + 3
     // virtual) Format: 222 (inactive) + active + 000 (virtual)
@@ -993,7 +1007,8 @@ TEST_F(WavefunctionActiveSpaceConversionTest, GetTotalDeterminantsMultiple) {
 
   // Verify all have correct orbital capacity
   for (const auto& det : total_dets) {
-    EXPECT_EQ(det.get_orbital_capacity(), 12);  // 10 total orbitals (padded to 4)
+    EXPECT_EQ(det.get_orbital_capacity(),
+              12);  // 10 total orbitals (padded to 4)
   }
 }
 

@@ -310,8 +310,8 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
             fake_basis_set);
         // Provide different indices for alpha and beta to trigger the exception
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -331,8 +331,8 @@ TEST_F(LocalizationTest, Iterative_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -416,8 +416,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -431,8 +431,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, coeffs_beta, fake_energies, fake_energies,
             std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2000"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2000"), orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -446,8 +446,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("0000"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("0000"), orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -461,8 +461,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2u00"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2u00"), orbitals));
         auto all_indices = orbitals->get_all_mo_indices();
         localizer->run(wfn, all_indices, all_indices);
       },
@@ -479,8 +479,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -495,8 +495,8 @@ TEST_F(LocalizationTest, MP2_EdgeCase) {
             coeffs, fake_energies, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -520,8 +520,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         vvhv_localizer->run(wfn, incomplete_indices_a, all_indices_b);
       },
       std::invalid_argument);
@@ -537,8 +537,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, coeffs, std::nullopt, std::nullopt,
             std::make_optional(fake_ao_overlap), fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         vvhv_localizer->run(wfn, all_indices_a, incomplete_indices_b);
       },
       std::invalid_argument);
@@ -555,8 +555,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         vvhv_localizer->run(wfn, indices_a, indices_b);
       },
       std::invalid_argument);
@@ -571,8 +571,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         vvhv_localizer->run(wfn, unsorted_indices, unsorted_indices);
       },
       std::invalid_argument);
@@ -589,8 +589,8 @@ TEST_F(LocalizationTest, VVHV_EdgeCase) {
             coeffs, std::nullopt, std::make_optional(fake_ao_overlap),
             fake_basis_set);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals));
         vvhv_localizer->run(wfn, out_of_bounds_indices, valid_indices);
       },
       std::invalid_argument);

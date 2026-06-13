@@ -184,8 +184,8 @@ TEST_F(ActiveSpaceTest, Occupation_EdgeCase) {
 
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2000"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2000"), orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -241,8 +241,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
                           basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("dd00"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("dd00"), orbitals_ptr));
         auto result_wavefunction = selector->run(wfn);
       },
       std::runtime_error);
@@ -263,8 +263,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", -1);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);
@@ -286,8 +286,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", -1);
         auto result_wavefunction = selector->run(wfn);
@@ -309,8 +309,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 5);
         auto result_wavefunction = selector->run(wfn);
@@ -332,8 +332,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2000"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2000"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -355,8 +355,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, energies, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 3);
         selector->settings().set("num_active_orbitals", 4);
         auto result_wavefunction = selector->run(wfn);
@@ -373,8 +373,8 @@ TEST_F(ActiveSpaceTest, Valence_EdgeCase) {
         Orbitals orbitals(coeffs, std::nullopt, std::nullopt, basis);
         auto orbitals_ptr = std::make_shared<Orbitals>(orbitals);
         auto wfn = std::make_shared<Wavefunction>(
-            std::make_unique<StateVectorContainer>(Configuration::from_spin_half_string("2200"),
-                                                   orbitals_ptr));
+            std::make_unique<StateVectorContainer>(
+                Configuration::from_spin_half_string("2200"), orbitals_ptr));
         selector->settings().set("num_active_electrons", 2);
         selector->settings().set("num_active_orbitals", 2);
         auto result_wavefunction = selector->run(wfn);

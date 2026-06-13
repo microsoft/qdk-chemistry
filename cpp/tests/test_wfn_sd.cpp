@@ -27,10 +27,12 @@ TEST_F(SlaterdeterminantTest, BasicProperties) {
 
   EXPECT_EQ(sd.size(), 1);
   EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(det)), 1.0);
-  EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(Configuration::from_spin_half_string("2000"))),
+  EXPECT_DOUBLE_EQ(std::get<double>(sd.get_coefficient(
+                       Configuration::from_spin_half_string("2000"))),
                    0.0);
   EXPECT_TRUE(sd.contains_determinant(det));
-  EXPECT_FALSE(sd.contains_determinant(Configuration::from_spin_half_string("2000")));
+  EXPECT_FALSE(
+      sd.contains_determinant(Configuration::from_spin_half_string("2000")));
   EXPECT_EQ(sd.get_active_determinants().size(), 1);
   EXPECT_EQ(sd.get_active_determinants()[0].to_string(), "2200");
   EXPECT_DOUBLE_EQ(sd.norm(), 1.0);
@@ -90,7 +92,8 @@ TEST_F(SlaterdeterminantTest, WithInactiveOrbitals) {
                                              inactive_indices);
 
   // Create determinant using only the active space (4 orbitals)
-  auto det = Configuration::from_spin_half_string("2200");  // 2 alpha electrons in first 2 active orbitals
+  auto det = Configuration::from_spin_half_string(
+      "2200");  // 2 alpha electrons in first 2 active orbitals
   StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with inactive orbitals
@@ -158,7 +161,8 @@ TEST_F(SlaterdeterminantTest, WithNonContinuousActiveSpace) {
                                              inactive_indices);
 
   // Create determinant using only the active space (4 orbitals)
-  auto det = Configuration::from_spin_half_string("2200");  // 2 alpha electrons in first 2 active orbitals
+  auto det = Configuration::from_spin_half_string(
+      "2200");  // 2 alpha electrons in first 2 active orbitals
   StateVectorContainer sd(det, orbitals);
 
   // Test electron counting with non-continuous active space

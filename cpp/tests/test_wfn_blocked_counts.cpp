@@ -92,9 +92,9 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
   auto det2 = Configuration::from_spin_half_string("u0d0");  // 2 occupied modes
   Eigen::VectorXd coeffs(2);
   coeffs << 0.9, 0.1;
-  StateVectorContainer sv(
-      ContainerTypes::VectorVariant{coeffs},
-      ContainerTypes::DeterminantVector{det1, det2}, orbitals);
+  StateVectorContainer sv(ContainerTypes::VectorVariant{coeffs},
+                          ContainerTypes::DeterminantVector{det1, det2},
+                          orbitals);
 
   // Active electron count is a single trivial block (no spin axis).
   auto count = sv.active_num_particles();
@@ -112,7 +112,8 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
 // Generic (bitstring) wavefunction construction — from_bitstring + inactive.
 // --------------------------------------------------------------------------
 
-TEST_F(WavefunctionBlockedCountsTest, BitstringWithInactiveSpaceCountsCorrectly) {
+TEST_F(WavefunctionBlockedCountsTest,
+       BitstringWithInactiveSpaceCountsCorrectly) {
   // 5 modes: inactive {0}, active {1,2,3}, virtual {4}
   auto active_idx = std::make_shared<const SymmetryBlockedIndexSet>(
       std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial()),
@@ -167,9 +168,9 @@ TEST_F(WavefunctionBlockedCountsTest, BitstringFullActiveCountsCorrectly) {
   auto det2 = Configuration::from_bitstring("0110");
   Eigen::VectorXd coeffs(2);
   coeffs << 0.8, 0.6;
-  StateVectorContainer sv(
-      ContainerTypes::VectorVariant{coeffs},
-      ContainerTypes::DeterminantVector{det1, det2}, orbitals);
+  StateVectorContainer sv(ContainerTypes::VectorVariant{coeffs},
+                          ContainerTypes::DeterminantVector{det1, det2},
+                          orbitals);
 
   auto active_count = sv.active_num_particles();
   ASSERT_NE(active_count, nullptr);

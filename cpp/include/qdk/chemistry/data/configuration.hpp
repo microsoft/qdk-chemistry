@@ -369,7 +369,8 @@ class Configuration : public DataClass {
    * little-endian format (spin-½ only).
    * @param num_orbitals How many orbitals to extract
    * @return Pair of binary strings (alpha, beta)
-   * @throws std::runtime_error If bits_per_mode() != 2 or num_orbitals exceeds capacity
+   * @throws std::runtime_error If bits_per_mode() != 2 or num_orbitals exceeds
+   * capacity
    */
   std::pair<std::string, std::string> to_binary_strings(
       size_t num_orbitals) const;
@@ -397,7 +398,8 @@ class Configuration : public DataClass {
     DOUBLY = 3
   };
 
-  /// Get the 2-bit occupation state of a spin-½ mode (asserts _bits_per_mode==2).
+  /// Get the 2-bit occupation state of a spin-½ mode (asserts
+  /// _bits_per_mode==2).
   OccupationState _get_orbital(size_t pos) const;
 
   /// Set the 2-bit occupation state of a spin-½ mode.

@@ -45,7 +45,7 @@ class ValenceActiveParametersTest : public ::testing::Test {
 
     water_wavefunction = water_wf;
 
-        auto config_truncated = Configuration::from_spin_half_string(
+    auto config_truncated = Configuration::from_spin_half_string(
         "22222");  // the orbitals of this config needs to be built specifically
     Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(
         water_orbitals->get_num_molecular_orbitals(), 5);
@@ -79,14 +79,16 @@ class ValenceActiveParametersTest : public ::testing::Test {
     oh_wavefunction = oh_wf;
 
     // Create configuration for 8 electrons (4 doubly occupied orbitals)
-    auto config_ohp = Configuration::from_spin_half_string("222200000");  // 4 doubly occupied orbitals
+    auto config_ohp = Configuration::from_spin_half_string(
+        "222200000");  // 4 doubly occupied orbitals
     auto ohp_wfn_container =
         std::make_unique<StateVectorContainer>(config_ohp, base_orbitals_oh);
     ohp_wavefunction =
         std::make_shared<Wavefunction>(std::move(ohp_wfn_container));
 
     // Create configuration for 10 electrons (5 doubly occupied orbitals)
-    auto config_ohn = Configuration::from_spin_half_string("222220000");  // 4 doubly occupied orbitals
+    auto config_ohn = Configuration::from_spin_half_string(
+        "222220000");  // 4 doubly occupied orbitals
     auto ohn_wfn_container =
         std::make_unique<StateVectorContainer>(config_ohn, base_orbitals_oh);
     ohn_wavefunction =
