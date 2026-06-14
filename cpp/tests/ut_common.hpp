@@ -235,6 +235,24 @@ inline std::shared_ptr<Structure> create_li_structure() {
 }
 
 /**
+ * @brief Creates a LiH structure
+ */
+inline std::shared_ptr<Structure> create_lih_structure() {
+  std::vector<Eigen::Vector3d> coords = {
+      {0.000000000, 0.000000000, 0.000000000},
+      {0.000000000, 0.000000000, 1.595000000}};
+
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+
+  std::vector<Element> elements = {qdk::chemistry::data::Element::Li,
+                                   qdk::chemistry::data::Element::H};
+
+  return std::make_shared<Structure>(coords, elements);
+}
+
+/**
  * @brief Creates an O2 structure
  */
 inline std::shared_ptr<Structure> create_o2_structure() {
