@@ -195,6 +195,10 @@ Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if nee
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
+.. note::
+   **Fast paths for factorized/sparse Hamiltonians:**
+   When running the ``"qdk"`` mapper, passing a :class:`~qdk_chemistry.data.Hamiltonian` object wrapping a :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` or a :class:`~qdk_chemistry.data.SparseHamiltonianContainer` triggers container-aware fast paths. These paths bypass full materialization of dense :math:`N^4` two-body integral tensors, saving significant memory and runtime while producing numerically identical results.
+
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
 .. rubric:: Settings

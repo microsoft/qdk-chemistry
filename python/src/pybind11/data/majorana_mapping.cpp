@@ -8,6 +8,8 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -326,5 +328,21 @@ handles each spin channel independently (unrestricted orbitals).
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
+)");
+
+  data.def(
+      "majorana_map_hamiltonian",
+      [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
+         double threshold, double integral_threshold) -> py::tuple {
+        auto result = majorana_map_hamiltonian(mapping, hamiltonian, threshold,
+                                               integral_threshold);
+        return py::make_tuple(py::cast(result.words),
+                              py::cast(result.coefficients));
+      },
+      py::arg("mapping"), py::arg("hamiltonian"), py::arg("threshold"),
+      py::arg("integral_threshold"),
+      R"(
+Map a fermionic Hamiltonian object directly to qubit Pauli terms.
+By passing the Hamiltonian directly, the mapping engine can exploit sparse/factorized ERI structures.
 )");
 }
