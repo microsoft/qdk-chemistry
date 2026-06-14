@@ -199,6 +199,17 @@ class Configuration : public DataClass {
   bool has_beta_electron(size_t orbital_idx) const;
 
   /**
+   * @brief Whether the configuration is closed-shell.
+   *
+   * Closed-shell means every spatial orbital is either unoccupied or doubly
+   * occupied — there are no singly-occupied (open-shell) orbitals. The
+   * resulting alpha and beta occupation patterns are identical.
+   *
+   * @return @c true iff no orbital is singly occupied.
+   */
+  bool is_closed_shell() const;
+
+  /**
    * @brief Equality comparison operator
    * @param other The configuration to compare with
    * @return true if the configurations are identical, false otherwise
@@ -331,6 +342,8 @@ class Configuration : public DataClass {
                                            std::string beta_string);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Friend classes that need direct access to packed data for efficient
   // serialization
   friend class ConfigurationSet;

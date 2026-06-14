@@ -45,6 +45,15 @@ py::object variant_to_python(
       [](const auto& value) -> py::object { return py::cast(value); }, var);
 }
 
+// SymmetryBlockedTensorVariant<Rank> -> Python: resolves to the bound
+// SymmetryBlockedTensorRank{N}{,Complex} class via pybind11's class caster.
+template <std::size_t Rank>
+py::object variant_to_python(
+    const qdk::chemistry::data::SymmetryBlockedTensorVariant<Rank>& var) {
+  return std::visit([](const auto& sbt) -> py::object { return py::cast(sbt); },
+                    var);
+}
+
 // Wrapper functions for file I/O methods that accept both strings and pathlib
 // Path objects
 void wavefunction_to_file_wrapper(qdk::chemistry::data::Wavefunction& self,
@@ -187,6 +196,54 @@ It uses variant types to support both real and complex arithmetic.
            &WavefunctionContainer::has_two_rdm_spin_traced,
            "Check if spin-traced two-particle RDM for active orbitals is "
            "available")
+      // SymmetryBlockedTensor-native RDM accessors
+      .def(
+          "active_one_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_one_rdm());
+          },
+          "Active-space 1-RDM as a rank-2 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank2`) or complex "
+          "(`SymmetryBlockedTensorRank2Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_one_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& row,
+             const SymmetryLabel& col) {
+            return variant_to_python(self.active_one_rdm_block(row, col));
+          },
+          "Active-space 1-RDM block for given row/col symmetry labels. "
+          "Returns a real (`numpy.ndarray[float64]`) or complex "
+          "(`numpy.ndarray[complex128]`) matrix.",
+          py::arg("row"), py::arg("col"))
+      .def("has_active_one_rdm", &WavefunctionContainer::has_active_one_rdm,
+           "True if the active-space 1-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
+      .def(
+          "active_two_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_two_rdm());
+          },
+          "Active-space 2-RDM as a rank-4 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank4`) or complex "
+          "(`SymmetryBlockedTensorRank4Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_two_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& p,
+             const SymmetryLabel& q, const SymmetryLabel& r,
+             const SymmetryLabel& s) {
+            return variant_to_python(self.active_two_rdm_block(p, q, r, s));
+          },
+          "Active-space 2-RDM block for given symmetry labels. Returns a real "
+          "(`numpy.ndarray[float64]`) or complex (`numpy.ndarray[complex128]`) "
+          "flat vector.",
+          py::arg("p"), py::arg("q"), py::arg("r"), py::arg("s"))
+      .def("has_active_two_rdm", &WavefunctionContainer::has_active_two_rdm,
+           "True if the active-space 2-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
       .def("is_complex", &WavefunctionContainer::is_complex,
            "Check if the wavefunction is complex-valued")
       .def("has_single_orbital_entropies",
@@ -1057,14 +1114,14 @@ Examples:
                       std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
                       std::optional<ContainerTypes::VectorVariant>
                           two_rdm_spin_traced,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
             return SciWavefunctionContainer(
                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aaaa,
+                two_rdm_aabb, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
           R"(
 Constructs a SCI wavefunction container with full RDM data.
@@ -1077,8 +1134,8 @@ Args:
     one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
     one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
@@ -1091,15 +1148,15 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.SciWavefunctionContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
-    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)
 )",
           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
           py::arg("one_rdm_spin_traced") = std::nullopt,
           py::arg("one_rdm_aa") = std::nullopt,
           py::arg("one_rdm_bb") = std::nullopt,
           py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_bbbb") = std::nullopt,
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)
@@ -1189,14 +1246,14 @@ Examples:
                       std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
                       std::optional<ContainerTypes::VectorVariant>
                           two_rdm_spin_traced,
-                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+                      std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
                       std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
                       py::object entropies, WavefunctionType type) {
             return CasWavefunctionContainer(
                 coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
-                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aabb,
-                two_rdm_aaaa, two_rdm_bbbb, parse_entropies(entropies), type);
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aaaa,
+                two_rdm_aabb, two_rdm_bbbb, parse_entropies(entropies), type);
           }),
           R"(
 Constructs a CAS wavefunction container with full RDM data.
@@ -1209,8 +1266,8 @@ Args:
     one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
     one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
     two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
-    two_rdm_aabb (numpy.ndarray | None): Alpha-beta-beta-alpha block of two-particle RDM
     two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
     two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
     entropies (dict | None): Orbital entropies, with optional keys
         ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
@@ -1223,15 +1280,15 @@ Examples:
     >>> dets = [qdk_chemistry.Configuration("33221100"), qdk_chemistry.Configuration("33221001")]
     >>> container = qdk_chemistry.CasWavefunctionContainer(coeffs, dets, orbitals,
     ...     one_rdm, one_rdm_aa, one_rdm_bb,
-    ...     two_rdm, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb)
+    ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)
 )",
           py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
           py::arg("one_rdm_spin_traced") = std::nullopt,
           py::arg("one_rdm_aa") = std::nullopt,
           py::arg("one_rdm_bb") = std::nullopt,
           py::arg("two_rdm_spin_traced") = std::nullopt,
-          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_aaaa") = std::nullopt,
+          py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_bbbb") = std::nullopt,
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)

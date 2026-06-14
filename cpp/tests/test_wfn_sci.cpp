@@ -530,9 +530,9 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMs) {
     EXPECT_TRUE(restored_one_rdm_r.isApprox(original_one_rdm_r,
                                             testing::rdm_tolerance));
 
-    auto [restored_aabb_rdm, restored_aaaa_rdm, restored_bbbb_rdm] =
+    auto [restored_aaaa_rdm, restored_aabb_rdm, restored_bbbb_rdm] =
         restored->get_active_two_rdm_spin_dependent();
-    auto [original_aabb_rdm, original_aaaa_rdm, original_bbbb_rdm] =
+    auto [original_aaaa_rdm, original_aabb_rdm, original_bbbb_rdm] =
         original.get_active_two_rdm_spin_dependent();
     // extract data from variants
     const auto& restored_aabb_rdm_r =
@@ -598,16 +598,15 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
 
   SciWavefunctionContainer original(coeffs, dets, orbitals, std::nullopt,
                                     one_rdm_aa, one_rdm_aa, std::nullopt,
-                                    two_rdm_aabb, two_rdm_aaaa, two_rdm_aaaa);
+                                    two_rdm_aaaa, two_rdm_aabb, two_rdm_aaaa);
 
   // Serialize to JSON
   nlohmann::json j = original.to_json();
 
   // Verify RDMs are in JSON
   EXPECT_TRUE(j.contains("rdms"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
+  EXPECT_TRUE(j["rdms"].contains("active_one_rdm"));
+  EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
   auto restored = std::unique_ptr<SciWavefunctionContainer>(
@@ -628,9 +627,9 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMs) {
                   .isApprox(std::get<Eigen::MatrixXd>(rest_one_aa),
                             testing::wf_tolerance));
 
-  auto [orig_two_aabb, orig_two_aaaa, orig_two_bbbb] =
+  auto [orig_two_aaaa, orig_two_aabb, orig_two_bbbb] =
       original.get_active_two_rdm_spin_dependent();
-  auto [rest_two_aabb, rest_two_aaaa, rest_two_bbbb] =
+  auto [rest_two_aaaa, rest_two_aabb, rest_two_bbbb] =
       restored->get_active_two_rdm_spin_dependent();
 
   EXPECT_TRUE(std::get<Eigen::VectorXd>(orig_two_aabb)
@@ -690,11 +689,8 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
 
   // Verify RDMs are in JSON
   EXPECT_TRUE(j.contains("rdms"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_aa"));
-  EXPECT_TRUE(j["rdms"].contains("one_rdm_bb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aabb"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_aaaa"));
-  EXPECT_TRUE(j["rdms"].contains("two_rdm_bbbb"));
+  EXPECT_TRUE(j["rdms"].contains("active_one_rdm"));
+  EXPECT_TRUE(j["rdms"].contains("active_two_rdm"));
 
   // Deserialize from JSON
   auto restored = std::unique_ptr<SciWavefunctionContainer>(
@@ -741,9 +737,9 @@ TEST_F(SciWavefunctionTest, JsonSerializationRDMsOpenShell) {
   EXPECT_TRUE(
       restored_one_rdm_r.isApprox(original_one_rdm_r, testing::rdm_tolerance));
 
-  auto [restored_aabb_rdm, restored_aaaa_rdm, restored_bbbb_rdm] =
+  auto [restored_aaaa_rdm, restored_aabb_rdm, restored_bbbb_rdm] =
       restored->get_active_two_rdm_spin_dependent();
-  auto [original_aabb_rdm, original_aaaa_rdm, original_bbbb_rdm] =
+  auto [original_aaaa_rdm, original_aabb_rdm, original_bbbb_rdm] =
       original.get_active_two_rdm_spin_dependent();
 
   // extract data from variants
@@ -879,9 +875,9 @@ TEST_F(SciWavefunctionTest, Hdf5SerializationRDMsOpenShell) {
     EXPECT_TRUE(restored_one_rdm_r.isApprox(original_one_rdm_r,
                                             testing::rdm_tolerance));
 
-    auto [restored_aabb_rdm, restored_aaaa_rdm, restored_bbbb_rdm] =
+    auto [restored_aaaa_rdm, restored_aabb_rdm, restored_bbbb_rdm] =
         restored->get_active_two_rdm_spin_dependent();
-    auto [original_aabb_rdm, original_aaaa_rdm, original_bbbb_rdm] =
+    auto [original_aaaa_rdm, original_aabb_rdm, original_bbbb_rdm] =
         original.get_active_two_rdm_spin_dependent();
 
     // extract data from variants
