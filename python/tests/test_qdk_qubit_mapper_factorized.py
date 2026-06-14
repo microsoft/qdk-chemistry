@@ -1,5 +1,10 @@
 """Tests for specialized fast mapping paths (Cholesky, Sparse) in QdkQubitMapper."""
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 import numpy as np
 import pytest
 
@@ -18,13 +23,14 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ppp_hamiltonian,
     ohno_potential,
 )
+
 from .test_helpers import create_test_basis_set
 
 
 def assert_qubit_hamiltonians_equal(qh1: QubitHamiltonian, qh2: QubitHamiltonian, atol: float = 1e-12):
     """Compare two QubitHamiltonians term-by-term within absolute tolerance."""
-    dict1 = {k: v for k, v in zip(qh1.pauli_strings, qh1.coefficients) if abs(v) > atol}
-    dict2 = {k: v for k, v in zip(qh2.pauli_strings, qh2.coefficients) if abs(v) > atol}
+    dict1 = {k: v for k, v in zip(qh1.pauli_strings, qh1.coefficients, strict=False) if abs(v) > atol}
+    dict2 = {k: v for k, v in zip(qh2.pauli_strings, qh2.coefficients, strict=False) if abs(v) > atol}
 
     keys1 = set(dict1.keys())
     keys2 = set(dict2.keys())
@@ -34,15 +40,21 @@ def assert_qubit_hamiltonians_equal(qh1: QubitHamiltonian, qh2: QubitHamiltonian
     missing_in_1 = keys2 - keys1
 
     for k in missing_in_2:
-        assert abs(dict1[k]) < 1e-11, f"Term {k} is missing in dense path but present in fast path with value {dict1[k]}"
+        assert abs(dict1[k]) < 1e-11, (
+            f"Term {k} is missing in dense path but present in fast path with value {dict1[k]}"
+        )
     for k in missing_in_1:
-        assert abs(dict2[k]) < 1e-11, f"Term {k} is missing in fast path but present in dense path with value {dict2[k]}"
+        assert abs(dict2[k]) < 1e-11, (
+            f"Term {k} is missing in fast path but present in dense path with value {dict2[k]}"
+        )
 
     # Check overlapping keys
     for k in keys1.intersection(keys2):
         val1 = dict1[k]
         val2 = dict2[k]
-        assert np.isclose(val1, val2, atol=atol, rtol=1e-8), f"Coefficients mismatch for term {k}: fast={val1}, dense={val2}"
+        assert np.isclose(val1, val2, atol=atol, rtol=1e-8), (
+            f"Coefficients mismatch for term {k}: fast={val1}, dense={val2}"
+        )
 
 
 def make_dense_counterpart(h_fast: Hamiltonian) -> Hamiltonian:
@@ -55,16 +67,12 @@ def make_dense_counterpart(h_fast: Hamiltonian) -> Hamiltonian:
 
     if orbitals.is_restricted():
         fock = np.zeros((norb, norb))
-        container_dense = CanonicalFourCenterHamiltonianContainer(
-            h1_alpha, h2_aaaa, orbitals, core_energy, fock
-        )
+        container_dense = CanonicalFourCenterHamiltonianContainer(h1_alpha, h2_aaaa, orbitals, core_energy, fock)
     else:
         fock_a = np.zeros((norb, norb))
         fock_b = np.zeros((norb, norb))
         container_dense = CanonicalFourCenterHamiltonianContainer(
-            h1_alpha, h1_beta,
-            h2_aaaa, h2_aabb, h2_bbbb,
-            orbitals, core_energy, fock_a, fock_b
+            h1_alpha, h1_beta, h2_aaaa, h2_aabb, h2_bbbb, orbitals, core_energy, fock_a, fock_b
         )
     return Hamiltonian(container_dense)
 
@@ -85,9 +93,7 @@ def make_random_restricted_cholesky(norb: int, naux: int = 15, seed: int = 42):
     fock = rng.standard_normal((norb, norb))
     fock = 0.5 * (fock + fock.T)
 
-    container = CholeskyHamiltonianContainer(
-        one_body, three_center, orbitals, 1.5, fock
-    )
+    container = CholeskyHamiltonianContainer(one_body, three_center, orbitals, 1.5, fock)
     return Hamiltonian(container)
 
 
@@ -120,9 +126,7 @@ def make_random_unrestricted_cholesky(norb: int, naux: int = 15, seed: int = 42)
     fock_b = 0.5 * (fock_b + fock_b.T)
 
     container = CholeskyHamiltonianContainer(
-        one_body_a, one_body_b,
-        three_center_aa, three_center_bb,
-        orbitals, 2.0, fock_a, fock_b
+        one_body_a, one_body_b, three_center_aa, three_center_bb, orbitals, 2.0, fock_a, fock_b
     )
     return Hamiltonian(container)
 
@@ -216,6 +220,7 @@ try:
     import pyscf.ao2mo
     import pyscf.gto
     import pyscf.scf
+
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False
@@ -254,18 +259,14 @@ def _molecular_cholesky_pair(atom: str, basis: str):
     mo_orbitals = Orbitals(coeffs, None, None, orbitals)
     fock = np.zeros((norb, norb))
 
-    h_fast = Hamiltonian(
-        CholeskyHamiltonianContainer(
-            h1, three_center, mo_orbitals, float(mf.energy_nuc()), fock
-        )
-    )
+    h_fast = Hamiltonian(CholeskyHamiltonianContainer(h1, three_center, mo_orbitals, float(mf.energy_nuc()), fock))
     return h_fast, norb
 
 
 @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not installed")
 def test_cholesky_molecular_fast_path():
     """Verify that molecular Cholesky matches dense mapped version on real orbitals."""
-    for name, atom, basis in MOLECULES:
+    for _, atom, basis in MOLECULES:
         for encoding in ["jordan_wigner", "bravyi_kitaev", "parity"]:
             h_fast, norb = _molecular_cholesky_pair(atom, basis)
             num_modes = 2 * norb
@@ -284,5 +285,3 @@ def test_cholesky_molecular_fast_path():
             qh_dense = mapper.run(h_dense, mapping)
 
             assert_qubit_hamiltonians_equal(qh_fast, qh_dense, atol=1e-12)
-
-
