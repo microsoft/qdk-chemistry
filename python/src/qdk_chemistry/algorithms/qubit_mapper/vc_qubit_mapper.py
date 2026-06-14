@@ -91,7 +91,7 @@ class VerstraeteCiracQubitMapper(QubitMapper):
 
     Codespace: the +1 eigenspace of the auxiliary Z operators
     (Z_{an} = +1 for all n, auxiliary qubits in state |0>).
-    Restricting to this 2N/2-qubit sector recovers the Jordan-Wigner
+    Restricting to this 2*n_sites-qubit sector recovers the Jordan-Wigner
     Hamiltonian for the (decoupled alpha + beta) spin-orbital blocks.
 
     Args:

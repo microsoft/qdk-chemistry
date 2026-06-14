@@ -150,7 +150,7 @@ def _vc_codespace_eigenvalues(qh: QubitHamiltonian, n_sites: int) -> np.ndarray:
     n_phys = 2 * n_sites
     dim_phys = 2**n_phys
     h_cs = sp.csr_matrix((dim_phys, dim_phys), dtype=complex)
-    for ps, coeff in zip(qh.pauli_strings, qh.coefficients, strict=False):
+    for ps, coeff in zip(qh.pauli_strings, qh.coefficients, strict=True):
         aux_chars = ps[:n_phys]
         phys_chars = ps[n_phys:]
         if any(ch in ("X", "Y") for ch in aux_chars):
@@ -220,6 +220,7 @@ class TestVCMappingConstruction:
 
 
 class TestVCEigenvalues:
+    scipy_sparse = pytest.importorskip("scipy.sparse", reason="scipy required for codespace eigenvalue tests")
     """Tests for AC2: codespace eigenvalues match JW to within 1e-10."""
 
     def test_2x2_fermi_hubbard_matches_jw(self):
