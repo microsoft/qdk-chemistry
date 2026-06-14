@@ -16,10 +16,7 @@
 
 namespace qdk::chemistry::data {
 
-/// Sentinel sector name used when no explicit sector is supplied.
-/// Internal callers should pass an explicit sector name; this default exists
-/// only for backward compatibility with legacy serialization formats.
-inline constexpr const char* DEFAULT_SECTOR = "__default__";
+class Wavefunction;  // forward declaration for DEFAULT_SECTOR
 
 /**
  * @class ConfigurationSet
@@ -58,26 +55,11 @@ class ConfigurationSet : public DataClass {
    */
   ConfigurationSet(const std::vector<Configuration>& configurations,
                    std::shared_ptr<Orbitals> orbitals,
-                   std::string sector = DEFAULT_SECTOR);
+                   std::string sector);
 
-  /**
-   * @brief Construct a ConfigurationSet from configurations and orbital
-   * information (move)
-   * @param configurations Vector of configurations (representing active space
-   * only, moved)
-   * @param orbitals Shared pointer to orbital basis set
-   * @param sector Name of the single-particle sector the orbitals belong to
-   * @throws std::invalid_argument if configurations are inconsistent with
-   * active space or if orbitals pointer is null
-   *
-   * @note All configurations must have the same number of orbitals and
-   * sufficient capacity to represent the active space defined in the orbitals
-   * object. Configurations only represent the active space; inactive and
-   * virtual orbitals are not included in the configuration representation.
-   */
   ConfigurationSet(std::vector<Configuration>&& configurations,
                    std::shared_ptr<Orbitals> orbitals,
-                   std::string sector = DEFAULT_SECTOR);
+                   std::string sector);
 
   /**
    * @brief Get the configurations

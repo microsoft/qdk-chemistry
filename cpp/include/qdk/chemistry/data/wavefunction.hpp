@@ -850,6 +850,10 @@ class WavefunctionContainer {
 class Wavefunction : public DataClass,
                      public std::enable_shared_from_this<Wavefunction> {
  public:
+  /// Sentinel sector name for single-species wavefunctions.
+  static constexpr const char* DEFAULT_SECTOR = "__default__";
+
+
   /**
    * @brief Get the data type name for this class
    * @return "wavefunction"
@@ -946,7 +950,7 @@ class Wavefunction : public DataClass,
    * basis's single-particle symmetries (see @ref sector_symmetries). Sectors
    * are owned by the underlying container (which binds each name to a basis);
    * these accessors surface that binding. The current single-species data
-   * model reports the sole @ref DEFAULT_SECTOR.
+   * model reports the sole @ref Wavefunction::DEFAULT_SECTOR.
    *
    * @return Names of the wavefunction's sectors.
    */

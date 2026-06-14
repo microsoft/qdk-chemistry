@@ -78,6 +78,68 @@ static std::shared_ptr<const SymmetryBlockedIndexSet> index_set_from_v1_indices(
       std::move(symmetries), std::move(extents), std::move(indices));
 }
 
+// Build a spin-resolved symmetry-blocked index set for a v1 CAS space. The
+// resulting index set carries a spin (S_z) axis (equivalent when @p restricted)
+// so the legacy CAS constructors share the same v2 plumbing as the dense
+// restricted/unrestricted constructors.
+static std::shared_ptr<const SymmetryBlockedIndexSet>
+spin_blocked_cas_index_set(bool restricted, std::size_t nmo,
+                           const std::vector<size_t>& alpha,
+                           const std::vector<size_t>& beta) {
+  auto symmetries = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, restricted)}));
+  std::unordered_map<SymmetryLabel, std::size_t> extents;
+  extents.emplace(axes::alpha(), nmo);
+  extents.emplace(axes::beta(), nmo);
+  return index_set_from_v1_indices(std::move(symmetries), std::move(extents),
+                                   alpha, beta);
+}
+
+// Active-space index set for the restricted v1 CAS constructor. A null tuple
+// selects the full active space (signalled by returning nullptr).
+static std::shared_ptr<const SymmetryBlockedIndexSet> restricted_cas_active(
+    const std::optional<Orbitals::RestrictedCASIndices>& indices,
+    std::size_t nmo) {
+  if (!indices) return nullptr;
+  const auto& active = std::get<0>(*indices);
+  return spin_blocked_cas_index_set(/*restricted=*/true, nmo, active, active);
+}
+
+// Inactive-space index set for the restricted v1 CAS constructor. An empty
+// inactive space is signalled by returning nullptr.
+static std::shared_ptr<const SymmetryBlockedIndexSet> restricted_cas_inactive(
+    const std::optional<Orbitals::RestrictedCASIndices>& indices,
+    std::size_t nmo) {
+  if (!indices || std::get<1>(*indices).empty()) return nullptr;
+  const auto& inactive = std::get<1>(*indices);
+  return spin_blocked_cas_index_set(/*restricted=*/true, nmo, inactive,
+                                    inactive);
+}
+
+// Active-space index set for the unrestricted v1 CAS constructor. A null tuple
+// selects the full active space (signalled by returning nullptr).
+static std::shared_ptr<const SymmetryBlockedIndexSet> unrestricted_cas_active(
+    const std::optional<Orbitals::UnrestrictedCASIndices>& indices,
+    std::size_t nmo) {
+  if (!indices) return nullptr;
+  return spin_blocked_cas_index_set(/*restricted=*/false, nmo,
+                                    std::get<0>(*indices),
+                                    std::get<1>(*indices));
+}
+
+// Inactive-space index set for the unrestricted v1 CAS constructor. An empty
+// inactive space (both channels) is signalled by returning nullptr.
+static std::shared_ptr<const SymmetryBlockedIndexSet> unrestricted_cas_inactive(
+    const std::optional<Orbitals::UnrestrictedCASIndices>& indices,
+    std::size_t nmo) {
+  if (!indices) return nullptr;
+  const auto& inactive_alpha = std::get<2>(*indices);
+  const auto& inactive_beta = std::get<3>(*indices);
+  if (inactive_alpha.empty() && inactive_beta.empty()) return nullptr;
+  return spin_blocked_cas_index_set(/*restricted=*/false, nmo, inactive_alpha,
+                                    inactive_beta);
+}
+
 Orbitals::Orbitals(
     const Eigen::MatrixXd& coefficients,
     const std::optional<Eigen::VectorXd>& energies,
@@ -246,6 +308,38 @@ Orbitals::Orbitals(
   // Validate after construction is complete to ensure virtual dispatch works
   _post_construction_validate();
 }
+
+// (v1) Restricted CAS-index constructor: convert the legacy (active, inactive)
+// tuple into a spin-resolved symmetry-blocked index set and delegate to the v2
+// constructor.
+Orbitals::Orbitals(const Eigen::MatrixXd& coefficients,
+                   const std::optional<Eigen::VectorXd>& energies,
+                   const std::optional<Eigen::MatrixXd>& ao_overlap,
+                   std::shared_ptr<BasisSet> basis_set,
+                   const std::optional<RestrictedCASIndices>& indices)
+    : Orbitals(coefficients, energies, ao_overlap, std::move(basis_set),
+               restricted_cas_active(
+                   indices, static_cast<std::size_t>(coefficients.cols())),
+               restricted_cas_inactive(
+                   indices, static_cast<std::size_t>(coefficients.cols()))) {}
+
+// (v1) Unrestricted CAS-index constructor: convert the legacy (active_alpha,
+// active_beta, inactive_alpha, inactive_beta) tuple into a spin-resolved
+// symmetry-blocked index set and delegate to the v2 constructor.
+Orbitals::Orbitals(const Eigen::MatrixXd& coefficients_alpha,
+                   const Eigen::MatrixXd& coefficients_beta,
+                   const std::optional<Eigen::VectorXd>& energies_alpha,
+                   const std::optional<Eigen::VectorXd>& energies_beta,
+                   const std::optional<Eigen::MatrixXd>& ao_overlap,
+                   std::shared_ptr<BasisSet> basis_set,
+                   const std::optional<UnrestrictedCASIndices>& indices)
+    : Orbitals(
+          coefficients_alpha, coefficients_beta, energies_alpha, energies_beta,
+          ao_overlap, std::move(basis_set),
+          unrestricted_cas_active(
+              indices, static_cast<std::size_t>(coefficients_alpha.cols())),
+          unrestricted_cas_inactive(
+              indices, static_cast<std::size_t>(coefficients_alpha.cols()))) {}
 
 Orbitals::~Orbitals() = default;
 
@@ -1709,6 +1803,37 @@ ModelOrbitals::ModelOrbitals(
   _active_indices = std::move(active_indices);
   _inactive_indices = std::move(inactive_indices);
 }
+
+// (v1) Restricted CAS-index constructor: convert the legacy (active, inactive)
+// tuple into a spin-resolved (equivalent S_z) symmetry-blocked index set and
+// delegate to the v2 index-set constructor.
+ModelOrbitals::ModelOrbitals(size_t basis_size,
+                             const RestrictedCASIndices& indices)
+    : ModelOrbitals(
+          spin_blocked_cas_index_set(/*restricted=*/true, basis_size,
+                                     std::get<0>(indices),
+                                     std::get<0>(indices)),
+          std::get<1>(indices).empty()
+              ? nullptr
+              : spin_blocked_cas_index_set(/*restricted=*/true, basis_size,
+                                           std::get<1>(indices),
+                                           std::get<1>(indices))) {}
+
+// (v1) Unrestricted CAS-index constructor: convert the legacy (active_alpha,
+// active_beta, inactive_alpha, inactive_beta) tuple into a spin-resolved
+// (non-equivalent S_z) symmetry-blocked index set and delegate to the v2
+// index-set constructor.
+ModelOrbitals::ModelOrbitals(size_t basis_size,
+                             const UnrestrictedCASIndices& indices)
+    : ModelOrbitals(
+          spin_blocked_cas_index_set(/*restricted=*/false, basis_size,
+                                     std::get<0>(indices),
+                                     std::get<1>(indices)),
+          (std::get<2>(indices).empty() && std::get<3>(indices).empty())
+              ? nullptr
+              : spin_blocked_cas_index_set(/*restricted=*/false, basis_size,
+                                           std::get<2>(indices),
+                                           std::get<3>(indices))) {}
 
 // Copy constructor for ModelOrbitals
 ModelOrbitals::ModelOrbitals(const ModelOrbitals& other)

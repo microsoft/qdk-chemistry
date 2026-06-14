@@ -538,11 +538,11 @@ class MockWavefunctionContainer : public WavefunctionContainer {
 
   bool is_complex() const override { return false; }
 
-  std::vector<std::string> sectors() const override { return {DEFAULT_SECTOR}; }
+  std::vector<std::string> sectors() const override { return {Wavefunction::DEFAULT_SECTOR}; }
 
   std::shared_ptr<const Orbitals> sector_basis(
       const std::string& name) const override {
-    if (name == DEFAULT_SECTOR) return orbitals_;
+    if (name == Wavefunction::DEFAULT_SECTOR) return orbitals_;
     throw std::out_of_range("Mock has no sector named '" + name + "'");
   }
 

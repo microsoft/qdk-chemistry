@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -134,7 +135,7 @@ Examples:
 
 )",
       py::arg("configurations"), py::arg("orbitals"),
-      py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR);
+      py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR);
 
   // Copy constructor
   configuration_set.def(py::init<const ConfigurationSet&>(), "Copy constructor",

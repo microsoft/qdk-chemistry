@@ -881,14 +881,13 @@ Calls to any functions requiring actual data (e.g. ``get_coefficients``,
 ``get_energies``, ``calculate_ao_density_matrix``, etc.) will throw runtime errors.
 
 Examples:
-    >>> # Create a simple 4-orbital restricted model system
-    >>> model_orb = ModelOrbitals(4, True)
+    >>> # Create a simple 4-orbital model system (no symmetry, aggregate quantities)
+    >>> model_orb = ModelOrbitals(4)
     >>> print(f"Number of orbitals: {model_orb.get_num_molecular_orbitals()}")
 
-    >>> # Create with active and inactive spaces
-    >>> active_indices = [1, 2]
-    >>> inactive_indices = [0, 3]
-    >>> model_orb = ModelOrbitals(4, active_indices, inactive_indices)
+    >>> # Create with an explicit spin axis for spin-resolved quantities
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> model_orb = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
 
 )");
 

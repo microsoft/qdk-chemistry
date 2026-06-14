@@ -8,6 +8,7 @@
 #include <bitset>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
@@ -288,7 +289,7 @@ TEST_F(ConfigurationSetTest, ValidActiveSpaceConfigurations) {
   };
 
   // Should not throw - all have same orbital capacity and electron count
-  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 }
 
 TEST_F(ConfigurationSetTest, RejectDifferentOrbitalCapacity) {
@@ -299,7 +300,7 @@ TEST_F(ConfigurationSetTest, RejectDifferentOrbitalCapacity) {
   };
 
   // Should throw - different orbital capacities
-  EXPECT_THROW(ConfigurationSet(configs, orbitals_with_active),
+  EXPECT_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR),
                std::invalid_argument);
 }
 
@@ -312,7 +313,7 @@ TEST_F(ConfigurationSetTest, AcceptDifferentElectronCount) {
       Configuration::from_spin_half_string("2u00")   // 3 electrons
   };
 
-  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 }
 
 TEST_F(ConfigurationSetTest, RejectOverhangingElectrons) {
@@ -323,7 +324,7 @@ TEST_F(ConfigurationSetTest, RejectOverhangingElectrons) {
   };
 
   // Should throw - electrons in overhanging orbitals
-  EXPECT_THROW(ConfigurationSet(configs, orbitals_with_active),
+  EXPECT_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR),
                std::invalid_argument);
 }
 
@@ -337,22 +338,22 @@ TEST_F(ConfigurationSetTest, AllowOverhangingUnoccupied) {
   };
 
   // Should not throw - overhanging orbitals are unoccupied
-  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 }
 
 TEST_F(ConfigurationSetTest, EmptyConfigurationSet) {
   // Empty configuration set should be valid
   std::vector<Configuration> configs;
-  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 }
 
 TEST_F(ConfigurationSetTest, SingleConfiguration) {
   // Single configuration should be valid
   std::vector<Configuration> configs = {
       Configuration::from_spin_half_string("2ud0")};
-  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 
-  ConfigurationSet config_set(configs, orbitals_with_active);
+  ConfigurationSet config_set(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
   EXPECT_EQ(config_set.size(), 1);
   EXPECT_FALSE(config_set.empty());
 }
@@ -364,7 +365,7 @@ TEST_F(ConfigurationSetTest, NoActiveSpaceNoValidation) {
       Configuration::from_spin_half_string("u2d0")};
 
   // Should not throw even without active space
-  EXPECT_THROW(ConfigurationSet(configs, orbitals_without_active),
+  EXPECT_THROW(ConfigurationSet(configs, orbitals_without_active, Wavefunction::DEFAULT_SECTOR),
                std::invalid_argument);
 }
 
@@ -374,7 +375,7 @@ TEST_F(ConfigurationSetTest, AccessOperators) {
       Configuration::from_spin_half_string("u2d0"),
       Configuration::from_spin_half_string("ud20")};
 
-  ConfigurationSet config_set(configs, orbitals_with_active);
+  ConfigurationSet config_set(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
 
   // Test operator[]
   EXPECT_EQ(config_set[0].to_string(), "2ud0");
@@ -394,7 +395,7 @@ TEST_F(ConfigurationSetTest, Iteration) {
       Configuration::from_spin_half_string("u2d0"),
       Configuration::from_spin_half_string("ud20")};
 
-  ConfigurationSet config_set(configs, orbitals_with_active);
+  ConfigurationSet config_set(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
 
   // Test iteration
   size_t count = 0;
@@ -419,9 +420,9 @@ TEST_F(ConfigurationSetTest, Equality) {
       Configuration::from_spin_half_string("ud20")  // Different
   };
 
-  ConfigurationSet set1(configs1, orbitals_with_active);
-  ConfigurationSet set2(configs2, orbitals_with_active);
-  ConfigurationSet set3(configs3, orbitals_with_active);
+  ConfigurationSet set1(configs1, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
+  ConfigurationSet set2(configs2, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
+  ConfigurationSet set3(configs3, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
 
   // Same configurations and orbitals
   EXPECT_TRUE(set1 == set2);
@@ -438,7 +439,7 @@ TEST_F(ConfigurationSetTest, GetSummary) {
       Configuration::from_spin_half_string("u2d0"),
       Configuration::from_spin_half_string("ud20")};
 
-  ConfigurationSet config_set(configs, orbitals_with_active);
+  ConfigurationSet config_set(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
 
   std::string summary = config_set.get_summary();
 
@@ -454,7 +455,7 @@ TEST_F(ConfigurationSetTest, MoveSemantics) {
       Configuration::from_spin_half_string("u2d0")};
 
   // Test move constructor
-  EXPECT_NO_THROW(ConfigurationSet(std::move(configs), orbitals_with_active));
+  EXPECT_NO_THROW(ConfigurationSet(std::move(configs), orbitals_with_active, Wavefunction::DEFAULT_SECTOR));
 }
 
 TEST_F(ConfigurationSetTest, NullOrbitalsRejected) {
@@ -462,7 +463,7 @@ TEST_F(ConfigurationSetTest, NullOrbitalsRejected) {
       Configuration::from_spin_half_string("2ud0")};
 
   // Should throw - null orbitals pointer
-  EXPECT_THROW(ConfigurationSet(configs, nullptr), std::invalid_argument);
+  EXPECT_THROW(ConfigurationSet(configs, nullptr, Wavefunction::DEFAULT_SECTOR), std::invalid_argument);
 }
 
 TEST_F(ConfigurationTest, DataTypeName) {
@@ -475,7 +476,7 @@ TEST_F(ConfigurationSetTest, DataTypeName) {
   // Test that ConfigurationSet has the correct data type name
   std::vector<Configuration> configs = {
       Configuration::from_spin_half_string("2ud0")};
-  ConfigurationSet config_set(configs, orbitals_with_active);
+  ConfigurationSet config_set(configs, orbitals_with_active, Wavefunction::DEFAULT_SECTOR);
 
   EXPECT_EQ(config_set.get_data_type_name(), "configuration_set");
 }

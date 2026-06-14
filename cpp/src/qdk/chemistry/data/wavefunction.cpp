@@ -353,13 +353,24 @@ bool WavefunctionContainer::_is_restricted_closed_shell() const {
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
 WavefunctionContainer::_make_particle_count(std::size_t n_alpha,
                                             std::size_t n_beta) const {
+  using SBS = SymmetryBlockedScalar<std::size_t>;
   auto symmetries = get_orbitals()->symmetries();
   if (symmetries && symmetries->has_axis(AxisName::Spin)) {
-    return std::make_shared<const SymmetryBlockedScalar<std::size_t>>(
-        make_spin_blocked_scalar<std::size_t>(n_alpha, n_beta));
+    auto sym = std::make_shared<const SymmetryProduct>(
+        SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+    SBS::BlockMap blocks;
+    blocks[{axes::alpha()}] = std::make_shared<const std::size_t>(n_alpha);
+    blocks[{axes::beta()}] = std::make_shared<const std::size_t>(n_beta);
+    return std::make_shared<const SBS>(SBS::SymmetriesArray{sym},
+                                       std::move(blocks));
   }
-  return std::make_shared<const SymmetryBlockedScalar<std::size_t>>(
-      make_trivial_blocked_scalar<std::size_t>(n_alpha + n_beta));
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  SBS::BlockMap blocks;
+  blocks[{SymmetryLabel{}}] =
+      std::make_shared<const std::size_t>(n_alpha + n_beta);
+  return std::make_shared<const SBS>(SBS::SymmetriesArray{sym},
+                                     std::move(blocks));
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
@@ -780,7 +791,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
-    std::string sector = DEFAULT_SECTOR;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (j.contains("configuration_set")) {
       auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
       determinants = config_set.get_configurations();
@@ -1216,7 +1227,7 @@ std::shared_ptr<Wavefunction> Wavefunction::truncate(
   // source wavefunction's sector.
   const auto sector_names = sectors();
   const std::string sector =
-      sector_names.empty() ? std::string(DEFAULT_SECTOR) : sector_names.front();
+      sector_names.empty() ? std::string(Wavefunction::DEFAULT_SECTOR) : sector_names.front();
   return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
       normalized_coeffs, top_configs, get_orbitals(), sector, get_type()));
 }
@@ -1793,7 +1804,7 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
-    std::string sector = DEFAULT_SECTOR;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (group.nameExists("configuration_set")) {
       H5::Group config_set_group = group.openGroup("configuration_set");
       auto config_set = ConfigurationSet::from_hdf5(config_set_group);

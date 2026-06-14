@@ -372,7 +372,7 @@ TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
   entropies.two_orbital = s2;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, DEFAULT_SECTOR,
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, Wavefunction::DEFAULT_SECTOR,
       entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
@@ -408,7 +408,7 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   entropies.mutual_information = mi;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, DEFAULT_SECTOR,
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, Wavefunction::DEFAULT_SECTOR,
       entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
@@ -424,13 +424,13 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
 TEST_F(WavefunctionCoreTest, ReportsSingleElectronSectorFromContainer) {
   // The container owns the sector->basis binding; the wavefunction surfaces it.
   // Today's single-species model reports the sole electronic sector.
-  EXPECT_EQ(wf->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
-  EXPECT_TRUE(wf->has_sector(DEFAULT_SECTOR));
+  EXPECT_EQ(wf->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
+  EXPECT_TRUE(wf->has_sector(Wavefunction::DEFAULT_SECTOR));
 
   // The sector resolves to the container's own basis, and symmetries are
   // inherited from that basis.
-  EXPECT_EQ(wf->sector_basis(DEFAULT_SECTOR), wf->get_orbitals());
-  EXPECT_EQ(wf->sector_symmetries(DEFAULT_SECTOR),
+  EXPECT_EQ(wf->sector_basis(Wavefunction::DEFAULT_SECTOR), wf->get_orbitals());
+  EXPECT_EQ(wf->sector_symmetries(Wavefunction::DEFAULT_SECTOR),
             wf->get_orbitals()->symmetries());
 }
 
@@ -444,7 +444,7 @@ TEST_F(WavefunctionCoreTest, SectorSurvivesJsonRoundTrip) {
   // Sectors are derived from the container, so they reappear after a reload
   // without any wavefunction-level sector serialization.
   auto reconstructed = Wavefunction::from_json(wf->to_json());
-  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
+  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
 }
 
 TEST_F(WavefunctionCoreTest, SectorSurvivesHdf5RoundTrip) {
@@ -453,7 +453,7 @@ TEST_F(WavefunctionCoreTest, SectorSurvivesHdf5RoundTrip) {
   auto reconstructed = Wavefunction::from_hdf5_file(filename);
   std::remove(filename.c_str());
 
-  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{DEFAULT_SECTOR});
+  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
 }
 
 TEST_F(WavefunctionCoreTest,
@@ -461,10 +461,10 @@ TEST_F(WavefunctionCoreTest,
   // The slot-partition seam: today one segment covering all slots, named the
   // electronic sector and backed by the set's orbitals.
   ConfigurationSet cs({Configuration::from_spin_half_string("ud2000")},
-                      orbitals);
+                      orbitals, Wavefunction::DEFAULT_SECTOR);
   const auto& layout = cs.sector_layout();
   ASSERT_EQ(layout.size(), 1u);
-  EXPECT_EQ(layout[0].first, DEFAULT_SECTOR);
+  EXPECT_EQ(layout[0].first, Wavefunction::DEFAULT_SECTOR);
   EXPECT_EQ(layout[0].second, orbitals);
 }
 
@@ -502,7 +502,7 @@ class WavefunctionSerializationTest : public ::testing::Test {
     cas_real =
         std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
             coeffs_real, dets, orbitals, std::nullopt, std::nullopt,
-            DEFAULT_SECTOR, entropies));
+            Wavefunction::DEFAULT_SECTOR, entropies));
 
     cas_complex = std::make_shared<Wavefunction>(
         std::make_unique<StateVectorContainer>(coeffs_complex, dets, orbitals));

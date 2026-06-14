@@ -350,7 +350,7 @@ class MockCoupledClusterCalculator(DynamicalCorrelationCalculator):
         original_wavefunction = ansatz.get_wavefunction()
 
         # Create AmplitudeContainer with T1 and T2 amplitudes
-        cc_container = AmplitudeContainer(orbs, original_wavefunction, AmplitudeType.CCSD, t1, t2)
+        cc_container = AmplitudeContainer(orbs, original_wavefunction, AmplitudeType.CoupledCluster, t1, t2)
 
         updated_wavefunction = Wavefunction(cc_container)
 

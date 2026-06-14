@@ -101,7 +101,7 @@ TEST_F(WavefunctionBlockedCountsTest, TrivialSymmetryWfnAggregatesCounts) {
   ASSERT_NE(count, nullptr);
   EXPECT_FALSE(count->symmetries()[0]->has_axis(AxisName::Spin));
 
-  // Sz-dependent v1 accessors must throw — there is no spin axis.
+  // Sz-resolved v1 accessors throw — no spin axis.
   EXPECT_THROW(sv.get_active_num_electrons(), std::runtime_error);
   EXPECT_THROW(sv.get_total_num_electrons(), std::runtime_error);
   EXPECT_THROW(sv.get_active_orbital_occupations(), std::runtime_error);

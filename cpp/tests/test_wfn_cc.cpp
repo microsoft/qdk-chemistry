@@ -43,10 +43,10 @@ TEST_F(AmplitudeContainerTest, BasicProperties) {
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                         t1_amplitudes, t2_amplitudes);
 
-  EXPECT_EQ(cc.get_amplitude_type(), AmplitudeType::CCSD);
+  EXPECT_EQ(cc.get_amplitude_type(), AmplitudeType::CoupledCluster);
 
   // check amplitudes
   auto [t1_alpha, t1_beta] = cc.get_t1_amplitudes();
@@ -79,37 +79,37 @@ TEST_F(AmplitudeContainerTest, InvalidAmplitudeSizesThrow) {
   // Test: T1 amplitude with wrong size (too small)
   Eigen::VectorXd t1_wrong_size = Eigen::VectorXd::Random(2);  // Should be 4
   Eigen::VectorXd t2_correct = Eigen::VectorXd::Random(16);
-  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CCSD,
+  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                                   t1_wrong_size, t2_correct),
                std::invalid_argument);
 
   // Test: T1 amplitude with wrong size (too large)
   Eigen::VectorXd t1_too_large = Eigen::VectorXd::Random(10);  // Should be 4
-  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CCSD,
+  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                                   t1_too_large, t2_correct),
                std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too small)
   Eigen::VectorXd t1_correct = Eigen::VectorXd::Random(4);
   Eigen::VectorXd t2_wrong_size = Eigen::VectorXd::Random(10);  // Should be 16
-  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CCSD,
+  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                                   t1_correct, t2_wrong_size),
                std::invalid_argument);
 
   // Test: T2 amplitude with wrong size (too large)
   Eigen::VectorXd t2_too_large = Eigen::VectorXd::Random(20);  // Should be 16
-  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CCSD,
+  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                                   t1_correct, t2_too_large),
                std::invalid_argument);
 
   // Test: Both amplitudes with wrong sizes
-  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CCSD,
+  EXPECT_THROW(AmplitudeContainer(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                                   t1_wrong_size, t2_wrong_size),
                std::invalid_argument);
 
   // Test: Correct sizes should not throw
   EXPECT_NO_THROW(AmplitudeContainer(
-      orbitals, wavefunction, AmplitudeType::CCSD, t1_correct, t2_correct));
+      orbitals, wavefunction, AmplitudeType::CoupledCluster, t1_correct, t2_correct));
 }
 
 // Test JSON serialization/deserialization
@@ -126,7 +126,7 @@ TEST_F(AmplitudeContainerTest, JsonSerializationSpatial) {
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                               t1_amplitudes, t2_amplitudes);
 
   // Serialize to JSON
@@ -136,13 +136,13 @@ TEST_F(AmplitudeContainerTest, JsonSerializationSpatial) {
   auto restored = AmplitudeContainer::from_json(j);
 
   // The amplitude type round-trips through serialization.
-  EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CCSD);
+  EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CoupledCluster);
 
   // Also test base Wavefunction::from_json() by wrapping container in
   // Wavefunction
   auto original_wf =
       std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
-          orbitals, wavefunction, AmplitudeType::CCSD, t1_amplitudes,
+          orbitals, wavefunction, AmplitudeType::CoupledCluster, t1_amplitudes,
           t2_amplitudes));
   nlohmann::json wf_j = original_wf->to_json();
   auto wf_restored = Wavefunction::from_json(wf_j);
@@ -212,7 +212,7 @@ TEST_F(AmplitudeContainerTest, JsonSerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                               t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb);
 
   // Serialize to JSON
@@ -259,7 +259,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpatial) {
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                               t1_amplitudes, t2_amplitudes);
 
   std::string filename = "test_cc_spatial_serialization.h5";
@@ -274,7 +274,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpatial) {
     auto restored = AmplitudeContainer::from_hdf5(root);
 
     // The amplitude type round-trips through HDF5 serialization.
-    EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CCSD);
+    EXPECT_EQ(restored->get_amplitude_type(), AmplitudeType::CoupledCluster);
 
     // check amplitudes
     auto [t1_alpha_orig, t1_beta_orig] = original.get_t1_amplitudes();
@@ -309,7 +309,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpatial) {
     // Create and serialize a Wavefunction wrapping the container
     auto original_wf =
         std::make_shared<Wavefunction>(std::make_unique<AmplitudeContainer>(
-            orbitals, wavefunction, AmplitudeType::CCSD, t1_amplitudes,
+            orbitals, wavefunction, AmplitudeType::CoupledCluster, t1_amplitudes,
             t2_amplitudes));
     H5::H5File file(wf_filename, H5F_ACC_TRUNC);
     H5::Group root = file.openGroup("/");
@@ -374,7 +374,7 @@ TEST_F(AmplitudeContainerTest, RdmsAndExpansionNotAvailable) {
   Eigen::VectorXd t2_amplitudes =
       Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
 
-  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer cc(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                         t1_amplitudes, t2_amplitudes);
 
   // Amplitude wavefunctions are not stored as a determinant/coefficient
@@ -410,7 +410,7 @@ TEST_F(AmplitudeContainerTest, WavefunctionExpansionAccessorsThrow) {
       Eigen::VectorXd::Ones(nocc * nocc * nvirt * nvirt) * 0.05;
 
   Wavefunction wf(std::make_unique<AmplitudeContainer>(
-      orbitals, reference, AmplitudeType::CCSD, t1_amplitudes, t2_amplitudes));
+      orbitals, reference, AmplitudeType::CoupledCluster, t1_amplitudes, t2_amplitudes));
 
   EXPECT_EQ(wf.get_container_type(), "amplitude");
 
@@ -449,7 +449,7 @@ TEST_F(AmplitudeContainerTest, Hdf5SerializationSpin) {
   Eigen::VectorXd t2_bbbb =
       Eigen::VectorXd::Random(nocc * nocc * nvirt * nvirt);
 
-  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CCSD,
+  AmplitudeContainer original(orbitals, wavefunction, AmplitudeType::CoupledCluster,
                               t1_aa, t1_bb, t2_abab, t2_aaaa, t2_bbbb);
 
   std::string filename = "test_cc_serialization.h5";

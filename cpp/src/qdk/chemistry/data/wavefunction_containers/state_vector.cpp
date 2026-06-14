@@ -276,8 +276,8 @@ ScalarVariant StateVectorContainer::overlap(
         "determinants");
   }
   if (this->get_active_determinants()[0].bits_per_mode() == 2) {
-    if (this->_active_electron_counts() !=
-        other_sv->_active_electron_counts()) {
+    if (this->get_active_determinants()[0].get_n_electrons() !=
+        other_sv->get_active_determinants()[0].get_n_electrons()) {
       throw std::runtime_error(
           "Overlap only implemented for wavefunctions with same number of "
           "electrons");
@@ -357,8 +357,11 @@ StateVectorContainer::total_num_particles() const {
     auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
     return _make_particle_count(active + alpha_inactive.size(), 0);
   }
-  auto [n_alpha, n_beta] = _total_electron_counts();
-  return _make_particle_count(n_alpha, n_beta);
+  auto [n_alpha, n_beta] = dets[0].get_n_electrons();
+  auto [alpha_inactive, beta_inactive] =
+      get_orbitals()->get_inactive_space_indices();
+  return _make_particle_count(n_alpha + alpha_inactive.size(),
+                              n_beta + beta_inactive.size());
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
@@ -369,37 +372,10 @@ StateVectorContainer::active_num_particles() const {
     throw std::runtime_error("No determinants available");
   }
   if (dets[0].bits_per_mode() != 2) {
-    // Generic (non-spin-½): aggregate count, no spin decomposition.
     return _make_particle_count(dets[0].total_occupation(), 0);
   }
-  auto [n_alpha, n_beta] = _active_electron_counts();
+  auto [n_alpha, n_beta] = dets[0].get_n_electrons();
   return _make_particle_count(n_alpha, n_beta);
-}
-
-std::pair<std::size_t, std::size_t>
-StateVectorContainer::_total_electron_counts() const {
-  QDK_LOG_TRACE_ENTERING();
-
-  auto [n_alpha_active, n_beta_active] = _active_electron_counts();
-
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      get_orbitals()->get_inactive_space_indices();
-
-  size_t n_alpha_total = n_alpha_active + alpha_inactive_indices.size();
-  size_t n_beta_total = n_beta_active + beta_inactive_indices.size();
-
-  return {n_alpha_total, n_beta_total};
-}
-
-std::pair<std::size_t, std::size_t>
-StateVectorContainer::_active_electron_counts() const {
-  QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = get_active_determinants();
-  if (determinants.empty()) {
-    throw std::runtime_error("No determinants available");
-  }
-  auto [n_alpha, n_beta] = determinants[0].get_n_electrons();
-  return {n_alpha, n_beta};
 }
 
 bool StateVectorContainer::has_coefficients() const {
@@ -992,7 +968,7 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_json(
 
       // Legacy "sd" files predate sectors; migrate as electronic.
       return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    DEFAULT_SECTOR, type);
+                                                    Wavefunction::DEFAULT_SECTOR, type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the
@@ -1051,7 +1027,7 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_hdf5(
 
       // Legacy "sd" files predate sectors; migrate as electronic.
       return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    DEFAULT_SECTOR, type);
+                                                    Wavefunction::DEFAULT_SECTOR, type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the

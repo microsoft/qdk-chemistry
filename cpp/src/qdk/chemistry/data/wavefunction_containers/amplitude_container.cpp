@@ -25,10 +25,10 @@ constexpr const char* kNoOccupationMessage =
 
 std::string amplitude_type_to_string(AmplitudeType type) {
   switch (type) {
-    case AmplitudeType::MP2:
-      return "mp2";
-    case AmplitudeType::CCSD:
-      return "ccsd";
+    case AmplitudeType::MollerPlesset:
+      return "moller_plesset";
+    case AmplitudeType::CoupledCluster:
+      return "coupled_cluster";
     case AmplitudeType::Unspecified:
       return "unspecified";
   }
@@ -36,11 +36,11 @@ std::string amplitude_type_to_string(AmplitudeType type) {
 }
 
 AmplitudeType amplitude_type_from_string(const std::string& s) {
-  if (s == "mp2") {
-    return AmplitudeType::MP2;
+  if (s == "moller_plesset" || s == "mp2") {
+    return AmplitudeType::MollerPlesset;
   }
-  if (s == "ccsd") {
-    return AmplitudeType::CCSD;
+  if (s == "coupled_cluster" || s == "ccsd") {
+    return AmplitudeType::CoupledCluster;
   }
   return AmplitudeType::Unspecified;
 }
@@ -339,8 +339,11 @@ AmplitudeContainer::total_num_particles() const {
     auto [alpha_inactive, _] = get_orbitals()->get_inactive_space_indices();
     return _make_particle_count(active + alpha_inactive.size(), 0);
   }
-  auto [n_alpha, n_beta] = _total_electron_counts();
-  return _make_particle_count(n_alpha, n_beta);
+  auto [n_alpha, n_beta] = determinants[0].get_n_electrons();
+  auto [alpha_inactive, beta_inactive] =
+      get_orbitals()->get_inactive_space_indices();
+  return _make_particle_count(n_alpha + alpha_inactive.size(),
+                              n_beta + beta_inactive.size());
 }
 
 std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
@@ -353,30 +356,8 @@ AmplitudeContainer::active_num_particles() const {
   if (determinants[0].bits_per_mode() != 2) {
     return _make_particle_count(determinants[0].total_occupation(), 0);
   }
-  auto [n_alpha, n_beta] = _active_electron_counts();
-  return _make_particle_count(n_alpha, n_beta);
-}
-
-std::pair<std::size_t, std::size_t> AmplitudeContainer::_total_electron_counts()
-    const {
-  QDK_LOG_TRACE_ENTERING();
-  auto [n_alpha_active, n_beta_active] = _active_electron_counts();
-  auto [alpha_inactive_indices, beta_inactive_indices] =
-      get_orbitals()->get_inactive_space_indices();
-  size_t n_alpha_total = n_alpha_active + alpha_inactive_indices.size();
-  size_t n_beta_total = n_beta_active + beta_inactive_indices.size();
-  return {n_alpha_total, n_beta_total};
-}
-
-std::pair<std::size_t, std::size_t>
-AmplitudeContainer::_active_electron_counts() const {
-  QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = _wavefunction->get_active_determinants();
-  if (determinants.empty()) {
-    throw std::runtime_error("No determinants available");
-  }
   auto [n_alpha, n_beta] = determinants[0].get_n_electrons();
-  return {n_alpha, n_beta};
+  return _make_particle_count(n_alpha, n_beta);
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>
@@ -467,7 +448,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = j.value("sector", std::string(DEFAULT_SECTOR));
+    std::string sector = j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
 
     // Determine the amplitude expansion type. New "amplitude" files store an
     // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
@@ -476,9 +457,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
         j.value("container_type", j.value("type", std::string{}));
     AmplitudeType amplitude_type = AmplitudeType::Unspecified;
     if (container_tag == "mp2") {
-      amplitude_type = AmplitudeType::MP2;
+      amplitude_type = AmplitudeType::MollerPlesset;
     } else if (container_tag == "coupled_cluster") {
-      amplitude_type = AmplitudeType::CCSD;
+      amplitude_type = AmplitudeType::CoupledCluster;
     } else if (j.contains("amplitude_type")) {
       amplitude_type =
           amplitude_type_from_string(j.at("amplitude_type").get<std::string>());
@@ -591,7 +572,7 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = DEFAULT_SECTOR;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (group.attrExists("sector")) {
       group.openAttribute("sector").read(string_type, sector);
     }
@@ -601,9 +582,9 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_hdf5(
     // files encode it in the container tag, and anything else is unspecified.
     AmplitudeType amplitude_type = AmplitudeType::Unspecified;
     if (container_type == "mp2") {
-      amplitude_type = AmplitudeType::MP2;
+      amplitude_type = AmplitudeType::MollerPlesset;
     } else if (container_type == "coupled_cluster") {
-      amplitude_type = AmplitudeType::CCSD;
+      amplitude_type = AmplitudeType::CoupledCluster;
     } else if (group.attrExists("amplitude_type")) {
       H5::Attribute amplitude_type_attr = group.openAttribute("amplitude_type");
       std::string amplitude_type_str;

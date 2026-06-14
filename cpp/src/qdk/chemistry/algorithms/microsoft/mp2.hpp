@@ -9,6 +9,7 @@
 #include <qdk/chemistry/algorithms/dynamical_correlation_calculator.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -161,34 +162,20 @@ class MP2Calculator : public DynamicalCorrelationCalculator {
       size_t n_beta) const;
 
   /**
-   * @brief Bundle of MP2 T1/T2 amplitude blocks.
-   *
-   * T1 amplitudes are zero for MP2 (Brillouin's theorem). When @c restricted
-   * is true the spin-separated T2 blocks mirror the spatial (opposite-spin)
-   * block.
-   */
-  struct Amplitudes {
-    Eigen::VectorXd t1_aa;
-    Eigen::VectorXd t1_bb;
-    Eigen::VectorXd t2_abab;
-    Eigen::VectorXd t2_aaaa;
-    Eigen::VectorXd t2_bbbb;
-    bool restricted = true;
-  };
-
-  /**
-   * @brief Compute MP2 T1/T2 amplitudes from the Hamiltonian and orbitals.
+   * @brief Compute MP2 T1/T2 amplitudes and package them in a container.
    *
    * @param ham Shared pointer to the Hamiltonian containing MO integrals
    * @param orbitals Shared pointer to orbitals containing orbital energies
+   * @param wavefunction Shared pointer to the reference wavefunction
    * @param n_alpha Number of alpha electrons
    * @param n_beta Number of beta electrons
-   * @return The computed amplitude blocks
+   * @return Container holding the computed amplitude blocks
    */
-  Amplitudes compute_amplitudes(
+  std::unique_ptr<data::AmplitudeContainer> compute_amplitudes(
       std::shared_ptr<qdk::chemistry::data::Hamiltonian> ham,
-      std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals, size_t n_alpha,
-      size_t n_beta) const;
+      std::shared_ptr<qdk::chemistry::data::Orbitals> orbitals,
+      std::shared_ptr<qdk::chemistry::data::Wavefunction> wavefunction,
+      size_t n_alpha, size_t n_beta) const;
 };
 
 /**

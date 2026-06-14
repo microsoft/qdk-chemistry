@@ -11,13 +11,37 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <stdexcept>
+#include <utility>
 
 using namespace qdk::chemistry::data;
 
 using SBS = SymmetryBlockedScalar<std::size_t>;
 
+namespace {
+
+// Build a spin-blocked count with independent (non-aliased) alpha/beta blocks.
+SBS make_spin_blocked(std::size_t alpha_value, std::size_t beta_value) {
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+  SBS::BlockMap blocks;
+  blocks[{axes::alpha()}] = std::make_shared<const std::size_t>(alpha_value);
+  blocks[{axes::beta()}] = std::make_shared<const std::size_t>(beta_value);
+  return SBS(SBS::SymmetriesArray{sym}, std::move(blocks));
+}
+
+// Build a trivial (axis-free) count carrying a single aggregate block.
+SBS make_trivial_blocked(std::size_t value) {
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  SBS::BlockMap blocks;
+  blocks[{SymmetryLabel{}}] = std::make_shared<const std::size_t>(value);
+  return SBS(SBS::SymmetriesArray{sym}, std::move(blocks));
+}
+
+}  // namespace
+
 TEST(SymmetryBlockedScalarTest, SpinBlockedHoldsIndependentChannels) {
-  auto scalar = make_spin_blocked_scalar<std::size_t>(5, 3);
+  auto scalar = make_spin_blocked(5, 3);
 
   EXPECT_TRUE(scalar.has_block({axes::alpha()}));
   EXPECT_TRUE(scalar.has_block({axes::beta()}));
@@ -31,7 +55,7 @@ TEST(SymmetryBlockedScalarTest, SpinBlockedHoldsIndependentChannels) {
 }
 
 TEST(SymmetryBlockedScalarTest, TrivialHoldsAggregate) {
-  auto scalar = make_trivial_blocked_scalar<std::size_t>(8);
+  auto scalar = make_trivial_blocked(8);
 
   EXPECT_FALSE(scalar.symmetries()[0]->has_axis(AxisName::Spin));
   EXPECT_EQ(scalar.num_blocks(), 1u);
@@ -40,12 +64,12 @@ TEST(SymmetryBlockedScalarTest, TrivialHoldsAggregate) {
 }
 
 TEST(SymmetryBlockedScalarTest, MissingBlockThrows) {
-  auto scalar = make_trivial_blocked_scalar<std::size_t>(4);
+  auto scalar = make_trivial_blocked(4);
   EXPECT_THROW(scalar.value(axes::alpha()), std::invalid_argument);
 }
 
 TEST(SymmetryBlockedScalarTest, JsonRoundTripSpinBlocked) {
-  auto scalar = make_spin_blocked_scalar<std::size_t>(7, 2);
+  auto scalar = make_spin_blocked(7, 2);
   auto restored = SBS::from_json(scalar.to_json());
 
   EXPECT_EQ(restored->value(axes::alpha()), 7u);
@@ -54,7 +78,7 @@ TEST(SymmetryBlockedScalarTest, JsonRoundTripSpinBlocked) {
 }
 
 TEST(SymmetryBlockedScalarTest, JsonRoundTripTrivial) {
-  auto scalar = make_trivial_blocked_scalar<std::size_t>(11);
+  auto scalar = make_trivial_blocked(11);
   auto restored = SBS::from_json(scalar.to_json());
 
   EXPECT_FALSE(restored->symmetries()[0]->has_axis(AxisName::Spin));
@@ -65,7 +89,7 @@ TEST(SymmetryBlockedScalarTest, Hdf5RoundTrip) {
   const std::filesystem::path filename = "symmetry_blocked_scalar_roundtrip.h5";
   std::filesystem::remove(filename);
 
-  auto scalar = make_spin_blocked_scalar<std::size_t>(6, 4);
+  auto scalar = make_spin_blocked(6, 4);
   scalar.to_hdf5_file(filename.string());
   auto restored = SBS::from_hdf5_file(filename.string());
 
@@ -75,13 +99,13 @@ TEST(SymmetryBlockedScalarTest, Hdf5RoundTrip) {
 }
 
 TEST(SymmetryBlockedScalarTest, JsonFromJsonRejectsMissingVersion) {
-  auto j = make_trivial_blocked_scalar<std::size_t>(1).to_json();
+  auto j = make_trivial_blocked(1).to_json();
   j.erase("version");
   EXPECT_THROW(SBS::from_json(j), std::runtime_error);
 }
 
 TEST(SymmetryBlockedScalarTest, JsonFromJsonRejectsMismatchedVersion) {
-  auto j = make_trivial_blocked_scalar<std::size_t>(1).to_json();
+  auto j = make_trivial_blocked(1).to_json();
   j["version"] = "99.0.0";
   EXPECT_THROW(SBS::from_json(j), std::runtime_error);
 }

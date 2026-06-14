@@ -4,6 +4,9 @@
 
 #pragma once
 
+#include <H5Cpp.h>
+
+#include <algorithm>
 #include <complex>
 #include <cstddef>
 #include <fstream>
@@ -25,24 +28,24 @@ namespace qdk::chemistry::data {
 /**
  * @brief Symmetry-blocked scalar quantity.
  *
- * A @ref SymmetryBlockedScalar stores one scalar value per symmetry sector of
- * a single-slot (rank-1) partition: a sparse map from a per-slot
+ * A @ref SymmetryBlockedScalar stores one scalar value per symmetry sector of a
+ * single-slot (rank-1) partition: a sparse map from a per-slot
  * @ref SymmetryLabel to a scalar @p Scalar. The slot carries its own
  * @ref SymmetryProduct. It is the scalar analogue of @ref SymmetryBlockedTensor
- * and is used for per-symmetry counts and other scalar quantities (e.g. the
- * number of electrons per spin channel) whose block structure is induced by
- * the single-particle basis rather than assumed.
+ * and is used for any symmetry-resolved scalar quantity whose block structure
+ * is induced by the single-particle basis.
  *
- * When the slot carries a spin axis, the stored labels are the spin labels
- * (@f$\alpha@f$, @f$\beta@f$) and the value under each label is that channel's
- * quantity. When the slot carries no axes (trivial @ref SymmetryProduct), a
- * single block keyed by the trivial label holds the aggregate quantity.
+ * Example: when the slot carries a spin axis, the stored labels can be the
+ * spin labels (@f$\alpha@f$, @f$\beta@f$) and the value under each label is
+ * that channel's quantity. When the slot carries no axes (trivial
+ * @ref SymmetryProduct), a single block keyed by the trivial label holds the
+ * aggregate quantity.
  *
  * Blocks are held via @c shared_ptr<const Scalar> so that symmetry-equivalent
  * sectors can alias the same storage when the axis is marked
- * @ref SymmetryAxis::equivalent. Scalar quantities whose channels are
- * independent (e.g. electron counts, which differ for open-shell references)
- * should use a non-equivalent axis so that no aliasing is applied.
+ * @ref SymmetryAxis::equivalent. Scalar quantities whose sectors are
+ * independent should use non-equivalent axes so that no aliasing is applied
+ * (for example, open-shell @f$\alpha@f$ and @f$\beta@f$ electron counts).
  *
  * @tparam Scalar The per-block scalar type (defaults to @c std::size_t for
  *                count-like quantities).
@@ -80,31 +83,25 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * construction.
    */
   using SymmetriesArray = std::array<std::shared_ptr<const SymmetryProduct>, 1>;
-  /**
-   * @brief Per-slot per-label extents.
-   *
-   * For a scalar quantity the extent of every label is conventionally @c 1.
-   */
-  using ExtentsArray =
-      std::array<std::unordered_map<SymmetryLabel, std::size_t>, 1>;
 
   /**
-   * @brief Construct from the per-slot symmetry, per-slot extents, and a block
-   * map. See the class description for the validation rules.
+   * @brief Construct from the per-slot symmetry and a block map. See the class
+   * description for the validation rules.
+   *
+   * A scalar block is a single number, so extents are meaningless and are not
+   * part of this constructor: the base-class extents (every label present in
+   * @p blocks mapped to @c 1) are computed automatically.
    *
    * @param symmetries Single-slot @ref SymmetryProduct definition.
-   * @param extents Single-slot per-label extents (conventionally @c 1 per
-   *                label).
    * @param blocks Scalar storage keyed by the per-slot label.
    *
-   * @throws std::invalid_argument if a block or extent label is not
-   *         admissible under the slot's @ref SymmetryProduct, if a block
-   *         pointer is null, or if restricted orbit partners are supplied
-   *         with distinct backing storage.
+   * @throws std::invalid_argument if a block label is not admissible under the
+   *         slot's @ref SymmetryProduct, if a block pointer is null, or if
+   *         restricted orbit partners are supplied with distinct backing
+   *         storage.
    */
-  SymmetryBlockedScalar(SymmetriesArray symmetries, ExtentsArray extents,
-                        BlockMap blocks)
-      : Base(std::move(symmetries), std::move(extents), std::move(blocks)) {}
+  SymmetryBlockedScalar(SymmetriesArray symmetries, BlockMap blocks)
+      : Base(std::move(symmetries), _unit_extents(blocks), blocks) {}
 
   /**
    * @brief The scalar value stored for @p label.
@@ -132,21 +129,48 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
   }
 
   /**
-   * @brief Single-line summary including scalar type, number of stored
-   * blocks, and number of independent (non-aliased) blocks.
+   * @brief Single-line summary including scalar type and per-block label/value
+   * pairs.
    * @return A short diagnostic string suitable for logging.
    */
   std::string get_summary() const override {
+    auto label_key = [](const SymmetryLabel& label) -> std::string {
+      if (label.empty()) return "";
+      const auto& vals = label.values();
+      if (vals.size() == 1 && vals.begin()->first == AxisName::Spin) {
+        auto* sv = dynamic_cast<const SpinValue*>(vals.begin()->second.get());
+        if (sv) {
+          if (sv->value() == 1) return "alpha";
+          if (sv->value() == -1) return "beta";
+        }
+      }
+      return label.to_json().dump();
+    };
+
+    std::vector<std::pair<std::string, Scalar>> entries;
+    entries.reserve(this->_blocks.size());
+    for (const auto& [labels, value_ptr] : this->_blocks) {
+      entries.emplace_back(label_key(labels[0]), *value_ptr);
+    }
+    std::sort(entries.begin(), entries.end(),
+              [](const auto& lhs, const auto& rhs) {
+                return lhs.first < rhs.first;
+              });
+
     std::ostringstream oss;
-    oss << "SymmetryBlockedScalar(scalar=" << _scalar_tag()
-        << ", blocks=" << this->num_blocks()
-        << ", independent=" << this->_group_by_pointer().size() << ")";
+    oss << "SymmetryBlockedScalar(scalar=" << _scalar_tag() << ", {";
+    for (std::size_t i = 0; i < entries.size(); ++i) {
+      if (i > 0) {
+        oss << ", ";
+      }
+      oss << entries[i].first << ": " << entries[i].second;
+    }
+    oss << "})";
     return oss.str();
   }
 
   /**
-   * @brief Serialize this scalar container to JSON, with one entry per group
-   * of pointer-equivalent blocks (the aliased keys and the scalar value).
+   * @brief Serialize this scalar container to JSON.
    *
    * @return JSON object carrying the serialization version, scalar type,
    *         per-slot symmetries and extents, and the per-block payload.
@@ -198,14 +222,19 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @param group HDF5 group to write into.
    * @throws std::runtime_error on HDF5 I/O failure.
    */
-  void to_hdf5(H5::Group& group) const override;
+  void to_hdf5(H5::Group& group) const override {
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    H5::DataSpace scalar_space(H5S_SCALAR);
+    auto dataset = group.createDataSet(
+        "symmetry_blocked_scalar_metadata", str_type, scalar_space);
+    std::string payload = to_json().dump(2);
+    dataset.write(payload, str_type);
+  }
 
-  /**
-   * @brief Serialize this scalar container to an HDF5 file.
-   * @param filename Path to the HDF5 file to create or overwrite.
-   * @throws std::runtime_error on HDF5 I/O failure.
-   */
-  void to_hdf5_file(const std::string& filename) const override;
+  void to_hdf5_file(const std::string& filename) const override {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    to_hdf5(file);
+  }
 
   /**
    * @brief Dispatch to JSON or HDF5 serialization based on @p type.
@@ -230,7 +259,9 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @brief Reconstruct from a JSON object produced by @ref to_json.
    *
    * Validates the serialization version recorded in @p j against
-   * @c SERIALIZATION_VERSION before reconstructing.
+   * @c SERIALIZATION_VERSION before reconstructing. Any @c "extents" field is
+   * accepted but ignored: scalar extents are always @c 1 and are recomputed
+   * from the blocks.
    *
    * @param j JSON object produced by a prior @ref to_json call.
    * @return Shared pointer to the reconstructed scalar container.
@@ -239,7 +270,38 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @throws nlohmann::json::exception if @p j is otherwise malformed.
    */
   static std::shared_ptr<SymmetryBlockedScalar> from_json(
-      const nlohmann::json& j);
+      const nlohmann::json& j) {
+    if (!j.contains("version")) {
+      throw std::runtime_error(
+          "SymmetryBlockedScalar JSON missing required 'version' field.");
+    }
+    _validate_version(j.at("version").template get<std::string>());
+
+    const std::string expected_scalar = _scalar_tag();
+    if (j.contains("scalar") &&
+        j.at("scalar").template get<std::string>() != expected_scalar) {
+      throw std::invalid_argument(
+          "SymmetryBlockedScalar JSON scalar type does not match the requested "
+          "type.");
+    }
+
+    auto symmetries = Base::_symmetries_from_json(j);
+
+    BlockMap blocks;
+    for (const auto& entry : j.at("blocks")) {
+      auto value =
+          std::make_shared<const Scalar>(_value_from_json(entry.at("value")));
+      for (const auto& key_json : entry.at("keys")) {
+        std::vector<SymmetryLabel> labels;
+        for (const auto& label_json : key_json) {
+          labels.push_back(SymmetryLabel::from_json(label_json));
+        }
+        blocks.emplace(detail::make_labels<1>(labels), value);
+      }
+    }
+    return std::make_shared<SymmetryBlockedScalar>(std::move(symmetries),
+                                                   std::move(blocks));
+  }
 
   /**
    * @brief Reconstruct a @ref SymmetryBlockedScalar from a JSON file produced
@@ -275,17 +337,23 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @throws std::invalid_argument if the encoded scalar type does not match
    *         the requested instantiation.
    */
-  static std::shared_ptr<SymmetryBlockedScalar> from_hdf5(H5::Group& group);
+  static std::shared_ptr<SymmetryBlockedScalar> from_hdf5(H5::Group& group) {
+    if (!group.nameExists("symmetry_blocked_scalar_metadata")) {
+      throw std::runtime_error(
+          "SymmetryBlockedScalar HDF5 metadata dataset not found.");
+    }
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    auto dataset = group.openDataSet("symmetry_blocked_scalar_metadata");
+    std::string payload;
+    dataset.read(payload, str_type);
+    return from_json(nlohmann::json::parse(payload));
+  }
 
-  /**
-   * @brief Reconstruct from an HDF5 file produced by @ref to_hdf5_file.
-   * @param filename Path to the HDF5 file to read.
-   * @return Shared pointer to the reconstructed scalar container.
-   * @throws std::runtime_error if the file cannot be opened or carries an
-   *         incompatible serialization version.
-   */
   static std::shared_ptr<SymmetryBlockedScalar> from_hdf5_file(
-      const std::string& filename);
+      const std::string& filename) {
+    H5::H5File file(filename, H5F_ACC_RDONLY);
+    return from_hdf5(file);
+  }
 
   /**
    * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
@@ -323,9 +391,38 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
   }
 
  private:
-  /// On-disk serialization format version. Bump on any change to the JSON or
-  /// HDF5 shape produced by @ref to_json / @ref to_hdf5.
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
+  static typename Base::ExtentsArray _unit_extents(const BlockMap& blocks) {
+    typename Base::ExtentsArray extents;
+    for (const auto& [labels, value_ptr] : blocks) {
+      extents[0].emplace(labels[0], std::size_t{1});
+    }
+    return extents;
+  }
+
+  static void _validate_version(const std::string& found) {
+    if (found == SERIALIZATION_VERSION) {
+      return;
+    }
+    auto major_minor = [](const std::string& version) {
+      const std::size_t first = version.find('.');
+      const std::size_t second = version.find('.', first + 1);
+      if (first == std::string::npos || second == std::string::npos) {
+        throw std::runtime_error(
+            "SymmetryBlockedScalar serialization version is malformed: " +
+            version);
+      }
+      return std::pair<int, int>{
+          std::stoi(version.substr(0, first)),
+          std::stoi(version.substr(first + 1, second - first - 1))};
+    };
+    if (major_minor(found) != major_minor(SERIALIZATION_VERSION)) {
+      throw std::runtime_error(
+          "SymmetryBlockedScalar serialization version mismatch. Expected: " +
+          std::string(SERIALIZATION_VERSION) + ", found: " + found + ".");
+    }
+  }
 
   /// Stable string tag identifying the scalar type in serialized payloads.
   static std::string _scalar_tag() {
@@ -355,59 +452,5 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
     }
   }
 };
-
-/**
- * @brief Build a rank-1 spin-blocked @ref SymmetryBlockedScalar carrying an
- * independent value per spin channel.
- *
- * The spin axis is constructed non-equivalent so that the two channels are
- * stored independently (correct for quantities such as electron counts that
- * differ between @f$\alpha@f$ and @f$\beta@f$ for open-shell references).
- *
- * @tparam Scalar Per-block scalar type.
- * @param alpha_value Value carried by the @f$\alpha@f$ channel.
- * @param beta_value Value carried by the @f$\beta@f$ channel.
- * @return Constructed spin-blocked scalar container.
- */
-template <class Scalar>
-SymmetryBlockedScalar<Scalar> make_spin_blocked_scalar(Scalar alpha_value,
-                                                       Scalar beta_value) {
-  using SBS = SymmetryBlockedScalar<Scalar>;
-  auto sym = std::make_shared<const SymmetryProduct>(
-      SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
-  std::unordered_map<SymmetryLabel, std::size_t> ext;
-  ext[axes::alpha()] = 1;
-  ext[axes::beta()] = 1;
-  typename SBS::BlockMap blocks;
-  blocks[{axes::alpha()}] = std::make_shared<const Scalar>(alpha_value);
-  blocks[{axes::beta()}] = std::make_shared<const Scalar>(beta_value);
-  return SBS(typename SBS::SymmetriesArray{sym},
-             typename SBS::ExtentsArray{ext}, std::move(blocks));
-}
-
-/**
- * @brief Build a rank-1 @ref SymmetryBlockedScalar carrying a single aggregate
- * value under the trivial (axis-free) symmetry.
- *
- * Used when the single-particle basis carries no spin axis, so the quantity
- * is not resolved per spin channel.
- *
- * @tparam Scalar Per-block scalar type.
- * @param value The aggregate value carried by the single trivial block.
- * @return Constructed trivial scalar container.
- */
-template <class Scalar>
-SymmetryBlockedScalar<Scalar> make_trivial_blocked_scalar(Scalar value) {
-  using SBS = SymmetryBlockedScalar<Scalar>;
-  auto sym =
-      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
-  typename SBS::BlockMap blocks;
-  blocks[{SymmetryLabel{}}] = std::make_shared<const Scalar>(value);
-  return SBS(typename SBS::SymmetriesArray{sym}, typename SBS::ExtentsArray{},
-             std::move(blocks));
-}
-
-// Explicit instantiation declarations (definitions emitted in the .cpp).
-extern template class SymmetryBlockedScalar<std::size_t>;
 
 }  // namespace qdk::chemistry::data

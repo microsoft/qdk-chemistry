@@ -199,7 +199,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
-                    AmplitudeType.CCSD,
+                    AmplitudeType.CoupledCluster,
                     t1_aa,
                     t1_bb,
                     t2_aabb,
@@ -212,7 +212,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
-                    AmplitudeType.CCSD,
+                    AmplitudeType.CoupledCluster,
                     sector="electrons",
                 )
         else:
@@ -229,7 +229,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
-                    AmplitudeType.CCSD,
+                    AmplitudeType.CoupledCluster,
                     t1,
                     t2,
                     sector="electrons",
@@ -239,7 +239,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                 cc_container = AmplitudeContainer(
                     orbitals,
                     original_wavefunction,
-                    AmplitudeType.CCSD,
+                    AmplitudeType.CoupledCluster,
                     sector="electrons",
                 )
 
@@ -272,7 +272,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
-                        AmplitudeType.CCSD,
+                        AmplitudeType.CoupledCluster,
                         l1_aa,
                         l1_bb,
                         l2_aabb,
@@ -285,7 +285,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
-                        AmplitudeType.CCSD,
+                        AmplitudeType.CoupledCluster,
                         sector="electrons",
                     )
             else:
@@ -302,7 +302,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
-                        AmplitudeType.CCSD,
+                        AmplitudeType.CoupledCluster,
                         l1,
                         l2,
                         sector="electrons",
@@ -312,7 +312,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                     bra_container = AmplitudeContainer(
                         orbitals,
                         original_wavefunction,
-                        AmplitudeType.CCSD,
+                        AmplitudeType.CoupledCluster,
                         sector="electrons",
                     )
 

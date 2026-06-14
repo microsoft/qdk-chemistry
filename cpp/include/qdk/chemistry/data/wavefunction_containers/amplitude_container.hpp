@@ -31,21 +31,23 @@ namespace qdk::chemistry::data {
  * exponential coupled-cluster ansatz).
  */
 enum class AmplitudeType {
-  MP2,          ///< Second-order Moller-Plesset perturbation theory
-  CCSD,         ///< Coupled cluster with single and double excitations
-  Unspecified,  ///< Producer did not record a type (e.g. legacy data)
+  MollerPlesset,  ///< Moller-Plesset perturbation theory
+  CoupledCluster, ///< Coupled cluster theory
+  Unspecified,    ///< Producer did not record a type (e.g. legacy data)
 };
 
 /**
  * @brief Convert an AmplitudeType to its serialization string.
  * @param type Amplitude type
- * @return Lowercase string identifier ("mp2", "ccsd", or "unspecified")
+ * @return Lowercase string identifier ("moller_plesset", "coupled_cluster", or
+ * "unspecified")
  */
 std::string amplitude_type_to_string(AmplitudeType type);
 
 /**
  * @brief Parse an AmplitudeType from its serialization string.
- * @param s String identifier ("mp2", "ccsd", or "unspecified")
+ * @param s String identifier ("moller_plesset", "coupled_cluster", or
+ * "unspecified"; legacy aliases "mp2" and "ccsd" are also accepted)
  * @return Corresponding AmplitudeType; unrecognized strings map to Unspecified
  */
 AmplitudeType amplitude_type_from_string(const std::string& s);
@@ -91,7 +93,7 @@ class AmplitudeContainer : public WavefunctionContainer {
                      AmplitudeType amplitude_type,
                      const std::optional<VectorVariant>& t1_amplitudes,
                      const std::optional<VectorVariant>& t2_amplitudes,
-                     std::string sector = DEFAULT_SECTOR);
+                     std::string sector = Wavefunction::DEFAULT_SECTOR);
 
   /**
    * @brief Constructs an amplitude wavefunction with spin-separated amplitudes.
@@ -116,7 +118,7 @@ class AmplitudeContainer : public WavefunctionContainer {
                      const std::optional<VectorVariant>& t2_amplitudes_abab,
                      const std::optional<VectorVariant>& t2_amplitudes_aaaa,
                      const std::optional<VectorVariant>& t2_amplitudes_bbbb,
-                     std::string sector = DEFAULT_SECTOR);
+                     std::string sector = Wavefunction::DEFAULT_SECTOR);
 
   /** @brief Destructor */
   ~AmplitudeContainer() override = default;
@@ -156,7 +158,8 @@ class AmplitudeContainer : public WavefunctionContainer {
 
   /**
    * @brief Get the correlated method that produced these amplitudes.
-   * @return The amplitude expansion type (MP2, CCSD, or Unspecified)
+   * @return The amplitude expansion type (MollerPlesset, CoupledCluster, or
+   * Unspecified)
    */
   AmplitudeType get_amplitude_type() const;
 
@@ -326,19 +329,6 @@ class AmplitudeContainer : public WavefunctionContainer {
   std::shared_ptr<VectorVariant> _t2_amplitudes_abab = nullptr;
   std::shared_ptr<VectorVariant> _t2_amplitudes_aaaa = nullptr;
   std::shared_ptr<VectorVariant> _t2_amplitudes_bbbb = nullptr;
-
-  /**
-   * @brief Number of active (alpha, beta) electrons read from the reference
-   * wavefunction's determinants.
-   * @return Pair of (n_alpha_active, n_beta_active).
-   */
-  std::pair<std::size_t, std::size_t> _active_electron_counts() const;
-
-  /**
-   * @brief Number of total (active + inactive) (alpha, beta) electrons.
-   * @return Pair of (n_alpha_total, n_beta_total).
-   */
-  std::pair<std::size_t, std::size_t> _total_electron_counts() const;
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

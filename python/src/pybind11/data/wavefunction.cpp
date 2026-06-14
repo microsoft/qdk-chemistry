@@ -1166,7 +1166,7 @@ Examples:
     >>> container = qdk_chemistry.StateVectorContainer(det, orbitals, "electrons")
 )",
            py::arg("det"), py::arg("orbitals"),
-           py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR,
+           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR,
            py::arg("type") = WavefunctionType::SelfDual)
       // Basic constructor: coeffs, dets, orbitals, sector, type
       .def(py::init<const ContainerTypes::VectorVariant&,
@@ -1190,7 +1190,7 @@ Examples:
     >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons")
 )",
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
-           py::arg("sector") = std::string(DEFAULT_SECTOR),
+           py::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
            py::arg("type") = WavefunctionType::SelfDual)
       // Constructor with spin-traced RDMs and optional entropies dict
       .def(py::init([](const ContainerTypes::VectorVariant& coeffs,
@@ -1234,7 +1234,7 @@ Examples:
            py::arg("coeffs"), py::arg("dets"), py::arg("orbitals"),
            py::arg("one_rdm_spin_traced") = std::nullopt,
            py::arg("two_rdm_spin_traced") = std::nullopt,
-           py::arg("sector") = std::string(DEFAULT_SECTOR),
+           py::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
            py::arg("entropies") = py::none(),
            py::arg("type") = WavefunctionType::SelfDual)
       // Full constructor with all RDM components and optional entropies dict
@@ -1295,7 +1295,7 @@ Examples:
           py::arg("two_rdm_aaaa") = std::nullopt,
           py::arg("two_rdm_aabb") = std::nullopt,
           py::arg("two_rdm_bbbb") = std::nullopt,
-          py::arg("sector") = std::string(DEFAULT_SECTOR),
+          py::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
           py::arg("entropies") = py::none(),
           py::arg("type") = WavefunctionType::SelfDual)
       .def("get_coefficients", &StateVectorContainer::get_coefficients,
@@ -1320,14 +1320,14 @@ Correlated method that produced an amplitude wavefunction.
 Because all amplitude-based wavefunctions share a single container type, this
 tag lets downstream consumers know how to interpret the stored amplitudes.
 
-* MP2: Second-order Moller-Plesset perturbation theory
-* CCSD: Coupled cluster with single and double excitations
+* MollerPlesset: Moller-Plesset perturbation theory
+* CoupledCluster: Coupled cluster theory
 * Unspecified: Producer did not record a type (e.g. legacy data)
 )")
-      .value("MP2", AmplitudeType::MP2,
-             "Second-order Moller-Plesset perturbation theory")
-      .value("CCSD", AmplitudeType::CCSD,
-             "Coupled cluster with single and double excitations")
+      .value("MollerPlesset", AmplitudeType::MollerPlesset,
+             "Moller-Plesset perturbation theory")
+      .value("CoupledCluster", AmplitudeType::CoupledCluster,
+             "Coupled cluster theory")
       .value("Unspecified", AmplitudeType::Unspecified,
              "Producer did not record a type (e.g. legacy data)")
       .export_values();
@@ -1365,12 +1365,12 @@ Args:
 Examples:
     >>> t1 = np.array([...])
     >>> t2 = np.array([...])
-    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, AmplitudeType.CCSD, t1, t2)
+    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, AmplitudeType.CoupledCluster, t1, t2)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("amplitude_type"), py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt,
-           py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR)
+           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
       .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
                     AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
@@ -1395,7 +1395,7 @@ Args:
 
 Examples:
     >>> container = qdk_chemistry.AmplitudeContainer(
-    ...     orbitals, wfn, AmplitudeType.CCSD, t1_aa, t1_bb, t2_abab, None, None)
+    ...     orbitals, wfn, AmplitudeType.CoupledCluster, t1_aa, t1_bb, t2_abab, None, None)
         )",
            py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("amplitude_type"),
@@ -1404,13 +1404,13 @@ Examples:
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt,
-           py::arg("sector") = qdk::chemistry::data::DEFAULT_SECTOR)
+           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
       .def("get_amplitude_type", &AmplitudeContainer::get_amplitude_type,
            R"(
 Get the correlated method that produced these amplitudes.
 
 Returns:
-    AmplitudeType: The amplitude expansion type (MP2, CCSD, or Unspecified)
+    AmplitudeType: The amplitude expansion type (MollerPlesset, CoupledCluster, or Unspecified)
 
 Examples:
     >>> amplitude_type = container.get_amplitude_type()

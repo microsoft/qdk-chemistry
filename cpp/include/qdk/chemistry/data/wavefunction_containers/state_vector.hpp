@@ -60,7 +60,7 @@ class StateVectorContainer : public WavefunctionContainer {
   StateVectorContainer(const VectorVariant& coeffs,
                        const DeterminantVector& dets,
                        std::shared_ptr<Orbitals> orbitals,
-                       const std::string& sector = DEFAULT_SECTOR,
+                       const std::string& sector = Wavefunction::DEFAULT_SECTOR,
                        WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -83,7 +83,7 @@ class StateVectorContainer : public WavefunctionContainer {
    */
   StateVectorContainer(const Configuration& det,
                        std::shared_ptr<Orbitals> orbitals,
-                       const std::string& sector = DEFAULT_SECTOR,
+                       const std::string& sector = Wavefunction::DEFAULT_SECTOR,
                        WavefunctionType type = WavefunctionType::SelfDual);
 
   /**
@@ -105,7 +105,7 @@ class StateVectorContainer : public WavefunctionContainer {
                        std::shared_ptr<Orbitals> orbitals,
                        const std::optional<MatrixVariant>& one_rdm_spin_traced,
                        const std::optional<VectorVariant>& two_rdm_spin_traced,
-                       const std::string& sector = DEFAULT_SECTOR,
+                       const std::string& sector = Wavefunction::DEFAULT_SECTOR,
                        const OrbitalEntropies& entropies = OrbitalEntropies{},
                        WavefunctionType type = WavefunctionType::SelfDual);
 
@@ -141,7 +141,7 @@ class StateVectorContainer : public WavefunctionContainer {
                        const std::optional<VectorVariant>& two_rdm_aaaa,
                        const std::optional<VectorVariant>& two_rdm_aabb,
                        const std::optional<VectorVariant>& two_rdm_bbbb,
-                       const std::string& sector = DEFAULT_SECTOR,
+                       const std::string& sector = Wavefunction::DEFAULT_SECTOR,
                        const OrbitalEntropies& entropies = OrbitalEntropies{},
                        WavefunctionType type = WavefunctionType::SelfDual);
 
@@ -172,7 +172,7 @@ class StateVectorContainer : public WavefunctionContainer {
       std::shared_ptr<VectorVariant> two_rdm_spin_traced,
       std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
       std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
-      const std::string& sector = DEFAULT_SECTOR,
+      const std::string& sector = Wavefunction::DEFAULT_SECTOR,
       const OrbitalEntropies& entropies = OrbitalEntropies{},
       WavefunctionType type = WavefunctionType::SelfDual);
 
@@ -434,19 +434,6 @@ class StateVectorContainer : public WavefunctionContainer {
    * occupations.
    */
   bool _is_single_determinant() const;
-
-  /**
-   * @brief Number of active (alpha, beta) electrons read from the expansion's
-   * determinants.
-   * @return Pair of (n_alpha_active, n_beta_active).
-   */
-  std::pair<std::size_t, std::size_t> _active_electron_counts() const;
-
-  /**
-   * @brief Number of total (active + inactive) (alpha, beta) electrons.
-   * @return Pair of (n_alpha_total, n_beta_total).
-   */
-  std::pair<std::size_t, std::size_t> _total_electron_counts() const;
 
   /**
    * @brief Active-orbital (alpha, beta) occupation vectors.

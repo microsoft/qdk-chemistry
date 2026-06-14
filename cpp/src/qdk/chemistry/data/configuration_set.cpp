@@ -6,6 +6,7 @@
 #include <fstream>
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
@@ -225,7 +226,7 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
   }
 
   // Sector name; legacy files predating sectors are migrated as electronic.
-  std::string sector = j.value("sector", std::string(DEFAULT_SECTOR));
+  std::string sector = j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
 
   std::vector<Configuration> configurations;
   if (!j.contains("configurations")) {
@@ -343,7 +344,7 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = DEFAULT_SECTOR;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (group.attrExists("sector")) {
       H5::StrType sector_str_type(H5::PredType::C_S1, H5T_VARIABLE);
       group.openAttribute("sector").read(sector_str_type, sector);

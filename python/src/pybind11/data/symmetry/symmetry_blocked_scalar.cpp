@@ -28,26 +28,25 @@ void bind_sbscalar_instance(py::module& m, const char* name) {
   using SBS = SymmetryBlockedScalar<Scalar>;
   using Labels = typename SBS::Labels;
   using SymmetriesArray = typename SBS::SymmetriesArray;
-  using ExtentsArray = typename SBS::ExtentsArray;
 
   py::class_<SBS, DataClass, py::smart_holder>(
       m, name,
       "Immutable symmetry-blocked scalar. Stores one scalar value per symmetry "
       "sector as a map from a per-slot SymmetryLabel to a scalar (e.g. an "
       "electron count per spin channel).")
-      .def(py::init([](SymmetriesArray symmetries, ExtentsArray extents,
+      .def(py::init([](SymmetriesArray symmetries,
                        std::vector<std::pair<Labels, Scalar>> blocks) {
              typename SBS::BlockMap block_map;
              for (auto& [labels, value] : blocks) {
                block_map.emplace(labels, std::make_shared<const Scalar>(value));
              }
              return std::make_shared<SBS>(std::move(symmetries),
-                                          std::move(extents),
                                           std::move(block_map));
            }),
-           py::arg("symmetries"), py::arg("extents"), py::arg("blocks"),
-           "Construct from the per-slot symmetry, per-slot extents, and a list "
-           "of (labels, value) pairs.")
+           py::arg("symmetries"), py::arg("blocks"),
+           "Construct from the per-slot symmetry and a list of (labels, value) "
+           "pairs. A scalar block is a single number, so no extents are "
+           "required.")
       .def(
           "symmetries",
           [](const SBS& self) {

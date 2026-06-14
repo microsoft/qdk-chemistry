@@ -187,7 +187,7 @@ class TestSymmetryBlockedScalarCount:
     def test_spin_blocked_holds_independent_channels(self, unrestricted_spin):
         """Per-spin counts are stored as independent (non-aliased) blocks."""
         syms, alpha, beta = unrestricted_spin
-        count = sym.SymmetryBlockedScalarCount([syms], [{alpha: 1, beta: 1}], [((alpha,), 5), ((beta,), 3)])
+        count = sym.SymmetryBlockedScalarCount([syms], [((alpha,), 5), ((beta,), 3)])
 
         assert count.has_block((alpha,))
         assert count.has_block((beta,))
@@ -200,7 +200,7 @@ class TestSymmetryBlockedScalarCount:
         """A trivial (axis-free) symmetry holds a single aggregate block."""
         trivial = sym.SymmetryProduct([])
         empty = sym.SymmetryLabel([])
-        count = sym.SymmetryBlockedScalarCount([trivial], [{empty: 1}], [((empty,), 8)])
+        count = sym.SymmetryBlockedScalarCount([trivial], [((empty,), 8)])
 
         assert not count.symmetries()[0].has_axis(sym.AxisName.Spin)
         assert count.num_blocks() == 1
@@ -210,14 +210,14 @@ class TestSymmetryBlockedScalarCount:
         """Requesting an absent label raises."""
         trivial = sym.SymmetryProduct([])
         empty = sym.SymmetryLabel([])
-        count = sym.SymmetryBlockedScalarCount([trivial], [{empty: 1}], [((empty,), 4)])
+        count = sym.SymmetryBlockedScalarCount([trivial], [((empty,), 4)])
         with pytest.raises(ValueError, match="no block"):
             count.value(sym.SymmetryLabel([sym.axes.alpha()]))
 
     def test_json_roundtrip(self, unrestricted_spin, tmp_path):
         """A spin-blocked count survives a JSON round-trip."""
         syms, alpha, beta = unrestricted_spin
-        count = sym.SymmetryBlockedScalarCount([syms], [{alpha: 1, beta: 1}], [((alpha,), 7), ((beta,), 2)])
+        count = sym.SymmetryBlockedScalarCount([syms], [((alpha,), 7), ((beta,), 2)])
         path = tmp_path / "count.json"
         count.to_json_file(str(path))
         loaded = sym.SymmetryBlockedScalarCount.from_json_file(str(path))
@@ -227,7 +227,7 @@ class TestSymmetryBlockedScalarCount:
     def test_hdf5_roundtrip(self, unrestricted_spin, tmp_path):
         """A spin-blocked count survives an HDF5 round-trip."""
         syms, alpha, beta = unrestricted_spin
-        count = sym.SymmetryBlockedScalarCount([syms], [{alpha: 1, beta: 1}], [((alpha,), 6), ((beta,), 4)])
+        count = sym.SymmetryBlockedScalarCount([syms], [((alpha,), 6), ((beta,), 4)])
         path = tmp_path / "count.h5"
         count.to_hdf5_file(str(path))
         loaded = sym.SymmetryBlockedScalarCount.from_hdf5_file(str(path))

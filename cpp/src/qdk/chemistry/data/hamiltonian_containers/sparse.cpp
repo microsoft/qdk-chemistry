@@ -617,8 +617,8 @@ void SparseHamiltonianContainer::_materialize_dense_two_body() const {
 
 std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
     int n) {
-  // Model Hamiltonian basis: a full active space over n modes, with no declared
-  // single-particle symmetry (callers opt into spin explicitly when needed).
+  // Model Hamiltonian basis: a full active space over n modes with no spin axis.
+  // The container itself is always restricted (is_restricted() == true).
   return std::make_shared<ModelOrbitals>(static_cast<size_t>(n));
 }
 
