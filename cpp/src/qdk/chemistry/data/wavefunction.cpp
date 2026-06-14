@@ -1226,8 +1226,9 @@ std::shared_ptr<Wavefunction> Wavefunction::truncate(
   // Create new wavefunction with a StateVectorContainer, preserving the
   // source wavefunction's sector.
   const auto sector_names = sectors();
-  const std::string sector =
-      sector_names.empty() ? std::string(Wavefunction::DEFAULT_SECTOR) : sector_names.front();
+  const std::string sector = sector_names.empty()
+                                 ? std::string(Wavefunction::DEFAULT_SECTOR)
+                                 : sector_names.front();
   return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
       normalized_coeffs, top_configs, get_orbitals(), sector, get_type()));
 }

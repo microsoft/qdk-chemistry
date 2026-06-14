@@ -152,10 +152,9 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
     for (const auto& [labels, value_ptr] : this->_blocks) {
       entries.emplace_back(label_key(labels[0]), *value_ptr);
     }
-    std::sort(entries.begin(), entries.end(),
-              [](const auto& lhs, const auto& rhs) {
-                return lhs.first < rhs.first;
-              });
+    std::sort(
+        entries.begin(), entries.end(),
+        [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
 
     std::ostringstream oss;
     oss << "SymmetryBlockedScalar(scalar=" << _scalar_tag() << ", {";
@@ -225,8 +224,8 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
   void to_hdf5(H5::Group& group) const override {
     H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
     H5::DataSpace scalar_space(H5S_SCALAR);
-    auto dataset = group.createDataSet(
-        "symmetry_blocked_scalar_metadata", str_type, scalar_space);
+    auto dataset = group.createDataSet("symmetry_blocked_scalar_metadata",
+                                       str_type, scalar_space);
     std::string payload = to_json().dump(2);
     dataset.write(payload, str_type);
   }

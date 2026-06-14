@@ -85,12 +85,13 @@ class Orbitals : public DataClass,
    * @param indices (active, inactive) indices; @c std::nullopt selects the full
    *        active space.
    */
-  Orbitals(const Eigen::MatrixXd& coefficients,
-           const std::optional<Eigen::VectorXd>& energies,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           const std::optional<std::tuple<std::vector<size_t>,
-                                          std::vector<size_t>>>& indices);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients,
+      const std::optional<Eigen::VectorXd>& energies,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      const std::optional<std::tuple<std::vector<size_t>, std::vector<size_t>>>&
+          indices);
 
   /**
    * @brief Constructor for unrestricted orbitals with shared pointer to basis
@@ -132,16 +133,16 @@ class Orbitals : public DataClass,
    * @param indices (active_alpha, active_beta, inactive_alpha, inactive_beta)
    *        indices; @c std::nullopt selects the full active space.
    */
-  Orbitals(const Eigen::MatrixXd& coefficients_alpha,
-           const Eigen::MatrixXd& coefficients_beta,
-           const std::optional<Eigen::VectorXd>& energies_alpha,
-           const std::optional<Eigen::VectorXd>& energies_beta,
-           const std::optional<Eigen::MatrixXd>& ao_overlap,
-           std::shared_ptr<BasisSet> basis_set,
-           const std::optional<std::tuple<std::vector<size_t>,
-                                          std::vector<size_t>,
-                                          std::vector<size_t>,
-                                          std::vector<size_t>>>& indices);
+  Orbitals(
+      const Eigen::MatrixXd& coefficients_alpha,
+      const Eigen::MatrixXd& coefficients_beta,
+      const std::optional<Eigen::VectorXd>& energies_alpha,
+      const std::optional<Eigen::VectorXd>& energies_beta,
+      const std::optional<Eigen::MatrixXd>& ao_overlap,
+      std::shared_ptr<BasisSet> basis_set,
+      const std::optional<std::tuple<std::vector<size_t>, std::vector<size_t>,
+                                     std::vector<size_t>, std::vector<size_t>>>&
+          indices);
 
   /**
    * @brief Constructor from symmetry-blocked storage primitives

@@ -853,7 +853,6 @@ class Wavefunction : public DataClass,
   /// Sentinel sector name for single-species wavefunctions.
   static constexpr const char* DEFAULT_SECTOR = "__default__";
 
-
   /**
    * @brief Get the data type name for this class
    * @return "wavefunction"

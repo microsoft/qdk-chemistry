@@ -372,8 +372,8 @@ TEST_F(WavefunctionCoreTest, LazyMutualInformationFromS1AndS2) {
   entropies.two_orbital = s2;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, Wavefunction::DEFAULT_SECTOR,
-      entropies));
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt,
+      Wavefunction::DEFAULT_SECTOR, entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
   EXPECT_TRUE(wf.has_two_orbital_entropies());
@@ -408,8 +408,8 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   entropies.mutual_information = mi;
 
   Wavefunction wf(std::make_unique<StateVectorContainer>(
-      coeffs, dets, test_orbitals, std::nullopt, std::nullopt, Wavefunction::DEFAULT_SECTOR,
-      entropies));
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt,
+      Wavefunction::DEFAULT_SECTOR, entropies));
 
   EXPECT_TRUE(wf.has_single_orbital_entropies());
   EXPECT_TRUE(wf.has_mutual_information());
@@ -424,7 +424,8 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
 TEST_F(WavefunctionCoreTest, ReportsSingleElectronSectorFromContainer) {
   // The container owns the sector->basis binding; the wavefunction surfaces it.
   // Today's single-species model reports the sole electronic sector.
-  EXPECT_EQ(wf->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
+  EXPECT_EQ(wf->sectors(),
+            std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
   EXPECT_TRUE(wf->has_sector(Wavefunction::DEFAULT_SECTOR));
 
   // The sector resolves to the container's own basis, and symmetries are
@@ -444,7 +445,8 @@ TEST_F(WavefunctionCoreTest, SectorSurvivesJsonRoundTrip) {
   // Sectors are derived from the container, so they reappear after a reload
   // without any wavefunction-level sector serialization.
   auto reconstructed = Wavefunction::from_json(wf->to_json());
-  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
+  EXPECT_EQ(reconstructed->sectors(),
+            std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
 }
 
 TEST_F(WavefunctionCoreTest, SectorSurvivesHdf5RoundTrip) {
@@ -453,7 +455,8 @@ TEST_F(WavefunctionCoreTest, SectorSurvivesHdf5RoundTrip) {
   auto reconstructed = Wavefunction::from_hdf5_file(filename);
   std::remove(filename.c_str());
 
-  EXPECT_EQ(reconstructed->sectors(), std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
+  EXPECT_EQ(reconstructed->sectors(),
+            std::vector<std::string>{Wavefunction::DEFAULT_SECTOR});
 }
 
 TEST_F(WavefunctionCoreTest,

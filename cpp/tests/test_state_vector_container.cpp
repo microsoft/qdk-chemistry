@@ -105,9 +105,8 @@ TEST_F(StateVectorContainerTest, EmptyDeterminantsThrows) {
 
   StateVectorContainer sv(empty_coeffs, empty_dets, orbitals);
 
-  EXPECT_THROW(
-      sv.get_coefficient(Configuration::from_spin_half_string("2200")),
-      std::runtime_error);
+  EXPECT_THROW(sv.get_coefficient(Configuration::from_spin_half_string("2200")),
+               std::runtime_error);
   EXPECT_THROW(sv.get_total_num_electrons(), std::runtime_error);
   EXPECT_THROW(sv.get_active_num_electrons(), std::runtime_error);
   EXPECT_THROW(sv.get_total_orbital_occupations(), std::runtime_error);

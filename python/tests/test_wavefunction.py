@@ -1456,7 +1456,9 @@ class TestCCContainer:
         """
         t1 = np.array([0.01, 0.02])
         t2 = np.array([0.001, 0.002, 0.003, 0.004])
-        wf = Wavefunction(AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CoupledCluster, t1, t2))
+        wf = Wavefunction(
+            AmplitudeContainer(basic_orbitals, reference_wavefunction, AmplitudeType.CoupledCluster, t1, t2)
+        )
 
         assert wf.get_container_type() == "amplitude"
 

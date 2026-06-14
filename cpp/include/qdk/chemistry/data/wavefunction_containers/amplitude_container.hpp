@@ -31,9 +31,9 @@ namespace qdk::chemistry::data {
  * exponential coupled-cluster ansatz).
  */
 enum class AmplitudeType {
-  MollerPlesset,  ///< Moller-Plesset perturbation theory
-  CoupledCluster, ///< Coupled cluster theory
-  Unspecified,    ///< Producer did not record a type (e.g. legacy data)
+  MollerPlesset,   ///< Moller-Plesset perturbation theory
+  CoupledCluster,  ///< Coupled cluster theory
+  Unspecified,     ///< Producer did not record a type (e.g. legacy data)
 };
 
 /**

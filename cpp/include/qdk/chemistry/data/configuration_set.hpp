@@ -54,12 +54,10 @@ class ConfigurationSet : public DataClass {
    * virtual orbitals are not included in the configuration representation.
    */
   ConfigurationSet(const std::vector<Configuration>& configurations,
-                   std::shared_ptr<Orbitals> orbitals,
-                   std::string sector);
+                   std::shared_ptr<Orbitals> orbitals, std::string sector);
 
   ConfigurationSet(std::vector<Configuration>&& configurations,
-                   std::shared_ptr<Orbitals> orbitals,
-                   std::string sector);
+                   std::shared_ptr<Orbitals> orbitals, std::string sector);
 
   /**
    * @brief Get the configurations

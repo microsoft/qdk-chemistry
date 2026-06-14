@@ -967,8 +967,8 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_json(
       Configuration determinant = Configuration::from_json(j["determinant"]);
 
       // Legacy "sd" files predate sectors; migrate as electronic.
-      return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    Wavefunction::DEFAULT_SECTOR, type);
+      return std::make_unique<StateVectorContainer>(
+          determinant, orbitals, Wavefunction::DEFAULT_SECTOR, type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the
@@ -1026,8 +1026,8 @@ std::unique_ptr<WavefunctionContainer> StateVectorContainer::from_hdf5(
       det_group.close();
 
       // Legacy "sd" files predate sectors; migrate as electronic.
-      return std::make_unique<StateVectorContainer>(determinant, orbitals,
-                                                    Wavefunction::DEFAULT_SECTOR, type);
+      return std::make_unique<StateVectorContainer>(
+          determinant, orbitals, Wavefunction::DEFAULT_SECTOR, type);
     }
 
     // Current "state_vector" format and legacy "cas"/"sci" formats share the

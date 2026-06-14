@@ -165,7 +165,8 @@ int main() {
   Eigen::VectorXd t2_mp2(1);
   t2_mp2 << 0.1;
   auto mp2_container = std::make_unique<AmplitudeContainer>(
-      orbitals_mp2, ref_wavefunction, AmplitudeType::MollerPlesset, t1_mp2, t2_mp2);
+      orbitals_mp2, ref_wavefunction, AmplitudeType::MollerPlesset, t1_mp2,
+      t2_mp2);
   Wavefunction mp2_wavefunction(std::move(mp2_container));
   // end-cell-create-mp2
   // --------------------------------------------------------------------------------------------
@@ -196,8 +197,8 @@ int main() {
   // Create CC container: requires reference wavefunction, orbitals, and
   // amplitudes
   auto cc_container = std::make_unique<AmplitudeContainer>(
-      orbitals_cc, ref_wavefunction_cc, AmplitudeType::CoupledCluster, t1_amplitudes,
-      t2_amplitudes);
+      orbitals_cc, ref_wavefunction_cc, AmplitudeType::CoupledCluster,
+      t1_amplitudes, t2_amplitudes);
   Wavefunction cc_wavefunction(std::move(cc_container));
   // end-cell-create-cc
   // --------------------------------------------------------------------------------------------

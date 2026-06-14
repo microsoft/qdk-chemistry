@@ -187,7 +187,11 @@ t2_amplitudes = np.array([0.15])
 
 # Create CC container: requires reference wavefunction, orbitals, and amplitudes
 cc_container = AmplitudeContainer(
-    orbitals, ref_wavefunction, AmplitudeType.CoupledCluster, t1_amplitudes, t2_amplitudes
+    orbitals,
+    ref_wavefunction,
+    AmplitudeType.CoupledCluster,
+    t1_amplitudes,
+    t2_amplitudes,
 )
 cc_wavefunction = Wavefunction(cc_container)
 # end-cell-create-cc

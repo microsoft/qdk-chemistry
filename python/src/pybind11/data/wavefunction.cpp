@@ -1166,7 +1166,8 @@ Examples:
     >>> container = qdk_chemistry.StateVectorContainer(det, orbitals, "electrons")
 )",
            py::arg("det"), py::arg("orbitals"),
-           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR,
+           py::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR,
            py::arg("type") = WavefunctionType::SelfDual)
       // Basic constructor: coeffs, dets, orbitals, sector, type
       .def(py::init<const ContainerTypes::VectorVariant&,
@@ -1370,7 +1371,8 @@ Examples:
            py::arg("orbitals"), py::arg("wavefunction"),
            py::arg("amplitude_type"), py::arg("t1_amplitudes") = std::nullopt,
            py::arg("t2_amplitudes") = std::nullopt,
-           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
+           py::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
       .def(py::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
                     AmplitudeType,
                     const std::optional<AmplitudeContainer::VectorVariant>&,
@@ -1404,7 +1406,8 @@ Examples:
            py::arg("t2_amplitudes_abab") = std::nullopt,
            py::arg("t2_amplitudes_aaaa") = std::nullopt,
            py::arg("t2_amplitudes_bbbb") = std::nullopt,
-           py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
+           py::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
       .def("get_amplitude_type", &AmplitudeContainer::get_amplitude_type,
            R"(
 Get the correlated method that produced these amplitudes.

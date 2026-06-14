@@ -226,7 +226,8 @@ ConfigurationSet ConfigurationSet::from_json(const nlohmann::json& j) {
   }
 
   // Sector name; legacy files predating sectors are migrated as electronic.
-  std::string sector = j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
+  std::string sector =
+      j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
 
   std::vector<Configuration> configurations;
   if (!j.contains("configurations")) {

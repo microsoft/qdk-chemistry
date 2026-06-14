@@ -448,7 +448,8 @@ std::unique_ptr<AmplitudeContainer> AmplitudeContainer::from_json(
     }
 
     // Sector name; legacy files predating sectors are migrated as electronic.
-    std::string sector = j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
+    std::string sector =
+        j.value("sector", std::string(Wavefunction::DEFAULT_SECTOR));
 
     // Determine the amplitude expansion type. New "amplitude" files store an
     // explicit "amplitude_type" field; legacy "coupled_cluster"/"mp2" files
