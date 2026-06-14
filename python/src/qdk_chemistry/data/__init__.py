@@ -118,6 +118,15 @@ from qdk_chemistry.data.estimator_data import EnergyExpectationResult, Measureme
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.resource_estimator_data import (
+    CircuitCounts,
+    ErrorBudget,
+    EstimationConfig,
+    LogicalCounts,
+    LogicalQubit,
+    PhysicalCounts,
+    ResourceEstimatorData,
+)
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -143,6 +152,7 @@ __all__ = [
     "CasWavefunctionContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
+    "CircuitCounts",
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
@@ -154,6 +164,8 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "ErrorBudget",
+    "EstimationConfig",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",
@@ -161,6 +173,8 @@ __all__ = [
     "HamiltonianType",
     "LatticeGraph",
     "LayeredPartition",
+    "LogicalCounts",
+    "LogicalQubit",
     "MP2Container",
     "MajoranaMapping",
     "MeasurementData",
@@ -170,9 +184,11 @@ __all__ = [
     "PauliOperator",
     "PauliProductFormulaContainer",
     "PauliTermAccumulator",
+    "PhysicalCounts",
     "QpeResult",
     "QuantumErrorProfile",
     "QubitHamiltonian",
+    "ResourceEstimatorData",
     "SciWavefunctionContainer",
     "SettingNotFound",
     "SettingNotFoundError",

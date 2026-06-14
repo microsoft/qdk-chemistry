@@ -51,6 +51,8 @@ from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
 )
 from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolver
 from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
+from qdk_chemistry.algorithms.resource_estimator.base import ResourceEstimator
+from qdk_chemistry.algorithms.resource_estimator.qdk_v1 import QdkQreV1
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
@@ -81,6 +83,7 @@ __all__ = [
     "QdkMacisPmc",
     "QdkOccupationActiveSpaceSelector",
     "QdkPipekMezeyLocalizer",
+    "QdkQreV1",
     "QdkQubitMapper",
     "QdkScfSolver",
     "QdkStabilityChecker",
@@ -89,6 +92,7 @@ __all__ = [
     "QpeCircuitBuilder",
     "QubitHamiltonianSolver",
     "QubitMapper",
+    "ResourceEstimator",
     "ScfSolver",
     "StabilityChecker",
     "StatePreparation",

@@ -684,6 +684,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.resource_estimator import ResourceEstimatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import (  # noqa: PLC0415
@@ -702,6 +703,7 @@ def _register_python_factories():
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
     register_factory(PhaseEstimationFactory())
+    register_factory(ResourceEstimatorFactory())
     register_factory(PropagatorFactory())
 
 
@@ -778,6 +780,8 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.resource_estimator.qdk_v1 import QdkQreV1  # noqa: PLC0415
+    from qdk_chemistry.algorithms.resource_estimator.qdk_v3 import QdkQreV3  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryGF2XStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import (  # noqa: PLC0415
         FullCommutingTermGrouper,
@@ -805,6 +809,8 @@ def _register_python_algorithms():
     register(lambda: QdkSparseStateSimulator())
     register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
+    register(lambda: QdkQreV1())
+    register(lambda: QdkQreV3())
     register(lambda: StandardPhaseEstimation())
 
 

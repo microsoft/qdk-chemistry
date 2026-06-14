@@ -23,6 +23,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
+from qdk_chemistry.algorithms import create as create_algorithm
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
@@ -420,10 +421,10 @@ class TestCircuitImmutability:
 
 
 class TestCircuitEstimate:
-    """Test cases for Circuit.estimate method."""
+    """Test cases for Circuit resource estimation via the algorithm."""
 
     def test_estimate_from_factory(self):
-        """Test that estimate works with Q# factory data."""
+        """Test that resource estimation works with Q# factory data."""
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
@@ -435,12 +436,13 @@ class TestCircuitEstimate:
             parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
-        result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
+        estimator = create_algorithm("resource_estimator")
+        results = estimator.run(circuit)
+        assert len(results) == 1
+        assert results[0].logical_counts.num_qubits >= 0
 
     def test_estimate_from_qasm(self):
-        """Test that estimate works with QASM representation."""
+        """Test that resource estimation works with QASM representation."""
         qasm_with_t = """
             OPENQASM 3.0;
             include "stdgates.inc";
@@ -453,9 +455,10 @@ class TestCircuitEstimate:
             c[1] = measure q[1];
         """
         circuit = Circuit(qasm=qasm_with_t)
-        result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
+        estimator = create_algorithm("resource_estimator")
+        results = estimator.run(circuit)
+        assert len(results) == 1
+        assert results[0].logical_counts.t_count >= 0
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""
@@ -470,5 +473,6 @@ class TestCircuitEstimate:
             c[1] = measure q[1];
         """)
         circuit = Circuit(qir=qir)
+        estimator = create_algorithm("resource_estimator")
         with pytest.raises(RuntimeError, match="Cannot estimate resources"):
-            circuit.estimate()
+            estimator.run(circuit)
