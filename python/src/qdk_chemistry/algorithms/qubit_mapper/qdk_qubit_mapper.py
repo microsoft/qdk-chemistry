@@ -138,7 +138,6 @@ class QdkQubitMapper(QubitMapper):
         integral_threshold = float(self.settings().get("integral_threshold"))
 
         h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
-        h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
         n_spatial = h1_alpha.shape[0]
         n_spin_orbitals = 2 * n_spatial
         spin_symmetric = hamiltonian.get_orbitals().is_restricted()
@@ -154,25 +153,35 @@ class QdkQubitMapper(QubitMapper):
                 f"Use MajoranaMapping.jordan_wigner(num_modes={n_spin_orbitals}) or equivalent."
             )
 
-        h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
-        h1_b_flat = h1_a_flat if spin_symmetric else np.ascontiguousarray(h1_beta).ravel()
-        h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
-        h2_aabb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_aabb).ravel()
-        h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
+        container_type = hamiltonian.get_container_type()
+        if container_type in ("cholesky", "sparse"):
+            words, coefficients = majorana_map_hamiltonian(
+                base_mapping,
+                hamiltonian,
+                threshold,
+                integral_threshold,
+            )
+        else:
+            h1_a_flat = np.ascontiguousarray(h1_alpha).ravel()
+            h1_b_flat = h1_a_flat if spin_symmetric else np.ascontiguousarray(h1_beta).ravel()
+            h2_aaaa, h2_aabb, h2_bbbb = hamiltonian.get_two_body_integrals()
+            h2_aaaa_flat = np.ascontiguousarray(h2_aaaa).ravel()
+            h2_aabb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_aabb).ravel()
+            h2_bbbb_flat = h2_aaaa_flat if spin_symmetric else np.ascontiguousarray(h2_bbbb).ravel()
 
-        words, coefficients = majorana_map_hamiltonian(
-            base_mapping,
-            0.0,
-            h1_a_flat,
-            h1_b_flat,
-            h2_aaaa_flat,
-            h2_aabb_flat,
-            h2_bbbb_flat,
-            n_spatial,
-            spin_symmetric,
-            threshold,
-            integral_threshold,
-        )
+            words, coefficients = majorana_map_hamiltonian(
+                base_mapping,
+                0.0,
+                h1_a_flat,
+                h1_b_flat,
+                h2_aaaa_flat,
+                h2_aabb_flat,
+                h2_bbbb_flat,
+                n_spatial,
+                spin_symmetric,
+                threshold,
+                integral_threshold,
+            )
 
         n_qubits = base_mapping.num_qubits
         pauli_strings = [sparse_pauli_word_to_label(word, n_qubits) for word in words]

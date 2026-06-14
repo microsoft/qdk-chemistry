@@ -353,10 +353,17 @@ struct MajoranaMapResult {
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
  */
+class Hamiltonian;
+
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
     const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold);
+
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           double threshold,
+                                           double integral_threshold);
 
 }  // namespace qdk::chemistry::data
