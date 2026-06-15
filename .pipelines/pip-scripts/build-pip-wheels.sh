@@ -152,6 +152,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
     fi
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+
+    # Source the CodeQL tracing env (if provided) so the in-container compile is traced.
+    if [ -n "${CODEQL_TRACING_SH:-}" ] && [ -f "${CODEQL_TRACING_SH}" ]; then
+        echo "Enabling CodeQL tracing from ${CODEQL_TRACING_SH}"
+        . "${CODEQL_TRACING_SH}"
+    fi
+
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=${MARCH} \

@@ -85,16 +85,25 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - bash: |
+      TRACING_SH="$(find "$(Agent.TempDirectory)/codeql3000" -name start-tracing.sh 2>/dev/null | head -n1 || true)"
+      if [ -n "$TRACING_SH" ]; then echo "CodeQL tracing env: $TRACING_SH"; else echo "No CodeQL tracing env (non-cadence build)"; fi
+      echo "##vso[task.setvariable variable=codeqlTracingSh]$TRACING_SH"
+    displayName: Locate CodeQL tracing environment
+
 - ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
       echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -v ${{ parameters.agentBuildDirectory }}:${{ parameters.agentBuildDirectory }}:rshared \
+        -v $(Agent.TempDirectory):$(Agent.TempDirectory) \
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
-        -w /workspace/qdk-chemistry \
+        -e CODEQL_TRACING_SH=$(codeqlTracingSh) \
+        -w ${{ parameters.agentBuildDirectory }}/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
                                                       ${{ parameters.pythonVersion }} \
@@ -118,11 +127,13 @@ steps:
       echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
       docker run --rm \
         --platform ${{ parameters.imageTag }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -v ${{ parameters.agentBuildDirectory }}:${{ parameters.agentBuildDirectory }}:rshared \
+        -v $(Agent.TempDirectory):$(Agent.TempDirectory) \
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
-        -w /workspace/qdk-chemistry \
+        -e CODEQL_TRACING_SH=$(codeqlTracingSh) \
+        -w ${{ parameters.agentBuildDirectory }}/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
                                                       ${{ parameters.pythonVersion }} \
