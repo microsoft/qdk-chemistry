@@ -334,23 +334,39 @@ struct SparseEriProvider {
     std::size_t r;
     std::size_t s;
 
+    bool operator==(const Key& other) const = default;
+
     friend bool operator<(const Key& left, const Key& right) {
       return std::tie(left.p, left.q, left.r, left.s) <
              std::tie(right.p, right.q, right.r, right.s);
     }
   };
 
+  struct KeyHash {
+    std::size_t operator()(const Key& key) const noexcept {
+      utils::HashContext ctx;
+      hash_value(ctx, "sparse_eri_key");
+      hash_value(ctx, static_cast<uint64_t>(key.p));
+      hash_value(ctx, static_cast<uint64_t>(key.q));
+      hash_value(ctx, static_cast<uint64_t>(key.r));
+      hash_value(ctx, static_cast<uint64_t>(key.s));
+      return ctx.hash_code();
+    }
+  };
+
   std::size_t n_spatial;
   std::size_t n2;
-  std::map<Key, double> entries;
+  std::vector<std::pair<Key, double>> entries;
+  std::unordered_map<Key, double, KeyHash> lookup;
 
   SparseEriProvider(std::size_t n,
                     const SparseHamiltonianContainer::TwoBodyMap& values)
       : n_spatial(n), n2(n * n) {
+    std::map<Key, double> canonical_entries;
     for (const auto& [indices, value] : values) {
       auto [p, q, r, s] = indices;
       Key key = canonicalize_checked(p, q, r, s);
-      auto [it, inserted] = entries.emplace(key, value);
+      auto [it, inserted] = canonical_entries.emplace(key, value);
       if (!inserted) {
         double scale = std::max({1.0, std::abs(it->second), std::abs(value)});
         if (std::abs(it->second - value) > 1e-12 * scale) {
@@ -359,6 +375,12 @@ struct SparseEriProvider {
               "symmetry-equivalent indices.");
         }
       }
+    }
+    entries.reserve(canonical_entries.size());
+    lookup.reserve(canonical_entries.size());
+    for (const auto& [key, value] : canonical_entries) {
+      entries.emplace_back(key, value);
+      lookup.emplace(key, value);
     }
   }
 
@@ -388,8 +410,8 @@ struct SparseEriProvider {
 
   double aaaa(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    auto it = entries.find(canonicalize(p, q, r, s));
-    return it == entries.end() ? 0.0 : it->second;
+    auto it = lookup.find(canonicalize(p, q, r, s));
+    return it == lookup.end() ? 0.0 : it->second;
   }
 
   std::vector<double> row_aaaa(std::size_t p, std::size_t q) const {
@@ -790,6 +812,12 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
 
   const std::size_t n_spatial = static_cast<std::size_t>(h1_alpha.rows());
   const bool spin_symmetric = hamiltonian.is_restricted();
+  if (!spin_symmetric && (h1_beta.rows() != h1_alpha.rows() ||
+                          h1_beta.cols() != h1_alpha.cols())) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: beta one-body integrals must match the "
+        "alpha one-body integral shape for unrestricted Hamiltonians.");
+  }
 
   std::vector<double> h1_alpha_flat(n_spatial * n_spatial);
   std::vector<double> h1_beta_flat(n_spatial * n_spatial);
@@ -804,19 +832,16 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
   constexpr double excluded_core_energy = 0.0;
 
   if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
-    if (!spin_symmetric) {
-      throw std::invalid_argument(
-          "majorana_map_hamiltonian: sparse container mapping currently "
-          "requires restricted orbitals.");
+    if (spin_symmetric) {
+      const auto& sparse =
+          hamiltonian.get_container<SparseHamiltonianContainer>();
+      detail::SparseEriProvider provider(n_spatial,
+                                         sparse.sparse_two_body_integrals());
+      return detail::dispatch_majorana_map(
+          mapping, excluded_core_energy, h1_alpha_flat.data(),
+          h1_beta_flat.data(), provider, n_spatial, spin_symmetric, threshold,
+          integral_threshold);
     }
-    const auto& sparse =
-        hamiltonian.get_container<SparseHamiltonianContainer>();
-    detail::SparseEriProvider provider(n_spatial,
-                                       sparse.sparse_two_body_integrals());
-    return detail::dispatch_majorana_map(
-        mapping, excluded_core_energy, h1_alpha_flat.data(),
-        h1_beta_flat.data(), provider, n_spatial, spin_symmetric, threshold,
-        integral_threshold);
   }
 
   if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
@@ -827,6 +852,13 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
       throw std::invalid_argument(
           "majorana_map_hamiltonian: Cholesky three-center rows must equal "
           "n_spatial^2.");
+    }
+    if (!spin_symmetric &&
+        (l_beta.rows() != l_alpha.rows() || l_beta.cols() != l_alpha.cols())) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: beta Cholesky three-center integrals "
+          "must match alpha rows and auxiliary columns for unrestricted "
+          "Hamiltonians.");
     }
     detail::CholeskyEriProvider provider{
         l_alpha, l_beta, n_spatial, n_spatial * n_spatial,
