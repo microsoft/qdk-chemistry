@@ -15,6 +15,13 @@ with, in terms of X = -i t A and Y = -i t B (A, B Hermitian Hamiltonian groups),
 
 Truncating after C_p yields an operator-norm error of O(t^{p+1}).
 
+The Hamiltonian is split into K internally-commuting groups and the builder uses
+the *multi-operator* Zassenhaus formula directly --
+``exp(sum_i X_i) = exp(X_0) ... exp(X_{K-1}) exp(C_2) ... exp(C_p)`` with one
+genuine K-operator exponent C_n per degree. The C_n are generated symbolically for
+any order (rather than hard-coded), so the two-operator C2/C3/C4 above are just the
+familiar low-order instances; see :func:`_zassenhaus_word_exponents`.
+
 References:
     Wilcox, R. M. "Exponential operators and parameter differentiation in
     quantum physics." J. Math. Phys. 8, 962 (1967).
@@ -33,6 +40,9 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from __future__ import annotations
+
+from fractions import Fraction
+from functools import cache
 
 import numpy as np
 
@@ -54,9 +64,103 @@ from qdk_chemistry.utils.pauli_commutation import commutator, do_pauli_labels_co
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
-# Supported expansion orders (matches acceptance criteria p in {2, 3, 4}).
+# Supported expansion orders. Corrections C_2..C_order are generated symbolically
+# (see below) for any order, and each is flattened with a Trotter-Suzuki product of
+# just-high-enough order (see Zassenhaus._correction_trotter_order), so the method
+# generalises to any order. The upper bound is a practical/tested cap, not a
+# fundamental one -- raise it as needed (cost grows ~K^order in the generator).
 _MIN_ORDER = 2
-_MAX_ORDER = 4
+_MAX_ORDER = 6
+
+
+# ----------------------------------------------------------------------------------- #
+# Universal Zassenhaus exponents (symbolic, operator-independent, cached)
+#
+# The multi-operator Zassenhaus formula factorises the exponential of a sum of K
+# operators X_0, ..., X_{K-1} as
+#
+#     exp(X_0 + ... + X_{K-1}) = exp(X_0) ... exp(X_{K-1}) exp(C_2) exp(C_3) ...
+#
+# where each C_n is a homogeneous degree-n element of the free Lie algebra on the
+# generators. C_n is computed once per (K, order) as a truncated noncommutative
+# word series with exact rational coefficients, then turned into nested commutators
+# of the actual operators via the Dynkin map (see Zassenhaus._evaluate_exponent).
+# This generalises the recursive two-operator scheme to a single correction block
+# per degree (textbook form: fewer, non-redundant factors) at any order.
+# ----------------------------------------------------------------------------------- #
+
+
+def _series_mul(a: dict, b: dict, max_degree: int) -> dict:
+    """Multiply two truncated word series (words = tuples of generator indices)."""
+    out: dict = {}
+    for w1, c1 in a.items():
+        for w2, c2 in b.items():
+            if len(w1) + len(w2) > max_degree:
+                continue
+            w = w1 + w2
+            out[w] = out.get(w, Fraction(0)) + c1 * c2
+    return {w: c for w, c in out.items() if c}
+
+
+def _series_exp(generator: dict, max_degree: int) -> dict:
+    """Exponential of a word series with no degree-0 term, truncated to ``max_degree``."""
+    result = {(): Fraction(1)}
+    term = {(): Fraction(1)}
+    for k in range(1, max_degree + 1):
+        term = {w: c * Fraction(1, k) for w, c in _series_mul(term, generator, max_degree).items()}
+        if not term:
+            break
+        for w, c in term.items():
+            result[w] = result.get(w, Fraction(0)) + c
+    return {w: c for w, c in result.items() if c}
+
+
+def _series_log(series: dict, max_degree: int) -> dict:
+    """Logarithm of ``1 + r`` (r the non-constant part), truncated to ``max_degree``."""
+    remainder = {w: c for w, c in series.items() if w != ()}
+    result: dict = {}
+    power = {(): Fraction(1)}
+    for k in range(1, max_degree + 1):
+        power = _series_mul(power, remainder, max_degree)
+        if not power:
+            break
+        sign = Fraction((-1) ** (k + 1), k)
+        for w, c in power.items():
+            result[w] = result.get(w, Fraction(0)) + sign * c
+    return {w: c for w, c in result.items() if c}
+
+
+@cache
+def _zassenhaus_word_exponents(num_generators: int, order: int) -> tuple:
+    """Return the Zassenhaus exponents C_2..C_order over ``num_generators`` symbols.
+
+    The result is a tuple whose entry ``n - 2`` is the word expansion of C_n as a
+    tuple of ``(word, Fraction)`` pairs, where ``word`` is a tuple of generator
+    indices. Depends only on ``(num_generators, order)`` so it is cached.
+
+    Peeling: with X_i the i-th generator and S their sum,
+    ``R = exp(-X_{K-1}) ... exp(-X_0) exp(S)`` has lowest degree 2, and
+    ``C_n`` is the degree-n part of ``log(exp(-C_{n-1}) ... exp(-C_2) R)``.
+    """
+    generators = [{(i,): Fraction(1)} for i in range(num_generators)]
+    total: dict = {}
+    for gen in generators:
+        for w, c in gen.items():
+            total[w] = total.get(w, Fraction(0)) + c
+
+    remainder = _series_exp(total, order)
+    for gen in generators:
+        neg = {w: -c for w, c in gen.items()}
+        remainder = _series_mul(_series_exp(neg, order), remainder, order)
+
+    exponents: list = []
+    for n in range(2, order + 1):
+        log_remainder = _series_log(remainder, order)
+        c_n = {w: c for w, c in log_remainder.items() if len(w) == n}
+        exponents.append(tuple(sorted(c_n.items())))
+        neg_c_n = {w: -c for w, c in c_n.items()}
+        remainder = _series_mul(_series_exp(neg_c_n, order), remainder, order)
+    return tuple(exponents)
 
 
 class ZassenhausSettings(TimeEvolutionSettings):
@@ -67,16 +171,28 @@ class ZassenhausSettings(TimeEvolutionSettings):
 
         Attributes:
             order: Expansion order p; corrections C_2..C_p are included so the
-                truncation error scales as O(t^{p+1}). Supported: 2, 3, 4.
-                Order 1 (no corrections) falls back to the first-order Trotter builder.
+                truncation error scales as O(t^{p+1}). Supported: 2, 3, 4, 5, 6.
+                Order 1 (no corrections) falls back to the first-order Trotter builder;
+                order 0 selects the order automatically from ``target_accuracy``.
             num_divisions: Number of time divisions N. The full Zassenhaus
                 product approximates exp(-iH t/N) and is repeated N times.
+            target_accuracy: Target operator-norm accuracy for automatic N
+                (0.0 disables it). When set, N is raised so the leading
+                truncation error ``||C_{p+1}|| t^{p+1} / N^p`` is below it.
             weight_threshold: Absolute threshold for filtering small coefficients.
 
         """
         super().__init__()
-        self._set_default("order", "int", 2, "The Zassenhaus expansion order p (2, 3, or 4; 1 falls back to Trotter).")
+        self._set_default(
+            "order", "int", 2, "The Zassenhaus expansion order p (2-6; 1 falls back to Trotter; 0 = auto)."
+        )
         self._set_default("num_divisions", "int", 1, "Number of time divisions N (>= 1).")
+        self._set_default(
+            "target_accuracy",
+            "double",
+            0.0,
+            "Target accuracy for automatic division-count estimation (0.0 means disabled).",
+        )
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
@@ -86,15 +202,15 @@ class Zassenhaus(TimeEvolutionBuilder):
     """Zassenhaus product-formula time-evolution builder.
 
     Note:
-        Unlike the Trotter builder, automatic step-count estimation from a
-        ``target_accuracy`` (Zassenhaus error scales as
-        ``||C_{p+1}|| t^{p+1} / N^p``) is not yet provided; ``num_divisions``
-        is set explicitly (default 1). Such an estimator is left as future work.
+        ``num_divisions`` N may be set explicitly (default 1) or estimated
+        automatically from ``target_accuracy`` (Zassenhaus error scales as
+        ``||C_{p+1}|| t^{p+1} / N^p``); when both are given the larger N wins.
+        With ``order=0`` the expansion order itself is chosen from
+        ``target_accuracy`` (the smallest order meeting the single-division bound).
 
-        Remaining gate-count optimisations are also left as future work:
-        ordering the recursion groups, exploiting disjoint-support (layer)
-        parallelism instead of flattening layers, and merging redundant terms
-        at division / Suzuki-copy boundaries.
+        Remaining gate-count optimisations are left as future work: exploiting
+        disjoint-support (layer) parallelism instead of flattening layers, and
+        merging redundant terms at division / Suzuki-copy boundaries.
 
     """
 
@@ -104,6 +220,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         *,
         time: float = 0.0,
         num_divisions: int = 1,
+        target_accuracy: float = 0.0,
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
@@ -111,21 +228,29 @@ class Zassenhaus(TimeEvolutionBuilder):
         r"""Initialize the Zassenhaus builder.
 
         Args:
-            order: Expansion order p in {2, 3, 4}; order 1 falls back to first-order Trotter. Defaults to 2.
+            order: Expansion order p in {2, 3, 4, 5, 6}; order 1 falls back to first-order Trotter; order 0
+                selects the order automatically from ``target_accuracy``. Defaults to 2.
             time: The evolution time. Defaults to 0.0.
             num_divisions: Number of time divisions N (>= 1). Defaults to 1.
+            target_accuracy: Target accuracy for automatic N estimation. Use 0.0 (default) to disable.
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
 
+        Raises:
+            ValueError: If ``num_divisions`` is less than 1.
+
         """
         super().__init__()
+        if num_divisions < 1:
+            raise ValueError(f"num_divisions must be >= 1, got {num_divisions}.")
         self._settings = ZassenhausSettings()
         self._settings.set("time", time)
         self._settings.set("power", power)
         self._settings.set("power_strategy", power_strategy)
         self._settings.set("order", order)
         self._settings.set("num_divisions", num_divisions)
+        self._settings.set("target_accuracy", target_accuracy)
         self._settings.set("weight_threshold", weight_threshold)
 
     # ------------------------------------------------------------------ #
@@ -138,10 +263,6 @@ class Zassenhaus(TimeEvolutionBuilder):
             # Order 1 carries no commutator corrections (e^X e^Y), which is
             # exactly the first-order Trotter product -- delegate to it.
             return self._trotter_fallback(qubit_hamiltonian)
-        if not (_MIN_ORDER <= order <= _MAX_ORDER):
-            raise NotImplementedError(
-                f"Zassenhaus order must be 1 (Trotter fallback) or in [{_MIN_ORDER}, {_MAX_ORDER}], got {order}."
-            )
 
         effective_time, power_repetitions = self._resolve_power()
         weight_threshold = self._settings.get("weight_threshold")
@@ -149,7 +270,16 @@ class Zassenhaus(TimeEvolutionBuilder):
         if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
-        num_divisions = max(1, self._settings.get("num_divisions"))
+        if order == 0:
+            # Pick the order from the accuracy budget (mirrors num_divisions=0).
+            order = self._resolve_auto_order(qubit_hamiltonian, effective_time)
+        if not (_MIN_ORDER <= order <= _MAX_ORDER):
+            raise NotImplementedError(
+                f"Zassenhaus order must be 0 (automatic), 1 (Trotter fallback), "
+                f"or in [{_MIN_ORDER}, {_MAX_ORDER}], got {order}."
+            )
+
+        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, effective_time, order)
         delta = effective_time / num_divisions
 
         # One Zassenhaus product approximating exp(-i H delta).
@@ -161,6 +291,81 @@ class Zassenhaus(TimeEvolutionBuilder):
             num_qubits=qubit_hamiltonian.num_qubits,
         )
         return UnitaryRepresentation(container=container)
+
+    def _resolve_auto_order(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+        r"""Pick the expansion order from ``target_accuracy`` (used when ``order == 0``).
+
+        Returns the smallest order p in ``[_MIN_ORDER, _MAX_ORDER]`` whose
+        single-division truncation bound ``||C_{p+1}|| t^{p+1}`` is within the
+        target (``||C_{p+1}||`` bounded by the 1-norm of its Pauli coefficients,
+        the same bound used for the division count). If none qualifies, the
+        maximum order is returned and ``num_divisions`` takes up the slack. This
+        is a closed-form accuracy bound in the spirit of the Trotter step-count
+        estimators, not a cost-optimal search.
+        """
+        target_accuracy = self._settings.get("target_accuracy")
+        if target_accuracy <= 0.0:
+            raise ValueError("Automatic order selection (order=0) requires target_accuracy > 0.")
+        groups = self._commuting_groups(qubit_hamiltonian)
+        if len(groups) < 2 or time == 0.0:
+            # A single commuting group is exact; nothing to expand.
+            return _MIN_ORDER
+
+        unit_ops = [(-1j) * group for group in groups]
+        word_exponents = _zassenhaus_word_exponents(len(groups), _MAX_ORDER + 1)
+        for order in range(_MIN_ORDER, _MAX_ORDER + 1):
+            leading = self._evaluate_exponent(word_exponents[order - 1], order + 1, unit_ops)
+            norm_bound = float(np.sum(np.abs(np.asarray(leading.coefficients))))
+            if norm_bound * abs(time) ** (order + 1) <= target_accuracy:
+                return order
+        return _MAX_ORDER
+
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float, order: int) -> int:
+        """Determine the number of Zassenhaus divisions N.
+
+        Uses ``max(num_divisions, auto)`` when ``target_accuracy`` is set, where
+        ``auto`` is :meth:`_estimate_divisions`; otherwise the explicit
+        ``num_divisions`` (>= 1, validated at construction).
+        """
+        manual = self._settings.get("num_divisions")
+        target_accuracy = self._settings.get("target_accuracy")
+        if target_accuracy <= 0.0:
+            return manual
+        estimated = self._estimate_divisions(qubit_hamiltonian, time, order, target_accuracy)
+        return max(manual, estimated)
+
+    def _estimate_divisions(
+        self, qubit_hamiltonian: QubitHamiltonian, time: float, order: int, target_accuracy: float
+    ) -> int:
+        r"""Estimate N so the leading Zassenhaus truncation error meets the target.
+
+        The dropped term is the degree-(p+1) exponent C_{p+1}; over N divisions of
+        time t the leading error is ``||C_{p+1}|| t^{p+1} / N^p`` (with C_{p+1} taken
+        at unit time). Bounding ``||C_{p+1}||`` by the 1-norm of its Pauli
+        coefficients (each Pauli has unit operator norm) and solving for N gives
+
+            N = ceil( ( ||C_{p+1}||_1 * t^{p+1} / target_accuracy )^{1/p} ).
+
+        Like the Trotter step-count bounds, this is an estimate (an upper bound on
+        the leading term), not an exact error guarantee.
+        """
+        if time == 0.0:
+            return 1
+        groups = self._commuting_groups(qubit_hamiltonian)
+        if len(groups) < 2:
+            # A single commuting group is evolved exactly; no truncation error.
+            return 1
+
+        # C_{p+1} at unit time: the leading dropped Zassenhaus exponent.
+        unit_ops = [(-1j) * group for group in groups]
+        word_exponents = _zassenhaus_word_exponents(len(groups), order + 1)
+        leading = self._evaluate_exponent(word_exponents[order - 1], order + 1, unit_ops)
+        norm_bound = float(np.sum(np.abs(np.asarray(leading.coefficients))))
+        if norm_bound <= 0.0:
+            return 1
+
+        n_float = (norm_bound * abs(time) ** (order + 1) / target_accuracy) ** (1.0 / order)
+        return max(1, int(np.ceil(n_float)))
 
     def _trotter_fallback(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Delegate order 1 to the first-order Trotter builder.
@@ -192,8 +397,11 @@ class Zassenhaus(TimeEvolutionBuilder):
     ) -> list[ExponentiatedPauliTerm]:
         r"""Decompose a single Zassenhaus step into exponentiated Pauli terms.
 
-        Partitions H into internally-commuting groups G_1, ..., G_K and builds
-        the recursive K-group Zassenhaus product (see :meth:`_zassenhaus_factors`),
+        Partitions H into internally-commuting groups G_0, ..., G_{K-1} and builds
+        the multi-operator Zassenhaus product (see :meth:`_multi_operator_factors`)
+
+            exp(-i t H) = exp(X_0) ... exp(X_{K-1}) exp(C_2) ... exp(C_order),
+
         then flattens each anti-Hermitian factor into ``ExponentiatedPauliTerm``s.
         """
         groups = self._commuting_groups(qubit_hamiltonian)
@@ -201,83 +409,76 @@ class Zassenhaus(TimeEvolutionBuilder):
             Logger.warn("No Pauli terms above the tolerance; returning empty term list.")
             return []
 
-        # Ordered (leftmost-first) list of (factor, is_correction) pairs.
-        factors = self._zassenhaus_factors(groups, time, order)
+        # Ordered (leftmost-first) list of (factor, degree) pairs; degree 0 marks a
+        # group (leaf) factor, degree n >= 2 marks the correction C_n.
+        factors = self._multi_operator_factors(groups, time, order)
 
-        # Flatten each factor in operator order exp(G_1) ... exp(C_n). Group
-        # factors are exact (internally commuting), so a plain product suffices.
-        # A degree-n correction flattens with error O(t^{2n}) (plain) or O(t^{3n})
-        # (symmetric/Strang). The lowest correction C_2 (n=2) gives O(t^4) plain,
-        # which is < O(t^{p+1}) only for p >= 4 -- so symmetric flattening is needed
-        # for order 4 but redundant (extra gates) for orders 2 and 3.
-        flatten_correction = self._exponentiate_factor_symmetric if order > 3 else self._exponentiate_factor
+        # Each factor exp(F) is realized by a Trotter-Suzuki product of its Pauli
+        # terms. A degree-n factor has ||F|| ~ t^n, so a Suzuki order-s product
+        # has error O(t^{n(s+1)}); we pick the smallest s in {1, 2, 4, 6, ...}
+        # with n(s+1) >= order + 1 so the flattening never dominates the O(t^{order+1})
+        # truncation (see :meth:`_correction_trotter_order`). Group (leaf) factors
+        # commute internally, so order 1 is already exact for them.
         terms: list[ExponentiatedPauliTerm] = []
-        for factor, is_correction in factors:
-            flatten = flatten_correction if is_correction else self._exponentiate_factor
-            terms.extend(flatten(factor, atol=atol))
+        for factor, degree in factors:
+            suzuki_order = self._correction_trotter_order(degree, order)
+            terms.extend(self._exponentiate_factor_suzuki(factor, suzuki_order, atol=atol))
 
         # The mapper applies step_terms[0] first (rightmost operator), so reverse
         # to realize the product above: the leftmost factor is applied last.
         terms.reverse()
         return terms
 
-    def _zassenhaus_factors(
+    def _multi_operator_factors(
         self, groups: list[QubitHamiltonian], time: float, order: int
-    ) -> list[tuple[QubitHamiltonian, bool]]:
-        r"""Recursive K-group Zassenhaus product.
+    ) -> list[tuple[QubitHamiltonian, int]]:
+        r"""Multi-operator (textbook) Zassenhaus product over all K groups at once.
 
-        For groups (G_1, ..., G_K), each internally commuting, with
-        X_1 = -i t G_1 and X_R = -i t (G_2 + ... + G_K):
+        With X_i = -i t G_i for the internally-commuting groups G_0, ..., G_{K-1},
 
-            Z_p(G_1, ..., G_K) = e^{X_1} . Z_p(G_2, ..., G_K) . e^{C_2} ... e^{C_p}
+            exp(sum_i X_i) = exp(X_0) ... exp(X_{K-1}) exp(C_2) ... exp(C_order),
 
-        where the corrections C_n = C_n(X_1, X_R) use the *exact* rest block X_R.
-        Returned as an ordered (leftmost-first) list of ``(factor, is_correction)``
-        pairs; each e^{X_i} group factor is exact because G_i is internally
-        commuting.
+        where each C_n is the genuine K-operator Zassenhaus exponent of degree n --
+        a single correction block per degree, with no recursive re-expansion and no
+        redundant per-level corrections. Returned as an ordered (leftmost-first)
+        list of ``(factor, degree)`` pairs: degree 0 for the exact group factors,
+        degree n for the correction C_n.
         """
-        x_first = (-1j * time) * groups[0]
-        if len(groups) == 1:
-            return [(x_first, False)]
-
-        rest = groups[1]
-        for group in groups[2:]:
-            rest = rest + group
-        x_rest = (-1j * time) * rest
-
-        inner = self._zassenhaus_factors(groups[1:], time, order)
-        corrections = [(c, True) for c in self._correction_factors(x_first, x_rest, order=order)]
-        return [(x_first, False), *inner, *corrections]
-
-    def _correction_factors(self, x: QubitHamiltonian, y: QubitHamiltonian, order: int) -> list[QubitHamiltonian]:
-        r"""Return the commutator-correction factors C_2 .. C_order for blocks X, Y.
-
-        Uses the native ``commutator`` (QDK-native, Qiskit-free) recursively.
-        Each returned factor is an anti-Hermitian ``QubitHamiltonian``.
-        """
-        k = commutator(x, y)  # [X, Y] -- shared building block
-
-        factors: list[QubitHamiltonian] = []
-
-        # Order 2: -1/2 [X, Y]
-        factors.append((-0.5) * k)
-        if order == 2:
+        ops = [(-1j * time) * group for group in groups]
+        factors: list[tuple[QubitHamiltonian, int]] = [(op, 0) for op in ops]
+        if len(ops) < 2:
+            # A single commuting group is exponentiated exactly; no corrections.
             return factors
 
-        # Order 3: 1/3 [Y, [X, Y]] + 1/6 [X, [X, Y]]
-        c3 = (1.0 / 3.0) * commutator(y, k) + (1.0 / 6.0) * commutator(x, k)
-        factors.append(c3)
-        if order == 3:
-            return factors
-
-        # Order 4: -1/24 [X,[X,[X,Y]]] - 1/8 [Y,[X,[X,Y]]] - 1/8 [Y,[Y,[X,Y]]].
-        # Coefficients verified two ways: (i) roots-of-unity extraction of the
-        # degree-4 term, and (ii) the operator-norm slope test gives p+1 = 5.
-        xk = commutator(x, k)  # [X, [X, Y]]
-        yk = commutator(y, k)  # [Y, [X, Y]]
-        c4 = (-1.0 / 24.0) * commutator(x, xk) + (-1.0 / 8.0) * commutator(y, xk) + (-1.0 / 8.0) * commutator(y, yk)
-        factors.append(c4)
+        word_exponents = _zassenhaus_word_exponents(len(ops), order)
+        for degree in range(2, order + 1):
+            c_n = self._evaluate_exponent(word_exponents[degree - 2], degree, ops)
+            factors.append((c_n, degree))
         return factors
+
+    def _evaluate_exponent(self, word_terms: tuple, degree: int, ops: list[QubitHamiltonian]) -> QubitHamiltonian:
+        r"""Evaluate a symbolic Zassenhaus exponent on the actual operators.
+
+        ``word_terms`` is the cached word expansion of C_n from
+        :func:`_zassenhaus_word_exponents`. By the Dynkin-Specht-Wever theorem a
+        homogeneous degree-n Lie element equals ``1/n`` times the right-nested
+        bracketing of its words, so
+
+            C_n = (1 / n) sum_w c_w [g_{w_0}, [g_{w_1}, [ ..., g_{w_{n-1}}]]],
+
+        evaluated with the QDK-native ``commutator`` (Qiskit-free). Nested
+        commutators of (anti-Hermitian) Pauli operators are again Pauli operators,
+        so the result is an anti-Hermitian ``QubitHamiltonian``.
+        """
+        inverse_degree = 1.0 / degree
+        total: QubitHamiltonian | None = None
+        for word, coeff in word_terms:
+            nested = ops[word[-1]]
+            for index in reversed(word[:-1]):
+                nested = commutator(ops[index], nested)
+            contribution = (float(coeff) * inverse_degree) * nested
+            total = contribution if total is None else total + contribution
+        return total
 
     # ------------------------------------------------------------------ #
     # Helpers
@@ -363,13 +564,25 @@ class Zassenhaus(TimeEvolutionBuilder):
         phases in PhaseEstimation (a leading ``I...I`` term, as in H2/STO-3G,
         carries a real physical phase).
 
-        Note: a factor's terms generally do NOT commute, so this first-order
-        flattening introduces an O(t^{2n}) error for an O(t^n) factor -- which
-        is >= O(t^{p+1}) for n >= 2, p <= 4, hence harmless to the target order.
+        This is the first-order (plain) Trotter product. A factor's terms
+        generally do NOT commute, so it carries an O(||F||^2) = O(t^{2n}) error
+        for a degree-n factor; the caller (:meth:`_decompose_zassenhaus_step`)
+        escalates to a higher Suzuki order when that is not high enough. Leaf
+        (group) factors commute internally, so this product is exact for them.
+
+        Like Pauli terms are summed before emission. ``QubitHamiltonian``
+        addition concatenates rather than merging, and the commutator sums in
+        :meth:`_correction_factors` can produce the same Pauli several times;
+        since ``exp(a P) exp(b P) = exp((a + b) P)`` exactly (P commutes with
+        itself), collecting them removes redundant rotations with no reordering
+        and no loss of accuracy.
         """
-        terms: list[ExponentiatedPauliTerm] = []
+        merged: dict[str, complex] = {}
         for label, coeff in zip(factor.pauli_strings, factor.coefficients, strict=True):
-            c = complex(coeff)
+            merged[label] = merged.get(label, 0j) + complex(coeff)
+
+        terms: list[ExponentiatedPauliTerm] = []
+        for label, c in merged.items():
             if abs(c) < atol:
                 continue
             if abs(c.real) > atol:
@@ -404,6 +617,52 @@ class Zassenhaus(TimeEvolutionBuilder):
         *body, last = half
         centre = ExponentiatedPauliTerm(pauli_term=last.pauli_term, angle=2.0 * last.angle)
         return [*body, centre, *body[::-1]]
+
+    def _exponentiate_factor_suzuki(
+        self, factor: QubitHamiltonian, suzuki_order: int, *, atol: float = 1e-12
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Flatten ``exp(F)`` with a Trotter-Suzuki product formula of order ``suzuki_order``.
+
+        Order 1 is the plain product (:meth:`_exponentiate_factor`), order 2 the
+        symmetric Strang product (:meth:`_exponentiate_factor_symmetric`), and even
+        orders 2k >= 4 use the standard Suzuki recursion (Suzuki 1992)
+
+            S_{2k}(F) = S_{2k-2}(u_k F)^2 S_{2k-2}((1 - 4 u_k) F) S_{2k-2}(u_k F)^2,
+            u_k = 1 / (4 - 4^{1/(2k-1)}),
+
+        whose error versus ``exp(F)`` is O(||F||^{2k+1}). Each S_{2k} is time
+        symmetric, so the emitted block is a palindrome and the outer
+        ``terms.reverse()`` in :meth:`_decompose_zassenhaus_step` leaves it intact.
+        """
+        if suzuki_order <= 1:
+            return self._exponentiate_factor(factor, atol=atol)
+        if suzuki_order == 2:
+            return self._exponentiate_factor_symmetric(factor, atol=atol)
+
+        k = suzuki_order // 2
+        u_k = 1.0 / (4.0 - 4.0 ** (1.0 / (2 * k - 1)))
+        outer = self._exponentiate_factor_suzuki(u_k * factor, suzuki_order - 2, atol=atol)
+        middle = self._exponentiate_factor_suzuki((1.0 - 4.0 * u_k) * factor, suzuki_order - 2, atol=atol)
+        return [*outer, *outer, *middle, *outer, *outer]
+
+    @staticmethod
+    def _correction_trotter_order(degree: int, order: int) -> int:
+        r"""Smallest Suzuki order s in {1, 2, 4, 6, ...} so the flattening is high enough.
+
+        A degree-n factor has ``||F|| ~ t^n``; a Suzuki order-s product formula
+        flattens it with error ``O(t^{n(s+1)})``. The truncation target is
+        ``O(t^{order+1})``, so we need ``n(s+1) >= order + 1``. Group (leaf) factors
+        (degree 0) commute internally and are exact at order 1.
+        """
+        if degree < 2:
+            return 1
+        needed = order + 1
+        if degree * 2 >= needed:  # plain product (s = 1) already suffices
+            return 1
+        suzuki_order = 2
+        while degree * (suzuki_order + 1) < needed:
+            suzuki_order += 2
+        return suzuki_order
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

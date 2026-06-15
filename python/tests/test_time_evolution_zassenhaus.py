@@ -157,6 +157,39 @@ class TestZassenhausBuilder:
         container = Zassenhaus(order=2, time=0.2, num_divisions=4).run(hamiltonian).get_container()
         assert container.step_reps == 4
 
+    def test_num_divisions_below_one_raises(self):
+        """num_divisions < 1 is rejected at construction, not silently clamped."""
+        with pytest.raises(ValueError, match="num_divisions"):
+            Zassenhaus(order=2, time=0.1, num_divisions=0)
+
+    def test_target_accuracy_increases_divisions(self):
+        """A target_accuracy raises N automatically until the error meets the target."""
+        hamiltonian = _heisenberg_hamiltonian()
+        time = 1.0
+        target = 1e-2
+        container = Zassenhaus(order=2, time=time, target_accuracy=target).run(hamiltonian).get_container()
+        assert container.step_reps > 1  # auto-estimation engaged
+        error = np.linalg.norm(_exact_unitary(hamiltonian, time) - _builder_unitary(container), 2)
+        assert error < target
+
+    def test_order_zero_selects_order_from_target_accuracy(self):
+        """order=0 picks the expansion order from target_accuracy (tighter -> higher order)."""
+        hamiltonian = _heisenberg_hamiltonian()
+        time = 0.1
+        loose = Zassenhaus(order=0, time=time, target_accuracy=1.0).run(hamiltonian).get_container()
+        tight = Zassenhaus(order=0, time=time, target_accuracy=1e-2).run(hamiltonian).get_container()
+        # A tighter accuracy selects a higher order, hence more terms per step.
+        assert len(tight.step_terms) > len(loose.step_terms)
+        # The auto-selected configuration meets the requested accuracy.
+        error = np.linalg.norm(_exact_unitary(hamiltonian, time) - _builder_unitary(tight), 2)
+        assert error < 1e-2
+
+    def test_order_zero_without_target_accuracy_raises(self):
+        """Automatic order selection needs an accuracy budget to choose from."""
+        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZI"], coefficients=[0.7, 0.5])
+        with pytest.raises(ValueError, match="target_accuracy"):
+            Zassenhaus(order=0, time=0.1).run(hamiltonian)
+
     def test_accepts_partitioned_hamiltonian(self):
         """A Hamiltonian carrying a commuting term_partition is accepted (as trotter accepts)."""
         hamiltonian = _heisenberg_hamiltonian()
@@ -165,10 +198,10 @@ class TestZassenhausBuilder:
         assert isinstance(unitary.get_container(), PauliProductFormulaContainer)
 
     def test_unsupported_order_raises(self):
-        """Orders outside the supported {1, 2, 3, 4} range raise NotImplementedError."""
+        """Orders outside the supported {1, 2, 3, 4, 5, 6} range raise NotImplementedError."""
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZI"], coefficients=[0.7, 0.5])
         with pytest.raises(NotImplementedError):
-            Zassenhaus(order=5, time=0.1).run(hamiltonian)
+            Zassenhaus(order=7, time=0.1).run(hamiltonian)
 
     def test_order_one_falls_back_to_trotter(self):
         """Order 1 (no commutator corrections) reproduces the first-order Trotter product."""
@@ -264,11 +297,18 @@ class TestZassenhausPhaseEstimation:
         return energies[int(np.argmin([abs(energy - reference_energy) for energy in energies]))]
 
     def test_consumed_by_phase_estimation_exact_for_commuting(self):
-        """A commuting Hamiltonian is evolved exactly, so QPE recovers the energy with no algorithmic error."""
+        """A commuting Hamiltonian is evolved exactly, so QPE recovers the energy with no algorithmic error.
+
+        ``H = 0.25 XX + 0.5 ZZ`` has the Bell state ``(|00> + |11>)/sqrt(2)`` as an
+        exact eigenstate with eigenvalue ``0.25 + 0.5 = 0.75`` (XX and ZZ both act
+        as +1 on it). Using a genuine eigenstate makes the result deterministic --
+        a non-eigenstate would collapse onto an eigenvalue only probabilistically.
+        """
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
+        bell = np.array([1.0, 0.0, 0.0, 1.0]) / np.sqrt(2.0)
         energy = self._run_iqpe(
             hamiltonian,
-            np.array([0.6, 0.0, 0.0, 0.8]),
+            bell,
             time=float(np.pi / 2),
             num_bits=4,
             order=2,
