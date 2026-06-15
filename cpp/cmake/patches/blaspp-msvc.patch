@@ -1,0 +1,68 @@
+# MSVC compatibility patches for blaspp v2025.05.28.
+# Apply with: git apply blaspp-msvc.patch  (run from blaspp source root)
+#
+# 1. cmake/BLASFinder.cmake: cache blaspp_defs_ so it survives reconfigure.
+#    blaspp_defs_ (e.g. -DBLAS_FORTRAN_ADD_) was never cached; on reconfigure
+#    detection is skipped (run_=false), blaspp_defs_ is empty, and
+#    blaspp_defines gets overwritten with empty (CACHE INTERNAL implies FORCE),
+#    causing defines.h to lose all BLAS mangling definitions.
+# 2. examples/util.hh, include/blas/symv.hh: replace __PRETTY_FUNCTION__ with
+#    __FUNCSIG__ on MSVC (the GCC/Clang builtin is not available).
+diff --git a/cmake/BLASFinder.cmake b/cmake/BLASFinder.cmake
+index 2994f85..fa494c9 100644
+--- a/cmake/BLASFinder.cmake
++++ b/cmake/BLASFinder.cmake
+@@ -26,6 +26,7 @@ if (BLAS_LIBRARIES)
+         # Already checked this BLAS_LIBRARIES; load cached results.
+         message( STATUS "Using cached BLAS_LIBRARIES settings" )
+         set( BLAS_FOUND "${blas_found_cached}" )
++        set( blaspp_defs_ "${blaspp_defs_cached}" )
+         set( run_ false )
+     else()
+         # Need to check BLAS_LIBRARIES.
+@@ -42,6 +43,7 @@ elseif (    "${blas}"          STREQUAL "${blas_cached}"
+     message( STATUS "Using cached blas settings" )
+     set( BLAS_LIBRARIES "${blas_libraries_cached}" )
+     set( BLAS_FOUND     "${blas_found_cached}" )
++    set( blaspp_defs_ "${blaspp_defs_cached}" )
+     set( run_ false )
+ else()
+     # Search blas, blas_int, etc.
+@@ -549,6 +551,7 @@ set( blas_fortran_cached   "${blas_fortran}"   CACHE INTERNAL "" )
+ set( blas_int_cached       "${blas_int}"       CACHE INTERNAL "" )
+ set( blas_threaded_cached  "${blas_threaded}"  CACHE INTERNAL "" )
+ 
++set( blaspp_defs_cached    "${blaspp_defs_}"   CACHE INTERNAL "" )
+ endif() # run_
+ #===============================================================================
+ 
+diff --git a/examples/util.hh b/examples/util.hh
+index 5e0a509..8812022 100644
+--- a/examples/util.hh
++++ b/examples/util.hh
+@@ -16,7 +16,11 @@ void print_func_( const char* func )
+ }
+ 
+ #ifdef __GNUC__
+-    #define print_func() print_func_( __PRETTY_FUNCTION__ )
++    #ifdef _MSC_VER
++        #define print_func() print_func_( __FUNCSIG__ )
++    #else
++        #define print_func() print_func_( __PRETTY_FUNCTION__ )
++    #endif
+ #else
+     #define print_func() print_func_( __func__ )
+ #endif
+diff --git a/include/blas/symv.hh b/include/blas/symv.hh
+index 0881fae..46d98b2 100644
+--- a/include/blas/symv.hh
++++ b/include/blas/symv.hh
+@@ -73,7 +73,7 @@ void symv(
+     blas::scalar_type<TA, TX, TY> beta,
+     TY *y, int64_t incy )
+ {
+-printf( "%s: %s\n", __func__, __PRETTY_FUNCTION__ );
++printf( "%s: %s\n", __func__, __FUNCSIG__ );
+     typedef blas::scalar_type<TA, TX, TY> scalar_t;
+ 
+     #define A(i_, j_) A[ (i_) + (j_)*lda ]
