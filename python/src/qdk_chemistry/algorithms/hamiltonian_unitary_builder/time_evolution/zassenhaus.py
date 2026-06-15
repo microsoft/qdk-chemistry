@@ -150,6 +150,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         terms = self._decompose_zassenhaus_step(
             qubit_hamiltonian, time=delta, atol=self._settings.get("weight_threshold"), order=resolved_order
         )
+        terms = self._optimize_pauli_sequence(terms, atol=1e-15)
 
         num_qubits = qubit_hamiltonian.num_qubits
 
@@ -505,6 +506,48 @@ class Zassenhaus(TimeEvolutionBuilder):
             angle = coeff * time
             terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
         return terms
+
+    def _optimize_pauli_sequence(
+        self,
+        terms: list[ExponentiatedPauliTerm],
+        *,
+        atol: float = 1e-15,
+    ) -> list[ExponentiatedPauliTerm]:
+        """Optimize a sequence of exponentiated Pauli terms by merging adjacent and commuting terms."""
+        if not terms:
+            return []
+
+        optimized: list[ExponentiatedPauliTerm] = []
+        for term in terms:
+            pauli_key = tuple(sorted(term.pauli_term.items()))
+            merged = False
+
+            # Bubble backwards to find a matching Pauli term to merge with
+            for i in reversed(range(len(optimized))):
+                prev_term = optimized[i]
+                prev_key = tuple(sorted(prev_term.pauli_term.items()))
+
+                if prev_key == pauli_key:
+                    # Found matching term, merge the angles
+                    new_angle = prev_term.angle + term.angle
+                    optimized[i] = ExponentiatedPauliTerm(pauli_term=prev_term.pauli_term, angle=new_angle)
+                    merged = True
+                    break
+
+                # If the terms do not commute, we cannot bubble past
+                if not do_pauli_maps_commute(term.pauli_term, prev_term.pauli_term):
+                    break
+
+            if not merged:
+                optimized.append(term)
+
+        # Filter out near-zero terms
+        final_terms = []
+        for term in optimized:
+            if abs(term.angle) >= atol:
+                final_terms.append(term)
+
+        return final_terms
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

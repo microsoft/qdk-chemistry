@@ -27,6 +27,7 @@ from qdk_chemistry.data import (
     Structure,
     UnitaryRepresentation,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.phase import resolve_energy_aliases
@@ -377,7 +378,64 @@ class TestZassenhausTimeEvolution:
             term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
         )
         container_part = Zassenhaus(num_divisions=1, order=4, time=t_sim).run(ham_partitioned).get_container()
-        assert len(container_part.step_terms) == 14
+        assert len(container_part.step_terms) == 12
+
+    def test_zassenhaus_bubble_and_merge_optimization(self):
+        """Verify the Bubble & Merge optimization reduces term counts and preserves accuracy."""
+        builder = Zassenhaus()
+        terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
+            ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.2),
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3),
+        ]
+        optimized = builder._optimize_pauli_sequence(terms)
+        assert len(optimized) == 2  # Should merge the two X0 terms
+        assert optimized[0].pauli_term == {0: "X"}
+        assert np.isclose(optimized[0].angle, 0.8)
+        assert optimized[1].pauli_term == {1: "Z"}
+        assert np.isclose(optimized[1].angle, 0.2)
+
+        non_commuting_terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
+            ExponentiatedPauliTerm(pauli_term={0: "Z"}, angle=0.2),
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.3),
+        ]
+        optimized_nc = builder._optimize_pauli_sequence(non_commuting_terms)
+        assert len(optimized_nc) == 3  # X0 and Z0 do not commute
+
+        canceling_terms = [
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=0.5),
+            ExponentiatedPauliTerm(pauli_term={1: "Z"}, angle=0.2),
+            ExponentiatedPauliTerm(pauli_term={0: "X"}, angle=-0.5),
+        ]
+        optimized_cancel = builder._optimize_pauli_sequence(canceling_terms)
+        assert len(optimized_cancel) == 1
+        assert optimized_cancel[0].pauli_term == {1: "Z"}
+
+        hamiltonian = QubitHamiltonian(
+            pauli_strings=["XI", "IX", "ZZ", "YY"],
+            coefficients=[0.7, -0.2, 0.3, 0.11],
+            term_partition=FlatPartition(strategy="commuting", groups=((0, 1), (2, 3))),
+        )
+        container_opt = Zassenhaus(num_divisions=1, order=4, time=0.1).run(hamiltonian).get_container()
+        raw_builder = Zassenhaus(num_divisions=1, order=4, time=0.1)
+        raw_terms = raw_builder._decompose_zassenhaus_step(hamiltonian, time=0.1, order=4)
+        assert len(container_opt.step_terms) < len(raw_terms)
+
+        def terms_to_unitary(step_terms):
+            u = np.eye(2**hamiltonian.num_qubits, dtype=complex)
+            for t in step_terms:
+                pauli_label = TestZassenhausTimeEvolution._pauli_label_from_map(
+                    t.pauli_term, num_qubits=hamiltonian.num_qubits
+                )
+                pauli_matrix = pauli_to_dense_matrix([pauli_label], np.array([1.0]))
+                u = scipy.linalg.expm(-1j * t.angle * pauli_matrix) @ u
+            return u
+
+        u_opt = terms_to_unitary(container_opt.step_terms)
+        u_raw = terms_to_unitary(raw_terms)
+
+        assert np.allclose(u_opt, u_raw, atol=1e-12)
 
     @pytest.mark.slow
     def test_zassenhaus_operator_norm_error_scaling(self):
