@@ -2,17 +2,24 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
 #include <complex>
 #include <cstddef>
 #include <cstdint>
+#include <map>
+#include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
+#include <span>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -191,12 +198,239 @@ class PackedAccumulator {
 //     cross-spin channels are related by Coulomb symmetry (pq|rs) =
 //     (rs|pq) and are handled in a single merged loop.
 
-template <std::size_t NW>
-MajoranaMapResult majorana_map_impl(
-    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
-    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
-    double threshold, double integral_threshold) {
+inline std::size_t idx4(std::size_t n_spatial, std::size_t p, std::size_t q,
+                        std::size_t r, std::size_t s) {
+  return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
+}
+
+inline std::size_t canonical_pair_index(std::size_t n_spatial, std::size_t p,
+                                        std::size_t q) {
+  if (p > q) std::swap(p, q);
+  return p * n_spatial - (p * (p - 1)) / 2 + (q - p);
+}
+
+struct DenseEriProvider {
+  const double* eri_aaaa;
+  const double* eri_aabb;
+  const double* eri_bbbb;
+  std::size_t n_spatial;
+  std::size_t n2;
+
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return eri_aaaa[idx4(n_spatial, p, q, r, s)];
+  }
+
+  std::span<const double> row_aaaa(std::size_t p, std::size_t q) const {
+    return {eri_aaaa + (p * n_spatial + q) * n2, n2};
+  }
+
+  std::span<const double> row_aabb(std::size_t p, std::size_t q) const {
+    return {eri_aabb + (p * n_spatial + q) * n2, n2};
+  }
+
+  std::span<const double> row_bbbb(std::size_t p, std::size_t q) const {
+    return {eri_bbbb + (p * n_spatial + q) * n2, n2};
+  }
+
+  template <typename Callback>
+  void for_each_restricted_eri(const std::vector<std::size_t>& sym_map,
+                               double integral_threshold,
+                               Callback&& callback) const {
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = p; q < n_spatial; ++q) {
+        std::size_t pq_idx = sym_map[p * n_spatial + q];
+        auto row = row_aaaa(p, q);
+        for (std::size_t r = 0; r < n_spatial; ++r) {
+          for (std::size_t s = r; s < n_spatial; ++s) {
+            std::size_t rs_idx = sym_map[r * n_spatial + s];
+            if (pq_idx > rs_idx) continue;
+
+            double eri = row[r * n_spatial + s];
+            if (std::abs(eri) < integral_threshold) continue;
+            callback(p, q, r, s, pq_idx, rs_idx, eri);
+          }
+        }
+      }
+    }
+  }
+};
+
+struct CholeskyEriProvider {
+  const Eigen::MatrixXd& l_alpha;
+  const Eigen::MatrixXd& l_beta;
+  std::size_t n_spatial;
+  std::size_t n2;
+  std::size_t naux;
+
+  double dot_rows(const Eigen::MatrixXd& left, std::size_t left_row,
+                  const Eigen::MatrixXd& right, std::size_t right_row) const {
+    double value = 0.0;
+    for (std::size_t aux = 0; aux < naux; ++aux) {
+      value += left(left_row, aux) * right(right_row, aux);
+    }
+    return value;
+  }
+
+  std::vector<double> build_row(const Eigen::MatrixXd& left,
+                                const Eigen::MatrixXd& right, std::size_t p,
+                                std::size_t q) const {
+    std::vector<double> row(n2, 0.0);
+    const std::size_t pq = p * n_spatial + q;
+    for (std::size_t aux = 0; aux < naux; ++aux) {
+      const double scale = left(pq, aux);
+      if (scale == 0.0) continue;
+      for (std::size_t rs = 0; rs < n2; ++rs) {
+        row[rs] += scale * right(rs, aux);
+      }
+    }
+    return row;
+  }
+
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    return dot_rows(l_alpha, p * n_spatial + q, l_alpha, r * n_spatial + s);
+  }
+
+  std::vector<double> row_aaaa(std::size_t p, std::size_t q) const {
+    return build_row(l_alpha, l_alpha, p, q);
+  }
+
+  std::vector<double> row_aabb(std::size_t p, std::size_t q) const {
+    return build_row(l_alpha, l_beta, p, q);
+  }
+
+  std::vector<double> row_bbbb(std::size_t p, std::size_t q) const {
+    return build_row(l_beta, l_beta, p, q);
+  }
+
+  template <typename Callback>
+  void for_each_restricted_eri(const std::vector<std::size_t>& sym_map,
+                               double integral_threshold,
+                               Callback&& callback) const {
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = p; q < n_spatial; ++q) {
+        std::size_t pq_idx = sym_map[p * n_spatial + q];
+        auto row = row_aaaa(p, q);
+        for (std::size_t r = 0; r < n_spatial; ++r) {
+          for (std::size_t s = r; s < n_spatial; ++s) {
+            std::size_t rs_idx = sym_map[r * n_spatial + s];
+            if (pq_idx > rs_idx) continue;
+
+            double eri = row[r * n_spatial + s];
+            if (std::abs(eri) < integral_threshold) continue;
+            callback(p, q, r, s, pq_idx, rs_idx, eri);
+          }
+        }
+      }
+    }
+  }
+};
+
+struct SparseEriProvider {
+  struct Key {
+    std::size_t p;
+    std::size_t q;
+    std::size_t r;
+    std::size_t s;
+
+    friend bool operator<(const Key& left, const Key& right) {
+      return std::tie(left.p, left.q, left.r, left.s) <
+             std::tie(right.p, right.q, right.r, right.s);
+    }
+  };
+
+  std::size_t n_spatial;
+  std::size_t n2;
+  std::map<Key, double> entries;
+
+  SparseEriProvider(std::size_t n,
+                    const SparseHamiltonianContainer::TwoBodyMap& values)
+      : n_spatial(n), n2(n * n) {
+    for (const auto& [indices, value] : values) {
+      auto [p, q, r, s] = indices;
+      Key key = canonicalize_checked(p, q, r, s);
+      auto [it, inserted] = entries.emplace(key, value);
+      if (!inserted) {
+        double scale = std::max({1.0, std::abs(it->second), std::abs(value)});
+        if (std::abs(it->second - value) > 1e-12 * scale) {
+          throw std::invalid_argument(
+              "Sparse two-body integrals contain inconsistent values for "
+              "symmetry-equivalent indices.");
+        }
+      }
+    }
+  }
+
+  Key canonicalize_checked(int p, int q, int r, int s) const {
+    auto checked = [&](int index) -> std::size_t {
+      if (index < 0 || static_cast<std::size_t>(index) >= n_spatial) {
+        throw std::invalid_argument(
+            "Sparse two-body integral index is outside the active-space "
+            "orbital range.");
+      }
+      return static_cast<std::size_t>(index);
+    };
+    return canonicalize(checked(p), checked(q), checked(r), checked(s));
+  }
+
+  Key canonicalize(std::size_t p, std::size_t q, std::size_t r,
+                   std::size_t s) const {
+    if (p > q) std::swap(p, q);
+    if (r > s) std::swap(r, s);
+    if (canonical_pair_index(n_spatial, p, q) >
+        canonical_pair_index(n_spatial, r, s)) {
+      std::swap(p, r);
+      std::swap(q, s);
+    }
+    return {p, q, r, s};
+  }
+
+  double aaaa(std::size_t p, std::size_t q, std::size_t r,
+              std::size_t s) const {
+    auto it = entries.find(canonicalize(p, q, r, s));
+    return it == entries.end() ? 0.0 : it->second;
+  }
+
+  std::vector<double> row_aaaa(std::size_t p, std::size_t q) const {
+    std::vector<double> row(n2, 0.0);
+    for (std::size_t r = 0; r < n_spatial; ++r) {
+      for (std::size_t s = 0; s < n_spatial; ++s) {
+        row[r * n_spatial + s] = aaaa(p, q, r, s);
+      }
+    }
+    return row;
+  }
+
+  std::vector<double> row_aabb(std::size_t p, std::size_t q) const {
+    return row_aaaa(p, q);
+  }
+
+  std::vector<double> row_bbbb(std::size_t p, std::size_t q) const {
+    return row_aaaa(p, q);
+  }
+
+  template <typename Callback>
+  void for_each_restricted_eri(const std::vector<std::size_t>& sym_map,
+                               double integral_threshold,
+                               Callback&& callback) const {
+    for (const auto& [key, eri] : entries) {
+      if (std::abs(eri) < integral_threshold) continue;
+      std::size_t pq_idx = sym_map[key.p * n_spatial + key.q];
+      std::size_t rs_idx = sym_map[key.r * n_spatial + key.s];
+      callback(key.p, key.q, key.r, key.s, pq_idx, rs_idx, eri);
+    }
+  }
+};
+
+template <std::size_t NW, typename EriProvider>
+MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
+                                    double core_energy, const double* h1_alpha,
+                                    const double* h1_beta,
+                                    const EriProvider& eri_provider,
+                                    std::size_t n_spatial, bool spin_symmetric,
+                                    double threshold,
+                                    double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
 
   PackedAccumulator<NW> acc;
@@ -270,11 +504,6 @@ MajoranaMapResult majorana_map_impl(
     acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
-  auto idx4 = [n_spatial](std::size_t p, std::size_t q, std::size_t r,
-                          std::size_t s) -> std::size_t {
-    return ((p * n_spatial + q) * n_spatial + r) * n_spatial + s;
-  };
-
   // ─── One-body terms ──────────────────────────────────────────────
   std::vector<double> h1_eff_alpha(n_spatial * n_spatial);
   std::vector<double> h1_eff_beta(n_spatial * n_spatial);
@@ -285,7 +514,7 @@ MajoranaMapResult majorana_map_impl(
       if (spin_symmetric) {
         double delta_corr = 0.0;
         for (std::size_t q = 0; q < n_spatial; ++q) {
-          delta_corr += eri_aaaa[idx4(p, q, q, s)];
+          delta_corr += eri_provider.aaaa(p, q, q, s);
         }
         h_a -= 0.5 * delta_corr;
         h_b = h_a;
@@ -367,40 +596,30 @@ MajoranaMapResult majorana_map_impl(
       }
     }
 
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = p; q < n_spatial; ++q) {
-        std::size_t pq_idx = sym_map[p * n_spatial + q];
-        const auto& s_pq = sym_e[pq_idx];
-        for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = r; s < n_spatial; ++s) {
-            std::size_t rs_idx = sym_map[r * n_spatial + s];
-            if (pq_idx > rs_idx) continue;
+    eri_provider.for_each_restricted_eri(
+        sym_map, integral_threshold,
+        [&](std::size_t, std::size_t, std::size_t, std::size_t,
+            std::size_t pq_idx, std::size_t rs_idx, double eri) {
+          const auto& s_pq = sym_e[pq_idx];
+          const auto& s_rs = sym_e[rs_idx];
 
-            double eri = eri_aaaa[idx4(p, q, r, s)];
-            if (std::abs(eri) < integral_threshold) continue;
-
-            const auto& s_rs = sym_e[rs_idx];
-
-            if (pq_idx == rs_idx) {
-              double half_eri = 0.5 * eri;
-              for (const auto& [c1, w1] : s_pq.terms) {
-                for (const auto& [c2, w2] : s_rs.terms) {
-                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-                }
+          if (pq_idx == rs_idx) {
+            double half_eri = 0.5 * eri;
+            for (const auto& [c1, w1] : s_pq.terms) {
+              for (const auto& [c2, w2] : s_rs.terms) {
+                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
               }
-            } else {
-              double half_eri = 0.5 * eri;
-              for (const auto& [c1, w1] : s_pq.terms) {
-                for (const auto& [c2, w2] : s_rs.terms) {
-                  acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-                  acc.accumulate_product(w2, w1, half_eri * c2 * c1);
-                }
+            }
+          } else {
+            double half_eri = 0.5 * eri;
+            for (const auto& [c1, w1] : s_pq.terms) {
+              for (const auto& [c2, w2] : s_rs.terms) {
+                acc.accumulate_product(w1, w2, half_eri * c1 * c2);
+                acc.accumulate_product(w2, w1, half_eri * c2 * c1);
               }
             }
           }
-        }
-      }
-    }
+        });
 
   } else {
     auto accumulate_two_body_product =
@@ -437,9 +656,10 @@ MajoranaMapResult majorana_map_impl(
     // αα channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        auto row = eri_provider.row_aaaa(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_aaaa[idx4(p, q, r, s)];
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_alpha(r), mode_alpha(s), eri);
@@ -454,9 +674,10 @@ MajoranaMapResult majorana_map_impl(
     // ββ channel
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        auto row = eri_provider.row_bbbb(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_bbbb[idx4(p, q, r, s)];
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_beta(p), mode_beta(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -471,9 +692,10 @@ MajoranaMapResult majorana_map_impl(
     // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
+        auto row = eri_provider.row_aabb(p, q);
         for (std::size_t r = 0; r < n_spatial; ++r) {
           for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = eri_aabb[idx4(p, q, r, s)];
+            double eri = row[r * n_spatial + s];
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_beta(r), mode_beta(s), eri);
@@ -501,27 +723,26 @@ MajoranaMapResult majorana_map_impl(
 }
 
 // Dispatch table: function pointer per NW, covering 1..16 (up to 1024 qubits).
+template <typename EriProvider>
 using DispatchFn = MajoranaMapResult (*)(const MajoranaMapping&, double,
                                          const double*, const double*,
-                                         const double*, const double*,
-                                         const double*, std::size_t, bool,
+                                         const EriProvider&, std::size_t, bool,
                                          double, double);
 
-template <std::size_t... Is>
-constexpr std::array<DispatchFn, sizeof...(Is)> make_dispatch_table(
-    std::index_sequence<Is...>) {
-  return {{&majorana_map_impl<Is + 1>...}};
+template <typename EriProvider, std::size_t... Is>
+constexpr std::array<DispatchFn<EriProvider>, sizeof...(Is)>
+make_dispatch_table(std::index_sequence<Is...>) {
+  return {{&majorana_map_impl<Is + 1, EriProvider>...}};
 }
 
 constexpr std::size_t max_nw = 16;
 
-}  // namespace detail
-
-MajoranaMapResult majorana_map_hamiltonian(
+template <typename EriProvider>
+MajoranaMapResult dispatch_majorana_map(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
-    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
-    double threshold, double integral_threshold) {
+    const double* h1_beta, const EriProvider& eri_provider,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
   const std::size_t num_qubits = mapping.num_qubits();
   if (num_qubits == 0) {
     throw std::invalid_argument(
@@ -530,18 +751,97 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
   const std::size_t num_words = (num_qubits + 63) / 64;
 
-  if (num_words > detail::max_nw) {
+  if (num_words > max_nw) {
     throw std::invalid_argument(
         "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
-        " exceeds the maximum of " + std::to_string(detail::max_nw * 64) +
-        " qubits.");
+        " exceeds the maximum of " + std::to_string(max_nw * 64) + " qubits.");
   }
 
   static const auto table =
-      detail::make_dispatch_table(std::make_index_sequence<detail::max_nw>{});
-  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta, eri_aaaa,
-                              eri_aabb, eri_bbbb, n_spatial, spin_symmetric,
+      make_dispatch_table<EriProvider>(std::make_index_sequence<max_nw>{});
+  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta,
+                              eri_provider, n_spatial, spin_symmetric,
                               threshold, integral_threshold);
+}
+
+}  // namespace detail
+
+MajoranaMapResult majorana_map_hamiltonian(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
+    double threshold, double integral_threshold) {
+  detail::DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial,
+                                    n_spatial * n_spatial};
+  return detail::dispatch_majorana_map(mapping, core_energy, h1_alpha, h1_beta,
+                                       provider, n_spatial, spin_symmetric,
+                                       threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           double threshold,
+                                           double integral_threshold) {
+  auto [h1_alpha, h1_beta] = hamiltonian.get_one_body_integrals();
+  if (h1_alpha.rows() != h1_alpha.cols()) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: alpha one-body integrals must be square.");
+  }
+
+  const std::size_t n_spatial = static_cast<std::size_t>(h1_alpha.rows());
+  const bool spin_symmetric = hamiltonian.is_restricted();
+
+  std::vector<double> h1_alpha_flat(n_spatial * n_spatial);
+  std::vector<double> h1_beta_flat(n_spatial * n_spatial);
+  for (std::size_t p = 0; p < n_spatial; ++p) {
+    for (std::size_t q = 0; q < n_spatial; ++q) {
+      h1_alpha_flat[p * n_spatial + q] = h1_alpha(p, q);
+      h1_beta_flat[p * n_spatial + q] =
+          spin_symmetric ? h1_alpha(p, q) : h1_beta(p, q);
+    }
+  }
+
+  constexpr double excluded_core_energy = 0.0;
+
+  if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
+    if (!spin_symmetric) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: sparse container mapping currently "
+          "requires restricted orbitals.");
+    }
+    const auto& sparse =
+        hamiltonian.get_container<SparseHamiltonianContainer>();
+    detail::SparseEriProvider provider(n_spatial,
+                                       sparse.sparse_two_body_integrals());
+    return detail::dispatch_majorana_map(
+        mapping, excluded_core_energy, h1_alpha_flat.data(),
+        h1_beta_flat.data(), provider, n_spatial, spin_symmetric, threshold,
+        integral_threshold);
+  }
+
+  if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
+    const auto& cholesky =
+        hamiltonian.get_container<CholeskyHamiltonianContainer>();
+    auto [l_alpha, l_beta] = cholesky.get_three_center_integrals();
+    if (static_cast<std::size_t>(l_alpha.rows()) != n_spatial * n_spatial) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: Cholesky three-center rows must equal "
+          "n_spatial^2.");
+    }
+    detail::CholeskyEriProvider provider{
+        l_alpha, l_beta, n_spatial, n_spatial * n_spatial,
+        static_cast<std::size_t>(l_alpha.cols())};
+    return detail::dispatch_majorana_map(
+        mapping, excluded_core_energy, h1_alpha_flat.data(),
+        h1_beta_flat.data(), provider, n_spatial, spin_symmetric, threshold,
+        integral_threshold);
+  }
+
+  auto [eri_aaaa, eri_aabb, eri_bbbb] = hamiltonian.get_two_body_integrals();
+  return majorana_map_hamiltonian(
+      mapping, excluded_core_energy, h1_alpha_flat.data(), h1_beta_flat.data(),
+      eri_aaaa.data(), eri_aabb.data(), eri_bbbb.data(), n_spatial,
+      spin_symmetric, threshold, integral_threshold);
 }
 
 }  // namespace qdk::chemistry::data

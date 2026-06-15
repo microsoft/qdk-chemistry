@@ -8,6 +8,7 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -323,6 +324,28 @@ Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
 identical integrals across spin channels (restricted orbitals). When false,
 handles each spin channel independently (unrestricted orbitals).
+
+Returns ``(words, coefficients)`` where ``words`` is a list of sparse
+Pauli words.
+)");
+
+  data.def(
+      "majorana_map_hamiltonian",
+      [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
+         double threshold, double integral_threshold) -> py::tuple {
+        auto result = majorana_map_hamiltonian(mapping, hamiltonian, threshold,
+                                               integral_threshold);
+        return py::make_tuple(py::cast(result.words),
+                              py::cast(result.coefficients));
+      },
+      py::arg("mapping"), py::arg("hamiltonian"), py::arg("threshold"),
+      py::arg("integral_threshold"),
+      R"(
+Map a Hamiltonian to qubit Pauli terms using the native container path.
+
+Sparse and Cholesky containers are consumed without materializing a dense
+four-index tensor. Other containers use the dense mapping path. The scalar
+core-energy shift is excluded to match QubitMapper output semantics.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.

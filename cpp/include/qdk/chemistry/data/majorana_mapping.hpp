@@ -18,6 +18,8 @@
 
 namespace qdk::chemistry::data {
 
+class Hamiltonian;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -332,5 +334,24 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold);
+
+/**
+ * @brief Map a Hamiltonian to qubit Pauli terms via the native container path.
+ *
+ * The overload preserves QubitMapper semantics: the scalar core-energy shift is
+ * not folded into the returned Pauli operator. Container-specific two-body
+ * storage is consumed directly when a sparse or Cholesky representation is
+ * available; other containers use the dense pointer overload.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param hamiltonian The Hamiltonian to map.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           double threshold,
+                                           double integral_threshold);
 
 }  // namespace qdk::chemistry::data

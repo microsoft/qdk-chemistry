@@ -195,6 +195,14 @@ Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if nee
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
+For :class:`~qdk_chemistry.data.SparseHamiltonianContainer` inputs, the native
+mapper iterates the stored two-body terms directly instead of first
+materializing a dense four-index tensor. For
+:class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` inputs, it contracts
+one ``(pq|*)`` row at a time from the three-center factors, preserving the same
+returned :class:`~qdk_chemistry.data.QubitHamiltonian` semantics, including the
+existing convention that core energy is not folded into the mapped operator.
+
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
 .. rubric:: Settings
