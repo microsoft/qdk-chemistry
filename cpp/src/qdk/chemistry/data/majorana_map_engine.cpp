@@ -873,8 +873,10 @@ MajoranaMapResult majorana_map_hamiltonian(
   }
 
   auto h1_alpha_flat = detail::flatten_row_major(h1_alpha);
-  auto h1_beta_flat =
-      spin_symmetric ? h1_alpha_flat : detail::flatten_row_major(h1_beta);
+  std::vector<double> h1_beta_flat;
+  if (!spin_symmetric) {
+    h1_beta_flat = detail::flatten_row_major(h1_beta);
+  }
   const double* h1_beta_ptr =
       spin_symmetric ? h1_alpha_flat.data() : h1_beta_flat.data();
 

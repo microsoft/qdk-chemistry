@@ -325,9 +325,9 @@ When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
 identical integrals across spin channels (restricted orbitals). When false,
 handles each spin channel independently (unrestricted orbitals).
 
-	Returns ``(words, coefficients)`` where ``words`` is a list of sparse
-	Pauli words.
-	)");
+Returns ``(words, coefficients)`` where ``words`` is a list of sparse
+Pauli words.
+)");
 
   data.def(
       "majorana_map_hamiltonian",
