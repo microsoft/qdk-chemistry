@@ -21,6 +21,7 @@ Exposed symmetry types are:
 
 Exposed storage types are:
 
+- :class:`SymmetryBlockedScalarCount`: One scalar count per symmetry sector.
 - :class:`SymmetryBlockedTensorRank1` / :class:`SymmetryBlockedTensorRank1Complex`
 - :class:`SymmetryBlockedTensorRank2` / :class:`SymmetryBlockedTensorRank2Complex`
 - :class:`SymmetryBlockedTensorRank3` / :class:`SymmetryBlockedTensorRank3Complex`
@@ -43,6 +44,7 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryAxis,
     SymmetryAxisValue,
     SymmetryBlockedIndexSet,
+    SymmetryBlockedScalarCount,
     SymmetryBlockedSparseMapRank4,
     SymmetryBlockedTensorRank1,
     SymmetryBlockedTensorRank1Complex,
@@ -64,6 +66,7 @@ __all__ = [
     "SymmetryAxis",
     "SymmetryAxisValue",
     "SymmetryBlockedIndexSet",
+    "SymmetryBlockedScalarCount",
     "SymmetryBlockedSparseMapRank4",
     "SymmetryBlockedTensorRank1",
     "SymmetryBlockedTensorRank1Complex",
@@ -77,4 +80,38 @@ __all__ = [
     "SymmetryProduct",
     "axes",
     "axis_name_to_string",
+    "spin_index_set",
 ]
+
+
+from collections.abc import Sequence
+
+
+def spin_index_set(
+    num_modes: int,
+    alpha: Sequence[int],
+    beta: Sequence[int],
+    *,
+    equivalent: bool = True,
+) -> SymmetryBlockedIndexSet:
+    """Build a spin-resolved SymmetryBlockedIndexSet from alpha/beta index lists.
+
+    Args:
+        num_modes: Universe size (total number of orbitals per spin channel).
+        alpha: Sorted active/inactive indices for the alpha channel.
+        beta: Sorted active/inactive indices for the beta channel.
+        equivalent: Whether the spin axis labels share storage (restricted).
+
+    Returns:
+        A SymmetryBlockedIndexSet carrying the spin symmetry and per-channel indices.
+
+    """
+    sym = SymmetryProduct([axes.spin(1, equivalent)])
+    alpha_label = SymmetryLabel([axes.alpha()])
+    beta_label = SymmetryLabel([axes.beta()])
+    extents = {alpha_label: num_modes, beta_label: num_modes}
+    indices = {
+        alpha_label: list(alpha),
+        beta_label: list(beta),
+    }
+    return SymmetryBlockedIndexSet(sym, extents, indices)

@@ -6,15 +6,57 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
+
+namespace {
+
+// Spin (S_z) symmetry; equivalent=true is restricted, false is unrestricted.
+std::shared_ptr<const SymmetryProduct> spin_sym(bool equivalent) {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, equivalent)}));
+}
+
+// No-symmetry (trivial) index set over `num_modes` carrying `idx` in a single
+// statistics-generic block.
+std::shared_ptr<const SymmetryBlockedIndexSet> trivial_iset(
+    size_t num_modes, const std::vector<size_t>& idx) {
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  std::unordered_map<SymmetryLabel, std::size_t> ext{
+      {SymmetryLabel{}, num_modes}};
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
+      {SymmetryLabel{}, std::vector<std::uint32_t>(idx.begin(), idx.end())}};
+  return std::make_shared<const SymmetryBlockedIndexSet>(sym, ext,
+                                                         std::move(indices));
+}
+
+// Spin-resolved index set over `num_modes` with per-spin alpha/beta index
+// lists.
+std::shared_ptr<const SymmetryBlockedIndexSet> spin_iset(
+    size_t num_modes, const std::vector<size_t>& alpha,
+    const std::vector<size_t>& beta, bool equivalent) {
+  std::unordered_map<SymmetryLabel, std::size_t> ext{{axes::alpha(), num_modes},
+                                                     {axes::beta(), num_modes}};
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
+      {axes::alpha(), std::vector<std::uint32_t>(alpha.begin(), alpha.end())},
+      {axes::beta(), std::vector<std::uint32_t>(beta.begin(), beta.end())}};
+  return std::make_shared<const SymmetryBlockedIndexSet>(
+      spin_sym(equivalent), ext, std::move(indices));
+}
+
+}  // namespace
 
 class ModelOrbitalsTest : public ::testing::Test {
  protected:
@@ -24,18 +66,18 @@ class ModelOrbitalsTest : public ::testing::Test {
 };
 
 TEST_F(ModelOrbitalsTest, BasicConstructor) {
-  // Test basic constructor with restricted and unrestricted cases
+  // Full active space; restricted-ness inferred from the declared symmetries.
   const size_t basis_size = 4;
 
-  // Restricted case
-  ModelOrbitals model_restricted(basis_size, true);
+  // No symmetry: a single statistics-generic channel, reported as restricted.
+  ModelOrbitals model_restricted(basis_size);
   EXPECT_TRUE(model_restricted.is_restricted());
   EXPECT_FALSE(model_restricted.is_unrestricted());
   EXPECT_EQ(basis_size, model_restricted.get_num_atomic_orbitals());
   EXPECT_EQ(basis_size, model_restricted.get_num_molecular_orbitals());
 
-  // Unrestricted case
-  ModelOrbitals model_unrestricted(basis_size, false);
+  // Spin axis with distinct alpha/beta labels: unrestricted.
+  ModelOrbitals model_unrestricted(basis_size, spin_sym(/*equivalent=*/false));
   EXPECT_FALSE(model_unrestricted.is_restricted());
   EXPECT_TRUE(model_unrestricted.is_unrestricted());
   EXPECT_EQ(basis_size, model_unrestricted.get_num_atomic_orbitals());
@@ -43,56 +85,57 @@ TEST_F(ModelOrbitalsTest, BasicConstructor) {
 }
 
 TEST_F(ModelOrbitalsTest, RestrictedActiveSpaceConstructor) {
-  // Test constructor with active and inactive space indices (restricted)
+  // Active/inactive spaces from no-symmetry index sets (restricted).
   const size_t basis_size = 6;
   std::vector<size_t> active_indices = {1, 2, 3};
   std::vector<size_t> inactive_indices = {0, 4, 5};
 
-  ModelOrbitals model(basis_size,
-                      std::make_tuple(active_indices, inactive_indices));
+  ModelOrbitals model(trivial_iset(basis_size, active_indices),
+                      trivial_iset(basis_size, inactive_indices));
 
   EXPECT_TRUE(model.is_restricted());
   EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
   EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
-  // Check active space
+  // Check active space (alpha == beta for a single channel).
   EXPECT_TRUE(model.has_active_space());
   auto [alpha_active, beta_active] = model.get_active_space_indices();
   EXPECT_EQ(active_indices, alpha_active);
-  EXPECT_EQ(active_indices, beta_active);  // Should be same for restricted
+  EXPECT_EQ(active_indices, beta_active);
 
-  // Check inactive space
+  // Check inactive space.
   EXPECT_TRUE(model.has_inactive_space());
   auto [alpha_inactive, beta_inactive] = model.get_inactive_space_indices();
   EXPECT_EQ(inactive_indices, alpha_inactive);
-  EXPECT_EQ(inactive_indices, beta_inactive);  // Should be same for restricted
+  EXPECT_EQ(inactive_indices, beta_inactive);
 }
 
 TEST_F(ModelOrbitalsTest, UnrestrictedActiveSpaceConstructor) {
-  // Test constructor with different alpha/beta active and inactive spaces
+  // Different alpha/beta active and inactive spaces (spin-resolved).
   const size_t basis_size = 6;
   std::vector<size_t> alpha_active = {1, 2};
   std::vector<size_t> beta_active = {2, 3, 4};
   std::vector<size_t> alpha_inactive = {0, 3, 4, 5};
   std::vector<size_t> beta_inactive = {0, 1, 5};
 
-  ModelOrbitals model(basis_size,
-                      std::make_tuple(alpha_active, beta_active, alpha_inactive,
-                                      beta_inactive));
+  ModelOrbitals model(
+      spin_iset(basis_size, alpha_active, beta_active, /*equivalent=*/false),
+      spin_iset(basis_size, alpha_inactive, beta_inactive,
+                /*equivalent=*/false));
 
   EXPECT_FALSE(model.is_restricted());
   EXPECT_TRUE(model.is_unrestricted());
   EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
   EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
 
-  // Check active space
+  // Check active space.
   EXPECT_TRUE(model.has_active_space());
   auto [retrieved_alpha_active, retrieved_beta_active] =
       model.get_active_space_indices();
   EXPECT_EQ(alpha_active, retrieved_alpha_active);
   EXPECT_EQ(beta_active, retrieved_beta_active);
 
-  // Check inactive space
+  // Check inactive space.
   EXPECT_TRUE(model.has_inactive_space());
   auto [retrieved_alpha_inactive, retrieved_beta_inactive] =
       model.get_inactive_space_indices();
@@ -103,110 +146,55 @@ TEST_F(ModelOrbitalsTest, UnrestrictedActiveSpaceConstructor) {
 TEST_F(ModelOrbitalsTest, ConstructorValidation) {
   const size_t basis_size = 4;
 
-  // Test that indices >= basis_size throw exceptions
-  std::vector<size_t> invalid_active = {0, 1, 4};  // 4 >= basis_size
-  std::vector<size_t> valid_inactive = {2, 3};
+  // Out-of-bounds indices are rejected when building the index set.
+  EXPECT_THROW(trivial_iset(basis_size, {0, 1, 4}),  // 4 >= basis_size
+               std::out_of_range);
 
-  EXPECT_THROW(
-      ModelOrbitals(basis_size, std::make_tuple(std::move(invalid_active),
-                                                std::move(valid_inactive))),
-      std::invalid_argument);
-
-  // Test invalid inactive indices
-  std::vector<size_t> valid_active = {0, 1};
-  std::vector<size_t> invalid_inactive = {2, 3, 5};  // 5 >= basis_size
-
-  EXPECT_THROW(
-      ModelOrbitals(basis_size, std::make_tuple(std::move(valid_active),
-                                                std::move(invalid_inactive))),
-      std::invalid_argument);
-
-  // Test overlap between active and inactive spaces
-  std::vector<size_t> overlapping_active = {0, 1, 2};
-  std::vector<size_t> overlapping_inactive = {2, 3};  // 2 appears in both
-
-  EXPECT_THROW(ModelOrbitals(basis_size,
-                             std::make_tuple(std::move(overlapping_active),
-                                             std::move(overlapping_inactive))),
+  // Active and inactive spaces must be disjoint.
+  EXPECT_THROW(ModelOrbitals(trivial_iset(basis_size, {0, 1, 2}),
+                             trivial_iset(basis_size, {2, 3})),  // 2 in both
                std::invalid_argument);
 }
 
 TEST_F(ModelOrbitalsTest, UnrestrictedConstructorValidation) {
   const size_t basis_size = 4;
-  std::vector<size_t> valid_alpha_active = {0, 1};
-  std::vector<size_t> valid_beta_active = {0, 1};
-  std::vector<size_t> valid_alpha_inactive = {2, 3};
-  std::vector<size_t> valid_beta_inactive = {2, 3};
 
-  // Test invalid alpha active indices
-  std::vector<size_t> invalid_alpha_active = {0, 1, 4};  // 4 >= basis_size
-  EXPECT_THROW(ModelOrbitals(basis_size,
-                             std::make_tuple(std::move(invalid_alpha_active),
-                                             std::move(valid_beta_active),
-                                             std::move(valid_alpha_inactive),
-                                             std::move(valid_beta_inactive))),
-               std::invalid_argument);
+  // Out-of-bounds alpha index rejected when building the index set.
+  EXPECT_THROW(spin_iset(basis_size, {0, 1, 4}, {0, 1}, /*equivalent=*/false),
+               std::out_of_range);
 
-  // Test invalid beta active indices
-  std::vector<size_t> invalid_beta_active = {0, 1, 5};  // 5 >= basis_size
-  EXPECT_THROW(ModelOrbitals(basis_size,
-                             std::make_tuple(std::move(valid_alpha_active),
-                                             std::move(invalid_beta_active),
-                                             std::move(valid_alpha_inactive),
-                                             std::move(valid_beta_inactive))),
-               std::invalid_argument);
-
-  // Test overlap in alpha space
-  std::vector<size_t> overlapping_alpha_active = {0, 1, 2};
-  std::vector<size_t> overlapping_alpha_inactive = {2, 3};  // 2 appears in both
+  // Overlap between active and inactive (alpha channel) is rejected.
   EXPECT_THROW(
-      ModelOrbitals(basis_size,
-                    std::make_tuple(std::move(overlapping_alpha_active),
-                                    std::move(valid_beta_active),
-                                    std::move(overlapping_alpha_inactive),
-                                    std::move(valid_beta_inactive))),
-      std::invalid_argument);
-
-  // Test overlap in beta space
-  std::vector<size_t> overlapping_beta_active = {0, 1, 2};
-  std::vector<size_t> overlapping_beta_inactive = {2, 3};  // 2 appears in both
-  EXPECT_THROW(
-      ModelOrbitals(basis_size,
-                    std::make_tuple(std::move(valid_alpha_active),
-                                    std::move(overlapping_beta_active),
-                                    std::move(valid_alpha_inactive),
-                                    std::move(overlapping_beta_inactive))),
+      ModelOrbitals(
+          spin_iset(basis_size, {0, 1, 2}, {0, 1}, /*equivalent=*/false),
+          spin_iset(basis_size, {2, 3}, {2, 3}, /*equivalent=*/false)),
       std::invalid_argument);
 }
 
 TEST_F(ModelOrbitalsTest, DefaultActiveSpace) {
-  // Test that default constructor sets all orbitals as active
+  // Full active space over all modes; inactive empty.
   const size_t basis_size = 5;
 
-  ModelOrbitals model_restricted(basis_size, true);
-  EXPECT_TRUE(model_restricted.has_active_space());
+  ModelOrbitals model(basis_size);
+  EXPECT_TRUE(model.has_active_space());
 
-  auto [alpha_active, beta_active] =
-      model_restricted.get_active_space_indices();
+  auto [alpha_active, beta_active] = model.get_active_space_indices();
   EXPECT_EQ(basis_size, alpha_active.size());
   EXPECT_EQ(basis_size, beta_active.size());
 
-  // Check that indices are 0, 1, 2, ..., basis_size-1
   for (size_t i = 0; i < basis_size; ++i) {
     EXPECT_EQ(i, alpha_active[i]);
     EXPECT_EQ(i, beta_active[i]);
   }
 
-  // Inactive space should be empty
-  EXPECT_FALSE(model_restricted.has_inactive_space());
+  EXPECT_FALSE(model.has_inactive_space());
 }
 
 TEST_F(ModelOrbitalsTest, ThrowingMethods) {
-  // Test that methods that should throw for model systems actually do
+  // Methods requiring real basis data throw for model systems.
   const size_t basis_size = 3;
-  ModelOrbitals model(basis_size, true);
+  ModelOrbitals model(basis_size);
 
-  // These methods should throw runtime_error for model systems
   EXPECT_THROW(model.get_coefficients(), std::runtime_error);
   EXPECT_THROW(model.get_energies(), std::runtime_error);
   EXPECT_THROW(model.get_overlap_matrix(), std::runtime_error);
@@ -217,14 +205,12 @@ TEST_F(ModelOrbitalsTest, ThrowingMethods) {
   EXPECT_THROW(model.get_energies_beta(), std::runtime_error);
   EXPECT_THROW(model.get_overlap_matrix(), std::runtime_error);
 
-  // Density matrix methods should also throw
   Eigen::VectorXd occupations = Eigen::VectorXd::Ones(basis_size);
   EXPECT_THROW(model.calculate_ao_density_matrix(occupations),
                std::runtime_error);
   EXPECT_THROW(model.calculate_ao_density_matrix(occupations, occupations),
                std::runtime_error);
 
-  // RDM-based density matrix methods should also throw
   Eigen::MatrixXd rdm = Eigen::MatrixXd::Identity(basis_size, basis_size);
   EXPECT_THROW(model.calculate_ao_density_matrix_from_rdm(rdm),
                std::runtime_error);
@@ -233,11 +219,10 @@ TEST_F(ModelOrbitalsTest, ThrowingMethods) {
 }
 
 TEST_F(ModelOrbitalsTest, MOOverlapMethods) {
-  // Test that MO overlap methods return identity matrices
+  // MO overlap methods return identity matrices.
   const size_t basis_size = 4;
-  ModelOrbitals model(basis_size, true);
+  ModelOrbitals model(basis_size);
 
-  // Test get_mo_overlap
   auto [alpha_alpha, alpha_beta, beta_beta] = model.get_mo_overlap();
   Eigen::MatrixXd expected_identity =
       Eigen::MatrixXd::Identity(basis_size, basis_size);
@@ -249,7 +234,6 @@ TEST_F(ModelOrbitalsTest, MOOverlapMethods) {
   EXPECT_TRUE(
       beta_beta.isApprox(expected_identity, testing::numerical_zero_tolerance));
 
-  // Test individual overlap methods
   EXPECT_TRUE(model.get_mo_overlap_alpha_alpha().isApprox(
       expected_identity, testing::numerical_zero_tolerance));
   EXPECT_TRUE(model.get_mo_overlap_alpha_beta().isApprox(
@@ -259,37 +243,33 @@ TEST_F(ModelOrbitalsTest, MOOverlapMethods) {
 }
 
 TEST_F(ModelOrbitalsTest, VirtualSpaceIndices) {
-  // Test virtual space indices calculation
+  // Virtual space = modes not in active or inactive.
   const size_t basis_size = 6;
   std::vector<size_t> active_indices = {1, 2, 3};
   std::vector<size_t> inactive_indices = {0, 4};
-  // Virtual space should be {5} (remaining index)
 
-  ModelOrbitals model(basis_size, std::make_tuple(std::move(active_indices),
-                                                  std::move(inactive_indices)));
+  ModelOrbitals model(trivial_iset(basis_size, active_indices),
+                      trivial_iset(basis_size, inactive_indices));
 
   auto [alpha_virtual, beta_virtual] = model.get_virtual_space_indices();
 
-  // Expected virtual space: all indices not in active or inactive
   std::vector<size_t> expected_virtual = {5};
   EXPECT_EQ(expected_virtual, alpha_virtual);
-  EXPECT_EQ(expected_virtual, beta_virtual);  // Same for restricted
+  EXPECT_EQ(expected_virtual, beta_virtual);
 }
 
 TEST_F(ModelOrbitalsTest, JSONSerialization) {
-  // Test JSON serialization for ModelOrbitals
+  // JSON serialization for a (restricted) active-space model.
   const size_t basis_size = 4;
   std::vector<size_t> active_indices = {1, 2};
   std::vector<size_t> inactive_indices = {0, 3};
 
-  ModelOrbitals model(basis_size,
-                      std::make_tuple(active_indices, inactive_indices));
+  ModelOrbitals model(trivial_iset(basis_size, active_indices),
+                      trivial_iset(basis_size, inactive_indices));
 
-  // Test JSON conversion
   auto json_data = model.to_json();
   EXPECT_FALSE(json_data.empty());
 
-  // Check that essential fields are present
   EXPECT_TRUE(json_data.contains("num_orbitals"));
   EXPECT_EQ(basis_size, json_data["num_orbitals"].get<size_t>());
 
@@ -310,36 +290,27 @@ TEST_F(ModelOrbitalsTest, JSONSerialization) {
 }
 
 TEST_F(ModelOrbitalsTest, JSONRoundTrip) {
-  // Test JSON round-trip serialization
+  // JSON round-trip for an unrestricted model with distinct alpha/beta spaces.
   const size_t basis_size = 5;
   std::vector<size_t> alpha_active = {1, 2};
   std::vector<size_t> beta_active = {0, 3, 4};
   std::vector<size_t> alpha_inactive = {0, 3, 4};
   std::vector<size_t> beta_inactive = {1, 2};
 
-  // Keep copies for comparison
-  std::vector<size_t> expected_alpha_active = alpha_active;
-  std::vector<size_t> expected_beta_active = beta_active;
-  std::vector<size_t> expected_alpha_inactive = alpha_inactive;
-  std::vector<size_t> expected_beta_inactive = beta_inactive;
-
   ModelOrbitals original(
-      basis_size,
-      std::make_tuple(std::move(alpha_active), std::move(beta_active),
-                      std::move(alpha_inactive), std::move(beta_inactive)));
+      spin_iset(basis_size, alpha_active, beta_active, /*equivalent=*/false),
+      spin_iset(basis_size, alpha_inactive, beta_inactive,
+                /*equivalent=*/false));
 
-  // Convert to JSON and back
   auto json_data = original.to_json();
   auto reconstructed = ModelOrbitals::from_json(json_data);
 
-  // Check that properties are preserved
   EXPECT_EQ(original.get_num_atomic_orbitals(),
             reconstructed->get_num_atomic_orbitals());
   EXPECT_EQ(original.get_num_molecular_orbitals(),
             reconstructed->get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), reconstructed->is_restricted());
 
-  // Check active space indices
   auto [orig_alpha_active, orig_beta_active] =
       original.get_active_space_indices();
   auto [recon_alpha_active, recon_beta_active] =
@@ -348,7 +319,6 @@ TEST_F(ModelOrbitalsTest, JSONRoundTrip) {
   EXPECT_EQ(orig_alpha_active, recon_alpha_active);
   EXPECT_EQ(orig_beta_active, recon_beta_active);
 
-  // Check inactive space indices
   auto [orig_alpha_inactive, orig_beta_inactive] =
       original.get_inactive_space_indices();
   auto [recon_alpha_inactive, recon_beta_inactive] =
@@ -359,9 +329,9 @@ TEST_F(ModelOrbitalsTest, JSONRoundTrip) {
 }
 
 TEST_F(ModelOrbitalsTest, SimpleRestrictedJSONRoundTrip) {
-  // Test JSON round-trip for simple restricted case
+  // JSON round-trip for the simple full-active case.
   const size_t basis_size = 3;
-  ModelOrbitals original(basis_size, true);
+  ModelOrbitals original(basis_size);
 
   auto json_data = original.to_json();
   auto reconstructed = ModelOrbitals::from_json(json_data);
@@ -374,19 +344,16 @@ TEST_F(ModelOrbitalsTest, SimpleRestrictedJSONRoundTrip) {
 }
 
 TEST_F(ModelOrbitalsTest, EdgeCaseEmptySpaces) {
-  // Test edge case with empty active/inactive spaces
+  // Empty active and inactive spaces are permitted.
   const size_t basis_size = 3;
-  std::vector<size_t> empty_indices;
 
-  // Should not throw for empty spaces
-  EXPECT_NO_THROW(ModelOrbitals(
-      basis_size,
-      std::make_tuple(std::move(empty_indices), std::vector<size_t>{})));
+  EXPECT_NO_THROW(ModelOrbitals(trivial_iset(basis_size, {}),
+                                trivial_iset(basis_size, {})));
 
-  ModelOrbitals model(basis_size, std::make_tuple(std::vector<size_t>{},
-                                                  std::vector<size_t>{}));
+  ModelOrbitals model(trivial_iset(basis_size, {}),
+                      trivial_iset(basis_size, {}));
 
-  // With empty active/inactive spaces, virtual space should contain all indices
+  // With empty active/inactive spaces, all modes are virtual.
   auto [alpha_virtual, beta_virtual] = model.get_virtual_space_indices();
   std::vector<size_t> expected_all_indices = {0, 1, 2};
   EXPECT_EQ(expected_all_indices, alpha_virtual);
@@ -394,14 +361,13 @@ TEST_F(ModelOrbitalsTest, EdgeCaseEmptySpaces) {
 }
 
 TEST_F(ModelOrbitalsTest, LargerSystem) {
-  // Test with a larger system to ensure scalability
+  // Larger system to exercise scalability.
   const size_t basis_size = 20;
   std::vector<size_t> active_indices = {5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
   std::vector<size_t> inactive_indices = {0, 1, 2, 3, 4};
-  // Virtual space should be {15, 16, 17, 18, 19}
 
-  ModelOrbitals model(basis_size,
-                      std::make_tuple(active_indices, inactive_indices));
+  ModelOrbitals model(trivial_iset(basis_size, active_indices),
+                      trivial_iset(basis_size, inactive_indices));
 
   EXPECT_EQ(basis_size, model.get_num_atomic_orbitals());
   EXPECT_EQ(basis_size, model.get_num_molecular_orbitals());
@@ -421,11 +387,10 @@ TEST_F(ModelOrbitalsTest, LargerSystem) {
 }
 
 TEST_F(ModelOrbitalsTest, InheritanceBehavior) {
-  // Test that ModelOrbitals properly inherits from Orbitals
+  // ModelOrbitals is usable through an Orbitals pointer.
   const size_t basis_size = 4;
-  ModelOrbitals model(basis_size, true);
+  ModelOrbitals model(basis_size);
 
-  // Test that we can use it as an Orbitals pointer
   std::shared_ptr<Orbitals> orbitals_ptr =
       std::make_shared<ModelOrbitals>(model);
 
@@ -433,37 +398,33 @@ TEST_F(ModelOrbitalsTest, InheritanceBehavior) {
   EXPECT_EQ(basis_size, orbitals_ptr->get_num_molecular_orbitals());
   EXPECT_TRUE(orbitals_ptr->is_restricted());
 
-  // Test that methods that should throw still throw through base pointer
   EXPECT_THROW(orbitals_ptr->get_coefficients(), std::runtime_error);
   EXPECT_THROW(orbitals_ptr->get_energies(), std::runtime_error);
 }
 
 TEST_F(ModelOrbitalsTest, CopyAndMoveSemantics) {
-  // Test copy and move behavior
+  // Copy and assignment preserve the model's spaces and symmetry.
   const size_t basis_size = 3;
   std::vector<size_t> active_indices = {0, 1};
   std::vector<size_t> inactive_indices = {2};
 
-  ModelOrbitals original(
-      basis_size,
-      std::make_tuple(std::move(active_indices), std::move(inactive_indices)));
+  ModelOrbitals original(trivial_iset(basis_size, active_indices),
+                         trivial_iset(basis_size, inactive_indices));
 
-  // Test copy constructor
   ModelOrbitals copy(original);
   EXPECT_EQ(original.get_num_atomic_orbitals(), copy.get_num_atomic_orbitals());
   EXPECT_EQ(original.get_num_molecular_orbitals(),
             copy.get_num_molecular_orbitals());
   EXPECT_EQ(original.is_restricted(), copy.is_restricted());
 
-  // Test that active/inactive spaces are preserved
   auto [orig_alpha_active, orig_beta_active] =
       original.get_active_space_indices();
   auto [copy_alpha_active, copy_beta_active] = copy.get_active_space_indices();
   EXPECT_EQ(orig_alpha_active, copy_alpha_active);
   EXPECT_EQ(orig_beta_active, copy_beta_active);
 
-  // Test assignment
-  ModelOrbitals assigned(2, false);  // Different initial state
+  // Assignment from a different initial state.
+  ModelOrbitals assigned(2, spin_sym(/*equivalent=*/false));
   assigned = original;
   EXPECT_EQ(original.get_num_atomic_orbitals(),
             assigned.get_num_atomic_orbitals());

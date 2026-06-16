@@ -16,8 +16,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 
 #include "ut_common.hpp"
@@ -35,11 +34,12 @@ class AnsatzSerializationTest : public ::testing::Test {
     Eigen::VectorXd coeffs(2);
     coeffs << 0.8, 0.6;
 
-    Wavefunction::DeterminantVector dets = {Configuration("200000"),
-                                            Configuration("ud0000")};
+    Wavefunction::DeterminantVector dets = {
+        Configuration::from_spin_half_string("200000"),
+        Configuration::from_spin_half_string("ud0000")};
 
     auto wf_container =
-        std::make_unique<CasWavefunctionContainer>(coeffs, dets, orbitals);
+        std::make_unique<StateVectorContainer>(coeffs, dets, orbitals);
     wavefunction = std::make_shared<Wavefunction>(std::move(wf_container));
 
     // Create test structure
