@@ -29,6 +29,19 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(j, i, t);
 }
 
+/**
+ * @brief Depth-first search (DFS) helper to find a Hamiltonian path in a sparse
+ * graph.
+ *
+ * Recursively visits unvisited neighbor vertices to build a path that visits
+ * every vertex in the graph exactly once.
+ *
+ * @param curr    The vertex index currently being visited.
+ * @param adj     The sparse adjacency matrix of the graph.
+ * @param visited Tracks which vertices have already been visited.
+ * @param path    Stores the sequence of vertices in the current path.
+ * @return True if a Hamiltonian path is found, false otherwise.
+ */
 bool find_hamiltonian_path_dfs(std::uint64_t curr,
                                const Eigen::SparseMatrix<double>& adj,
                                std::vector<bool>& visited,
@@ -53,6 +66,16 @@ bool find_hamiltonian_path_dfs(std::uint64_t curr,
   return false;
 }
 
+/**
+ * @brief Search for a Hamiltonian path in the given sparse graph.
+ *
+ * Tries to find a path that visits every vertex exactly once, starting the
+ * search from each possible vertex in the graph.
+ *
+ * @param adj The sparse adjacency matrix representing the graph.
+ * @return A vector of vertex indices in path order, or an empty vector if no
+ * path exists.
+ */
 std::vector<std::uint64_t> find_hamiltonian_path(
     const Eigen::SparseMatrix<double>& adj) {
   std::uint64_t V = adj.rows();
@@ -203,7 +226,7 @@ std::uint64_t LatticeGraph::num_edges() const {
 }
 
 LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
-                                 bool optimal_ordering) {
+                                 bool dfs_ordering) {
   if (n == 0) {
     throw std::invalid_argument("chain: n must be > 0.");
   }
@@ -227,7 +250,7 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
   adj.makeCompressed();
   LatticeGraph g(std::move(adj),
                  chain_coloring(static_cast<std::int64_t>(N), periodic));
-  if (optimal_ordering) {
+  if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
       return permute(g, path);
@@ -241,7 +264,7 @@ LatticeGraph LatticeGraph::chain(std::uint64_t n, bool periodic, double t,
 
 LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
                                   bool periodic_x, bool periodic_y, double t,
-                                  bool optimal_ordering) {
+                                  bool dfs_ordering) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("square: nx and ny must be > 0.");
   }
@@ -286,7 +309,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
   adj.makeCompressed();
   LatticeGraph g(std::move(adj),
                  square_coloring(Nx, Ny, periodic_x, periodic_y));
-  if (optimal_ordering) {
+  if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
       return permute(g, path);
@@ -301,7 +324,7 @@ LatticeGraph LatticeGraph::square(std::uint64_t nx, std::uint64_t ny,
 LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
                                       bool periodic_x, bool periodic_y,
                                       double t, int coloring_seed,
-                                      bool optimal_ordering) {
+                                      bool dfs_ordering) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("triangular: nx and ny must be > 0.");
   }
@@ -357,7 +380,7 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
   // No known deterministic coloring for triangular lattices with arbitrary
   // periodic boundaries; use greedy with multiple trials instead.
   LatticeGraph g(std::move(adj), greedy_edge_coloring(adj, coloring_seed, 32));
-  if (optimal_ordering) {
+  if (dfs_ordering) {
     auto path = detail::find_hamiltonian_path(g.sparse_adjacency_matrix());
     if (!path.empty()) {
       return permute(g, path);
@@ -371,8 +394,8 @@ LatticeGraph LatticeGraph::triangular(std::uint64_t nx, std::uint64_t ny,
 
 LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
                                      bool periodic_x, bool periodic_y, double t,
-                                     bool optimal_ordering) {
-  (void)optimal_ordering;
+                                     bool dfs_ordering) {
+  (void)dfs_ordering;
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("honeycomb: nx and ny must be > 0.");
   }
@@ -425,8 +448,8 @@ LatticeGraph LatticeGraph::honeycomb(std::uint64_t nx, std::uint64_t ny,
 
 LatticeGraph LatticeGraph::kagome(std::uint64_t nx, std::uint64_t ny,
                                   bool periodic_x, bool periodic_y, double t,
-                                  int coloring_seed, bool optimal_ordering) {
-  (void)optimal_ordering;
+                                  int coloring_seed, bool dfs_ordering) {
+  (void)dfs_ordering;
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument("kagome: nx and ny must be > 0.");
   }

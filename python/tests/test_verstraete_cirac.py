@@ -22,8 +22,8 @@ class TestVerstraeteCiracMapping:
     """Tests covering the Verstraete-Cirac mapping factory, dimensions, and properties."""
 
     def test_factory_and_dimensions(self) -> None:
-        """Test that VC factory accepts correct grid dimensions and rejects invalid ones."""
-        # Testing valid grids: square and rectangular
+        """Test that VC factory accepts valid lattices (>= 3 sites) and rejects lattices with < 3 sites."""
+        # Testing valid lattices with >= 3 sites
         lattice_2x2 = LatticeGraph.square(2, 2)
         mapping_2x2 = MajoranaMapping.verstraete_cirac(lattice_2x2)
         assert len(mapping_2x2.stabilizers) > 0
@@ -43,6 +43,11 @@ class TestVerstraeteCiracMapping:
         mapping_4x4 = MajoranaMapping.verstraete_cirac(lattice_4x4)
         assert len(mapping_4x4.stabilizers) > 0
 
+        # Testing invalid lattices with < 3 sites
+        lattice_1x2 = LatticeGraph.square(1, 2)
+        with pytest.raises(ValueError, match="requires a lattice graph with at least 3 sites"):
+            MajoranaMapping.verstraete_cirac(lattice_1x2)
+
     def test_majorana_raises_error(self) -> None:
         """Verstraete-Cirac mapping is bilinear-only and majorana(k) should raise ValueError."""
         lattice = LatticeGraph.square(2, 2)
@@ -58,8 +63,8 @@ class TestVerstraeteCiracMapping:
         assert len(base.stabilizers) == len(mapping.stabilizers)
         assert base.name == "verstraete-cirac"
 
-    def test_serialization_round_trip(self) -> None:
-        """Verify that Verstraete-Cirac mapping survives JSON and HDF5 serialization round-trips."""
+    def test_json_serialization(self) -> None:
+        """Verify that Verstraete-Cirac mapping survives JSON serialization."""
         lattice = LatticeGraph.square(2, 2)
         mapping = MajoranaMapping.verstraete_cirac(lattice)
 
@@ -85,6 +90,17 @@ class TestVerstraeteCiracMapping:
             assert p_orig == p_json
             assert np.isclose(c_orig, c_json, atol=1e-10)
 
+    def test_hdf5_serialization(self) -> None:
+        """Verify that Verstraete-Cirac mapping survives HDF5 serialization."""
+        lattice = LatticeGraph.square(2, 2)
+        mapping = MajoranaMapping.verstraete_cirac(lattice)
+
+        # Construct a simple Hubbard Hamiltonian on the lattice
+        ham = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
+        mapper = create("qubit_mapper", "qdk")
+        qh_orig = mapper.run(ham, mapping)
+        terms_orig = sorted(zip(qh_orig.pauli_strings, qh_orig.coefficients, strict=False))
+
         # HDF5 Round-trip
         with tempfile.NamedTemporaryFile(suffix=".h5") as f:
             with h5py.File(f.name, "w") as hf:
@@ -104,7 +120,19 @@ class TestVerstraeteCiracMapping:
             assert p_orig == p_h5
             assert np.isclose(c_orig, c_h5, atol=1e-10)
 
-    def test_stabilizers_and_commutation(self) -> None:
+    @pytest.mark.parametrize(
+        ("lattice_type", "args", "kwargs"),
+        [
+            ("square", (2, 2), {}),
+            ("square", (3, 3), {}),
+            ("square", (3, 4), {}),
+            ("honeycomb", (2, 2), {"periodic_x": True, "periodic_y": True}),
+            ("triangular", (2, 2), {}),
+            ("kagome", (2, 2), {"periodic_x": True, "periodic_y": True}),
+            ("kagome", (3, 3), {}),
+        ],
+    )
+    def test_stabilizers_and_commutation(self, lattice_type: str, args: tuple, kwargs: dict) -> None:
         """Verify that stabilizers mutually commute and commute with mapped H for various lattices."""
 
         def commute(p1: str, p2: str) -> bool:
@@ -116,41 +144,32 @@ class TestVerstraeteCiracMapping:
             return (anti_commutes % 2) == 0
 
         mapper = create("qubit_mapper", "qdk")
-        lattices = [
-            LatticeGraph.square(2, 2),
-            LatticeGraph.square(3, 3),
-            LatticeGraph.square(3, 4),
-            LatticeGraph.honeycomb(2, 2, periodic_x=True, periodic_y=True),
-            LatticeGraph.triangular(2, 2),
-            LatticeGraph.kagome(2, 2, periodic_x=True, periodic_y=True),
-            LatticeGraph.kagome(3, 3),
-        ]
+        lattice = getattr(LatticeGraph, lattice_type)(*args, **kwargs)
 
-        for lattice in lattices:
-            ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
-            mapping = MajoranaMapping.verstraete_cirac(lattice)
+        ham = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
+        mapping = MajoranaMapping.verstraete_cirac(lattice)
 
-            assert mapping.num_qubits - len(mapping.stabilizers) == 2 * lattice.num_sites
-            assert len(mapping.stabilizers) > 0
+        assert mapping.num_qubits - len(mapping.stabilizers) == 2 * lattice.num_sites
+        assert len(mapping.stabilizers) > 0
 
-            qh_vc = mapper.run(ham, mapping)
-            assert qh_vc.num_qubits == mapping.num_qubits
+        qh_vc = mapper.run(ham, mapping)
+        assert qh_vc.num_qubits == mapping.num_qubits
 
-            # Convert stabilizers to Pauli labels
-            stabs = []
-            for _, word in mapping.stabilizers:
-                label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
-                stabs.append(label)
+        # Convert stabilizers to Pauli labels
+        stabs = []
+        for _, word in mapping.stabilizers:
+            label = sparse_pauli_word_to_label(word, qh_vc.num_qubits)
+            stabs.append(label)
 
-            # Check mutual commutation of stabilizers: [S_i, S_j] = 0
-            for i in range(len(stabs)):
-                for j in range(i + 1, len(stabs)):
-                    assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
+        # Check mutual commutation of stabilizers: [S_i, S_j] = 0
+        for i in range(len(stabs)):
+            for j in range(i + 1, len(stabs)):
+                assert commute(stabs[i], stabs[j]), f"Stabilizers {i} and {j} do not commute!"
 
-            # Check commutation with Hamiltonian: [H, S_i] = 0
-            for i, stab in enumerate(stabs):
-                for p_term in qh_vc.pauli_strings:
-                    assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
+        # Check commutation with Hamiltonian: [H, S_i] = 0
+        for i, stab in enumerate(stabs):
+            for p_term in qh_vc.pauli_strings:
+                assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
 
     def test_pauli_weight_scaling(self) -> None:
         """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
@@ -164,7 +183,7 @@ class TestVerstraeteCiracMapping:
 
         max_weights = []
         for grid_length in [2, 3, 4]:
-            lattice = LatticeGraph.square(grid_length, grid_length, optimal_ordering=True)
+            lattice = LatticeGraph.square(grid_length, grid_length, dfs_ordering=True)
             # Create a simple hopping-only Hamiltonian (U=0) on the L x L lattice
             ham = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=0.0)
 
@@ -198,7 +217,7 @@ class TestVerstraeteCiracSpectral:
 
         Model parameters: t = 1.0, U = 4.0, half-filling (epsilon = -U/2 = -2.0).
         """
-        lattice = LatticeGraph.square(2, 2, periodic_x=True, optimal_ordering=True)
+        lattice = LatticeGraph.square(2, 2, periodic_x=True, dfs_ordering=True)
         n_modes = 8  # 4 spatial sites * 2 spins
         hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-2.0, t=1.0, U=4.0)
         mapper = create("qubit_mapper", "qdk")
@@ -227,7 +246,7 @@ class TestVerstraeteCiracSpectral:
         Validates that the lowest eigenstates of the penalized Hamiltonian are
         in the +1 codespace sector of the generated loop-plaquette stabilizers.
         """
-        lattice = LatticeGraph.square(3, 2, optimal_ordering=True)
+        lattice = LatticeGraph.square(3, 2, dfs_ordering=True)
         n_modes = 12  # 6 spatial sites * 2 spins
         hamiltonian = create_huckel_hamiltonian(lattice, epsilon=-2.0, t=1.0)
         mapper = create("qubit_mapper", "qdk")

@@ -629,3 +629,59 @@ TEST_F(LatticeGraphTest, KagomeColoringSeed) {
   EXPECT_EQ(*kg_a.edge_coloring(), *kg_b.edge_coloring());
   check_valid_edge_coloring(*kg_a.edge_coloring());
 }
+
+TEST_F(LatticeGraphTest, Permute) {
+  // Create a 2x3 square lattice (6 sites):
+  // 3 -- 4 -- 5
+  // |    |    |
+  // 0 -- 1 -- 2
+  //
+  // Adjacency connections:
+  // (0,1), (1,2), (3,4), (4,5) [horizontal]
+  // (0,3), (1,4), (2,5) [vertical]
+  auto sq = LatticeGraph::square(3, 2, false, false);
+  ASSERT_TRUE(sq.edge_coloring().has_value());
+
+  // Define a permutation path: e.g., [0, 3, 4, 1, 2, 5]
+  std::vector<std::uint64_t> path = {0, 3, 4, 1, 2, 5};
+  auto permuted = LatticeGraph::permute(sq, path);
+
+  EXPECT_EQ(permuted.num_sites(), sq.num_sites());
+  EXPECT_EQ(permuted.num_edges(), sq.num_edges());
+
+  // Inverse permutation mapping for checking:
+  // inv_p[old_site] = new_site
+  std::vector<std::uint64_t> inv_p(6);
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    inv_p[path[i]] = i;
+  }
+
+  // Assert are_connected(i,j) after permute matches the remapped coloring keys
+  const auto& new_coloring = *permuted.edge_coloring();
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    for (std::uint64_t j = i + 1; j < 6; ++j) {
+      bool connected = permuted.are_connected(i, j);
+      auto key = std::make_pair(i, j);
+      bool in_coloring = (new_coloring.count(key) > 0);
+      EXPECT_EQ(connected, in_coloring);
+
+      if (connected) {
+        // Find corresponding old vertices
+        std::uint64_t old_u = path[i];
+        std::uint64_t old_v = path[j];
+        auto old_key = std::minmax(old_u, old_v);
+        // Assert color matches
+        EXPECT_EQ(new_coloring.at(key),
+                  sq.edge_coloring()->at({old_key.first, old_key.second}));
+      }
+    }
+  }
+
+  // Confirms dfs_ordering=true yields path-consecutive adjacency
+  auto ordered_sq = LatticeGraph::square(3, 3, false, false, 1.0, true);
+  for (std::uint64_t i = 0; i < ordered_sq.num_sites() - 1; ++i) {
+    EXPECT_TRUE(ordered_sq.are_connected(i, i + 1))
+        << "ordered_sq sites " << i << " and " << (i + 1)
+        << " are not connected";
+  }
+}

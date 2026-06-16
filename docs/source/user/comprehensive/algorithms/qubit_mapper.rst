@@ -55,7 +55,7 @@ Bravyi-Kitaev tree :cite:`Havlicek2017`
 .. _encoding-verstraete-cirac:
 
 Verstraete-Cirac :cite:`Verstraete2005`
-   An auxiliary-qubit encoding that operates on a general connected :class:`~qdk_chemistry.data.LatticeGraph` that admits a Hamiltonian path. It eliminates non-local Z-strings by introducing auxiliary qubits that locally track parity. For 2D square grids, the maximum Pauli weight of nearest-neighbor hopping terms remains constant regardless of the grid size. Use :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with a :class:`~qdk_chemistry.data.LatticeGraph`.
+   An auxiliary qubit encoding that eliminates non-local Z-strings by locally tracking parity. It operates on any connected :class:`~qdk_chemistry.data.LatticeGraph`; an optional Hamiltonian-path reordering (``dfs_ordering=True`` on the lattice factories) minimizes the number of auxiliary qubits and stabilizers. Use :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with a :class:`~qdk_chemistry.data.LatticeGraph`.
 
 Using the QubitMapper
 ---------------------
