@@ -268,7 +268,6 @@ When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :
    E = \lambda \cos(\theta)
 
 where :math:`\lambda = \sum_j |\alpha_j|` is the L1 norm of the Hamiltonian coefficients.
-No alias resolution is needed because the cosine maps the full phase range to a unique energy in :math:`[-\lambda, \lambda]`.
 
 For qubitization, ``branching`` is a single-element tuple and ``resolved_energy`` is ``None``.
 
