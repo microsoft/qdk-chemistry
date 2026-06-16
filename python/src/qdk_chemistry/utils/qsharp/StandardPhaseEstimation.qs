@@ -6,6 +6,7 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import Std.ResourceEstimation.*;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -59,6 +60,44 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
             set results w/= idx <- MResetZ(ancillas[idx]);
         }
         return results;
+    }
+    /// Fast resource estimation for standard QPE using RepeatEstimates.
+    ///
+    /// Instead of tracing through all 2^numBits - 1 Trotter steps individually,
+    /// this operation tells the resource estimator to analyze a single controlled
+    /// Trotter step and multiply the cost by numQueries. This is dramatically faster
+    /// for large circuits.
+    ///
+    /// # Parameters
+    /// - `numQueries`: Total number of Trotter steps (2^numBits - 1 for standard QPE).
+    /// - `singleControlledEvolution`: The base controlled-U operation (power=1).
+    /// - `statePrep`: State preparation operation on system qubits.
+    /// - `numBits`: Number of ancilla qubits for QPE.
+    /// - `numSystemQubits`: Number of system qubits.
+    operation EstimateStandardQPE(
+        numQueries : Int,
+        singleControlledEvolution : (Qubit, Qubit[]) => Unit,
+        statePrep : Qubit[] => Unit,
+        numBits : Int,
+        numSystemQubits : Int,
+    ) : Unit {
+        use ancillas = Qubit[numBits];
+        use systems = Qubit[numSystemQubits];
+
+        // State preparation (counted once)
+        statePrep(systems);
+
+        // The controlled Trotter step is repeated numQueries = 2^numBits - 1 times total.
+        // RepeatEstimates tells the resource estimator to estimate one invocation and multiply.
+        within { RepeatEstimates(numQueries); } apply {
+            singleControlledEvolution(ancillas[0], systems);
+        }
+
+        // Inverse QFT on ancillas (counted once)
+        Adjoint ApplyQFT(ancillas);
+
+        ResetAll(ancillas);
+        ResetAll(systems);
     }
 
     /// Prepare a standard QPE circuit (factory entry point).

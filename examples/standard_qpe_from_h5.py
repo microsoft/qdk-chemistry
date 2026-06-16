@@ -87,14 +87,11 @@ Logger.info(qubit_hamiltonian.get_summary())
 target_energy_accuracy = 0.01
 evolution_time = np.pi / 4
 num_bits = int(np.ceil(np.log2(2 * np.pi / (evolution_time * target_energy_accuracy))))
-
 unitary_builder = AlgorithmRef(
     "hamiltonian_unitary_builder",
     "trotter",
     time=evolution_time,
-    order=2,
-    target_accuracy=target_energy_accuracy * evolution_time,
-    error_bound="naive",
+    order=1,
 )
 
 # =============================================================================
@@ -107,57 +104,55 @@ controlled_circuit_mapper = AlgorithmRef(
 
 # =============================================================================
 # 7. Run standard QPE circuit builder to get a full QPE circuit
+# This builder uses RepeatEstimates to tell the resource estimator to analyze
+# a single controlled Trotter step and multiply by (2^numBits - 1), rather than
+# tracing through all steps individually. Much faster for large circuits.
 # =============================================================================
-qpe_circuit_builder = create(
+estimate_circuit_builder = create(
     "qpe_circuit_builder",
-    "qdk_standard",
+    "qdk_standard_estimate",
     num_bits=num_bits,
     unitary_builder=unitary_builder,
     controlled_circuit_mapper=controlled_circuit_mapper,
 )
 
-# Build the full QPE circuit
-qpe_circuits = qpe_circuit_builder.run(
+estimate_circuits = estimate_circuit_builder.run(
     state_preparation=state_prep_circuit,
     qubit_hamiltonian=qubit_hamiltonian,
 )
+estimate_circuit = estimate_circuits[0]
+Logger.info("Fast estimation QPE circuit built successfully!")
 
-# The standard builder returns a single-element list
-qpe_circuit = qpe_circuits[0]
-Logger.info("\nStandard QPE circuit built successfully!")
-Logger.info(f"  Phase bits (ancillas): {num_bits}")
-Logger.info(f"  System qubits: {qubit_hamiltonian.num_qubits}")
-Logger.info(f"  Total qubits: {num_bits + qubit_hamiltonian.num_qubits}")
-Logger.info(f"  Evolution time: {evolution_time:.6f}")
+from qdk._interpreter import logical_counts
 
+lc = logical_counts(
+    estimate_circuit._qsharp_factory.program,
+    estimate_circuit._qsharp_factory.parameter.values(),
+)
+print(f"Logical counts: {lc}")
 # =============================================================================
-# (Optional) Inspect or estimate resources
+# 8. Resource estimation using the fast circuit
 # =============================================================================
 from qdk.qre import estimate
 from qdk.qre.application import QSharpApplication
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 
-Logger.info("\nResource estimation for the QPE circuit...")
-# Wrap the largest QPE iteration circuit as a QREv3 application.
+Logger.info("Resource estimation for the QPE circuit (using RepeatEstimates)...")
+# Use the fast estimation circuit — it wraps a single Trotter step with RepeatEstimates
 qpe_app = QSharpApplication(
-    qpe_circuits[0]._qsharp_factory.program,
-    qpe_circuits[0]._qsharp_factory.parameter.values(),
+    estimate_circuit._qsharp_factory.program,
+    estimate_circuit._qsharp_factory.parameter.values(),
 )
-
 Logger.info(
-    "\nEstimating resources for a Majorana-based architecture with ThreeAux QEC code..."
+    "Estimating resources for a Majorana-based architecture with ThreeAux QEC code..."
 )
-# Majorana-based architecture with an error rate of $10^{-5}$ and the `ThreeAux`
-# QEC code, along with round-based magic state factories
-architecture = Majorana(error_rate=1e-5)
-isa_query = ThreeAux.q(distance=[11, 13, 15, 17, 19]) * RoundBasedFactory.q(
-    use_cache=True, code_query=ThreeAux.q(distance=[11, 13, 15, 17, 19])
-)
+architecture = Majorana(error_rate=1e-4)
+isa_query = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
 
-# Run resource estimation with 1% total error budget
-results = estimate(qpe_app, architecture, isa_query, max_error=0.01, name="QPE")
+# Run resource estimation with 10% total error budget
+results = estimate(qpe_app, architecture, isa_query, max_error=0.5, name="QPE")
 
 # Display the Pareto-optimal results table
 results.add_factory_summary_column()
 Logger.info("\nPareto-optimal resource estimates for the QPE circuit:")
-Logger.info(results.as_frame())
+print(results.as_frame())

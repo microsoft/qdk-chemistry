@@ -766,6 +766,9 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.estimate_builder import (  # noqa: PLC0415
+        QdkEstimateQpeCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
         QdkIterativeQpeCircuitBuilder,
     )
@@ -808,6 +811,7 @@ def _register_python_algorithms():
     register(lambda: QdkSparseStateSimulator())
     register(lambda: QdkIterativeQpeCircuitBuilder())
     register(lambda: QdkStandardQpeCircuitBuilder())
+    register(lambda: QdkEstimateQpeCircuitBuilder())
     register(lambda: IterativePhaseEstimation())
     register(lambda: StandardPhaseEstimation())
 
