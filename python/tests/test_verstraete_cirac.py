@@ -131,6 +131,15 @@ class TestVerstraeteCiracMapping:
             ("kagome", (2, 2), {"periodic_x": True, "periodic_y": True}),
             ("kagome", (3, 3), {}),
         ],
+        ids=[
+            "square-2x2",
+            "square-3x3",
+            "square-3x4",
+            "honeycomb-2x2-periodic",
+            "triangular-2x2",
+            "kagome-2x2-periodic",
+            "kagome-3x3",
+        ],
     )
     def test_stabilizers_and_commutation(self, lattice_type: str, args: tuple, kwargs: dict) -> None:
         """Verify that stabilizers mutually commute and commute with mapped H for various lattices."""
