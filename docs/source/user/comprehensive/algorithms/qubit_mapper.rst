@@ -195,6 +195,20 @@ Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if nee
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
+For :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` and
+:class:`~qdk_chemistry.data.SparseHamiltonianContainer` inputs, the native
+``"qdk"`` implementation uses container-specific two-body integral paths.
+Cholesky-backed Hamiltonians are mapped directly from their three-center
+factors. Restricted sparse model Hamiltonians are mapped by iterating stored
+two-body entries, avoiding dense ``n^4`` two-body materialization; sparse
+containers that are not restricted fall back to the dense compatibility path.
+Restricted sparse entries preserve dense-overload compatibility: stored
+``(p,q,r,s)`` keys are treated as exact rank-4 tensor coordinates, not
+symmetry-equivalent ERI alias classes. The native Hamiltonian mapper derives
+restricted/unrestricted behavior from the Hamiltonian container and
+intentionally omits the Hamiltonian core energy, preserving the historical
+``QdkQubitMapper`` output convention.
+
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
 .. rubric:: Settings

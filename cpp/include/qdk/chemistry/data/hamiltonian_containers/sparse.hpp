@@ -233,6 +233,15 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   const SymmetryBlockedSparseMap<4>& two_body_integrals_sparse() const;
 
   /**
+   * @brief Diagnostic hook for tests and memory-sensitive callers.
+   * @return True after the lazy dense n^4 two-body cache has been built.
+   *
+   * Reports only whether the compatibility dense cache already exists; calling
+   * this method never materializes the cache.
+   */
+  bool has_materialized_dense_two_body_integrals() const;
+
+  /**
    * @brief Access a single one-body integral element.
    * @param i Row index
    * @param j Column index

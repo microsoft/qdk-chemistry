@@ -18,6 +18,8 @@
 
 namespace qdk::chemistry::data {
 
+class Hamiltonian;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -331,6 +333,28 @@ MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
     const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
+    double threshold, double integral_threshold);
+
+/**
+ * @brief Map a Hamiltonian without forcing dense two-body materialization for
+ *        sparse or Cholesky-backed containers.
+ *
+ * The returned terms are numerically equivalent to the dense-array overload for
+ * dense containers. Restricted sparse inputs preserve the compatibility
+ * semantics of the dense-array overload: sparse two-body entries are treated as
+ * exact rank-4 tensor coordinates, and only coordinates read by the restricted
+ * dense mapper contribute. This overload derives restricted/unrestricted
+ * behavior from the Hamiltonian container and intentionally excludes the
+ * Hamiltonian core energy, preserving the high-level QdkQubitMapper convention.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param hamiltonian Hamiltonian to map.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian(
+    const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
     double threshold, double integral_threshold);
 
 }  // namespace qdk::chemistry::data

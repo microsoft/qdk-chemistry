@@ -670,4 +670,9 @@ SparseHamiltonianContainer::two_body_integrals_sparse() const {
   return *_two_body_sparse;
 }
 
+bool SparseHamiltonianContainer::has_materialized_dense_two_body_integrals()
+    const {
+  return _two_body_dense_valid;
+}
+
 }  // namespace qdk::chemistry::data
