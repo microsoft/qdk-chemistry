@@ -178,6 +178,7 @@ class SymmetryBlockedSparseMap
    */
   nlohmann::json to_json() const override {
     nlohmann::json j;
+    j["version"] = SERIALIZATION_VERSION;
     j["type"] = "SymmetryBlockedSparseMap";
     j["rank"] = Rank;
     j["symmetries"] = this->_symmetries_to_json();
@@ -223,43 +224,39 @@ class SymmetryBlockedSparseMap
   }
 
   /**
-   * @brief HDF5 serialization is not yet implemented for sparse maps;
-   * always throws.
-   * @throws std::runtime_error unconditionally.
+   * @brief Serialize this sparse map into an HDF5 group.
+   *
+   * Writes the JSON form (see @ref to_json) as a single string dataset within
+   * @p group, mirroring the HDF5 layout used by @ref SymmetryBlockedScalar.
+   *
+   * @param group HDF5 group to write into.
+   * @throws std::runtime_error on HDF5 I/O failure.
    */
-  void to_hdf5(H5::Group& /*group*/) const override {
-    throw std::runtime_error(
-        "SymmetryBlockedSparseMap HDF5 serialization not yet implemented.");
-  }
+  void to_hdf5(H5::Group& group) const override;
 
   /**
-   * @brief HDF5 serialization is not yet implemented for sparse maps;
-   * always throws.
-   * @throws std::runtime_error unconditionally.
+   * @brief Serialize this sparse map to an HDF5 file.
+   * @param filename Path to the HDF5 file to create or overwrite.
+   * @throws std::runtime_error on HDF5 I/O failure.
    */
-  void to_hdf5_file(const std::string& /*filename*/) const override {
-    throw std::runtime_error(
-        "SymmetryBlockedSparseMap HDF5 serialization not yet implemented.");
-  }
+  void to_hdf5_file(const std::string& filename) const override;
 
   /**
-   * @brief Dispatch to JSON serialization. HDF5 is not yet implemented for
-   * sparse maps and will throw.
+   * @brief Dispatch to JSON or HDF5 serialization based on @p type.
    * @param filename Target file path.
-   * @param type Either @c "json" (supported) or @c "hdf5" (throws).
+   * @param type Either @c "json" or @c "hdf5".
    * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
-   * @throws std::runtime_error if @p type is @c "hdf5" (HDF5 not
-   *         implemented) or if the JSON I/O fails.
+   * @throws std::runtime_error if the underlying I/O operation fails.
    */
   void to_file(const std::string& filename,
                const std::string& type) const override {
     if (type == "json") {
       to_json_file(filename);
     } else if (type == "hdf5") {
-      throw std::runtime_error(
-          "SymmetryBlockedSparseMap HDF5 serialization not yet implemented.");
+      to_hdf5_file(filename);
     } else {
-      throw std::invalid_argument("Unsupported file type: " + type);
+      throw std::invalid_argument("Unsupported file type: " + type +
+                                  ". Supported types are: json, hdf5");
     }
   }
 
@@ -290,42 +287,76 @@ class SymmetryBlockedSparseMap
    * @brief Reconstruct a @ref SymmetryBlockedSparseMap from a JSON object
    * produced by @ref to_json.
    *
+   * Validates the serialization version recorded in @p j against
+   * @c SERIALIZATION_VERSION before reconstructing.
+   *
    * @param j JSON object produced by a prior @ref to_json call.
    * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::runtime_error if @p j is missing the @c "version" field or
+   *         its version is incompatible with @c SERIALIZATION_VERSION.
    * @throws std::invalid_argument if a block label is not admissible or a
    *         sparse entry index exceeds the declared extent.
    * @throws nlohmann::json::exception if @p j is otherwise malformed.
    */
   static std::shared_ptr<SymmetryBlockedSparseMap> from_json(
-      const nlohmann::json& j) {
-    auto symmetries = Base::_symmetries_from_json(j);
-    auto extents = Base::_extents_from_json(j);
+      const nlohmann::json& j);
 
-    BlockMap blocks;
-    for (const auto& entry : j.at("blocks")) {
-      auto sparse_block = std::make_shared<SparseBlock>();
-      for (const auto& e : entry.at("entries")) {
-        IndexTuple idx{};
-        for (std::size_t i = 0; i < Rank; ++i) {
-          idx[i] = e.at(i).template get<unsigned>();
-        }
-        (*sparse_block)[idx] = e.at(Rank).template get<Scalar>();
-      }
-      auto const_block =
-          std::const_pointer_cast<const SparseBlock>(sparse_block);
-      for (const auto& key_json : entry.at("keys")) {
-        std::vector<SymmetryLabel> labels;
-        for (const auto& label_json : key_json) {
-          labels.push_back(SymmetryLabel::from_json(label_json));
-        }
-        blocks.emplace(detail::make_labels<Rank>(labels), const_block);
-      }
+  /**
+   * @brief Reconstruct a @ref SymmetryBlockedSparseMap from a JSON file
+   * produced by @ref to_json_file.
+   * @param filename Path to the JSON file to read.
+   * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::runtime_error if the file cannot be opened, parsed, or
+   *         carries an incompatible serialization version.
+   */
+  static std::shared_ptr<SymmetryBlockedSparseMap> from_json_file(
+      const std::string& filename);
+
+  /**
+   * @brief Reconstruct from an HDF5 group produced by @ref to_hdf5.
+   * @param group HDF5 group to read from.
+   * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::runtime_error if the metadata dataset or its @c "version"
+   *         field is missing or the version is incompatible, or on HDF5 I/O
+   *         failure.
+   */
+  static std::shared_ptr<SymmetryBlockedSparseMap> from_hdf5(H5::Group& group);
+
+  /**
+   * @brief Reconstruct from an HDF5 file produced by @ref to_hdf5_file.
+   * @param filename Path to the HDF5 file to read.
+   * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::runtime_error if the file cannot be opened or carries an
+   *         incompatible serialization version.
+   */
+  static std::shared_ptr<SymmetryBlockedSparseMap> from_hdf5_file(
+      const std::string& filename);
+
+  /**
+   * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
+   * @param filename Source file path.
+   * @param type Either @c "json" or @c "hdf5".
+   * @return Shared pointer to the reconstructed sparse map.
+   * @throws std::invalid_argument if @p type is not @c "json" or @c "hdf5".
+   * @throws std::runtime_error if the underlying I/O operation fails or the
+   *         serialization version is incompatible.
+   */
+  static std::shared_ptr<SymmetryBlockedSparseMap> from_file(
+      const std::string& filename, const std::string& type) {
+    if (type == "json") {
+      return from_json_file(filename);
+    } else if (type == "hdf5") {
+      return from_hdf5_file(filename);
     }
-    return std::make_shared<SymmetryBlockedSparseMap>(
-        std::move(symmetries), std::move(extents), std::move(blocks));
+    throw std::invalid_argument("Unsupported file type: " + type +
+                                ". Supported types are: json, hdf5");
   }
 
  private:
+  /// On-disk serialization format version. Bump on any change to the JSON or
+  /// HDF5 shape produced by @ref to_json / @ref to_hdf5.
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+
   void _validate_sparse_blocks() const {
     for (const auto& [labels, ptr] : this->_blocks) {
       for (const auto& [idx, value] : *ptr) {
@@ -341,6 +372,9 @@ class SymmetryBlockedSparseMap
     }
   }
 };
+
+// Explicit instantiation declaration (definition emitted in the .cpp).
+extern template class SymmetryBlockedSparseMap<4, double>;
 
 /**
  * @brief Build a single-channel restricted rank-4

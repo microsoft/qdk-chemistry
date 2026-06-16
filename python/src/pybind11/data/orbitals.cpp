@@ -101,8 +101,8 @@ Examples:
       py::init<const Eigen::MatrixXd &, const std::optional<Eigen::VectorXd> &,
                const std::optional<Eigen::MatrixXd> &,
                std::shared_ptr<qdk::chemistry::data::BasisSet>,
-               const std::optional<
-                   std::tuple<std::vector<size_t>, std::vector<size_t>>> &>(),
+               std::shared_ptr<const SymmetryBlockedIndexSet>,
+               std::shared_ptr<const SymmetryBlockedIndexSet>>(),
       R"(
 Constructor for restricted orbitals.
 
@@ -114,33 +114,34 @@ Args:
     energies (numpy.ndarray | None): The orbital energies (``num_molecular_orbitals``), can be None
     ao_overlap (numpy.ndarray | None): The atomic orbital overlap matrix (``num_atomic_orbitals`` × ``num_atomic_orbitals``), can be ``None``
     basis_set (BasisSet): The basis set
-    indices (tuple[list[int], list[int]] | None): Tuple of (active_space_indices, inactive_space_indices), can be ``None``
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be ``None``
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be ``None``
 
 Examples:
     >>> import numpy as np
     >>> coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
-    >>> orbitals = Orbitals(coeffs, None, None, basis_set, None)
+    >>> orbitals = Orbitals(coeffs, None, None, basis_set)
 
 )",
       py::arg("coefficients"),
       py::arg("energies") = std::optional<Eigen::VectorXd>{},
       py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
       py::arg("basis_set"),
-      py::arg("indices") = std::optional<
-          std::tuple<std::vector<size_t>, std::vector<size_t>>>{});
+      py::arg("active_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>(),
+      py::arg("inactive_indices") =
+          std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // Constructor for unrestricted orbitals
-  orbitals.def(
-      py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::VectorXd> &,
-               const std::optional<Eigen::MatrixXd> &,
-               std::shared_ptr<qdk::chemistry::data::BasisSet>,
-               const std::optional<
-                   std::tuple<std::vector<size_t>, std::vector<size_t>,
-                              std::vector<size_t>, std::vector<size_t>>> &>(),
-      R"(
+  orbitals.def(py::init<const Eigen::MatrixXd &, const Eigen::MatrixXd &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::VectorXd> &,
+                        const std::optional<Eigen::MatrixXd> &,
+                        std::shared_ptr<qdk::chemistry::data::BasisSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>,
+                        std::shared_ptr<const SymmetryBlockedIndexSet>>(),
+               R"(
 Constructor for unrestricted orbitals.
 
 ``num_atomic_orbitals`` refers to the number of atomic orbitals and ``num_molecular_orbitals`` refers to
@@ -169,26 +170,27 @@ Args:
 
     basis_set (BasisSet): The basis set
 
-    indices (tuple[list[int], list[int], list[int], list[int]] | None): Tuple of
+    active_indices (SymmetryBlockedIndexSet | None): Active-space index set, can be ``None``
 
-        (``active_alpha``, ``active_beta``, ``inactive_alpha``, ``inactive_beta``), can be ``None``
+    inactive_indices (SymmetryBlockedIndexSet | None): Inactive-space index set, can be ``None``
 
 Examples:
     >>> import numpy as np
     >>> alpha_coeffs = np.random.random((4, 3))
     >>> beta_coeffs = np.random.random((4, 3))
     >>> basis_set = BasisSet(...)
-    >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set, None)
+    >>> orbitals = Orbitals(alpha_coeffs, beta_coeffs, None, None, None, basis_set)
 
 )",
-      py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
-      py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
-      py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
-      py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
-      py::arg("basis_set"),
-      py::arg("indices") = std::optional<
-          std::tuple<std::vector<size_t>, std::vector<size_t>,
-                     std::vector<size_t>, std::vector<size_t>>>{});
+               py::arg("coefficients_alpha"), py::arg("coefficients_beta"),
+               py::arg("energies_alpha") = std::optional<Eigen::VectorXd>{},
+               py::arg("energies_beta") = std::optional<Eigen::VectorXd>{},
+               py::arg("ao_overlap") = std::optional<Eigen::MatrixXd>{},
+               py::arg("basis_set"),
+               py::arg("active_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>(),
+               py::arg("inactive_indices") =
+                   std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // SBT-native constructor (symmetry-blocked tensors)
   orbitals.def(
@@ -879,96 +881,56 @@ Calls to any functions requiring actual data (e.g. ``get_coefficients``,
 ``get_energies``, ``calculate_ao_density_matrix``, etc.) will throw runtime errors.
 
 Examples:
-    >>> # Create a simple 4-orbital restricted model system
-    >>> model_orb = ModelOrbitals(4, True)
+    >>> # Create a simple 4-orbital model system (no symmetry, aggregate quantities)
+    >>> model_orb = ModelOrbitals(4)
     >>> print(f"Number of orbitals: {model_orb.get_num_molecular_orbitals()}")
 
-    >>> # Create with active and inactive spaces
-    >>> active_indices = [1, 2]
-    >>> inactive_indices = [0, 3]
-    >>> model_orb = ModelOrbitals(4, active_indices, inactive_indices)
+    >>> # Create with an explicit spin axis for spin-resolved quantities
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> model_orb = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
 
 )");
 
-  // Basic constructor
-  model_orbitals.def(py::init<size_t, bool>(),
+  // Full active space; restricted inferred from symmetries.
+  model_orbitals.def(
+      py::init<size_t, std::shared_ptr<const SymmetryProduct>>(),
+      R"(
+Construct model orbitals over a full active space.
+
+Restricted-ness is inferred from ``symmetries`` (a spin axis whose labels are
+equivalent is restricted); the default is no symmetry.
+
+Args:
+    basis_size (int): Number of single-particle modes.
+    symmetries (SymmetryProduct, optional): Explicit single-particle symmetries; defaults to no symmetry. Pass ``SymmetryProduct([axes.spin(1, True)])`` for spin-resolved quantities.
+
+Examples:
+    >>> # Full active space, no symmetry (aggregate quantities)
+    >>> model_orb = ModelOrbitals(6)
+
+    >>> # Full active space with an explicit spin axis
+    >>> from qdk_chemistry.data.symmetry import SymmetryProduct, axes
+    >>> model_orb = ModelOrbitals(6, SymmetryProduct([axes.spin(1, True)]))
+)",
+      py::arg("basis_size"),
+      py::arg("symmetries") = std::shared_ptr<const SymmetryProduct>());
+
+  // Active (+ optional inactive) spaces as symmetry-blocked index sets.
+  model_orbitals.def(py::init<std::shared_ptr<const SymmetryBlockedIndexSet>,
+                              std::shared_ptr<const SymmetryBlockedIndexSet>>(),
                      R"(
-Constructor for model orbitals with basic parameters.
+Construct model orbitals from symmetry-blocked active/inactive index sets.
+
+The single-particle symmetries, per-mode extents, and restricted-ness are taken
+from the index sets; no spin convention is assumed.
 
 Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    restricted (bool): Whether the calculation is restricted (True) or unrestricted (False)
-
-Examples:
-    >>> # Restricted calculation with 6 orbitals
-    >>> model_orb = ModelOrbitals(6, True)
-    >>> print(f"Is restricted: {model_orb.is_restricted()}")
-
-    >>> # Unrestricted calculation with 4 orbitals
-    >>> model_orb = ModelOrbitals(4, False)
-    >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
-
+    active_indices (SymmetryBlockedIndexSet): Active-space index set.
+    inactive_indices (SymmetryBlockedIndexSet, optional): Inactive-space index set; defaults to none.
 )",
-                     py::arg("basis_size"), py::arg("restricted"));
-
-  // Constructor with active and inactive space indices (restricted)
-  model_orbitals.def(
-      py::init<size_t,
-               const std::tuple<std::vector<size_t>, std::vector<size_t>> &>(),
-      R"(
-Constructor with active and inactive space indices (restricted).
-
-For restricted calculations, the same active and inactive space indices are used for both alpha and beta electrons.
-
-Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    indices (tuple[list[int], list[int]]): Tuple of ``(active_space_indices, inactive_space_indices)``
-
-Raises:
-    ValueError: If indices are >= basis_size or if active and inactive spaces overlap
-
-Examples:
-    >>> # Create a 6-orbital system with orbitals 2,3 active and 0,1,4,5 inactive
-    >>> active = [2, 3]
-    >>> inactive = [0, 1, 4, 5]
-    >>> indices = (active, inactive)
-    >>> model_orb = ModelOrbitals(6, indices)
-    >>> print(f"Active space size: {len(model_orb.get_active_space_indices()[0])}")
-
-)",
-      py::arg("basis_size"), py::arg("indices"));
-
-  // Constructor with active and inactive space indices (unrestricted)
-  model_orbitals.def(
-      py::init<size_t,
-               const std::tuple<std::vector<size_t>, std::vector<size_t>,
-                                std::vector<size_t>, std::vector<size_t>> &>(),
-      R"(
-Constructor with active and inactive space indices (unrestricted).
-
-For unrestricted calculations, separate active and inactive space indices can be provided for alpha and beta electrons.
-
-Args:
-    basis_size (int): Number of atomic orbitals (and molecular orbitals)
-    indices (tuple[list[int], list[int], list[int], list[int]]): Tuple of
-
-        ``(active_alpha, active_beta, inactive_alpha, inactive_beta)``
-
-Raises:
-    ValueError: If indices are >= basis_size or if active and inactive spaces overlap
-
-Examples:
-    >>> # Create unrestricted system with different alpha/beta active spaces
-    >>> alpha_active = [1, 2]
-    >>> beta_active = [2, 3]
-    >>> alpha_inactive = [0, 3, 4]
-    >>> beta_inactive = [0, 1, 4]
-    >>> indices = (alpha_active, beta_active, alpha_inactive, beta_inactive)
-    >>> model_orb = ModelOrbitals(5, indices)
-    >>> print(f"Is unrestricted: {model_orb.is_unrestricted()}")
-
-)",
-      py::arg("basis_size"), py::arg("indices"));
+                     py::arg("active_indices"),
+                     py::arg("inactive_indices") =
+                         std::shared_ptr<const SymmetryBlockedIndexSet>());
 
   // Static from_json method
   model_orbitals
