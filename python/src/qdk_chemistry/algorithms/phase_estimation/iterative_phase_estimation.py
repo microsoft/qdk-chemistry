@@ -15,6 +15,7 @@ References:
 # --------------------------------------------------------------------------------------------
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     Circuit,
     QpeResult,
@@ -141,6 +142,16 @@ class IterativePhaseEstimation(PhaseEstimation):
         if isinstance(unitary_builder, LCUBuilder):
             # For block-encoding builders (qubitization), use E = λ cos(2πφ).
             lambda_val = qubit_hamiltonian.schatten_norm
+            return QpeResult.from_qubitization_result(
+                method=self.name(),
+                phase_fraction=phase_fraction,
+                lambda_val=lambda_val,
+                bits_msb_first=bits,
+            )
+        if isinstance(unitary_builder, SOSSABuilder):
+            # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
+            # Retrieve Λ from the builder settings (set during build_from_dfthc).
+            lambda_val = unitary_builder.settings().get("normalization")
             return QpeResult.from_qubitization_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,

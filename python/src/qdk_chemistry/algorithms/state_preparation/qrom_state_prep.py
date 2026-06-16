@@ -1,0 +1,115 @@
+"""QDK/Chemistry QROM-based state preparation algorithm."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+import numpy as np
+
+from qdk_chemistry.data import Wavefunction
+from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+
+from .state_preparation import StatePreparation
+
+__all__: list[str] = ["QROMStatePreparation"]
+
+
+class QROMStatePreparation(StatePreparation):
+    r"""State preparation using QROM-based multiplexed rotations (SBM decomposition).
+
+    Prepares an arbitrary n-qubit state using n layers of multiplexed Ry rotations,
+    where each layer's angles are loaded from a QROM table.
+
+    This approach uses only :math:`n = \lceil\log_2 L\rceil` qubits (no ancilla
+    registers for alias sampling), but requires n QROM lookups.
+
+    For resource estimation, each multiplexed rotation layer costs:
+      - QROM load: O(2^l) Toffolis to load angle bits for layer l
+      - Phase gradient addition: O(b_rot) Toffolis per rotation
+      - QROM uncompute: measurement-based (free in Toffoli cost)
+
+    Total Toffoli cost: :math:`\sum_{l=0}^{n-1} (2^l + b_{rot})` per walk step.
+
+    Reference: arXiv:2502.15882v1, Section C (SBM decomposition).
+
+    """
+
+    def __init__(self, rotation_bit_precision: int = 10):
+        """Initialize QROMStatePreparation.
+
+        Args:
+            rotation_bit_precision: Number of bits for Givens rotation angle
+                precision. Higher values give more accurate rotations.
+                Defaults to 10.
+
+        """
+        super().__init__()
+        self._rotation_bit_precision = rotation_bit_precision
+
+    def name(self) -> str:
+        """Return the algorithm name."""
+        return "qrom_state_prep"
+
+    def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
+        """Not directly applicable -- use prepare_from_statevector instead.
+
+        Raises:
+            NotImplementedError: Use prepare_from_statevector for block encoding PREPARE.
+
+        """
+        raise NotImplementedError(
+            "QROMStatePreparation does not support direct Wavefunction input. "
+            "Use prepare_from_statevector() for block encoding PREPARE oracles."
+        )
+
+    def prepare_from_statevector(
+        self,
+        statevector: np.ndarray,
+        num_qubits: int,
+        qubit_indices: list[int],
+    ) -> Circuit:
+        r"""Create a PREPARE circuit using QROM-based SBM decomposition.
+
+        The SBM (Shende-Bullock-Markov) decomposition splits the state preparation
+        into n layers of multiplexed Ry rotations. Each rotation angle is computed
+        from the ratio of sub-tree norms.
+
+        This method uses only n qubits (no ancilla), making it suitable for
+        minimum-qubit scenarios.
+
+        Args:
+            statevector: A 1-D array of real amplitudes to load (length L).
+            num_qubits: Number of qubits in the state register.
+            qubit_indices: Qubit indices for the state register (used for layout).
+
+        Returns:
+            Circuit: A Circuit wrapping the Q# QROM state prep callable and factory.
+
+        """
+        amplitudes = statevector.tolist()
+        num_state_qubits = num_qubits
+
+        params = QSHARP_UTILS.QROMStatePrep.QROMStatePrepParams(
+            amplitudes=amplitudes,
+            rotationBitPrecision=self._rotation_bit_precision,
+            numStateQubits=num_state_qubits,
+        )
+
+        qsharp_op = QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepOp(params)
+        qsharp_factory = QsharpFactoryData(
+            program=QSHARP_UTILS.QROMStatePrep.MakeQROMStatePrepCircuit,
+            parameter={
+                "amplitudes": amplitudes,
+                "rotationBitPrecision": self._rotation_bit_precision,
+                "numStateQubits": num_state_qubits,
+            },
+        )
+
+        return Circuit(qsharp_op=qsharp_op, qsharp_factory=qsharp_factory)
+
+    @property
+    def rotation_bit_precision(self) -> int:
+        """Number of bits for rotation angle precision."""
+        return self._rotation_bit_precision

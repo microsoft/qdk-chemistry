@@ -15,6 +15,7 @@ from qdk_chemistry.data.base import DataClass
 from .containers.base import UnitaryContainer
 from .containers.block_encoding import LCUContainer
 from .containers.pauli_product_formula import PauliProductFormulaContainer
+from .containers.sossa import SOSSAContainer
 
 __all__: list[str] = []
 
@@ -116,6 +117,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_json(json_data)
         elif container_type == "lcu":
             container = LCUContainer.from_json(json_data)
+        elif container_type == "sossa":
+            container = SOSSAContainer.from_json(json_data)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
 
@@ -137,6 +140,8 @@ class UnitaryRepresentation(DataClass):
             container = PauliProductFormulaContainer.from_hdf5(group)
         elif container_type == "lcu":
             container = LCUContainer.from_hdf5(group)
+        elif container_type == "sossa":
+            container = SOSSAContainer.from_hdf5(group)
         else:
             raise ValueError(f"Unsupported container type: {container_type}")
         return cls(container=container)
