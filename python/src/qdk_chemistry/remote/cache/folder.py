@@ -18,7 +18,9 @@ and never written as separate files.
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import tempfile
 from typing import TYPE_CHECKING, Any
 
 from qdk_chemistry.data._hashing import _item_content_hash
@@ -84,7 +86,14 @@ class FolderCache(CacheBackend):
 
     # ── Job metadata ─────────────────────────────────────────────────────
 
+    @staticmethod
+    def _validate_key(key: str, label: str = "key") -> None:
+        """Reject keys containing path separators or glob metacharacters."""
+        if not key or any(c in key for c in ("/", "\\", "..", "*", "?", "[", "]")):
+            raise ValueError(f"Invalid cache {label}: {key!r}")
+
     def _job_path(self, run_hash: str) -> pathlib.Path:
+        self._validate_key(run_hash, "run_hash")
         return self._root / f"{run_hash}.job.json"
 
     def get_job(self, run_hash: str) -> Job | None:
@@ -103,12 +112,13 @@ class FolderCache(CacheBackend):
         """Store (or update) job metadata keyed by *run_hash*."""
         self._root.mkdir(parents=True, exist_ok=True)
         p = self._job_path(run_hash)
-        p.write_text(json.dumps(job.to_dict(), indent=2))
+        self._atomic_write_text(p, json.dumps(job.to_dict(), indent=2))
 
     # ── DataClass blobs ──────────────────────────────────────────────────
 
     def get_data(self, content_hash: str) -> DataClass | list | None:
         """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
+        self._validate_key(content_hash, "content_hash")
         generic_list_path = self._root / f"{content_hash}.list.json"
         if generic_list_path.exists():
             return self._get_generic_data_list(generic_list_path)
@@ -160,6 +170,7 @@ class FolderCache(CacheBackend):
 
     def put_data(self, content_hash: str, data: DataClass | list) -> None:
         """Store a DataClass object (or list of them) by content hash."""
+        self._validate_key(content_hash, "content_hash")
         if isinstance(data, list):
             return self._put_data_list(content_hash, data)
         type_name = data._data_type_name  # noqa: SLF001
@@ -167,7 +178,7 @@ class FolderCache(CacheBackend):
         if filepath.exists():
             return None  # already cached
         self._root.mkdir(parents=True, exist_ok=True)
-        data.to_hdf5_file(str(filepath))
+        self._atomic_write_hdf5(filepath, data)
         return None
 
     def _put_data_list(self, content_hash: str, data_list: list) -> None:
@@ -185,7 +196,7 @@ class FolderCache(CacheBackend):
             item_hash = item.content_hash()[:16]
             self.put_data(item_hash, item)
             item_hashes.append(item_hash)
-        manifest_path.write_text(json.dumps({"type": type_name, "items": item_hashes}))
+        self._atomic_write_text(manifest_path, json.dumps({"type": type_name, "items": item_hashes}))
         return None
 
     def _put_generic_data_list(self, content_hash: str, data_list: list) -> None:
@@ -195,7 +206,7 @@ class FolderCache(CacheBackend):
             return
         self._root.mkdir(parents=True, exist_ok=True)
         manifest = self._data_to_node(data_list)
-        manifest_path.write_text(json.dumps(manifest))
+        self._atomic_write_text(manifest_path, json.dumps(manifest))
 
     @staticmethod
     def _is_homogeneous_dataclass_list(data_list: list) -> bool:
@@ -259,6 +270,7 @@ class FolderCache(CacheBackend):
 
     def has_data(self, content_hash: str) -> bool:
         """Fast existence check via glob (no deserialization)."""
+        self._validate_key(content_hash, "content_hash")
         return (
             bool(list(self._root.glob(f"{content_hash}.*.h5")))
             or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))
@@ -285,6 +297,7 @@ class FolderCache(CacheBackend):
 
     def delete_data(self, content_hash: str) -> bool:
         """Remove a DataClass blob (or list manifest and its items) by content hash."""
+        self._validate_key(content_hash, "content_hash")
         import json as _json  # noqa: PLC0415
 
         deleted = False
@@ -359,3 +372,33 @@ class FolderCache(CacheBackend):
         import shutil  # noqa: PLC0415
 
         shutil.rmtree(self._root)
+
+    # ── Atomic write helpers ────────────────────────────────────────────────
+
+    def _atomic_write_text(self, path: pathlib.Path, text: str) -> None:
+        """Write *text* to *path* atomically via temp file + os.replace."""
+        fd, tmp = tempfile.mkstemp(dir=self._root, suffix=".tmp")
+        try:
+            os.write(fd, text.encode())
+            os.close(fd)
+            fd = -1
+            os.replace(tmp, path)
+        except BaseException:
+            if fd >= 0:
+                os.close(fd)
+            pathlib.Path(tmp).unlink(missing_ok=True)
+            raise
+
+    def _atomic_write_hdf5(self, path: pathlib.Path, data: DataClass) -> None:
+        """Write *data* to *path* atomically via temp file + os.replace."""
+        # Temp file must match the <hash>.<type>.h5 naming convention
+        # expected by DataClass.to_hdf5_file.
+        type_name = data._data_type_name  # noqa: SLF001
+        fd, tmp = tempfile.mkstemp(dir=self._root, prefix="tmp_", suffix=f".{type_name}.h5")
+        os.close(fd)
+        try:
+            data.to_hdf5_file(tmp)
+            os.replace(tmp, path)
+        except BaseException:
+            pathlib.Path(tmp).unlink(missing_ok=True)
+            raise

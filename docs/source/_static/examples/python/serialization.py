@@ -55,7 +55,7 @@ os.remove(tmpfile)
 # Create dummy data for Hamiltonian class
 one_body = np.identity(2)
 two_body = 2 * np.ones((16,))
-orbitals = ModelOrbitals(2, True)  # 2 orbitals, restricted
+orbitals = ModelOrbitals(2)  # 2 orbitals, trivial symmetry
 core_energy = 1.5
 inactive_fock = np.zeros((0, 0))
 
