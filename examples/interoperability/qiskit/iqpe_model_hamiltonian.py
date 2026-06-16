@@ -30,7 +30,7 @@ except ImportError as ex:
     ) from ex
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Circuit, QubitHamiltonian
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian
 from qdk_chemistry.utils import Logger
 
 Logger.set_global_level("info")
@@ -72,21 +72,31 @@ state_prep_circuit_1 = Circuit(qasm3.dumps(state_prep_1))
 # 2. Run iterative QPE
 iqpe_1 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_1,
-    evolution_time=TIME_STEP_1,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_1,
 )
-simulator_1 = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1)
-evolution_builder = create("time_evolution_builder", "trotter")
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+iqpe_1.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_1,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_1
+        ),
+    ),
+)
+iqpe_1.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_1),
+)
 
 result_1 = iqpe_1.run(
     state_preparation=state_prep_circuit_1,
     qubit_hamiltonian=hamiltonian_1,
-    circuit_executor=simulator_1,
-    evolution_builder=evolution_builder,
-    circuit_mapper=circuit_mapper,
 )
 
 phase_angle_1 = result_1.phase_angle
@@ -145,21 +155,31 @@ state_prep_circuit_2 = Circuit(qasm3.dumps(state_prep_2))
 # 2. Run iterative QPE
 iqpe_2 = create(
     "phase_estimation",
-    "iterative",
-    num_bits=PHASE_BITS_2,
-    evolution_time=TIME_STEP_2,
+    "qdk_iterative",
     shots_per_bit=SHOTS_PER_BIT_2,
 )
-simulator_2 = create("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2)
-evolution_builder = create("time_evolution_builder", "trotter")
-circuit_mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+iqpe_2.settings().set(
+    "qpe_circuit_builder",
+    AlgorithmRef(
+        "qpe_circuit_builder",
+        "qiskit_iterative",
+        num_bits=PHASE_BITS_2,
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "pauli_sequence"
+        ),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "trotter", time=TIME_STEP_2
+        ),
+    ),
+)
+iqpe_2.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qiskit_aer_simulator", seed=SIMULATOR_SEED_2),
+)
 
 result_2 = iqpe_2.run(
     state_preparation=state_prep_circuit_2,
     qubit_hamiltonian=hamiltonian_2,
-    circuit_executor=simulator_2,
-    evolution_builder=evolution_builder,
-    circuit_mapper=circuit_mapper,
 )
 
 phase_angle_2 = result_2.phase_angle

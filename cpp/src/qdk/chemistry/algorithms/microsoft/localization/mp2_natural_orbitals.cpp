@@ -94,7 +94,8 @@ std::shared_ptr<data::Wavefunction> MP2NaturalOrbitalLocalizer::_run_impl(
   }
 
   // Extract selected orbitals for MP2 natural orbital calculation
-  const auto& full_coeffs = orbitals->get_coefficients().first;
+  const auto& full_coeffs = orbitals->coefficients()->block(
+      {data::axes::alpha(), data::axes::alpha()});
   const size_t num_orbitals = loc_indices_a.size();
   const size_t num_occupied = occ_indices.size();
   const size_t num_virtual = virt_indices.size();

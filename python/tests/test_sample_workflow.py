@@ -23,6 +23,8 @@ from pathlib import Path
 
 import pytest
 
+from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+
 # Optional dependencies for notebook execution
 try:
     import nbformat
@@ -165,12 +167,20 @@ def _strip_visualization_lines(cell_source: str) -> str:
     return "\n".join(filtered_lines)
 
 
-def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 600) -> None:
+def _execute_notebook_skip_visualizations(
+    notebook_path: Path,
+    timeout: int = 1800,
+    cell_patches: dict[int, dict[str, str]] | None = None,
+) -> None:
     """Execute a notebook, stripping visualization code from cells.
 
     Args:
         notebook_path: Path to the notebook file.
         timeout: Maximum time in seconds to wait for each cell execution.
+        cell_patches: Optional dict mapping cell indices to ``{old: new}``
+            string replacements applied before execution.  Use this to
+            inject lighter parameters at test time without modifying the
+            notebook itself.
 
     Raises:
         CellExecutionError: If a cell fails to execute.
@@ -192,6 +202,17 @@ def _execute_notebook_skip_visualizations(notebook_path: Path, timeout: int = 60
 
         # Strip visualization lines from the cell
         cell.source = _strip_visualization_lines(cell_source)
+
+    # Apply cell-level text patches (e.g., lighter parameters for testing)
+    if cell_patches:
+        for cell_idx, replacements in cell_patches.items():
+            assert cell_idx < len(nb.cells), (
+                f"cell_patches: cell index {cell_idx} out of range (notebook has {len(nb.cells)} cells)"
+            )
+            assert nb.cells[cell_idx].cell_type == "code", f"cell_patches: cell {cell_idx} is not a code cell"
+            for old, new in replacements.items():
+                assert old in nb.cells[cell_idx].source, f"cell_patches: string {old!r} not found in cell {cell_idx}"
+                nb.cells[cell_idx].source = nb.cells[cell_idx].source.replace(old, new)
 
     # Set the working directory to the notebook's directory for relative paths
     notebook_dir = notebook_path.parent
@@ -233,12 +254,22 @@ def test_factory_list():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
-@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+@pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT,
+    reason="Qiskit dependencies not available",
+)
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            25: {
+                "total_shots=600000": "total_shots=50000",
+            },
+        },
+    )
 
 
 @_requires_notebook_deps
@@ -251,9 +282,19 @@ def test_state_prep_energy():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
-@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+@pytest.mark.skipif(
+    not QDK_CHEMISTRY_HAS_QISKIT,
+    reason="Qiskit dependencies not available",
+)
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "qpe_stretched_n2.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook_skip_visualizations(
+        notebook_path,
+        cell_patches={
+            31: {
+                "NUM_TRIALS = 20": "NUM_TRIALS = 3",
+            },
+        },
+    )

@@ -12,6 +12,18 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+/**
+ * @class MacisCasSettings
+ * @brief Settings class for MACIS CAS calculations.
+ *
+ * Inherits MCSCF defaults from MacisSettings.
+ */
+class MacisCasSettings : public MacisSettings {
+ public:
+  MacisCasSettings() = default;
+  ~MacisCasSettings() override = default;
+};
+
 class MacisCas : public Macis {
  public:
   /**
@@ -19,7 +31,7 @@ class MacisCas : public Macis {
    *
    * Initializes a MACIS calculator with default settings.
    */
-  MacisCas() { _settings = std::make_unique<MultiConfigurationSettings>(); };
+  MacisCas() { _settings = std::make_unique<MacisCasSettings>(); };
 
   ~MacisCas() noexcept override = default;
 

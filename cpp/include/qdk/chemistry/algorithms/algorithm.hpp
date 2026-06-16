@@ -4,16 +4,17 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include "qdk/chemistry/data/settings.hpp"
+#include "qdk/chemistry/utils/hash_context.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -62,6 +63,27 @@ class Algorithm {
   }
 
   /**
+   * @brief Compute a deterministic content hash for a run with these inputs.
+   *
+   * Hashes the algorithm type, algorithm name, current settings, and arguments
+   * that would be passed to run(). The result identifies a run for cache and
+   * checkpoint/restart workflows among compatible builds.
+   *
+   * @param args Arguments that would be forwarded to run()
+   * @return 16-character hex content hash
+   */
+  virtual std::string hash(Args... args) const {
+    qdk::chemistry::utils::HashContext ctx;
+    using qdk::chemistry::utils::hash_value;
+    hash_value(ctx, this->type_name());
+    hash_value(ctx, this->name());
+    hash_value(ctx, this->_settings->content_hash());
+    hash_value(ctx, static_cast<uint64_t>(sizeof...(Args)));
+    (hash_value(ctx, args), ...);
+    return ctx.hexdigest();
+  }
+
+  /**
    * @brief Access the algorithm's settings
    *
    * @return Reference to the algorithm's Settings object
@@ -97,6 +119,38 @@ class Algorithm {
    * @brief Lock settings before execution
    */
   void lock_settings() const { this->_settings->lock(); }
+
+  /**
+   * @brief Create a nested algorithm from an AlgorithmRef stored in settings.
+   *
+   * Reads the AlgorithmRef at the given settings key, uses the specified
+   * factory to create the algorithm, and applies any nested settings
+   * overrides.
+   *
+   * @tparam FactoryType The AlgorithmFactory subclass (e.g.
+   *         HamiltonianConstructorFactory)
+   * @param key The settings key holding the AlgorithmRef
+   * @return A unique pointer to the created nested algorithm
+   * @throws SettingNotFound if key doesn't exist
+   * @throws SettingTypeMismatch if the value is not an AlgorithmRef
+   * @throws std::runtime_error if the factory cannot create the algorithm
+   */
+  template <typename FactoryType>
+  typename FactoryType::return_type _create_nested(
+      const std::string& key) const {
+    auto ref = this->_settings->template get<data::AlgorithmRef>(key);
+    if (ref.get_algorithm_type() != FactoryType::algorithm_type_name()) {
+      throw std::runtime_error("AlgorithmRef type mismatch for settings key '" +
+                               key + "': expected '" +
+                               FactoryType::algorithm_type_name() +
+                               "' but got '" + ref.get_algorithm_type() + "'");
+    }
+    auto instance = FactoryType::create(ref.get_algorithm_name());
+    if (ref.get_settings()) {
+      instance->settings().update(*ref.get_settings());
+    }
+    return instance;
+  }
 
   /**
    * @brief Implementation method that derived classes must override

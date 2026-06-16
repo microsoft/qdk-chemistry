@@ -109,16 +109,18 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   double norm() const override;
 
   /**
-   * @brief Get spin-dependent one-particle RDMs for active orbitals only
+   * @brief Active-space spin-dependent one-particle RDM as an SBT (lazy).
+   *
+   * Generates the RDM from determinant occupations on first access.
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const override;
+  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const override;
 
   /**
-   * @brief Get spin-dependent two-particle RDMs for active orbitals only
+   * @brief Active-space spin-dependent two-particle RDM as an SBT (lazy).
+   *
+   * Generates the RDM from determinant occupations on first access.
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
-  get_active_two_rdm_spin_dependent() const override;
+  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const override;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
@@ -252,6 +254,8 @@ class SlaterDeterminantContainer : public WavefunctionContainer {
   bool is_complex() const override;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   // Single determinant - optimized storage for exactly one determinant
   const Configuration _determinant;
 

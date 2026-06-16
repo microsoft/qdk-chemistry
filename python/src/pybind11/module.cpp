@@ -4,9 +4,15 @@
 
 #include <pybind11/pybind11.h>
 
+#include <qdk/chemistry/data/settings.hpp>
+
 namespace py = pybind11;
 
 void bind_base_class(py::module& m);
+void bind_symmetry(py::module& m);
+void bind_symmetry_blocked_tensor(py::module& m);
+void bind_symmetry_blocked_index_set(py::module& m);
+void bind_symmetry_blocked_sparse_map(py::module& m);
 void bind_element_data(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
@@ -31,6 +37,7 @@ void bind_configuration(py::module& m);
 void bind_qdk_chemistry_config(py::module& m);
 void bind_pauli_operator(py::module& m);
 void bind_valence_space(py::module& m);
+void bind_majorana_mapping(py::module& m);
 void bind_orbital_rotation(py::module& m);
 void bind_dynamical_correlation_calculator(py::module& m);
 void bind_logger(py::module& m);
@@ -51,9 +58,17 @@ PYBIND11_MODULE(_core, m) {
   auto utils = m.def_submodule("utils");
   utils.doc() = R"(Utilities submodule)";
 
+  auto symmetry = data.def_submodule("symmetry");
+  symmetry.doc() =
+      R"(Single-particle SymmetryProduct and symmetry-blocked storage)";
+
   // Ordering is important!
 
   bind_base_class(data);
+  bind_symmetry(symmetry);  // axis types + SBT/SBIS before orbital containers
+  bind_symmetry_blocked_tensor(symmetry);
+  bind_symmetry_blocked_index_set(symmetry);
+  bind_symmetry_blocked_sparse_map(symmetry);
   bind_element_data(data);  // Element enums must be bound before Structure
   bind_structure(data);
   bind_settings(data);
@@ -67,6 +82,8 @@ PYBIND11_MODULE(_core, m) {
   bind_ansatz(data);
   bind_stability_result(data);
   bind_pauli_operator(data);
+  bind_majorana_mapping(
+      data);  // Depends on SparsePauliWord from pauli_operator
   bind_serialization(data);
 
   bind_localizer(algorithms);
@@ -90,4 +107,23 @@ PYBIND11_MODULE(_core, m) {
   // Bind constants and config at the top level
   bind_constants(m);
   bind_qdk_chemistry_config(m);
+
+  // Install the global create function so AlgorithmRef can auto-resolve
+  // default settings via the Python algorithm registry.
+  qdk::chemistry::data::AlgorithmRef::create_default_settings =
+      [](const std::string& type, const std::string& name)
+      -> std::shared_ptr<qdk::chemistry::data::Settings> {
+    py::gil_scoped_acquire gil;
+    try {
+      py::module_ reg =
+          py::module_::import("qdk_chemistry.algorithms.registry");
+      py::object instance = reg.attr("create")(type, name);
+      py::object py_settings = instance.attr("settings")();
+      auto json_obj =
+          py_settings.cast<qdk::chemistry::data::Settings&>().to_json();
+      return qdk::chemistry::data::Settings::from_json(json_obj);
+    } catch (...) {
+      return nullptr;
+    }
+  };
 }

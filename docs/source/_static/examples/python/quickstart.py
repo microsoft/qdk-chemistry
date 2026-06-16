@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import AlgorithmRef, Structure
 
 # Load para-benzyne structure from XYZ file
 structure = Structure.from_xyz_file(
@@ -103,8 +103,14 @@ sparse_isometry_circuit = state_prep.run(wfn_sparse)
 ################################################################################
 # start-cell-qubit-hamiltonian
 # Prepare qubit Hamiltonian
-qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wigner")
-qubit_hamiltonian = qubit_mapper.run(hamiltonian)
+from qdk_chemistry.data import MajoranaMapping
+
+active_alpha, active_beta = active_orbitals.get_active_space_indices()
+n_active_spin_orbitals = len(active_alpha) + len(active_beta)
+qubit_mapper = create("qubit_mapper", algorithm_name="qdk")
+qubit_hamiltonian = qubit_mapper.run(
+    hamiltonian, MajoranaMapping.jordan_wigner(num_modes=n_active_spin_orbitals)
+)
 
 # Print the number of Pauli strings in the full Hamiltonian
 print(
@@ -117,11 +123,16 @@ print(
 # start-cell-energy-estimation
 # Estimate energy using the optimized circuit and the qubit Hamiltonian
 estimator = create("energy_estimator", algorithm_name="qdk")
-circuit_executor = create("circuit_executor", algorithm_name="qdk_full_state_simulator")
+estimator.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+)
+term_grouper = create("term_grouper", "qubit_wise_commuting")
+grouped_hamiltonian = term_grouper.run(qubit_hamiltonian=qubit_hamiltonian)
+
 energy_results, simulation_data = estimator.run(
     circuit=sparse_isometry_circuit,
-    qubit_hamiltonian=qubit_hamiltonian,
-    circuit_executor=circuit_executor,
+    qubit_hamiltonian=grouped_hamiltonian,
     total_shots=500000,
 )
 

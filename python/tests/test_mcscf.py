@@ -10,7 +10,7 @@ import pytest
 
 from qdk_chemistry import algorithms as alg
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import AlgorithmRef, Structure
 
 from .reference_tolerances import float_comparison_relative_tolerance, mcscf_energy_tolerance
 
@@ -54,14 +54,6 @@ class TestMCSCF:
         scf_solver = alg.create("scf_solver")
         _, wavefunction = scf_solver.run(n2, 0, 1, "cc-pvdz")
 
-        # Construct QDK Hamiltonian for active space
-        ham_calculator = alg.create("hamiltonian_constructor")
-
-        # Create MACIS calculator
-        macis_calc = alg.create("multi_configuration_calculator", "macis_cas")
-        macis_calc.settings().set("calculate_one_rdm", True)
-        macis_calc.settings().set("calculate_two_rdm", True)
-
         # Select active space
         valence_selector = alg.create("active_space_selector", "qdk_valence")
         valence_selector.settings().set("num_active_electrons", 6)
@@ -70,7 +62,11 @@ class TestMCSCF:
 
         # Calculate with QDK/MACIS
         mcscf = alg.create("multi_configuration_scf", "pyscf")
-        mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 3, 3)
+        mcscf.settings().set(
+            "multi_configuration_calculator",
+            AlgorithmRef("multi_configuration_calculator", "macis_cas"),
+        )
+        mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), 3, 3)
 
         assert np.isclose(
             mcscf_energy, -108.78966139913287, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance
@@ -86,15 +82,6 @@ class TestMCSCF:
         scf_solver.settings().set("scf_type", "restricted")
         _, wavefunction = scf_solver.run(o2, 0, 3, "cc-pvdz")
 
-        # Construct QDK Hamiltonian for active space
-        ham_calculator = alg.create("hamiltonian_constructor")
-
-        # Create MACIS calculator
-        macis_calc = alg.create("multi_configuration_calculator", "macis_cas")
-        macis_calc.settings().set("calculate_one_rdm", True)
-        macis_calc.settings().set("calculate_two_rdm", True)
-        macis_calc.settings().set("ci_residual_tolerance", 1e-10)
-
         # Select active space: 6 orbitals, 6 electrons
         valence_selector = alg.create("active_space_selector", "qdk_valence")
         valence_selector.settings().set("num_active_electrons", 6)
@@ -103,7 +90,11 @@ class TestMCSCF:
 
         # Calculate with QDK/MACIS
         mcscf = alg.create("multi_configuration_scf", "pyscf")
-        mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), ham_calculator, macis_calc, 4, 2)
+        mcscf.settings().set(
+            "multi_configuration_calculator",
+            AlgorithmRef("multi_configuration_calculator", "macis_cas", ci_residual_tolerance=1e-10),
+        )
+        mcscf_energy, _ = mcscf.run(active_orbitals_sd.get_orbitals(), 4, 2)
 
         assert np.isclose(
             mcscf_energy, -149.68131616317658, rtol=float_comparison_relative_tolerance, atol=mcscf_energy_tolerance

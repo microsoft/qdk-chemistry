@@ -14,15 +14,33 @@
 
 namespace qdk::chemistry::algorithms::microsoft {
 
+/**
+ * @class MacisSettings
+ * @brief Base settings for all MACIS-backed multi-configuration calculations.
+ *
+ * Extends MultiConfigurationSettings by registering MACIS MCSCFSettings
+ * defaults. All MACIS calculator settings classes (CAS, ASCI, PMC) should
+ * derive from this so that the solver settings are automatically available and
+ * auto-propagate if MACIS changes its defaults.
+ */
+class MacisSettings : public MultiConfigurationSettings {
+ public:
+  MacisSettings() {
+    macis::MCSCFSettings defaults;
+    set_default<double>("ci_matel_tol", defaults.ci_matel_tol,
+                        "Hamiltonian matrix element sparsification threshold",
+                        data::BoundConstraint<double>{0.0, 1.0});
+  }
+  ~MacisSettings() override = default;
+};
+
 /** @brief Build a MACIS MCSCFSettings struct from generic settings.
  *
- * Recognizes native MACIS keys (`ci_res_tol`, `ci_max_subspace`) when present,
- * otherwise falls back to QDK synonyms (`ci_residual_tolerance`,
- * `max_solver_iterations`). Additional tolerances are copied verbatim.
+ * Maps QDK setting names (`ci_residual_tolerance`, `max_solver_iterations`,
+ * `ci_matel_tol`) to the corresponding MACIS struct fields.
  *
  * @param settings_ Source settings.
- * @return Populated `macis::MCSCFSettings` respecting defaults for missing
- * keys.
+ * @return Populated `macis::MCSCFSettings`.
  */
 macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
 
@@ -96,7 +114,7 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  *    (coeffs, dets, orbitals)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, two_rdm_spin_traced)
  *    (coeffs, dets, orbitals, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
- *       two_rdm_spin_traced, two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb,
+ *       two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb,
  *       single_orbital_entropies, mutual_information, type)
  *
  * @tparam Container Concrete wavefunction container class.
@@ -230,8 +248,8 @@ inline data::Wavefunction build_wavefunction(
       computed_entropies.has_any()) {
     container = std::make_unique<Container>(
         C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
-        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aabb),
-        to_vv(two_aaaa), to_vv(two_bbbb), computed_entropies,
+        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aaaa),
+        to_vv(two_aabb), to_vv(two_bbbb), computed_entropies,
         data::WavefunctionType::SelfDual);
   } else {
     container = std::make_unique<Container>(C_vector, dets_configs,

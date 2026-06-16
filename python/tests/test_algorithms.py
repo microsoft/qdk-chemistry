@@ -21,6 +21,7 @@ from qdk_chemistry.algorithms import (
     StabilityChecker,
     StatePreparation,
 )
+from qdk_chemistry.algorithms.hashing import run_content_hash
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
@@ -116,7 +117,7 @@ class MockProjectedMultiConfigurationCalculator(ProjectedMultiConfigurationCalcu
         self._settings = Settings()
         # Define default settings
         self._settings._set_default("test_param", "int", 42)
-        self._settings._set_default("h_el_tol", "double", 1e-12)
+        self._settings._set_default("search_matel_tol", "double", 1e-12)
         self._settings._set_default("calculate_one_rdm", "bool", False)
         self._settings._set_default("calculate_two_rdm", "bool", False)
 
@@ -289,7 +290,7 @@ class MockMultiConfigurationScf(MultiConfigurationScf):
         self._settings._set_default("numeric_param", "double", 0.0)
         self._settings._set_default("list_param", "vector<int>", [])
 
-    def _run_impl(self, _orbs, _hamil_constr, _mc_solver, __: int, ___: int):
+    def _run_impl(self, _orbs, __: int, ___: int):
         """A simple test implementation of the solve method."""
         # Simple test implementation - return basic energy and wavefunction
         energy = -1.5  # Mock energy value
@@ -561,9 +562,7 @@ class TestAlgorithmClasses:
 
         # Test solve method with basic hamiltonian and mc calculator
         orbitals = create_test_orbitals(2)
-        hamiltonian_creator = MockHamiltonianConstructor()
-        cas_solver = MockMultiConfigurationCalculator()
-        energy, wavefunction = mcscf_solver.run(orbitals, hamiltonian_creator, cas_solver, 1, 1)
+        energy, wavefunction = mcscf_solver.run(orbitals, 1, 1)
         assert isinstance(energy, float)
         assert isinstance(wavefunction, Wavefunction)
 
@@ -842,6 +841,23 @@ class TestAlgorithmClasses:
             # Test list settings
             settings["list_param"] = [1, 2, 3]
             assert settings["list_param"] == [1, 2, 3]
+
+    def test_run_content_hash_rejects_unsupported_argument_type(self):
+        """Test algorithm hashing rejects non-deterministic unsupported argument types."""
+
+        class UnsupportedArgument:
+            pass
+
+        with pytest.raises(TypeError, match="Unsupported hash argument type"):
+            run_content_hash("test_type", "test_name", Settings(), UnsupportedArgument())
+
+    def test_run_content_hash_disambiguates_argument_types(self):
+        """Test algorithm hashing tags argument types to avoid cache collisions."""
+        values = [None, False, 0, 0.0, "", b"", [], (), {}, np.array([], dtype=np.float64)]
+
+        hashes = [run_content_hash("test_type", "test_name", Settings(), value) for value in values]
+
+        assert len(set(hashes)) == len(values)
 
     def test_abstract_methods_required(self):
         """Test that abstract methods must be implemented."""

@@ -22,7 +22,6 @@ int main() {
   // start-cell-configure
   // Set the convergence threshold for the CI iterations
   pmc_calculator->settings().set("ci_residual_tolerance", 1.0e-6);
-  pmc_calculator->settings().set("davidson_res_tol", 1.0e-8);
   // end-cell-configure
   // --------------------------------------------------------------------------------------------
 

@@ -103,7 +103,8 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   }
 
   // Get orbital energies (same for alpha and beta in restricted case)
-  const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
+  const auto& eps_alpha = orbitals->energies()->block({data::axes::alpha()});
+  const auto& eps_beta = orbitals->energies()->block({data::axes::beta()});
 
   const auto& active_space_indices = orbitals->get_active_space_indices();
   const auto& active_indices_alpha = active_space_indices.first;
@@ -174,7 +175,8 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   }
 
   // Core computation
-  const auto& [eps_alpha, eps_beta] = orbitals->get_energies();
+  const auto& eps_alpha = orbitals->energies()->block({data::axes::alpha()});
+  const auto& eps_beta = orbitals->energies()->block({data::axes::beta()});
 
   const auto& [active_indices_alpha, active_indices_beta] =
       orbitals->get_active_space_indices();

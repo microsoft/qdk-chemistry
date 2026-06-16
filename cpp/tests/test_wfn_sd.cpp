@@ -338,7 +338,7 @@ TEST_F(SlaterdeterminantTest, ClosedShellReducedDensityMatrices) {
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
   auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
   auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+  auto [two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb] =
       sd.get_active_two_rdm_spin_dependent();
 
   // get bbaa from transposed aabb
@@ -381,7 +381,7 @@ TEST_F(SlaterdeterminantTest, OpenShellReducedDensityMatrices) {
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
   auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
   auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+  auto [two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb] =
       sd.get_active_two_rdm_spin_dependent();
 
   // get bbaa from transposed aabb
@@ -425,7 +425,7 @@ TEST_F(SlaterdeterminantTest, NonContinuousDeterminantReducedDensityMatrices) {
   auto one_rdm = std::get<Eigen::MatrixXd>(sd.get_active_one_rdm_spin_traced());
   auto two_rdm = std::get<Eigen::VectorXd>(sd.get_active_two_rdm_spin_traced());
   auto [one_rdm_aa, one_rdm_bb] = sd.get_active_one_rdm_spin_dependent();
-  auto [two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb] =
+  auto [two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb] =
       sd.get_active_two_rdm_spin_dependent();
 
   // get bbaa from transposed aabb
@@ -477,7 +477,7 @@ TEST_F(SlaterdeterminantTest, EntropiesTest) {
   Configuration det("2ud0200u0u2d");
   SlaterDeterminantContainer sd(det, orbitals);
   sd.get_active_one_rdm_spin_dependent();
-  auto [aabb, aaaa, bbbb] = sd.get_active_two_rdm_spin_dependent();
+  auto [aaaa, aabb, bbbb] = sd.get_active_two_rdm_spin_dependent();
 
   // get entropies
   auto s1 = sd.get_single_orbital_entropies();

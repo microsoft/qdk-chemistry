@@ -105,6 +105,17 @@ bool Configuration::has_beta_electron(size_t orbital_idx) const {
   return (state == BETA || state == DOUBLY);
 }
 
+bool Configuration::is_closed_shell() const {
+  QDK_LOG_TRACE_ENTERING();
+  for (size_t i = 0; i < get_orbital_capacity(); ++i) {
+    const auto state = _get_orbital(i);
+    if (state == ALPHA || state == BETA) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Equality operator for std::find and other algorithms
 bool Configuration::operator==(const Configuration& other) const {
   QDK_LOG_TRACE_ENTERING();
@@ -441,5 +452,10 @@ Configuration Configuration::from_binary_strings(std::string alpha_string,
     }
   }
   return Configuration(orbital_rep);
+}
+
+void Configuration::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, to_string());
 }
 }  // namespace qdk::chemistry::data

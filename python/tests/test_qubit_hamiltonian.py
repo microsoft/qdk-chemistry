@@ -13,8 +13,10 @@ import numpy as np
 import pytest
 import scipy.sparse
 
+from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -66,75 +68,116 @@ class TestQubitHamiltonian:
         with pytest.raises(ValueError, match="empty"):
             QubitHamiltonian(pauli_strings=[], coefficients=[])
 
+    def test_content_hash_includes_fermion_mode_order(self):
+        """Content hash changes when fermion_mode_order changes."""
+        blocked = QubitHamiltonian(["IX", "ZI"], np.array([1.0, 0.5]), fermion_mode_order="blocked")
+        interleaved = QubitHamiltonian(["IX", "ZI"], np.array([1.0, 0.5]), fermion_mode_order="interleaved")
+        assert blocked.content_hash() != interleaved.content_hash()
+
+    def test_content_hash_includes_term_partition(self):
+        """Content hash changes when term_partition changes."""
+        grouped = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            term_partition=FlatPartition(strategy="commuting", groups=((0, 1),)),
+        )
+        ungrouped = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            term_partition=FlatPartition(strategy="commuting", groups=((0,), (1,))),
+        )
+        assert grouped.content_hash() != ungrouped.content_hash()
+
+    def test_content_hash_includes_tapering(self):
+        """Content hash changes when tapering metadata changes."""
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
+
+        h1 = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
+        )
+        h2 = QubitHamiltonian(
+            ["IX", "ZI"],
+            np.array([1.0, 0.5]),
+            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, 1)),
+        )
+        assert h1.content_hash() != h2.content_hash()
+
     def test_group_commuting(self):
-        """Test group_commuting."""
+        """Test full-commuting term grouper produces correct groups."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = qubit_hamiltonian.group_commuting(qubit_wise=False)
-        assert len(grouped) == 2
+        grouped = registry.create("term_grouper", "commuting").run(qubit_hamiltonian)
+        partition = grouped.term_partition
+        assert isinstance(partition, FlatPartition)
+        assert partition.num_groups == 2
 
         # Verify coefficients are preserved
-        coeff_map = dict(zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True))
-        for group in grouped:
-            for pauli_str, coeff in zip(group.pauli_strings, group.coefficients, strict=True):
+        for group_indices in partition.groups:
+            for idx in group_indices:
                 assert np.isclose(
-                    coeff,
-                    coeff_map[pauli_str],
+                    grouped.coefficients[idx],
+                    qubit_hamiltonian.coefficients[idx],
                     atol=float_comparison_absolute_tolerance,
                     rtol=float_comparison_relative_tolerance,
                 )
 
     def test_group_commuting_qubitwise(self):
-        """Test group_commuting without qubit-wise commuting."""
+        """Test qubit-wise commuting grouper."""
         qubit_hamiltonian = QubitHamiltonian(["XX", "YY", "ZZ", "XY"], [1.0, 0.5, -0.5, 0.2])
-        grouped = qubit_hamiltonian.group_commuting(qubit_wise=True)
-        assert len(grouped) == 4  # Qubit-wise commuting returns four groups
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qubit_hamiltonian)
+        partition = grouped.term_partition
+        assert isinstance(partition, FlatPartition)
+        assert partition.num_groups == 4
 
-        # Check that all original Pauli strings are present across all groups
-        all_grouped_strings = []
-        for group in grouped:
-            assert len(group.pauli_strings) == 1  # Each group should contain only one Pauli string
-            all_grouped_strings.extend(group.pauli_strings)
-        assert set(all_grouped_strings) == {"XX", "YY", "ZZ", "XY"}
+        # Each group should contain exactly one term
+        for group_indices in partition.groups:
+            assert len(group_indices) == 1
+        # All original terms are present
+        all_indices = sorted(partition.all_indices())
+        assert all_indices == list(range(4))
 
     def test_group_commuting_all_commute(self):
         """Test that fully commuting operators go into one group."""
-        # ZI, IZ, ZZ all commute with each other
         qh = QubitHamiltonian(["ZI", "IZ", "ZZ"], np.array([1.0, -0.5, 0.3]))
-        grouped = qh.group_commuting(qubit_wise=False)
-        assert len(grouped) == 1
-        assert len(grouped[0].pauli_strings) == 3
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 1
+        assert len(grouped.term_partition.groups[0]) == 3
 
     def test_group_commuting_none_commute(self):
         """Test that non-commuting operators each get their own group."""
-        # X and Z anticommute; Y and X anticommute; Y and Z anticommute
         qh = QubitHamiltonian(["X", "Z", "Y"], np.array([1.0, -0.5, 0.3]))
-        grouped = qh.group_commuting(qubit_wise=False)
-        assert len(grouped) == 3
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 3
 
     def test_group_commuting_single_term(self):
-        """Test group_commuting with a single term."""
+        """Test grouping with a single term."""
         qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
-        grouped = qh.group_commuting(qubit_wise=False)
-        assert len(grouped) == 1
-        assert grouped[0].pauli_strings == ["ZZ"]
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        assert grouped.term_partition.num_groups == 1
+        assert grouped.pauli_strings == ["ZZ"]
 
     def test_group_commuting_reconstruct_matrix(self):
-        """Test group_commuting with matrix verification."""
+        """Test that grouped terms reconstruct the same matrix."""
         qh = QubitHamiltonian(
             ["II", "IZ", "ZI", "ZZ", "XX", "YY"],
             np.array([-0.8, 0.17, -0.17, 0.12, 0.04, 0.04]),
         )
-        # General commuting: all diagonal terms commute, XX and YY commute with each other and with diag terms
-        grouped = qh.group_commuting(qubit_wise=False)
-        total_terms = sum(len(g.pauli_strings) for g in grouped)
+        grouped = registry.create("term_grouper", "commuting").run(qh)
+        partition = grouped.term_partition
+        total_terms = sum(len(g) for g in partition.groups)
         assert total_terms == 6
-        # Verify ground state energy via eigenvalues
+
         mat = qh.to_matrix()
         gs_energy = np.min(np.linalg.eigvalsh(mat))
         # Reconstruct from groups and check same ground state energy
         full_mat = np.zeros_like(mat)
-        for g in grouped:
-            full_mat += g.to_matrix()
+        for group_indices in partition.groups:
+            sub = QubitHamiltonian(
+                [grouped.pauli_strings[i] for i in group_indices],
+                np.array([grouped.coefficients[i] for i in group_indices]),
+            )
+            full_mat += sub.to_matrix()
         gs_energy_grouped = np.min(np.linalg.eigvalsh(full_mat))
         assert np.isclose(gs_energy, gs_energy_grouped, atol=float_comparison_absolute_tolerance)
 
@@ -144,10 +187,16 @@ class TestQubitHamiltonian:
         coeffs = np.array([0.5, 0.3, 0.2, -0.1, 0.4, -0.25, 0.15])
         qh = QubitHamiltonian(labels, coeffs)
         original_mat = qh.to_matrix()
-        groups = qh.group_commuting(qubit_wise=True)
+
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
+        partition = grouped.term_partition
         reconstructed = np.zeros_like(original_mat)
-        for g in groups:
-            reconstructed += g.to_matrix()
+        for group_indices in partition.groups:
+            sub = QubitHamiltonian(
+                [grouped.pauli_strings[i] for i in group_indices],
+                np.array([grouped.coefficients[i] for i in group_indices]),
+            )
+            reconstructed += sub.to_matrix()
         assert np.allclose(
             reconstructed,
             original_mat,
@@ -531,14 +580,14 @@ class TestFermionModeOrder:
         assert restored.fermion_mode_order is None
 
     def test_group_commuting_preserves(self):
-        """group_commuting preserves fermion_mode_order."""
+        """term_grouper preserves fermion_mode_order."""
         qh = QubitHamiltonian(
             ["XX", "YY", "ZZ"],
             np.array([1.0, 0.5, -0.5]),
             fermion_mode_order=FermionModeOrder.BLOCKED,
         )
-        for group in qh.group_commuting(qubit_wise=True):
-            assert group.fermion_mode_order == FermionModeOrder.BLOCKED
+        grouped = registry.create("term_grouper", "qubit_wise_commuting").run(qh)
+        assert grouped.fermion_mode_order == FermionModeOrder.BLOCKED
 
     def test_to_interleaved_sets_order(self):
         """to_interleaved sets fermion_mode_order to INTERLEAVED."""
@@ -566,3 +615,159 @@ class TestFermionModeOrder:
         qh = QubitHamiltonian(["IX", "ZZ"], np.array([0.5, 0.3]))
         summary = qh.get_summary()
         assert "Fermion mode order" not in summary
+
+
+class TestQubitHamiltonianArithmetic:
+    """Tests for __add__, __mul__, __rmul__ and partition merging."""
+
+    def test_add_concatenates_terms(self):
+        """H1 + H2 should concatenate pauli_strings and coefficients."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]))
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]))
+        result = h1 + h2
+        assert result.pauli_strings == ["XI", "IZ"]
+        np.testing.assert_allclose(result.coefficients, [1.0, 2.0])
+
+    def test_add_merges_flat_partitions(self):
+        """__add__ should merge FlatPartitions with offset."""
+        h1 = QubitHamiltonian(
+            ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=FlatPartition(strategy="s", groups=((0, 1),))
+        )
+        h2 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        result = h1 + h2
+        assert result.term_partition is not None
+        assert isinstance(result.term_partition, FlatPartition)
+        assert result.term_partition.groups == ((0, 1), (2,))
+
+    def test_add_merges_layered_partitions(self):
+        """__add__ should merge LayeredPartitions with offset."""
+        h1 = QubitHamiltonian(
+            ["XI", "IZ"], np.array([1.0, 1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,), (1,)),))
+        )
+        h2 = QubitHamiltonian(["XX"], np.array([0.5]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        result = h1 + h2
+        assert isinstance(result.term_partition, LayeredPartition)
+        assert result.term_partition.groups == (((0,), (1,)), ((2,),))
+
+    def test_add_mismatched_partition_types_raises(self):
+        """__add__ with FlatPartition + LayeredPartition should raise TypeError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        h2 = QubitHamiltonian(["IZ"], np.array([1.0]), term_partition=LayeredPartition(strategy="s", groups=(((0,),),)))
+        with pytest.raises(TypeError, match="Cannot merge partitions of different types"):
+            h1 + h2
+
+    def test_add_no_partition_when_either_missing(self):
+        """__add__ should produce None partition when only one operand has one."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), term_partition=FlatPartition(strategy="s", groups=((0,),)))
+        h2 = QubitHamiltonian(["IZ"], np.array([1.0]))
+        result = h1 + h2
+        assert result.term_partition is None
+
+    def test_add_preserves_encoding(self):
+        """__add__ should propagate matching encoding."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), encoding="jordan-wigner")
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]), encoding="jordan-wigner")
+        assert (h1 + h2).encoding == "jordan-wigner"
+
+    def test_add_mismatched_encoding_raises(self):
+        """__add__ with different encodings should raise ValueError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]), encoding="jordan-wigner")
+        h2 = QubitHamiltonian(["IZ"], np.array([2.0]), encoding="bravyi-kitaev")
+        with pytest.raises(ValueError, match="different encodings"):
+            h1 + h2
+
+    def test_add_mismatched_qubits_raises(self):
+        """__add__ with different qubit counts should raise ValueError."""
+        h1 = QubitHamiltonian(["XI"], np.array([1.0]))
+        h2 = QubitHamiltonian(["IIZ"], np.array([2.0]))
+        with pytest.raises(ValueError, match="Cannot add"):
+            h1 + h2
+
+    def test_mul_scales_coefficients(self):
+        """Scalar * H should scale coefficients."""
+        h = QubitHamiltonian(["XI", "IZ"], np.array([1.0, 2.0]))
+        result = 3.0 * h
+        np.testing.assert_allclose(result.coefficients, [3.0, 6.0])
+
+    def test_mul_preserves_partition(self):
+        """Scalar * H should keep the partition unchanged."""
+        p = FlatPartition(strategy="s", groups=((0,), (1,)))
+        h = QubitHamiltonian(["XI", "IZ"], np.array([1.0, 2.0]), term_partition=p)
+        result = 2.0 * h
+        assert result.term_partition is not None
+        assert result.term_partition.groups == p.groups
+
+    def test_rmul_equals_mul(self):
+        """H * scalar and scalar * H should give the same result."""
+        h = QubitHamiltonian(["XI"], np.array([3.0]))
+        np.testing.assert_allclose((h * 2.0).coefficients, (2.0 * h).coefficients)
+
+
+class TestTaperingPropagation:
+    """Verify tapering metadata survives arithmetic and reordering."""
+
+    @pytest.fixture
+    def tapering(self):
+        """Create a sample tapering specification."""
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
+
+        return TaperingSpecification(
+            qubit_indices=(3, 1),
+            eigenvalues=(1, -1),
+        )
+
+    @pytest.fixture
+    def tapered_h(self, tapering):
+        """Create a QubitHamiltonian with tapering metadata."""
+        return QubitHamiltonian(
+            ["XI", "IZ"],
+            np.array([1.0, 0.5]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+
+    def test_add_preserves_tapering(self, tapered_h, tapering):
+        """H1 + H2 with matching tapering should preserve it."""
+        h2 = QubitHamiltonian(
+            ["XX"],
+            np.array([0.3]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+        result = tapered_h + h2
+        assert result.tapering == tapering
+
+    def test_add_mismatched_tapering_raises(self, tapered_h):
+        """H1 + H2 with different tapering should raise ValueError."""
+        from qdk_chemistry.data import TaperingSpecification  # noqa: PLC0415
+
+        other_tapering = TaperingSpecification(
+            qubit_indices=(3, 1),
+            eigenvalues=(1, 1),
+        )
+        h2 = QubitHamiltonian(
+            ["XX"],
+            np.array([0.3]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=other_tapering,
+        )
+        with pytest.raises(ValueError, match="tapering"):
+            tapered_h + h2
+
+    def test_mul_preserves_tapering(self, tapered_h, tapering):
+        """Scalar * H should preserve tapering metadata."""
+        result = 2.0 * tapered_h
+        assert result.tapering == tapering
+        result2 = tapered_h * 3.0
+        assert result2.tapering == tapering
+
+    def test_to_interleaved_preserves_tapering(self, tapering):
+        """to_interleaved should preserve tapering metadata."""
+        h = QubitHamiltonian(
+            ["XIZI", "IZIX"],
+            np.array([1.0, 0.5]),
+            encoding="symmetry-conserving-bravyi-kitaev",
+            tapering=tapering,
+        )
+        result = h.to_interleaved(n_spatial=2)
+        assert result.tapering == tapering

@@ -18,7 +18,6 @@ pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
 # start-cell-configure
 # Configure the PMC calculator using the settings interface
 pmc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
 # end-cell-configure
 ################################################################################
 

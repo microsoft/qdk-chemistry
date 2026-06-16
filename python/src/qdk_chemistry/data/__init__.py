@@ -15,7 +15,7 @@ Exposed classes are:
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
-- :class:`ControlledTimeEvolutionUnitary`: Controlled time evolution unitary.
+- :class:`ControlledUnitary`: Controlled unitary.
 - :class:`CoupledClusterContainer`: Container for coupled cluster wavefunction amplitudes and determinants.
 - :class:`DataClass`: Base data class.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
@@ -25,6 +25,7 @@ Exposed classes are:
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
+- :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitHamiltonian objects.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
@@ -43,9 +44,11 @@ Exposed classes are:
 - :class:`SlaterDeterminantContainer`: Single Slater determinant wavefunction representation.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
 - :class:`Structure`: Molecular structure and geometry information.
-- :class:`Symmetries`: Physical symmetries of an electronic state for symmetry-exploiting algorithms.
-- :class:`TimeEvolutionUnitary`: Time evolution unitary.
-- :class:`TimeEvolutionUnitaryContainer`: Abstract base class for different time evolution unitary representation.
+- :class:`Symmetries`: Physical symmetries of an electronic state.
+- :class:`TermPartition`: Index-based partition of Hamiltonian terms.
+  See :class:`FlatPartition` and :class:`LayeredPartition`.
+- :class:`UnitaryRepresentation`: Unitary representation.
+- :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).
@@ -65,6 +68,7 @@ Exposed exceptions are:
 from contextlib import suppress
 
 from qdk_chemistry._core.data import (
+    AlgorithmRef,
     Ansatz,
     AOType,
     BasisSet,
@@ -80,6 +84,7 @@ from qdk_chemistry._core.data import (
     HamiltonianContainer,
     HamiltonianType,
     LatticeGraph,
+    MajoranaMapping,
     ModelOrbitals,
     MP2Container,
     Orbitals,
@@ -98,6 +103,7 @@ from qdk_chemistry._core.data import (
     SpinChannel,
     StabilityResult,
     Structure,
+    TaperingSpecification,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -106,17 +112,21 @@ from qdk_chemistry._core.data import (
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
-from qdk_chemistry.data.encoding_validation import EncodingMismatchError, validate_encoding_compatibility
+from qdk_chemistry.data.controlled_unitary import ControlledUnitary
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 from qdk_chemistry.data.qubit_hamiltonian import QubitHamiltonian
 from qdk_chemistry.data.symmetries import Symmetries
-from qdk_chemistry.data.time_evolution.base import TimeEvolutionUnitary
-from qdk_chemistry.data.time_evolution.containers.base import TimeEvolutionUnitaryContainer
-from qdk_chemistry.data.time_evolution.containers.pauli_product_formula import PauliProductFormulaContainer
-from qdk_chemistry.data.time_evolution.controlled_time_evolution import ControlledTimeEvolutionUnitary
+from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven import DrivenContainer
+from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQubitHamiltonian
+from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -126,6 +136,7 @@ SettingsAreLockedError = SettingsAreLocked
 
 __all__ = [
     "AOType",
+    "AlgorithmRef",
     "Ansatz",
     "BasisSet",
     "CanonicalFourCenterHamiltonianContainer",
@@ -135,19 +146,23 @@ __all__ = [
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
-    "ControlledTimeEvolutionUnitary",
+    "ControlledUnitary",
     "CoupledClusterContainer",
     "DataClass",
+    "DrivenContainer",
+    "DrivenQubitHamiltonian",
     "ElectronicStructureSettings",
     "Element",
-    "EncodingMismatchError",
     "EnergyExpectationResult",
     "FermionModeOrder",
+    "FlatPartition",
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
     "LatticeGraph",
+    "LayeredPartition",
     "MP2Container",
+    "MajoranaMapping",
     "MeasurementData",
     "ModelOrbitals",
     "OrbitalType",
@@ -174,11 +189,14 @@ __all__ = [
     "StabilityResult",
     "Structure",
     "Symmetries",
-    "TimeEvolutionUnitary",
-    "TimeEvolutionUnitaryContainer",
+    "TaperingSpecification",
+    "TermPartition",
+    "TimeDependentQubitHamiltonian",
+    "TimeDependentQubitHamiltonianContainer",
+    "UnitaryContainer",
+    "UnitaryRepresentation",
     "Wavefunction",
     "WavefunctionContainer",
     "WavefunctionType",
     "get_current_ciaaw_version",
-    "validate_encoding_compatibility",
 ]

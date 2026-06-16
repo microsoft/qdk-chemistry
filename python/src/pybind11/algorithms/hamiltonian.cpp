@@ -156,6 +156,9 @@ Returns:
 
 )");
 
+  hamiltonian_constructor.def("hash", &HamiltonianConstructor::hash,
+                              py::arg("orbitals"));
+
   // Factory class binding - creates HamiltonianConstructorFactory class with
   // static methods
   qdk::chemistry::python::bind_algorithm_factory<HamiltonianConstructorFactory,
@@ -166,6 +169,8 @@ Returns:
   hamiltonian_constructor.def("__repr__", [](const HamiltonianConstructor &) {
     return "<qdk_chemistry.algorithms.HamiltonianConstructor>";
   });
+
+  qdk::chemistry::python::bind_create_nested(hamiltonian_constructor);
 
   // Bind concrete microsoft::HamiltonianConstructor implementation
   py::class_<microsoft::HamiltonianConstructor, HamiltonianConstructor,

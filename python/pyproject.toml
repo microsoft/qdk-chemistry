@@ -34,9 +34,9 @@ dependencies = [
   "scipy>=1.7.0",
   "matplotlib>=3.10.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]>=1.27.0",
+  "qdk[jupyter]>=1.28.0",
   "pybind11-stubgen>=2.5.1",
-  "h5py>=3.0.0"
+  "h5py>=3.0.0",
 ]
 description = "Quantum Development Kit - Chemistry Library"
 license = { file = "LICENSE.txt" }
@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,plugins,qiskit-extras,openfermion-extras]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,test]"
 ]
 coverage = [
   "coverage",
@@ -81,17 +81,31 @@ jupyter = [
   "pandas>=2.0.0",
   "qdk-chemistry[plugins]",
 ]
+networkx-extras = [
+  "networkx>=3.0; python_full_version != '3.14.1'",  # due to incompatibility with Python 3.14.1
+]
+openfermion-extras = [
+  "openfermion>=1.0.0; python_version < '3.14'"
+]
 plugins = [
   "pyscf>=2.9.0,<2.12.1"
 ]
 qiskit-extras = [
-  "qiskit[qasm3-import]>=2.2.0",
-  "qiskit-aer",
-  "qiskit-nature",
-  "pylatexenc==2.10"
+  "qiskit[qasm3-import]>=2.2.0; python_version < '3.14'",
+  "qiskit-aer; python_version < '3.14'",
+  "qiskit-ibm-runtime>=0.46.1; python_version < '3.14'",
+  "qiskit-nature; python_version < '3.14'",
+  "qiskit-qasm3-import; python_version < '3.14'",
+  "pylatexenc==2.10; python_version < '3.14'",
+  "requests>=2.33.0; python_version < '3.14'"
 ]
-openfermion-extras = [
-  "openfermion>=1.0.0"
+test = [
+  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
+  "nbclient",
+  "nbformat",
+  "pennylane",
+  "rdkit",
+  "requests>=2.33.0"
 ]
 
 [project.urls]
@@ -239,6 +253,7 @@ select = [
 
 # Scikit-build-core configuration
 [tool.scikit-build]
+experimental = true
 cmake.version = ">=3.15"
 cmake.build-type = "Release"
 # Build in current directory (python/)
@@ -246,9 +261,9 @@ cmake.source-dir = "."
 # Enable verbose output for debugging
 build.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
-metadata.version.provider = "scikit_build_core.metadata.regex"
+metadata.version.provider = "_dev_version"
+metadata.version.provider-path = "."
 metadata.version.input = "../VERSION"
-metadata.version.regex = "^(?P<value>\\S+)$"
 
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
