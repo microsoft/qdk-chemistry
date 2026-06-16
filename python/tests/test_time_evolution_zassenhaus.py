@@ -12,6 +12,7 @@ import pytest
 import scipy
 
 from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution import zassenhaus as zassenhaus_module
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.data import (
@@ -156,6 +157,21 @@ class TestZassenhausBuilder:
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZI", "IZ"], coefficients=[0.7, 0.3, 0.5])
         container = Zassenhaus(order=2, time=0.2, num_divisions=4).run(hamiltonian).get_container()
         assert container.step_reps == 4
+
+    def test_large_generator_warns(self, monkeypatch):
+        """The symbolic generator warns (not silently hangs) when ~K^order is huge."""
+        messages: list[str] = []
+
+        class _RecordingLogger:
+            @staticmethod
+            def warn(message: str) -> None:
+                messages.append(message)
+
+        monkeypatch.setattr(zassenhaus_module, "Logger", _RecordingLogger)
+        zassenhaus_module._warn_if_series_large(20, 7)  # ~1.3e9 words -> over threshold
+        zassenhaus_module._warn_if_series_large(3, 7)  # 2187 words (e.g. Heisenberg) -> under threshold
+        assert len(messages) == 1
+        assert "may be slow" in messages[0]
 
     def test_num_divisions_below_one_raises(self):
         """num_divisions < 1 is rejected at construction, not silently clamped."""

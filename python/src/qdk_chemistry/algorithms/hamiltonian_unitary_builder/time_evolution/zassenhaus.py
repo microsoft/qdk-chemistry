@@ -72,6 +72,12 @@ __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 _MIN_ORDER = 2
 _MAX_ORDER = 6
 
+# The symbolic exponent generator builds ~num_generators^order words, so its cost
+# grows exponentially in the order. Warn before attempting an intractable size --
+# reached only for Hamiltonians with many commuting groups (large molecules),
+# especially via automatic accuracy estimation which probes up to _MAX_ORDER + 1.
+_WORD_SERIES_WARN_THRESHOLD = 100_000
+
 
 # ----------------------------------------------------------------------------------- #
 # Universal Zassenhaus exponents (symbolic, operator-independent, cached)
@@ -130,6 +136,17 @@ def _series_log(series: dict, max_degree: int) -> dict:
     return {w: c for w, c in result.items() if c}
 
 
+def _warn_if_series_large(num_generators: int, order: int) -> None:
+    """Warn when the word series (~``num_generators^order`` words) is large enough to be slow."""
+    estimated_words = num_generators**order
+    if estimated_words > _WORD_SERIES_WARN_THRESHOLD:
+        Logger.warn(
+            f"Zassenhaus exponent generation for {num_generators} commuting groups at order "
+            f"{order} builds ~{estimated_words:.1e} terms and may be slow or memory-intensive; "
+            f"consider a lower order, coarser grouping, or disabling automatic accuracy estimation."
+        )
+
+
 @cache
 def _zassenhaus_word_exponents(num_generators: int, order: int) -> tuple:
     """Return the Zassenhaus exponents C_2..C_order over ``num_generators`` symbols.
@@ -142,6 +159,7 @@ def _zassenhaus_word_exponents(num_generators: int, order: int) -> tuple:
     ``R = exp(-X_{K-1}) ... exp(-X_0) exp(S)`` has lowest degree 2, and
     ``C_n`` is the degree-n part of ``log(exp(-C_{n-1}) ... exp(-C_2) R)``.
     """
+    _warn_if_series_large(num_generators, order)
     generators = [{(i,): Fraction(1)} for i in range(num_generators)]
     total: dict = {}
     for gen in generators:
@@ -537,7 +555,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             groups.append(
                 QubitHamiltonian(
                     pauli_strings=[labels[i] for i in indices],
-                    coefficients=np.asarray([coeffs[i] for i in indices]),
+                    coefficients=coeffs[list(indices)],
                     encoding=encoding,
                     fermion_mode_order=fmo,
                 )
