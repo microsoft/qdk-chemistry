@@ -18,6 +18,8 @@
 
 namespace qdk::chemistry::data {
 
+class Hamiltonian;
+
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -334,6 +336,31 @@ MajoranaMapResult majorana_map_hamiltonian(
     double threshold, double integral_threshold);
 
 /**
+ * @brief Map a fermionic Hamiltonian to qubit Pauli terms.
+ *
+ * Dispatches to the dense, Cholesky, or sparse engine entry point based on
+ * the Hamiltonian's container type, without materializing a dense N^4
+ * two-body tensor when a specialized container is present.  One-body
+ * integrals are flattened to row-major layout internally.
+ *
+ * The constant energy shift (nuclear repulsion / frozen core) is excluded
+ * from the mapped operator (`core_energy = 0`), matching the buffer-based
+ * overload as invoked by ``QdkQubitMapper``.
+ *
+ * @param mapping The Majorana-to-Pauli encoding.
+ * @param hamiltonian The fermionic Hamiltonian.
+ * @param spin_symmetric Use the spin-summed restricted fast path when true.
+ * @param threshold Pauli terms with |coeff| < threshold are dropped.
+ * @param integral_threshold Integrals with |value| < this are skipped.
+ * @return MajoranaMapResult with Pauli words and coefficients.
+ */
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           bool spin_symmetric,
+                                           double threshold,
+                                           double integral_threshold);
+
+/**
  * @brief Map a fermionic Hamiltonian to qubit Pauli terms directly from
  *        three-center (Cholesky/density-fitted) two-body factors.
  *
@@ -374,8 +401,15 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * Equivalent to ::majorana_map_hamiltonian but consumes the stored
  * non-zero (p,q,r,s) integrals instead of a dense N^4 tensor, which is
  * never materialized.  Missing entries are treated as zero, exactly as in
- * the dense layout, so the result is numerically equivalent to the dense
- * path for the same integrals.
+ * the dense layout.
+ *
+ * Stored entries are canonicalized under the 8-fold ERI symmetry and
+ * symmetry-expanded before mapping.  The dense reference path for
+ * ``SparseHamiltonianContainer`` materializes each stored tuple at its
+ * exact index with no symmetry expansion, so the two paths agree when
+ * stored integrals are canonical or symmetry-complete (as for in-repo
+ * model builders), while this entry point is more robust when a container
+ * stores only non-canonical symmetry representatives.
  *
  * Entries are canonicalized under the 8-fold ERI symmetry at ingestion
  * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the

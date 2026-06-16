@@ -9,15 +9,12 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
 #include <string>
 #include <tuple>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -333,93 +330,16 @@ Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
 )");
 
-  // Overload taking a Hamiltonian directly.  The two-body integrals are
-  // consumed in the native storage format of the underlying container:
-  // Cholesky containers feed their three-center factors and sparse
-  // containers their non-zero integral list straight into the engine, so
-  // the dense N^4 two-body tensor is never materialized.  Any other
-  // container uses the dense engine path.  The result is numerically
-  // equivalent to the dense path for the same integrals.
+  // Overload taking a Hamiltonian directly.  Container dispatch and sparse
+  // index marshalling live in the C++ library overload.
   data.def(
       "majorana_map_hamiltonian",
       [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
          bool spin_symmetric, double threshold,
          double integral_threshold) -> py::tuple {
-        auto one_body = hamiltonian.get_one_body_integrals();
-        const Eigen::MatrixXd& h1a = std::get<0>(one_body);
-        const Eigen::MatrixXd& h1b = std::get<1>(one_body);
-        const std::size_t n = static_cast<std::size_t>(h1a.rows());
-
-        // Flatten one-body integrals to row-major [n*n] as the engine
-        // expects.  A single Eigen layout-converting copy avoids
-        // per-element access into the column-major source.
-        using RowMajorMatrix = Eigen::Matrix<double, Eigen::Dynamic,
-                                             Eigen::Dynamic, Eigen::RowMajor>;
-        const RowMajorMatrix h1a_flat = h1a;
-        const RowMajorMatrix h1b_flat = h1b;
-
-        // core_energy is 0.0 in every branch on purpose: the constant
-        // (nuclear repulsion / frozen core) shift is excluded from the
-        // mapped operator, exactly as in the buffer-based overload as
-        // invoked by QdkQubitMapper.
-        MajoranaMapResult result;
-        if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
-          const auto& container =
-              hamiltonian.get_container<CholeskyHamiltonianContainer>();
-          auto three_center = container.get_three_center_integrals();
-          const Eigen::MatrixXd& three_center_aa = three_center.first;
-          const Eigen::MatrixXd& three_center_bb = three_center.second;
-          const std::size_t naux =
-              static_cast<std::size_t>(three_center_aa.cols());
-          result = majorana_map_hamiltonian_cholesky(
-              mapping, 0.0, h1a_flat.data(), h1b_flat.data(),
-              three_center_aa.data(), three_center_bb.data(), n, naux,
-              spin_symmetric, threshold, integral_threshold);
-        } else if (hamiltonian
-                       .has_container_type<SparseHamiltonianContainer>()) {
-          const auto& container =
-              hamiltonian.get_container<SparseHamiltonianContainer>();
-          // TwoBodyMap is an ordered std::map, so this iteration is
-          // already deterministic; the engine additionally canonicalizes
-          // and sorts the entries before accumulating, so the mapped
-          // operator is reproducible for any input ordering.
-          const auto& two_body_map = container.sparse_two_body_integrals();
-          // The container's index components are int by definition, so the
-          // pushes below involve no narrowing; this assert turns any future
-          // widening of the index type into a build error instead of a
-          // silent truncation.
-          static_assert(
-              std::is_same_v<SparseHamiltonianContainer::TwoBodyIndex,
-                             std::tuple<int, int, int, int>>,
-              "sparse two-body indices must be int to match the engine API");
-          std::vector<int> indices;
-          std::vector<double> values;
-          indices.reserve(two_body_map.size() * 4);
-          values.reserve(two_body_map.size());
-          for (const auto& [idx, val] : two_body_map) {
-            const auto& [p, q, r, s] = idx;
-            indices.push_back(p);
-            indices.push_back(q);
-            indices.push_back(r);
-            indices.push_back(s);
-            values.push_back(val);
-          }
-          result = majorana_map_hamiltonian_sparse(
-              mapping, 0.0, h1a_flat.data(), h1b_flat.data(), indices.data(),
-              values.data(), values.size(), n, spin_symmetric, threshold,
-              integral_threshold);
-        } else {
-          // Dense path for canonical four-center (and any other) container.
-          auto two_body = hamiltonian.get_two_body_integrals();
-          const Eigen::VectorXd& aaaa = std::get<0>(two_body);
-          const Eigen::VectorXd& aabb = std::get<1>(two_body);
-          const Eigen::VectorXd& bbbb = std::get<2>(two_body);
-          result = majorana_map_hamiltonian(
-              mapping, 0.0, h1a_flat.data(), h1b_flat.data(), aaaa.data(),
-              aabb.data(), bbbb.data(), n, spin_symmetric, threshold,
-              integral_threshold);
-        }
-
+        const MajoranaMapResult result =
+            majorana_map_hamiltonian(mapping, hamiltonian, spin_symmetric,
+                                     threshold, integral_threshold);
         return py::make_tuple(py::cast(result.words),
                               py::cast(result.coefficients));
       },
@@ -431,9 +351,15 @@ Map a fermionic Hamiltonian to qubit Pauli terms.
 The two-body integrals are consumed in the native storage format of the
 Hamiltonian's container: Cholesky (three-center) and sparse containers are
 read directly without materializing the dense N^4 two-body tensor; any
-other container uses the dense path.  The returned ``(words,
-coefficients)`` are numerically equivalent to the dense path for the same
-underlying integrals.
+other container uses the dense path.
+
+For Cholesky and dense containers, the returned ``(words, coefficients)``
+match the dense path for the same underlying integrals.  For sparse
+containers, stored entries are canonicalized and symmetry-expanded before
+mapping, so results agree with the dense path when integrals are stored
+canonically or symmetry-complete (as for in-repo model builders); the
+sparse fast path is more robust when only non-canonical symmetry
+representatives are stored.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
 is intentionally **not** included in the mapped operator, matching the

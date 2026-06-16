@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <Eigen/Core>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -9,11 +10,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/utils/hash_context.hpp>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -333,9 +338,6 @@ struct CholeskyEriProvider {
 //                two-body loop.
 //   * map_     — every symmetry-related position of every entry; used by
 //                the one-body delta fold's scalar lookups.
-//   * rows_    — map_ bucketed by the (p,q) pair index, so building one
-//                (pq|·) row costs O(non-zeros in that row) instead of a
-//                scan over all stored entries.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -345,9 +347,6 @@ struct SparseEriProvider {
   };
   // Symmetry-expanded flattened position -> value.
   std::unordered_map<std::uint64_t, double> map_;
-  // (p*N + q) -> list of (r*N + s, value) for that row.
-  std::unordered_map<std::uint64_t, std::vector<std::pair<std::size_t, double>>>
-      rows_;
   // Canonical representatives, sorted lexicographically.
   std::vector<Entry> entries_;
   std::size_t n_ = 0;
@@ -366,14 +365,16 @@ struct SparseEriProvider {
     auto it = map_.find(key(p, q, r, s));
     return it == map_.end() ? 0.0 : it->second;
   }
-  // Build the (pq|·) row from the per-pair bucket; missing positions are
-  // implicitly zero.  Values are assigned (not accumulated), so the result
-  // is independent of the bucket's internal order.
+  // Build the (pq|·) row from map_; only used if the unrestricted branch
+  // is reached (the sparse entry point enforces spin_symmetric=true).
   const double* build_row(std::size_t p, std::size_t q) const {
     row_buf_.assign(n_ * n_, 0.0);
-    auto it = rows_.find(static_cast<std::uint64_t>(p * n_ + q));
-    if (it != rows_.end()) {
-      for (const auto& [rs, v] : it->second) row_buf_[rs] = v;
+    const std::uint64_t n2 = static_cast<std::uint64_t>(n_ * n_);
+    const std::uint64_t pair = static_cast<std::uint64_t>(p * n_ + q);
+    for (const auto& [k, v] : map_) {
+      if (k / n2 == pair) {
+        row_buf_[static_cast<std::size_t>(k % n2)] = v;
+      }
     }
     return row_buf_.data();
   }
@@ -589,14 +590,14 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
     if constexpr (EriProvider::kSparse) {
       // Fast path: visit only the stored non-zero entries.  Entries are
-      // canonicalized (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated at
-      // ingestion, so each maps to exactly one canonical (pq, rs) pair of
-      // the symmetric quad loop below — no stored integral is skipped, no
-      // zeros are touched, and process_pair's pq_idx <= rs_idx
-      // pre-condition holds by construction.
+      // canonicalized (p<=q, r<=s, (p,q)<=(r,s)) at ingestion; enforce the
+      // same pq_idx <= rs_idx ordering the dense quad loop uses before
+      // calling process_pair.
       for (const auto& e : eri_provider.entries()) {
-        process_pair(sym_map[e.p * n_spatial + e.q],
-                     sym_map[e.r * n_spatial + e.s], e.value);
+        std::size_t pq_idx = sym_map[e.p * n_spatial + e.q];
+        std::size_t rs_idx = sym_map[e.r * n_spatial + e.s];
+        if (pq_idx > rs_idx) std::swap(pq_idx, rs_idx);
+        process_pair(pq_idx, rs_idx, e.value);
       }
     } else {
       for (std::size_t p = 0; p < n_spatial; ++p) {
@@ -923,16 +924,81 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     }
   }
 
-  // Bucket the expanded map by (p,q) pair so building one (pq|·) row
-  // costs O(non-zeros in that row).
-  const std::size_t n2 = n_spatial * n_spatial;
-  for (const auto& [k, v] : provider.map_) {
-    provider.rows_[k / n2].emplace_back(static_cast<std::size_t>(k % n2), v);
-  }
-
   return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
                                    provider, n_spatial, spin_symmetric,
                                    threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
+                                           const Hamiltonian& hamiltonian,
+                                           bool spin_symmetric,
+                                           double threshold,
+                                           double integral_threshold) {
+  constexpr double core_energy = 0.0;
+
+  auto one_body = hamiltonian.get_one_body_integrals();
+  const Eigen::MatrixXd& h1a = std::get<0>(one_body);
+  const Eigen::MatrixXd& h1b = std::get<1>(one_body);
+  const std::size_t n = static_cast<std::size_t>(h1a.rows());
+
+  using RowMajorMatrix =
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+  const RowMajorMatrix h1a_flat = h1a;
+  const double* h1b_ptr = nullptr;
+  RowMajorMatrix h1b_flat;
+  if (spin_symmetric) {
+    h1b_ptr = h1a_flat.data();
+  } else {
+    h1b_flat = h1b;
+    h1b_ptr = h1b_flat.data();
+  }
+
+  if (hamiltonian.has_container_type<CholeskyHamiltonianContainer>()) {
+    const auto& container =
+        hamiltonian.get_container<CholeskyHamiltonianContainer>();
+    const auto three_center = container.get_three_center_integrals();
+    const Eigen::MatrixXd& three_center_aa = three_center.first;
+    const Eigen::MatrixXd& three_center_bb = three_center.second;
+    const std::size_t naux = static_cast<std::size_t>(three_center_aa.cols());
+    return majorana_map_hamiltonian_cholesky(
+        mapping, core_energy, h1a_flat.data(), h1b_ptr, three_center_aa.data(),
+        three_center_bb.data(), n, naux, spin_symmetric, threshold,
+        integral_threshold);
+  }
+
+  if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
+    const auto& container =
+        hamiltonian.get_container<SparseHamiltonianContainer>();
+    const auto& two_body_map = container.sparse_two_body_integrals();
+    static_assert(
+        std::is_same_v<SparseHamiltonianContainer::TwoBodyIndex,
+                       std::tuple<int, int, int, int>>,
+        "sparse two-body indices must be int to match the engine API");
+    std::vector<int> indices;
+    std::vector<double> values;
+    indices.reserve(two_body_map.size() * 4);
+    values.reserve(two_body_map.size());
+    for (const auto& [idx, val] : two_body_map) {
+      const auto& [p, q, r, s] = idx;
+      indices.push_back(p);
+      indices.push_back(q);
+      indices.push_back(r);
+      indices.push_back(s);
+      values.push_back(val);
+    }
+    return majorana_map_hamiltonian_sparse(
+        mapping, core_energy, h1a_flat.data(), h1b_ptr, indices.data(),
+        values.data(), values.size(), n, spin_symmetric, threshold,
+        integral_threshold);
+  }
+
+  const auto two_body = hamiltonian.get_two_body_integrals();
+  const Eigen::VectorXd& aaaa = std::get<0>(two_body);
+  const Eigen::VectorXd& aabb = std::get<1>(two_body);
+  const Eigen::VectorXd& bbbb = std::get<2>(two_body);
+  return majorana_map_hamiltonian(
+      mapping, core_energy, h1a_flat.data(), h1b_ptr, aaaa.data(), aabb.data(),
+      bbbb.data(), n, spin_symmetric, threshold, integral_threshold);
 }
 
 }  // namespace qdk::chemistry::data
