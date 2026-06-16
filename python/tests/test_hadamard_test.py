@@ -16,7 +16,7 @@ import pytest
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
 from qdk_chemistry.algorithms.hadamard_test.hadamard_test import QdkHadamardTest
-from qdk_chemistry.data import Circuit, Structure, TimeEvolutionUnitary
+from qdk_chemistry.data import Circuit, MajoranaMapping, Structure, UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 _HAS_QSHARP = importlib.util.find_spec("qdk.qsharp") is not None
@@ -36,7 +36,7 @@ class HadamardWaterBenchmark:
     """Container for the water benchmark used by Hadamard generator tests."""
 
     state_preparation: Circuit
-    time_evolution_unitary: TimeEvolutionUnitary
+    unitary: UnitaryRepresentation
 
 
 @pytest.fixture(scope="module")
@@ -74,18 +74,19 @@ def water_hadamard_benchmark() -> HadamardWaterBenchmark:
     hamiltonian_constructor = create("hamiltonian_constructor")
     active_hamiltonian = hamiltonian_constructor.run(active_wfn.get_orbitals())
 
-    qubit_mapper = create("qubit_mapper", algorithm_name="qdk", encoding="jordan-wigner")
-    qubit_hamiltonian = qubit_mapper.run(active_hamiltonian)
+    qubit_mapper = create("qubit_mapper", algorithm_name="qdk")
+    mapping = MajoranaMapping.jordan_wigner(2 * num_active_orbitals)
+    qubit_hamiltonian = qubit_mapper.run(active_hamiltonian, mapping)
 
     state_prep_builder = create("state_prep", algorithm_name="sparse_isometry_gf2x")
     state_preparation = state_prep_builder.run(active_wfn)
 
-    evolution_builder = create("time_evolution_builder", "trotter")
-    time_evolution = evolution_builder.run(qubit_hamiltonian, _EVOLUTION_TIME)
+    evolution_builder = create("hamiltonian_unitary_builder", "trotter", time=_EVOLUTION_TIME, power=_OBSERVABLE_POWER)
+    unitary = evolution_builder.run(qubit_hamiltonian)
 
     return HadamardWaterBenchmark(
         state_preparation=state_preparation,
-        time_evolution_unitary=time_evolution,
+        unitary=unitary,
     )
 
 
@@ -96,9 +97,8 @@ def test_qiskit_hadamard_generator_measures_water_observable(
     """Qiskit Hadamard generator reproduces the reference observable for water."""
     result = QiskitHadamardTest().run(
         water_hadamard_benchmark.state_preparation,
-        water_hadamard_benchmark.time_evolution_unitary,
+        water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        unitary_power=_OBSERVABLE_POWER,
     )
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
@@ -113,9 +113,8 @@ def test_qdk_hadamard_test_measures_water_observable(
     """Q# Hadamard generator reproduces the reference observable for water."""
     result = QdkHadamardTest().run(
         water_hadamard_benchmark.state_preparation,
-        water_hadamard_benchmark.time_evolution_unitary,
+        water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        unitary_power=_OBSERVABLE_POWER,
     )
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
@@ -130,9 +129,8 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
     """Qiskit Hadamard generator reproduces the Y-basis reference observable for water."""
     result = QiskitHadamardTest().run(
         water_hadamard_benchmark.state_preparation,
-        water_hadamard_benchmark.time_evolution_unitary,
+        water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        unitary_power=_OBSERVABLE_POWER,
         test_basis=HadamardTestBasis.Y,
     )
     counts = result.bitstring_counts
@@ -148,9 +146,8 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
     result = QdkHadamardTest().run(
         water_hadamard_benchmark.state_preparation,
-        water_hadamard_benchmark.time_evolution_unitary,
+        water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        unitary_power=_OBSERVABLE_POWER,
         test_basis=HadamardTestBasis.Y,
     )
     counts = result.bitstring_counts
@@ -169,7 +166,6 @@ def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
             Circuit(qasm=qasm3.dumps(state_prep_qc)),
             object(),
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis="Z",
         )
 
@@ -182,7 +178,6 @@ def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
             object(),
             object(),
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis="Z",
         )
 
@@ -197,18 +192,16 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(  # type: ignore[arg-type]
             object(),
-            water_hadamard_benchmark.time_evolution_unitary,
+            water_hadamard_benchmark.unitary,
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis=HadamardTestBasis.X,
         )
 
-    with pytest.raises(TypeError, match="TimeEvolutionUnitary"):
+    with pytest.raises(TypeError, match="UnitaryRepresentation"):
         generator.run(  # type: ignore[arg-type]
             Circuit(qasm=qasm3.dumps(QuantumCircuit(1))),
             object(),
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis=HadamardTestBasis.X,
         )
 
@@ -224,53 +217,32 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
     with pytest.raises(ValueError, match="state_preparation"):
         generator.run(
             bad_state_preparation_circuit,
-            water_hadamard_benchmark.time_evolution_unitary,
+            water_hadamard_benchmark.unitary,
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis=HadamardTestBasis.X,
         )
 
-    with pytest.raises(TypeError, match="TimeEvolutionUnitary"):
+    with pytest.raises(TypeError, match="UnitaryRepresentation"):
         generator.run(
             water_hadamard_benchmark.state_preparation,
             object(),
             shots=_SHOTS,
-            unitary_power=_OBSERVABLE_POWER,
             test_basis=HadamardTestBasis.X,
         )
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_hadamard_test_accepts_explicit_mapper_with_matching_power(
+def test_hadamard_test_accepts_explicit_mapper(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
-    """Explicit mapper is accepted when mapper power matches unitary_power."""
-    mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence", power=3)
+    """Explicit mapper is accepted when provided."""
+    mapper = create("controlled_circuit_mapper", "pauli_sequence")
 
     result = QiskitHadamardTest().run(
         water_hadamard_benchmark.state_preparation,
-        water_hadamard_benchmark.time_evolution_unitary,
+        water_hadamard_benchmark.unitary,
         shots=7,
-        unitary_power=3,
         mapper=mapper,
     )
 
     assert result.total_shots == 7
-    assert mapper.settings().get("power") == 3
-
-
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_hadamard_test_rejects_explicit_mapper_with_mismatched_power(
-    water_hadamard_benchmark: HadamardWaterBenchmark,
-) -> None:
-    """Explicit mapper is rejected when mapper power does not match unitary_power."""
-    mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence", power=2)
-
-    with pytest.raises(ValueError, match="unitary_power must match mapper.settings\\(\\)\\.get\\('power'\\)"):
-        QiskitHadamardTest().run(
-            water_hadamard_benchmark.state_preparation,
-            water_hadamard_benchmark.time_evolution_unitary,
-            shots=7,
-            unitary_power=3,
-            mapper=mapper,
-        )

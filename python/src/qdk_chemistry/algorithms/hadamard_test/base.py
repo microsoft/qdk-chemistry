@@ -10,13 +10,12 @@ from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
-    ControlledTimeEvolutionUnitary,
-    SettingNotFound,
-    TimeEvolutionUnitary,
+    ControlledUnitary,
+    UnitaryRepresentation,
 )
 
 __all__: list[str] = [
@@ -65,10 +64,9 @@ class HadamardTest(Algorithm):
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
-        time_evolution_unitary: TimeEvolutionUnitary,
+        unitary: UnitaryRepresentation,
         shots: int,
-        unitary_power: int,
-        mapper: ControlledEvolutionCircuitMapper | None = None,
+        mapper: ControlledCircuitMapper | None = None,
         simulator: CircuitExecutor | None = None,
         simulator_seed: int = 42,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
@@ -77,12 +75,9 @@ class HadamardTest(Algorithm):
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
-            time_evolution_unitary: Time evolution unitary :math:`\exp(-i H \Delta t)`.
+            unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
             shots: Number of shots to execute the circuit.
-            unitary_power: Power :math:`n` used to form the controlled unitary :math:`U^n`. If ``mapper`` is
-                provided, this value must match ``mapper.settings().get("power")``.
-            mapper: Controlled evolution circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
-                If provided, it is used as-is and must already have its ``power`` setting configured.
+            mapper: Controlled circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
             simulator: Circuit executor. If ``None``, the default ``qdk_full_state_simulator`` is used.
             simulator_seed: Random seed used for reproducible sampling when ``simulator`` is ``None``.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
@@ -94,13 +89,9 @@ class HadamardTest(Algorithm):
         """
         if not isinstance(test_basis, HadamardTestBasis):
             raise TypeError("test_basis must be an instance of HadamardTestBasis.")
-        if not isinstance(time_evolution_unitary, TimeEvolutionUnitary):
-            raise TypeError("time_evolution_unitary must be an instance of TimeEvolutionUnitary.")
-        num_system_qubits = time_evolution_unitary.get_num_qubits()
-        if not isinstance(unitary_power, int):
-            raise TypeError("unitary_power must be an integer.")
-        if unitary_power < 1:
-            raise ValueError("unitary_power must be a positive integer.")
+        if not isinstance(unitary, UnitaryRepresentation):
+            raise TypeError("unitary must be an instance of UnitaryRepresentation.")
+        num_system_qubits = unitary.get_num_qubits()
         if not isinstance(simulator_seed, int):
             raise TypeError("simulator_seed must be an integer.")
         if not isinstance(shots, int):
@@ -110,31 +101,19 @@ class HadamardTest(Algorithm):
 
         from qdk_chemistry.algorithms import create  # noqa: PLC0415
 
-        controlled_evolution = ControlledTimeEvolutionUnitary(
-            time_evolution_unitary=time_evolution_unitary,
+        controlled_evolution = ControlledUnitary(
+            unitary=unitary,
             control_indices=[0],
         )
 
         if mapper is None:
             try:
-                mapper = create("controlled_evolution_circuit_mapper", "pauli_sequence")
+                mapper = create("controlled_circuit_mapper", "pauli_sequence")
             except KeyError as err:
-                raise ValueError("Unknown controlled evolution circuit mapper type: pauli_sequence.") from err
-            mapper.settings().update("power", unitary_power)
-        elif not isinstance(mapper, ControlledEvolutionCircuitMapper):
-            raise TypeError("mapper must be an instance of ControlledEvolutionCircuitMapper or None.")
-        else:
-            try:
-                mapper_power = mapper.settings().get("power")
-            except SettingNotFound as err:
-                raise ValueError(
-                    "Provided mapper must define a 'power' setting when mapper is supplied explicitly."
-                ) from err
-            if mapper_power != unitary_power:
-                raise ValueError(
-                    "unitary_power must match mapper.settings().get('power') when mapper is supplied explicitly."
-                )
-        ctrl_time_evol_unitary_circuit = mapper.run(controlled_evolution=controlled_evolution)
+                raise ValueError("Default controlled circuit mapper 'pauli_sequence' not available.") from err
+        elif not isinstance(mapper, ControlledCircuitMapper):
+            raise TypeError("mapper must be an instance of ControlledCircuitMapper or None.")
+        ctrl_time_evol_unitary_circuit = mapper.run(controlled_unitary=controlled_evolution)
 
         circuit = self._build_hadamard_test_circuit(
             state_preparation_circuit,
