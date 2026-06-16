@@ -25,12 +25,11 @@ namespace qdk::chemistry::data {
  *        of Slater determinants.
  *
  * This is the single container type for determinant-expansion wavefunctions. It
- * stores a coefficient vector together with the corresponding determinants (as
- * a
- * @ref ConfigurationSet) and subsumes the previous single-determinant (Slater
- * determinant), complete-active-space (CAS), and selected-configuration-
- * interaction (SCI) containers, which were structurally identical apart from a
- * type tag.
+ * stores a coefficient vector together with the corresponding determinants
+ * (as a @ref ConfigurationSet) and subsumes the previous single-determinant
+ * (Slater determinant), complete-active-space (CAS), and
+ * selected-configuration-interaction (SCI) containers, which were structurally
+ * identical apart from a type tag.
  *
  * A single Slater determinant is simply the special case of a one-determinant
  * expansion with coefficient 1.0; use the single-determinant convenience

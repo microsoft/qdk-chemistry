@@ -21,6 +21,7 @@ target_sources(chemistry PRIVATE
     structure.cpp
     symmetry/symmetry.cpp
     symmetry/symmetry_blocked_sparse_map.cpp
+    symmetry/symmetry_blocked_scalar.cpp
     symmetry/symmetry_blocked_tensor.cpp
     symmetry/symmetry_blocked_index_set.cpp
     tapering.cpp

@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <H5Cpp.h>
-
 #include <algorithm>
 #include <complex>
 #include <cstddef>
@@ -31,9 +29,9 @@ namespace qdk::chemistry::data {
  * A @ref SymmetryBlockedScalar stores one scalar value per symmetry sector of a
  * single-slot (rank-1) partition: a sparse map from a per-slot
  * @ref SymmetryLabel to a scalar @p Scalar. The slot carries its own
- * @ref SymmetryProduct. It is the scalar analogue of @ref SymmetryBlockedTensor
- * and is used for any symmetry-resolved scalar quantity whose block structure
- * is induced by the single-particle basis.
+ * @ref SymmetryProduct. A @ref SymmetryBlockedScalar is the scalar analogue of
+ * @ref SymmetryBlockedTensor and is used for any symmetry-resolved scalar
+ * quantity whose block structure is induced by the single-particle basis.
  *
  * Example: when the slot carries a spin axis, the stored labels can be the
  * spin labels (@f$\alpha@f$, @f$\beta@f$) and the value under each label is
@@ -221,19 +219,9 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @param group HDF5 group to write into.
    * @throws std::runtime_error on HDF5 I/O failure.
    */
-  void to_hdf5(H5::Group& group) const override {
-    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-    H5::DataSpace scalar_space(H5S_SCALAR);
-    auto dataset = group.createDataSet("symmetry_blocked_scalar_metadata",
-                                       str_type, scalar_space);
-    std::string payload = to_json().dump(2);
-    dataset.write(payload, str_type);
-  }
+  void to_hdf5(H5::Group& group) const override;
 
-  void to_hdf5_file(const std::string& filename) const override {
-    H5::H5File file(filename, H5F_ACC_TRUNC);
-    to_hdf5(file);
-  }
+  void to_hdf5_file(const std::string& filename) const override;
 
   /**
    * @brief Dispatch to JSON or HDF5 serialization based on @p type.
@@ -269,38 +257,7 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @throws nlohmann::json::exception if @p j is otherwise malformed.
    */
   static std::shared_ptr<SymmetryBlockedScalar> from_json(
-      const nlohmann::json& j) {
-    if (!j.contains("version")) {
-      throw std::runtime_error(
-          "SymmetryBlockedScalar JSON missing required 'version' field.");
-    }
-    _validate_version(j.at("version").template get<std::string>());
-
-    const std::string expected_scalar = _scalar_tag();
-    if (j.contains("scalar") &&
-        j.at("scalar").template get<std::string>() != expected_scalar) {
-      throw std::invalid_argument(
-          "SymmetryBlockedScalar JSON scalar type does not match the requested "
-          "type.");
-    }
-
-    auto symmetries = Base::_symmetries_from_json(j);
-
-    BlockMap blocks;
-    for (const auto& entry : j.at("blocks")) {
-      auto value =
-          std::make_shared<const Scalar>(_value_from_json(entry.at("value")));
-      for (const auto& key_json : entry.at("keys")) {
-        std::vector<SymmetryLabel> labels;
-        for (const auto& label_json : key_json) {
-          labels.push_back(SymmetryLabel::from_json(label_json));
-        }
-        blocks.emplace(detail::make_labels<1>(labels), value);
-      }
-    }
-    return std::make_shared<SymmetryBlockedScalar>(std::move(symmetries),
-                                                   std::move(blocks));
-  }
+      const nlohmann::json& j);
 
   /**
    * @brief Reconstruct a @ref SymmetryBlockedScalar from a JSON file produced
@@ -336,23 +293,10 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
    * @throws std::invalid_argument if the encoded scalar type does not match
    *         the requested instantiation.
    */
-  static std::shared_ptr<SymmetryBlockedScalar> from_hdf5(H5::Group& group) {
-    if (!group.nameExists("symmetry_blocked_scalar_metadata")) {
-      throw std::runtime_error(
-          "SymmetryBlockedScalar HDF5 metadata dataset not found.");
-    }
-    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-    auto dataset = group.openDataSet("symmetry_blocked_scalar_metadata");
-    std::string payload;
-    dataset.read(payload, str_type);
-    return from_json(nlohmann::json::parse(payload));
-  }
+  static std::shared_ptr<SymmetryBlockedScalar> from_hdf5(H5::Group& group);
 
   static std::shared_ptr<SymmetryBlockedScalar> from_hdf5_file(
-      const std::string& filename) {
-    H5::H5File file(filename, H5F_ACC_RDONLY);
-    return from_hdf5(file);
-  }
+      const std::string& filename);
 
   /**
    * @brief Dispatch to JSON or HDF5 deserialization based on @p type.
@@ -451,5 +395,7 @@ class SymmetryBlockedScalar : public SymmetryBlocked<1, Scalar> {
     }
   }
 };
+
+extern template class SymmetryBlockedScalar<std::size_t>;
 
 }  // namespace qdk::chemistry::data
