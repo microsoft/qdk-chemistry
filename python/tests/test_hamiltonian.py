@@ -20,6 +20,7 @@ from qdk_chemistry.data import (
     ModelOrbitals,
     Orbitals,
 )
+from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
@@ -550,7 +551,7 @@ class TestHamiltonian:
     def test_active_space_consistency(self):
         """Test that active space handling works correctly for both restricted and unrestricted."""
         # Test restricted case with active space
-        model_orbitals_restricted = ModelOrbitals(4, True)
+        model_orbitals_restricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
         assert model_orbitals_restricted.is_restricted()
         assert model_orbitals_restricted.has_active_space()
 
@@ -563,7 +564,7 @@ class TestHamiltonian:
         assert h_restricted.is_restricted()
 
         # Test unrestricted case with active space
-        model_orbitals_unrestricted = ModelOrbitals(4, False)
+        model_orbitals_unrestricted = ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))
         assert not model_orbitals_unrestricted.is_restricted()
         assert model_orbitals_unrestricted.is_unrestricted()
         assert model_orbitals_unrestricted.has_active_space()
