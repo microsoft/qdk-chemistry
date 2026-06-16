@@ -240,6 +240,7 @@ class TestVerstraeteCiracSpectral:
         # Ensure lowest physical energy levels match baseline
         np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
+    @pytest.mark.slow
     def test_spectral_validation_3x2_huckel(self) -> None:
         """Compare eigenvalues of 3x2 Hückel model under VC and JW mappings.
 
