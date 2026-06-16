@@ -13,12 +13,15 @@ Supported QDK backends include:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from collections import Counter
 from typing import Literal
 
-import qsharp
-from qsharp._simulation import run_qir
-from qsharp.openqasm import run as sparse_state_run_qasm
+from qdk import qsharp
+from qdk.openqasm import run as sparse_state_run_qasm
+
+try:
+    from qdk.simulation import run_qir
+except ImportError:
+    from qsharp._simulation import run_qir
 
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.data import Circuit, CircuitExecutorData, QuantumErrorProfile, Settings
@@ -27,12 +30,48 @@ from qdk_chemistry.utils import Logger
 __all__: list[str] = ["QdkFullStateSimulator", "QdkFullStateSimulatorSettings"]
 
 
+def _process_raw_results(raw_results: list) -> tuple[dict[str, int], dict[str, int] | None]:
+    """Convert raw measurement results into bitstring counts, separating clean and lost shots.
+
+    Reorders bits to Little Endian convention and uses 'L' to mark lost qubits.
+
+    Args:
+        raw_results: Raw measurement results from the simulator.
+
+    Returns:
+        A tuple of (bitstring_counts, loss_bitstrings). loss_bitstrings is None
+        if no shots experienced qubit loss.
+
+    """
+    _map = {"One": "1", "Loss": "L", "Zero": "0"}
+    clean_counts: dict[str, int] = {}
+    loss_counts: dict[str, int] = {}
+
+    for one_run in raw_results:
+        has_loss = False
+        chars = []
+        for x in reversed(one_run):
+            label = str(x)
+            if label not in _map:
+                raise ValueError(f"Unexpected measurement result '{label}'; expected one of {set(_map)}")
+            c = _map[label]
+            if c == "L":
+                has_loss = True
+            chars.append(c)
+        key = "".join(chars)
+        if has_loss:
+            loss_counts[key] = loss_counts.get(key, 0) + 1
+        else:
+            clean_counts[key] = clean_counts.get(key, 0) + 1
+
+    return clean_counts, loss_counts if loss_counts else None
+
+
 class QdkFullStateSimulatorSettings(Settings):
     """Settings for the QDK Full State Simulator circuit executor."""
 
     def __init__(self) -> None:
         """Initialize QDK Full State Simulator settings."""
-        Logger.trace_entering()
         super().__init__()
         self._set_default(
             "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
@@ -55,7 +94,6 @@ class QdkFullStateSimulator(CircuitExecutor):
             seed: The random seed for simulation reproducibility.
 
         """
-        Logger.trace_entering()
         super().__init__()
         self._settings = QdkFullStateSimulatorSettings()
         self._settings.set("type", simulator_type)
@@ -85,15 +123,13 @@ class QdkFullStateSimulator(CircuitExecutor):
         raw_results = run_qir(
             qir, shots=shots, noise=noise_config, seed=self._settings.get("seed"), type=self._settings.get("type")
         )
-        Logger.debug(f"Measurement results obtained: {raw_results}")
-        # Reorder bits in each measurement result to match Little Endian convention
-        bitstrings = ["".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results]
-        counts = dict(Counter(bitstrings))
+        bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
-            bitstring_counts=counts,
+            bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
+            loss_bitstrings=loss_bitstrings,
         )
 
     def name(self) -> str:
@@ -138,36 +174,31 @@ class QdkSparseStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
-
-        if noise is not None:
-            raise NotImplementedError("Gate specific noise is not yet supported for the QDK Sparse State Simulator. ")
+        noise_config = noise.to_qdk_noise_config() if noise is not None else None
         if circuit._qsharp_factory is not None:  # noqa: SLF001
             raw_results = qsharp.run(
                 circuit._qsharp_factory.program,  # noqa: SLF001
                 shots,
                 *circuit._qsharp_factory.parameter.values(),  # noqa: SLF001
+                noise=noise_config,
+                seed=self._settings.get("seed"),
             )
-            Logger.debug(f"Measurement results obtained: {raw_results}")
-            bitstrings = [
-                "".join("0" if str(x) == "Zero" else "1" for x in reversed(one_run)) for one_run in raw_results
-            ]
-            bitstring_counts = dict(Counter(bitstrings))
+            bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         else:
             qasm = circuit.get_qasm()
             raw_results = sparse_state_run_qasm(
                 qasm,
                 shots=shots,
-                as_bitstring=True,
+                noise=noise_config,
                 seed=self._settings.get("seed"),
             )
-            Logger.debug(f"Measurement results obtained: {raw_results}")
-            # Reverse the order of bits in each measurement result to match Little Endian convention
-            bitstring_counts = {bitstring[::-1]: count for bitstring, count in Counter(raw_results).items()}
+            bitstring_counts, loss_bitstrings = _process_raw_results(raw_results)
         return CircuitExecutorData(
             bitstring_counts=bitstring_counts,
             total_shots=shots,
             executor=self.name(),
             executor_metadata=raw_results,
+            loss_bitstrings=loss_bitstrings,
         )
 
     def name(self) -> str:

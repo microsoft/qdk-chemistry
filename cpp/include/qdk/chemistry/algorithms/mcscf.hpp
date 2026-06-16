@@ -15,6 +15,20 @@
 namespace qdk::chemistry::algorithms {
 
 /**
+ * @class MultiConfigurationScfSettings
+ * @brief Settings for MCSCF calculations with nested algorithm references
+ */
+class MultiConfigurationScfSettings : public data::Settings {
+ public:
+  MultiConfigurationScfSettings() {
+    set_default(
+        "multi_configuration_calculator",
+        data::AlgorithmRef("multi_configuration_calculator", "macis_cas"));
+  }
+  virtual ~MultiConfigurationScfSettings() = default;
+};
+
+/**
  * @brief Abstract base class for multi-configurational Self-Consistent Field
  * (MCSCF) calculations
  *
@@ -33,17 +47,18 @@ namespace qdk::chemistry::algorithms {
 class MultiConfigurationScf
     : public Algorithm<MultiConfigurationScf,
                        std::pair<double, std::shared_ptr<data::Wavefunction>>,
-                       std::shared_ptr<data::Orbitals>,
-                       std::shared_ptr<HamiltonianConstructor>,
-                       std::shared_ptr<MultiConfigurationCalculator>,
-                       unsigned int, unsigned int> {
+                       std::shared_ptr<data::Orbitals>, unsigned int,
+                       unsigned int> {
  public:
   /**
    * @brief Default constructor
    *
-   * Creates an MultiConfigurationScf solver with default settings.
+   * Creates an MultiConfigurationScf solver with default settings that
+   * include an AlgorithmRef entry for multi_configuration_calculator.
    */
-  MultiConfigurationScf() = default;
+  MultiConfigurationScf() {
+    _settings = std::make_unique<MultiConfigurationScfSettings>();
+  }
 
   /**
    * @brief Virtual destructor
@@ -55,19 +70,11 @@ class MultiConfigurationScf
   /**
    * @brief Perform an MultiConfigurationScf calculation
    *
-   * This pure virtual method must be implemented by derived classes to perform
-   * the MultiConfigurationScf calculation, which optimizes both orbital and CI
-   * coefficients. The method takes a Hamiltonian describing the quantum system
-   * and returns both the calculated energy and the optimized
-   * multi-configurational wavefunction, including both optimized orbital
-   * coefficients and CI coefficients.
+   * The nested HamiltonianConstructor and MultiConfigurationCalculator are
+   * created from AlgorithmRef settings automatically.
    *
    * \cond DOXYGEN_SUPRESS (Doxygen warning suppression for argument packs)
    * @param orbitals The initial molecular orbitals for the calculation
-   * @param hamiltonian_ctor The Hamiltonian constructor for building the
-   * Hamiltonian
-   * @param mc_calculator The multi-configurational calculator for evaluation
-   * of the active space
    * @param n_active_alpha_electrons The number of alpha electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
    * @param n_active_beta_electrons The number of beta electrons in the
@@ -83,9 +90,6 @@ class MultiConfigurationScf
    * @note This method is const as it should not modify the solver's state
    * @see data::Hamiltonian
    * @see data::Wavefunction
-   * @note The specific requirements for the inputs and settings affecting
-   * this method may vary by implementation. See the documentation for
-   * the specific MultiConfigurationScf solver being used (docstring).
    */
   using Algorithm::run;
 
@@ -109,16 +113,11 @@ class MultiConfigurationScf
    *
    * This pure virtual method must be implemented by derived classes to perform
    * the MCSCF calculation, which optimizes both orbital and CI coefficients.
-   * The method takes initial orbitals, a Hamiltonian constructor and a
-   * multi-configurational calculator, then returns both the calculated energy
+   * The method takes initial orbitals, then returns both the calculated energy
    * and the optimized multi-configurational wavefunction, including both
    * optimized orbital coefficients and CI coefficients.
    *
    * @param orbitals The initial molecular orbitals for the calculation
-   * @param hamiltonian_ctor The Hamiltonian constructor for building the
-   * Hamiltonian
-   * @param mc_calculator The multi-configurational calculator for evaluation
-   * of the active space
    * @param n_active_alpha_electrons The number of alpha electrons in the
    * active space, inactive orbitals are assumed to be fully occupied.
    * @param n_active_beta_electrons The number of beta electrons in the
@@ -129,8 +128,6 @@ class MultiConfigurationScf
    */
   virtual std::pair<double, std::shared_ptr<data::Wavefunction>> _run_impl(
       std::shared_ptr<data::Orbitals> orbitals,
-      std::shared_ptr<HamiltonianConstructor> hamiltonian_ctor,
-      std::shared_ptr<MultiConfigurationCalculator> mc_calculator,
       unsigned int n_active_alpha_electrons,
       unsigned int n_active_beta_electrons) const = 0;
 };

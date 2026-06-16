@@ -10,6 +10,7 @@ import pytest
 from qdk_chemistry.algorithms.circuit_executor.qdk import (
     QdkFullStateSimulator,
     QdkSparseStateSimulator,
+    _process_raw_results,
 )
 from qdk_chemistry.data import Circuit, QuantumErrorProfile
 
@@ -95,16 +96,42 @@ class TestQdkFullStateCircuitExecutor:
         for outcome in raw_data:
             assert "One, Zero" in str(outcome)  # Raw data bitstring outcomes should be in qubit order
 
-    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile):
+    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile_with_qubit_loss):
         """Test execution with a depolarizing noise model."""
         executor = QdkFullStateSimulator()
-        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile)
+        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile_with_qubit_loss)
         counts = result.bitstring_counts
         # With noise, we expect some erroneous outcomes ("01" or "10") in addition to "00" and "11"
-        total = sum(counts.values())
-        assert total == 1000
+        clean_total = sum(counts.values())
+        loss_total = sum(result.loss_bitstrings.values()) if result.loss_bitstrings else 0
+        assert clean_total + loss_total == 1000
         error_count = counts.get("01", 0) + counts.get("10", 0)
         assert error_count > 0, "Noise should introduce some erroneous outcomes"
+
+    def test_noise_high_qubit_loss(self, test_circuit_1):
+        """Test execution with high qubit loss rate produces loss bitstrings."""
+        high_loss_noise = QuantumErrorProfile(
+            name="high_loss",
+            description="High qubit loss for testing",
+            errors={
+                "h": {"qubit_loss": 0.5},
+                "cx": {"qubit_loss": 0.5},
+            },
+        )
+        executor = QdkFullStateSimulator()
+        result = executor.run(test_circuit_1, shots=1000, noise=high_loss_noise)
+        assert result.loss_bitstrings is not None, "High loss rate should produce loss bitstrings"
+        assert sum(result.loss_bitstrings.values()) > 0
+        # All loss bitstrings should contain 'L'
+        for bs in result.loss_bitstrings:
+            assert "L" in bs
+        # Clean bitstrings should only contain '0' and '1'
+        for bs in result.bitstring_counts:
+            assert "L" not in bs
+        # Total should still sum to shots
+        clean_total = sum(result.bitstring_counts.values())
+        loss_total = sum(result.loss_bitstrings.values())
+        assert clean_total + loss_total == 1000
 
     def test_noise_high_error_rate(self, test_circuit_2):
         """Test execution with a high noise rate produces many errors."""
@@ -112,9 +139,9 @@ class TestQdkFullStateCircuitExecutor:
             name="high_noise",
             description="High noise for testing",
             errors={
-                "x": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 1},
-                "h": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 1},
-                "cx": {"type": "depolarizing_error", "rate": 0.5, "num_qubits": 2},
+                "x": {"depolarizing_error": 0.5},
+                "h": {"depolarizing_error": 0.5},
+                "cx": {"depolarizing_error": 0.5},
             },
         )
         executor = QdkFullStateSimulator()
@@ -165,10 +192,65 @@ class TestQdkSparseStateCircuitExecutor:
         result = executor.run(test_circuit_2, shots=5)
         assert result.executor == "qdk_sparse_state_simulator"
         assert result.get_executor_metadata() is not None
-        assert all("10" in str(outcome) for outcome in result.get_executor_metadata())
+        raw_data = result.get_executor_metadata()
+        for outcome in raw_data:
+            assert "One, Zero" in str(outcome)
 
-    def test_gate_noise_profile_raises(self, test_circuit_1, simple_error_profile):
-        """Test that passing a QuantumErrorProfile noise raises NotImplementedError."""
+    def test_noise_with_depolarizing_error(self, test_circuit_1, simple_error_profile_with_qubit_loss):
+        """Test execution with a depolarizing noise model."""
         executor = QdkSparseStateSimulator()
-        with pytest.raises(NotImplementedError, match="Gate specific noise is not yet supported"):
-            executor.run(test_circuit_1, shots=10, noise=simple_error_profile)
+        result = executor.run(test_circuit_1, shots=1000, noise=simple_error_profile_with_qubit_loss)
+        counts = result.bitstring_counts
+        # With noise, we expect some erroneous outcomes ("01" or "10") in addition to "00" and "11"
+        clean_total = sum(counts.values())
+        loss_total = sum(result.loss_bitstrings.values()) if result.loss_bitstrings else 0
+        assert clean_total + loss_total == 1000
+        error_count = counts.get("01", 0) + counts.get("10", 0)
+        assert error_count > 0, "Noise should introduce some erroneous outcomes"
+
+    def test_noise_high_qubit_loss(self, test_circuit_1):
+        """Test execution with high qubit loss rate produces loss bitstrings."""
+        high_loss_noise = QuantumErrorProfile(
+            name="high_loss",
+            description="High qubit loss for testing",
+            errors={
+                "h": {"qubit_loss": 0.5},
+                "cx": {"qubit_loss": 0.5},
+            },
+        )
+        executor = QdkSparseStateSimulator()
+        result = executor.run(test_circuit_1, shots=1000, noise=high_loss_noise)
+        assert result.loss_bitstrings is not None, "High loss rate should produce loss bitstrings"
+        assert sum(result.loss_bitstrings.values()) > 0
+        for bs in result.loss_bitstrings:
+            assert "L" in bs
+        for bs in result.bitstring_counts:
+            assert "L" not in bs
+        clean_total = sum(result.bitstring_counts.values())
+        loss_total = sum(result.loss_bitstrings.values())
+        assert clean_total + loss_total == 1000
+
+
+class TestProcessRawResults:
+    """Tests for the _process_raw_results helper."""
+
+    def test_all_clean(self):
+        """All shots are clean (no loss)."""
+        raw = [["One", "Zero"], ["One", "Zero"], ["Zero", "One"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {"01": 2, "10": 1}
+        assert loss is None
+
+    def test_all_loss(self):
+        """Every shot contains at least one lost qubit."""
+        raw = [["Loss", "Zero"], ["One", "Loss"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {}
+        assert loss == {"0L": 1, "L1": 1}
+
+    def test_mixed_clean_and_loss(self):
+        """Mix of clean and loss shots."""
+        raw = [["One", "Zero"], ["Loss", "One"], ["Zero", "Zero"]]
+        counts, loss = _process_raw_results(raw)
+        assert counts == {"01": 1, "00": 1}
+        assert loss == {"1L": 1}

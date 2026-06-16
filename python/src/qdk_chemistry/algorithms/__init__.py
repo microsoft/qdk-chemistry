@@ -22,6 +22,7 @@ from qdk_chemistry.algorithms.active_space_selector import (
     QdkValenceActiveSpaceSelector,
 )
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator
 from qdk_chemistry.algorithms.energy_estimator.energy_estimator import EnergyEstimator
 from qdk_chemistry.algorithms.energy_estimator.qdk import QdkEnergyEstimator
@@ -30,6 +31,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
     HamiltonianConstructor,
     QdkHamiltonianConstructor,
 )
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
     QdkMacisAsci,
@@ -43,6 +45,7 @@ from qdk_chemistry.algorithms.orbital_localizer import (
     QdkVVHVLocalizer,
 )
 from qdk_chemistry.algorithms.phase_estimation.base import PhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCircuitBuilder
 from qdk_chemistry.algorithms.projected_multi_configuration_calculator import (
     ProjectedMultiConfigurationCalculator,
     QdkMacisPmc,
@@ -52,8 +55,6 @@ from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
-from qdk_chemistry.algorithms.time_evolution.builder.base import TimeEvolutionBuilder
-from qdk_chemistry.algorithms.time_evolution.controlled_circuit_mapper.base import ControlledEvolutionCircuitMapper
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
@@ -61,11 +62,12 @@ __all__ = [
     # Classes
     "ActiveSpaceSelector",
     "CircuitExecutor",
-    "ControlledEvolutionCircuitMapper",
+    "ControlledCircuitMapper",
     "DynamicalCorrelationCalculator",
     "EnergyEstimator",
     "HadamardTest",
     "HamiltonianConstructor",
+    "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "OrbitalLocalizer",
@@ -86,6 +88,7 @@ __all__ = [
     "QdkStabilityChecker",
     "QdkVVHVLocalizer",
     "QdkValenceActiveSpaceSelector",
+    "QpeCircuitBuilder",
     "QubitHamiltonianSolver",
     "QubitMapper",
     "ScfSolver",

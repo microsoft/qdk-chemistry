@@ -29,6 +29,8 @@ import itertools
 import math
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from qdk_chemistry.data import PauliTermAccumulator
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ if TYPE_CHECKING:
     from qdk_chemistry.data import QubitHamiltonian
 
 __all__: list[str] = [
+    "commutator",
     "commutator_bound_first_order",
     "commutator_bound_higher_order",
     "commutator_bound_second_order",
@@ -47,6 +50,45 @@ __all__: list[str] = [
     "does_nested_commutator_vanish",
     "get_commutation_checker",
 ]
+
+
+def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian:
+    r"""Compute the commutator :math:`[H_a, H_b] = H_a H_b - H_b H_a`.
+
+    Uses :class:`~qdk_chemistry.data.PauliTermAccumulator` to multiply
+    every pair of Pauli terms and accumulate the result.
+
+    Args:
+        h_a: First qubit Hamiltonian.
+        h_b: Second qubit Hamiltonian.
+
+    Returns:
+        The commutator as a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+
+    """
+    from qdk_chemistry.data import QubitHamiltonian as _QubitHamiltonian  # noqa: PLC0415
+
+    num_qubits = max(h_a.num_qubits, h_b.num_qubits)
+    acc = PauliTermAccumulator()
+
+    words_a = [_label_to_sparse_word(s) for s in h_a.pauli_strings]
+    words_b = [_label_to_sparse_word(s) for s in h_b.pauli_strings]
+
+    for i, (w_a, c_a) in enumerate(zip(words_a, h_a.coefficients, strict=True)):
+        for j, (w_b, c_b) in enumerate(zip(words_b, h_b.coefficients, strict=True)):
+            if do_pauli_labels_commute(h_a.pauli_strings[i], h_b.pauli_strings[j]):
+                continue
+            # AB - BA: for anticommuting Pauli strings, AB = -BA so [A,B] = 2AB
+            acc.accumulate_product(w_a, w_b, 2.0 * complex(c_a) * complex(c_b))
+
+    terms = acc.get_terms_as_strings(num_qubits)
+    if not terms:
+        return _QubitHamiltonian(["I" * num_qubits], np.array([0.0]))
+
+    # PauliTermAccumulator returns qubit-0-first ordering; reverse to Qiskit/QubitHamiltonian convention (qubit-0-last).
+    labels = [label[::-1] for _, label in terms]
+    coeffs = np.array([complex(c) for c, _ in terms])
+    return _QubitHamiltonian(labels, coeffs)
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:

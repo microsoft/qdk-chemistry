@@ -147,6 +147,9 @@ Returns:
     str: The type name of the algorithm
 )");
 
+  stability_checker.def("hash", &StabilityChecker::hash,
+                        py::arg("wavefunction"));
+
   // Factory class binding - creates StabilityCheckerFactory class with static
   // methods
   bind_algorithm_factory<StabilityCheckerFactory, StabilityChecker,
@@ -155,6 +158,8 @@ Returns:
   stability_checker.def("__repr__", [](const StabilityChecker &) {
     return "<qdk_chemistry.algorithms.StabilityChecker>";
   });
+
+  qdk::chemistry::python::bind_create_nested(stability_checker);
 
   // Bind concrete microsoft::StabilityChecker implementation
   py::class_<microsoft::StabilityChecker, StabilityChecker, py::smart_holder>(

@@ -158,6 +158,10 @@ Returns:
 
 )");
 
+  mc_calculator.def("hash", &MultiConfigurationCalculator::hash,
+                    py::arg("hamiltonian"), py::arg("n_active_alpha_electrons"),
+                    py::arg("n_active_beta_electrons"));
+
   // Factory class binding - creates MultiConfigurationCalculatorFactory class
   // with static methods
   qdk::chemistry::python::bind_algorithm_factory<
@@ -168,6 +172,8 @@ Returns:
   mc_calculator.def("__repr__", [](const MultiConfigurationCalculator &) {
     return "<qdk_chemistry.algorithms.MultiConfigurationCalculator>";
   });
+
+  qdk::chemistry::python::bind_create_nested(mc_calculator);
 
   // Bind concrete microsoft::MacisCas implementation
   py::class_<microsoft::MacisCas, MultiConfigurationCalculator,
@@ -227,7 +233,7 @@ Typical usage:
 
     # Configure ASCI-specific settings
     asci.settings().set("ntdets_max", 1000)
-    asci.settings().set("h_el_tol", 1e-6)
+    asci.settings().set("search_matel_tol", 1e-6)
 
     # Run calculation
     energy, wavefunction = asci.run(hamiltonian, n_alpha, n_beta)

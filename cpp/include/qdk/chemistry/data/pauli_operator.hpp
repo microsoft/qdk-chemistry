@@ -35,9 +35,31 @@ namespace qdk::chemistry::data {
 using SparsePauliWord = std::vector<std::pair<std::uint64_t, std::uint8_t>>;
 
 /**
+ * @brief Convert a sparse Pauli word to a QubitHamiltonian label.
+ *
+ * The returned label uses the QubitHamiltonian convention: qubit 0 is the
+ * rightmost character.
+ */
+std::string sparse_pauli_word_to_label(const SparsePauliWord& word,
+                                       std::uint64_t num_qubits);
+
+/**
+ * @brief Convert a QubitHamiltonian label to a sparse Pauli word.
+ *
+ * The input label uses the QubitHamiltonian convention: qubit 0 is the
+ * rightmost character.  Identity characters are omitted from the output.
+ *
+ * @param label Dense Pauli-string label (e.g. "XIZZ").
+ * @return Sparse Pauli word sorted by qubit index.
+ * @throws std::invalid_argument If the label contains invalid characters.
+ */
+SparsePauliWord label_to_sparse_pauli_word(const std::string& label);
+
+/**
  * @brief Hash function for SparsePauliWord.
  *
- * Uses boost-style hash_combine for portable and efficient hash computation.
+ * Uses hash_combine for unordered-map lookup performance. This is a local table
+ * hash, not a deterministic content digest.
  */
 struct SparsePauliWordHash {
   std::size_t operator()(const SparsePauliWord& word) const noexcept {
@@ -53,14 +75,15 @@ struct SparsePauliWordHash {
  * @brief Hash function for pairs of SparsePauliWord (used for multiplication
  * caching).
  *
- * Combines two SparsePauliWordHash results using hash_combine.
+ * Combines the two SparsePauliWordHash results for fast unordered-map lookup.
+ * This is a local table hash, not a deterministic content digest.
  */
 struct SparsePauliWordPairHash {
   std::size_t operator()(
       const std::pair<SparsePauliWord, SparsePauliWord>& pair) const noexcept {
     SparsePauliWordHash hasher;
-    std::size_t h1 = hasher(pair.first);
-    std::size_t h2 = hasher(pair.second);
+    const std::size_t h1 = hasher(pair.first);
+    const std::size_t h2 = hasher(pair.second);
     return utils::hash_combine(h1, h2);
   }
 };

@@ -46,7 +46,7 @@ from qdk_chemistry.data import (
     Configuration,
     ElectronicStructureSettings,
     Orbitals,
-    SlaterDeterminantContainer,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -299,11 +299,9 @@ class PyscfScfSolver(ScfSolver):
         _ovlp = mf.get_ovlp()
 
         if scf_type == SCFType.RESTRICTED and mol.spin != 0:
-            # ROHF/ROKS case - create unrestricted-style orbitals but with same coefficients
+            # ROHF/ROKS case - restricted orbitals (same coefficients for alpha and beta)
             orbitals = Orbitals(
-                mf.mo_coeff,  # Same coefficients for alpha and beta
                 mf.mo_coeff,
-                mf.mo_energy,  # Same energies for alpha and beta
                 mf.mo_energy,
                 ao_overlap=_ovlp,
                 basis_set=basis_set,
@@ -338,7 +336,7 @@ class PyscfScfSolver(ScfSolver):
         # Create HF ground state configuration using canonical method
         hf_config = Configuration.canonical_hf_configuration(n_alpha, n_beta, n_orbitals)
 
-        wfn = Wavefunction(SlaterDeterminantContainer(hf_config, orbitals))
+        wfn = Wavefunction(StateVectorContainer(hf_config, orbitals, "electrons"))
 
         return energy, wfn
 

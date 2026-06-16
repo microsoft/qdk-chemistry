@@ -17,25 +17,39 @@ _loaded = False
 QDK_CHEMISTRY_HAS_QISKIT = False
 QDK_CHEMISTRY_HAS_QISKIT_NATURE = False
 QDK_CHEMISTRY_HAS_QISKIT_AER = False
+QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = False
 
 
 def load():
     """Load the Qiskit related plugins into QDK/Chemistry."""
     Logger.trace_entering()
     global _loaded  # noqa: PLW0603
-    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE, QDK_CHEMISTRY_HAS_QISKIT_AER  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_NATURE  # noqa: PLW0603
+    global QDK_CHEMISTRY_HAS_QISKIT_AER, QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
+
     if importlib.util.find_spec("qiskit") is not None:
         QDK_CHEMISTRY_HAS_QISKIT = True
-        qiskit_load()
     if importlib.util.find_spec("qiskit_nature") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_NATURE = True
-        qiskit_nature_load()
     if importlib.util.find_spec("qiskit_aer") is not None:
         QDK_CHEMISTRY_HAS_QISKIT_AER = True
+    if (
+        importlib.util.find_spec("qiskit_ibm_runtime") is not None
+        and importlib.util.find_spec("qiskit_ibm_runtime.fake_provider") is not None
+    ):
+        QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME = True
+
+    if QDK_CHEMISTRY_HAS_QISKIT:
+        qiskit_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
+        qiskit_nature_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_AER:
         qiskit_aer_load()
+    if QDK_CHEMISTRY_HAS_QISKIT_IBM_RUNTIME:
+        qiskit_ibm_runtime_load()
 
 
 def qiskit_load():
@@ -44,17 +58,22 @@ def qiskit_load():
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
+        QiskitIterativeQpeCircuitBuilder,
+        QiskitStandardQpeCircuitBuilder,
+    )
     from qdk_chemistry.plugins.qiskit.regular_isometry import RegularIsometryStatePreparation  # noqa: PLC0415
-    from qdk_chemistry.plugins.qiskit.standard_phase_estimation import QiskitStandardPhaseEstimation  # noqa: PLC0415
 
     register(lambda: RegularIsometryStatePreparation())
-    register(lambda: QiskitStandardPhaseEstimation())
+    register(lambda: QiskitIterativeQpeCircuitBuilder())
+    register(lambda: QiskitStandardQpeCircuitBuilder())
     register(lambda: QiskitHadamardTest())
 
     Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
-        f"[{QiskitStandardPhaseEstimation().type_name()}: {QiskitStandardPhaseEstimation().name()}], "
+        f"[{QiskitIterativeQpeCircuitBuilder().type_name()}: {QiskitIterativeQpeCircuitBuilder().name()}], "
+        f"[{QiskitStandardQpeCircuitBuilder().type_name()}: {QiskitStandardQpeCircuitBuilder().name()}], "
         f"[{QiskitHadamardTest().type_name()}: {QiskitHadamardTest().name()}]."
     )
 
@@ -68,6 +87,15 @@ def qiskit_nature_load():
 
     register(lambda: QiskitQubitMapper())
     Logger.debug(f"Qiskit Nature plugin loaded: [{QiskitQubitMapper().type_name()}: {QiskitQubitMapper().name()}].")
+
+
+def qiskit_ibm_runtime_load():
+    """Load the Qiskit IBM Runtime fake provider into QDK/Chemistry."""
+    Logger.trace_entering()
+
+    import qiskit_ibm_runtime.fake_provider  # noqa: PLC0415
+
+    Logger.debug("Qiskit IBM Runtime fake provider loaded.")
 
 
 def qiskit_aer_load():

@@ -22,7 +22,6 @@ int main() {
   // start-cell-configure
   // Set the convergence threshold for the CI iterations
   pmc_calculator->settings().set("ci_residual_tolerance", 1.0e-6);
-  pmc_calculator->settings().set("davidson_res_tol", 1.0e-8);
   // end-cell-configure
   // --------------------------------------------------------------------------------------------
 
@@ -44,8 +43,10 @@ int main() {
 
   // Define configurations
   std::vector<Configuration> configurations = {
-      Configuration("20"),  // Ground state (both electrons in lowest orbital)
-      Configuration("02"),  // Excited state (both electrons in higher orbital)
+      Configuration::from_spin_half_string(
+          "20"),  // Ground state (both electrons in lowest orbital)
+      Configuration::from_spin_half_string(
+          "02"),  // Excited state (both electrons in higher orbital)
   };
 
   // Run the PMC calculation

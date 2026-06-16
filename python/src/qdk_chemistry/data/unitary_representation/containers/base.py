@@ -1,0 +1,110 @@
+"""QDK/Chemistry unitary container base module."""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+from abc import abstractmethod
+from typing import Any
+
+import h5py
+
+from qdk_chemistry.data.base import DataClass
+
+__all__: list[str] = ["UnitaryContainer"]
+
+
+class UnitaryContainer(DataClass):
+    """Abstract class for a unitary container."""
+
+    # Class attribute for filename validation
+    _data_type_name = "unitary_container"
+
+    # Serialization version for this class
+    _serialization_version = "0.1.0"
+
+    @property
+    @abstractmethod
+    def type(self) -> str:
+        """Get the type of the unitary container.
+
+        Returns:
+            The type of the unitary container.
+
+        """
+
+    @property
+    @abstractmethod
+    def num_qubits(self) -> int:
+        """Get the number of qubits the unitary acts on.
+
+        Returns:
+            The number of qubits.
+
+        """
+
+    @abstractmethod
+    def to_json(self) -> dict[str, Any]:
+        """Convert the UnitaryContainer to a dictionary for JSON serialization.
+
+        Returns:
+            dict: Dictionary representation of the UnitaryContainer
+
+        """
+
+    @abstractmethod
+    def to_hdf5(self, group: h5py.Group) -> None:
+        """Save the UnitaryContainer to an HDF5 group.
+
+        Args:
+            group: HDF5 group or file to write data to
+
+        """
+
+    @classmethod
+    @abstractmethod
+    def from_json(cls, json_data: dict[str, Any]) -> "UnitaryContainer":
+        """Create UnitaryContainer from a JSON dictionary.
+
+        Args:
+            json_data: Dictionary containing the serialized data
+
+        Returns:
+            UnitaryContainer
+
+        """
+
+    @classmethod
+    @abstractmethod
+    def from_hdf5(cls, group: h5py.Group) -> "UnitaryContainer":
+        """Load an instance from an HDF5 group.
+
+        Args:
+            group: HDF5 group or file to read data from
+
+        Returns:
+            UnitaryContainer
+
+        """
+
+    @abstractmethod
+    def get_summary(self) -> str:
+        """Get summary of unitary container.
+
+        Returns:
+            str: Summary string describing the UnitaryContainer's contents and properties
+
+        """
+
+    @abstractmethod
+    def combine(self, other: "UnitaryContainer") -> "UnitaryContainer":
+        """Combine this container with another to represent sequential application.
+
+        Args:
+            other: The container to append after this one.
+
+        Returns:
+            A new container representing the combined evolution.
+
+        """

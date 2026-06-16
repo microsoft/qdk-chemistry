@@ -8,6 +8,7 @@
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
 
 #include "path_utils.hpp"
 #include "property_binding_helpers.hpp"
@@ -60,7 +61,7 @@ void bind_configuration_set(pybind11::module& data) {
 
   py::class_<ConfigurationSet, DataClass, py::smart_holder> configuration_set(
       data, "ConfigurationSet", R"(
-Represents a collection of electronic configurations with associated orbital information.
+Represents a collection of configurations with associated single-particle basis information.
 
 This class manages a set of Configuration objects that share the same single-particle
 basis (specifically the active space of an Orbitals object). By storing the orbital
@@ -85,7 +86,7 @@ Examples:
     Create a ConfigurationSet from configurations and orbitals:
 
     >>> import qdk_chemistry.data as data
-    >>> configs = [data.Configuration("2200"), data.Configuration("22ud")]
+    >>> configs = [data.Configuration.from_spin_half_string("2200"), data.Configuration.from_spin_half_string("22ud")]
     >>> config_set = data.ConfigurationSet(configs, orbitals)
 
     Access configurations:
@@ -110,13 +111,15 @@ Examples:
 
   // Constructors
   configuration_set.def(
-      py::init<const std::vector<Configuration>&, std::shared_ptr<Orbitals>>(),
+      py::init<const std::vector<Configuration>&, std::shared_ptr<Orbitals>,
+               std::string>(),
       R"(
 Construct a ConfigurationSet from configurations and orbital information.
 
 Args:
     configurations (list[Configuration]): List of Configuration objects representing the active space
     orbitals (Orbitals): Orbitals object defining the single-particle basis
+    sector (str): Name of the single-particle sector the orbitals belong to
 
 Raises:
     ValueError: If configurations are inconsistent with active space or if orbitals is None
@@ -127,11 +130,12 @@ Note:
     represent the active space; inactive and virtual orbitals are not included.
 
 Examples:
-    >>> configs = [Configuration("2200"), Configuration("22ud")]
-    >>> config_set = ConfigurationSet(configs, orbitals)
+    >>> configs = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("22ud")]
+    >>> config_set = ConfigurationSet(configs, orbitals, "electrons")
 
 )",
-      py::arg("configurations"), py::arg("orbitals"));
+      py::arg("configurations"), py::arg("orbitals"),
+      py::arg("sector") = qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR);
 
   // Copy constructor
   configuration_set.def(py::init<const ConfigurationSet&>(), "Copy constructor",

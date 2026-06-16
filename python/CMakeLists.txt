@@ -16,6 +16,33 @@ else()
     message(STATUS "Project version: ${QDK_VERSION}")
 endif()
 
+# Compute full version: append +local for from-source builds not on a release tag.
+set(QDK_FULL_VERSION "${QDK_VERSION_RAW}")
+if(QDK_VERSION_RAW MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/../.git")
+        find_package(Git QUIET)
+        if(GIT_FOUND)
+            execute_process(
+                COMMAND ${GIT_EXECUTABLE} describe --tags --exact-match HEAD
+                WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/.."
+                OUTPUT_VARIABLE _GIT_TAG
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE _GIT_TAG_RESULT)
+            if(_GIT_TAG_RESULT EQUAL 0
+               AND (_GIT_TAG STREQUAL "${QDK_VERSION_RAW}" OR _GIT_TAG STREQUAL "v${QDK_VERSION_RAW}"))
+                # On a matching release tag — keep version as-is
+            else()
+                string(APPEND QDK_FULL_VERSION "+local")
+            endif()
+        else()
+            # .git exists but git not found — cannot verify tag, treat as local
+            string(APPEND QDK_FULL_VERSION "+local")
+        endif()
+    endif()
+endif()
+message(STATUS "Full version: ${QDK_FULL_VERSION}")
+
 # Re-run CMake configure when the VERSION file changes
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_VERSION_FILE}")
 
@@ -90,6 +117,11 @@ find_package(pybind11 REQUIRED)
 # Create the Python extension module
 pybind11_add_module(_core
     src/pybind11/data/data_class.cpp
+    src/pybind11/data/symmetry/symmetry.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_scalar.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_tensor.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
+    src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
     src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
     src/pybind11/data/wavefunction.cpp
@@ -102,6 +134,7 @@ pybind11_add_module(_core
     src/pybind11/data/ansatz.cpp
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/pauli_operator.cpp
+    src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
     src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp
@@ -168,7 +201,7 @@ function(find_python_module module)
 endfunction()
 
 # Set module properties
-target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
+target_compile_definitions(_core PRIVATE VERSION_INFO="${QDK_FULL_VERSION}")
 set_target_properties(_core PROPERTIES
     CXX_VISIBILITY_PRESET "hidden"
     VISIBILITY_INLINES_HIDDEN YES

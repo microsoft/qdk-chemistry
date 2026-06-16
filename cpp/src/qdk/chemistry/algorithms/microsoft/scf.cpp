@@ -10,7 +10,7 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 #ifdef _OPENMP
@@ -47,33 +47,50 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   utils::microsoft::initialize_backend();
 
   // check basis_or_guess type
+  if (basis_or_guess.valueless_by_exception()) {
+    throw std::invalid_argument(
+        "basis_or_guess is valueless due to an exception.");
+  }
   enum class BasisSetType { Explicit, FromString, FromOrbitals };
   BasisSetType basis_set_type;
 
   std::string basis_set_name;
+  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
   if (std::holds_alternative<std::shared_ptr<data::Orbitals>>(basis_or_guess)) {
-    basis_set_name = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess)
-                         ->get_basis_set()
-                         ->get_name();
+    auto orbitals = std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
+    if (!orbitals || !orbitals->get_basis_set()) {
+      throw std::invalid_argument(
+          "Orbitals initial guess must include a basis set.");
+    }
     basis_set_type = BasisSetType::FromOrbitals;
+    basis_set_name = orbitals->get_basis_set()->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = orbitals->get_basis_set();
   } else if (std::holds_alternative<std::shared_ptr<data::BasisSet>>(
                  basis_or_guess)) {
-    basis_set_name =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess)->get_name();
+    auto basis = std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
+    if (!basis) {
+      throw std::invalid_argument(
+          "Explicit BasisSet argument must not be null.");
+    }
     basis_set_type = BasisSetType::Explicit;
+    basis_set_name = basis->get_name();
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    qdk_raw_basis_set = basis;
   } else if (std::holds_alternative<std::string>(basis_or_guess)) {
-    basis_set_name = std::get<std::string>(basis_or_guess);
     basis_set_type = BasisSetType::FromString;
-  }
-  std::transform(basis_set_name.begin(), basis_set_name.end(),
-                 basis_set_name.begin(), ::tolower);
-
-  std::shared_ptr<data::BasisSet> qdk_raw_basis_set = nullptr;
-  if (basis_set_name == data::BasisSet::custom_name ||
-      basis_set_type == BasisSetType::Explicit) {
-    qdk_raw_basis_set =
-        std::get<std::shared_ptr<data::BasisSet>>(basis_or_guess);
-  } else {
+    basis_set_name = std::get<std::string>(basis_or_guess);
+    std::transform(
+        basis_set_name.begin(), basis_set_name.end(), basis_set_name.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (basis_set_name == data::BasisSet::custom_name) {
+      throw std::invalid_argument(
+          "Custom basis name requires an explicit BasisSet or Orbitals.");
+    }
     qdk_raw_basis_set =
         data::BasisSet::from_basis_name(basis_set_name, structure);
   }
@@ -295,7 +312,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
   if (basis_set_type == BasisSetType::FromOrbitals) {
     auto initial_guess =
         std::get<std::shared_ptr<data::Orbitals>>(basis_or_guess);
-    auto [coeff_alpha, coeff_beta] = initial_guess->get_coefficients();
+    const auto& coeff_alpha = initial_guess->coefficients()->block(
+        {data::axes::alpha(), data::axes::alpha()});
+    const auto& coeff_beta = initial_guess->coefficients()->block(
+        {data::axes::beta(), data::axes::beta()});
 
     // Calculate number of electrons
     auto [n_alpha, n_beta] =
@@ -308,8 +328,10 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
 
     const bool is_unrestricted =
         (ms_scf_config->scf_orbital_type == SCFOrbitalType::Unrestricted);
-    if (is_unrestricted) {
-      if (initial_guess->is_restricted())
+    const bool is_restricted_open_shell = (ms_scf_config->scf_orbital_type ==
+                                           SCFOrbitalType::RestrictedOpenShell);
+    if (is_unrestricted || is_restricted_open_shell) {
+      if (is_unrestricted && initial_guess->is_restricted())
         QDK_LOGGER().warn(
             "Unrestricted calculation requested but restricted "
             "initial guess provided.");
@@ -427,15 +449,9 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     Eigen::VectorXd energies_alpha = eps.row(0);
     Eigen::VectorXd energies_beta = eps.row(1);
 
-    // Construct orbitals with correct parameter order:
-    // (coeff_alpha, coeff_beta,
-    //  energies_alpha, energies_beta, ao_overlap,
-    //  basis_set_name, active_indices_alpha,
-    //  active_indices_beta)
-    orbitals = std::make_shared<data::Orbitals>(
-        C_alpha, C_beta, energies_alpha, energies_beta, ao_overlap,
-        qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(C_alpha, C_beta, energies_alpha,
+                                                energies_beta, ao_overlap,
+                                                qdk_raw_basis_set);
 
   } else {
     // Restricted case - store matrices first to avoid
@@ -447,12 +463,8 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     const auto& eps = scf->get_eigenvalues();
     energies = eps.row(0);
 
-    // Construct orbitals with correct parameter order:
-    // (coefficients, energies, ao_overlap, basis_set_name,
-    // active_space_indices)
-    orbitals = std::make_shared<data::Orbitals>(
-        coefficients, energies, ao_overlap, qdk_raw_basis_set,
-        std::nullopt);  // no active space indices
+    orbitals = std::make_shared<data::Orbitals>(coefficients, energies,
+                                                ao_overlap, qdk_raw_basis_set);
   }
 
   // Create canonical Hartree-Fock Configuration
@@ -471,11 +483,11 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> ScfSolver::_run_impl(
     }
   }
   // Create Configuration object
-  data::Configuration hf_det(config_str);
+  auto hf_det = data::Configuration::from_spin_half_string(config_str);
 
-  // Create SlaterDeterminantContainer
-  auto container =
-      std::make_unique<data::SlaterDeterminantContainer>(hf_det, orbitals);
+  // Create StateVectorContainer
+  auto container = std::make_unique<data::StateVectorContainer>(
+      hf_det, orbitals, "electrons");
 
   // Create Wavefunction
   data::Wavefunction wavefunction(std::move(container));

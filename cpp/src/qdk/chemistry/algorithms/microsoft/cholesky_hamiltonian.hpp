@@ -53,13 +53,12 @@ Eigen::MatrixXd build_K_from_cholesky(
 class CholeskyHamiltonianSettings : public qdk::chemistry::data::Settings {
  public:
   CholeskyHamiltonianSettings() {
-    set_default("scf_type", "auto");
     set_default("cholesky_tolerance", 1e-8);
     set_default("eri_threshold", 1e-12,
                 "ERI screening threshold for skipping negligible shell "
                 "quartets during Cholesky decomposition",
                 qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
-    set_default("store_cholesky_vectors", false);
+    set_default("store_ao_cholesky_vectors", false);
   }
   ~CholeskyHamiltonianSettings() override = default;
 };

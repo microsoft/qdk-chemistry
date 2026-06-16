@@ -165,7 +165,7 @@ orbitals = _orbitals  # alias for display
 constructor = create("hamiltonian_constructor", "qdk_cholesky")
 constructor.settings().set("cholesky_tolerance", 1e-8)
 constructor.settings().set("eri_threshold", 1e-12)
-constructor.settings().set("store_cholesky_vectors", True)
+constructor.settings().set("store_ao_cholesky_vectors", True)
 cholesky_hamiltonian = constructor.run(orbitals)
 # end-cell-cholesky
 ################################################################################

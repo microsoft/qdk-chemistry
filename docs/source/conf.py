@@ -111,6 +111,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
+    "qiskit_ibm_runtime",
     "openfermion",
     "cirq",
     "cirq_core",
@@ -185,6 +186,8 @@ nitpick_ignore_regex = [
     # C++20 concepts - Sphinx/Breathe doesn't fully support concept references yet
     (r"cpp:identifier", r"NonBoolIntegral<.*>"),
     (r"cpp:identifier", r"NonBoolIntegralVector<.*>"),
+    (r"cpp:identifier", r"HashComplexScalar<.*>"),
+    (r"cpp:identifier", r"HashSignedIntegral<.*>"),
     (r"cpp:identifier", r"NonIntegralBool"),
     (r"cpp:identifier", r"VariantMember<.*>"),
     (r"cpp:identifier", r"Vector<.*>"),
@@ -202,10 +205,17 @@ nitpick_ignore_regex = [
     (r"py:class", r"cirq.*"),
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
+    (r"py:class", r"qdk_chemistry._core\.data\.MajoranaMapping"),
+    (r"py:class", r"_CoreMajoranaMapping"),
+    (r"py:class", r"^TaperingSpecification$"),
+    (r"py:class", r"qdk_chemistry\.data\.tapering\.TaperingSpecification"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
     (r"py:class", r"^SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
+    (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
+    (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
+    (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]
 
 # Configure output for to-dos
@@ -306,6 +316,11 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
+        # Escape '*args' and '**kwargs' in pybind11 auto-generated signature
+        # lines so Sphinx/reST does not treat them as emphasis/bold markup.
+        # Negative lookbehind avoids double-escaping already-escaped instances.
+        rewritten = re.sub(r"(?<!\\)\*\*kwargs", r"\\**kwargs", rewritten)
+        rewritten = re.sub(r"(?<![\\*])\*args", r"\\*args", rewritten)
         if rewritten != line:
             lines[idx] = rewritten
     if options is not None and "._core." in name:

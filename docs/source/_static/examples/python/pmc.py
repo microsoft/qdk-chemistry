@@ -18,7 +18,6 @@ pmc_calculator = create("projected_multi_configuration_calculator", "macis_pmc")
 # start-cell-configure
 # Configure the PMC calculator using the settings interface
 pmc_calculator.settings().set("ci_residual_tolerance", 1.0e-6)
-pmc_calculator.settings().set("davidson_res_tol", 1.0e-8)
 # end-cell-configure
 ################################################################################
 
@@ -45,8 +44,12 @@ hamiltonian = ham_constructor.run(wfn.get_orbitals())
 
 # Define configurations
 configurations = [
-    Configuration("20"),  # Ground state (both electrons in lowest orbital)
-    Configuration("02"),  # Excited state (both electrons in higher orbital)
+    Configuration.from_spin_half_string(
+        "20"
+    ),  # Ground state (both electrons in lowest orbital)
+    Configuration.from_spin_half_string(
+        "02"
+    ),  # Excited state (both electrons in higher orbital)
 ]
 
 # Run the PMC calculation

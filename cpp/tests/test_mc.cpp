@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -32,8 +32,9 @@ class TestMultiConfigurationCalculator : public MultiConfigurationCalculator {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration("2000000")};
-    auto container = std::make_unique<CasWavefunctionContainer>(
+    Wavefunction::DeterminantVector dets{
+        Configuration::from_spin_half_string("2000000")};
+    auto container = std::make_unique<StateVectorContainer>(
         coeffs, dets, hamiltonian->get_orbitals());
     Wavefunction wfn(std::move(container));
     return {0.0, std::make_shared<Wavefunction>(std::move(wfn))};
@@ -306,8 +307,11 @@ TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
@@ -347,8 +351,11 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
@@ -359,4 +366,85 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
   mc->settings().set("core_selection_strategy", "fixed");
   auto [E_sci, wfn_sci] = mc->run(ham, 4, 1);
   EXPECT_NEAR(E_sci, -54.385428499370562, testing::ci_energy_tolerance);
+}
+
+/**
+ * @brief Test CAS single-determinant edge case (dets.size() == 1).
+ *
+ * Water/STO-3G with a 1-orbital active space: CAS(1,1) in orbital 4 (HOMO)
+ * with 4 inactive occupied orbitals gives C(1,1)*C(1,1) = 1 determinant,
+ * exercising the trivial diagonal branch. Energy must equal HF.
+ */
+TEST_F(MCTest, Water_STO3G_CAS_SingleDet) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+
+  // CAS(1,1) in 1 orbital: active = {4}, inactive = {0,1,2,3}
+  auto orbitals_with_active_space =
+      testing::with_active_space(wfn_HF->get_orbitals(), std::vector<size_t>{4},
+                                 std::vector<size_t>{0, 1, 2, 3});
+  auto ham = hamiltonian_constructor->run(orbitals_with_active_space);
+
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_cas");
+  auto [E_cas, wfn_cas] = mc->run(ham, 1, 1);
+  EXPECT_EQ(wfn_cas->size(), 1);
+  EXPECT_NEAR(E_cas, E_HF, testing::ci_energy_tolerance);
+}
+
+/**
+ * @brief Test CAS iterative solver path by lowering the dimension cutoff.
+ *
+ * Water/STO-3G FCI has 441 determinants, which normally hits the dense path
+ * (cutoff = 2000). Setting iterative_solver_dimension_cutoff = 10 forces
+ * the Davidson/iterative solver. The energy is checked against a fixed
+ * regression reference.
+ */
+TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
+  auto water = testing::create_water_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  auto [E_HF, wfn_HF] = scf_solver->run(water, 0, 1, "sto-3g");
+
+  auto hamiltonian_constructor =
+      qdk::chemistry::algorithms::HamiltonianConstructorFactory::create();
+  auto ham = hamiltonian_constructor->run(wfn_HF->get_orbitals());
+
+  // Force the iterative solver by setting cutoff below 441
+  auto mc =
+      qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory::create(
+          "macis_cas");
+  mc->settings().set("iterative_solver_dimension_cutoff",
+                     static_cast<int64_t>(10));
+  auto [E_fci, wfn_fci] = mc->run(ham, 5, 5);
+
+  EXPECT_NEAR(E_fci - ham->get_core_energy(), -8.301534669468e+01,
+              testing::ci_energy_tolerance);
+  EXPECT_EQ(wfn_fci->size(), 441);
+}
+
+/**
+ * @brief Verify settings defaults, overrides, and constraints for CAS.
+ */
+TEST_F(MCTest, MCSettings_DefaultsAndConstraints) {
+  auto mc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto& settings = mc->settings();
+
+  // iterative_solver_dimension_cutoff: default, override, constraint
+  EXPECT_EQ(settings.get<int64_t>("iterative_solver_dimension_cutoff"), 2000);
+  settings.set("iterative_solver_dimension_cutoff", static_cast<int64_t>(500));
+  EXPECT_EQ(settings.get<int64_t>("iterative_solver_dimension_cutoff"), 500);
+  EXPECT_THROW(settings.set("iterative_solver_dimension_cutoff",
+                            static_cast<int64_t>(0)),
+               std::invalid_argument);
+
+  // ci_matel_tol: default, override
+  EXPECT_DOUBLE_EQ(settings.get<double>("ci_matel_tol"),
+                   std::numeric_limits<double>::epsilon());
+  settings.set("ci_matel_tol", 1e-12);
+  EXPECT_DOUBLE_EQ(settings.get<double>("ci_matel_tol"), 1e-12);
 }

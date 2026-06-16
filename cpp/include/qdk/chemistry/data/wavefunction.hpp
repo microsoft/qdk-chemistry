@@ -13,6 +13,8 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
 #include <tuple>
@@ -141,7 +143,7 @@ bool is_vector_variant_complex(const ContainerTypes::VectorVariant& variant);
  */
 std::shared_ptr<ContainerTypes::VectorVariant>
 transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
-                                   int norbs);
+                                   size_t norbs);
 
 /**
  * @brief Consolidate duplicate determinants by summing their coefficients
@@ -158,6 +160,7 @@ transpose_ijkl_klij_vector_variant(const ContainerTypes::VectorVariant& variant,
 void consolidate_determinants(std::vector<Configuration>& determinants,
                               ContainerTypes::VectorVariant& coefficients,
                               double threshold = 1e-9);
+
 }  // namespace detail
 
 /**
@@ -222,9 +225,9 @@ class WavefunctionContainer {
    * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
    * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
    * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
-   * @param two_rdm_aabb Alpha-beta-alpha-beta block of 2-RDM for active
-   * orbitals (optional)
    * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
    * orbitals (optional)
    * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
    * (optional)
@@ -235,11 +238,39 @@ class WavefunctionContainer {
                         const std::optional<MatrixVariant>& one_rdm_aa,
                         const std::optional<MatrixVariant>& one_rdm_bb,
                         const std::optional<VectorVariant>& two_rdm_spin_traced,
-                        const std::optional<VectorVariant>& two_rdm_aabb,
                         const std::optional<VectorVariant>& two_rdm_aaaa,
+                        const std::optional<VectorVariant>& two_rdm_aabb,
                         const std::optional<VectorVariant>& two_rdm_bbbb,
                         const OrbitalEntropies& entropies = OrbitalEntropies{},
                         WavefunctionType type = WavefunctionType::SelfDual);
+
+  /**
+   * @brief Constructs a wavefunction container directly from preconstructed
+   *        symmetry-blocked storage for the spin-dependent active-space RDMs.
+   *
+   * Used by the serialization layer to hand reconstructed @ref
+   * SymmetryBlockedTensorVariant objects to the container without going
+   * through the per-block construction path. Any of the four shared pointers
+   * may be @c nullptr to indicate that the corresponding RDM is not stored.
+   *
+   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (may be
+   *        @c nullptr).
+   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (may be
+   *        @c nullptr).
+   * @param active_one_rdm Spin-dependent active-space 1-RDM (may be
+   *        @c nullptr).
+   * @param active_two_rdm Spin-dependent active-space 2-RDM (may be
+   *        @c nullptr).
+   * @param entropies Orbital entropy data.
+   * @param type The type of wavefunction.
+   */
+  WavefunctionContainer(
+      std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
+      std::shared_ptr<VectorVariant> two_rdm_spin_traced,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm,
+      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm,
+      const OrbitalEntropies& entropies = OrbitalEntropies{},
+      WavefunctionType type = WavefunctionType::SelfDual);
 
   virtual ~WavefunctionContainer() = default;
 
@@ -251,28 +282,48 @@ class WavefunctionContainer {
 
   /**
    * @brief Get all coefficients
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all coefficients (real or complex)
    */
-  virtual const VectorVariant& get_coefficients() const = 0;
+  virtual const VectorVariant& get_coefficients() const;
 
   /**
    * @brief Get coefficient for a specific determinant
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @param det Configuration/determinant to get coefficient for
    * @return Scalar coefficient (real or complex)
    */
-  virtual ScalarVariant get_coefficient(const Configuration& det) const = 0;
+  virtual ScalarVariant get_coefficient(const Configuration& det) const;
 
   /**
    * @brief Get all determinants in the wavefunction
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all configurations/determinants
    */
-  virtual const DeterminantVector& get_active_determinants() const = 0;
+  virtual const DeterminantVector& get_active_determinants() const;
 
   /**
    * @brief Get number of determinants
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Number of determinants in the wavefunction
    */
-  virtual size_t size() const = 0;
+  virtual size_t size() const;
 
   /**
    * @brief Calculate overlap with another wavefunction
@@ -289,28 +340,32 @@ class WavefunctionContainer {
 
   /**
    * @brief Get spin-dependent one-particle RDMs for active orbitals only
+   *
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active
-   * orbitals
+   * orbitals, constructed from the canonical symmetry-blocked tensor.
    */
-  virtual std::tuple<const MatrixVariant&, const MatrixVariant&>
+  virtual std::tuple<MatrixVariant, MatrixVariant>
   get_active_one_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs for active orbitals only
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs for active orbitals
+   *
+   * @return Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals,
+   * constructed from the canonical symmetry-blocked tensor.
    */
-  virtual std::tuple<const VectorVariant&, const VectorVariant&,
-                     const VectorVariant&>
+  virtual std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const;
 
   /**
    * @brief Get spin-traced one-particle RDM for active orbitals only
+   *
    * @return Spin-traced one-particle RDM for active orbitals
    */
   virtual const MatrixVariant& get_active_one_rdm_spin_traced() const;
 
   /**
    * @brief Get spin-traced two-particle RDM for active orbitals only
+   *
    * @return Spin-traced two-particle RDM for active orbitals
    */
   virtual const VectorVariant& get_active_two_rdm_spin_traced() const;
@@ -369,31 +424,106 @@ class WavefunctionContainer {
   virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
-   * @brief Get total number of alpha and beta electrons (active + inactive)
-   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * The block structure is induced by the single-particle basis: when the
+   * associated @ref Orbitals carry a spin (@f$S_z@f$) axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ count; when they carry no spin
+   * axis the result holds a single trivial block with the aggregate count.
+   *
+   * @return Shared pointer to the symmetry-blocked total particle count.
    */
-  virtual std::pair<size_t, size_t> get_total_num_electrons() const = 0;
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_particles() const = 0;
+
+  /**
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
+   *
+   * Blocked the same way as @ref total_num_particles; see that method for the
+   * basis-induced block structure.
+   *
+   * @return Shared pointer to the symmetry-blocked active particle count.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_particles() const = 0;
+
+  /**
+   * @brief Orbital occupations for all orbitals (total = active + inactive +
+   * virtual) as a rank-1 symmetry-blocked tensor.
+   *
+   * When the associated @ref Orbitals carry a spin axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ occupation vector; otherwise it
+   * holds a single trivial block with the spin-summed occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  total_orbital_occupations() const = 0;
+
+  /**
+   * @brief Orbital occupations for active orbitals only as a rank-1
+   * symmetry-blocked tensor.
+   *
+   * Blocked the same way as @ref total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  active_orbital_occupations() const = 0;
+
+  /**
+   * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_particles.
+   *
+   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
+   */
+  virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_particles.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
-  virtual std::pair<size_t, size_t> get_active_num_electrons() const = 0;
+  virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_total_orbital_occupations() const = 0;
+  get_total_orbital_occupations() const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_active_orbital_occupations() const = 0;
+  get_active_orbital_occupations() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
@@ -422,6 +552,85 @@ class WavefunctionContainer {
    * @return True if available
    */
   virtual bool has_two_rdm_spin_traced() const;
+
+  // ---- SymmetryBlockedTensor RDM accessors
+  // -------------------------------------------
+
+  /**
+   * @brief Active-space 1-RDM as a rank-2 symmetry-blocked tensor.
+   *
+   * The block structure (label set, per-slot extents, equivalence aliasing) is
+   * determined by the symmetries carried on the associated @ref Orbitals. The
+   * returned @ref SymmetryBlockedTensorVariant holds either the real
+   * (@c SymmetryBlockedTensor<2, double>) or complex
+   * (@c SymmetryBlockedTensor<2, std::complex<double>>) alternative depending
+   * on the scalar type of the underlying RDM.
+   *
+   * @return Const reference to the 1-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if not available.
+   */
+  virtual const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
+
+  /**
+   * @brief Active-space 1-RDM block for the given row/column symmetry labels.
+   *
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
+   * @return @ref MatrixVariant holding the requested block as either an
+   * @c Eigen::MatrixXd or an @c Eigen::MatrixXcd, matching the scalar type of
+   * the underlying RDM.
+   * @throws std::runtime_error if the 1-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
+   */
+  MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
+                                     const SymmetryLabel& col) const;
+
+  /**
+   * @brief True if the active-space 1-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   * @return @c true iff @ref active_one_rdm would succeed without throwing.
+   */
+  bool has_active_one_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM as a rank-4 symmetry-blocked tensor.
+   *
+   * The block structure is determined by the symmetries carried on the
+   * associated @ref Orbitals. The returned @ref SymmetryBlockedTensorVariant
+   * holds either the real or complex alternative depending on the scalar
+   * type of the underlying RDM.
+   *
+   * @return Const reference to the 2-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if not available.
+   */
+  virtual const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM block for the given symmetry labels.
+   *
+   * @param p First slot's symmetry label.
+   * @param q Second slot's symmetry label.
+   * @param r Third slot's symmetry label.
+   * @param s Fourth slot's symmetry label.
+   * @return @ref VectorVariant holding the requested block as either an
+   * @c Eigen::VectorXd or an @c Eigen::VectorXcd, matching the scalar type of
+   * the underlying RDM.
+   * @throws std::runtime_error if the 2-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label tuple.
+   */
+  VectorVariant active_two_rdm_block(const SymmetryLabel& p,
+                                     const SymmetryLabel& q,
+                                     const SymmetryLabel& r,
+                                     const SymmetryLabel& s) const;
+
+  /**
+   * @brief True if the active-space 2-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   * @return @c true iff @ref active_two_rdm would succeed without throwing.
+   */
+  bool has_active_two_rdm() const;
 
   /**
    * @brief Clear cached data to release memory
@@ -467,7 +676,8 @@ class WavefunctionContainer {
 
   /**
    * @brief Get container type identifier for serialization
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const = 0;
 
@@ -512,11 +722,39 @@ class WavefunctionContainer {
         "Configuration set not available for this container type");
   }
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this container spans.
+   *
+   * A sector is a named single-particle basis; every container owns its own
+   * sector-to-basis binding (see @ref sector_basis) and must report it. The
+   * current single-species containers report one electronic sector.
+   *
+   * @return Names of the container's sectors.
+   */
+  virtual std::vector<std::string> sectors() const = 0;
+
+  /**
+   * @brief Single-particle basis bound to a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if this container has no sector named @p name.
+   */
+  virtual std::shared_ptr<const Orbitals> sector_basis(
+      const std::string& name) const = 0;
+
+  /**
+   * @brief Feed identifying data into a hash context.
+   * Subclasses override to add their container-specific data.
+   */
+  virtual void hash_update(qdk::chemistry::utils::HashContext& ctx) const;
+
  protected:
   /// Wavefunction type (SelfDual or NotSelfDual)
   WavefunctionType _type;
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * @brief Check if the system uses restricted orbitals with a closed-shell
@@ -527,15 +765,66 @@ class WavefunctionContainer {
    */
   bool _is_restricted_closed_shell() const;
 
+  /**
+   * @brief Build a symmetry-blocked particle count from per-spin counts.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * aggregate count @p n_alpha + @p n_beta.
+   *
+   * @param n_alpha Number of alpha electrons.
+   * @param n_beta Number of beta electrons.
+   * @return Shared pointer to the symmetry-blocked count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  _make_particle_count(std::size_t n_alpha, std::size_t n_beta) const;
+
+  /**
+   * @brief Build symmetry-blocked orbital occupations from per-spin vectors.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * spin-summed occupations @p alpha + @p beta.
+   *
+   * @param alpha Alpha-spin occupation vector.
+   * @param beta Beta-spin occupation vector.
+   * @return Shared pointer to the symmetry-blocked occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> _make_orbital_occupations(
+      const Eigen::VectorXd& alpha, const Eigen::VectorXd& beta) const;
+
+  /**
+   * @brief Read the (alpha, beta) values of a spin-blocked scalar.
+   *
+   * @param scalar Symmetry-blocked scalar to read.
+   * @return Pair of (alpha_value, beta_value).
+   * @throws std::runtime_error if @p scalar carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<std::size_t, std::size_t> _read_spin_count(
+      const SymmetryBlockedScalar<std::size_t>& scalar);
+
+  /**
+   * @brief Read the (alpha, beta) blocks of a rank-1 spin-blocked tensor.
+   *
+   * @param tensor Symmetry-blocked rank-1 tensor to read.
+   * @return Pair of (alpha_block, beta_block).
+   * @throws std::runtime_error if @p tensor carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<Eigen::VectorXd, Eigen::VectorXd> _read_spin_occupations(
+      const SymmetryBlockedTensor<1>& tensor);
+
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
   mutable std::shared_ptr<VectorVariant> _two_rdm_spin_traced = nullptr;
-  // spin-dependent RDMs
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_aa = nullptr;
-  mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_dependent_bb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aaaa = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_aabb = nullptr;
-  mutable std::shared_ptr<VectorVariant> _two_rdm_spin_dependent_bbbb = nullptr;
+
+  // SymmetryBlockedTensor-canonical active-space RDM containers (sole storage
+  // for the spin-dependent active-space RDMs).
+  mutable std::shared_ptr<const SymmetryBlockedTensorVariant<2>>
+      _active_one_rdm;
+  mutable std::shared_ptr<const SymmetryBlockedTensorVariant<4>>
+      _active_two_rdm;
 
   // Orbital entropies
   mutable OrbitalEntropies _entropies;
@@ -544,48 +833,10 @@ class WavefunctionContainer {
   void _clear_rdms() const;
 
   /**
-   * @brief Serialize RDMs to HDF5 group if they are available
-   * @param group HDF5 group to write RDM data to
-   */
-  void _serialize_rdms_to_hdf5(H5::Group& group) const;
-
-  /**
-   * @brief Deserialize RDMs from HDF5 group
-   * @param rdm_group HDF5 group containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
-   * two_rdm_spin_traced)
-   */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_hdf5(H5::Group& rdm_group);
-
-  /**
-   * @brief Serialize RDMs to JSON if they are available
-   * @param j JSON object to add RDM data to
-   */
-  void _serialize_rdms_to_json(nlohmann::json& j) const;
-
-  /**
    * @brief Serialize single-orbital entropies and mutual information to JSON
    * @param j JSON object to add entropy data to
    */
   void _serialize_entropies_to_json(nlohmann::json& j) const;
-
-  /**
-   * @brief Deserialize RDMs from JSON
-   * @param j JSON object containing RDM data
-   * @return tuple of optional RDM variants (one_rdm_aa, one_rdm_bb,
-   * two_rdm_aabb, two_rdm_aaaa, two_rdm_bbbb, one_rdm_spin_traced,
-   * two_rdm_spin_traced)
-   */
-  static std::tuple<std::optional<MatrixVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>, std::optional<VectorVariant>,
-                    std::optional<VectorVariant>, std::optional<MatrixVariant>,
-                    std::optional<VectorVariant>>
-  _deserialize_rdms_from_json(const nlohmann::json& j);
 };
 
 /**
@@ -599,6 +850,9 @@ class WavefunctionContainer {
 class Wavefunction : public DataClass,
                      public std::enable_shared_from_this<Wavefunction> {
  public:
+  /// Sentinel sector name for single-species wavefunctions.
+  static constexpr const char* DEFAULT_SECTOR = "__default__";
+
   /**
    * @brief Get the data type name for this class
    * @return "wavefunction"
@@ -621,8 +875,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Construct wavefunction with container (orbitals are stored in
-   * container)
-   * @param container Wavefunction container implementation
+   * container).
+   * @param container Wavefunction container implementation.
    */
   Wavefunction(std::unique_ptr<WavefunctionContainer> container);
 
@@ -656,7 +910,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const;
 
@@ -685,29 +940,137 @@ class Wavefunction : public DataClass,
     return dynamic_cast<const T*>(_container.get()) != nullptr;
   }
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this wavefunction spans.
+   *
+   * A sector is a named single-particle basis; the sector inherits that
+   * basis's single-particle symmetries (see @ref sector_symmetries). Sectors
+   * are owned by the underlying container (which binds each name to a basis);
+   * these accessors surface that binding. The current single-species data
+   * model reports the sole @ref Wavefunction::DEFAULT_SECTOR.
+   *
+   * @return Names of the wavefunction's sectors.
+   */
+  std::vector<std::string> sectors() const;
+
+  /**
+   * @brief Whether a sector with the given name is present.
+   * @param name Sector name to look up.
+   * @return @c true iff the container binds a basis under @p name.
+   */
+  bool has_sector(const std::string& name) const;
+
+  /**
+   * @brief Single-particle basis associated with a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const Orbitals> sector_basis(const std::string& name) const;
+
+  /**
+   * @brief Single-particle symmetries inherited from a sector's basis.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref SymmetryProduct of the sector's basis.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const SymmetryProduct> sector_symmetries(
+      const std::string& name) const;
+
+  /**
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_num_particles.
+   *
+   * @return Shared pointer to the symmetry-blocked total particle count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_particles() const;
+
+  /**
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_num_particles.
+   *
+   * @return Shared pointer to the symmetry-blocked active particle count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_particles() const;
+
+  /**
+   * @brief Orbital occupations for all orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
+      const;
+
+  /**
+   * @brief Orbital occupations for active orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
+      const;
+
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_particles.
+   *
    * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_particles.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
       const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
       const;
@@ -795,7 +1158,7 @@ class Wavefunction : public DataClass,
    *
    * Creates a new wavefunction containing only the top N determinants
    * ranked by absolute coefficient value, with coefficients renormalized.
-   * The resulting wavefunction uses a SciWavefunctionContainer.
+   * The resulting wavefunction uses a StateVectorContainer.
    *
    * @param max_determinants Maximum number of determinants to keep.
    *        If nullopt, returns a copy with all determinants, with
@@ -823,14 +1186,14 @@ class Wavefunction : public DataClass,
    * @brief Get spin-dependent one-particle RDMs
    * @return Tuple of (alpha-alpha, beta-beta) one-particle RDMs
    */
-  std::tuple<const MatrixVariant&, const MatrixVariant&>
-  get_active_one_rdm_spin_dependent() const;
+  std::tuple<MatrixVariant, MatrixVariant> get_active_one_rdm_spin_dependent()
+      const;
 
   /**
    * @brief Get spin-dependent two-particle RDMs
-   * @return Tuple of (aabb, aaaa, bbbb) two-particle RDMs
+   * @return Tuple of (aaaa, aabb, bbbb) two-particle RDMs
    */
-  std::tuple<const VectorVariant&, const VectorVariant&, const VectorVariant&>
+  std::tuple<VectorVariant, VectorVariant, VectorVariant>
   get_active_two_rdm_spin_dependent() const;
 
   /**
@@ -844,6 +1207,82 @@ class Wavefunction : public DataClass,
    * @return Spin-traced two-particle RDM
    */
   const VectorVariant& get_active_two_rdm_spin_traced() const;
+
+  // ---- SymmetryBlockedTensor RDM accessors --------------------------------
+
+  /**
+   * @brief Active-space 1-RDM as a rank-2 symmetry-blocked tensor variant
+   * (real or complex).
+   *
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_one_rdm.
+   *
+   * @return Const reference to the 1-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if the 1-RDM is not available.
+   */
+  const SymmetryBlockedTensorVariant<2>& active_one_rdm() const;
+
+  /**
+   * @brief Active-space 1-RDM block for the given row/column symmetry labels.
+   *
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_one_rdm_block.
+   *
+   * @param row Row-slot symmetry label.
+   * @param col Column-slot symmetry label.
+   * @return @ref MatrixVariant holding the requested block.
+   * @throws std::runtime_error if the 1-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label pair.
+   */
+  MatrixVariant active_one_rdm_block(const SymmetryLabel& row,
+                                     const SymmetryLabel& col) const;
+
+  /**
+   * @brief True if the active-space 1-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   * @return @c true iff @ref active_one_rdm would succeed without throwing.
+   */
+  bool has_active_one_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM as a rank-4 symmetry-blocked tensor variant
+   * (real or complex).
+   *
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_two_rdm.
+   *
+   * @return Const reference to the 2-RDM symmetry-blocked tensor variant.
+   * @throws std::runtime_error if the 2-RDM is not available.
+   */
+  const SymmetryBlockedTensorVariant<4>& active_two_rdm() const;
+
+  /**
+   * @brief Active-space 2-RDM block for the given symmetry labels.
+   *
+   * Forwards to the underlying container's
+   * @ref WavefunctionContainer::active_two_rdm_block.
+   *
+   * @param p First slot's symmetry label.
+   * @param q Second slot's symmetry label.
+   * @param r Third slot's symmetry label.
+   * @param s Fourth slot's symmetry label.
+   * @return @ref VectorVariant holding the requested block.
+   * @throws std::runtime_error if the 2-RDM is not available.
+   * @throws std::invalid_argument if no block is stored for the requested
+   *         label tuple.
+   */
+  VectorVariant active_two_rdm_block(const SymmetryLabel& p,
+                                     const SymmetryLabel& q,
+                                     const SymmetryLabel& r,
+                                     const SymmetryLabel& s) const;
+
+  /**
+   * @brief True if the active-space 2-RDM symmetry-blocked tensor is
+   * available (real or complex).
+   * @return @c true iff @ref active_two_rdm would succeed without throwing.
+   */
+  bool has_active_two_rdm() const;
 
   /**
    * @brief Checks if single-orbital entropies for active orbitals are available
@@ -1004,11 +1443,13 @@ class Wavefunction : public DataClass,
   bool is_complex() const;
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Container holding the wavefunction implementation
   std::unique_ptr<const WavefunctionContainer> _container;
 
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
 
   /**
    * @brief Clear cached data to release memory

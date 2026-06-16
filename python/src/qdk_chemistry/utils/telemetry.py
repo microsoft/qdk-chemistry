@@ -43,7 +43,7 @@ try:
 except PackageNotFoundError:
     # Package is not installed (e.g. running from source tree).
     # Use a dev sentinel - telemetry does not require the real version.
-    QDK_CHEMISTRY_VERSION = "0.0.0.dev0"
+    QDK_CHEMISTRY_VERSION = "0.0.0+local"
 
 if sys.version_info >= (3, 11):
     from datetime import UTC
@@ -68,7 +68,9 @@ TELEMETRY_ENABLED = (
     else (
         False
         if QSHARP_PYTHON_TELEMETRY in ["0", "false", "disabled", "none"]
-        else ("dev" not in QDK_CHEMISTRY_VERSION)  # Auto-disable for dev builds
+        else (
+            "dev" not in QDK_CHEMISTRY_VERSION and "+local" not in QDK_CHEMISTRY_VERSION
+        )  # Auto-disable for dev/local builds
     )
 )
 

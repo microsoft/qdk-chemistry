@@ -5,12 +5,16 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_index_set.hpp>
+#include <unordered_map>
 #include <vector>
 
 namespace testing {
@@ -55,6 +59,35 @@ inline static constexpr double small_value_upper_bound_tolerance = 1e-14;
 inline static constexpr double integral_tolerance = 1e-13;
 
 using namespace qdk::chemistry::data;
+
+inline std::shared_ptr<const SymmetryProduct> spin_symmetry(
+    bool equivalent = true) {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, equivalent)}));
+}
+
+inline std::shared_ptr<const SymmetryBlockedIndexSet> spin_index_set(
+    size_t num_modes, const std::vector<size_t>& alpha,
+    const std::vector<size_t>& beta, bool equivalent = true) {
+  std::unordered_map<SymmetryLabel, size_t> extents{{axes::alpha(), num_modes},
+                                                    {axes::beta(), num_modes}};
+  std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>> indices{
+      {axes::alpha(), std::vector<std::uint32_t>(alpha.begin(), alpha.end())},
+      {axes::beta(), std::vector<std::uint32_t>(beta.begin(), beta.end())}};
+  return std::make_shared<const SymmetryBlockedIndexSet>(
+      spin_symmetry(equivalent), extents, std::move(indices));
+}
+
+inline std::shared_ptr<const SymmetryBlockedIndexSet> restricted_index_set(
+    size_t num_modes, const std::vector<size_t>& indices) {
+  return spin_index_set(num_modes, indices, indices, true);
+}
+
+inline std::shared_ptr<const SymmetryBlockedIndexSet> unrestricted_index_set(
+    size_t num_modes, const std::vector<size_t>& alpha,
+    const std::vector<size_t>& beta) {
+  return spin_index_set(num_modes, alpha, beta, false);
+}
 
 /**
  * @brief Creates a random basis set with specified number of atomic orbitals
@@ -127,14 +160,13 @@ inline std::shared_ptr<Orbitals> create_test_orbitals(int n_basis = 3,
 
   if (restricted) {
     return std::make_shared<Orbitals>(coeffs, std::nullopt, std::nullopt,
-                                      basis_set, std::nullopt);
+                                      basis_set);
   } else {
     Eigen::MatrixXd coeffs_beta(n_basis, n_orbitals);
     coeffs_beta.setRandom();
 
     return std::make_shared<Orbitals>(coeffs, coeffs_beta, std::nullopt,
-                                      std::nullopt, std::nullopt, basis_set,
-                                      std::nullopt);
+                                      std::nullopt, std::nullopt, basis_set);
   }
 }
 
@@ -151,8 +183,8 @@ inline Orbitals create_test_orbitals_with_properties(int n_basis = 3,
 
   auto basis_set = create_random_basis_set(n_basis);
 
-  return Orbitals(coeffs, std::make_optional(energies), std::nullopt, basis_set,
-                  std::nullopt);
+  return Orbitals(coeffs, std::make_optional(energies), std::nullopt,
+                  basis_set);
 }
 
 /**
@@ -188,14 +220,16 @@ inline std::shared_ptr<Orbitals> with_active_space(
   if (existing->is_restricted()) {
     return std::make_shared<Orbitals>(
         alpha_coeffs, alpha_energies, ao_overlap, basis_set,
-        std::make_tuple(std::move(active_indices),
-                        std::move(inactive_indices)));
+        restricted_index_set(alpha_coeffs.cols(), active_indices),
+        restricted_index_set(alpha_coeffs.cols(), inactive_indices));
   } else {
     return std::make_shared<Orbitals>(
         alpha_coeffs, beta_coeffs, alpha_energies, beta_energies, ao_overlap,
         basis_set,
-        std::make_tuple(active_indices,  // Same for alpha/beta
-                        active_indices, inactive_indices, inactive_indices));
+        unrestricted_index_set(alpha_coeffs.cols(), active_indices,
+                               active_indices),
+        unrestricted_index_set(alpha_coeffs.cols(), inactive_indices,
+                               inactive_indices));
   }
 }
 
