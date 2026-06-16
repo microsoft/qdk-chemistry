@@ -642,12 +642,21 @@ TEST_F(LatticeGraphTest, Permute) {
   auto sq = LatticeGraph::square(3, 2, false, false);
   ASSERT_TRUE(sq.edge_coloring().has_value());
 
-  // Define a permutation path: e.g., [0, 3, 4, 1, 2, 5]
-  std::vector<std::uint64_t> path = {0, 3, 4, 1, 2, 5};
+  // Define a permutation path that is not an involution:
+  std::vector<std::uint64_t> path = {1, 2, 0, 4, 5, 3};
   auto permuted = LatticeGraph::permute(sq, path);
 
   EXPECT_EQ(permuted.num_sites(), sq.num_sites());
   EXPECT_EQ(permuted.num_edges(), sq.num_edges());
+
+  // Verify that new vertex i corresponds to old vertex path[i] (locks down
+  // permutation direction)
+  for (std::uint64_t i = 0; i < 6; ++i) {
+    for (std::uint64_t j = i + 1; j < 6; ++j) {
+      EXPECT_EQ(permuted.are_connected(i, j),
+                sq.are_connected(path[i], path[j]));
+    }
+  }
 
   // Inverse permutation mapping for checking:
   // inv_p[old_site] = new_site

@@ -203,8 +203,9 @@ class TestVerstraeteCiracMapping:
             for pauli_str, coeff in zip(qh_vc.pauli_strings, qh_vc.coefficients, strict=False):
                 if pauli_str == "I" * len(pauli_str):
                     continue
-                # Skip stabilizer penalty terms (which have coefficient >= 9.0,
-                # whereas nearest-neighbor hops have coefficient <= 1.0)
+                # Skip stabilizer penalty terms. Physical hops have a coefficient of t/2 (0.5 here).
+                # Stabilizer penalty terms are scaled by lambda = 1.0 + ||h_1||_1, which sums all hop
+                # amplitudes and yields >= 17.0 for L >= 2. A threshold of 2.0 (2.0*t) cleanly splits them.
                 if np.abs(coeff) > 2.0:
                     continue
                 # Weight is the number of non-I characters
