@@ -53,11 +53,15 @@ if(NOT lapackpp_FOUND )
     # config.h to skip #include <complex>. Force-include it.
     target_compile_options( lapackpp PRIVATE /FIcomplex )
 
-    # Suppress all warnings from third-party blaspp/lapackpp (clang-cl)
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-      target_compile_options( blaspp   PRIVATE -w )
-      target_compile_options( lapackpp PRIVATE -w )
-    endif()
+    # Suppress warnings in upstream blaspp/lapackpp sources
+    # /wd4100 unreferenced formal parameter
+    # /wd4101 unreferenced local variable
+    # /wd4242 conversion with possible loss of data
+    # /wd4244 conversion with possible loss of data
+    # /wd4267 conversion with possible loss of data
+    set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4100 /wd4101 /wd4242 /wd4244 /wd4267)
+    target_compile_options(blaspp   PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+    target_compile_options(lapackpp PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
   endif()
 endif()
 

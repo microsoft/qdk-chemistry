@@ -69,12 +69,6 @@ if(MSVC AND TARGET libint2_cxx)
   # uses Boost.Preprocessor macros that require correct expansion order (the
   # legacy preprocessor concatenates tokens incorrectly). Available since VS 2019 16.5.
   target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
-  # Suppress warnings in auto-generated libint2 headers included by consumers.
-  target_compile_options(libint2_cxx INTERFACE /wd4100 /wd4701 /wd4703)
-endif()
-if(MSVC AND TARGET libint2)
-  # Suppress warnings in auto-generated libint2 compiled sources.
-  target_compile_options(libint2 PRIVATE /wd4100 /wd4101)
 endif()
 
 # ecpint for ECP-related integral evaluation
@@ -97,10 +91,7 @@ handle_dependency(ecpint
   ${_ecpint_patch_args}
   REQUIRED
 )
-if(MSVC AND TARGET ecpint)
-  # Suppress warnings in upstream ecpint sources.
-  target_compile_options(ecpint PRIVATE /wd4100 /wd4101)
-endif()
+
 
 # gauxc for XC evaluation
 set(EXCHCXX_ENABLE_LIBXC OFF CACHE BOOL "Enable LibXC Support"         FORCE)
@@ -119,22 +110,38 @@ endif()
 
 handle_dependency(gauxc
   GIT_REPOSITORY https://github.com/lorisercole/gauxc.git
-  GIT_TAG e8494a52c457483ad11670e6b234873a1a06dc05
+  GIT_TAG 9bae9a439334da23a2a5685f88ca9761c81dbbdf
   BUILD_TARGET gauxc::gauxc
   INSTALL_TARGET gauxc::gauxc
   ${DEPENDENCY_BUILD_FLAGS}
   REQUIRED
 )
-if(MSVC)
-  # blaspp and lapackpp are fetched transitively by gauxc.
-  if(TARGET blaspp)
-    target_compile_options(blaspp PRIVATE /wd4100 /wd4244)
-  endif()
-  if(TARGET lapackpp)
-    target_compile_options(lapackpp PRIVATE /wd4100 /wd4244)
-  endif()
-endif()
 
 # Restore previous settings
 set(CMAKE_WARN_DEPRECATED ${_old_warn_deprecated} CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS ${_old_suppress_dev} CACHE BOOL "" FORCE)
+
+if(MSVC)
+  # Suppress warnings in upstream ecpint/libint2 sources
+  # /wd4018 signed/unsigned mismatch
+  # /wd4068 unknown pragma
+  # /wd4100 unreferenced formal parameter
+  # /wd4101 unreferenced local variable
+  # /wd4242 conversion with possible loss of data
+  # /wd4244 conversion with possible loss of data
+  # /wd4245 conversion, signed/unsigned mismatch
+  # /wd4267 conversion with possible loss of data
+  # /wd4389 signed/unsigned mismatch
+  # /wd4701 potentially uninitialized local variable used
+  # /wd4703 potentially uninitialized local pointer variable used
+  set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4018 /wd4100 /wd4101 /wd4242 /wd4244 /wd4245 /wd4267 /wd4389 /wd4701 /wd4703)
+  target_compile_options(ecpint      PRIVATE   ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  # ecpint also builds a `generate` executable at build time for code generation
+  if(TARGET generate)
+    target_compile_options(generate PRIVATE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  endif()
+  # libint2 is a wrapper around $<TARGET_OBJECTS:libint2_obj>; the OBJECT
+  # library libint2_obj is what actually compiles the auto-generated sources.
+  target_compile_options(libint2_cxx INTERFACE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  target_compile_options(libint2_obj PRIVATE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+endif()

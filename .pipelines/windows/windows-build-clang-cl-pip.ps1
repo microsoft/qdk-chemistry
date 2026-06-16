@@ -350,7 +350,7 @@ if (-not $SkipTests) {
         .\venv\Scripts\activate
     }
 
-    $env:OMP_NUM_THREADS = 2
+    $env:OMP_NUM_THREADS = 4
     pytest -v --tb=short
     $pytestExit = $LASTEXITCODE
     Pop-Location
