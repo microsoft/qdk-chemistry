@@ -148,7 +148,7 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                Py${{ py }}:
+                Py${{ replace(py, '.', '_') }}:
                   pythonVersion: ${{ py }}
             maxParallel: 5
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
