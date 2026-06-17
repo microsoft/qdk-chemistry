@@ -26,7 +26,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         bzip2-devel \
         cmake \
         curl \
-        eigen3 \
         fmt-devel \
         gcc \
         gcc-c++ \
@@ -53,6 +52,15 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         xz-devel \
         zlib-devel
     cmake --version
+
+    # Eigen3 is not packaged in Azure Linux 3; install headers from source
+    echo "Installing Eigen3 headers..."
+    EIGEN_VERSION=3.4.0
+    wget -q https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz
+    tar -xzf eigen-${EIGEN_VERSION}.tar.gz
+    cmake -S eigen-${EIGEN_VERSION} -B eigen-${EIGEN_VERSION}/build -DCMAKE_INSTALL_PREFIX=/usr/local
+    $SUDO cmake --install eigen-${EIGEN_VERSION}/build
+    rm -rf eigen-${EIGEN_VERSION} eigen-${EIGEN_VERSION}.tar.gz
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
