@@ -76,11 +76,12 @@ class StatePreparation(Algorithm):
             wavefunction: The target wavefunction.
 
         Returns:
-            tuple of (bitstrings, coefficients, n_qubits, n_determinants):
-                - bitstrings: list of little-endian binary strings
-                - coefficients: numpy array of CI coefficients
-                - n_qubits: number of qubits (length of each bitstring)
-                - n_determinants: number of determinants
+            A 4-tuple ``(bitstrings, coefficients, n_qubits, n_determinants)``:
+
+            - ``bitstrings``: list of little-endian binary strings
+            - ``coefficients``: numpy array of CI coefficients
+            - ``n_qubits``: number of qubits (length of each bitstring)
+            - ``n_determinants``: number of determinants
 
         Raises:
             ValueError: If wavefunction has no active determinants.

@@ -136,7 +136,9 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int, tolerance: float) -> Wavefunction:
+    def _build_prepare(
+        qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int, tolerance: float
+    ) -> Wavefunction:
         """Compute the prepare wavefunction from Hamiltonian coefficients.
 
         Normalizes the absolute Hamiltonian coefficients by the L1 norm and
@@ -150,7 +152,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
                 this threshold.
 
         Returns:
-            Wavefunction: A wavefunction over the ancilla register whose amplitudes encode 
+            Wavefunction: A wavefunction over the ancilla register whose amplitudes encode
             the normalized coefficients of the Hamiltonian.
 
         """
