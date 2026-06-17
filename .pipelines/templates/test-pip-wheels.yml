@@ -19,8 +19,9 @@ steps:
       export QSHARP_PYTHON_TELEMETRY=false
       export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
-      sudo -E bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
+      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
+    target: linux_build_container
     displayName: Test wheel (Linux)
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
