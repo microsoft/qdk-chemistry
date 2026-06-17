@@ -57,7 +57,7 @@ def qiskit_load():
     Logger.trace_entering()
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
-    from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTest  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTestCircuitBuilder  # noqa: PLC0415
     from qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
         QiskitIterativeQpeCircuitBuilder,
         QiskitStandardQpeCircuitBuilder,
@@ -67,14 +67,14 @@ def qiskit_load():
     register(lambda: RegularIsometryStatePreparation())
     register(lambda: QiskitIterativeQpeCircuitBuilder())
     register(lambda: QiskitStandardQpeCircuitBuilder())
-    register(lambda: QiskitHadamardTest())
+    register(lambda: QiskitHadamardTestCircuitBuilder())
 
     Logger.debug(
         "Qiskit plugins loaded: "
         f"[{RegularIsometryStatePreparation().type_name()}: {RegularIsometryStatePreparation().name()}], "
         f"[{QiskitIterativeQpeCircuitBuilder().type_name()}: {QiskitIterativeQpeCircuitBuilder().name()}], "
         f"[{QiskitStandardQpeCircuitBuilder().type_name()}: {QiskitStandardQpeCircuitBuilder().name()}], "
-        f"[{QiskitHadamardTest().type_name()}: {QiskitHadamardTest().name()}]."
+        f"[{QiskitHadamardTestCircuitBuilder().type_name()}: {QiskitHadamardTestCircuitBuilder().name()}]."
     )
 
 

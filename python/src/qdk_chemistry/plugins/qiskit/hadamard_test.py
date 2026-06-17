@@ -1,27 +1,28 @@
-"""Qiskit Hadamard test generator implementation."""
+"""Qiskit Hadamard test circuit builder implementation."""
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.hadamard_test.base import HadamardTest, HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
+from qdk_chemistry.algorithms.hadamard_test.circuit_builder.base import HadamardTestCircuitBuilder
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.utils import Logger
 
-__all__: list[str] = ["QiskitHadamardTest"]
+__all__: list[str] = ["QiskitHadamardTestCircuitBuilder"]
 
 
-class QiskitHadamardTest(HadamardTest):
-    """Hadamard test circuit generator based on Qiskit framework."""
+class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
+    """Hadamard test circuit builder based on the Qiskit framework."""
 
     def __init__(
         self,
     ):
-        """Initialize QiskitHadamardTest."""
+        """Initialize QiskitHadamardTestCircuitBuilder."""
         Logger.trace_entering()
         super().__init__()
 
-    def _build_hadamard_test_circuit(
+    def _run_impl(
         self,
         state_preparation_circuit: Circuit,
         num_system_qubits: int,
@@ -52,7 +53,8 @@ class QiskitHadamardTest(HadamardTest):
             from qiskit import ClassicalRegister, QuantumCircuit, QuantumRegister, qasm3  # noqa: PLC0415
         except ModuleNotFoundError as err:
             raise ModuleNotFoundError(
-                "Qiskit is required to use QiskitHadamardTest. Install qiskit or use QdkHadamardTest."
+                "Qiskit is required to use QiskitHadamardTestCircuitBuilder. "
+                "Install qiskit or use QdkHadamardTestCircuitBuilder."
             ) from err
 
         # Build the base circuit with registers.
@@ -70,7 +72,9 @@ class QiskitHadamardTest(HadamardTest):
         try:
             state_prep_qc = state_preparation_circuit.get_qiskit_circuit()
         except (AttributeError, RuntimeError) as err:
-            raise ValueError("Input state_preparation_circuit cannot be used for QiskitHadamardTest.") from err
+            raise ValueError(
+                "Input state_preparation_circuit cannot be used for QiskitHadamardTestCircuitBuilder."
+            ) from err
         circuit.append(state_prep_qc.to_gate(), system_target)
 
         # Prepare ancilla and apply controlled time evolution.
@@ -84,7 +88,9 @@ class QiskitHadamardTest(HadamardTest):
         try:
             ctrl_evol_qc = ctrl_time_evol_unitary_circuit.get_qiskit_circuit()
         except (AttributeError, RuntimeError) as err:
-            raise ValueError("Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardTest.") from err
+            raise ValueError(
+                "Input ctrl_time_evol_unitary_circuit cannot be used for QiskitHadamardTestCircuitBuilder."
+            ) from err
         circuit.append(ctrl_evol_qc.to_gate(), [control, *target_qubits])
 
         # Final basis rotation and measurement on the control qubit.
@@ -103,5 +109,5 @@ class QiskitHadamardTest(HadamardTest):
         return Circuit(qasm=qasm3.dumps(circuit))
 
     def name(self) -> str:
-        """Return the name of the QiskitHadamardTest algorithm."""
-        return "qiskit_hadamard_test"
+        """Return the name of the QiskitHadamardTestCircuitBuilder algorithm."""
+        return "qiskit_circuit_builder"

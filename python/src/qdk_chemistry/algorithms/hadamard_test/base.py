@@ -4,7 +4,6 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-from abc import abstractmethod
 from enum import Enum
 from typing import Any
 
@@ -51,16 +50,21 @@ def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
 
 
 class HadamardTestSettings(Settings):
-    """Settings for the Phase Estimation algorithm."""
+    """Settings for the Hadamard test algorithm."""
 
     def __init__(self):
-        """Initialize the settings for Hadamard Test.
+        """Initialize the settings for the Hadamard test.
 
-        Includes nested algorithm references for the controlled circuit mapper
-        and circuit executor.
+        Includes nested algorithm references for the circuit builder,
+        the controlled circuit mapper and the circuit executor.
 
         """
         super().__init__()
+        self._set_default(
+            "circuit_builder",
+            "algorithm_ref",
+            AlgorithmRef("hadamard_test_circuit_builder", "qdk_circuit_builder"),
+        )
         self._set_default(
             "controlled_circuit_mapper",
             "algorithm_ref",
@@ -74,7 +78,14 @@ class HadamardTestSettings(Settings):
 
 
 class HadamardTest(Algorithm):
-    """Abstract base class for Hadamard test generators."""
+    """Hadamard test generator.
+
+    Orchestrates the backend-agnostic Hadamard test workflow: it validates the
+    inputs, builds the controlled evolution circuit via the nested
+    ``controlled_circuit_mapper``, delegates the backend-specific circuit
+    construction to the nested ``hadamard_test_circuit_builder``, and executes
+    the resulting circuit with the nested ``circuit_executor``.
+    """
 
     def __init__(self):
         """Initialize a Hadamard test generator."""
@@ -126,7 +137,9 @@ class HadamardTest(Algorithm):
 
         ctrl_time_evol_unitary_circuit = mapper.run(controlled_unitary=controlled_evolution)
 
-        circuit = self._build_hadamard_test_circuit(
+        circuit_builder = self._create_nested("circuit_builder")
+
+        circuit = circuit_builder.run(
             state_preparation_circuit,
             num_system_qubits,
             ctrl_time_evol_unitary_circuit,
@@ -138,31 +151,9 @@ class HadamardTest(Algorithm):
 
         return circuit_executor.run(circuit, shots=shots)
 
-    @abstractmethod
-    def _build_hadamard_test_circuit(
-        self,
-        state_preparation_circuit: Circuit,
-        num_system_qubits: int,
-        ctrl_time_evol_unitary_circuit: Circuit,
-        test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
-    ) -> Circuit:
-        r"""Build the Hadamard test circuit for a given state and controlled unitary.
-
-        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
-
-        Args:
-            state_preparation_circuit: Circuit that prepares the trial state on system qubits.
-            num_system_qubits: Number of qubits in the system register.
-            ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
-
-        Returns:
-            Circuit representing the Hadamard test workflow for the selected backend.
-
-        """
+    def name(self) -> str:
+        """Return the name of the Hadamard test algorithm."""
+        return "qdk_hadamard_test"
 
 
 class HadamardTestFactory(AlgorithmFactory):
