@@ -13,7 +13,7 @@ from qdk import qsharp
 
 from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
-from qdk_chemistry.data import CasWavefunctionContainer, Circuit, Configuration, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -71,14 +71,13 @@ def _build_expected_statevector(
 ) -> np.ndarray:
     """Build a normalized expected statevector in Q# big-endian ordering.
 
-    Converts determinants to bitstrings in the JW little-endian convention,
+    Converts spin-½ determinants to JW little-endian bitstrings,
     then reverses each bitstring to match Q#'s big-endian dump_machine output.
     """
     n_qubits = 2 * num_orbitals
     expected = np.zeros(2**n_qubits, dtype=complex)
     for coeff, det in zip(coeffs, dets, strict=True):
         alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-        # JW little-endian bitstring
         le_bitstring = beta_str[::-1] + alpha_str[::-1]
         # Reverse for Q# big-endian
         be_bitstring = le_bitstring[::-1]
@@ -136,7 +135,7 @@ class TestDensePureStatePreparation:
         actual_sv = _run_state_prep_and_dump(circuit)
 
         coeffs = np.array([-0.9837947571031265, 0.17929828748875612])
-        dets = [Configuration("2200"), Configuration("2020")]
+        dets = [Configuration.from_spin_half_string("2200"), Configuration.from_spin_half_string("2020")]
         expected = _build_expected_statevector(coeffs, dets, num_orbitals=4)
 
         # Compare up to global phase: |<actual|expected>| should be 1
@@ -156,8 +155,38 @@ class TestDensePureStatePreparation:
         actual_sv = _run_state_prep_and_dump(circuit)
 
         coeffs = np.array([-0.9731147049456421, 0.22612369393111892, 0.04377037881377919])
-        dets = [Configuration("222220"), Configuration("220222"), Configuration("222202")]
+        dets = [
+            Configuration.from_spin_half_string("222220"),
+            Configuration.from_spin_half_string("220222"),
+            Configuration.from_spin_half_string("222202"),
+        ]
         expected = _build_expected_statevector(coeffs, dets, num_orbitals=6)
+
+        fidelity = abs(np.dot(np.conj(actual_sv), expected))
+        assert np.isclose(fidelity, 1.0, atol=1e-6)
+
+    def test_config_from_bitstring(self):
+        """Verify state preparation for configurations created from bitstrings."""
+        test_orbitals = create_test_orbitals(2)
+        det = Configuration.from_bitstring("11")
+        dets = [det]
+        coeffs = [1.0]
+
+        container = StateVectorContainer(coeffs, dets, test_orbitals)
+        wavefunction = Wavefunction(container)
+
+        prep = DensePureStatePreparation()
+        circuit = prep.run(wavefunction)
+        actual_sv = _run_state_prep_and_dump(circuit)
+
+        # Build expected statevector for 1-bit-per-mode config.
+        # Convert little-endian bitstring to Q# big-endian for dump_machine comparison.
+        num_modes = test_orbitals.num_modes()
+        bitstring_le = det.to_string()[:num_modes][::-1]
+        bitstring_be = bitstring_le[::-1]
+        n_qubits = len(bitstring_le)
+        expected = np.zeros(2**n_qubits, dtype=complex)
+        expected[int(bitstring_be, 2)] = 1.0
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
@@ -165,8 +194,11 @@ class TestDensePureStatePreparation:
     def test_single_determinant(self):
         """Verify state preparation for a single-determinant wavefunction."""
         test_orbitals = create_test_orbitals(2)
-        det = Configuration("du00")
-        container = CasWavefunctionContainer([1.0], [det], test_orbitals)
+        det = Configuration.from_spin_half_string("du00")
+        dets = [det]
+        coeffs = [1.0]
+
+        container = StateVectorContainer(coeffs, dets, test_orbitals)
         wavefunction = Wavefunction(container)
 
         prep = DensePureStatePreparation()

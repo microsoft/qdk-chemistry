@@ -18,11 +18,17 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
     HamiltonianUnitaryBuilderSettings,
 )
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import (
+    Configuration,
+    ModelOrbitals,
+    QubitHamiltonian,
+    StateVectorContainer,
+    UnitaryRepresentation,
+    Wavefunction,
+)
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
     ControlledOperation,
     LCUContainer,
-    Prepare,
     Select,
 )
 
@@ -115,14 +121,14 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
 
         coefficients = qubit_hamiltonian.coefficients
         num_terms = len(coefficients)
-        num_prepare_qubits = int(np.ceil(np.log2(num_terms)))
+        num_prepare_ancillas = int(np.ceil(np.log2(num_terms)))
 
-        prepare = self._build_prepare(qubit_hamiltonian, num_prepare_qubits, self._settings.get("tolerance"))
-        select = self._build_select(qubit_hamiltonian, num_prepare_qubits)
+        prepare_wfn = self._build_prepare(qubit_hamiltonian, num_prepare_ancillas, self._settings.get("tolerance"))
+        select = self._build_select(qubit_hamiltonian, num_prepare_ancillas)
 
         container = LCUContainer(
             power=power,
-            prepare=prepare,
+            prepare=prepare_wfn,
             select=select,
             quantum_walk=quantum_walk,
         )
@@ -130,20 +136,22 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int, tolerance: float) -> Prepare:
-        """Compute the PREPARE statevector from Hamiltonian coefficients.
+    def _build_prepare(qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int, tolerance: float) -> Wavefunction:
+        """Compute the prepare wavefunction from Hamiltonian coefficients.
 
         Normalizes the absolute Hamiltonian coefficients by the L1 norm and
         takes the element-wise square root to produce the state-preparation amplitudes.
+        Returns a :class:`Wavefunction` with 1-bit-per-mode configurations.
 
         Args:
             qubit_hamiltonian: The qubit Hamiltonian whose coefficients define the amplitudes.
-            num_prepare_qubits: Number of qubits in the prepare (ancilla) register.
+            num_prepare_ancillas: Number of qubits in the prepare ancillary register.
             tolerance: Minimum allowable L1 norm; raises if the norm is below
                 this threshold.
 
         Returns:
-            Prepare: The PREPARE oracle dataclass containing the statevector and qubit layout.
+            Wavefunction: A wavefunction over the ancilla register whose amplitudes encode 
+            the normalized coefficients of the Hamiltonian.
 
         """
         coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
@@ -152,16 +160,24 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             raise ValueError("L1 norm is too small, cannot build LCU block encoding.")
 
         abs_coeffs = np.abs(coefficients)
-        statevector = np.sqrt(abs_coeffs / l1_norm)
+        amplitudes = np.sqrt(abs_coeffs / l1_norm)
 
-        return Prepare(
-            statevector=statevector,
-            num_prepare_qubits=num_prepare_qubits,
-            prepare_qubits=list(range(num_prepare_qubits)),
-        )
+        # Build 1-bit-per-mode Configuration determinants for each nonzero amplitude
+        coeffs_list: list[float] = []
+        dets: list[Configuration] = []
+        for idx, amp in enumerate(amplitudes):
+            if amp != 0.0:
+                bitstring = format(idx, f"0{num_prepare_ancillas}b")
+                dets.append(Configuration.from_bitstring(bitstring))
+                coeffs_list.append(float(amp))
+
+        coeffs_array = np.array(coeffs_list)
+        orbitals = ModelOrbitals(num_prepare_ancillas)
+        container = StateVectorContainer(coeffs_array, dets, orbitals)
+        return Wavefunction(container)
 
     @staticmethod
-    def _build_select(qubit_hamiltonian: QubitHamiltonian, num_prepare_qubits: int) -> Select:
+    def _build_select(qubit_hamiltonian: QubitHamiltonian, num_prepare_ancillas: int) -> Select:
         """Compute SELECT controlled operations and phases from Hamiltonian terms.
 
         Builds a list of controlled Pauli-string operations (one per Hamiltonian term)
@@ -170,7 +186,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         Args:
             qubit_hamiltonian: The qubit Hamiltonian whose Pauli strings and coefficients
                 define the controlled operations.
-            num_prepare_qubits: Number of qubits in the prepare (control) register.
+            num_prepare_ancillas: Number of qubits in the prepare ancillary register.
 
         Returns:
             Select: The SELECT oracle dataclass containing controlled operations, phases,
@@ -195,10 +211,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return Select(
             controlled_operations=controlled_ops,
             phases=phases,
-            num_prepare_qubits=num_prepare_qubits,
+            num_prepare_ancillas=num_prepare_ancillas,
             num_target_qubits=num_system_qubits,
-            prepare_qubits=list(range(num_prepare_qubits)),
-            target_qubits=list(range(num_prepare_qubits, num_prepare_qubits + num_system_qubits)),
+            prepare_qubits=list(range(num_prepare_ancillas)),
+            target_qubits=list(range(num_prepare_ancillas, num_prepare_ancillas + num_system_qubits)),
         )
 
     def name(self) -> str:

@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import numpy as np
+
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
@@ -62,6 +64,50 @@ class StatePreparation(Algorithm):
 
         """
         return super().run(wavefunction)
+
+    @staticmethod
+    def extract_state_data(wavefunction: Wavefunction) -> tuple[list[str], np.ndarray, int, int]:
+        """Extract the 4 essential quantities for state preparation from a wavefunction.
+
+        Handles both spin-½ (bits_per_mode == 2) and generic bitstring
+        (bits_per_mode == 1) wavefunctions transparently.
+
+        Args:
+            wavefunction: The target wavefunction.
+
+        Returns:
+            tuple of (bitstrings, coefficients, n_qubits, n_determinants):
+                - bitstrings: list of little-endian binary strings
+                - coefficients: numpy array of CI coefficients
+                - n_qubits: number of qubits (length of each bitstring)
+                - n_determinants: number of determinants
+
+        Raises:
+            ValueError: If wavefunction has no active determinants.
+
+        """
+        dets = wavefunction.get_active_determinants()
+        if not dets:
+            raise ValueError("Wavefunction has no active determinants")
+
+        coeffs = np.asarray(wavefunction.get_coefficients())
+
+        # Determine num_orbitals from active space for spin-½
+        if dets[0].bits_per_mode() == 2:
+            alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
+            num_orbitals = max(len(alpha_indices), len(beta_indices))
+            bitstrings = []
+            for det in dets:
+                alpha_str, beta_str = det.to_binary_strings(num_orbitals)
+                bitstrings.append(beta_str[::-1] + alpha_str[::-1])
+        else:
+            # Generic bitstring (1 bit/mode): use Orbitals.num_modes() for correct size.
+            num_modes = wavefunction.get_orbitals().num_modes()
+            bitstrings = [det.to_string()[:num_modes] for det in dets]
+
+        n_qubits = len(bitstrings[0])
+        n_determinants = len(bitstrings)
+        return bitstrings, coeffs, n_qubits, n_determinants
 
 
 class StatePreparationFactory(AlgorithmFactory):

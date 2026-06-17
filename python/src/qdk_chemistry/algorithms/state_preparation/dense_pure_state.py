@@ -52,34 +52,11 @@ class DensePureStatePreparation(StatePreparation):
             Circuit: A Circuit object implementing the state preparation.
 
         """
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = max(len(alpha_indices), len(beta_indices))
-
-        # Convert determinants to bitstrings (little-endian convention)
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-            bitstring = beta_str[::-1] + alpha_str[::-1]
-            bitstrings.append(bitstring)
-
-        n_qubits = len(bitstrings[0])
-
-        # Build the full statevector: place each coefficient at the index
-        # corresponding to its bitstring
+        # Extract state data and build dense statevector
+        bitstrings, coeffs, n_qubits, _ = StatePreparation.extract_state_data(wavefunction)
         statevector = np.zeros(2**n_qubits, dtype=float)
         for coeff, bitstring in zip(coeffs, bitstrings, strict=True):
-            index = int(bitstring, 2)
-            statevector[index] += coeff
-
-        # Normalize
+            statevector[int(bitstring, 2)] += coeff
         norm = np.linalg.norm(statevector)
         if norm > 0:
             statevector /= norm

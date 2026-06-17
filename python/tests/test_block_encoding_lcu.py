@@ -50,7 +50,7 @@ class TestLCUBuilder:
         )
         builder = LCUBuilder()
         result = builder.run(hamiltonian)
-        assert result.get_container().prepare.num_prepare_qubits == 1
+        assert result.get_container().num_prepare_ancillas == 1
 
         # 3 terms -> 2 select qubits (ceil(log2(3)) = 2)
         hamiltonian3 = QubitHamiltonian(
@@ -59,7 +59,7 @@ class TestLCUBuilder:
         )
         builder3 = LCUBuilder()
         result3 = builder3.run(hamiltonian3)
-        assert result3.get_container().prepare.num_prepare_qubits == 2
+        assert result3.get_container().num_prepare_ancillas == 2
 
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder is accessible via the registry."""
@@ -68,10 +68,10 @@ class TestLCUBuilder:
         assert builder.name() == "lcu"
 
     def test_prepare_statevector_encodes_normalized_coefficients(self):
-        """Verify PREPARE statevector is sqrt(|alpha_j|/lambda) for each term.
+        """Verify PREPARE wavefunction amplitudes are sqrt(|alpha_j|/lambda) for each term.
 
         For H = 0.25*XX + 0.5*ZZ, lambda = 0.75,
-        statevector = [sqrt(0.25/0.75), sqrt(0.5/0.75)] padded to length 2.
+        amplitudes = [sqrt(0.25/0.75), sqrt(0.5/0.75)].
         """
         coefficients = np.array([0.25, 0.5])
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ"], coefficients=coefficients)
@@ -79,31 +79,30 @@ class TestLCUBuilder:
         container = builder.run(hamiltonian).get_container()
 
         lam = np.sum(np.abs(coefficients))
-        expected_sv = np.sqrt(np.abs(coefficients) / lam)
-        # Pad to 2^num_prepare_qubits
-        padded = np.zeros(2**container.prepare.num_prepare_qubits)
-        padded[: len(expected_sv)] = expected_sv
+        expected_amplitudes = np.sqrt(np.abs(coefficients) / lam)
 
+        actual_amplitudes = np.array(container.prepare.get_coefficients())
         assert np.allclose(
-            container.prepare.statevector,
-            padded,
+            actual_amplitudes,
+            expected_amplitudes,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
 
     def test_prepare_statevector_three_terms(self):
-        """Verify PREPARE statevector for 3 terms."""
+        """Verify PREPARE wavefunction amplitudes for 3 terms."""
         coefficients = np.array([0.25, -0.5, 0.3])
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZZ", "XZ"], coefficients=coefficients)
         builder = LCUBuilder()
         container = builder.run(hamiltonian).get_container()
 
         lam = np.sum(np.abs(coefficients))
-        expected_sv = np.sqrt(np.abs(coefficients) / lam)
+        expected_amplitudes = np.sqrt(np.abs(coefficients) / lam)
 
+        actual_amplitudes = np.array(container.prepare.get_coefficients())
         assert np.allclose(
-            container.prepare.statevector,
-            expected_sv,
+            actual_amplitudes,
+            expected_amplitudes,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
@@ -179,7 +178,7 @@ class TestLCUContainer:
 
         assert restored.type == container.type
         assert restored.num_qubits == container.num_qubits
-        assert restored.prepare.num_prepare_qubits == container.prepare.num_prepare_qubits
+        assert restored.num_prepare_ancillas == container.num_prepare_ancillas
         assert np.array_equal(restored.select.phases, container.select.phases)
         assert [op.operation for op in restored.select.controlled_operations] == [
             op.operation for op in container.select.controlled_operations
@@ -206,10 +205,10 @@ class TestLCUContainer:
         assert isinstance(restored_container, BlockEncodingContainer)
         assert restored_container.type == "lcu"
         assert restored_container.num_qubits == unitary_rep.get_container().num_qubits
-        assert restored_container.prepare.num_prepare_qubits == unitary_rep.get_container().prepare.num_prepare_qubits
+        assert restored_container.num_prepare_ancillas == unitary_rep.get_container().num_prepare_ancillas
 
     def test_serialization_preserves_statevector(self):
-        """Verify that serialization preserves the PREPARE statevector exactly."""
+        """Verify that serialization preserves the PREPARE wavefunction coefficients."""
         hamiltonian = QubitHamiltonian(
             pauli_strings=["XX", "ZZ", "XZ"],
             coefficients=np.array([0.25, -0.5, 0.3]),
@@ -220,9 +219,11 @@ class TestLCUContainer:
         json_data = container.to_json()
         restored = LCUContainer.from_json(json_data)
 
+        original_coeffs = np.array(container.prepare.get_coefficients())
+        restored_coeffs = np.array(restored.prepare.get_coefficients())
         assert np.allclose(
-            restored.prepare.statevector,
-            container.prepare.statevector,
+            restored_coeffs,
+            original_coeffs,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
@@ -249,8 +250,10 @@ class TestLCUContainer:
             assert restored.type == container.type
             assert restored.power == container.power
             assert restored.quantum_walk == container.quantum_walk
-            assert restored.prepare.num_prepare_qubits == container.prepare.num_prepare_qubits
-            assert np.allclose(restored.prepare.statevector, container.prepare.statevector)
+            assert restored.num_prepare_ancillas == container.num_prepare_ancillas
+            original_coeffs = np.array(container.prepare.get_coefficients())
+            restored_coeffs = np.array(restored.prepare.get_coefficients())
+            assert np.allclose(restored_coeffs, original_coeffs)
             assert np.array_equal(restored.select.phases, container.select.phases)
             assert len(restored.select.controlled_operations) == len(container.select.controlled_operations)
             for r_op, c_op in zip(
