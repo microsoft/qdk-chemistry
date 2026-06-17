@@ -49,6 +49,7 @@ __all__: list[str] = [
     "do_pauli_maps_qw_commute",
     "does_nested_commutator_vanish",
     "get_commutation_checker",
+    "nested_commutator",
 ]
 
 
@@ -89,6 +90,26 @@ def commutator(h_a: QubitHamiltonian, h_b: QubitHamiltonian) -> QubitHamiltonian
     labels = [label[::-1] for _, label in terms]
     coeffs = np.array([complex(c) for c, _ in terms])
     return _QubitHamiltonian(labels, coeffs)
+
+
+def nested_commutator(operators: list[QubitHamiltonian]) -> QubitHamiltonian:
+    r"""Right-nested commutator :math:`[g_0, [g_1, [\ldots, [g_{m-2}, g_{m-1}]]]]`.
+
+    Builds the bracket from the inside out using :func:`commutator`; a single
+    operator is returned unchanged. A nested commutator of Pauli operators is again
+    a (combination of) Pauli operators, so the result stays in the Pauli basis.
+
+    Args:
+        operators: The operators :math:`g_0, \ldots, g_{m-1}` to bracket, in order.
+
+    Returns:
+        The right-nested commutator as a :class:`~qdk_chemistry.data.QubitHamiltonian`.
+
+    """
+    nested = operators[-1]
+    for operator in reversed(operators[:-1]):
+        nested = commutator(operator, nested)
+    return nested
 
 
 def _label_to_sparse_word(label: str) -> list[tuple[int, int]]:

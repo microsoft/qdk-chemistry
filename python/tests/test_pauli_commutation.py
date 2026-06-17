@@ -17,6 +17,7 @@ from qdk_chemistry.utils.pauli_commutation import (
     do_pauli_maps_commute,
     do_pauli_maps_qw_commute,
     get_commutation_checker,
+    nested_commutator,
 )
 
 
@@ -295,3 +296,18 @@ class TestCommutator:
         # [XI, ZI] = [X,Z]⊗I = -2iYI; [IX, ZI] commutes → only -2i YI
         idx = result.pauli_strings.index("YI")
         np.testing.assert_allclose(result.coefficients[idx], -2.0j, atol=1e-14)
+
+    def test_nested_commutator_right_nested(self):
+        """nested_commutator([X, X, Z]) = [X, [X, Z]] = 4Z."""
+        h_x = _make_hamiltonian(["X"], [1.0])
+        h_z = _make_hamiltonian(["Z"], [1.0])
+        result = nested_commutator([h_x, h_x, h_z])
+        assert result.pauli_strings[0] == "Z"
+        np.testing.assert_allclose(result.coefficients[0], 4.0, atol=1e-14)
+
+    def test_nested_commutator_single_operator(self):
+        """A single operator is returned unchanged."""
+        h_x = _make_hamiltonian(["X"], [1.0])
+        result = nested_commutator([h_x])
+        assert result.pauli_strings[0] == "X"
+        np.testing.assert_allclose(result.coefficients[0], 1.0, atol=1e-14)

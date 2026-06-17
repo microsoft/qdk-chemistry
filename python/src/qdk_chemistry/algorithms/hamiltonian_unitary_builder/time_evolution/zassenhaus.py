@@ -61,9 +61,9 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 )
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_commutation import (
-    commutator,
     commutator_bound_higher_order,
     do_pauli_labels_commute,
+    nested_commutator,
 )
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
@@ -440,16 +440,14 @@ class Zassenhaus(TimeEvolutionBuilder):
 
             C_n = (1 / n) sum_w c_w [g_{w_0}, [g_{w_1}, [ ..., g_{w_{n-1}}]]],
 
-        evaluated with the QDK-native ``commutator`` (Qiskit-free). Nested
-        commutators of (anti-Hermitian) Pauli operators are again Pauli operators,
-        so the result is an anti-Hermitian ``QubitHamiltonian``.
+        evaluated with the native ``commutator``. Nested commutators of
+        (anti-Hermitian) Pauli operators are again Pauli operators, so the result
+        is an anti-Hermitian ``QubitHamiltonian``.
         """
         inverse_degree = 1.0 / degree
         total: QubitHamiltonian | None = None
         for word, coeff in word_terms:
-            nested = ops[word[-1]]
-            for index in reversed(word[:-1]):
-                nested = commutator(ops[index], nested)
+            nested = nested_commutator([ops[index] for index in word])
             contribution = (float(coeff) * inverse_degree) * nested
             total = contribution if total is None else total + contribution
         return total
