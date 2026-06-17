@@ -26,7 +26,7 @@ resources:
   # all share one environment (see codeql-docker docs). Both x86_64 and aarch64 reference this
   # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
   - container: linux_build_container
-    image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+    image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.02
 
 parameters:
 - name: matrix
@@ -161,10 +161,25 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          # Build - Linux ARM64
           - script: |
+              echo "== uname =="
               uname -a
-              cat /etc/os-release
+
+              echo "== os-release =="
+              cat /etc/os-release || true
+
+              echo "== cgroup =="
+              cat /proc/1/cgroup || true
+
+              echo "== mountinfo =="
+              grep -E 'overlay|container' /proc/1/mountinfo || true
+
+              echo "== env =="
+              env | grep -Ei 'container|docker|podman' || true
+
+              echo "== pid1 =="
+              ps -p 1 -o pid,comm,args=
+
               which apt-get || echo "no apt-get"
               which docker && docker ps || echo "no docker"
             displayName: Diagnose environment
