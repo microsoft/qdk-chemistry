@@ -27,6 +27,7 @@ class QiskitHadamardTest(HadamardTest):
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
 
@@ -36,8 +37,9 @@ class QiskitHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
-                or ``HadamardTestBasis.Z``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
@@ -56,8 +58,13 @@ class QiskitHadamardTest(HadamardTest):
         # Build the base circuit with registers.
         ancilla = QuantumRegister(1, "ancilla")
         system_target = QuantumRegister(num_system_qubits, "system")
+        registers = [ancilla, system_target]
+        if num_ancilla_qubits > 0:
+            extra_ancillas = QuantumRegister(num_ancilla_qubits, "ancilla_extra")
+            registers.append(extra_ancillas)
         classical = ClassicalRegister(1, "c")
-        circuit = QuantumCircuit(ancilla, system_target, classical)
+        registers.append(classical)
+        circuit = QuantumCircuit(*registers)
 
         # Apply state preparation.
         try:
@@ -69,6 +76,8 @@ class QiskitHadamardTest(HadamardTest):
         # Prepare ancilla and apply controlled time evolution.
         control = ancilla[0]
         target_qubits = list(system_target)
+        if num_ancilla_qubits > 0:
+            target_qubits += list(extra_ancillas)
 
         circuit.h(control)
 

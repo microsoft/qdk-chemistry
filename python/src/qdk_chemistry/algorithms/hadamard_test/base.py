@@ -68,8 +68,8 @@ class HadamardTest(Algorithm):
         shots: int,
         mapper: ControlledCircuitMapper | None = None,
         simulator: CircuitExecutor | None = None,
-        simulator_seed: int = 42,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
     ) -> CircuitExecutorData:
         r"""Run the Hadamard test by building and executing a backend-specific circuit.
 
@@ -79,9 +79,9 @@ class HadamardTest(Algorithm):
             shots: Number of shots to execute the circuit.
             mapper: Controlled circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
             simulator: Circuit executor. If ``None``, the default ``qdk_full_state_simulator`` is used.
-            simulator_seed: Random seed used for reproducible sampling when ``simulator`` is ``None``.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
-                or ``HadamardTestBasis.Z``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             CircuitExecutorData returned directly by the given simulator.
@@ -92,8 +92,6 @@ class HadamardTest(Algorithm):
         if not isinstance(unitary, UnitaryRepresentation):
             raise TypeError("unitary must be an instance of UnitaryRepresentation.")
         num_system_qubits = unitary.get_num_qubits()
-        if not isinstance(simulator_seed, int):
-            raise TypeError("simulator_seed must be an integer.")
         if not isinstance(shots, int):
             raise TypeError("shots must be an integer.")
         if shots <= 0:
@@ -120,6 +118,7 @@ class HadamardTest(Algorithm):
             num_system_qubits,
             ctrl_time_evol_unitary_circuit,
             test_basis,
+            num_ancilla_qubits,
         )
 
         if simulator is None:
@@ -127,7 +126,6 @@ class HadamardTest(Algorithm):
                 simulator = create("circuit_executor", "qdk_full_state_simulator")
             except KeyError as err:
                 raise ValueError("Unknown simulator type: qdk_full_state_simulator.") from err
-            simulator.settings().update("seed", simulator_seed)
         elif not isinstance(simulator, CircuitExecutor):
             raise TypeError("simulator must be an instance of CircuitExecutor or None.")
 
@@ -140,6 +138,7 @@ class HadamardTest(Algorithm):
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build the Hadamard test circuit for a given state and controlled unitary.
 
@@ -149,8 +148,9 @@ class HadamardTest(Algorithm):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
-                or ``HadamardTestBasis.Z``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit representing the Hadamard test workflow for the selected backend.

@@ -13,6 +13,7 @@ namespace QDKChemistry.Utils.HadamardTest {
     /// - `testBasis`: Measurement basis for the control qubit. Supported values are `PauliX`, `PauliY`, and `PauliZ`.
     /// - `control`: The index of the control qubit in the allocated register.
     /// - `systems`: An array of indices representing the system qubits.
+    /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled evolution (0 if none).
     /// # Returns
     /// A single-element result array containing the control-qubit measurement in the selected basis.
     operation HadamardTest(
@@ -21,15 +22,22 @@ namespace QDKChemistry.Utils.HadamardTest {
         testBasis : Pauli,
         control : Int,
         systems : Int[],
+        numAncillaQubits : Int,
     ) : Result[] {
-        use qs = Qubit[Length(systems) + 1];
+        use qs = Qubit[Length(systems) + 1 + numAncillaQubits];
         let control_q = qs[control];
         let system_q = Subarray(systems, qs);
+        let ancillas = if numAncillaQubits == 0 {
+            []
+        } else {
+            qs[1 + Length(systems)..Length(qs) - 1]
+        };
+        let allTargets = system_q + ancillas;
 
         statePrep(system_q);
 
         H(control_q);
-        repControlledEvolution(control_q, system_q);
+        repControlledEvolution(control_q, allTargets);
 
         if (testBasis == PauliX) {
             H(control_q);
@@ -41,7 +49,7 @@ namespace QDKChemistry.Utils.HadamardTest {
         } else {
             fail $"Invalid measurement basis: {testBasis}. Supported values are PauliX, PauliY, and PauliZ.";
         }
-        ResetAll(system_q);
+        ResetAll(allTargets);
         return [MResetZ(control_q)];
     }
 }

@@ -34,6 +34,7 @@ class QdkHadamardTest(HadamardTest):
         num_system_qubits: int,
         ctrl_time_evol_unitary_circuit: Circuit,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
 
@@ -43,8 +44,9 @@ class QdkHadamardTest(HadamardTest):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             num_system_qubits: Number of qubits in the system register.
             ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``,
-                or ``HadamardTestBasis.Z``).
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
@@ -68,6 +70,7 @@ class QdkHadamardTest(HadamardTest):
             "testBasis": qsharp_basis,
             "control": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
+            "numAncillaQubits": num_ancilla_qubits,
         }
 
         return Circuit(
