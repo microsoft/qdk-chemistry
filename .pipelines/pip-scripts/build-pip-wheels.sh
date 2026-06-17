@@ -20,6 +20,7 @@ SUDO=""
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     # Update and install dependencies (Azure Linux 3 / tdnf)
     echo "Installing tdnf dependencies..."
+    $SUDO tdnf update -y
     $SUDO tdnf install -y \
         binutils \
         boost-devel \
@@ -54,7 +55,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         xz-devel \
         zlib-devel
 
-    # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
+    # Build cmake from source to ensure a sufficiently recent version
     echo "Downloading and installing CMake ${CMAKE_VERSION}..."
     export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
     wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz

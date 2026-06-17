@@ -20,6 +20,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     SUDO=""
     [ "$(id -u)" != "0" ] && SUDO="sudo"
     echo "Installing tdnf dependencies..."
+    $SUDO tdnf update -y
     $SUDO tdnf install -y \
         bzip2-devel \
         curl \
