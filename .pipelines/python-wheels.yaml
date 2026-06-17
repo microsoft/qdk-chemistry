@@ -21,6 +21,13 @@ resources:
     ref: refs/tags/release
   - repository: self
     path: qdk-chemistry
+  containers:
+  # Used for Linux container jobs so that CodeQL C++ tracing, the build, and CodeQL finalize
+  # all share one environment (see codeql-docker docs). Both x86_64 and aarch64 reference this
+  # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
+  - container: linux_build_container
+    image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+    options: --user root
 
 parameters:
 - name: matrix
@@ -113,21 +120,25 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          ${{ if eq(target.os, 'macOS') }}:
+          # Run Linux builds inside the container directly so that CodeQL tracing,
+          # compilation, and finalize all share one environment.
+          ${{ if eq(target.os, 'linux') }}:
+            container: linux_build_container
+          ${{ if eq(target.os, 'macOS') }}:  # macOS ARM64
             pool:
               name: AcesShared
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
-          ${{ elseif eq(target.arch, 'aarch64') }}:
+          ${{ elseif eq(target.arch, 'aarch64') }}:  # Linux ARM64
             pool:
               name: $(CPU_POOL_ARM)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
-          ${{ else }}:
+          ${{ else }}:  # Linux x86_64
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -165,8 +176,6 @@ extends:
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
 
@@ -175,8 +184,6 @@ extends:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
 
@@ -188,8 +195,6 @@ extends:
                 buildTesting: OFF
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 devTag: ${{ parameters.devTag }}
 
@@ -198,8 +203,6 @@ extends:
             - template: .pipelines/templates/test-pip-wheels.yml@self
               parameters:
                 agentBuildDirectory: $(Agent.BuildDirectory)
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
 
@@ -225,10 +228,13 @@ extends:
                 runSlowTests: ${{ parameters.runSlowTests }}
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
-          # back to the original base image user
-          - script: |
-              sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-            displayName: Fix wheel directory ownership
+          # back to the original base image user. For Linux container jobs we run as root
+          # throughout, so no ownership transfer is needed (sudo is also not available in the
+          # minimal ubuntu:24.04 image).
+          - ${{ if not(eq(target.os, 'linux')) }}:
+            - script: |
+                sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+              displayName: Fix wheel directory ownership
 
           - task: TwineAuthenticate@1
             inputs:
