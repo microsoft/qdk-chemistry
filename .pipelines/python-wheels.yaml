@@ -120,8 +120,9 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
-          # Run Linux builds inside the container directly so that CodeQL tracing,
-          # compilation, and finalize all share one environment.
+          # Linux builds use task-level target: linux_build_container so CodeQL tracing,
+          # compilation, and finalize all share one environment (1ES PT does not support
+          # job-level container: for CodeQL C++ tracing).
           ${{ if eq(target.os, 'macOS') }}:  # macOS ARM64
             pool:
               name: AcesShared
@@ -130,7 +131,6 @@ extends:
               os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ elseif eq(target.arch, 'aarch64') }}:  # Linux ARM64
-            container: linux_build_container
             pool:
               name: $(CPU_POOL_ARM)
               demands:
@@ -138,7 +138,6 @@ extends:
               os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ else }}:  # Linux x86_64
-            container: linux_build_container
             pool:
               name: $(CPU_POOL_X86)
               demands:
@@ -156,6 +155,14 @@ extends:
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
+            # Disable auto-injected CodeQL C++ for ARM64 and macOS: the build doesn't run
+            # in a target: container (ARM64 uses docker run; macOS is native but the C++
+            # source is identical to x86_64, so one scan suffices).
+            ${{ if not(eq(target.arch, 'x86_64')) }}:
+              sdl:
+                codeql:
+                  compiled:
+                    enabled: false
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
@@ -221,10 +228,16 @@ extends:
 
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
-            target: linux_build_container
             inputs:
               artifactFeeds: AzureQuantum/quantum-apps-dependencies
               onlyAddExtraIndex: false
+
+          # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
+          # same environment for C++ tracing to work; using target: keeps them in the container.
+          - ${{ if eq(target.arch, 'x86_64') }}:
+            - task: CodeQL3000Init@0
+              target: linux_build_container
+              displayName: CodeQL Initialize
 
           # Build - Linux x86_64
           - ${{ if eq(target.arch, 'x86_64') }}:
@@ -296,6 +309,13 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
+          # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
+          - ${{ if eq(target.arch, 'x86_64') }}:
+            - task: CodeQL3000Finalize@0
+              target: linux_build_container
+              condition: always()
+              displayName: CodeQL Finalize
+
 
     - stage: Test
       displayName: Test Python Wheels
@@ -303,8 +323,6 @@ extends:
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Test_${{ target.name }}
-          ${{ if eq(target.os, 'linux') }}:
-            container: linux_build_container
           ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
@@ -330,7 +348,7 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                Py${{ py }}:
+                Py${{ replace(py, '.', '_') }}:
                   pythonVersion: ${{ py }}
             maxParallel: 5
           displayName: Test ${{ target.march }} ${{ target.os }} wheels

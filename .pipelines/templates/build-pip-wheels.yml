@@ -37,7 +37,7 @@ parameters:
   default: 'None'
 - name: containerName
   type: string
-  default: ''
+  default: 'linux_build_container'
 
 steps:
 - checkout: self
@@ -72,7 +72,7 @@ steps:
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
-    target: linux_build_container
+    target: ${{ parameters.containerName }}
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
     env:
