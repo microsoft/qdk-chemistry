@@ -30,25 +30,15 @@ resources:
     options: --user root
 
 parameters:
-- name: matrix
+- name: target
   type: object
   default:
-  - name: linux_x86_64
+    name: linux_x86_64
     os: linux
     arch: x86_64
     march: x86-64-v3
     imageName: Ubuntu24.04Nightly
-  - name: linux_aarch64
-    os: linux
-    arch: aarch64
-    march: armv8-a
-    imageName: 1es-pt-azurelinux3-arm
-  - name: macos_arm64
-    os: macOS
-    arch: aarch64
-    march: armv8-a
-    imageName: ACES_VM_SharedPool_Tahoe
-  displayName: Target platforms
+  displayName: Target platform
 - name: pythonVersions
   type: stringList
   values:
@@ -118,86 +108,39 @@ extends:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
       jobs:
-      - ${{ each target in parameters.matrix }}:
-        - job: Build_${{ target.name }}
-          # Linux builds use task-level target: linux_build_container so CodeQL tracing,
-          # compilation, and finalize all share one environment (1ES PT does not support
-          # job-level container: for CodeQL C++ tracing).
-          ${{ if eq(target.os, 'macOS') }}:  # macOS ARM64
-            pool:
-              name: AcesShared
-              demands:
-              - ImageOverride -equals ${{ target.imageName }}
-              os: ${{ target.os }}
-              hostArchitecture: Arm64
-          ${{ elseif eq(target.arch, 'aarch64') }}:  # Linux ARM64
-            pool:
-              name: $(CPU_POOL_ARM)
-              demands:
-              - ImageOverride -equals ${{ target.imageName }}
-              os: ${{ target.os }}
-              hostArchitecture: Arm64
-          ${{ else }}:  # Linux x86_64
-            pool:
-              name: $(CPU_POOL_X86)
-              demands:
-              - ImageOverride -equals ${{ target.imageName }}
-              os: ${{ target.os }}
-
-          timeoutInMinutes: 60
-          strategy:
-            matrix:
-              ${{ each py in parameters.pythonVersions }}:
-                Py${{ replace(py, '.', '_') }}:
-                  pythonVersion: ${{ py }}
-            maxParallel: 5
-          displayName: Build ${{ target.march }} ${{ target.os }} wheels
-          variables:
-            LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-          templateContext:
+      - job: Build_${{ target.name }}
+        pool:
+          name: $(CPU_POOL_X86)
+          demands:
+          - ImageOverride -equals ${{ target.imageName }}
+          os: ${{ target.os }}
+        container: linux_build_container
+        timeoutInMinutes: 60
+        strategy:
+          matrix:
+            ${{ each py in parameters.pythonVersions }}:
+              Py${{ replace(py, '.', '_') }}:
+                pythonVersion: ${{ py }}
+          maxParallel: 5
+        displayName: Build ${{ target.march }} ${{ target.os }} wheels
+        variables:
+          LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+        templateContext:
             # Disable auto-injected CodeQL C++ for ARM64 and macOS: the build doesn't run
             # in a target: container (ARM64 uses docker run; macOS is native but the C++
             # source is identical to x86_64, so one scan suffices).
-            ${{ if not(eq(target.arch, 'x86_64')) }}:
-              sdl:
-                codeql:
-                  compiled:
-                    enabled: false
-            outputs:
-            - output: pipelineArtifact
-              displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
-              targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-              artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
-          steps:
-          - ${{ if eq(target.os, 'linux') }}:
-            - script: |
-                set -x
-                whoami && id
-                pwd
-                ls -la
-                echo "== uname =="
-                uname -a
-
-                echo "== os-release =="
-                cat /etc/os-release || true
-
-                echo "== cgroup =="
-                cat /proc/1/cgroup || true
-
-                echo "== mountinfo =="
-                grep -E 'overlay|container' /proc/1/mountinfo || true
-
-                echo "== env =="
-                env | grep -Ei 'container|docker|podman' || true
-
-                echo "== pid1 =="
-                ps -p 1 -o pid,comm,args=
-
-                which apt-get || echo "no apt-get"
-                which docker && docker ps || echo "no docker"
-              target: linux_build_container
-              displayName: Diagnose environment
-
+          ${{ if not(eq(target.arch, 'x86_64')) }}:
+            sdl:
+              codeql:
+                compiled:
+                  enabled: false
+          outputs:
+          - output: pipelineArtifact
+            displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
+            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
+            artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
+        steps:
+        - ${{ if eq(target.os, 'linux') }}:
           - script: |
               set -x
               whoami && id
@@ -223,98 +166,126 @@ extends:
 
               which apt-get || echo "no apt-get"
               which docker && docker ps || echo "no docker"
-            displayName: Diagnose environment (withou target)
+            target: linux_build_container
+            displayName: Diagnose environment
+
+        - script: |
+            set -x
+            whoami && id
+            pwd
+            ls -la
+            echo "== uname =="
+            uname -a
+
+            echo "== os-release =="
+            cat /etc/os-release || true
+
+            echo "== cgroup =="
+            cat /proc/1/cgroup || true
+
+            echo "== mountinfo =="
+            grep -E 'overlay|container' /proc/1/mountinfo || true
+
+            echo "== env =="
+            env | grep -Ei 'container|docker|podman' || true
+
+            echo "== pid1 =="
+            ps -p 1 -o pid,comm,args=
+
+            which apt-get || echo "no apt-get"
+            which docker && docker ps || echo "no docker"
+          displayName: Diagnose environment (without target)
 
 
-          - task: PipAuthenticate@1
-            displayName: Pip Authenticate
-            inputs:
-              artifactFeeds: AzureQuantum/quantum-apps-dependencies
-              onlyAddExtraIndex: false
+        - task: PipAuthenticate@1
+          displayName: Pip Authenticate
+          inputs:
+            artifactFeeds: AzureQuantum/quantum-apps-dependencies
+            onlyAddExtraIndex: false
 
-          # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
-          # same environment for C++ tracing to work; using target: keeps them in the container.
-          - ${{ if eq(target.arch, 'x86_64') }}:
-            - task: CodeQL3000Init@0
-              target: linux_build_container
-              displayName: CodeQL Initialize
+          # # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
+          # # same environment for C++ tracing to work; using target: keeps them in the container.
+          # - ${{ if eq(target.arch, 'x86_64') }}:
+          #   - task: CodeQL3000Init@0
+          #     target: linux_build_container
+          #     displayName: CodeQL Initialize
 
           # Build - Linux x86_64
-          - ${{ if eq(target.arch, 'x86_64') }}:
-            - template: .pipelines/templates/build-pip-wheels.yml@self
-              parameters:
-                march: ${{ target.march }}
-                buildTesting: OFF
-                enableCoverage: OFF
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-                devTag: ${{ parameters.devTag }}
-                containerName: linux_build_container
+        - ${{ if eq(target.arch, 'x86_64') }}:
+          - template: .pipelines/templates/build-pip-wheels.yml@self
+            parameters:
+              march: ${{ target.march }}
+              buildTesting: OFF
+              enableCoverage: OFF
+              agentBuildDirectory: $(Agent.BuildDirectory)
+              pythonVersion: $(pythonVersion)
+              devTag: ${{ parameters.devTag }}
+              containerName: linux_build_container
 
           # Build - Linux ARM64
-          - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
-            - template: .pipelines/templates/build-pip-wheels.yml@self
-              parameters:
-                march: ${{ target.march }}
-                buildTesting: OFF
-                enableCoverage: OFF
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-                devTag: ${{ parameters.devTag }}
-                containerName: linux_build_container
+        - ${{ if and(eq(target.arch, 'aarch64'), eq(target.os, 'linux')) }}:
+          - template: .pipelines/templates/build-pip-wheels.yml@self
+            parameters:
+              march: ${{ target.march }}
+              buildTesting: OFF
+              enableCoverage: OFF
+              agentBuildDirectory: $(Agent.BuildDirectory)
+              pythonVersion: $(pythonVersion)
+              devTag: ${{ parameters.devTag }}
+              containerName: linux_build_container
 
           # Build - macOS ARM64
-          - ${{ if eq(target.os, 'macOS') }}:
-            - template: .pipelines/templates/build-pip-wheels.yml@self
-              parameters:
-                march: ${{ target.march }}
-                buildTesting: OFF
-                enableCoverage: OFF
-                agentBuildDirectory: $(Agent.BuildDirectory)
-                pythonVersion: $(pythonVersion)
-                macBuild: ON
-                devTag: ${{ parameters.devTag }}
+        - ${{ if eq(target.os, 'macOS') }}:
+          - template: .pipelines/templates/build-pip-wheels.yml@self
+            parameters:
+              march: ${{ target.march }}
+              buildTesting: OFF
+              enableCoverage: OFF
+              agentBuildDirectory: $(Agent.BuildDirectory)
+              pythonVersion: $(pythonVersion)
+              macBuild: ON
+              devTag: ${{ parameters.devTag }}
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user. For Linux container jobs we run as root
           # throughout, so no ownership transfer is needed (sudo is also not available in the
           # minimal ubuntu:24.04 image).
-          - ${{ if not(eq(target.os, 'linux')) }}:
-            - script: |
-                sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-              displayName: Fix wheel directory ownership
-
-          - task: TwineAuthenticate@1
-            inputs:
-              artifactFeed: $(artifactProject)/$(artifactFeed)
-            displayName: Authenticate to internal feed
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
-
+        - ${{ if not(eq(target.os, 'linux')) }}:
           - script: |
-              cd $(Agent.BuildDirectory)/qdk-chemistry/python
-              python3 -m pip install twine
-              python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-            displayName: Upload wheel with twine
-            condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+              sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+            displayName: Fix wheel directory ownership
+
+        - task: TwineAuthenticate@1
+          inputs:
+            artifactFeed: $(artifactProject)/$(artifactFeed)
+          displayName: Authenticate to internal feed
+          condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+
+        - script: |
+            cd $(Agent.BuildDirectory)/qdk-chemistry/python
+            python3 -m pip install twine
+            python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+          displayName: Upload wheel with twine
+          condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
           # Publishing debug symbols is not supported for macOS
-          - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
-            - task: PublishSymbols@2
-              displayName: Publish debug symbols
-              condition: and(succeeded(), ${{ parameters.publishEsrp }})
-              inputs:
-                SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
-                IndexSources: false # Not applicable for non-Windows builds
-                SymbolServerType: TeamServices
-                SearchPattern: '**/*.debug'
-                publishLinuxSymbols: true
+        - ${{ if and( eq(target.os, 'linux'), eq(target.arch, 'x86_64') ) }}:
+          - task: PublishSymbols@2
+            displayName: Publish debug symbols
+            condition: and(succeeded(), ${{ parameters.publishEsrp }})
+            inputs:
+              SymbolsFolder: $(System.DefaultWorkingDirectory)/python/debug_symbols
+              IndexSources: false   # Not applicable for non-Windows builds
+              SymbolServerType: TeamServices
+              SearchPattern: '**/*.debug'
+              publishLinuxSymbols: true
 
-          # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
-          - ${{ if eq(target.arch, 'x86_64') }}:
-            - task: CodeQL3000Finalize@0
-              target: linux_build_container
-              condition: always()
-              displayName: CodeQL Finalize
+          # # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
+          # - ${{ if eq(target.arch, 'x86_64') }}:
+          #   - task: CodeQL3000Finalize@0
+          #     target: linux_build_container
+          #     condition: always()
+          #     displayName: CodeQL Finalize
 
 
     - stage: Test
