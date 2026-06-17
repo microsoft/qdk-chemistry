@@ -9,12 +9,15 @@ import os
 import tempfile
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import h5py
 import numpy as np
 
 from .base import UnitaryContainer
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Wavefunction
 
 __all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select"]
 
@@ -266,9 +269,8 @@ class LCUContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
 
-        # TODO: Replace temp-file bridge once Wavefunction.to_hdf5(h5py.Group)
-        # is exposed in the pybind11 bindings.
-        # Then this becomes: self.prepare.to_hdf5(group.create_group("prepare"))
+        # TODO(hid_t bridging): replace temp-file bridge with direct
+        # Wavefunction.to_hdf5(h5py.Group) once exposed in the pybind11 bindings.
         fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
         os.close(fd)
         try:
@@ -294,7 +296,7 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
-        from qdk_chemistry.data import Wavefunction
+        from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
 
         cls._validate_json_version(cls._serialization_version, json_data)
 
@@ -335,11 +337,10 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
-        from qdk_chemistry.data import Wavefunction
+        from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
 
-        # TODO: Replace temp-file bridge once Wavefunction.from_hdf5(h5py.Group)
-        # is exposed in the pybind11 bindings. Then this becomes:
-        # prepare = Wavefunction.from_hdf5(group["prepare"])
+        # TODO(hid_t bridging): replace temp-file bridge with direct
+        # Wavefunction.from_hdf5(h5py.Group) once exposed in the pybind11 bindings.
         fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
         os.close(fd)
         try:
