@@ -1,6 +1,7 @@
 target_sources(chemistry PRIVATE
     active_space.cpp
     algorithm_defaults.cpp
+    effective_hamiltonian.cpp
     hamiltonian.cpp
     localization.cpp
     mc.cpp

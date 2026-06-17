@@ -30,6 +30,7 @@ void bind_serialization(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
+void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_scf(py::module& m);
 void bind_active_space(py::module& m);
 void bind_constants(py::module& m);
@@ -92,6 +93,7 @@ PYBIND11_MODULE(_core, m) {
   bind_mc(algorithms);
   bind_mcscf(algorithms);
   bind_hamiltonian_constructor(algorithms);
+  bind_effective_hamiltonian_constructor(algorithms);
   bind_scf(algorithms);
   bind_active_space(algorithms);
   bind_dynamical_correlation_calculator(algorithms);

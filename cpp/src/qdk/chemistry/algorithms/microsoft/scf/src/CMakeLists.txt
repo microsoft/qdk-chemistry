@@ -42,7 +42,9 @@ target_sources(chemistry PRIVATE
 ###############################################################################
 
 target_sources(chemistry PRIVATE
+  util/cabs.cpp
   util/gauxc_util.cpp
+  util/geminal_eri.cpp
   util/int1e.cpp
   util/libint2_util.cpp
   util/matrix_exp.cpp
