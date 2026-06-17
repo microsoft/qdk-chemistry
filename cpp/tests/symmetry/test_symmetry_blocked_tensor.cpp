@@ -208,22 +208,27 @@ TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresNativeDoubleBlocks) {
   EXPECT_EQ(restored->block_ptr(aa()).get(), restored->block_ptr(bb()).get());
   EXPECT_TRUE(restored->block(aa()).isApprox(data));
 
-  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
-  auto metadata = file.openDataSet("symmetry_blocked_tensor_metadata");
-  EXPECT_EQ(metadata.getTypeClass(), H5T_STRING);
+  // On Windows, the file stays locked until every HDF5 handle to it is
+  // destroyed (DataSet, DataSpace, etc. all keep the underlying H5File alive
+  // via reference counting). Scope them in a block so std::filesystem::remove
+  // below can succeed.
+  {
+    H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+    auto metadata = file.openDataSet("symmetry_blocked_tensor_metadata");
+    EXPECT_EQ(metadata.getTypeClass(), H5T_STRING);
 
-  auto block_dataset = file.openDataSet("block_0");
-  EXPECT_EQ(block_dataset.getTypeClass(), H5T_FLOAT);
-  EXPECT_EQ(block_dataset.getDataType().getSize(), sizeof(double));
+    auto block_dataset = file.openDataSet("block_0");
+    EXPECT_EQ(block_dataset.getTypeClass(), H5T_FLOAT);
+    EXPECT_EQ(block_dataset.getDataType().getSize(), sizeof(double));
 
-  auto dataspace = block_dataset.getSpace();
-  EXPECT_EQ(dataspace.getSimpleExtentNdims(), 2);
-  hsize_t dims[2] = {0, 0};
-  dataspace.getSimpleExtentDims(dims);
-  EXPECT_EQ(dims[0], 2u);
-  EXPECT_EQ(dims[1], 2u);
+    auto dataspace = block_dataset.getSpace();
+    EXPECT_EQ(dataspace.getSimpleExtentNdims(), 2);
+    hsize_t dims[2] = {0, 0};
+    dataspace.getSimpleExtentDims(dims);
+    EXPECT_EQ(dims[0], 2u);
+    EXPECT_EQ(dims[1], 2u);
+  }
 
-  file.close();
   std::filesystem::remove(filename);
 }
 
@@ -251,13 +256,15 @@ TEST(SymmetryBlockedTensorTest,
   EXPECT_TRUE(restored->block(SBT1c::Labels{SymmetryLabel({axes::alpha()})})
                   .isApprox(v));
 
-  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
-  auto block_dataset = file.openDataSet("block_0");
-  EXPECT_EQ(block_dataset.getTypeClass(), H5T_COMPOUND);
-  EXPECT_FALSE(file.nameExists("block_0_real"));
-  EXPECT_FALSE(file.nameExists("block_0_imag"));
+  // Scope HDF5 handles so Windows releases the file lock before remove.
+  {
+    H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+    auto block_dataset = file.openDataSet("block_0");
+    EXPECT_EQ(block_dataset.getTypeClass(), H5T_COMPOUND);
+    EXPECT_FALSE(file.nameExists("block_0_real"));
+    EXPECT_FALSE(file.nameExists("block_0_imag"));
+  }
 
-  file.close();
   std::filesystem::remove(filename);
 }
 
@@ -287,17 +294,19 @@ TEST(SymmetryBlockedTensorTest, Hdf5MetadataCarriesSerializationVersion) {
 
   make_simple_tensor().to_hdf5_file(filename.string());
 
-  H5::H5File file(filename.string(), H5F_ACC_RDONLY);
-  auto dataset = file.openDataSet("symmetry_blocked_tensor_metadata");
-  H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
-  std::string metadata_str;
-  dataset.read(metadata_str, str_type);
-  auto metadata = nlohmann::json::parse(metadata_str);
-  ASSERT_TRUE(metadata.contains("version"));
-  EXPECT_TRUE(metadata["version"].is_string());
-  EXPECT_FALSE(metadata["version"].get<std::string>().empty());
+  // Scope HDF5 handles so Windows releases the file lock before remove.
+  {
+    H5::H5File file(filename.string(), H5F_ACC_RDONLY);
+    auto dataset = file.openDataSet("symmetry_blocked_tensor_metadata");
+    H5::StrType str_type(H5::PredType::C_S1, H5T_VARIABLE);
+    std::string metadata_str;
+    dataset.read(metadata_str, str_type);
+    auto metadata = nlohmann::json::parse(metadata_str);
+    ASSERT_TRUE(metadata.contains("version"));
+    EXPECT_TRUE(metadata["version"].is_string());
+    EXPECT_FALSE(metadata["version"].get<std::string>().empty());
+  }
 
-  file.close();
   std::filesystem::remove(filename);
 }
 
