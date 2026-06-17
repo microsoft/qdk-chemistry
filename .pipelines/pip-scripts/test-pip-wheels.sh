@@ -17,16 +17,18 @@ export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
     # Try to prevent stochastic segfault from libc-bin
+    SUDO=""
+    [ "$(id -u)" != "0" ] && SUDO="sudo"
     echo "Reinstalling libc-bin..."
-    rm /var/lib/dpkg/info/libc-bin.*
-    apt-get clean
-    apt-get update -q
-    apt-get install -y -q libc-bin
+    $SUDO rm -f /var/lib/dpkg/info/libc-bin.*
+    $SUDO apt-get clean
+    $SUDO apt-get update -q
+    $SUDO apt-get install -y -q libc-bin
 
     # Update and install dependencies needed for testing
     echo "Installing apt dependencies..."
-    apt-get update -q
-    apt-get install -y -q \
+    $SUDO apt-get update -q
+    $SUDO apt-get install -y -q \
         build-essential \
         curl \
         git \

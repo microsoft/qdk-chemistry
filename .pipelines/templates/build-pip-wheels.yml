@@ -14,12 +14,6 @@ parameters:
 - name: agentBuildDirectory
   type: string
   default: $(Agent.BuildDirectory)
-- name: dockerImage
-  type: string
-  default: ubuntu:24.04
-- name: imageTag
-  type: string
-  default: linux/amd64
 - name: pythonVersion
   type: string
   default: 3.11
@@ -85,17 +79,10 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.imageTag, 'linux/amd64')) }}:
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
   - script: |
-      echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
-      docker run --rm \
-        --platform ${{ parameters.imageTag }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
-        -e PIP_INDEX_URL \
-        -e SYSTEM_ACCESSTOKEN \
-        -e QDK_UARCH=${{ parameters.march }} \
-        -w /workspace/qdk-chemistry \
-        ${{ parameters.dockerImage }} \
+      echo "Running pip wheel build (Linux ${{ parameters.march }})..."
+      cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
                                                       ${{ parameters.pythonVersion }} \
                                                       ${{ parameters.buildType }} \
@@ -111,32 +98,6 @@ steps:
     env:
       # Required by the conda bootstrap to authenticate to the Azure Artifacts
       # feed that proxies ms-ensureconda + conda channels.
-      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
-
-- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
-  - script: |
-      echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
-      docker run --rm \
-        --platform ${{ parameters.imageTag }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
-        -e PIP_INDEX_URL \
-        -e SYSTEM_ACCESSTOKEN \
-        -e QDK_UARCH=${{ parameters.march }} \
-        -w /workspace/qdk-chemistry \
-        ${{ parameters.dockerImage }} \
-      bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
-                                                      ${{ parameters.pythonVersion }} \
-                                                      ${{ parameters.buildType }} \
-                                                      ${{ parameters.buildTesting }} \
-                                                      ${{ parameters.enableCoverage }} \
-                                                      ${{ parameters.cmakeVersion }} \
-                                                      ${{ parameters.hdf5Version }} \
-                                                      ${{ parameters.blisVersion }} \
-                                                      ${{ parameters.libflameVersion }} \
-                                                      ${{ parameters.macBuild }}
-    displayName: Build wheel (Linux ${{ parameters.march }})
-    retryCountOnTaskFailure: 2
-    env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
