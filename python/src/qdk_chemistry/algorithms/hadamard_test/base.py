@@ -9,12 +9,12 @@ from enum import Enum
 from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
-from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
-from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.data import (
+    AlgorithmRef,
     Circuit,
     CircuitExecutorData,
     ControlledUnitary,
+    Settings,
     UnitaryRepresentation,
 )
 
@@ -50,12 +50,36 @@ def basis_to_qsharp_pauli(basis: HadamardTestBasis) -> Any:
     return getattr(_qsharp.Pauli, basis.value)
 
 
+class HadamardTestSettings(Settings):
+    """Settings for the Phase Estimation algorithm."""
+
+    def __init__(self):
+        """Initialize the settings for Hadamard Test.
+
+        Includes nested algorithm references for the controlled circuit mapper
+        and circuit executor.
+
+        """
+        super().__init__()
+        self._set_default(
+            "controlled_circuit_mapper",
+            "algorithm_ref",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        self._set_default(
+            "circuit_executor",
+            "algorithm_ref",
+            AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+        )
+
+
 class HadamardTest(Algorithm):
     """Abstract base class for Hadamard test generators."""
 
     def __init__(self):
         """Initialize a Hadamard test generator."""
         super().__init__()
+        self._settings = HadamardTestSettings()
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test."""
@@ -66,8 +90,6 @@ class HadamardTest(Algorithm):
         state_preparation_circuit: Circuit,
         unitary: UnitaryRepresentation,
         shots: int,
-        mapper: ControlledCircuitMapper | None = None,
-        simulator: CircuitExecutor | None = None,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
         num_ancilla_qubits: int = 0,
     ) -> CircuitExecutorData:
@@ -77,8 +99,6 @@ class HadamardTest(Algorithm):
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
             shots: Number of shots to execute the circuit.
-            mapper: Controlled circuit mapper. If ``None``, the default ``pauli_sequence`` mapper is used.
-            simulator: Circuit executor. If ``None``, the default ``qdk_full_state_simulator`` is used.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
             num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
@@ -97,20 +117,13 @@ class HadamardTest(Algorithm):
         if shots <= 0:
             raise ValueError("shots must be a positive integer.")
 
-        from qdk_chemistry.algorithms import create  # noqa: PLC0415
-
         controlled_evolution = ControlledUnitary(
             unitary=unitary,
             control_indices=[0],
         )
 
-        if mapper is None:
-            try:
-                mapper = create("controlled_circuit_mapper", "pauli_sequence")
-            except KeyError as err:
-                raise ValueError("Default controlled circuit mapper 'pauli_sequence' not available.") from err
-        elif not isinstance(mapper, ControlledCircuitMapper):
-            raise TypeError("mapper must be an instance of ControlledCircuitMapper or None.")
+        mapper = self._create_nested("controlled_circuit_mapper")
+
         ctrl_time_evol_unitary_circuit = mapper.run(controlled_unitary=controlled_evolution)
 
         circuit = self._build_hadamard_test_circuit(
@@ -121,15 +134,9 @@ class HadamardTest(Algorithm):
             num_ancilla_qubits,
         )
 
-        if simulator is None:
-            try:
-                simulator = create("circuit_executor", "qdk_full_state_simulator")
-            except KeyError as err:
-                raise ValueError("Unknown simulator type: qdk_full_state_simulator.") from err
-        elif not isinstance(simulator, CircuitExecutor):
-            raise TypeError("simulator must be an instance of CircuitExecutor or None.")
+        circuit_executor = self._create_nested("circuit_executor")
 
-        return simulator.run(circuit, shots=shots)
+        return circuit_executor.run(circuit, shots=shots)
 
     @abstractmethod
     def _build_hadamard_test_circuit(
