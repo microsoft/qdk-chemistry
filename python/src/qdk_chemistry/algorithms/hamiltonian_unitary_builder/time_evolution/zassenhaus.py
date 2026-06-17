@@ -388,15 +388,16 @@ class Zassenhaus(TimeEvolutionBuilder):
         factors = self._multi_operator_factors(groups, time, order)
 
         # Each factor exp(F) is realized by a Trotter-Suzuki product of its Pauli
-        # terms. A degree-n factor has ||F|| ~ t^n, so a Suzuki order-s product
-        # has error O(t^{n(s+1)}); we pick the smallest s in {1, 2, 4, 6, ...}
-        # with n(s+1) >= order + 1 so the flattening never dominates the O(t^{order+1})
-        # truncation (see :meth:`_correction_trotter_order`). Group (leaf) factors
-        # commute internally, so order 1 is already exact for them.
+        # terms (delegated to the Trotter builder). A degree-n factor has
+        # ||F|| ~ t^n, so a Suzuki order-s product has error O(t^{n(s+1)}); we pick
+        # the smallest s in {1, 2, 4, 6, ...} with n(s+1) >= order + 1 so the
+        # flattening never dominates the O(t^{order+1}) truncation
+        # (see :meth:`_correction_trotter_order`). Group (leaf) factors commute
+        # internally, so order 1 is already exact for them.
         terms: list[ExponentiatedPauliTerm] = []
         for factor, degree in factors:
             suzuki_order = self._correction_trotter_order(degree, order)
-            terms.extend(self._exponentiate_factor_suzuki(factor, suzuki_order, atol=atol))
+            terms.extend(self._exponentiate_factor(factor, suzuki_order, atol=atol))
 
         # The mapper applies step_terms[0] first (rightmost operator), so reverse
         # to realize the product above: the leftmost factor is applied last.
@@ -524,98 +525,49 @@ class Zassenhaus(TimeEvolutionBuilder):
             do_pauli_labels_commute(labels[i], labels[j]) for i in range(len(labels)) for j in range(i + 1, len(labels))
         )
 
-    def _exponentiate_factor(self, factor: QubitHamiltonian, *, atol: float = 1e-12) -> list[ExponentiatedPauliTerm]:
-        r"""Flatten an anti-Hermitian factor F = sum f_j P_j into exp terms.
+    def _exponentiate_factor(
+        self, factor: QubitHamiltonian, suzuki_order: int, *, atol: float = 1e-12
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Flatten an anti-Hermitian factor ``exp(F)`` with a Trotter-Suzuki product.
 
-        Since F is anti-Hermitian, f_j is purely imaginary, and
-        exp(F) = prod_j exp(f_j P_j) = prod_j exp(-i (-Im f_j) P_j),
-        i.e. the ``ExponentiatedPauliTerm`` angle is ``-Im(f_j)``.
+        ``F`` is anti-Hermitian, so ``G = i F`` is Hermitian and
+        ``exp(F) = exp(-i G)``. The flattening is delegated to the Trotter builder
+        on ``G`` at the requested Suzuki order, reusing its product-formula schedule
+        rather than re-implementing one here. The needed orders are always 1, 2 or
+        even (see :meth:`_correction_trotter_order`), all of which Trotter supports.
+        Identity terms are kept as global-phase rotations by the Trotter builder, as
+        required for PhaseEstimation.
 
-        Identity terms are kept as global-phase rotations (empty Pauli map),
-        matching the Trotter builder: dropping them corrupts controlled-U
-        phases in PhaseEstimation (a leading ``I...I`` term, as in H2/STO-3G,
-        carries a real physical phase).
+        Like Pauli terms are summed first: ``QubitHamiltonian`` addition
+        concatenates, and the commutator sums in ``C_n`` can repeat a Pauli, but
+        ``exp(a P) exp(b P) = exp((a + b) P)`` exactly, so collecting them removes
+        redundant rotations with no loss of accuracy. A leftover real part in ``F``
+        makes ``G`` non-Hermitian, which the Trotter builder rejects (the factor is
+        expected to be anti-Hermitian).
 
-        This is the first-order (plain) Trotter product. A factor's terms
-        generally do NOT commute, so it carries an O(||F||^2) = O(t^{2n}) error
-        for a degree-n factor; the caller (:meth:`_decompose_zassenhaus_step`)
-        escalates to a higher Suzuki order when that is not high enough. Leaf
-        (group) factors commute internally, so this product is exact for them.
-
-        Like Pauli terms are summed before emission. ``QubitHamiltonian``
-        addition concatenates rather than merging, and the commutator sums in
-        :meth:`_correction_factors` can produce the same Pauli several times;
-        since ``exp(a P) exp(b P) = exp((a + b) P)`` exactly (P commutes with
-        itself), collecting them removes redundant rotations with no reordering
-        and no loss of accuracy.
+        The Trotter container is in mapper order (``step_terms[0]`` applied first);
+        the caller assembles factors in product (leftmost-first) order and reverses
+        once at the end, so the terms are reversed here to match that convention.
         """
         merged: dict[str, complex] = {}
         for label, coeff in zip(factor.pauli_strings, factor.coefficients, strict=True):
             merged[label] = merged.get(label, 0j) + complex(coeff)
 
-        terms: list[ExponentiatedPauliTerm] = []
-        for label, c in merged.items():
-            if abs(c) < atol:
+        labels: list[str] = []
+        coeffs: list[complex] = []
+        for label, coeff in merged.items():
+            if abs(coeff) < atol:
                 continue
-            if abs(c.real) > atol:
-                # Anti-Hermitian factor should have ~zero real part. Surface
-                # violations instead of silently dropping them (Copilot review
-                # flagged this exact failure mode on PR #508).
-                raise ValueError(f"Expected anti-Hermitian factor; term {label!r} has real coeff {c.real}.")
-            angle = -c.imag
-            mapping = self._pauli_label_to_map(label)  # empty for identity -> global phase
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-        return terms
-
-    def _exponentiate_factor_symmetric(
-        self, factor: QubitHamiltonian, *, atol: float = 1e-12
-    ) -> list[ExponentiatedPauliTerm]:
-        r"""Symmetric (Strang) flattening of an anti-Hermitian factor.
-
-        Emits half-angle terms forward then in reverse:
-        ``exp(f_1/2) ... exp(f_m/2) exp(f_m/2) ... exp(f_1/2)``, whose error
-        versus ``exp(F)`` is O(||F||^3). For a degree-n factor (||F|| ~ t^n)
-        this is O(t^{3n}), one symmetric order tighter than the plain product.
-        The emitted block is a palindrome, so the outer ``terms.reverse()`` in
-        :meth:`_decompose_zassenhaus_step` leaves its internal order intact.
-
-        The two identical centre terms ``exp(f_m/2) exp(f_m/2) = exp(f_m)`` are
-        merged into a single full-angle rotation, saving one gate per factor
-        (and collapsing a single-term factor to one rotation).
-        """
-        half = self._exponentiate_factor((0.5) * factor, atol=atol)
-        if not half:
+            labels.append(label)
+            coeffs.append(1j * coeff)  # G = i F is Hermitian when F is anti-Hermitian
+        if not labels:
             return []
-        *body, last = half
-        centre = ExponentiatedPauliTerm(pauli_term=last.pauli_term, angle=2.0 * last.angle)
-        return [*body, centre, *body[::-1]]
 
-    def _exponentiate_factor_suzuki(
-        self, factor: QubitHamiltonian, suzuki_order: int, *, atol: float = 1e-12
-    ) -> list[ExponentiatedPauliTerm]:
-        r"""Flatten ``exp(F)`` with a Trotter-Suzuki product formula of order ``suzuki_order``.
-
-        Order 1 is the plain product (:meth:`_exponentiate_factor`), order 2 the
-        symmetric Strang product (:meth:`_exponentiate_factor_symmetric`), and even
-        orders 2k >= 4 use the standard Suzuki recursion (Suzuki 1992)
-
-            S_{2k}(F) = S_{2k-2}(u_k F)^2 S_{2k-2}((1 - 4 u_k) F) S_{2k-2}(u_k F)^2,
-            u_k = 1 / (4 - 4^{1/(2k-1)}),
-
-        whose error versus ``exp(F)`` is O(||F||^{2k+1}). Each S_{2k} is time
-        symmetric, so the emitted block is a palindrome and the outer
-        ``terms.reverse()`` in :meth:`_decompose_zassenhaus_step` leaves it intact.
-        """
-        if suzuki_order <= 1:
-            return self._exponentiate_factor(factor, atol=atol)
-        if suzuki_order == 2:
-            return self._exponentiate_factor_symmetric(factor, atol=atol)
-
-        k = suzuki_order // 2
-        u_k = 1.0 / (4.0 - 4.0 ** (1.0 / (2 * k - 1)))
-        outer = self._exponentiate_factor_suzuki(u_k * factor, suzuki_order - 2, atol=atol)
-        middle = self._exponentiate_factor_suzuki((1.0 - 4.0 * u_k) * factor, suzuki_order - 2, atol=atol)
-        return [*outer, *outer, *middle, *outer, *outer]
+        hermitian = QubitHamiltonian(labels, np.asarray(coeffs))
+        container = (
+            Trotter(order=suzuki_order, time=1.0, num_divisions=1, weight_threshold=atol).run(hermitian).get_container()
+        )
+        return list(reversed(container.step_terms))
 
     @staticmethod
     def _correction_trotter_order(degree: int, order: int) -> int:
