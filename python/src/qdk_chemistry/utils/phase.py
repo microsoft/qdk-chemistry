@@ -34,17 +34,20 @@ def qpe_evolution_time_from_hamiltonian(
     *,
     phase_bound: float = np.pi,
 ) -> float:
-    """Choose a QPE evolution time from the Hamiltonian norm bound.
+    """Choose a QPE evolution time from a Hamiltonian spectral-norm bound.
 
-    The Hamiltonian 1-norm bounds the magnitude of every eigenvalue, so
-    ``t = phase_bound / ||H||`` keeps ``|E| t <= phase_bound`` for all
-    eigenvalues. The default ``phase_bound = π`` maximizes phase resolution
-    while staying within the principal QPE branch under that bound.
+    The supplied ``hamiltonian.schatten_norm`` value is treated as a positive
+    upper bound ``B`` on the operator norm ``||H||_2``. For Hermitian ``H``,
+    every eigenvalue satisfies ``|E| <= ||H||_2 <= B``, so
+    ``t = phase_bound / B`` keeps ``|E| t <= phase_bound`` for all eigenvalues.
+    For :class:`~qdk_chemistry.data.QubitHamiltonian`, this bound is the
+    Pauli-coefficient 1-norm and may be loose depending on the decomposition.
+    The default ``phase_bound = π`` maximizes phase resolution while staying
+    within the principal QPE branch under that bound.
 
     Args:
-        hamiltonian: Object exposing ``schatten_norm``; for
-            :class:`~qdk_chemistry.data.QubitHamiltonian`, this is the
-            coefficient 1-norm.
+        hamiltonian: Object exposing ``schatten_norm`` as a positive upper
+            bound on the operator norm.
         phase_bound: Maximum allowed phase magnitude in radians. Must be in
             ``(0, π]``.
 

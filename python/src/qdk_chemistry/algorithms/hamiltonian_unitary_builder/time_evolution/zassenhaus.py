@@ -48,6 +48,7 @@ __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
 Word = tuple[int, ...]
 WordPolynomial = dict[Word, Fraction]
+CachedWordPolynomial = tuple[tuple[Word, Fraction], ...]
 PauliWord = tuple[tuple[int, int], ...]
 PauliSummand = tuple[str, PauliWord, complex]
 
@@ -317,7 +318,7 @@ class Zassenhaus(TimeEvolutionBuilder):
 
 
 @cache
-def _zassenhaus_word_factors(num_symbols: int, order: int) -> tuple[WordPolynomial, ...]:
+def _zassenhaus_word_factors(num_symbols: int, order: int) -> tuple[CachedWordPolynomial, ...]:
     """Generate homogeneous Zassenhaus correction factors as word polynomials."""
     if num_symbols <= 1 or order < 2:
         return ()
@@ -336,7 +337,7 @@ def _zassenhaus_word_factors(num_symbols: int, order: int) -> tuple[WordPolynomi
         if correction and degree < order:
             current = _poly_mul(current, _poly_exp(correction, order), order)
 
-    return tuple(factors)
+    return tuple(tuple(factor.items()) for factor in factors)
 
 
 def _poly_add(a: WordPolynomial, b: WordPolynomial, *, scale: Fraction = Fraction(1)) -> WordPolynomial:
@@ -391,7 +392,7 @@ def _hamiltonian_to_pauli_terms(hamiltonian: QubitHamiltonian, atol: float) -> l
 
 
 def _evaluate_word_polynomial(
-    polynomial: WordPolynomial,
+    polynomial: CachedWordPolynomial,
     pauli_blocks: list[list[PauliSummand]],
     *,
     time: float,
@@ -406,7 +407,7 @@ def _evaluate_word_polynomial(
     lets vanishing Pauli commutators short-circuit before sparse multiplication.
     """
     accumulator: dict[PauliWord, complex] = {}
-    for word, rational_coeff in polynomial.items():
+    for word, rational_coeff in polynomial:
         degree = len(word)
         if degree == 0 or any(not pauli_blocks[symbol] for symbol in word):
             continue

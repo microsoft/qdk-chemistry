@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from fractions import Fraction
 from functools import cache
 
 import numpy as np
@@ -189,6 +190,16 @@ class TestZassenhaus:
         ).get_container()
 
         assert container.step_reps == 10
+
+    def test_cached_word_factors_are_read_only(self):
+        """Cached formal word factors should not be mutable through callers."""
+        factors = zassenhaus_module._zassenhaus_word_factors(2, 3)
+        original = tuple(dict(factor) for factor in factors)
+
+        with pytest.raises(TypeError):
+            factors[0][(0, 0)] = Fraction(999)
+
+        assert tuple(dict(factor) for factor in zassenhaus_module._zassenhaus_word_factors(2, 3)) == original
 
     def test_vanishing_corrections_short_circuit_before_pauli_multiplication(self, monkeypatch):
         """Commuting correction blocks should be skipped before sparse Pauli multiplication."""
