@@ -1,7 +1,7 @@
 ---
 name: qdk-chemistry-mcp
 version: '{{QDK_CHEMISTRY_VERSION}}'
-description: 'Use QDK Chemistry MCP tools for interactive quantum chemistry workflows. Use when: running molecules through the MCP server, calling MCP tools directly, building no-code agent-driven pipelines, visualizing structures/circuits/orbitals, or working with the quantum-agent multi-agent system. Covers all 40+ MCP tools, return format, visualization, and agent orchestration patterns.'
+description: 'Use QDK Chemistry MCP tools for interactive quantum chemistry workflows. Use when: running molecules through the MCP server, calling MCP tools directly, building no-code agent-driven pipelines, visualizing structures/circuits/orbitals, or working with the quantum-agent multi-agent system. Covers all 42 MCP tools, return format, visualization, remote execution, backend management, and agent orchestration patterns.'
 ---
 
 # QDK Chemistry MCP Tools
@@ -67,6 +67,16 @@ Examples: `h2.structure.json`, `h2.wavefunction.json`, `h2.circuit.json`
 | `create_project` | Create a new project directory | `project_name` |
 | `list_project_files` | List files in a project with inferred types | `project_name` |
 | `list_tools` | List available tools by category | `category?` |
+
+### Backend & Cache Management
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `list_cache_backends` | List available local caching backends | — |
+| `list_remote_backends` | List available remote execution backends | — |
+| `describe_backend` | Get details about a specific backend (local or remote) | `backend_name` |
+
+Use these tools to discover available resources before submitting remote jobs or configuring caching strategies.
 
 ### Structure & Helpers
 
@@ -138,14 +148,14 @@ Build and inspect QPE circuit components for resource estimates. No energy compu
 
 ### Remote / Async Job Execution
 
-Any `run_*` tool can execute remotely by passing `remote` and `remote_config`. Jobs are persisted to disk and can be checked/resumed later. Use `remote_timeout=0` for fire-and-forget submission.
+Any `run_*` tool can execute remotely by passing `remote` and `remote_config`. Jobs are persisted to disk and can be checked/resumed later. Use `remote_timeout=0` for fire-and-forget submission. Discover available backends with `list_remote_backends` before configuring remote execution.
 
-| Tool | Purpose |
-|------|---------|
-| `check_remote_job` | Poll job status and logs |
-| `retrieve_remote_results` | Download results into project directory |
-| `list_remote_jobs` | List jobs (optionally filtered by status) |
-| `cancel_remote_job` | Cancel a running job |
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `check_remote_job` | Poll job status and logs | `project_name`, `job_id` |
+| `retrieve_remote_results` | Download results into project directory | `project_name`, `job_id` |
+| `list_remote_jobs` | List jobs (optionally filtered by status) | `project_name?`, `status?` |
+| `cancel_remote_job` | Cancel a running job | `project_name`, `job_id` |
 
 See the `remote-execution` skill for full async workflow details.
 

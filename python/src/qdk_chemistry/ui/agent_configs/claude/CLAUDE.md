@@ -34,6 +34,16 @@ Once configured, the MCP server exposes tools for no-code quantum chemistry work
 | `list_project_files` | List files in a project with inferred types | `project_name` |
 | `list_tools` | List available tools by category | `category?` |
 
+#### Backend & Cache Management
+
+| Tool | Purpose | Key Parameters |
+|------|---------|----------------|
+| `list_cache_backends` | List available local caching backends | — |
+| `list_remote_backends` | List available remote execution backends | — |
+| `describe_backend` | Get details about a specific backend (local or remote) | `backend_name` |
+
+Use these tools to discover available resources before submitting remote jobs or configuring caching strategies.
+
 #### Structure & Helpers
 
 | Tool | Purpose | Key Parameters |
