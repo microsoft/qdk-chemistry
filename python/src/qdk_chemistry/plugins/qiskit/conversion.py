@@ -69,7 +69,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     # Fill statevector
     for i, det in enumerate(determinants):
         # Convert configuration to statevector index
-        index = _configuration_to_statevector_index(det, num_orbs)
+        index = _configuration_to_statevector_index(det)
         statevector[index] = coeffs_array[i]
 
     # Normalize if requested
@@ -81,7 +81,7 @@ def create_statevector_from_wavefunction(wavefunction: data.Wavefunction, normal
     return statevector
 
 
-def _configuration_to_statevector_index(configuration: data.Configuration, num_orbitals: int) -> int:
+def _configuration_to_statevector_index(configuration: data.Configuration) -> int:
     """Convert a Configuration to its corresponding integer index in the statevector array.
 
     This function maps an electronic configuration (orbital occupation pattern) to
@@ -112,31 +112,20 @@ def _configuration_to_statevector_index(configuration: data.Configuration, num_o
         configuration (Configuration): The electronic configuration to convert. This object
             encodes the occupation of each orbital (unoccupied, alpha, beta,
             or doubly occupied).
-        num_orbitals (int): Number of spatial orbitals to use from the configuration.
-            This allows extracting a subset for active space calculations.
 
     Returns:
-        int: The statevector index (0 to 2^(2*num_orbitals) - 1) corresponding
-            to this configuration in the computational basis.
-
-    Raises:
-        RuntimeError: If num_orbitals exceeds the configuration's capacity.
+        int: The statevector index corresponding to this configuration in the
+            computational basis.
 
     """
-    # Get binary strings for alpha and beta
-    alpha_str, beta_str = configuration.to_binary_strings(num_orbitals)
+    # Get bit vector: [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]
+    bits = configuration.to_bits()
 
     index = 0
 
-    # Process alpha electrons (lower bits)
     # Little-endian: bit i corresponds to qubit i
-    for i, bit in enumerate(alpha_str):
-        if bit == "1":
+    for i, bit in enumerate(bits):
+        if bit:
             index |= 1 << i
-
-    # Process beta electrons (upper bits, offset by num_orbitals)
-    for i, bit in enumerate(beta_str):
-        if bit == "1":
-            index |= 1 << (num_orbitals + i)
 
     return index

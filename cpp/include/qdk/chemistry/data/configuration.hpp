@@ -74,6 +74,7 @@ class Configuration : public DataClass {
 
     Configuration result;
     result._bits_per_mode = 2;
+    result._num_modes = num_orbitals;
     result._packed_orbs.resize(_packed_bytes(num_orbitals, 2), 0);
 
     for (size_t i = 0; i < num_orbitals; ++i) {
@@ -112,6 +113,7 @@ class Configuration : public DataClass {
     }
     Configuration result;
     result._bits_per_mode = 1;
+    result._num_modes = num_modes;
     result._packed_orbs.resize(_packed_bytes(num_modes, 1), 0);
     for (size_t i = 0; i < num_modes; ++i) {
       if (orbs[i]) result._set_mode_raw(i, 1);
@@ -201,6 +203,25 @@ class Configuration : public DataClass {
    * @throws std::out_of_range if @p idx >= num_modes().
    */
   uint8_t get_mode_state(size_t idx) const;
+
+  /**
+   * @brief Return a flat vector of 0/1 bit values representing the
+   * configuration.
+   *
+   * For bits_per_mode == 1: returns a vector of length num_modes() where each
+   * element is the mode state (0 or 1).
+   *
+   * For bits_per_mode == 2 (spin-½): returns a vector of length
+   * 2 * num_modes(). The first num_modes() entries are the alpha occupations
+   * and the last num_modes() entries are the beta occupations (Jordan–Wigner
+   * ordering).
+   *
+   * The total length equals num_modes() * bits_per_mode(), which is the
+   * number of qubits in a Jordan–Wigner mapping.
+   *
+   * @return Vector of 0s and 1s.
+   */
+  std::vector<uint8_t> to_bits() const;
 
   /**
    * @brief Total occupation summed over all modes.
@@ -419,6 +440,9 @@ class Configuration : public DataClass {
 
   /// Packed mode data. Layout depends on _bits_per_mode.
   std::vector<uint8_t> _packed_orbs;
+
+  /// Number of modes.
+  size_t _num_modes = 0;
 
   /// Bits used to encode each single-particle mode (1 or 2).
   uint8_t _bits_per_mode = 2;

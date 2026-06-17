@@ -41,13 +41,13 @@ class TestConfigurationToStatevectorIndex:
         Binary: 01010011 = 64 + 16 + 2 + 1 = 83
         """
         config = Configuration.from_spin_half_string("2ud0")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 83
 
     def test_empty_configuration(self):
         """Test that empty configuration maps to index 0."""
         config = Configuration.from_spin_half_string("0000")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 0
 
     def test_all_doubly_occupied(self):
@@ -57,7 +57,7 @@ class TestConfigurationToStatevectorIndex:
         Binary: 11111111 = 255
         """
         config = Configuration.from_spin_half_string("2222")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 255
 
     def test_all_alpha_electrons(self):
@@ -67,7 +67,7 @@ class TestConfigurationToStatevectorIndex:
         Binary: 00001111 = 15
         """
         config = Configuration.from_spin_half_string("uuuu")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 15
 
     def test_all_beta_electrons(self):
@@ -77,30 +77,13 @@ class TestConfigurationToStatevectorIndex:
         Binary: 11110000 = 240
         """
         config = Configuration.from_spin_half_string("dddd")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 240
-
-    def test_partial_orbital_usage(self):
-        """Test using only a subset of orbitals from configuration.
-
-        Configuration "2ud000" using first 3 orbitals:
-        - Orbital 0: doubly
-        - Orbital 1: alpha
-        - Orbital 2: beta
-
-        Qubits: 5 4 3 | 2 1 0
-                2 1 0 | 2 1 0
-                1 0 1 | 0 1 1
-        Binary: 101011 = 32 + 8 + 2 + 1 = 43
-        """
-        config = Configuration.from_spin_half_string("2ud000")
-        index = _configuration_to_statevector_index(config, 3)
-        assert index == 43
 
     def test_single_orbital_empty(self):
         """Test single empty orbital."""
         config = Configuration.from_spin_half_string("0")
-        index = _configuration_to_statevector_index(config, 1)
+        index = _configuration_to_statevector_index(config)
         assert index == 0
 
     def test_single_orbital_alpha(self):
@@ -109,7 +92,7 @@ class TestConfigurationToStatevectorIndex:
         Bit 0 set, bit 1 clear: Binary 01 = 1
         """
         config = Configuration.from_spin_half_string("u")
-        index = _configuration_to_statevector_index(config, 1)
+        index = _configuration_to_statevector_index(config)
         assert index == 1
 
     def test_single_orbital_beta(self):
@@ -118,7 +101,7 @@ class TestConfigurationToStatevectorIndex:
         Bit 0 clear, bit 1 set: Binary 10 = 2
         """
         config = Configuration.from_spin_half_string("d")
-        index = _configuration_to_statevector_index(config, 1)
+        index = _configuration_to_statevector_index(config)
         assert index == 2
 
     def test_single_orbital_doubly(self):
@@ -127,7 +110,7 @@ class TestConfigurationToStatevectorIndex:
         Bits 0 and 1 set: Binary 11 = 3
         """
         config = Configuration.from_spin_half_string("2")
-        index = _configuration_to_statevector_index(config, 1)
+        index = _configuration_to_statevector_index(config)
         assert index == 3
 
     def test_little_endian_ordering(self):
@@ -140,14 +123,8 @@ class TestConfigurationToStatevectorIndex:
         Binary: 01000001 = 64 + 1 = 65
         """
         config = Configuration.from_spin_half_string("u0d0")
-        index = _configuration_to_statevector_index(config, 4)
+        index = _configuration_to_statevector_index(config)
         assert index == 65
-
-    def test_error_on_too_many_orbitals(self):
-        """Test that requesting more orbitals than available raises error."""
-        config = Configuration.from_spin_half_string("ud")
-        with pytest.raises(RuntimeError):
-            _configuration_to_statevector_index(config, 10)
 
 
 class TestCreateStatevectorFromWavefunction:

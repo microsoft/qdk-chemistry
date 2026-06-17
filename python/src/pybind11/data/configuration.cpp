@@ -304,6 +304,33 @@ Returns:
     str: String representation of the Configuration as a orbital occupation string
 
 )");
+
+  configuration.def("to_bits", &Configuration::to_bits,
+                    R"(
+Return a flat list of 0/1 bit values representing the configuration.
+
+For bits_per_mode == 1: returns a list of length num_modes where each
+element is the mode state (0 or 1).
+
+For bits_per_mode == 2 (spin-½): returns a list of length 2 * num_modes.
+The first num_modes entries are the alpha occupations and the last num_modes
+entries are the beta occupations (Jordan-Wigner ordering).
+
+The total length is always num_modes * bits_per_mode, i.e. the number of
+qubits in a Jordan-Wigner mapping.
+
+Returns:
+    list[int]: List of 0s and 1s.
+
+Examples:
+    >>> config = qdk_chemistry.Configuration.from_bitstring("10110")
+    >>> config.to_bits()
+    [1, 0, 1, 1, 0]
+    >>> config = qdk_chemistry.Configuration.from_spin_half_string("2u0d")
+    >>> config.to_bits()
+    [1, 1, 0, 0, 1, 0, 0, 1]
+
+)");
   // Data type name class attribute
   configuration.attr("_data_type_name") =
       DATACLASS_TO_SNAKE_CASE(Configuration);
