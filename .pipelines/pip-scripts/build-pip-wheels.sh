@@ -54,14 +54,19 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         zlib-devel
     cmake --version
 
-    # Eigen3 is not packaged in Azure Linux 3; install headers from source
+    # Eigen3 is not packaged in Azure Linux 3; download from internal Azure Artifacts feed
     echo "Installing Eigen3 headers..."
-    EIGEN_VERSION=3.4.0
-    wget -q https://gitlab.com/libeigen/eigen/-/archive/${EIGEN_VERSION}/eigen-${EIGEN_VERSION}.tar.gz
-    tar -xzf eigen-${EIGEN_VERSION}.tar.gz
-    cmake -S eigen-${EIGEN_VERSION} -B eigen-${EIGEN_VERSION}/build -DCMAKE_INSTALL_PREFIX=/usr/local
-    $SUDO cmake --install eigen-${EIGEN_VERSION}/build
-    rm -rf eigen-${EIGEN_VERSION} eigen-${EIGEN_VERSION}.tar.gz
+    AZURE_DEVOPS_EXT_PAT=$SYSTEM_ACCESSTOKEN az artifacts universal download \
+        --organization https://dev.azure.com/ms-azurequantum \
+        --project AzureQuantum \
+        --scope project \
+        --feed quantum-apps-dependencies \
+        --name eigen3 \
+        --version 3.4.0 \
+        --path eigen3
+    cmake -S eigen3 -B eigen3/build -DCMAKE_INSTALL_PREFIX=/usr/local
+    $SUDO cmake --install eigen3/build
+    rm -rf eigen3
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
