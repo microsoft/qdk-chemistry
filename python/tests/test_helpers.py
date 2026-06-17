@@ -11,12 +11,12 @@ from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
-    CasWavefunctionContainer,
     Configuration,
     Hamiltonian,
     Orbitals,
     OrbitalType,
     Shell,
+    StateVectorContainer,
     Structure,
     Wavefunction,
 )
@@ -208,11 +208,11 @@ def create_test_wavefunction(num_orbitals: int = 2):
 
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
 
     return Wavefunction(container)
 
@@ -239,11 +239,11 @@ def create_test_ansatz(num_orbitals: int = 2):
     # Create wavefunction using the same shared orbitals
     # Create single determinant configuration (e.g., "20" for 2 electrons in first orbital)
     config_string = "2" + "0" * (num_orbitals - 1)
-    det = Configuration(config_string)
+    det = Configuration.from_spin_half_string(config_string)
 
     # Single determinant with coefficient 1.0
     coeffs = np.array([1.0])
-    container = CasWavefunctionContainer(coeffs, [det], orbitals)
+    container = StateVectorContainer(coeffs, [det], orbitals)
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
@@ -400,4 +400,4 @@ def create_random_wavefunction(
     coeffs = raw / np.linalg.norm(raw)
 
     orbitals = create_test_orbitals(n_orbitals)
-    return Wavefunction(CasWavefunctionContainer(coeffs, configs, orbitals))
+    return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))

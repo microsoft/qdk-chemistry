@@ -9,6 +9,7 @@ from typing import Any
 
 import h5py
 
+from qdk_chemistry.data._hashing import _hash_str
 from qdk_chemistry.data.base import DataClass
 
 from .containers.base import UnitaryContainer
@@ -35,6 +36,11 @@ class UnitaryRepresentation(DataClass):
         """Initialize a UnitaryRepresentation."""
         self._container = container
         super().__init__()
+
+    def _hash_update(self, h) -> None:
+        """Feed identifying data into the hasher."""
+        _hash_str(h, "unitary_representation")
+        _hash_str(h, self._container.content_hash())
 
     def get_container_type(self) -> str:
         """Get the type of the unitary container.
