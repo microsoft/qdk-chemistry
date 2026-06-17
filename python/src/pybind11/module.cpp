@@ -10,6 +10,7 @@ namespace py = pybind11;
 
 void bind_base_class(py::module& m);
 void bind_symmetry(py::module& m);
+void bind_symmetry_blocked_scalar(py::module& m);
 void bind_symmetry_blocked_tensor(py::module& m);
 void bind_symmetry_blocked_index_set(py::module& m);
 void bind_symmetry_blocked_sparse_map(py::module& m);
@@ -66,6 +67,7 @@ PYBIND11_MODULE(_core, m) {
 
   bind_base_class(data);
   bind_symmetry(symmetry);  // axis types + SBT/SBIS before orbital containers
+  bind_symmetry_blocked_scalar(symmetry);
   bind_symmetry_blocked_tensor(symmetry);
   bind_symmetry_blocked_index_set(symmetry);
   bind_symmetry_blocked_sparse_map(symmetry);

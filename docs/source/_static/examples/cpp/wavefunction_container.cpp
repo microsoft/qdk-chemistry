@@ -86,11 +86,10 @@ int main() {
   std::shared_ptr<Orbitals> orbitals = make_minimal_orbitals();
   // Create a simple Slater determinant wavefunction for H2 ground state
   // 2 electrons in bonding sigma orbital
-  Configuration det("20");
+  auto det = Configuration::from_spin_half_string("20");
 
   // Constructor takes single determinant and orbitals as input
-  auto sd_container =
-      std::make_unique<SlaterDeterminantContainer>(det, orbitals);
+  auto sd_container = std::make_unique<StateVectorContainer>(det, orbitals);
   Wavefunction sd_wavefunction(std::move(sd_container));
   // end-cell-create-slater
   // --------------------------------------------------------------------------------------------
@@ -101,10 +100,14 @@ int main() {
   // CAS(2,2) = 2 electrons in 2 MOs (bonding and antibonding)
   // All possible configurations:
   std::vector<Configuration> cas_dets = {
-      Configuration("20"),  // Both electrons in bonding (ground state)
-      Configuration("ud"),  // Alpha in bonding, beta in antibonding
-      Configuration("du"),  // Beta in bonding, alpha in antibonding
-      Configuration("02")   // Both electrons in antibonding
+      Configuration::from_spin_half_string(
+          "20"),  // Both electrons in bonding (ground state)
+      Configuration::from_spin_half_string(
+          "ud"),  // Alpha in bonding, beta in antibonding
+      Configuration::from_spin_half_string(
+          "du"),  // Beta in bonding, alpha in antibonding
+      Configuration::from_spin_half_string(
+          "02")  // Both electrons in antibonding
   };
 
   // Coefficients
@@ -113,8 +116,8 @@ int main() {
 
   // Create a CAS wavefunction : requires all coefficients and determinants, as
   // well as orbitals, in constructor
-  auto cas_container = std::make_unique<CasWavefunctionContainer>(
-      cas_coeffs, cas_dets, orbitals);
+  auto cas_container =
+      std::make_unique<StateVectorContainer>(cas_coeffs, cas_dets, orbitals);
   Wavefunction cas_wavefunction(std::move(cas_container));
   // end-cell-create-cas
   // --------------------------------------------------------------------------------------------
@@ -125,9 +128,9 @@ int main() {
   // SCI selects only the most important configurations/determinants from the
   // full space
   std::vector<Configuration> sci_dets = {
-      Configuration("20"),  // Ground state
-      Configuration("ud"),  // Mixed state
-      Configuration("du")   // Mixed state
+      Configuration::from_spin_half_string("20"),  // Ground state
+      Configuration::from_spin_half_string("ud"),  // Mixed state
+      Configuration::from_spin_half_string("du")   // Mixed state
   };
 
   // Coefficients for selected determinants
@@ -136,8 +139,8 @@ int main() {
 
   // Create a SCI wavefunction: requires selected coefficients and determinants,
   // as well as orbitals, in constructor
-  auto sci_container = std::make_unique<SciWavefunctionContainer>(
-      sci_coeffs, sci_dets, orbitals);
+  auto sci_container =
+      std::make_unique<StateVectorContainer>(sci_coeffs, sci_dets, orbitals);
   Wavefunction sci_wavefunction(std::move(sci_container));
   // end-cell-create-sci
   // --------------------------------------------------------------------------------------------
@@ -150,17 +153,20 @@ int main() {
 
   // Use the Slater determinant as reference
   auto orbitals_mp2 = make_minimal_orbitals();
-  auto hamiltonian = make_minimal_hamiltonian(orbitals_mp2);
-  Configuration ref_det("20");
+  auto ref_det = Configuration::from_spin_half_string("20");
   auto sd_container_mp2 =
-      std::make_unique<SlaterDeterminantContainer>(ref_det, orbitals_mp2);
+      std::make_unique<StateVectorContainer>(ref_det, orbitals_mp2);
   auto ref_wavefunction =
       std::make_shared<Wavefunction>(std::move(sd_container_mp2));
 
-  // Create MP2 container: requires Hamiltonian and reference wavefunction
-  // Amplitudes are computed lazily when first requested
-  auto mp2_container =
-      std::make_unique<MP2Container>(hamiltonian, ref_wavefunction, "mp");
+  // In practice the MP2 algorithm computes the amplitudes; here we store them
+  // directly in an AmplitudeContainer. T1 is zero for MP2.
+  Eigen::VectorXd t1_mp2 = Eigen::VectorXd::Zero(1);
+  Eigen::VectorXd t2_mp2(1);
+  t2_mp2 << 0.1;
+  auto mp2_container = std::make_unique<AmplitudeContainer>(
+      orbitals_mp2, ref_wavefunction, AmplitudeType::MollerPlesset, t1_mp2,
+      t2_mp2);
   Wavefunction mp2_wavefunction(std::move(mp2_container));
   // end-cell-create-mp2
   // --------------------------------------------------------------------------------------------
@@ -172,9 +178,9 @@ int main() {
 
   // Use the Slater determinant as reference
   auto orbitals_cc = make_minimal_orbitals();
-  Configuration ref_det_cc("20");
+  auto ref_det_cc = Configuration::from_spin_half_string("20");
   auto sd_container_cc =
-      std::make_unique<SlaterDeterminantContainer>(ref_det_cc, orbitals_cc);
+      std::make_unique<StateVectorContainer>(ref_det_cc, orbitals_cc);
   auto ref_wavefunction_cc =
       std::make_shared<Wavefunction>(std::move(sd_container_cc));
 
@@ -190,8 +196,9 @@ int main() {
 
   // Create CC container: requires reference wavefunction, orbitals, and
   // amplitudes
-  auto cc_container = std::make_unique<CoupledClusterContainer>(
-      orbitals_cc, ref_wavefunction_cc, t1_amplitudes, t2_amplitudes);
+  auto cc_container = std::make_unique<AmplitudeContainer>(
+      orbitals_cc, ref_wavefunction_cc, AmplitudeType::CoupledCluster,
+      t1_amplitudes, t2_amplitudes);
   Wavefunction cc_wavefunction(std::move(cc_container));
   // end-cell-create-cc
   // --------------------------------------------------------------------------------------------
@@ -227,18 +234,17 @@ int main() {
   // MP2
   // Get the container back from wfn
   const auto& mp2_container_ref =
-      mp2_wavefunction.get_container<MP2Container>();
-  // Amplitudes are lazily evaluated on first call then cached
+      mp2_wavefunction.get_container<AmplitudeContainer>();
   auto [t2_abab_mp2, t2_aaaa_mp2, t2_bbbb_mp2] =
-      mp2_container_ref->get_t2_amplitudes();
+      mp2_container_ref.get_t2_amplitudes();
 
   // CC
   const auto& cc_container_ref =
-      cc_wavefunction.get_container<CoupledClusterContainer>();
+      cc_wavefunction.get_container<AmplitudeContainer>();
   // Amplitudes are stored already from construction
-  auto [t1_aa, t1_bb] = cc_container_ref->get_t1_amplitudes();
+  auto [t1_aa, t1_bb] = cc_container_ref.get_t1_amplitudes();
   auto [t2_abab_cc, t2_aaaa_cc, t2_bbbb_cc] =
-      cc_container_ref->get_t2_amplitudes();
+      cc_container_ref.get_t2_amplitudes();
   // end-cell-access-amplitudes
   // --------------------------------------------------------------------------------------------
 
