@@ -21,6 +21,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     echo "Installing tdnf dependencies..."
     $SUDO tdnf update -y
     $SUDO tdnf install -y \
+        azure-cli \
         binutils \
         boost-devel \
         bzip2-devel \

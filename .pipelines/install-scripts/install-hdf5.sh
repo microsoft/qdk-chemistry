@@ -43,7 +43,7 @@ fi
 echo "Downloading HDF5 ${HDF5_VERSION}..."
 rm -rf hdf5 hdf5-${HDF5_VERSION} hdf5-${HDF5_VERSION}.tar.bz2
 wget -q "https://support.hdfgroup.org/ftp/HDF5/releases/${HDF5_RELEASE_DIR}/hdf5-${HDF5_VERSION}/src/hdf5-${HDF5_VERSION}.tar.bz2"
-echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | shasum -a 256 -c || exit 1
+echo "${HDF5_CHECKSUM}  hdf5-${HDF5_VERSION}.tar.bz2" | sha256sum --check || exit 1
 tar -xjf hdf5-${HDF5_VERSION}.tar.bz2
 rm hdf5-${HDF5_VERSION}.tar.bz2
 mv hdf5-${HDF5_VERSION} hdf5
