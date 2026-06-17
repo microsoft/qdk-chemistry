@@ -161,8 +161,6 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
-          - script: whoami && id
-            displayName: Check container user
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
             inputs:
