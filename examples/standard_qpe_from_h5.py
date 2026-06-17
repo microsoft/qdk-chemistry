@@ -123,17 +123,18 @@ estimate_circuits = estimate_circuit_builder.run(
 estimate_circuit = estimate_circuits[0]
 Logger.info("Fast estimation QPE circuit built successfully!")
 
-from qdk._interpreter import logical_counts
+# from qdk._interpreter import logical_counts
 
-lc = logical_counts(
-    estimate_circuit._qsharp_factory.program,
-    estimate_circuit._qsharp_factory.parameter.values(),
-)
-print(f"Logical counts: {lc}")
+# lc = logical_counts(
+#    estimate_circuit._qsharp_factory.program,
+#    estimate_circuit._qsharp_factory.parameter.values(),
+# )
+# print(f"Logical counts: {lc}")
+
 # =============================================================================
 # 8. Resource estimation using the fast circuit
 # =============================================================================
-from qdk.qre import estimate
+from qdk.qre import PSSPC, LatticeSurgery, estimate
 from qdk.qre.application import QSharpApplication
 from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
 
@@ -146,11 +147,18 @@ qpe_app = QSharpApplication(
 Logger.info(
     "Estimating resources for a Majorana-based architecture with ThreeAux QEC code..."
 )
-architecture = Majorana(error_rate=1e-4)
+architecture = Majorana(error_rate=1e-5)
+trace_query = (
+    qpe_app.q()
+    * PSSPC.q(ccx_magic_states=False, num_ts_per_rotation=list(range(20, 40)))
+    * LatticeSurgery.q()
+)
 isa_query = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
 
-# Run resource estimation with 10% total error budget
-results = estimate(qpe_app, architecture, isa_query, max_error=0.5, name="QPE")
+# Run resource estimation with 1% total error budget
+results = estimate(
+    qpe_app, architecture, isa_query, trace_query, max_error=0.01, name="QPE"
+)
 
 # Display the Pareto-optimal results table
 results.add_factory_summary_column()
