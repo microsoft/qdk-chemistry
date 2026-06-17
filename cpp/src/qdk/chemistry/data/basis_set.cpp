@@ -63,7 +63,18 @@ std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
   }
 
   // unpack the tar.gz file
-  auto cmd = "tar xzf \"" + file_path.generic_string() + "\" --directory \"" +
+  // On Windows, GNU tar (typically from Git for Windows / MSYS, which is what
+  // ends up in PATH when Git is installed) interprets paths with a colon, e.g.
+  // "C:/...", as remote host:path syntax and fails with
+  // "Cannot connect to C: resolve failed". --force-local disables that parsing.
+  // BSD tar (Windows 10+ System32\tar.exe) does not need this flag and does not
+  // recognize it, so we only add it on Windows where GNU tar dominates.
+#ifdef _WIN32
+  const std::string tar_cmd = "tar --force-local -xzf ";
+#else
+  const std::string tar_cmd = "tar -xzf ";
+#endif
+  auto cmd = tar_cmd + "\"" + file_path.generic_string() + "\" --directory \"" +
              temp_dir.generic_string() + "\"";
   int return_code = std::system(cmd.c_str());
   if (return_code != 0) {

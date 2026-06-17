@@ -256,9 +256,19 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
       if (!std::filesystem::exists(odir)) {
         std::filesystem::create_directories(odir);
       }
+      // On Windows, GNU tar (Git for Windows/MSYS) interprets paths with a
+      // colon as remote host:path and fails with "Cannot connect to C:". The
+      // --force-local flag disables that parsing. BSD tar (the System32 one)
+      // does not need or recognize it, so only pass it on Windows.
+#ifdef _WIN32
       auto cmd =
-          fmt::format("tar xzf \"{}\" --directory \"{}\"",
+          fmt::format("tar --force-local -xzf \"{}\" --directory \"{}\"",
                       compressed_path.generic_string(), odir.generic_string());
+#else
+      auto cmd =
+          fmt::format("tar -xzf \"{}\" --directory \"{}\"",
+                      compressed_path.generic_string(), odir.generic_string());
+#endif
       QDK_LOGGER().trace("Execute command: {}", cmd);
       int return_code = std::system(cmd.c_str());
       if (return_code != 0) {
