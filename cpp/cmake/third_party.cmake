@@ -68,13 +68,22 @@ if(MSVC AND TARGET libint2_cxx)
   # /Zc:preprocessor: enables conforming preprocessor; libint2's engine.impl.h
   # uses Boost.Preprocessor macros that require correct expansion order (the
   # legacy preprocessor concatenates tokens incorrectly). Available since VS 2019 16.5.
-  target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+  # Skip when libint2_cxx is an IMPORTED target from a previous install
+  # (target_compile_options rejects IMPORTED targets).
+  get_target_property(_libint2_cxx_imported libint2_cxx IMPORTED)
+  if(NOT _libint2_cxx_imported)
+    target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
+  endif()
 endif()
 # eritest-libint2 links only to libint2-static (C library), so it does not pick
 # up the INTERFACE flags from libint2_cxx. The test source includes libint2/boys.h
-# which requires C++11 detection via __cplusplus.
+# which requires C++11 detection via __cplusplus. Only present when libint2 is
+# built from source.
 if(MSVC AND TARGET eritest-libint2)
-  target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+  get_target_property(_eritest_imported eritest-libint2 IMPORTED)
+  if(NOT _eritest_imported)
+    target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+  endif()
 endif()
 
 # ecpint for ECP-related integral evaluation
@@ -142,13 +151,25 @@ if(MSVC)
   # /wd4701 potentially uninitialized local variable used
   # /wd4703 potentially uninitialized local pointer variable used
   set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4018 /wd4068 /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4245 /wd4267 /wd4389 /wd4701 /wd4703)
-  target_compile_options(ecpint      PRIVATE   ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  # Helper: apply compile options only to targets actually built by this project.
+  # handle_dependency() may resolve a dependency via find_package() to a prior
+  # install, producing IMPORTED targets that reject target_compile_options.
+  function(_qdk_msvc_suppress_warnings_if_built target visibility)
+    if(NOT TARGET ${target})
+      return()
+    endif()
+    get_target_property(_is_imported ${target} IMPORTED)
+    if(_is_imported)
+      return()
+    endif()
+    target_compile_options(${target} ${visibility} ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  endfunction()
+
+  _qdk_msvc_suppress_warnings_if_built(ecpint      PRIVATE)
   # ecpint also builds a `generate` executable at build time for code generation
-  if(TARGET generate)
-    target_compile_options(generate PRIVATE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
-  endif()
+  _qdk_msvc_suppress_warnings_if_built(generate    PRIVATE)
   # libint2 is a wrapper around $<TARGET_OBJECTS:libint2_obj>; the OBJECT
   # library libint2_obj is what actually compiles the auto-generated sources.
-  target_compile_options(libint2_cxx INTERFACE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
-  target_compile_options(libint2_obj PRIVATE ${COMMON_MSVC_WARNING_SUPPRESSIONS})
+  _qdk_msvc_suppress_warnings_if_built(libint2_cxx INTERFACE)
+  _qdk_msvc_suppress_warnings_if_built(libint2_obj PRIVATE)
 endif()
