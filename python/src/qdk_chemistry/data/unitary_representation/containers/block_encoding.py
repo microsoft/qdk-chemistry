@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+import tempfile
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
@@ -267,7 +269,7 @@ class LCUContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
 
-        self.prepare.to_hdf5(group.create_group("prepare"))
+        _wavefunction_to_hdf5(self.prepare, group.create_group("prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
@@ -322,9 +324,7 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
-        from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
-
-        prepare = Wavefunction.from_hdf5(group["prepare"])
+        prepare = _wavefunction_from_hdf5(group["prepare"])
 
         select = Select.from_hdf5(group["select"])
         quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
@@ -351,3 +351,55 @@ class LCUContainer(BlockEncodingContainer):
             f" {len(self.select.controlled_operations)} controlled operations\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
         )
+
+
+def _wavefunction_to_hdf5(wavefunction: "Wavefunction", group: h5py.Group) -> None:
+    """Serialize a Wavefunction into an h5py Group via a temp-file bridge.
+
+    The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper
+    writes to a temporary file and copies the contents into *group*.
+
+    Args:
+        wavefunction: The wavefunction to serialize.
+        group: Target HDF5 group to populate.
+
+    """
+    fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
+    os.close(fd)
+    try:
+        wavefunction.to_hdf5_file(tmp_path)
+        with h5py.File(tmp_path, "r") as src:
+            for key in src:
+                src.copy(key, group)
+            for attr_name, attr_val in src.attrs.items():
+                group.attrs[attr_name] = attr_val
+    finally:
+        os.unlink(tmp_path)
+
+
+def _wavefunction_from_hdf5(group: h5py.Group) -> "Wavefunction":
+    """Deserialize a Wavefunction from an h5py Group via a temp-file bridge.
+
+    The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper
+    copies *group* into a temporary file and loads from it.
+
+    Args:
+        group: Source HDF5 group containing serialized wavefunction data.
+
+    Returns:
+        Wavefunction: The deserialized wavefunction.
+
+    """
+    from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
+
+    fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
+    os.close(fd)
+    try:
+        with h5py.File(tmp_path, "w") as dst:
+            for key in group:
+                group.copy(key, dst)
+            for attr_name, attr_val in group.attrs.items():
+                dst.attrs[attr_name] = attr_val
+        return Wavefunction.from_hdf5_file(tmp_path)
+    finally:
+        os.unlink(tmp_path)
