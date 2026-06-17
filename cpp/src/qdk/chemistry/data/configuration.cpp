@@ -10,14 +10,63 @@
 
 namespace qdk::chemistry::data {
 
-// Constructor from string representation (e.g., "22uudd000")
-Configuration::Configuration(const std::string& str) {
-  QDK_LOG_TRACE_ENTERING();
-  size_t num_orbitals = str.size();
-  _packed_orbs.resize((num_orbitals + 3) / 4,
-                      0);  // Each byte stores 4 orbitals
+// ---- Internal helpers ------------------------------------------------------
 
-  for (size_t i = 0; i < num_orbitals; ++i) {
+size_t Configuration::_packed_bytes(size_t n_modes, uint8_t bpm) {
+  if (bpm == 0 || (8 % bpm) != 0) {
+    throw std::invalid_argument(
+        "bits_per_mode (" + std::to_string(bpm) +
+        ") must be a positive divisor of 8 (1, 2, 4, or 8)");
+  }
+  size_t modes_per_byte = 8 / bpm;
+  return (n_modes + modes_per_byte - 1) / modes_per_byte;
+}
+
+void Configuration::_require_spin_half(const char* caller) const {
+  if (_bits_per_mode != 2) {
+    throw std::runtime_error(
+        std::string(caller) +
+        " requires a spin-½ configuration (2 bits/mode), but this "
+        "configuration has " +
+        std::to_string(_bits_per_mode) + " bit(s) per mode.");
+  }
+}
+
+uint8_t Configuration::_get_mode_raw(size_t pos) const {
+  size_t modes_per_byte = 8 / _bits_per_mode;
+  size_t byte_idx = pos / modes_per_byte;
+  size_t bit_offset = (pos % modes_per_byte) * _bits_per_mode;
+  uint8_t mask = (1 << _bits_per_mode) - 1;
+  return (_packed_orbs[byte_idx] >> bit_offset) & mask;
+}
+
+void Configuration::_set_mode_raw(size_t pos, uint8_t value) {
+  size_t modes_per_byte = 8 / _bits_per_mode;
+  size_t byte_idx = pos / modes_per_byte;
+  size_t bit_offset = (pos % modes_per_byte) * _bits_per_mode;
+  uint8_t mask = (1 << _bits_per_mode) - 1;
+  _packed_orbs[byte_idx] &= ~(mask << bit_offset);
+  _packed_orbs[byte_idx] |= (value & mask) << bit_offset;
+}
+
+Configuration::OccupationState Configuration::_get_orbital(size_t pos) const {
+  return static_cast<OccupationState>(_get_mode_raw(pos));
+}
+
+void Configuration::_set_orbital(size_t pos, OccupationState value) {
+  _set_mode_raw(pos, static_cast<uint8_t>(value));
+}
+
+// ---- Constructors ----------------------------------------------------------
+
+// ---- Named factories -------------------------------------------------------
+
+Configuration Configuration::from_spin_half_string(const std::string& str) {
+  Configuration result;
+  result._bits_per_mode = 2;
+  result._packed_orbs.resize(_packed_bytes(str.size(), 2), 0);
+
+  for (size_t i = 0; i < str.size(); ++i) {
     OccupationState value;
     switch (str[i]) {
       case '0':
@@ -34,46 +83,100 @@ Configuration::Configuration(const std::string& str) {
         break;
       default:
         throw std::invalid_argument(
-            "Invalid character in configuration string");
+            "Invalid character '" + std::string(1, str[i]) +
+            "' in spin-½ configuration string (expected '0','u','d','2')");
     }
-    _set_orbital(i, value);
+    result._set_orbital(i, value);
   }
+  return result;
+}
+
+Configuration Configuration::from_bitstring(const std::string& str) {
+  Configuration result;
+  result._bits_per_mode = 1;
+  result._packed_orbs.resize(_packed_bytes(str.size(), 1), 0);
+
+  for (size_t i = 0; i < str.size(); ++i) {
+    if (str[i] == '1') {
+      result._set_mode_raw(i, 1);
+    } else if (str[i] != '0') {
+      throw std::invalid_argument(
+          "Invalid character '" + std::string(1, str[i]) +
+          "' in bitstring configuration (expected '0' or '1')");
+    }
+  }
+  return result;
 }
 
 // Convert back to string representation
 std::string Configuration::to_string() const {
   QDK_LOG_TRACE_ENTERING();
 
-  size_t num_orbitals = get_orbital_capacity();
-  std::string result(num_orbitals, '0');
-  for (size_t i = 0; i < num_orbitals; ++i) {
-    OccupationState state = _get_orbital(i);
-    switch (state) {
-      case UNOCCUPIED:
-        result[i] = '0';
-        break;
-      case ALPHA:
-        result[i] = 'u';
-        break;
-      case BETA:
-        result[i] = 'd';
-        break;
-      case DOUBLY:
-        result[i] = '2';
-        break;
+  std::string result(num_modes(), '0');
+  if (_bits_per_mode == 1) {
+    for (size_t i = 0; i < num_modes(); ++i) {
+      if (_get_mode_raw(i)) result[i] = '1';
+    }
+  } else {
+    for (size_t i = 0; i < num_modes(); ++i) {
+      OccupationState state = _get_orbital(i);
+      switch (state) {
+        case UNOCCUPIED:
+          break;
+        case ALPHA:
+          result[i] = 'u';
+          break;
+        case BETA:
+          result[i] = 'd';
+          break;
+        case DOUBLY:
+          result[i] = '2';
+          break;
+      }
     }
   }
   return result;
 }
 
-// Get number of electrons
+// ---- Generic accessors -----------------------------------------------------
+
+size_t Configuration::num_modes() const {
+  return _packed_orbs.size() * (8 / _bits_per_mode);
+}
+
+uint8_t Configuration::bits_per_mode() const { return _bits_per_mode; }
+
+uint8_t Configuration::get_mode_state(size_t idx) const {
+  if (idx >= num_modes()) {
+    throw std::out_of_range(
+        "Mode index " + std::to_string(idx) +
+        " out of range (num_modes=" + std::to_string(num_modes()) + ")");
+  }
+  return _get_mode_raw(idx);
+}
+
+size_t Configuration::total_occupation() const {
+  size_t total = 0;
+  for (size_t i = 0; i < num_modes(); ++i) {
+    uint8_t state = _get_mode_raw(i);
+    if (_bits_per_mode == 2) {
+      // Popcount of 2-bit state: 0→0, 1→1, 2→1, 3→2
+      total += (state & 1) + ((state >> 1) & 1);
+    } else {
+      total += state;
+    }
+  }
+  return total;
+}
+
+// ---- Spin-½ accessors (gated) ----------------------------------------------
+
 std::tuple<size_t, size_t> Configuration::get_n_electrons() const {
   QDK_LOG_TRACE_ENTERING();
+  _require_spin_half("get_n_electrons");
 
-  size_t num_orbitals = get_orbital_capacity();
   size_t n_alpha = 0, n_beta = 0;
-
-  for (size_t i = 0; i < num_orbitals; ++i) {
+  for (size_t i = 0; i < num_modes(); ++i) {
     OccupationState state = _get_orbital(i);
     if (state == ALPHA || state == DOUBLY) ++n_alpha;
     if (state == BETA || state == DOUBLY) ++n_beta;
@@ -81,37 +184,30 @@ std::tuple<size_t, size_t> Configuration::get_n_electrons() const {
   return {n_alpha, n_beta};
 }
 
-// Check if orbital has alpha electron
 bool Configuration::has_alpha_electron(size_t orbital_idx) const {
   QDK_LOG_TRACE_ENTERING();
+  _require_spin_half("has_alpha_electron");
 
-  size_t num_orbitals = get_orbital_capacity();
-  if (orbital_idx >= num_orbitals) {
-    return false;
-  }
+  if (orbital_idx >= num_modes()) return false;
   OccupationState state = _get_orbital(orbital_idx);
   return (state == ALPHA || state == DOUBLY);
 }
 
-// Check if orbital has beta electron
 bool Configuration::has_beta_electron(size_t orbital_idx) const {
   QDK_LOG_TRACE_ENTERING();
+  _require_spin_half("has_beta_electron");
 
-  size_t num_orbitals = get_orbital_capacity();
-  if (orbital_idx >= num_orbitals) {
-    return false;
-  }
+  if (orbital_idx >= num_modes()) return false;
   OccupationState state = _get_orbital(orbital_idx);
   return (state == BETA || state == DOUBLY);
 }
 
 bool Configuration::is_closed_shell() const {
   QDK_LOG_TRACE_ENTERING();
-  for (size_t i = 0; i < get_orbital_capacity(); ++i) {
+  _require_spin_half("is_closed_shell");
+  for (size_t i = 0; i < num_modes(); ++i) {
     const auto state = _get_orbital(i);
-    if (state == ALPHA || state == BETA) {
-      return false;
-    }
+    if (state == ALPHA || state == BETA) return false;
   }
   return true;
 }
@@ -120,58 +216,23 @@ bool Configuration::is_closed_shell() const {
 bool Configuration::operator==(const Configuration& other) const {
   QDK_LOG_TRACE_ENTERING();
 
-  // Check if they have the same storage size (and thus capacity)
-  if (_packed_orbs.size() != other._packed_orbs.size()) {
-    return false;
-  }
+  if (_bits_per_mode != other._bits_per_mode) return false;
+  if (num_modes() != other.num_modes()) return false;
 
-  // Compare the orbital states for each orbital
-  size_t num_orbitals = get_orbital_capacity();
-  for (size_t i = 0; i < num_orbitals; ++i) {
-    if (_get_orbital(i) != other._get_orbital(i)) {
-      return false;
-    }
+  for (size_t i = 0; i < num_modes(); ++i) {
+    if (_get_mode_raw(i) != other._get_mode_raw(i)) return false;
   }
-
   return true;
 }
 
-// Capacity (number of orbitals)
 size_t Configuration::get_orbital_capacity() const {
   QDK_LOG_TRACE_ENTERING();
-
-  return _packed_orbs.size() * 4;  // Each byte stores 4 orbitals
+  return num_modes();
 }
 
 // Inequality operator (for completeness)
 bool Configuration::operator!=(const Configuration& other) const {
-  QDK_LOG_TRACE_ENTERING();
-
   return !(*this == other);
-}
-
-// Get the occupation state of an orbital
-Configuration::OccupationState Configuration::_get_orbital(size_t pos) const {
-  QDK_LOG_TRACE_ENTERING();
-
-  size_t byte_pos = pos / 4;
-  size_t bit_offset = (pos % 4) * 2;  // Each orbital uses 2 bits
-  return static_cast<OccupationState>((_packed_orbs[byte_pos] >> bit_offset) &
-                                      0x3);
-}
-
-// Set the occupation state of an orbital
-void Configuration::_set_orbital(size_t pos, OccupationState value) {
-  QDK_LOG_TRACE_ENTERING();
-
-  size_t byte_pos = pos / 4;
-  size_t bit_offset = (pos % 4) * 2;
-
-  // Clear the 2 bits at position
-  _packed_orbs[byte_pos] &= ~(0x3 << bit_offset);
-
-  // Set the new value
-  _packed_orbs[byte_pos] |= (value << bit_offset);
 }
 
 // Create a canonical Hartree-Fock configuration using the Aufbau principle
@@ -202,15 +263,15 @@ Configuration Configuration::canonical_hf_configuration(size_t n_alpha,
     }
   }
 
-  return Configuration(config_str);
+  return Configuration::from_spin_half_string(config_str);
 }
 
 nlohmann::json Configuration::to_json() const {
   QDK_LOG_TRACE_ENTERING();
 
   nlohmann::json j;
-  // Store as string representation for human readability
   j["configuration"] = to_string();
+  j["bits_per_mode"] = _bits_per_mode;
   return j;
 }
 
@@ -221,7 +282,9 @@ Configuration Configuration::from_json(const nlohmann::json& j) {
     throw std::runtime_error("JSON missing required 'configuration' field");
   }
   std::string config_str = j["configuration"];
-  return Configuration(config_str);
+  uint8_t bpm = j.value("bits_per_mode", static_cast<uint8_t>(2));
+  if (bpm == 1) return Configuration::from_bitstring(config_str);
+  return Configuration::from_spin_half_string(config_str);
 }
 
 void Configuration::to_hdf5(H5::Group& group) const {
@@ -235,12 +298,15 @@ void Configuration::to_hdf5(H5::Group& group) const {
         "configuration", H5::PredType::NATIVE_UINT8, dataspace);
     dataset.write(_packed_orbs.data(), H5::PredType::NATIVE_UINT8);
 
-    // Store orbital capacity as attribute for proper reconstruction
     H5::Attribute orb_attr =
         dataset.createAttribute("orbital_capacity", H5::PredType::NATIVE_HSIZE,
                                 H5::DataSpace(H5S_SCALAR));
-    hsize_t capacity = get_orbital_capacity();
+    hsize_t capacity = num_modes();
     orb_attr.write(H5::PredType::NATIVE_HSIZE, &capacity);
+
+    H5::Attribute bpm_attr = dataset.createAttribute(
+        "bits_per_mode", H5::PredType::NATIVE_UINT8, H5::DataSpace(H5S_SCALAR));
+    bpm_attr.write(H5::PredType::NATIVE_UINT8, &_bits_per_mode);
 
     dataset.close();
   } catch (const H5::Exception& e) {
@@ -255,12 +321,17 @@ Configuration Configuration::from_hdf5(H5::Group& group) {
   try {
     H5::DataSet dataset = group.openDataSet("configuration");
 
-    // Read the orbital capacity from attribute
     H5::Attribute orb_attr = dataset.openAttribute("orbital_capacity");
     hsize_t orbital_capacity;
     orb_attr.read(H5::PredType::NATIVE_HSIZE, &orbital_capacity);
 
-    // Read the packed binary data
+    // Legacy files lack bits_per_mode — default to 2 (spin-½).
+    uint8_t bpm = 2;
+    if (dataset.attrExists("bits_per_mode")) {
+      H5::Attribute bpm_attr = dataset.openAttribute("bits_per_mode");
+      bpm_attr.read(H5::PredType::NATIVE_UINT8, &bpm);
+    }
+
     H5::DataSpace dataspace = dataset.getSpace();
     hsize_t packed_size;
     dataspace.getSimpleExtentDims(&packed_size);
@@ -269,9 +340,9 @@ Configuration Configuration::from_hdf5(H5::Group& group) {
     dataset.read(packed_data.data(), H5::PredType::NATIVE_UINT8);
     dataset.close();
 
-    // Create new Configuration and set its packed data
     Configuration result;
     result._packed_orbs = std::move(packed_data);
+    result._bits_per_mode = bpm;
     return result;
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error in Configuration::from_hdf5: " +
@@ -282,14 +353,17 @@ Configuration Configuration::from_hdf5(H5::Group& group) {
 std::string Configuration::get_summary() const {
   QDK_LOG_TRACE_ENTERING();
 
-  auto [n_alpha, n_beta] = get_n_electrons();
   std::ostringstream oss;
   oss << "Configuration Summary:\n";
   oss << "  Representation: " << to_string() << "\n";
-  oss << "  Alpha electrons: " << n_alpha << "\n";
-  oss << "  Beta electrons: " << n_beta << "\n";
-  oss << "  Total electrons: " << (n_alpha + n_beta) << "\n";
-  oss << "  Orbital capacity: " << get_orbital_capacity() << "\n";
+  oss << "  Bits per mode: " << static_cast<int>(_bits_per_mode) << "\n";
+  oss << "  Modes: " << num_modes() << "\n";
+  oss << "  Total occupation: " << total_occupation() << "\n";
+  if (_bits_per_mode == 2) {
+    auto [n_alpha, n_beta] = get_n_electrons();
+    oss << "  Alpha electrons: " << n_alpha << "\n";
+    oss << "  Beta electrons: " << n_beta << "\n";
+  }
   return oss.str();
 }
 
@@ -393,7 +467,8 @@ Configuration Configuration::from_hdf5_file(const std::string& filename) {
 
 std::pair<std::string, std::string> Configuration::to_binary_strings(
     size_t num_orbitals) const {
-  size_t capacity = get_orbital_capacity();
+  _require_spin_half("to_binary_strings");
+  size_t capacity = num_modes();
 
   // Throw if we ask for too many orbitals
   if (num_orbitals > capacity) {
@@ -451,11 +526,12 @@ Configuration Configuration::from_binary_strings(std::string alpha_string,
       orbital_rep[i] = 'd';
     }
   }
-  return Configuration(orbital_rep);
+  return Configuration::from_spin_half_string(orbital_rep);
 }
 
 void Configuration::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   hash_value(ctx, get_data_type_name());
+  hash_value(ctx, static_cast<uint64_t>(_bits_per_mode));
   hash_value(ctx, to_string());
 }
 }  // namespace qdk::chemistry::data

@@ -617,11 +617,9 @@ void SparseHamiltonianContainer::_materialize_dense_two_body() const {
 
 std::shared_ptr<ModelOrbitals> SparseHamiltonianContainer::_make_orbitals(
     int n) {
-  std::vector<size_t> active(static_cast<size_t>(n));
-  std::iota(active.begin(), active.end(), size_t{0});
-  return std::make_shared<ModelOrbitals>(
-      static_cast<size_t>(n),
-      Orbitals::RestrictedCASIndices{std::move(active), {}});
+  // Model Hamiltonian basis: a full active space over n modes with no spin
+  // axis. The container itself is always restricted (is_restricted() == true).
+  return std::make_shared<ModelOrbitals>(static_cast<size_t>(n));
 }
 
 Eigen::SparseMatrix<double> SparseHamiltonianContainer::_to_sparse(

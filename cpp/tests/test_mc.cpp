@@ -9,7 +9,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
 
@@ -32,8 +32,9 @@ class TestMultiConfigurationCalculator : public MultiConfigurationCalculator {
     // Dummy implementation for testing
     Eigen::VectorXcd coeffs(1);
     coeffs(0) = std::complex<double>(1.0, 0.0);
-    Wavefunction::DeterminantVector dets{Configuration("2000000")};
-    auto container = std::make_unique<CasWavefunctionContainer>(
+    Wavefunction::DeterminantVector dets{
+        Configuration::from_spin_half_string("2000000")};
+    auto container = std::make_unique<StateVectorContainer>(
         coeffs, dets, hamiltonian->get_orbitals());
     Wavefunction wfn(std::move(container));
     return {0.0, std::make_shared<Wavefunction>(std::move(wfn))};
@@ -306,8 +307,11 @@ TEST_F(MCTest, HydrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
@@ -347,8 +351,11 @@ TEST_F(MCTest, NitrogenAtom_CCPVDZ_SCI) {
       orbitals_with_active_space->get_energies().first,
       orbitals_with_active_space->get_overlap_matrix(),
       orbitals_with_active_space->get_basis_set(),
-      std::make_tuple(
-          orbitals_with_active_space->get_active_space_indices().first,
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
+          orbitals_with_active_space->get_active_space_indices().first),
+      testing::restricted_index_set(
+          orbitals_with_active_space->get_num_molecular_orbitals(),
           orbitals_with_active_space->get_inactive_space_indices().first));
   auto ham = hamiltonian_constructor->run(restricted_orbitals);
 
