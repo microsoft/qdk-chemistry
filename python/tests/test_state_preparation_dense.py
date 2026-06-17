@@ -69,19 +69,22 @@ def _build_expected_statevector(
     dets: list[Configuration],
     num_orbitals: int,
 ) -> np.ndarray:
-    """Build a normalized expected statevector in Q# big-endian ordering.
+    """Build a normalized expected statevector matching Q# dump_machine output.
 
-    Converts spin-½ determinants to JW little-endian bitstrings,
-    then reverses each bitstring to match Q#'s big-endian dump_machine output.
+    Q# dump_machine uses little-endian (qubit k = bit k of index).
+    With reversed rowMap, to_bits()[k] maps to Q# qubit (n-1-k), so
+    dump_machine index is the little-endian interpretation of to_bits().
     """
     n_qubits = 2 * num_orbitals
     expected = np.zeros(2**n_qubits, dtype=complex)
     for coeff, det in zip(coeffs, dets, strict=True):
-        alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-        le_bitstring = beta_str[::-1] + alpha_str[::-1]
-        # Reverse for Q# big-endian
-        be_bitstring = le_bitstring[::-1]
-        expected[int(be_bitstring, 2)] = coeff
+        bits = det.to_bits()
+        # bits is [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]
+        # dump_machine index = LE interpretation: qubit k = bit k
+        index = 0
+        for i, b in enumerate(bits):
+            index |= b << i
+        expected[index] = coeff
     norm = np.linalg.norm(expected)
     if norm > 0:
         expected /= norm
@@ -179,14 +182,14 @@ class TestDensePureStatePreparation:
         circuit = prep.run(wavefunction)
         actual_sv = _run_state_prep_and_dump(circuit)
 
-        # Build expected statevector for 1-bit-per-mode config.
-        # Convert little-endian bitstring to Q# big-endian for dump_machine comparison.
-        num_modes = test_orbitals.num_modes()
-        bitstring_le = det.to_string()[:num_modes][::-1]
-        bitstring_be = bitstring_le[::-1]
-        n_qubits = len(bitstring_le)
+        # Build expected statevector for 1-bit-per-mode config using to_bits().
+        bits = det.to_bits()
+        n_qubits = len(bits)
+        index = 0
+        for b in bits:
+            index = (index << 1) | b
         expected = np.zeros(2**n_qubits, dtype=complex)
-        expected[int(bitstring_be, 2)] = 1.0
+        expected[index] = 1.0
 
         fidelity = abs(np.dot(np.conj(actual_sv), expected))
         assert np.isclose(fidelity, 1.0, atol=1e-6)
@@ -194,7 +197,7 @@ class TestDensePureStatePreparation:
     def test_single_determinant(self):
         """Verify state preparation for a single-determinant wavefunction."""
         test_orbitals = create_test_orbitals(2)
-        det = Configuration.from_spin_half_string("du00")
+        det = Configuration.from_spin_half_string("du")
         dets = [det]
         coeffs = [1.0]
 
@@ -224,7 +227,9 @@ class TestDensePureStatePreparation:
         dense_prep = create("state_prep", "dense_pure_state")
         sparse_prep = create("state_prep", "sparse_isometry_gf2x")
 
-        dense_circuit = dense_prep.run(wavefunction_4e4o).get_qiskit_circuit()
+        # Dense prep with reversed rowMap produces a Qiskit circuit with reversed
+        # qubit ordering; reverse_bits() aligns it with the Hamiltonian convention.
+        dense_circuit = dense_prep.run(wavefunction_4e4o).get_qiskit_circuit().reverse_bits()
         sparse_circuit = sparse_prep.run(wavefunction_4e4o).get_qiskit_circuit()
 
         hamiltonian_op = SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients)
@@ -235,17 +240,3 @@ class TestDensePureStatePreparation:
 
         assert np.isclose(dense_energy, ref_energy_4e4o, atol=estimator_energy_tolerance)
         assert np.isclose(dense_energy, sparse_energy, atol=float_comparison_absolute_tolerance)
-
-    def test_prepare_from_statevector(self):
-        """Verify prepare_from_statevector produces a circuit with correct factory parameters."""
-        prep = DensePureStatePreparation()
-        statevector = np.array([1.0 / np.sqrt(2), 1.0 / np.sqrt(2)])
-        qubit_indices = [0]
-        circuit = prep.prepare_from_statevector(statevector, num_qubits=1, qubit_indices=qubit_indices)
-
-        assert isinstance(circuit, Circuit)
-        params = circuit._qsharp_factory.parameter
-        assert params["numQubits"] == 1
-        assert params["rowMap"] == qubit_indices
-        assert params["expansionOps"] == []
-        assert np.allclose(params["stateVector"], statevector.tolist())

@@ -375,7 +375,7 @@ class LCUContainer(BlockEncodingContainer):
             f"LCU Container:\n"
             f"  Power: {self.power}\n"
             f"  Prepare: {self.num_prepare_ancillas} qubits, statevector shape {len(self.prepare.get_coefficients())}\n"
-            f"  Select: {self.num_prepare_ancillas} control qubits, {self.num_prepare_ancillas} target qubits,"
+            f"  Select: {self.num_prepare_ancillas} control qubits, {self.select.num_target_qubits} target qubits,"
             f" {len(self.select.controlled_operations)} controlled operations\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
         )
