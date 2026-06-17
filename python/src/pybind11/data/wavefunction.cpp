@@ -78,6 +78,48 @@ wavefunction_from_hdf5_file_wrapper(const py::object& filename) {
       qdk::chemistry::python::utils::to_string_path(filename));
 }
 
+void wavefunction_to_hdf5_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                  const py::object& h5py_group) {
+  py::module_ h5py = py::module_::import("h5py");
+
+  if (!py::isinstance(h5py_group, h5py.attr("Group")) &&
+      !py::isinstance(h5py_group, h5py.attr("File"))) {
+    throw std::runtime_error(
+        "to_hdf5() expects an h5py.Group or h5py.File object");
+  }
+
+  py::object id_obj = h5py_group.attr("id");
+  py::object id_attr = id_obj.attr("id");
+  hid_t group_id = id_attr.cast<hid_t>();
+
+  // Increment the reference count so that H5::Group's destructor does not
+  // invalidate the handle that h5py still owns.
+  H5Iinc_ref(group_id);
+  H5::Group cpp_group(group_id);
+  self.to_hdf5(cpp_group);
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_hdf5_wrapper(const py::object& h5py_group) {
+  py::module_ h5py = py::module_::import("h5py");
+
+  if (!py::isinstance(h5py_group, h5py.attr("Group")) &&
+      !py::isinstance(h5py_group, h5py.attr("File"))) {
+    throw std::runtime_error(
+        "from_hdf5() expects an h5py.Group or h5py.File object");
+  }
+
+  py::object id_obj = h5py_group.attr("id");
+  py::object id_attr = id_obj.attr("id");
+  hid_t group_id = id_attr.cast<hid_t>();
+
+  // Increment the reference count so that H5::Group's destructor does not
+  // invalidate the handle that h5py still owns.
+  H5Iinc_ref(group_id);
+  H5::Group cpp_group(group_id);
+  return qdk::chemistry::data::Wavefunction::from_hdf5(cpp_group);
+}
+
 void wavefunction_to_json_file_wrapper(qdk::chemistry::data::Wavefunction& self,
                                        const py::object& filename) {
   self.to_json_file(qdk::chemistry::python::utils::to_string_path(filename));
@@ -1039,6 +1081,23 @@ Examples:
 )",
                    py::arg("filename"));
 
+  wavefunction.def("to_hdf5", wavefunction_to_hdf5_wrapper,
+                   R"(
+Save wavefunction to an HDF5 group.
+
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to write data to
+
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.h5", "w") as f:
+    ...     wf.to_hdf5(f)
+    >>> with h5py.File("data.h5", "w") as f:
+    ...     group = f.create_group("wavefunction")
+    ...     wf.to_hdf5(group)
+)",
+                   py::arg("group"));
+
   wavefunction.def_static("from_hdf5_file", wavefunction_from_hdf5_file_wrapper,
                           R"(
 Load wavefunction from HDF5 file.
@@ -1054,6 +1113,26 @@ Examples:
     >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file(Path("wavefunction.h5"))
 )",
                           py::arg("filename"));
+
+  wavefunction.def_static("from_hdf5", wavefunction_from_hdf5_wrapper,
+                          R"(
+Load wavefunction from an HDF5 group.
+
+Args:
+    group (h5py.Group | h5py.File): HDF5 group or file object to load data from
+
+Returns:
+    Wavefunction: Wavefunction object loaded from the group
+
+Examples:
+    >>> import h5py
+    >>> with h5py.File("data.h5", "r") as f:
+    ...     wf = Wavefunction.from_hdf5(f)
+    >>> with h5py.File("data.h5", "r") as f:
+    ...     group = f["wavefunction"]
+    ...     wf = Wavefunction.from_hdf5(group)
+)",
+                          py::arg("group"));
 
   wavefunction.def("to_file", wavefunction_to_file_wrapper,
                    R"(
