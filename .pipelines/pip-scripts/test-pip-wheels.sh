@@ -18,7 +18,7 @@ export DEBIAN_FRONTEND=noninteractive
 if [ "$MAC_BUILD" == "OFF" ]; then
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
-    rm /var/lib/dpkg/info/libc-bin.*
+    rm -f /var/lib/dpkg/info/libc-bin.*
     apt-get clean
     apt-get update -q
     apt-get install -y -q libc-bin
