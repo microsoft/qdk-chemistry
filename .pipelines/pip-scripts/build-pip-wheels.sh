@@ -26,7 +26,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         bzip2-devel \
         cmake \
         curl \
-        eigen3-devel \
+        eigen3 \
         fmt-devel \
         gcc \
         gcc-c++ \
