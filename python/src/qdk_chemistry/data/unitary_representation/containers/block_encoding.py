@@ -5,8 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import os
-import tempfile
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
@@ -269,20 +267,7 @@ class LCUContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
 
-        # TODO(hid_t bridging): replace temp-file bridge with direct
-        # Wavefunction.to_hdf5(h5py.Group) once exposed in the pybind11 bindings.
-        fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
-        os.close(fd)
-        try:
-            self.prepare.to_hdf5_file(tmp_path)
-            with h5py.File(tmp_path, "r") as src:
-                for key in src:
-                    src.copy(key, group.require_group("prepare"))
-                for attr_name, attr_val in src.attrs.items():
-                    group["prepare"].attrs[attr_name] = attr_val
-        finally:
-            os.unlink(tmp_path)
-
+        self.prepare.to_hdf5(group.create_group("prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
@@ -339,20 +324,7 @@ class LCUContainer(BlockEncodingContainer):
         """
         from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
 
-        # TODO(hid_t bridging): replace temp-file bridge with direct
-        # Wavefunction.from_hdf5(h5py.Group) once exposed in the pybind11 bindings.
-        fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
-        os.close(fd)
-        try:
-            with h5py.File(tmp_path, "w") as dst:
-                src_group = group["prepare"]
-                for key in src_group:
-                    src_group.copy(key, dst)
-                for attr_name, attr_val in src_group.attrs.items():
-                    dst.attrs[attr_name] = attr_val
-            prepare = Wavefunction.from_hdf5_file(tmp_path)
-        finally:
-            os.unlink(tmp_path)
+        prepare = Wavefunction.from_hdf5(group["prepare"])
 
         select = Select.from_hdf5(group["select"])
         quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
