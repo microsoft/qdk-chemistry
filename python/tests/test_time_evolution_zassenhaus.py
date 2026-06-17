@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+from functools import cache
+
 import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution import zassenhaus as zassenhaus_module
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
@@ -19,7 +21,9 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     LatticeGraph,
+    MajoranaMapping,
     QubitHamiltonian,
+    Structure,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
@@ -28,50 +32,21 @@ from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
 from qdk_chemistry.utils.phase import energy_from_phase
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-# H2 / STO-3G qubit Hamiltonian (4-qubit Jordan-Wigner, equilibrium geometry).
-# Coefficients follow the standard ordering used throughout the literature
-# (e.g. Seeley, Richard, Love 2012; O'Malley et al. 2016).
-_H2_LABELS = [
-    "IIII",
-    "IIIZ",
-    "IIZI",
-    "IZII",
-    "ZIII",
-    "IIZZ",
-    "IZIZ",
-    "ZIIZ",
-    "IZZI",
-    "ZIZI",
-    "ZZII",
-    "XXYY",
-    "YYXX",
-    "XYYX",
-    "YXXY",
-]
-_H2_COEFFS = np.array(
-    [
-        -0.81261,
-        0.171201,
-        0.171201,
-        -0.2227965,
-        -0.2227965,
-        0.16862325,
-        0.12054625,
-        0.165868,
-        0.165868,
-        0.12054625,
-        0.17434925,
-        -0.04532175,
-        -0.04532175,
-        0.04532175,
-        0.04532175,
-    ]
-)
 
-
+@cache
 def _h2_hamiltonian() -> QubitHamiltonian:
-    """Return the 4-qubit H2/STO-3G Jordan-Wigner qubit Hamiltonian."""
-    return QubitHamiltonian(pauli_strings=list(_H2_LABELS), coefficients=_H2_COEFFS.copy())
+    """Return the 4-qubit H2/STO-3G Jordan-Wigner qubit Hamiltonian.
+
+    Built end-to-end with the QDK pipeline (SCF -> Hamiltonian -> Jordan-Wigner
+    qubit mapping) rather than hardcoded coefficients, so the test exercises the
+    real chemistry stack. Cached so the SCF runs once across the test module.
+    """
+    structure = Structure.from_xyz("2\nH2 molecule\nH 0.0 0.0 0.0\nH 0.0 0.0 0.74\n")
+    _, wavefunction = create("scf_solver").run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    orbitals = wavefunction.get_orbitals()
+    classical_hamiltonian = create("hamiltonian_constructor").run(orbitals)
+    num_spin_orbitals = 2 * len(orbitals.get_active_space_indices()[0])
+    return create("qubit_mapper", "qdk").run(classical_hamiltonian, MajoranaMapping.jordan_wigner(num_spin_orbitals))
 
 
 def _heisenberg_hamiltonian() -> QubitHamiltonian:
@@ -327,13 +302,17 @@ class TestZassenhausPhaseEstimation:
         ground_energy = float(eigenvalues[0])
         ground_state = eigenvectors[:, 0].real
 
+        # Evolution time from the Hamiltonian (the base time of compute_evolution_time
+        # in the QPE example): pi / ||H|| keeps the phase within one period.
+        time = float(np.pi / hamiltonian.schatten_norm)
+
         energy = self._run_iqpe(
             hamiltonian,
             ground_state,
-            time=0.5,
-            num_bits=12,
+            time=time,
+            num_bits=13,
             order=4,
-            num_divisions=2,
+            num_divisions=4,
             reference_energy=ground_energy,
         )
         assert abs(energy - ground_energy) < 1.6e-3
