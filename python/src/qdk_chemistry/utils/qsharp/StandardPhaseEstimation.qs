@@ -75,7 +75,6 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `numBits`: Number of ancilla qubits for QPE.
     /// - `numSystemQubits`: Number of system qubits.
     operation EstimateStandardQPE(
-        numQueries : Int,
         singleControlledEvolution : (Qubit, Qubit[]) => Unit,
         statePrep : Qubit[] => Unit,
         numBits : Int,
@@ -87,9 +86,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         // State preparation (counted once)
         statePrep(systems);
 
-        // The controlled Trotter step is repeated numQueries = 2^numBits - 1 times total.
-        // RepeatEstimates tells the resource estimator to estimate one invocation and multiply.
-        within { RepeatEstimates(numQueries); } apply {
+        // Total controlled-U applications across all ancillas = 2^numBits - 1.
+        // The gate cost is control-qubit-agnostic, so trace once and multiply.
+        // Qubit count is correct because all numBits ancillas are allocated above.
+        within { RepeatEstimates(2^numBits - 1); } apply {
             singleControlledEvolution(ancillas[0], systems);
         }
 

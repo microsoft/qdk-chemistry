@@ -101,9 +101,7 @@ class QdkEstimateQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         if state_preparation._qsharp_op and base_ctrl_circuit._qsharp_op:  # noqa: SLF001
             circuit = self._create_estimate_circuit(state_preparation, base_ctrl_circuit, num_bits, num_system_qubits)
-            Logger.info(
-                f"Built fast estimation QPE circuit with {num_bits} ancilla qubits (numQueries={2**num_bits - 1})."
-            )
+            Logger.info(f"Built fast estimation QPE circuit with {num_bits} ancilla qubits.")
             return [circuit]
 
         raise RuntimeError("Failed to create estimate QPE circuit: Q# operations are not available.")
@@ -129,12 +127,8 @@ class QdkEstimateQpeCircuitBuilder(StandardQpeCircuitBuilder):
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         single_ctrl_evo_op = base_controlled_circuit._qsharp_op  # noqa: SLF001
-        # Total number of controlled-U applications in standard QPE with num_bits ancillas
-        # 2^(n-1) + 2^(n-2) + ... + 2^0 = 2^n - 1.
-        num_queries = 2**num_bits - 1
 
         estimate_parameters = {
-            "numQueries": num_queries,
             "singleControlledEvolution": single_ctrl_evo_op,
             "statePrep": state_prep_op,
             "numBits": num_bits,
