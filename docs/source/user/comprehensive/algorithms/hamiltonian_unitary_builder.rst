@@ -191,7 +191,7 @@ The output is a ``PauliProductFormulaContainer`` of the same shape as the :ref:`
      - Description
    * - ``order``
      - int
-     - Zassenhaus expansion order :math:`p` (supported values 2-6); order 1 (no commutator corrections) falls back to the first-order Trotter builder; order 0 selects the smallest order meeting ``target_accuracy`` automatically. Default is 2.
+     - Zassenhaus expansion order :math:`p` (:math:`\ge 2`; validated for 2-6); order 1 (no commutator corrections) falls back to the first-order Trotter builder. Default is 2.
    * - ``num_divisions``
      - int
      - Number of time divisions :math:`N` (:math:`\ge 1`). The Zassenhaus product approximates :math:`e^{-iHt/N}` and is repeated :math:`N` times. Default is 1.

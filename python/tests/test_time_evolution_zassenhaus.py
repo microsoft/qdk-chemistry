@@ -188,24 +188,6 @@ class TestZassenhausBuilder:
         error = np.linalg.norm(_exact_unitary(hamiltonian, time) - _builder_unitary(container), 2)
         assert error < target
 
-    def test_order_zero_selects_order_from_target_accuracy(self):
-        """order=0 picks the expansion order from target_accuracy (tighter -> higher order)."""
-        hamiltonian = _heisenberg_hamiltonian()
-        time = 0.1
-        loose = Zassenhaus(order=0, time=time, target_accuracy=1.0).run(hamiltonian).get_container()
-        tight = Zassenhaus(order=0, time=time, target_accuracy=1e-2).run(hamiltonian).get_container()
-        # A tighter accuracy selects a higher order, hence more terms per step.
-        assert len(tight.step_terms) > len(loose.step_terms)
-        # The auto-selected configuration meets the requested accuracy.
-        error = np.linalg.norm(_exact_unitary(hamiltonian, time) - _builder_unitary(tight), 2)
-        assert error < 1e-2
-
-    def test_order_zero_without_target_accuracy_raises(self):
-        """Automatic order selection needs an accuracy budget to choose from."""
-        hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZI"], coefficients=[0.7, 0.5])
-        with pytest.raises(ValueError, match="target_accuracy"):
-            Zassenhaus(order=0, time=0.1).run(hamiltonian)
-
     def test_accepts_partitioned_hamiltonian(self):
         """A Hamiltonian carrying a commuting term_partition is accepted (as trotter accepts)."""
         hamiltonian = _heisenberg_hamiltonian()
@@ -213,11 +195,11 @@ class TestZassenhausBuilder:
         unitary = Zassenhaus(order=2, time=0.05, num_divisions=1).run(partitioned)
         assert isinstance(unitary.get_container(), PauliProductFormulaContainer)
 
-    def test_unsupported_order_raises(self):
-        """Orders outside the supported {1, 2, 3, 4, 5, 6} range raise NotImplementedError."""
+    def test_invalid_order_raises(self):
+        """Orders below 1 are rejected (1 = Trotter fallback, >= 2 = Zassenhaus)."""
         hamiltonian = QubitHamiltonian(pauli_strings=["XX", "ZI"], coefficients=[0.7, 0.5])
-        with pytest.raises(NotImplementedError):
-            Zassenhaus(order=7, time=0.1).run(hamiltonian)
+        with pytest.raises(ValueError, match="order"):
+            Zassenhaus(order=0, time=0.1).run(hamiltonian)
 
     def test_order_one_falls_back_to_trotter(self):
         """Order 1 (no commutator corrections) reproduces the first-order Trotter product."""

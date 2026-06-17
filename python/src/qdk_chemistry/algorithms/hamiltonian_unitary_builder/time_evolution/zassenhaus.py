@@ -64,18 +64,12 @@ from qdk_chemistry.utils.pauli_commutation import commutator, do_pauli_labels_co
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
-# Supported expansion orders. Corrections C_2..C_order are generated symbolically
-# (see below) for any order, and each is flattened with a Trotter-Suzuki product of
-# just-high-enough order (see Zassenhaus._correction_trotter_order), so the method
-# generalises to any order. The upper bound is a practical/tested cap, not a
-# fundamental one -- raise it as needed (cost grows ~K^order in the generator).
-_MIN_ORDER = 2
-_MAX_ORDER = 6
-
 # The symbolic exponent generator builds ~num_generators^order words, so its cost
 # grows exponentially in the order. Warn before attempting an intractable size --
-# reached only for Hamiltonians with many commuting groups (large molecules),
-# especially via automatic accuracy estimation which probes up to _MAX_ORDER + 1.
+# reached only for Hamiltonians with many commuting groups (large molecules) at high
+# order. No hardcoded maximum order is needed: corrections are generated and flattened
+# for any order (see Zassenhaus._correction_trotter_order), and this guardrail flags
+# the rare case where that becomes too expensive.
 _WORD_SERIES_WARN_THRESHOLD = 100_000
 
 
@@ -188,10 +182,9 @@ class ZassenhausSettings(TimeEvolutionSettings):
         """Initialize ZassenhausSettings with default values.
 
         Attributes:
-            order: Expansion order p; corrections C_2..C_p are included so the
-                truncation error scales as O(t^{p+1}). Supported: 2, 3, 4, 5, 6.
-                Order 1 (no corrections) falls back to the first-order Trotter builder;
-                order 0 selects the order automatically from ``target_accuracy``.
+            order: Expansion order p (>= 2); corrections C_2..C_p are included so the
+                truncation error scales as O(t^{p+1}). Order 1 (no corrections) falls
+                back to the first-order Trotter builder.
             num_divisions: Number of time divisions N. The full Zassenhaus
                 product approximates exp(-iH t/N) and is repeated N times.
             target_accuracy: Target operator-norm accuracy for automatic N
@@ -201,9 +194,7 @@ class ZassenhausSettings(TimeEvolutionSettings):
 
         """
         super().__init__()
-        self._set_default(
-            "order", "int", 2, "The Zassenhaus expansion order p (2-6; 1 falls back to Trotter; 0 = auto)."
-        )
+        self._set_default("order", "int", 2, "The Zassenhaus expansion order p (>= 2; 1 falls back to Trotter).")
         self._set_default("num_divisions", "int", 1, "Number of time divisions N (>= 1).")
         self._set_default(
             "target_accuracy",
@@ -223,8 +214,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         ``num_divisions`` N may be set explicitly (default 1) or estimated
         automatically from ``target_accuracy`` (Zassenhaus error scales as
         ``||C_{p+1}|| t^{p+1} / N^p``); when both are given the larger N wins.
-        With ``order=0`` the expansion order itself is chosen from
-        ``target_accuracy`` (the smallest order meeting the single-division bound).
+        The expansion ``order`` is always user-provided (1 falls back to Trotter).
 
         Remaining gate-count optimisations are left as future work: exploiting
         disjoint-support (layer) parallelism instead of flattening layers, and
@@ -246,8 +236,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         r"""Initialize the Zassenhaus builder.
 
         Args:
-            order: Expansion order p in {2, 3, 4, 5, 6}; order 1 falls back to first-order Trotter; order 0
-                selects the order automatically from ``target_accuracy``. Defaults to 2.
+            order: Expansion order p >= 2; order 1 falls back to first-order Trotter. Defaults to 2.
             time: The evolution time. Defaults to 0.0.
             num_divisions: Number of time divisions N (>= 1). Defaults to 1.
             target_accuracy: Target accuracy for automatic N estimation. Use 0.0 (default) to disable.
@@ -277,6 +266,8 @@ class Zassenhaus(TimeEvolutionBuilder):
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Construct the unitary representation using the Zassenhaus expansion."""
         order = self._settings.get("order")
+        if order < 1:
+            raise ValueError(f"Zassenhaus order must be >= 1 (1 falls back to Trotter); got {order}.")
         if order == 1:
             # Order 1 carries no commutator corrections (e^X e^Y), which is
             # exactly the first-order Trotter product -- delegate to it.
@@ -287,15 +278,6 @@ class Zassenhaus(TimeEvolutionBuilder):
 
         if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
-
-        if order == 0:
-            # Pick the order from the accuracy budget (mirrors num_divisions=0).
-            order = self._resolve_auto_order(qubit_hamiltonian, effective_time)
-        if not (_MIN_ORDER <= order <= _MAX_ORDER):
-            raise NotImplementedError(
-                f"Zassenhaus order must be 0 (automatic), 1 (Trotter fallback), "
-                f"or in [{_MIN_ORDER}, {_MAX_ORDER}], got {order}."
-            )
 
         num_divisions = self._resolve_num_divisions(qubit_hamiltonian, effective_time, order)
         delta = effective_time / num_divisions
@@ -309,34 +291,6 @@ class Zassenhaus(TimeEvolutionBuilder):
             num_qubits=qubit_hamiltonian.num_qubits,
         )
         return UnitaryRepresentation(container=container)
-
-    def _resolve_auto_order(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
-        r"""Pick the expansion order from ``target_accuracy`` (used when ``order == 0``).
-
-        Returns the smallest order p in ``[_MIN_ORDER, _MAX_ORDER]`` whose
-        single-division truncation bound ``||C_{p+1}|| t^{p+1}`` is within the
-        target (``||C_{p+1}||`` bounded by the 1-norm of its Pauli coefficients,
-        the same bound used for the division count). If none qualifies, the
-        maximum order is returned and ``num_divisions`` takes up the slack. This
-        is a closed-form accuracy bound in the spirit of the Trotter step-count
-        estimators, not a cost-optimal search.
-        """
-        target_accuracy = self._settings.get("target_accuracy")
-        if target_accuracy <= 0.0:
-            raise ValueError("Automatic order selection (order=0) requires target_accuracy > 0.")
-        groups = self._commuting_groups(qubit_hamiltonian)
-        if len(groups) < 2 or time == 0.0:
-            # A single commuting group is exact; nothing to expand.
-            return _MIN_ORDER
-
-        unit_ops = [(-1j) * group for group in groups]
-        word_exponents = _zassenhaus_word_exponents(len(groups), _MAX_ORDER + 1)
-        for order in range(_MIN_ORDER, _MAX_ORDER + 1):
-            leading = self._evaluate_exponent(word_exponents[order - 1], order + 1, unit_ops)
-            norm_bound = float(np.sum(np.abs(np.asarray(leading.coefficients))))
-            if norm_bound * abs(time) ** (order + 1) <= target_accuracy:
-                return order
-        return _MAX_ORDER
 
     def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float, order: int) -> int:
         """Determine the number of Zassenhaus divisions N.
