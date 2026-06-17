@@ -17,6 +17,8 @@
 #   -SkipConfigure  # Skip CMake configure, incremental build only
 #   -SkipPython     # Skip Python build, only do C++
 #   -SkipTests      # Skip test runs
+#   -Debug          # Build C++ in Debug mode (build-msvc-debug/, enables MSVC iterator checks).
+#                   # Python build is skipped automatically.
 
 param(
     [switch]$DynamicDeps,
@@ -24,7 +26,8 @@ param(
     [switch]$SkipCpp,
     [switch]$SkipConfigure,
     [switch]$SkipPython,
-    [switch]$SkipTests
+    [switch]$SkipTests,
+    [switch]$Debug
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,8 +36,16 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-$BuildDir = "$RepoRoot\cpp\build-msvc"
-$InstallDir = "$RepoRoot\install-msvc"
+if ($Debug) {
+    $BuildDir   = "$RepoRoot\cpp\build-msvc-debug"
+    $InstallDir = "$RepoRoot\install-msvc-debug"
+    $BuildType  = "Debug"
+    $SkipPython = $true   # Debug build is not usable for the Python extension
+} else {
+    $BuildDir   = "$RepoRoot\cpp\build-msvc"
+    $InstallDir = "$RepoRoot\install-msvc"
+    $BuildType  = "Release"
+}
 $VcpkgInstalledDir = "$RepoRoot\vcpkg_installed"
 # vcpkg triplets: https://learn.microsoft.com/en-us/vcpkg/users/platforms/windows
 # Using dynamic (DLL) dependencies requires copying the corresponding DLL files to qdk-chemistry's Python package
@@ -52,8 +63,9 @@ $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  QDK Chemistry - Windows Build (MSVC cl)   " -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
-Write-Host "Repo root: $RepoRoot"
-Write-Host "Triplet:   $VcpkgTriplet ($linkMode)"
+Write-Host "Repo root:  $RepoRoot"
+Write-Host "Build type: $BuildType"
+Write-Host "Triplet:    $VcpkgTriplet ($linkMode)"
 Write-Host ""
 
 # --------------------------------------------------------------------------
@@ -267,7 +279,7 @@ if (-not $SkipCpp) {
             -DMACIS_ENABLE_TESTS=OFF `
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
-            -DCMAKE_BUILD_TYPE=Release `
+            -DCMAKE_BUILD_TYPE=$BuildType `
             -DCMAKE_C_COMPILER=cl `
             -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `
