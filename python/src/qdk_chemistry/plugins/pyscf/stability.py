@@ -246,7 +246,7 @@ class PyscfStabilityChecker(StabilityChecker):
     - Returns StabilityResult with separate internal and external stability information
 
     Raises:
-        ValueError: If wavefunction is not a SlaterDeterminantContainer (container type "sd").
+        ValueError: If wavefunction is not a single-determinant state vector.
 
     Examples:
         >>> checker = PyscfStabilityChecker()
@@ -279,14 +279,14 @@ class PyscfStabilityChecker(StabilityChecker):
             with detailed analysis results.
 
         Raises:
-            ValueError: If wavefunction is not a SlaterDeterminantContainer or if external
+            ValueError: If wavefunction is not a single-determinant state vector or if external
                 stability analysis is requested for ROHF/UHF wavefunctions.
 
         """
         Logger.trace_entering()
-        # Verify wavefunction compatibility: Only SlaterDeterminantContainer currently supported
-        if wavefunction.get_container_type() != "sd":
-            raise ValueError("Stability analysis currently only supports SlaterDeterminantContainer wavefunctions")
+        # Verify wavefunction compatibility: only single-determinant state vectors are supported
+        if wavefunction.get_container_type() != "state_vector" or wavefunction.size() != 1:
+            raise ValueError("Stability analysis currently only supports single-determinant wavefunctions")
 
         # Extract settings
         do_internal = self._settings.get("internal")

@@ -8,22 +8,47 @@
 #include <array>
 #include <cstddef>
 #include <map>
+#include <memory>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_sparse_map.hpp>
 #include <string>
+#include <utility>
+#include <vector>
+
+#include "../path_utils.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::data;
+using qdk::chemistry::python::utils::to_string_path;
 
 void bind_symmetry_blocked_sparse_map(py::module& m) {
   using SBSM = SymmetryBlockedSparseMap<4>;
   using Block = SparseMapBlock<4>;
+  using Labels = SBSM::Labels;
+  using SymmetriesArray = SBSM::SymmetriesArray;
+  using ExtentsArray = SBSM::ExtentsArray;
 
   py::class_<SBSM, DataClass, std::shared_ptr<SBSM>>(
       m, "SymmetryBlockedSparseMapRank4",
       "Immutable rank-4 symmetry-blocked sparse map (double-valued). Each "
       "block is a dict-like map from a per-slot local-index tuple to a "
       "scalar value.")
+      .def(py::init([](SymmetriesArray symmetries, ExtentsArray extents,
+                       std::vector<std::pair<Labels, Block>> blocks) {
+             typename SBSM::BlockMap block_map;
+             for (auto& [labels, block] : blocks) {
+               block_map.emplace(
+                   labels, std::make_shared<const Block>(std::move(block)));
+             }
+             return std::make_shared<SBSM>(std::move(symmetries),
+                                           std::move(extents),
+                                           std::move(block_map));
+           }),
+           py::arg("symmetries"), py::arg("extents"), py::arg("blocks"),
+           "Construct from per-slot symmetries, per-slot extents, and a list "
+           "of (labels, block) pairs, where each block is a "
+           "dict[tuple[int,int,int,int], float]. Orbit-equivalent sectors that "
+           "share the same supplied block are auto-aliased.")
       .def(
           "symmetries",
           [](const SBSM& self) {
@@ -64,5 +89,42 @@ void bind_symmetry_blocked_sparse_map(py::module& m) {
           "Single-entry lookup; returns 0.0 if the entry is absent.")
       .def("get_data_type_name", &SBSM::get_data_type_name)
       .def("get_summary", &SBSM::get_summary)
-      .def("__repr__", &SBSM::get_summary);
+      .def("__repr__", &SBSM::get_summary)
+      .def(
+          "to_file",
+          [](const SBSM& self, const py::object& filename,
+             const std::string& type) {
+            self.to_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def(
+          "to_json_file",
+          [](const SBSM& self, const py::object& filename) {
+            self.to_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def(
+          "to_hdf5_file",
+          [](const SBSM& self, const py::object& filename) {
+            self.to_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_file",
+          [](const py::object& filename, const std::string& type) {
+            return SBSM::from_file(to_string_path(filename), type);
+          },
+          py::arg("filename"), py::arg("type"))
+      .def_static(
+          "from_json_file",
+          [](const py::object& filename) {
+            return SBSM::from_json_file(to_string_path(filename));
+          },
+          py::arg("filename"))
+      .def_static(
+          "from_hdf5_file",
+          [](const py::object& filename) {
+            return SBSM::from_hdf5_file(to_string_path(filename));
+          },
+          py::arg("filename"));
 }
