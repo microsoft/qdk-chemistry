@@ -27,6 +27,16 @@ from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian, c
 
 from .test_helpers import create_test_basis_set, create_test_orbitals
 
+try:
+    from pyscf import ao2mo, gto, scf
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    ao2mo = None
+    gto = None
+    scf = None
+    PYSCF_AVAILABLE = False
+
 
 def _dense_hamiltonian(one_body: np.ndarray, two_body: np.ndarray) -> Hamiltonian:
     orbitals = create_test_orbitals(one_body.shape[0])
@@ -107,6 +117,39 @@ def _three_center(n_orbitals: int, n_auxiliary: int, start: int) -> np.ndarray:
     return centered.reshape(n_orbitals**2, n_auxiliary) / (10.0 * n_orbitals * n_auxiliary)
 
 
+def _molecular_cholesky_pair(atom: str, basis: str) -> tuple[Hamiltonian, Hamiltonian, int]:
+    assert ao2mo is not None
+    assert gto is not None
+    assert scf is not None
+
+    mol = gto.M(atom=atom, basis=basis, unit="Angstrom", verbose=0)
+    mf = scf.RHF(mol)
+    mf.conv_tol = 1e-10
+    mf.kernel()
+    assert mf.converged
+
+    coefficients = mf.mo_coeff
+    n_orbitals = coefficients.shape[1]
+    one_body = coefficients.T @ mf.get_hcore() @ coefficients
+    eri_mo = ao2mo.restore(1, ao2mo.kernel(mol, coefficients), n_orbitals)
+
+    pair_matrix = np.asarray(eri_mo).reshape(n_orbitals**2, n_orbitals**2)
+    pair_matrix = (pair_matrix + pair_matrix.T) / 2
+    eigvals, eigvecs = np.linalg.eigh(pair_matrix)
+    keep = eigvals > 1e-12
+    three_center = np.ascontiguousarray(eigvecs[:, keep] * np.sqrt(eigvals[keep]))
+    dense_two_body = np.ascontiguousarray((three_center @ three_center.T).reshape(n_orbitals**4))
+
+    orbitals = create_test_orbitals(n_orbitals)
+    core_energy = float(mf.energy_nuc())
+    dense = Hamiltonian(
+        CanonicalFourCenterHamiltonianContainer(one_body, dense_two_body, orbitals, core_energy, np.eye(0))
+    )
+    cholesky = Hamiltonian(CholeskyHamiltonianContainer(one_body, three_center, orbitals, core_energy, np.eye(0)))
+
+    return cholesky, dense, n_orbitals
+
+
 MAPPING_FACTORIES = [
     MajoranaMapping.jordan_wigner,
     MajoranaMapping.bravyi_kitaev,
@@ -128,6 +171,12 @@ RESTRICTED_CHOLESKY_CASES = [
 UNRESTRICTED_CHOLESKY_CASES = [
     pytest.param(2, 2, id="two-orbital"),
     pytest.param(3, 2, id="three-orbital"),
+]
+
+MOLECULAR_CHOLESKY_CASES = [
+    pytest.param("H 0 0 0; H 0 0 0.74", "sto-3g", id="h2-sto3g"),
+    pytest.param("O 0 0 0; H 0 0.757 0.587; H 0 -0.757 0.587", "sto-3g", id="h2o-sto3g"),
+    pytest.param("N 0 0 0; N 0 0 1.10", "sto-3g", id="n2-sto3g"),
 ]
 
 
@@ -186,6 +235,53 @@ def test_sparse_container_canonicalizes_symmetry_related_two_body_keys(mapping_f
     )
 
 
+def test_sparse_container_ignores_below_threshold_duplicate_mismatch() -> None:
+    """Below-threshold symmetry duplicates should not fail consistency checks."""
+    n_orbitals = 2
+    one_body = np.diag([0.3, -0.1])
+    dense_two_body = np.zeros(n_orbitals**4)
+    _set_coulomb_symmetric(dense_two_body, n_orbitals, (0, 1, 0, 1), 1e-7)
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
+    mapper = qdk_mapper_module.QdkQubitMapper(integral_threshold=1e-6)
+
+    sparse_hamiltonian = Hamiltonian(
+        SparseHamiltonianContainer(
+            sparse.csc_matrix(one_body),
+            {
+                (0, 1, 0, 1): 1e-7,
+                (1, 0, 0, 1): 2e-7,
+            },
+        )
+    )
+    dense_hamiltonian = _dense_hamiltonian(one_body, dense_two_body)
+
+    _assert_equivalent(
+        mapper.run(sparse_hamiltonian, mapping),
+        mapper.run(dense_hamiltonian, mapping),
+    )
+
+
+def test_sparse_container_rejects_above_threshold_duplicate_mismatch() -> None:
+    """Meaningful symmetry duplicate disagreements should stay explicit."""
+    n_orbitals = 2
+    one_body = np.zeros((n_orbitals, n_orbitals))
+    mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_orbitals)
+    mapper = qdk_mapper_module.QdkQubitMapper(integral_threshold=1e-12)
+
+    sparse_hamiltonian = Hamiltonian(
+        SparseHamiltonianContainer(
+            sparse.csc_matrix(one_body),
+            {
+                (0, 1, 0, 1): 0.7,
+                (1, 0, 0, 1): 0.5,
+            },
+        )
+    )
+
+    with pytest.raises(ValueError, match="inconsistent values"):
+        mapper.run(sparse_hamiltonian, mapping)
+
+
 @pytest.mark.parametrize("model_factory", SPARSE_MODEL_FACTORIES)
 @pytest.mark.parametrize("mapping_factory", MAPPING_FACTORIES)
 def test_sparse_model_hamiltonian_maps_like_dense_materialization(mapping_factory, model_factory) -> None:
@@ -221,6 +317,23 @@ def test_cholesky_container_maps_like_dense_reconstruction(mapping_factory, n_or
     _assert_equivalent(
         mapper.run(cholesky, mapping),
         mapper.run(dense, mapping),
+    )
+
+
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+@pytest.mark.parametrize(("atom", "basis"), MOLECULAR_CHOLESKY_CASES)
+@pytest.mark.parametrize("mapping_factory", MAPPING_FACTORIES)
+def test_molecular_cholesky_container_maps_like_dense_reconstruction(mapping_factory, atom, basis) -> None:
+    """Molecular Cholesky-backed systems should match dense references."""
+    cholesky, dense, n_orbitals = _molecular_cholesky_pair(atom, basis)
+
+    mapping = mapping_factory(num_modes=2 * n_orbitals)
+    mapper = create("qubit_mapper", "qdk")
+
+    _assert_equivalent(
+        mapper.run(cholesky, mapping),
+        mapper.run(dense, mapping),
+        atol=5e-11,
     )
 
 

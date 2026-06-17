@@ -4,10 +4,17 @@
 
 #include <gtest/gtest.h>
 
+#include <Eigen/Dense>
 #include <complex>
+#include <memory>
+#include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -58,6 +65,22 @@ void expect_real_term(
   EXPECT_NEAR(it->second.real(), expected, 1e-12);
   EXPECT_NEAR(it->second.imag(), 0.0, 1e-12);
 }
+
+std::shared_ptr<const SymmetryProduct> model_spin_symmetry(bool restricted) {
+  return std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::spin(1, restricted)}));
+}
+
+class ThrowingDenseCholeskyContainer : public CholeskyHamiltonianContainer {
+ public:
+  using CholeskyHamiltonianContainer::CholeskyHamiltonianContainer;
+
+  std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+             const Eigen::VectorXd&>
+  get_two_body_integrals() const override {
+    throw std::runtime_error("dense Cholesky materialization is forbidden");
+  }
+};
 
 }  // namespace
 
@@ -213,6 +236,26 @@ TEST(MajoranaMapEngineTest, RejectsZeroQubitMappings) {
                                /*threshold=*/1e-12,
                                /*integral_threshold=*/1e-12),
       std::invalid_argument);
+}
+
+TEST(MajoranaMapEngineTest,
+     CholeskyHamiltonianOverloadDoesNotCallDenseTwoBodyGetter) {
+  Eigen::MatrixXd h1(2, 2);
+  h1 << 0.2, -0.1, -0.1, 0.3;
+  Eigen::MatrixXd three_center(4, 2);
+  three_center << 0.4, 0.1, -0.2, 0.3, -0.2, 0.3, 0.5, -0.4;
+  auto orbitals = std::make_shared<ModelOrbitals>(2, model_spin_symmetry(true));
+  Eigen::MatrixXd inactive_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  Hamiltonian hamiltonian(std::make_unique<ThrowingDenseCholeskyContainer>(
+      h1, three_center, orbitals, /*core_energy=*/0.0, inactive_fock));
+  auto mapping = MajoranaMapping::jordan_wigner(4);
+
+  MajoranaMapResult result;
+  EXPECT_NO_THROW(result = majorana_map_hamiltonian(
+                      mapping, hamiltonian, /*threshold=*/1e-12,
+                      /*integral_threshold=*/1e-12));
+  EXPECT_FALSE(result.words.empty());
 }
 
 TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {
