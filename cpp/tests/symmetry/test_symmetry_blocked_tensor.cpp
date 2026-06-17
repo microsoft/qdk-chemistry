@@ -223,6 +223,7 @@ TEST(SymmetryBlockedTensorTest, Hdf5RoundTripStoresNativeDoubleBlocks) {
   EXPECT_EQ(dims[0], 2u);
   EXPECT_EQ(dims[1], 2u);
 
+  file.close();
   std::filesystem::remove(filename);
 }
 
@@ -256,6 +257,7 @@ TEST(SymmetryBlockedTensorTest,
   EXPECT_FALSE(file.nameExists("block_0_real"));
   EXPECT_FALSE(file.nameExists("block_0_imag"));
 
+  file.close();
   std::filesystem::remove(filename);
 }
 
@@ -295,6 +297,7 @@ TEST(SymmetryBlockedTensorTest, Hdf5MetadataCarriesSerializationVersion) {
   EXPECT_TRUE(metadata["version"].is_string());
   EXPECT_FALSE(metadata["version"].get<std::string>().empty());
 
+  file.close();
   std::filesystem::remove(filename);
 }
 
