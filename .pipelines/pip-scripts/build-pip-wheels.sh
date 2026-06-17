@@ -6,11 +6,10 @@ PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
 BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
-CMAKE_VERSION=${6:-3.28.3}
-HDF5_VERSION=${7:-1.13.0}
-BLIS_VERSION=${8:-2.0}
-LIBFLAME_VERSION=${9:-5.2.0}
-MAC_BUILD=${10:-OFF}
+HDF5_VERSION=${6:-1.13.0}
+BLIS_VERSION=${7:-2.0}
+LIBFLAME_VERSION=${8:-5.2.0}
+MAC_BUILD=${9:-OFF}
 
 export CFLAGS="-fPIC -Os"
 # Use sudo for system-level installs when running as a non-root pipeline agent.
@@ -25,6 +24,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         binutils \
         boost-devel \
         bzip2-devel \
+        cmake \
         curl \
         eigen3-devel \
         fmt-devel \
@@ -54,20 +54,6 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         xz \
         xz-devel \
         zlib-devel
-
-    # Build cmake from source to ensure a sufficiently recent version
-    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
-    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
-    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | sha256sum --check || exit 1
-    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
-    rm cmake-${CMAKE_VERSION}.tar.gz
-    cd cmake-${CMAKE_VERSION}
-    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
-    make --silent -j$(nproc)
-    $SUDO make install
-    cd ..
-    rm -r cmake-${CMAKE_VERSION}
     cmake --version
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
