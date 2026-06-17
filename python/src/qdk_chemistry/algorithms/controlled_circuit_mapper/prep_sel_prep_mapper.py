@@ -117,15 +117,12 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
             raise ValueError("PrepSelPrepMapper currently only supports a single control qubit.")
 
         power = unitary_container.power
-        prepare = unitary_container.prepare
+        prepare_wavefunction = unitary_container.prepare
         select = unitary_container.select
 
         # 1. Create PREPARE circuit via the state-preparation algorithm.
         prepare_algorithm = self._create_nested("state_prep")
-        reversed_qubits = list(reversed(prepare.prepare_qubits))
-        prepare_circuit = prepare_algorithm.prepare_from_statevector(
-            prepare.statevector, prepare.num_prepare_qubits, reversed_qubits
-        )
+        prepare_circuit = prepare_algorithm.run(prepare_wavefunction)
         prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
 
         # 2. Create SELECT circuit directly (Pauli SELECT oracle).
@@ -133,7 +130,7 @@ class PrepSelPrepMapper(ControlledCircuitMapper):
 
         # 3. Compose into a controlled PREPARE-SELECT-PREPARE (optionally with quantum walk).
         num_system = select.num_target_qubits
-        num_ancilla = select.num_prepare_qubits
+        num_ancilla = unitary_container.num_prepare_ancillas
 
         psp_parameters = {
             "prepareOp": prepare_op,

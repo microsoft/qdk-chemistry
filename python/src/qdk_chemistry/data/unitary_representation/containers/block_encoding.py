@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import os
+import tempfile
 from abc import abstractmethod
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -14,7 +16,7 @@ import numpy as np
 
 from .base import UnitaryContainer
 
-__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Prepare", "Select"]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select"]
 
 
 class BlockEncodingContainer(UnitaryContainer):
@@ -75,48 +77,6 @@ class ControlledOperation:
 
 
 @dataclass(frozen=True)
-class Prepare:
-    """Class representing the PREPARE oracle for block encoding."""
-
-    statevector: np.ndarray
-    """Pre-computed amplitude array to load into the ancilla register."""
-
-    num_prepare_qubits: int
-    """Number of qubits in the prepare register."""
-
-    prepare_qubits: list[int]
-    """List of qubit indices for the prepare register."""
-
-    def to_hdf5(self, group: h5py.Group) -> None:
-        """Save the Prepare oracle to an HDF5 group.
-
-        Args:
-            group: HDF5 group to write the statevector dataset and attributes to.
-
-        """
-        group.create_dataset("statevector", data=self.statevector)
-        group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
-        group.attrs["prepare_qubits"] = self.prepare_qubits
-
-    @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "Prepare":
-        """Load a Prepare oracle from an HDF5 group.
-
-        Args:
-            group: HDF5 group to read the statevector dataset and attributes from.
-
-        Returns:
-            Prepare: The deserialized instance.
-
-        """
-        return cls(
-            statevector=np.array(group["statevector"]),
-            num_prepare_qubits=int(group.attrs["num_prepare_qubits"]),
-            prepare_qubits=list(group.attrs["prepare_qubits"]),
-        )
-
-
-@dataclass(frozen=True)
 class Select:
     """Class representing the SELECT oracle for block encoding."""
 
@@ -126,7 +86,7 @@ class Select:
     phases: np.ndarray
     """Array of +1/-1 phase corrections (uncontrolled global phase per term)."""
 
-    num_prepare_qubits: int
+    num_prepare_ancillas: int
     """Number of control qubits."""
 
     num_target_qubits: int
@@ -146,7 +106,7 @@ class Select:
 
         """
         group.create_dataset("phases", data=self.phases)
-        group.attrs["num_prepare_qubits"] = self.num_prepare_qubits
+        group.attrs["num_prepare_ancillas"] = self.num_prepare_ancillas
         group.attrs["num_target_qubits"] = self.num_target_qubits
         group.attrs["prepare_qubits"] = self.prepare_qubits
         group.attrs["target_qubits"] = self.target_qubits
@@ -173,7 +133,7 @@ class Select:
         return cls(
             controlled_operations=controlled_ops,
             phases=np.array(group["phases"]),
-            num_prepare_qubits=int(group.attrs["num_prepare_qubits"]),
+            num_prepare_ancillas=int(group.attrs["num_prepare_ancillas"]),
             num_target_qubits=int(group.attrs["num_target_qubits"]),
             prepare_qubits=list(group.attrs["prepare_qubits"]),
             target_qubits=list(group.attrs["target_qubits"]),
@@ -201,7 +161,7 @@ class LCUContainer(BlockEncodingContainer):
 
     def __init__(
         self,
-        prepare: Prepare,
+        prepare: "Wavefunction",
         select: Select,
         power: int = 1,
         quantum_walk: bool = False,
@@ -209,9 +169,9 @@ class LCUContainer(BlockEncodingContainer):
         r"""Initialize an LCUContainer.
 
         Args:
+            prepare: The prepare wavefunction encoding coefficients for the block encoded Hamiltonian.
+            select: The select oracle for controlled operations.
             power: Number of times to apply the walk operator (for W^power in QPE).
-            prepare: The PREPARE oracle data class instance.
-            select: The SELECT oracle data class instance.
             quantum_walk: When True, the circuit mapper wraps the block encoding with a
                 quantum walk operator (use with QPE). When False, the plain block
                 encoding is used (use with Hadamard test).
@@ -245,6 +205,18 @@ class LCUContainer(BlockEncodingContainer):
         return self._quantum_walk
 
     @property
+    def num_prepare_ancillas(self) -> int:
+        """Number of qubits in the prepare ancillary register.
+
+        Derived from the orbital basis size of the prepare wavefunction.
+
+        Returns:
+            int: The ancilla qubit count.
+
+        """
+        return self.prepare.get_orbitals().num_modes()
+
+    @property
     def num_qubits(self) -> int:
         """Total number of qubits (system + ancilla).
 
@@ -252,7 +224,7 @@ class LCUContainer(BlockEncodingContainer):
             int: The combined qubit count.
 
         """
-        return self.select.num_target_qubits + self.prepare.num_prepare_qubits
+        return self.select.num_target_qubits + self.num_prepare_ancillas
 
     @property
     def type(self) -> str:
@@ -275,7 +247,7 @@ class LCUContainer(BlockEncodingContainer):
         data: dict[str, Any] = {
             "container_type": self.type,
             "power": self.power,
-            "prepare": asdict(self.prepare) | {"statevector": self.prepare.statevector.tolist()},
+            "prepare": self.prepare.to_json(),
             "select": asdict(self.select) | {"phases": self.select.phases.tolist()},
             "quantum_walk": self.quantum_walk,
         }
@@ -293,7 +265,22 @@ class LCUContainer(BlockEncodingContainer):
         group.attrs["container_type"] = self.type
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
-        self.prepare.to_hdf5(group.create_group("prepare"))
+
+        # TODO: Replace temp-file bridge once Wavefunction.to_hdf5(h5py.Group)
+        # is exposed in the pybind11 bindings.
+        # Then this becomes: self.prepare.to_hdf5(group.create_group("prepare"))
+        fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
+        os.close(fd)
+        try:
+            self.prepare.to_hdf5_file(tmp_path)
+            with h5py.File(tmp_path, "r") as src:
+                for key in src:
+                    src.copy(key, group.require_group("prepare"))
+                for attr_name, attr_val in src.attrs.items():
+                    group["prepare"].attrs[attr_name] = attr_val
+        finally:
+            os.unlink(tmp_path)
+
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
@@ -307,14 +294,11 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
+        from qdk_chemistry.data import Wavefunction
+
         cls._validate_json_version(cls._serialization_version, json_data)
 
-        prep_data = json_data["prepare"]
-        prepare = Prepare(
-            statevector=np.array(prep_data["statevector"], dtype=float),
-            num_prepare_qubits=prep_data["num_prepare_qubits"],
-            prepare_qubits=prep_data["prepare_qubits"],
-        )
+        prepare = Wavefunction.from_json(json_data["prepare"])
 
         sel_data = json_data["select"]
         controlled_ops = [
@@ -327,7 +311,7 @@ class LCUContainer(BlockEncodingContainer):
         select = Select(
             controlled_operations=controlled_ops,
             phases=np.array(sel_data["phases"], dtype=int),
-            num_prepare_qubits=sel_data["num_prepare_qubits"],
+            num_prepare_ancillas=sel_data["num_prepare_ancillas"],
             num_target_qubits=sel_data["num_target_qubits"],
             prepare_qubits=sel_data["prepare_qubits"],
             target_qubits=sel_data["target_qubits"],
@@ -351,7 +335,24 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
-        prepare = Prepare.from_hdf5(group["prepare"])
+        from qdk_chemistry.data import Wavefunction
+
+        # TODO: Replace temp-file bridge once Wavefunction.from_hdf5(h5py.Group)
+        # is exposed in the pybind11 bindings. Then this becomes:
+        # prepare = Wavefunction.from_hdf5(group["prepare"])
+        fd, tmp_path = tempfile.mkstemp(suffix=".wavefunction.h5")
+        os.close(fd)
+        try:
+            with h5py.File(tmp_path, "w") as dst:
+                src_group = group["prepare"]
+                for key in src_group:
+                    src_group.copy(key, dst)
+                for attr_name, attr_val in src_group.attrs.items():
+                    dst.attrs[attr_name] = attr_val
+            prepare = Wavefunction.from_hdf5_file(tmp_path)
+        finally:
+            os.unlink(tmp_path)
+
         select = Select.from_hdf5(group["select"])
         quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
         power = int(group.attrs["power"])
@@ -372,8 +373,8 @@ class LCUContainer(BlockEncodingContainer):
         return (
             f"LCU Container:\n"
             f"  Power: {self.power}\n"
-            f"  Prepare: {self.prepare.num_prepare_qubits} qubits, statevector shape {self.prepare.statevector.shape}\n"
-            f"  Select: {self.select.num_prepare_qubits} control qubits, {self.select.num_target_qubits} target qubits,"
+            f"  Prepare: {self.num_prepare_ancillas} qubits, statevector shape {len(self.prepare.get_coefficients())}\n"
+            f"  Select: {self.num_prepare_ancillas} control qubits, {self.num_prepare_ancillas} target qubits,"
             f" {len(self.select.controlled_operations)} controlled operations\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"
         )

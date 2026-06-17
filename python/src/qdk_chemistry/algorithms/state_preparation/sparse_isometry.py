@@ -114,23 +114,8 @@ class SparseIsometryGF2XStatePreparation(StatePreparation):
                 "Qiskit is not available. Please install Qiskit to use the 'qiskit' dense preparation method."
             )
 
-        # Active Space Consistency Check
-        alpha_indices, beta_indices = wavefunction.get_orbitals().get_active_space_indices()
-        if alpha_indices != beta_indices:
-            raise ValueError(
-                f"Active space contains {len(alpha_indices)} alpha orbitals and "
-                f"{len(beta_indices)} beta orbitals. Asymmetric active spaces for "
-                "alpha and beta orbitals are not supported for state preparation."
-            )
-
-        coeffs = wavefunction.get_coefficients()
-        dets = wavefunction.get_active_determinants()
-        num_orbitals = len(wavefunction.get_orbitals().get_active_space_indices()[0])
-        bitstrings = []
-        for det in dets:
-            alpha_str, beta_str = det.to_binary_strings(num_orbitals)
-            bitstring = beta_str[::-1] + alpha_str[::-1]  # Qiskit uses little-endian convention
-            bitstrings.append(bitstring)
+        # Validate active space and get num_orbitals (works for both spin-½ and 1-bit-per-mode)
+        bitstrings, coeffs, n_qubits, _ = StatePreparation.extract_state_data(wavefunction)
 
         # Check for single determinant case after filtering
         if len(bitstrings) == 1:
