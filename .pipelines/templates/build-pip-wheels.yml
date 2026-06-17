@@ -35,6 +35,9 @@ parameters:
 - name: devTag
   type: string
   default: 'None'
+- name: containerName
+  type: string
+  default: ''
 
 steps:
 - checkout: self
@@ -69,6 +72,7 @@ steps:
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
+    target: linux_build_container
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
     env:
