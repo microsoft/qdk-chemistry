@@ -24,7 +24,8 @@ from itertools import product
 import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )
@@ -53,7 +54,7 @@ class ZassenhausSettings(TimeEvolutionSettings):
         """Initialize ZassenhausSettings with default values.
 
         Attributes:
-            order: The order of the Zassenhaus decomposition (0 means auto).
+            order: The order of the Zassenhaus decomposition.
             target_accuracy: Target accuracy for automatic step computation (0.0 means disabled).
             num_divisions: Explicit number of repeated Zassenhaus time slices (0 means automatic).
             error_bound: Strategy for computing the Zassenhaus error bound ("commutator" or "naive").
@@ -61,7 +62,7 @@ class ZassenhausSettings(TimeEvolutionSettings):
 
         """
         super().__init__()
-        self._set_default("order", "int", 0, "The order of the Zassenhaus decomposition (0 means auto).")
+        self._set_default("order", "int", 2, "The order of the Zassenhaus decomposition.")
         self._set_default(
             "target_accuracy",
             "double",
@@ -91,7 +92,7 @@ class Zassenhaus(TimeEvolutionBuilder):
 
     def __init__(
         self,
-        order: int = 0,
+        order: int = 2,
         *,
         time: float = 0.0,
         target_accuracy: float = 0.0,
@@ -104,7 +105,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         """Initialize Zassenhaus builder with specified Zassenhaus decomposition settings.
 
         Args:
-            order: Zassenhaus decomposition order (0 for auto, or 1, 2, 3, 4). Defaults to 0.
+            order: Zassenhaus decomposition order (1, 2, 3, 4). Defaults to 2.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Target accuracy for auto step computation. Use 0.0 (default) to disable.
             num_divisions: Repeated Zassenhaus time slices. Max of this and auto value is used. Defaults to 0.
@@ -138,13 +139,25 @@ class Zassenhaus(TimeEvolutionBuilder):
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
 
-        if order == 0:
-            resolved_order, num_divisions = self._resolve_optimal_order_and_divisions(qubit_hamiltonian, effective_time)
-        elif order >= 1:
+        if order == 1:
+            # Delegate order=1 to the Trotter builder to avoid code duplication.
+            trotter_builder = Trotter(
+                order=1,
+                time=self._settings.get("time"),
+                target_accuracy=self._settings.get("target_accuracy"),
+                num_divisions=self._settings.get("num_divisions"),
+                error_bound=self._settings.get("error_bound"),
+                weight_threshold=self._settings.get("weight_threshold"),
+                power=self._settings.get("power"),
+                power_strategy=self._settings.get("power_strategy"),
+            )
+            return trotter_builder.run(qubit_hamiltonian)
+
+        if order >= 2:
             resolved_order = order
             num_divisions = self._resolve_num_divisions(qubit_hamiltonian, effective_time, order=order)
         else:
-            raise NotImplementedError("Zassenhaus orders must be non-negative (0 for auto, or >= 1).")
+            raise NotImplementedError("Zassenhaus orders must be greater than or equal to 1.")
 
         delta = effective_time / num_divisions
         terms = self._decompose_zassenhaus_step(
@@ -180,9 +193,6 @@ class Zassenhaus(TimeEvolutionBuilder):
 
         if order is None:
             order = self._settings.get("order")
-            # If still 0 (auto), default to 2 as base order for auto-resolution fallback
-            if order == 0:
-                order = 2
 
         weight_threshold = self._settings.get("weight_threshold")
         error_bound = self._settings.get("error_bound")
@@ -204,42 +214,6 @@ class Zassenhaus(TimeEvolutionBuilder):
                 weight_threshold=weight_threshold,
             )
         return max(manual, auto)
-
-    def _resolve_optimal_order_and_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> tuple[int, int]:
-        """Determine the optimal Zassenhaus order and the corresponding number of divisions.
-
-        Sweeps orders 2, 3, and 4, computes the required divisions for each order
-        to achieve target_accuracy, and selects the order that minimizes the total
-        number of Pauli rotations (step_reps * step_terms).
-        """
-        target_accuracy = self._settings.get("target_accuracy")
-        if target_accuracy <= 0.0:
-            # Fallback to order 2 if target accuracy is not specified
-            return 2, self._resolve_num_divisions(qubit_hamiltonian, time, order=2)
-
-        best_order = 2
-        best_divisions = 1
-        min_total_terms = float("inf")
-
-        for p in (2, 3, 4):
-            divisions = self._resolve_num_divisions(qubit_hamiltonian, time, order=p)
-            try:
-                delta = time / divisions
-                step_terms = self._decompose_zassenhaus_step(
-                    qubit_hamiltonian,
-                    time=delta,
-                    atol=self._settings.get("weight_threshold"),
-                    order=p,
-                )
-                total_terms = len(step_terms) * divisions
-                if total_terms < min_total_terms:
-                    min_total_terms = total_terms
-                    best_order = p
-                    best_divisions = divisions
-            except Exception:  # noqa: BLE001
-                pass
-
-        return best_order, best_divisions
 
     def _decompose_zassenhaus_step(
         self,
@@ -273,8 +247,6 @@ class Zassenhaus(TimeEvolutionBuilder):
 
         if order is None:
             order = self._settings.get("order")
-            if order == 0:
-                order = 2
 
         grouped_hamiltonians = self._group_terms(qubit_hamiltonian)
 
@@ -343,10 +315,31 @@ class Zassenhaus(TimeEvolutionBuilder):
                 if key not in commutator_cache:
                     left, right = plan[ref]
                     left_size = len(leaf_sequence(left))
-                    commutator_cache[key] = commutator(
-                        evaluate(left, choices[:left_size]),
-                        evaluate(right, choices[left_size:]),
-                    )
+                    h_left = evaluate(left, choices[:left_size])
+                    h_right = evaluate(right, choices[left_size:])
+
+                    # Convert to maps and check standard commutation
+                    left_maps = [self._pauli_label_to_map(s) for s in h_left.pauli_strings]
+                    right_maps = [self._pauli_label_to_map(s) for s in h_right.pauli_strings]
+
+                    all_commute = True
+                    for map_l in left_maps:
+                        for map_r in right_maps:
+                            if not do_pauli_maps_commute(map_l, map_r):
+                                all_commute = False
+                                break
+                        if not all_commute:
+                            break
+
+                    if all_commute:
+                        num_qubits = max(h_left.num_qubits, h_right.num_qubits)
+                        # Avoid the expensive commutator calculation if all terms commute
+                        commutator_cache[key] = QubitHamiltonian(
+                            pauli_strings=["I" * num_qubits],
+                            coefficients=np.array([0.0], dtype=complex),
+                        )
+                    else:
+                        commutator_cache[key] = commutator(h_left, h_right)
                 return commutator_cache[key]
 
             if not isinstance(ref, int):
@@ -358,6 +351,11 @@ class Zassenhaus(TimeEvolutionBuilder):
             return grouped_hamiltonians[ref][choices[0]]
 
         for n in range(2, order + 1):
+            # For a degree-n correction exponent in the Zassenhaus expansion of e^{-i H t},
+            # the symbolic Lie polynomial C_n is homogeneous of degree n in the generators {-i H_j}.
+            # Thus, C_n has a factor of (-i)^n. Since we represent the exponentiated Pauli terms
+            # in the form e^{-i C'_n t^n}, we factor out -i (or -1j), leaving a phase factor of
+            # (-i)^n / (-i) = (-i)^{n-1} = i * (-i)^n.
             phase = 1j * ((-1j) ** n)
             correction_terms: list[ExponentiatedPauliTerm] = []
 

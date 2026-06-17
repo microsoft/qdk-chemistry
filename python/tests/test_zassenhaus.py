@@ -13,11 +13,11 @@ import pytest
 import scipy.linalg
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.data import (
     AlgorithmRef,
     FlatPartition,
@@ -364,9 +364,9 @@ class TestZassenhausTimeEvolution:
             u_z2 = scipy.linalg.expm(-1j * term.angle * pauli_mat) @ u_z2
         assert np.linalg.norm(u_z2 - u_exact, ord=2) < 0.01
 
-        # Auto order selection
-        container_auto = Zassenhaus(order=0, target_accuracy=1e-3, time=0.1).run(ham_two).get_container()
-        assert container_auto.step_reps > 0
+        # Auto order selection is removed; order <= 0 now raises NotImplementedError
+        with pytest.raises(NotImplementedError):
+            Zassenhaus(order=0).run(ham_two)
 
         with pytest.raises(NotImplementedError):
             Zassenhaus(order=-1).run(ham_two)
