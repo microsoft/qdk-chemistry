@@ -226,3 +226,13 @@ python/VERSION
 
 # VS Code
 .vscode/
+
+# MPL
+.matplotlib
+
+# GHCP
+.github/copilot-instructions.md
+.github/skills/
+
+# Claude
+.claude

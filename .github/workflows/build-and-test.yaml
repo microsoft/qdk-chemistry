@@ -468,13 +468,6 @@ jobs:
           echo "</details>" >> pr-comment.md
         fi
 
-    - name: Comment PR with coverage
-      if: github.event_name == 'pull_request'
-      uses: marocchino/sticky-pull-request-comment@v3
-      with:
-        path: pr-comment.md
-        header: coverage-report
-
     - name: Add coverage to job summary
       run: |
         # Create comprehensive summary with table and detailed reports
