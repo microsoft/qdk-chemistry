@@ -30,6 +30,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         gcc \
         gcc-c++ \
         git \
+        glibc-devel \
         gtest-devel \
         libffi-devel \
         libxml2-devel \
