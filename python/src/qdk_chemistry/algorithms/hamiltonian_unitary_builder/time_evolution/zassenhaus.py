@@ -60,7 +60,11 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.pauli_commutation import commutator, do_pauli_labels_commute
+from qdk_chemistry.utils.pauli_commutation import (
+    commutator,
+    commutator_bound_higher_order,
+    do_pauli_labels_commute,
+)
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
@@ -311,32 +315,30 @@ class Zassenhaus(TimeEvolutionBuilder):
     ) -> int:
         r"""Estimate N so the leading Zassenhaus truncation error meets the target.
 
-        The dropped term is the degree-(p+1) exponent C_{p+1}; over N divisions of
-        time t the leading error is ``||C_{p+1}|| t^{p+1} / N^p`` (with C_{p+1} taken
-        at unit time). Bounding ``||C_{p+1}||`` by the 1-norm of its Pauli
-        coefficients (each Pauli has unit operator norm) and solving for N gives
+        An order-p Zassenhaus step has leading error ``||C_{p+1}|| t^{p+1} / N^p``,
+        the same scaling as an order-p Trotter step. We reuse the shared
+        commutator bound :func:`~qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order`
+        (the alpha multiplying ``t^{p+1}`` in Theorem 6 of Childs et al. 2021, also
+        used by the Trotter step-count estimators) and solve for N with the same
+        closed form:
 
-            N = ceil( ( ||C_{p+1}||_1 * t^{p+1} / target_accuracy )^{1/p} ).
+            N = ceil( alpha^{1/p} * t^{1 + 1/p} / target_accuracy^{1/p} ).
 
-        Like the Trotter step-count bounds, this is an estimate (an upper bound on
-        the leading term), not an exact error guarantee.
+        The bound is shared with -- not re-derived from -- the Trotter machinery;
+        unlike ``trotter_steps_commutator`` it is applied at every order p (the
+        Trotter wrapper only supports orders 1, 2 and even, whereas Zassenhaus also
+        allows odd orders). Like all such bounds it is a conservative estimate, not
+        an exact error guarantee.
         """
         if time == 0.0:
             return 1
-        groups = self._commuting_groups(qubit_hamiltonian)
-        if len(groups) < 2:
-            # A single commuting group is evolved exactly; no truncation error.
+        weight_threshold = self._settings.get("weight_threshold")
+        alpha = commutator_bound_higher_order(qubit_hamiltonian, order=order, weight_threshold=weight_threshold)
+        if alpha <= 0.0:
+            # No inter-term commutators: the step is already exact.
             return 1
 
-        # C_{p+1} at unit time: the leading dropped Zassenhaus exponent.
-        unit_ops = [(-1j) * group for group in groups]
-        word_exponents = _zassenhaus_word_exponents(len(groups), order + 1)
-        leading = self._evaluate_exponent(word_exponents[order - 1], order + 1, unit_ops)
-        norm_bound = float(np.sum(np.abs(np.asarray(leading.coefficients))))
-        if norm_bound <= 0.0:
-            return 1
-
-        n_float = (norm_bound * abs(time) ** (order + 1) / target_accuracy) ** (1.0 / order)
+        n_float = alpha ** (1.0 / order) * abs(time) ** (1.0 + 1.0 / order) / target_accuracy ** (1.0 / order)
         return max(1, int(np.ceil(n_float)))
 
     def _trotter_fallback(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:

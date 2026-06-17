@@ -178,12 +178,17 @@ class TestZassenhausBuilder:
         with pytest.raises(ValueError, match="num_divisions"):
             Zassenhaus(order=2, time=0.1, num_divisions=0)
 
-    def test_target_accuracy_increases_divisions(self):
-        """A target_accuracy raises N automatically until the error meets the target."""
+    @pytest.mark.parametrize("order", [2, 3])
+    def test_target_accuracy_increases_divisions(self, order):
+        """target_accuracy raises N until the error meets the target (even and odd orders).
+
+        The shared ``commutator_bound_higher_order`` estimate is applied directly, so
+        it also covers odd orders that the ``trotter_steps_*`` wrappers reject.
+        """
         hamiltonian = _heisenberg_hamiltonian()
         time = 1.0
         target = 1e-2
-        container = Zassenhaus(order=2, time=time, target_accuracy=target).run(hamiltonian).get_container()
+        container = Zassenhaus(order=order, time=time, target_accuracy=target).run(hamiltonian).get_container()
         assert container.step_reps > 1  # auto-estimation engaged
         error = np.linalg.norm(_exact_unitary(hamiltonian, time) - _builder_unitary(container), 2)
         assert error < target
