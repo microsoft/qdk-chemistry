@@ -105,7 +105,12 @@ def nested_commutator(operators: list[QubitHamiltonian]) -> QubitHamiltonian:
     Returns:
         The right-nested commutator as a :class:`~qdk_chemistry.data.QubitHamiltonian`.
 
+    Raises:
+        ValueError: If ``operators`` is empty.
+
     """
+    if not operators:
+        raise ValueError("nested_commutator requires at least one operator.")
     nested = operators[-1]
     for operator in reversed(operators[:-1]):
         nested = commutator(operator, nested)

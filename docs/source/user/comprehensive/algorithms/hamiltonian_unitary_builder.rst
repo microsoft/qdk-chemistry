@@ -174,7 +174,7 @@ Unlike Trotter-Suzuki, where the commutator structure is absorbed into the step 
 
 with a single genuine :math:`K`-operator exponent :math:`C_n` per degree (the two-operator formulae above are the :math:`K = 2` instances).
 The :math:`C_n` are **not hard-coded**: for the requested order they are generated once as exact rational coefficients of a free-Lie-algebra word series, then evaluated on the group operators through nested commutators (the Dynkin map) using the QDK-native ``commutator``.
-The expansion therefore extends to any order; orders **2-6** are validated.
+The expansion therefore extends to any order; orders **2-4** are covered by the test suite.
 Each correction :math:`e^{C_n}` is in turn realised by a Trotter-Suzuki product of just-high-enough order, so its splitting error never dominates the :math:`O(t^{p+1})` truncation.
 
 Groups are taken from the Hamiltonian's :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition` when it is present and internally commuting; otherwise the builder groups terms greedily with the :ref:`commuting term grouper <algorithms-term-grouper>`.
@@ -191,7 +191,7 @@ The output is a ``PauliProductFormulaContainer`` of the same shape as the :ref:`
      - Description
    * - ``order``
      - int
-     - Zassenhaus expansion order :math:`p` (:math:`\ge 2`; validated for 2-6); order 1 (no commutator corrections) falls back to the first-order Trotter builder. Default is 2.
+     - Zassenhaus expansion order :math:`p` (:math:`\ge 2`; tested for 2-4); order 1 (no commutator corrections) falls back to the first-order Trotter builder. Default is 2.
    * - ``num_divisions``
      - int
      - Number of time divisions :math:`N` (:math:`\ge 1`). The Zassenhaus product approximates :math:`e^{-iHt/N}` and is repeated :math:`N` times. Default is 1.

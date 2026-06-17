@@ -206,9 +206,14 @@ class TestZassenhausErrorScaling:
         slope = _fitted_error_slope(_heisenberg_hamiltonian(), order)
         assert abs(slope - (order + 1)) < 0.1
 
+    @pytest.mark.slow
     @pytest.mark.parametrize("order", [2, 3, 4])
     def test_h2_scaling(self, order):
-        """H2/STO-3G (K = 2 commuting groups, with an identity term) scales as O(t^{p+1})."""
+        """H2/STO-3G (K = 2 commuting groups, with an identity term) scales as O(t^{p+1}).
+
+        Marked slow because ``_h2_hamiltonian`` runs the end-to-end SCF + qubit-mapping
+        pipeline; the Heisenberg scaling test covers the fast suite.
+        """
         slope = _fitted_error_slope(_h2_hamiltonian(), order)
         assert abs(slope - (order + 1)) < 0.1
 

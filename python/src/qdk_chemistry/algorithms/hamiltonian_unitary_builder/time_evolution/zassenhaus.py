@@ -171,7 +171,10 @@ def _zassenhaus_word_exponents(num_generators: int, order: int) -> tuple:
 
     exponents: list = []
     for n in range(2, order + 1):
-        log_remainder = _series_log(remainder, order)
+        # Only the degree-n part of the log is needed for C_n, so truncate the log
+        # to degree n (the remainder itself stays truncated to `order` for the next
+        # iterations).
+        log_remainder = _series_log(remainder, n)
         c_n = {w: c for w, c in log_remainder.items() if len(w) == n}
         exponents.append(tuple(sorted(c_n.items())))
         neg_c_n = {w: -c for w, c in c_n.items()}

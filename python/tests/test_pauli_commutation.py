@@ -311,3 +311,8 @@ class TestCommutator:
         result = nested_commutator([h_x])
         assert result.pauli_strings[0] == "X"
         np.testing.assert_allclose(result.coefficients[0], 1.0, atol=1e-14)
+
+    def test_nested_commutator_empty_raises(self):
+        """An empty operator list raises a clear ValueError, not an IndexError."""
+        with pytest.raises(ValueError, match="at least one operator"):
+            nested_commutator([])
