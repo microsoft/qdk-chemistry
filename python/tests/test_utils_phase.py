@@ -18,6 +18,7 @@ from qdk_chemistry.utils.phase import (
     energy_from_phase,
     iterative_phase_feedback_update,
     phase_fraction_from_feedback,
+    qpe_evolution_time_from_hamiltonian,
     resolve_energy_aliases,
 )
 
@@ -26,6 +27,35 @@ from .reference_tolerances import (
     qpe_energy_tolerance,
     qpe_phase_fraction_tolerance,
 )
+
+
+class _HamiltonianWithNorm:
+    def __init__(self, norm: float) -> None:
+        self.schatten_norm = norm
+
+
+def test_qpe_evolution_time_from_hamiltonian_uses_norm_bound() -> None:
+    """Evolution time should be derived from the Hamiltonian norm."""
+    hamiltonian = _HamiltonianWithNorm(4.0)
+
+    assert qpe_evolution_time_from_hamiltonian(hamiltonian) == pytest.approx(np.pi / 4.0)
+    assert qpe_evolution_time_from_hamiltonian(hamiltonian, phase_bound=np.pi / 2.0) == pytest.approx(
+        np.pi / 8.0
+    )
+
+
+@pytest.mark.parametrize("norm", [0.0, -1.0, np.inf, np.nan])
+def test_qpe_evolution_time_from_hamiltonian_rejects_invalid_norm(norm: float) -> None:
+    """Hamiltonian norm must be positive and finite."""
+    with pytest.raises(ValueError, match="Hamiltonian norm"):
+        qpe_evolution_time_from_hamiltonian(_HamiltonianWithNorm(norm))
+
+
+@pytest.mark.parametrize("phase_bound", [0.0, -1.0, np.pi + 1e-12, np.inf, np.nan])
+def test_qpe_evolution_time_from_hamiltonian_rejects_invalid_phase_bound(phase_bound: float) -> None:
+    """The phase bound must keep the selected time inside the principal branch."""
+    with pytest.raises(ValueError, match="phase_bound"):
+        qpe_evolution_time_from_hamiltonian(_HamiltonianWithNorm(1.0), phase_bound=phase_bound)
 
 
 def test_energy_from_phase_wraps_into_branch() -> None:

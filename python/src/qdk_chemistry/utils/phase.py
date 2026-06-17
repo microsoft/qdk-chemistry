@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from collections.abc import Iterable, Sequence
+from typing import Protocol
 
 import numpy as np
 
@@ -17,8 +18,54 @@ __all__ = [
     "energy_from_phase",
     "iterative_phase_feedback_update",
     "phase_fraction_from_feedback",
+    "qpe_evolution_time_from_hamiltonian",
     "resolve_energy_aliases",
 ]
+
+
+class _HamiltonianNormBound(Protocol):
+    @property
+    def schatten_norm(self) -> float:
+        ...
+
+
+def qpe_evolution_time_from_hamiltonian(
+    hamiltonian: _HamiltonianNormBound,
+    *,
+    phase_bound: float = np.pi,
+) -> float:
+    """Choose a QPE evolution time from the Hamiltonian norm bound.
+
+    The Hamiltonian 1-norm bounds the magnitude of every eigenvalue, so
+    ``t = phase_bound / ||H||`` keeps ``|E| t <= phase_bound`` for all
+    eigenvalues. The default ``phase_bound = π`` maximizes phase resolution
+    while staying within the principal QPE branch under that bound.
+
+    Args:
+        hamiltonian: Object exposing ``schatten_norm``; for
+            :class:`~qdk_chemistry.data.QubitHamiltonian`, this is the
+            coefficient 1-norm.
+        phase_bound: Maximum allowed phase magnitude in radians. Must be in
+            ``(0, π]``.
+
+    Returns:
+        Evolution time suitable for configuring Hamiltonian time evolution.
+
+    Raises:
+        ValueError: If the Hamiltonian norm or phase bound is non-finite or
+            outside the supported range.
+
+    """
+    Logger.trace_entering()
+    norm = float(hamiltonian.schatten_norm)
+    if not np.isfinite(norm) or norm <= 0.0:
+        raise ValueError(f"Hamiltonian norm must be positive and finite, got {norm}.")
+
+    phase_bound = float(phase_bound)
+    if not np.isfinite(phase_bound) or phase_bound <= 0.0 or phase_bound > np.pi:
+        raise ValueError(f"phase_bound must be positive, finite, and no larger than pi, got {phase_bound}.")
+
+    return float(phase_bound / norm)
 
 
 def energy_from_phase(phase_fraction: float, *, evolution_time: float) -> float:

@@ -142,9 +142,8 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
-
 Consuming term partitions
--------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^
 
 When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, the Trotter builder consumes it directly:
 
@@ -207,6 +206,55 @@ Example::
     #   exp(-i * +0.2500 * IIXI)
     #   exp(-i * +0.2500 * IXII)
     #   exp(-i * +0.2500 * XIII)
+
+
+.. _zassenhaus-builder:
+
+Zassenhaus product formulas
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"zassenhaus"``
+
+The Zassenhaus builder approximates the time-evolution operator by making low-order commutator corrections explicit.
+For one time slice :math:`\Delta t = t/N`, write the Hamiltonian as :math:`H = \sum_j H_j` and define :math:`X_j = -i\Delta t H_j`.
+The builder constructs
+
+.. math::
+
+   e^{\sum_j X_j} \approx
+   \left(\prod_j e^{X_j}\right)e^{C_2}e^{C_3}\cdots e^{C_p},
+
+where each :math:`C_k` is the homogeneous order-:math:`k` Zassenhaus correction generated from nested commutators :cite:`Wilcox1967,Casas2012,Childs2021`.
+The correction exponents are evaluated as Pauli sums and flattened back into the same ``PauliProductFormulaContainer`` shape used by ``"trotter"``, so consumers such as :doc:`PhaseEstimation <phase_estimation>` do not need interface changes.
+
+Order 1 delegates to the first-order Trotter builder.
+For higher orders, the local approximation error scales as :math:`O(\Delta t^{p+1})`.
+The builder uses the user-provided ``order`` and varies only the number of divisions when ``target_accuracy`` is set.
+Automatic division estimates use the same ``error_bound`` strategies as the Trotter builder.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Zassenhaus expansion order. Default is 2.
+   * - ``target_accuracy``
+     - float
+     - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic division-count estimation is disabled.
+   * - ``num_divisions``
+     - int
+     - Explicit number of time divisions :math:`N`. Default is 1.
+   * - ``error_bound``
+     - str
+     - Error bound strategy for automatic division-count estimation: ``"commutator"`` (default) or ``"naive"``.
+   * - ``weight_threshold``
+     - float
+     - Coefficient threshold below which Pauli terms and generated corrections are discarded. Default is 1e-12.
 
 
 Related classes
