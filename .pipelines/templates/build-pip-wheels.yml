@@ -55,8 +55,8 @@ steps:
       sudo rm -rf /opt/hostedtoolcache/go || true
       sudo rm -rf /opt/hostedtoolcache/Ruby || true
 
-      # Clean apt cache
-      sudo apt-get clean || true
+      # Clean tdnf cache
+      sudo tdnf clean all || true
 
       echo "=== Disk space after cleanup ==="
       df -h

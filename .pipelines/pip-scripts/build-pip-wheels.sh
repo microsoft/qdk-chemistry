@@ -18,58 +18,47 @@ SUDO=""
 [ "$(id -u)" != "0" ] && SUDO="sudo"
 
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
-    export DEBIAN_FRONTEND=noninteractive
-    # Try to prevent stochastic segfault from libc-bin
-    echo "Reinstalling libc-bin..."
-    $SUDO rm -f /var/lib/dpkg/info/libc-bin.*
-    $SUDO apt-get clean
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q libc-bin
-
-    # Update and install dependencies
-    echo "Installing apt dependencies..."
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q \
-        build-essential \
+    # Update and install dependencies (Azure Linux 3 / tdnf)
+    echo "Installing tdnf dependencies..."
+    $SUDO tdnf install -y \
+        binutils \
+        boost-devel \
+        bzip2-devel \
         curl \
-        gcc g++ \
+        eigen3-devel \
+        fmt-devel \
+        gcc \
+        gcc-c++ \
         git \
-        libboost-all-dev \
-        libbz2-dev \
-        libeigen3-dev \
-        libffi-dev \
-        libfmt-dev \
-        libgmock-dev \
-        libgtest-dev \
-        liblzma-dev \
-        libncursesw5-dev \
-        libpugixml-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
+        gtest-devel \
+        libffi-devel \
+        libxml2-devel \
         make \
+        ncurses-devel \
         ninja-build \
-        nlohmann-json3-dev \
+        nlohmann-json-devel \
+        openssl-devel \
         patchelf \
-        pybind11-dev \
+        pugixml-devel \
+        pybind11-devel \
         python3 \
-        python3-dev \
+        python3-devel \
         python3-pip \
-        python3-pybind11 \
-        python3-venv \
-        tk-dev \
+        readline-devel \
+        sqlite-devel \
+        tk-devel \
         unzip \
         wget \
-        xz-utils \
-        zlib1g-dev
+        xmlsec1-devel \
+        xz \
+        xz-devel \
+        zlib-devel
 
     # Upgrade cmake as Ubuntu 22.04 only has up to v3.22 in apt
     echo "Downloading and installing CMake ${CMAKE_VERSION}..."
     export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
     wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
-    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | sha256sum --check || exit 1
     tar -xzf cmake-${CMAKE_VERSION}.tar.gz
     rm cmake-${CMAKE_VERSION}.tar.gz
     cd cmake-${CMAKE_VERSION}

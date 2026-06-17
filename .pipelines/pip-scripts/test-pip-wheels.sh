@@ -16,40 +16,33 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 
 if [ "$MAC_BUILD" == "OFF" ]; then
-    # Try to prevent stochastic segfault from libc-bin
+    # Update and install dependencies needed for testing (Azure Linux 3 / tdnf)
     SUDO=""
     [ "$(id -u)" != "0" ] && SUDO="sudo"
-    echo "Reinstalling libc-bin..."
-    $SUDO rm -f /var/lib/dpkg/info/libc-bin.*
-    $SUDO apt-get clean
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q libc-bin
-
-    # Update and install dependencies needed for testing
-    echo "Installing apt dependencies..."
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q \
-        build-essential \
+    echo "Installing tdnf dependencies..."
+    $SUDO tdnf install -y \
+        bzip2-devel \
         curl \
+        gcc \
+        gcc-c++ \
         git \
-        libbz2-dev \
-        libffi-dev \
-        liblzma-dev \
-        libncursesw5-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
+        libffi-devel \
+        libxml2-devel \
         make \
+        ncurses-devel \
+        openssl-devel \
         python3 \
+        python3-devel \
         python3-pip \
-        python3-venv \
-        tk-dev \
+        readline-devel \
+        sqlite-devel \
+        tk-devel \
         unzip \
         wget \
-        xz-utils \
-        zlib1g-dev
+        xmlsec1-devel \
+        xz \
+        xz-devel \
+        zlib-devel
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
