@@ -149,8 +149,7 @@ Logger.info(
 )
 architecture = Majorana(error_rate=1e-5)
 trace_query = (
-    qpe_app.q()
-    * PSSPC.q(ccx_magic_states=False, num_ts_per_rotation=list(range(20, 40)))
+    PSSPC.q(ccx_magic_states=False, num_ts_per_rotation=list(range(10, 40)))
     * LatticeSurgery.q()
 )
 isa_query = ThreeAux.q() * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q())
