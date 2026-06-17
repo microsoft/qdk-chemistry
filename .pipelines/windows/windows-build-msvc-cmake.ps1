@@ -46,6 +46,7 @@ if ($DynamicDeps) {
     $VcpkgTriplet = "x64-windows-static-md"
 }
 $QDK_UARCH = "x86-64-v3"
+$NCPUS = [System.Environment]::ProcessorCount - 2
 
 $linkMode = if ($DynamicDeps) { "dynamic" } else { "static" }
 Write-Host "============================================" -ForegroundColor Cyan
@@ -285,7 +286,7 @@ if (-not $SkipCpp) {
 
     Write-Host ""
     Write-Host "=== Step 2: Build C++ library ===" -ForegroundColor Yellow
-    cmake --build "$BuildDir" --parallel 6 2>&1 *> "$BuildDir\build.log"
+    cmake --build "$BuildDir" --parallel $NCPUS 2>&1 *> "$BuildDir\build.log"
     if ($LASTEXITCODE -ne 0) { Write-Error "CMake build failed"; exit 1 }
     Write-Host "C++ build succeeded." -ForegroundColor Green
 
@@ -322,7 +323,7 @@ if (-not $SkipPython) {
     Write-Host "=== Step 5: Install Python package ===" -ForegroundColor Yellow
     Push-Location "$RepoRoot\python"
 
-    $env:CMAKE_BUILD_PARALLEL_LEVEL = "6"
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "$NCPUS"
     if (-not (Test-Path .\venv)) {
         uv venv .\venv
     }

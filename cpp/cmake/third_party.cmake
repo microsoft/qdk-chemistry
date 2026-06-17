@@ -127,6 +127,7 @@ if(MSVC)
   # /wd4068 unknown pragma
   # /wd4100 unreferenced formal parameter
   # /wd4101 unreferenced local variable
+  # /wd4127 conditional expression is constant
   # /wd4242 conversion with possible loss of data
   # /wd4244 conversion with possible loss of data
   # /wd4245 conversion, signed/unsigned mismatch
@@ -134,7 +135,7 @@ if(MSVC)
   # /wd4389 signed/unsigned mismatch
   # /wd4701 potentially uninitialized local variable used
   # /wd4703 potentially uninitialized local pointer variable used
-  set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4018 /wd4100 /wd4101 /wd4242 /wd4244 /wd4245 /wd4267 /wd4389 /wd4701 /wd4703)
+  set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4018 /wd4068 /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4245 /wd4267 /wd4389 /wd4701 /wd4703)
   target_compile_options(ecpint      PRIVATE   ${COMMON_MSVC_WARNING_SUPPRESSIONS})
   # ecpint also builds a `generate` executable at build time for code generation
   if(TARGET generate)

@@ -56,10 +56,11 @@ if(NOT lapackpp_FOUND )
     # Suppress warnings in upstream blaspp/lapackpp sources
     # /wd4100 unreferenced formal parameter
     # /wd4101 unreferenced local variable
+    # /wd4127 conditional expression is constant
     # /wd4242 conversion with possible loss of data
     # /wd4244 conversion with possible loss of data
     # /wd4267 conversion with possible loss of data
-    set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4100 /wd4101 /wd4242 /wd4244 /wd4267)
+    set(COMMON_MSVC_WARNING_SUPPRESSIONS /wd4100 /wd4101 /wd4127 /wd4242 /wd4244 /wd4267)
     target_compile_options(blaspp   PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
     target_compile_options(lapackpp PUBLIC ${COMMON_MSVC_WARNING_SUPPRESSIONS})
   endif()
