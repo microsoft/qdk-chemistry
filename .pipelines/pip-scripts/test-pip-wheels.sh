@@ -13,8 +13,6 @@ else
     PYTHON_DIR="$REPO_ROOT/python"
 fi
 
-export DEBIAN_FRONTEND=noninteractive
-
 if [ "$MAC_BUILD" == "OFF" ]; then
     # Update and install dependencies needed for testing (Azure Linux 3 / tdnf)
     SUDO=""
@@ -34,10 +32,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         openssl-devel \
         python3 \
         python3-devel \
-        python3-pip \
         readline-devel \
         sqlite-devel \
-        tk-devel \
         unzip \
         wget \
         xmlsec1-devel \

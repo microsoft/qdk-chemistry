@@ -44,10 +44,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         pybind11-devel \
         python3 \
         python3-devel \
-        python3-pip \
         readline-devel \
         sqlite-devel \
-        tk-devel \
         unzip \
         wget \
         xmlsec1-devel \
