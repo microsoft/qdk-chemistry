@@ -27,7 +27,6 @@ resources:
   # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
   - container: linux_build_container
     image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-    options: --user root
 
 parameters:
 - name: matrix
