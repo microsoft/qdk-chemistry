@@ -161,6 +161,14 @@ extends:
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
           steps:
+          # Build - Linux ARM64
+          - script: |
+              uname -a
+              cat /etc/os-release
+              which apt-get || echo "no apt-get"
+              which docker && docker ps || echo "no docker"
+            displayName: Diagnose environment
+
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
             inputs:
