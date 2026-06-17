@@ -70,6 +70,12 @@ if(MSVC AND TARGET libint2_cxx)
   # legacy preprocessor concatenates tokens incorrectly). Available since VS 2019 16.5.
   target_compile_options(libint2_cxx INTERFACE /Zc:__cplusplus /Zc:preprocessor)
 endif()
+# eritest-libint2 links only to libint2-static (C library), so it does not pick
+# up the INTERFACE flags from libint2_cxx. The test source includes libint2/boys.h
+# which requires C++11 detection via __cplusplus.
+if(MSVC AND TARGET eritest-libint2)
+  target_compile_options(eritest-libint2 PRIVATE /Zc:__cplusplus /Zc:preprocessor)
+endif()
 
 # ecpint for ECP-related integral evaluation
 set(LIBECPINT_BUILD_TESTS OFF CACHE BOOL "Enable ECPINT Tests" FORCE)
