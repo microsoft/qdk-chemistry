@@ -108,8 +108,8 @@ extends:
         image: windows-2022
         os: windows
     stages:
-    - stage: Build
-      displayName: Build C++ Deps and Python Wheels
+    - stage: BuildAndTest
+      displayName: Build and Test Python Wheels
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
@@ -216,13 +216,8 @@ extends:
                 SearchPattern: '**/*.debug'
                 publishLinuxSymbols: true
 
-
-    - stage: Test
-      displayName: Test Python Wheels
-      dependsOn: Build
-      jobs:
-      - ${{ each target in parameters.matrix }}:
         - job: Test_${{ target.name }}
+          dependsOn: Build_${{ target.name }}
           ${{ if eq(target.os, 'macOS') }}:
             pool:
               name: AcesShared
@@ -282,7 +277,7 @@ extends:
 
     - stage: Approval
       displayName: Approval
-      dependsOn: Test
+      dependsOn: BuildAndTest
       condition: and(succeeded(), eq(variables['Build.Reason'], 'Manual'), ${{ parameters.publishEsrp }})
       jobs:
       - job: Approval
