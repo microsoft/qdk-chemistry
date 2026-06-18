@@ -32,9 +32,11 @@ jobs:
     - name: Upload release asset
       if: github.event_name == 'release'
       run: |
+        VERSION="${{ github.event.release.tag_name }}"
+        VERSION="${VERSION//\//-}"
         gh release upload \
           "${{ github.event.release.tag_name }}" \
-          "dist/qdk-chemistry-examples-${{ github.event.release.tag_name }}.zip" \
+          "dist/qdk-chemistry-examples-${VERSION}.zip" \
           --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
