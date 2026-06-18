@@ -45,6 +45,16 @@ steps:
   path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
+  target: ${{ parameters.containerName }}
+
+- script: |
+    # show folder contents for debugging
+    pwd
+    ls -la
+    ls -la ..
+    ls -laR ..
+  target: ${{ parameters.containerName }}
+  displayName: List directory contents in build container
 
 # Check if user provided a development tag for release and validate before building wheels.
 # If a development tag is provided and is valid, the VERSION file in the top level directory
