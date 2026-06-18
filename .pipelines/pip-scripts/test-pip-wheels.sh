@@ -15,18 +15,24 @@ fi
 
 export DEBIAN_FRONTEND=noninteractive
 
+# Use sudo for system-level installs when running as a non-root pipeline agent.
+# Use `sudo env` to pass DEBIAN_FRONTEND through sudo's environment reset.
+SUDO=""
+[ "$(id -u)" != "0" ] && SUDO="sudo"
+APT="$SUDO env DEBIAN_FRONTEND=noninteractive apt-get"
+
 if [ "$MAC_BUILD" == "OFF" ]; then
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
     rm -f /var/lib/dpkg/info/libc-bin.*
-    apt-get clean
-    apt-get update -q
-    apt-get install -y -q libc-bin
+    $APT clean
+    $APT update -q
+    $APT install -y -q libc-bin
 
     # Update and install dependencies needed for testing
     echo "Installing apt dependencies..."
-    apt-get update -q
-    apt-get install -y -q \
+    $APT update -q
+    $APT install -y -q \
         build-essential \
         curl \
         git \
