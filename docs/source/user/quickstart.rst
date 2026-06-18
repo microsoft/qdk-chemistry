@@ -26,7 +26,7 @@ This example walks through the full quantum applications workflow: from building
 The emphasis is on optimizing the quantum resource requirements at every stage, demonstrating how QDK/Chemistry's modular pipeline makes it easy to select the right method for each step.
 
 You can also view a related code sample in a Jupyter notebook format, along with several other examples, in the `examples folder <https://github.com/microsoft/qdk-chemistry/blob/main/examples/>`_ of the GitHub repository.
-To run the examples, either clone the repository or download the packaged examples from the https://github.com/microsoft/qdk-chemistry/releases, as individual examples may depend on accompanying files within the examples directory.
+To run the examples, either clone the repository or download the packaged examples from the `GitHub releases page <https://github.com/microsoft/qdk-chemistry/releases>`_, as individual examples may depend on accompanying files within the examples directory.
 
 .. note::
 
