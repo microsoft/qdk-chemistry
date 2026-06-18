@@ -17,6 +17,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     # Update and install dependencies needed for testing (Azure Linux 3 / tdnf)
     SUDO=""
     [ "$(id -u)" != "0" ] && SUDO="sudo"
+    echo "Upgrading glibc..."
+    $SUDO tdnf upgrade -y glibc
     echo "Installing tdnf dependencies..."
     $SUDO tdnf update -y
     $SUDO tdnf install -y \
