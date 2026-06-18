@@ -757,9 +757,17 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
     // For each spin sector, we accumulate the single boundary link stabilizer
     // individually to lift the Z_2 gauge degeneracy, followed by the products
-    // of adjacent link stabilizers (S_i * S_{i+1}) to form loop-plaquette
-    // stabilizers.
+    // of adjacent link stabilizers (paired via Minimum Spanning Tree to
+    // minimize their Pauli weight) to form local loop-plaquette stabilizers.
     if (half_stabs >= 1) {
+      auto get_packed_weight = [](const PackedPauliWord<NW>& pw) -> int {
+        int w = 0;
+        for (std::size_t k = 0; k < NW; ++k) {
+          w += std::popcount(pw.x[k] | pw.z[k]);
+        }
+        return w;
+      };
+
       auto accumulate_product = [&](std::size_t i, std::size_t j) {
         const auto& s1 = packed_stabs[i];
         const auto& s2 = packed_stabs[j];
@@ -768,19 +776,61 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
             apply_phase(phase_idx, s1.coeff * s2.coeff);
         acc.accumulate(word, -aux_ham_coefficient * prod_coeff);
       };
-      // S[0] * S[0..n/2] for α spin Majoranas
-      acc.accumulate(packed_stabs[0].word,
-                     -aux_ham_coefficient * packed_stabs[0].coeff);
-      for (std::size_t i = 0; i < half_stabs - 1; ++i) {
-        accumulate_product(i, i + 1);
-      }
 
-      // S[n/2] * S[n/2..] for β spin Majoranas
-      acc.accumulate(packed_stabs[half_stabs].word,
-                     -aux_ham_coefficient * packed_stabs[half_stabs].coeff);
-      for (std::size_t i = half_stabs; i < num_stabs - 1; ++i) {
-        accumulate_product(i, i + 1);
-      }
+      auto build_mst_and_accumulate = [&](std::size_t start_idx,
+                                          std::size_t count) {
+        // Accumulate the root boundary link stabilizer
+        acc.accumulate(packed_stabs[start_idx].word,
+                       -aux_ham_coefficient * packed_stabs[start_idx].coeff);
+
+        if (count <= 1) return;
+
+        // Prim's algorithm to find the Minimum Spanning Tree of stabilizer
+        // pairings
+        std::vector<bool> in_mst(count, false);
+        std::vector<int> min_weight(count, 1e9);
+        std::vector<std::size_t> parent(count, 0);
+
+        min_weight[0] = 0;
+
+        for (std::size_t step = 0; step < count; ++step) {
+          std::size_t u = 0;
+          int min_val = 1e9;
+          for (std::size_t i = 0; i < count; ++i) {
+            if (!in_mst[i] && min_weight[i] < min_val) {
+              min_val = min_weight[i];
+              u = i;
+            }
+          }
+
+          in_mst[u] = true;
+
+          for (std::size_t v = 0; v < count; ++v) {
+            if (!in_mst[v]) {
+              auto [phase_idx, word] =
+                  multiply_packed(packed_stabs[start_idx + u].word,
+                                  packed_stabs[start_idx + v].word);
+              int w = get_packed_weight(word);
+              if (w < min_weight[v]) {
+                min_weight[v] = w;
+                parent[v] = u;
+              }
+            }
+          }
+        }
+
+        // Accumulate products for the selected MST edges
+        for (std::size_t v = 1; v < count; ++v) {
+          accumulate_product(start_idx + parent[v], start_idx + v);
+        }
+      };
+
+      // Construct MST for α spin Majoranas
+      build_mst_and_accumulate(0, half_stabs);
+
+      // Construct MST for β spin Majoranas
+      build_mst_and_accumulate(half_stabs, half_stabs);
+
     } else {
       // Fallback to individual stabilizers if too few to form products
       for (const auto& stab : packed_stabs) {

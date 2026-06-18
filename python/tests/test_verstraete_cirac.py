@@ -248,14 +248,15 @@ class TestVerstraeteCiracMapping:
 
         def check_local_plaquette(
             stabs_list: list[str],
-            i_idx: int,
+            u_idx: int,
+            v_idx: int,
             w: int,
             p_str: str,
             thresh: int,
             max_weight: int,
         ) -> None:
-            indices1 = [idx for idx, char in enumerate(stabs_list[i_idx]) if char != "I"]
-            indices2 = [idx for idx, char in enumerate(stabs_list[i_idx + 1]) if char != "I"]
+            indices1 = [idx for idx, char in enumerate(stabs_list[u_idx]) if char != "I"]
+            indices2 = [idx for idx, char in enumerate(stabs_list[v_idx]) if char != "I"]
             if indices1 and indices2:
                 a1, b1 = indices1[0], indices1[-1]
                 a2, b2 = indices2[0], indices2[-1]
@@ -263,6 +264,39 @@ class TestVerstraeteCiracMapping:
                     assert w <= max_weight, (
                         f"Local plaquette stabilizer {p_str} has weight {w} > {max_weight}, violating local scaling"
                     )
+
+        def get_mst_edges(stabs_list: list[str], start_idx: int, count: int) -> list[tuple[int, int]]:
+            if count <= 1:
+                return []
+
+            in_mst = [False] * count
+            min_weight = [1000000000] * count
+            parent = [0] * count
+
+            min_weight[0] = 0
+
+            for _ in range(count):
+                u = -1
+                min_val = 1000000000
+                for i in range(count):
+                    if not in_mst[i] and min_weight[i] < min_val:
+                        min_val = min_weight[i]
+                        u = i
+
+                in_mst[u] = True
+
+                for v in range(count):
+                    if not in_mst[v]:
+                        prod_str = multiply_pauli_labels(stabs_list[start_idx + u], stabs_list[start_idx + v])
+                        w = sum(1 for c in prod_str if c != "I")
+                        if w < min_weight[v]:
+                            min_weight[v] = w
+                            parent[v] = u
+
+            edges = []
+            for v in range(1, count):
+                edges.append((start_idx + parent[v], start_idx + v))
+            return edges
 
         max_weights = []
         for grid_length in [2, 3, 4]:
@@ -282,28 +316,30 @@ class TestVerstraeteCiracMapping:
                 threshold = (max_allowed_weight - 2) // 2
 
                 penalty_strings.add(stabs[0])
-                for i in range(half_stabs - 1):
-                    prod = multiply_pauli_labels(stabs[i], stabs[i + 1])
+                alpha_edges = get_mst_edges(stabs, 0, half_stabs)
+                for u, v in alpha_edges:
+                    prod = multiply_pauli_labels(stabs[u], stabs[v])
                     penalty_strings.add(prod)
                     weight = sum(1 for c in prod if c != "I")
-                    expected_weight = get_expected_weight(stabs[i], stabs[i + 1])
+                    expected_weight = get_expected_weight(stabs[u], stabs[v])
                     assert weight <= expected_weight, (
                         f"Weight {weight} exceeds analytical expected bound {expected_weight} "
-                        f"for product of stabilizer {i} and {i + 1}"
+                        f"for product of stabilizer {u} and {v}"
                     )
-                    check_local_plaquette(stabs, i, weight, prod, threshold, max_allowed_weight)
+                    check_local_plaquette(stabs, u, v, weight, prod, threshold, max_allowed_weight)
 
                 penalty_strings.add(stabs[half_stabs])
-                for i in range(half_stabs, len(stabs) - 1):
-                    prod = multiply_pauli_labels(stabs[i], stabs[i + 1])
+                beta_edges = get_mst_edges(stabs, half_stabs, half_stabs)
+                for u, v in beta_edges:
+                    prod = multiply_pauli_labels(stabs[u], stabs[v])
                     penalty_strings.add(prod)
                     weight = sum(1 for c in prod if c != "I")
-                    expected_weight = get_expected_weight(stabs[i], stabs[i + 1])
+                    expected_weight = get_expected_weight(stabs[u], stabs[v])
                     assert weight <= expected_weight, (
                         f"Weight {weight} exceeds analytical expected bound {expected_weight} "
-                        f"for product of stabilizer {i} and {i + 1}"
+                        f"for product of stabilizer {u} and {v}"
                     )
-                    check_local_plaquette(stabs, i, weight, prod, threshold, max_allowed_weight)
+                    check_local_plaquette(stabs, u, v, weight, prod, threshold, max_allowed_weight)
             else:
                 penalty_strings.update(stabs)
 
