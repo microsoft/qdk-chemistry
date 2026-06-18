@@ -56,6 +56,30 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         zlib-devel
     cmake --version
 
+    # boost-devel on Azure Linux 3 strips the CMake config files; synthesise a
+    # minimal BoostConfig.cmake so find_package(Boost CONFIG REQUIRED) works.
+    BOOST_CMAKE_DIR=/usr/lib/cmake/Boost
+    $SUDO mkdir -p "${BOOST_CMAKE_DIR}"
+    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfig.cmake" > /dev/null <<'EOF'
+set(Boost_FOUND TRUE)
+if(NOT TARGET Boost::boost)
+  add_library(Boost::boost INTERFACE IMPORTED)
+  set_target_properties(Boost::boost PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "/usr/include")
+endif()
+EOF
+    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfigVersion.cmake" > /dev/null <<'EOF'
+set(PACKAGE_VERSION "1.83.0")
+if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)
+  set(PACKAGE_VERSION_COMPATIBLE FALSE)
+else()
+  set(PACKAGE_VERSION_COMPATIBLE TRUE)
+  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
+    set(PACKAGE_VERSION_EXACT TRUE)
+  endif()
+endif()
+EOF
+
     # Eigen3 is not packaged in Azure Linux 3; download from internal Azure Artifacts feed
     echo "Installing Eigen3 headers..."
     AZURE_DEVOPS_EXT_PAT=$SYSTEM_ACCESSTOKEN az artifacts universal download \
@@ -155,9 +179,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
-        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.Boost_NO_BOOST_CMAKE=ON \
-        -C cmake.define.MACIS_ENABLE_BOOST=OFF
+        -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
