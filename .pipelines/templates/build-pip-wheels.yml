@@ -14,9 +14,18 @@ parameters:
 - name: agentBuildDirectory
   type: string
   default: $(Agent.BuildDirectory)
+- name: dockerImage
+  type: string
+  default: ''
+- name: imageTag
+  type: string
+  default: linux/amd64
 - name: pythonVersion
   type: string
   default: 3.11
+- name: cmakeVersion
+  type: string
+  default: 3.28.3
 - name: hdf5Version
   type: string
   default: 1.13.0
@@ -40,7 +49,8 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
+# Disk cleanup for native Ubuntu build host
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.dockerImage, '')) }}:
   - script: |
       echo "=== Disk space before cleanup ==="
       df -h
@@ -52,6 +62,23 @@ steps:
       sudo rm -rf /opt/hostedtoolcache/go || true
       sudo rm -rf /opt/hostedtoolcache/Ruby || true
 
+      # Clean apt cache
+      sudo apt-get clean || true
+
+      echo "=== Disk space after cleanup ==="
+      df -h
+
+      echo "Workspace path: $(Agent.BuildDirectory)"
+      echo "Space available:"
+      df -h "$(Agent.BuildDirectory)"
+    displayName: Free up disk space (Ubuntu native)
+
+# Disk cleanup for AzureLinux3 docker host (arm64)
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.dockerImage, '')) }}:
+  - script: |
+      echo "=== Disk space before cleanup ==="
+      df -h
+
       # Clean tdnf cache
       sudo tdnf clean all || true
 
@@ -61,7 +88,7 @@ steps:
       echo "Workspace path: $(Agent.BuildDirectory)"
       echo "Space available:"
       df -h "$(Agent.BuildDirectory)"
-    displayName: Free up disk space (Linux)
+    displayName: Free up disk space (Linux Docker host)
 
 
 # Check if user provided a development tag for release and validate before building wheels.
@@ -76,15 +103,44 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-- ${{ if eq(parameters.macBuild, 'OFF') }}:
+# Build - Linux x86_64 natively (no Docker; enables CodeQL tracing)
+- ${{ if and(eq(parameters.macBuild, 'OFF'), eq(parameters.dockerImage, '')) }}:
   - script: |
-      echo "Running pip wheel build (Linux ${{ parameters.march }})..."
+      echo "Running pip wheel build (Linux ${{ parameters.march }} native)..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
                                                       ${{ parameters.pythonVersion }} \
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
+                                                      ${{ parameters.hdf5Version }} \
+                                                      ${{ parameters.blisVersion }} \
+                                                      ${{ parameters.libflameVersion }} \
+                                                      ${{ parameters.macBuild }}
+    displayName: Build wheel (Linux ${{ parameters.march }} native)
+    retryCountOnTaskFailure: 2
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+# Build - Linux arm64 via Docker
+- ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.dockerImage, '')) }}:
+  - script: |
+      echo "Running pip wheel build (Linux ${{ parameters.march }} on ${{ parameters.imageTag }})..."
+      docker run --rm \
+        --platform ${{ parameters.imageTag }} \
+        -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+        -e PIP_INDEX_URL \
+        -e SYSTEM_ACCESSTOKEN \
+        -e QDK_UARCH=${{ parameters.march }} \
+        -w /workspace/qdk-chemistry \
+        ${{ parameters.dockerImage }} \
+      bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
+                                                      ${{ parameters.pythonVersion }} \
+                                                      ${{ parameters.buildType }} \
+                                                      ${{ parameters.buildTesting }} \
+                                                      ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \
@@ -92,8 +148,6 @@ steps:
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
     env:
-      # Required by the conda bootstrap to authenticate to the Azure Artifacts
-      # feed that proxies ms-ensureconda + conda channels.
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
@@ -106,6 +160,7 @@ steps:
                                                       ${{ parameters.buildType }} \
                                                       ${{ parameters.buildTesting }} \
                                                       ${{ parameters.enableCoverage }} \
+                                                      ${{ parameters.cmakeVersion }} \
                                                       ${{ parameters.hdf5Version }} \
                                                       ${{ parameters.blisVersion }} \
                                                       ${{ parameters.libflameVersion }} \

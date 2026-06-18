@@ -6,10 +6,11 @@ PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
 BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
-HDF5_VERSION=${6:-1.13.0}
-BLIS_VERSION=${7:-2.0}
-LIBFLAME_VERSION=${8:-5.2.0}
-MAC_BUILD=${9:-OFF}
+CMAKE_VERSION=${6:-3.28.3}
+HDF5_VERSION=${7:-1.13.0}
+BLIS_VERSION=${8:-2.0}
+LIBFLAME_VERSION=${9:-5.2.0}
+MAC_BUILD=${10:-OFF}
 
 export CFLAGS="-fPIC -Os"
 # Use sudo for system-level installs when running as a non-root pipeline agent.
@@ -17,90 +18,67 @@ SUDO=""
 [ "$(id -u)" != "0" ] && SUDO="sudo"
 
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
-    # Update and install dependencies (Azure Linux 3 / tdnf)
-    echo "Installing tdnf dependencies..."
-    $SUDO tdnf update -y
-    $SUDO tdnf install -y \
-        azure-cli \
-        binutils \
-        boost-devel \
-        bzip2-devel \
-        cmake \
+    export DEBIAN_FRONTEND=noninteractive
+    # Try to prevent stochastic segfault from libc-bin
+    echo "Reinstalling libc-bin..."
+    $SUDO rm /var/lib/dpkg/info/libc-bin.*
+    $SUDO apt-get clean
+    $SUDO apt-get update -q
+    $SUDO apt-get install -y -q libc-bin
+
+    # Update and install dependencies
+    echo "Installing apt dependencies..."
+    $SUDO apt-get update -q
+    $SUDO apt-get install -y -q \
+        build-essential \
         curl \
-        fmt-devel \
-        gcc \
-        gcc-c++ \
-        gcc-gfortran \
+        gcc g++ \
         git \
-        glibc-devel \
-        kernel-headers \
-        gtest-devel \
-        libffi-devel \
-        libxml2-devel \
+        libboost-all-dev \
+        libbz2-dev \
+        libeigen3-dev \
+        libffi-dev \
+        libfmt-dev \
+        libgmock-dev \
+        libgtest-dev \
+        liblzma-dev \
+        libncursesw5-dev \
+        libpugixml-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
         make \
-        ncurses-devel \
         ninja-build \
-        nlohmann-json-devel \
-        openssl-devel \
+        nlohmann-json3-dev \
         patchelf \
-        pugixml-devel \
-        pybind11-devel \
+        pybind11-dev \
         python3 \
-        python3-devel \
-        readline-devel \
-        sqlite-devel \
+        python3-dev \
+        python3-pip \
+        python3-pybind11 \
+        python3-venv \
+        tk-dev \
         unzip \
         wget \
-        xmlsec1-devel \
-        xz \
-        xz-devel \
-        zlib-devel
+        xz-utils \
+        zlib1g-dev
+
+    # Upgrade cmake as Ubuntu only has older versions in apt
+    echo "Downloading and installing CMake ${CMAKE_VERSION}..."
+    export CMAKE_CHECKSUM=72b7570e5c8593de6ac4ab433b73eab18c5fb328880460c86ce32608141ad5c1
+    wget -q https://cmake.org/files/v3.28/cmake-${CMAKE_VERSION}.tar.gz -O cmake-${CMAKE_VERSION}.tar.gz
+    echo "${CMAKE_CHECKSUM}  cmake-${CMAKE_VERSION}.tar.gz" | shasum -a 256 -c || exit 1
+    tar -xzf cmake-${CMAKE_VERSION}.tar.gz
+    rm cmake-${CMAKE_VERSION}.tar.gz
+    cd cmake-${CMAKE_VERSION}
+    ./bootstrap --parallel=$(nproc) --prefix=/usr/local
+    make --silent -j$(nproc)
+    $SUDO make install
+    cd ..
+    rm -r cmake-${CMAKE_VERSION}
     cmake --version
-
-    # boost-devel on Azure Linux 3 strips the CMake config files; synthesise a
-    # minimal BoostConfig.cmake so find_package(Boost CONFIG REQUIRED) works.
-    BOOST_VERSION=$(python3 -c "
-import re, sys
-text = open('/usr/include/boost/version.hpp').read()
-num = int(re.search(r'define BOOST_VERSION (\d+)', text).group(1))
-print(f'{num // 100000}.{num // 100 % 1000}.{num % 100}')
-")
-    echo "Detected Boost version: ${BOOST_VERSION}"
-    BOOST_CMAKE_DIR=/usr/lib/cmake/Boost
-    $SUDO mkdir -p "${BOOST_CMAKE_DIR}"
-    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfig.cmake" > /dev/null <<'EOF'
-set(Boost_FOUND TRUE)
-if(NOT TARGET Boost::boost)
-  add_library(Boost::boost INTERFACE IMPORTED)
-  set_target_properties(Boost::boost PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "/usr/include")
-endif()
-EOF
-    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfigVersion.cmake" > /dev/null <<EOF
-set(PACKAGE_VERSION "${BOOST_VERSION}")
-if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)
-  set(PACKAGE_VERSION_COMPATIBLE FALSE)
-else()
-  set(PACKAGE_VERSION_COMPATIBLE TRUE)
-  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)
-    set(PACKAGE_VERSION_EXACT TRUE)
-  endif()
-endif()
-EOF
-
-    # Eigen3 is not packaged in Azure Linux 3; download from internal Azure Artifacts feed
-    echo "Installing Eigen3 headers..."
-    AZURE_DEVOPS_EXT_PAT=$SYSTEM_ACCESSTOKEN az artifacts universal download \
-        --organization https://dev.azure.com/ms-azurequantum \
-        --project AzureQuantum \
-        --scope project \
-        --feed quantum-apps-dependencies \
-        --name eigen3 \
-        --version 3.4.0 \
-        --path eigen3
-    cmake -S eigen3 -B eigen3/build -DCMAKE_INSTALL_PREFIX=/usr/local
-    $SUDO cmake --install eigen3/build
-    rm -rf eigen3
 
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
@@ -192,12 +170,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel. --plat pins the glibc floor to the minimum required by the
-    # wheel's actual versioned symbols (GLIBC_2.38 from libc.so.6 on AzureLinux3).
-    # A lower floor such as manylinux_2_35 is not achievable without rebuilding on
-    # an older toolchain; auditwheel enforces that --plat >= actual symbol max.
-    auditwheel show dist/qdk_chemistry-*.whl
-    auditwheel repair --plat "manylinux_2_38_$(uname -m)" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    # Repair wheel
+    auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)

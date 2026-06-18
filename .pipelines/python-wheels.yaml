@@ -30,7 +30,7 @@ parameters:
     os: linux
     arch: x86_64
     march: x86-64-v3
-    imageName: 1es-pt-azurelinux3
+    imageName: Ubuntu24.04Nightly
   - name: linux_aarch64
     os: linux
     arch: aarch64
@@ -183,6 +183,8 @@ extends:
                 enableCoverage: OFF
                 agentBuildDirectory: $(Agent.BuildDirectory)
                 pythonVersion: $(pythonVersion)
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+                imageTag: linux/arm64/v8
                 devTag: ${{ parameters.devTag }}
 
           # Build - macOS ARM64
@@ -271,6 +273,12 @@ extends:
               runSlowTests: ${{ parameters.runSlowTests }}
               ${{ if eq(target.os, 'macOS') }}:
                 macBuild: ON
+              ${{ if and(eq(target.os, 'linux'), eq(target.arch, 'x86_64')) }}:
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+                imageTag: linux/amd64
+              ${{ if and(eq(target.os, 'linux'), eq(target.arch, 'aarch64')) }}:
+                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+                imageTag: linux/arm64/v8
 
           - task: TwineAuthenticate@1
             inputs:
