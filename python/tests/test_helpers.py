@@ -247,3 +247,64 @@ def create_test_ansatz(num_orbitals: int = 2):
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def create_random_dfthc_data(
+    num_orbitals: int = 4,
+    num_ranks: int = 2,
+    num_bases: int = 2,
+    num_copies: int = 2,
+    seed: int = 42,
+    core_energy: float = 0.0,
+) -> dict:
+    """Create random DFTHC factorization data for testing.
+
+    Generates random DFTHC-like factorization arrays with physically sensible
+    structure: symmetric h1_majorana, row-normalized U matrices, and small W/WB
+    amplitudes.  Returns a dict suitable for constructing a
+    DFTHCHamiltonianContainer once the C++ binding is available.
+
+    Args:
+        num_orbitals: Number of spatial orbitals (N).
+        num_ranks: Number of ranks (R).
+        num_bases: Number of bases per rank (B).
+        num_copies: Number of copies per rank (C).
+        seed: Random seed for reproducibility.
+        core_energy: Nuclear repulsion energy.
+
+    Returns:
+        Dict with keys: num_orbitals, num_ranks, num_bases, num_copies,
+        h1_majorana, basis_vectors, two_body_weights, identity_weight,
+        core_energy.
+
+    """
+    rng = np.random.default_rng(seed)
+    N, R, B, C = num_orbitals, num_ranks, num_bases, num_copies
+
+    # Symmetric one-body matrix (Majorana-adjusted)
+    raw = rng.standard_normal((N, N)) * 0.3
+    h1_majorana = (raw + raw.T) / 2
+
+    # Row-normalized U matrices: shape [R, B, N]
+    basis_vectors = rng.standard_normal((R, B, N))
+    norms = np.linalg.norm(basis_vectors, axis=2, keepdims=True)
+    norms = np.where(norms > 1e-12, norms, 1.0)
+    basis_vectors = basis_vectors / norms
+
+    # Two-body weights: shape [R, B, C]
+    two_body_weights = rng.standard_normal((R, B, C)) * 0.1
+
+    # Identity weights: shape [R, C]
+    identity_weight = rng.standard_normal((R, C)) * 0.1
+
+    return {
+        "num_orbitals": N,
+        "num_ranks": R,
+        "num_bases": B,
+        "num_copies": C,
+        "h1_majorana": h1_majorana,
+        "basis_vectors": basis_vectors,
+        "two_body_weights": two_body_weights,
+        "identity_weight": identity_weight,
+        "core_energy": core_energy,
+    }

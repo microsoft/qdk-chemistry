@@ -17,41 +17,9 @@ from typing import Any
 import h5py
 import numpy as np
 
-from .block_encoding import BlockEncodingContainer
+from .block_encoding import BlockEncodingContainer, Prepare
 
-__all__ = ["SOSSAContainer", "SOSSAInnerPrepare", "SOSSAOuterPrepare", "SOSSASelect"]
-
-
-@dataclass(frozen=True)
-class SOSSAOuterPrepare:
-    r"""Outer PREPARE oracle for the SOSSA block encoding.
-
-    Encodes amplitudes into the :math:`x_o` register of :math:`X_o = N + RC` entries.
-    The outer coefficient encodes:
-      - :math:`[0, N_{D1})` — D1 one-body generators :math:`\sqrt{w^+}`
-      - :math:`[N_{D1}, N)` — Q1 one-body generators :math:`\sqrt{w^-}`
-      - :math:`[N, N+RC)` — SF two-body generators :math:`(\|w_B\| + \sum_b\|w_b\|)/\sqrt{2}`
-
-    """
-
-    statevector: np.ndarray
-    """Outer PREPARE amplitudes (length X_o = N + R*C)."""
-
-    num_outer_qubits: int
-    r"""Number of qubits in the :math:`x_o` register: :math:`\lceil\log_2 X_o\rceil`."""
-
-    def to_hdf5(self, group: h5py.Group) -> None:
-        """Save to HDF5."""
-        group.create_dataset("statevector", data=self.statevector)
-        group.attrs["num_outer_qubits"] = self.num_outer_qubits
-
-    @classmethod
-    def from_hdf5(cls, group: h5py.Group) -> "SOSSAOuterPrepare":
-        """Load from HDF5."""
-        return cls(
-            statevector=np.array(group["statevector"]),
-            num_outer_qubits=int(group.attrs["num_outer_qubits"]),
-        )
+__all__ = ["SOSSAContainer", "SOSSAInnerPrepare", "SOSSASelect"]
 
 
 @dataclass(frozen=True)
@@ -162,7 +130,7 @@ class SOSSAContainer(BlockEncodingContainer):
 
     def __init__(
         self,
-        outer_prepare: SOSSAOuterPrepare,
+        outer_prepare: Prepare,
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
         normalization: float,
@@ -208,7 +176,7 @@ class SOSSAContainer(BlockEncodingContainer):
 
         """
         num_system = 2 * self.select.num_orbitals
-        num_ancilla = self.outer_prepare.num_outer_qubits + self.inner_prepare.num_inner_qubits
+        num_ancilla = self.outer_prepare.num_prepare_qubits + self.inner_prepare.num_inner_qubits
         # Additional ancilla: 2 spin qubits + flag + keep register (approximate)
         num_ancilla += 3
         return num_system + num_ancilla
@@ -227,7 +195,8 @@ class SOSSAContainer(BlockEncodingContainer):
             "normalization": self.normalization,
             "outer_prepare": {
                 "statevector": self.outer_prepare.statevector.tolist(),
-                "num_outer_qubits": self.outer_prepare.num_outer_qubits,
+                "num_prepare_qubits": self.outer_prepare.num_prepare_qubits,
+                "prepare_qubits": self.outer_prepare.prepare_qubits,
             },
             "inner_prepare": {
                 "conditional_coefficients": self.inner_prepare.conditional_coefficients.tolist(),
@@ -263,9 +232,10 @@ class SOSSAContainer(BlockEncodingContainer):
         cls._validate_json_version(cls._serialization_version, json_data)
 
         op = json_data["outer_prepare"]
-        outer_prepare = SOSSAOuterPrepare(
+        outer_prepare = Prepare(
             statevector=np.array(op["statevector"], dtype=float),
-            num_outer_qubits=op["num_outer_qubits"],
+            num_prepare_qubits=op["num_prepare_qubits"],
+            prepare_qubits=op["prepare_qubits"],
         )
 
         ip = json_data["inner_prepare"]
@@ -298,7 +268,7 @@ class SOSSAContainer(BlockEncodingContainer):
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAContainer":
         """Load a SOSSAContainer from an HDF5 group."""
-        outer_prepare = SOSSAOuterPrepare.from_hdf5(group["outer_prepare"])
+        outer_prepare = Prepare.from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
         return cls(
@@ -322,7 +292,7 @@ class SOSSAContainer(BlockEncodingContainer):
             f"  Orbitals N={n}, Ranks R={r}, Bases B={b}, Copies C={c}\n"
             f"  Xo = N + R*C = {n + r * c}\n"
             f"  Normalization Lambda = {self.normalization:.6f}\n"
-            f"  Outer PREPARE: {self.outer_prepare.num_outer_qubits} qubits\n"
+            f"  Outer PREPARE: {self.outer_prepare.num_prepare_qubits} qubits\n"
             f"  Inner PREPARE: {self.inner_prepare.num_inner_qubits} qubits, {b+1} basis entries\n"
             f"  System: {2*n} spin-orbitals\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"

@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 
@@ -985,6 +986,239 @@ Args:
     nbeta (int): Number of beta electrons.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
+  // ============================================================================
+  // FactorizedHamiltonianContainer - factorized container
+  // ============================================================================
+  py::class_<FactorizedHamiltonianContainer, HamiltonianContainer,
+             py::smart_holder>
+      factorized_container(data, "FactorizedHamiltonianContainer", R"(
+Represents a molecular Hamiltonian using Double-Factorized Tensor Hypercontraction.
+
+This class stores the factorized two-body integrals:
+
+    h2_{pqrs} = sum_{r,c} (sum_b U^r_{bp} U^r_{bq} W^r_{bc})
+                           (sum_b' U^r_{b'r} U^r_{b's} W^r_{b'c})
+
+along with an identity weight matrix WB[R,C] and optional BLISS core energy shift.
+Two-body integrals are lazily reconstructed on first access.
+
+This container is always restricted (uses spin-free integrals).
+
+Examples:
+    >>> import numpy as np
+    >>> N, R, B, C = 4, 2, 3, 2
+    >>> h1 = np.random.rand(N, N)
+    >>> u = np.random.rand(R * B * N)
+    >>> w = np.random.rand(R * B * C)
+    >>> wb = np.random.rand(R, C)
+    >>> container = FactorizedHamiltonianContainer(
+    ...     h1, u, w, wb, R, B, C, orbitals, 10.5, fock
+    ... )
+    >>> hamiltonian = Hamiltonian(container)
+)");
+
+  factorized_container.def(
+      py::init<const Eigen::MatrixXd&, const Eigen::VectorXd&,
+               const Eigen::VectorXd&, const Eigen::MatrixXd&, size_t, size_t,
+               size_t, std::shared_ptr<Orbitals>, double,
+               const Eigen::MatrixXd&, double, double, HamiltonianType>(),
+      R"(
+Constructor for factorized Hamiltonian.
+
+Args:
+    one_body_integrals (numpy.ndarray): One-electron integrals [N x N]
+    u_matrices (numpy.ndarray): Orbital rotation matrices, flat [R*B*N]
+    w_matrices (numpy.ndarray): Two-body weights, flat [R*B*C]
+    wb_matrix (numpy.ndarray): Identity weights [R x C]
+    num_ranks (int): Number of ranks R
+    num_bases (int): Number of bases per rank B
+    num_copies (int): Number of copies per rank C
+    orbitals (Orbitals): Molecular orbital data
+    core_energy (float): Core energy (nuclear repulsion + inactive orbitals)
+    inactive_fock_matrix (numpy.ndarray): Inactive Fock matrix [N x N]
+    bliss_core_shift (float, optional): BLISS core energy shift (default 0)
+    energy_gap (float, optional): E_gap for SOS block encoding (default 0)
+    type (HamiltonianType, optional): Hamiltonian type (Hermitian by default)
+)",
+      py::arg("one_body_integrals"), py::arg("u_matrices"),
+      py::arg("w_matrices"), py::arg("wb_matrix"), py::arg("num_ranks"),
+      py::arg("num_bases"), py::arg("num_copies"), py::arg("orbitals"),
+      py::arg("core_energy"), py::arg("inactive_fock_matrix"),
+      py::arg("bliss_core_shift") = 0.0, py::arg("energy_gap") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
+
+  // Factorized-specific accessors
+  factorized_container.def(
+      "get_u_matrices", &FactorizedHamiltonianContainer::get_u_matrices,
+      py::return_value_policy::reference_internal, R"(
+Get U matrices as flat vector [R*B*N].
+
+Returns:
+    numpy.ndarray: Flat array of orbital rotation matrices
+)");
+
+  factorized_container.def(
+      "get_w_matrices", &FactorizedHamiltonianContainer::get_w_matrices,
+      py::return_value_policy::reference_internal, R"(
+Get W matrices as flat vector [R*B*C].
+
+Returns:
+    numpy.ndarray: Flat array of two-body weights
+)");
+
+  factorized_container.def(
+      "get_wb_matrix", &FactorizedHamiltonianContainer::get_wb_matrix,
+      py::return_value_policy::reference_internal, R"(
+Get WB identity weight matrix [R x C].
+
+Returns:
+    numpy.ndarray: Identity weight matrix
+)");
+
+  factorized_container.def(
+      "get_num_orbitals", &FactorizedHamiltonianContainer::get_num_orbitals,
+      R"(
+Number of spatial orbitals (N).
+
+Returns:
+    int: Number of spatial orbitals
+)");
+
+  factorized_container.def(
+      "get_num_ranks", &FactorizedHamiltonianContainer::get_num_ranks, R"(
+Number of ranks (R).
+
+Returns:
+    int: Number of ranks in the factorization
+)");
+
+  factorized_container.def(
+      "get_num_bases", &FactorizedHamiltonianContainer::get_num_bases, R"(
+Number of bases per rank (B).
+
+Returns:
+    int: Number of bases per rank
+)");
+
+  factorized_container.def(
+      "get_num_copies", &FactorizedHamiltonianContainer::get_num_copies, R"(
+Number of copies per rank (C).
+
+Returns:
+    int: Number of copies per rank
+)");
+
+  factorized_container.def(
+      "get_bliss_core_shift",
+      &FactorizedHamiltonianContainer::get_bliss_core_shift, R"(
+BLISS core energy shift.
+
+Returns:
+    float: The BLISS core energy shift value
+)");
+
+  factorized_container.def(
+      "get_energy_gap", &FactorizedHamiltonianContainer::get_energy_gap, R"(
+Energy gap E_gap for SOS block encoding.
+
+Returns:
+    float: The energy gap value
+)");
+
+  factorized_container.def(
+      "get_lambda", &FactorizedHamiltonianContainer::get_lambda, R"(
+Block-encoding normalization Lambda.
+
+Lambda = sum|eig(h1_majorana)| + 0.25 * sum_{rc} (|WB_{rc}| + sum_b |W_{rb,c}|)^2
+
+Returns:
+    float: The block-encoding normalization factor
+)");
+
+  factorized_container.def(
+      "get_lambda_eff", &FactorizedHamiltonianContainer::get_lambda_eff, R"(
+Effective lambda for SOS walk.
+
+lambda_eff = sqrt(E_gap * (2*Lambda - E_gap))
+
+Requires E_gap > 0 and E_gap < 2*Lambda.
+
+Returns:
+    float: The effective lambda value
+
+Raises:
+    RuntimeError: If E_gap is non-positive or >= 2*Lambda
+)");
+
+  factorized_container.def(
+      "get_h1_majorana", &FactorizedHamiltonianContainer::get_h1_majorana, R"(
+Adjusted one-body matrix in Majorana basis.
+
+h'(1)_{pq} = h1_{pq} - 0.5*sum_{rs} h2_{prrs->pq} + sum_{rs} h2_{pqrr}
+             - sum_{rc,b} WB_{rc} W_{rb,c} U_{bp} U_{bq}
+
+Returns:
+    numpy.ndarray: The modified one-body matrix [N x N]
+)");
+
+  factorized_container.def(
+      "reconstruct_two_body_integrals",
+      &FactorizedHamiltonianContainer::reconstruct_two_body_integrals, R"(
+Reconstruct approximate two-body integrals from factorization.
+
+Returns:
+    numpy.ndarray: Flat vector of reconstructed two-body integrals [N^4]
+)");
+
+  factorized_container.def(
+      "get_two_body_integrals",
+      &FactorizedHamiltonianContainer::get_two_body_integrals,
+      py::return_value_policy::reference_internal, R"(
+Get the full two-body integrals (lazily reconstructed).
+
+Returns:
+    tuple[numpy.ndarray, numpy.ndarray, numpy.ndarray]: Tuple of (aaaa, aabb, bbbb)
+    two-body integral vectors [N^4] (all identical for restricted).
+)");
+
+  factorized_container.def(
+      "is_restricted", &FactorizedHamiltonianContainer::is_restricted, R"(
+Check if Hamiltonian is restricted. Always True for factorized container.
+
+Returns:
+    bool: True
+)");
+
+  factorized_container.def("is_valid",
+                           &FactorizedHamiltonianContainer::is_valid, R"(
+Check if the Hamiltonian data is complete and consistent.
+
+Returns:
+    bool: True if all required data is set and dimensions are consistent
+)");
+
+  factorized_container.def(
+      "to_json",
+      [](const FactorizedHamiltonianContainer& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert container to JSON string.
+
+Returns:
+    str: JSON representation of the container
+)");
+
+  factorized_container.def(
+      "__repr__",
+      [](const FactorizedHamiltonianContainer& self) -> std::string {
+        return "<FactorizedHamiltonianContainer N=" +
+               std::to_string(self.get_num_orbitals()) +
+               " R=" + std::to_string(self.get_num_ranks()) +
+               " B=" + std::to_string(self.get_num_bases()) +
+               " C=" + std::to_string(self.get_num_copies()) + ">";
+      });
 
   // ============================================================================
   // Hamiltonian - Interface class

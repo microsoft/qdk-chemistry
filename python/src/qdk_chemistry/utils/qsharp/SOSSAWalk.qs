@@ -4,11 +4,15 @@
 
 /// SOSSA (Sum of Squares with Ancilla) walk operator for DFTHC block encoding.
 ///
-/// Implements the walk operator from arXiv:2502.15882v1 (Low et al. 2025):
+/// Composable design: each sub-operation (OuterPrepare, InnerPrepare, Select)
+/// is built independently as a Q# callable. The walk step composes them with
+/// reflections, following the same pattern as PrepSelPrep.
+///
+/// Walk operator (arXiv:2502.15882v1, Eq. 77):
 ///   W = Ref_{a,B} · U† · Ref_B · U
 /// where U = OuterPREP · within{InnerPREP} apply{SELECT}.
 ///
-/// For QPE, only the reflections are controlled:
+/// For QPE, only reflections are controlled:
 ///   c-W = c-Ref_{a,B} · U† · c-Ref_B · U
 namespace QDKChemistry.Utils.SOSSAWalk {
 
@@ -22,66 +26,123 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Math.PI;
     import Std.StatePreparation.PreparePureStateD;
 
-    /// Parameters for the SOSSA walk step.
-    struct SOSSAWalkParams {
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Type aliases for composable sub-operations
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Outer PREPARE: (outerReg: Qubit[]) => Unit is Adj + Ctl
+    /// Inner PREPARE: (outerReg: Qubit[], innerReg: Qubit[]) => Unit is Adj + Ctl
+    /// SELECT: (outerReg: Qubit[], innerReg: Qubit[], spinReg: Qubit[], systemReg: Qubit[]) => Unit is Adj + Ctl
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Outer PREPARE factories
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Build an outer PREPARE using alias sampling.
+    function MakeOuterPrepareAliasSampling(
+        statevector : Double[],
+        coefficientBitPrecision : Int,
+    ) : (Qubit[]) => Unit is Adj + Ctl {
+        // TODO: Replace with actual alias sampling implementation.
+        // For now, uses PreparePureStateD as a placeholder.
+        qs => PreparePureStateD(statevector, qs)
+    }
+
+    /// Build an outer PREPARE using coherent pure-state preparation.
+    function MakeOuterPreparePureState(
+        statevector : Double[],
+    ) : (Qubit[]) => Unit is Adj + Ctl {
+        qs => PreparePureStateD(statevector, qs)
+    }
+
+    /// Build an outer PREPARE using QROM amplitude loading.
+    function MakeOuterPrepareQROM(
+        statevector : Double[],
+        coefficientBitPrecision : Int,
+    ) : (Qubit[]) => Unit is Adj + Ctl {
+        // TODO: Replace with QROM-based amplitude loading.
+        qs => PreparePureStateD(statevector, qs)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Inner PREPARE factories
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Build an inner PREPARE using controlled alias sampling.
+    function MakeInnerPrepareAliasSampling(
+        innerCoefficients : Double[][],
+        coefficientBitPrecision : Int,
+    ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        // TODO: Replace with actual controlled alias sampling.
+        (outerReg, innerReg) => {
+            let xo = Length(innerCoefficients);
+            for i in 0..xo - 1 {
+                ApplyControlledOnInt(
+                    i,
+                    PreparePureStateD(innerCoefficients[i], _),
+                    outerReg,
+                    innerReg,
+                );
+            }
+        }
+    }
+
+    /// Build an inner PREPARE using direct controlled preparation.
+    function MakeInnerPrepareDirect(
+        innerCoefficients : Double[][],
+    ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg) => {
+            let xo = Length(innerCoefficients);
+            for i in 0..xo - 1 {
+                ApplyControlledOnInt(
+                    i,
+                    PreparePureStateD(innerCoefficients[i], _),
+                    outerReg,
+                    innerReg,
+                );
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // SELECT factories
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Parameters for SELECT factory functions.
+    struct SelectParams {
         numOrbitals : Int,
         numRanks : Int,
         numBases : Int,
         numCopies : Int,
         numD1 : Int,
-        outerStatevector : Double[],
-        innerCoefficients : Double[][],
         dqRotationAngles : Double[][],
         sfRotationAngles : Double[][],
         rotationBitPrecision : Int,
-        coefficientBitPrecision : Int,
-        power : Int,
     }
 
-    /// Reflection about the zero state: 2|0⟩⟨0| - I.
-    operation ReflectAboutZero(qs : Qubit[]) : Unit is Adj + Ctl {
-        let n = Length(qs);
-        if n == 0 {
-            // No qubits: global phase (no-op).
-        } elif n == 1 {
-            Z(qs[0]);
-        } else {
-            within {
-                ApplyToEachCA(X, qs);
-            } apply {
-                Controlled Z(qs[1...], qs[0]);
-            }
-            R(PauliI, 2.0 * PI(), qs[0]);
+    /// Build a SELECT using QROM + phase gradient rotation.
+    function MakeSelectPhaseGradient(
+        params : SelectParams,
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        // TODO: Replace with QROM angle load + phase gradient adder.
+        // For now, uses direct Ry rotations as simulation placeholder.
+        (outerReg, innerReg, spinReg, systemReg) => {
+            SelectImpl(params, outerReg, innerReg, spinReg, systemReg);
         }
     }
 
-    /// OuterPREP: prepare the outer superposition over x_o ∈ [0, X_o).
-    operation OuterPrepare(statevector : Double[], qs : Qubit[]) : Unit is Adj + Ctl {
-        PreparePureStateD(statevector, qs);
-    }
-
-    /// InnerPREP: conditional preparation over b ∈ [0, B] given x_o.
-    /// Simplified simulation-mode implementation using state preparation.
-    operation InnerPrepare(
-        innerCoefficients : Double[][],
-        outerReg : Qubit[],
-        innerReg : Qubit[],
-    ) : Unit is Adj + Ctl {
-        let xo = Length(innerCoefficients);
-        for i in 0..xo - 1 {
-            ApplyControlledOnInt(
-                i,
-                PreparePureStateD(innerCoefficients[i], _),
-                outerReg,
-                innerReg,
-            );
+    /// Build a SELECT using direct rotation synthesis.
+    function MakeSelectDirectRotation(
+        params : SelectParams,
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        (outerReg, innerReg, spinReg, systemReg) => {
+            SelectImpl(params, outerReg, innerReg, spinReg, systemReg);
         }
     }
 
-    /// SELECT: applies Givens rotations + Majorana controlled on (x_o, b).
-    /// Simulation-mode implementation for correctness validation.
-    operation Select(
-        params : SOSSAWalkParams,
+    /// Shared SELECT implementation (Givens rotations + Majorana).
+    operation SelectImpl(
+        params : SelectParams,
         outerReg : Qubit[],
         innerReg : Qubit[],
         spinReg : Qubit[],
@@ -89,10 +150,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ) : Unit is Adj + Ctl {
         let numOrbitals = params.numOrbitals;
         let numD1 = params.numD1;
-        let numQ1 = numOrbitals - numD1;
         let numSF = params.numRanks * params.numCopies;
 
-        // Apply Givens rotations conditioned on x_o value.
         // D1 entries: x_o in [0, numD1)
         for xo in 0..numD1 - 1 {
             ApplyControlledOnInt(
@@ -112,7 +171,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             );
         }
         // SF entries: x_o in [numOrbitals, numOrbitals + numSF)
-        // SF angles indexed by r*(B+1)+b
         let numBp1 = params.numBases + 1;
         for xo in numOrbitals..numOrbitals + numSF - 1 {
             let r = (xo - numOrbitals) / params.numCopies;
@@ -134,10 +192,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             }
         }
 
-        // Majorana operator on system[0] conditioned on generator type.
-        // SF (b < B): Z on system[0] (two-body term)
-        // D1: X on system[0], then CZ(spin, system[0])
-        // Q1: X on system[0], then CZ(spin, system[0]), then Z(spin)
+        // Majorana operators conditioned on generator type.
         for xo in 0..numD1 - 1 {
             ApplyControlledOnInt(xo, MajoranaD1(spinReg, _), outerReg, systemReg[0..0]);
         }
@@ -149,26 +204,140 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
-    /// D1 Majorana: X(sys[0]) · CZ(spin, sys[0]) — annihilation (γ₀).
-    operation MajoranaD1(spinReg : Qubit[], target : Qubit[]) : Unit is Adj + Ctl {
-        X(target[0]);
-        if Length(spinReg) > 0 {
-            CZ(spinReg[0], target[0]);
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Walk step composer
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Compose the SOSSA walk step from pre-built sub-operation callables.
+    ///
+    /// W = Ref_{a,B} · U† · Ref_B · U
+    /// c-W = c-Ref_{a,B} · U† · c-Ref_B · U (only reflections controlled)
+    operation SOSSAWalkStep(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        outerReg : Qubit[],
+        innerReg : Qubit[],
+        spinReg : Qubit[],
+        systemReg : Qubit[],
+    ) : Unit is Adj + Ctl {
+        body ... {
+            // U: OuterPREP · within{InnerPREP} apply{SELECT}
+            outerPrepareOp(outerReg);
+            within {
+                innerPrepareOp(outerReg, innerReg);
+            } apply {
+                selectOp(outerReg, innerReg, spinReg, systemReg);
+            }
+
+            // Ref_B: inner reflection
+            ReflectAboutZero(innerReg + spinReg);
+
+            // U†
+            Adjoint outerPrepareOp(outerReg);
+            within {
+                innerPrepareOp(outerReg, innerReg);
+            } apply {
+                Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
+            }
+
+            // Ref_{a,B}: outer reflection
+            ReflectAboutZero(outerReg + innerReg + spinReg);
+        }
+        adjoint auto;
+        controlled (ctls, ...) {
+            // Only reflections are controlled for QPE.
+            outerPrepareOp(outerReg);
+            within {
+                innerPrepareOp(outerReg, innerReg);
+            } apply {
+                selectOp(outerReg, innerReg, spinReg, systemReg);
+            }
+
+            // c-Ref_B
+            Controlled ReflectAboutZero(ctls, innerReg + spinReg);
+
+            // U†
+            Adjoint outerPrepareOp(outerReg);
+            within {
+                innerPrepareOp(outerReg, innerReg);
+            } apply {
+                Adjoint selectOp(outerReg, innerReg, spinReg, systemReg);
+            }
+
+            // c-Ref_{a,B}
+            Controlled ReflectAboutZero(ctls, outerReg + innerReg + spinReg);
+        }
+        controlled adjoint auto;
+    }
+
+    /// Creates a controlled SOSSA walk callable from pre-built sub-ops.
+    function MakeControlledSOSSAWalkOp(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numOuterQubits : Int,
+        numInnerQubits : Int,
+        power : Int,
+    ) : (Qubit, Qubit[]) => Unit {
+        let numSpinQubits = 2;
+        (control, allQubits) => {
+            let outerReg = allQubits[0..numOuterQubits - 1];
+            let innerReg = allQubits[numOuterQubits..numOuterQubits + numInnerQubits - 1];
+            let spinReg = allQubits[numOuterQubits + numInnerQubits..numOuterQubits + numInnerQubits + numSpinQubits - 1];
+            let systemReg = allQubits[numOuterQubits + numInnerQubits + numSpinQubits..numOuterQubits + numInnerQubits + numSpinQubits + numSystemQubits - 1];
+            for _ in 0..power - 1 {
+                Controlled SOSSAWalkStep(
+                    [control],
+                    (outerPrepareOp, innerPrepareOp, selectOp,
+                     outerReg, innerReg, spinReg, systemReg),
+                );
+            }
         }
     }
 
-    /// Q1 Majorana: X(sys[0]) · CZ(spin, sys[0]) · Z(spin) — creation (iγ₁).
-    operation MajoranaQ1(spinReg : Qubit[], target : Qubit[]) : Unit is Adj + Ctl {
-        X(target[0]);
-        if Length(spinReg) > 0 {
-            CZ(spinReg[0], target[0]);
-            Z(spinReg[0]);
-        }
+    /// Circuit entry point: allocates qubits and runs controlled walk.
+    operation MakeControlledSOSSAWalkCircuit(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numSystemQubits : Int,
+        numOuterQubits : Int,
+        numInnerQubits : Int,
+        power : Int,
+    ) : Unit {
+        let numSpinQubits = 2;
+        let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits;
+
+        use control = Qubit();
+        use allQubits = Qubit[totalAncilla + numSystemQubits];
+        let op = MakeControlledSOSSAWalkOp(
+            outerPrepareOp, innerPrepareOp, selectOp,
+            numSystemQubits, numOuterQubits, numInnerQubits, power,
+        );
+        op(control, allQubits);
     }
 
-    /// SF Majorana: Z(sys[0]) — two-body (b < B identity term).
-    operation MajoranaSF(target : Qubit[]) : Unit is Adj + Ctl {
-        Z(target[0]);
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Helpers
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /// Reflection about the zero state: 2|0⟩⟨0| - I.
+    operation ReflectAboutZero(qs : Qubit[]) : Unit is Adj + Ctl {
+        let n = Length(qs);
+        if n == 0 {
+            // No qubits: global phase (no-op).
+        } elif n == 1 {
+            Z(qs[0]);
+        } else {
+            within {
+                ApplyToEachCA(X, qs);
+            } apply {
+                Controlled Z(qs[1...], qs[0]);
+            }
+            R(PauliI, 2.0 * PI(), qs[0]);
+        }
     }
 
     /// Apply a sequence of Givens rotations Ry(angle) to target qubits.
@@ -182,127 +351,25 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
     }
 
-    /// Full SOSSA walk step: W = Ref_{a,B} · U† · Ref_B · U.
-    /// Controlled: c-Ref_{a,B} · U† · c-Ref_B · U (only reflections controlled).
-    operation SOSSAWalkStep(
-        params : SOSSAWalkParams,
-        outerReg : Qubit[],
-        innerReg : Qubit[],
-        spinReg : Qubit[],
-        systemReg : Qubit[],
-    ) : Unit is Adj + Ctl {
-        body ... {
-            // U: OuterPREP · within{InnerPREP} apply{SELECT}
-            OuterPrepare(params.outerStatevector, outerReg);
-            within {
-                InnerPrepare(params.innerCoefficients, outerReg, innerReg);
-            } apply {
-                Select(params, outerReg, innerReg, spinReg, systemReg);
-            }
-
-            // Ref_B: inner reflection
-            ReflectAboutZero(innerReg + spinReg);
-
-            // U†
-            Adjoint OuterPrepare(params.outerStatevector, outerReg);
-            within {
-                InnerPrepare(params.innerCoefficients, outerReg, innerReg);
-            } apply {
-                Adjoint Select(params, outerReg, innerReg, spinReg, systemReg);
-            }
-
-            // Ref_{a,B}: outer reflection
-            ReflectAboutZero(outerReg + innerReg + spinReg);
-        }
-        adjoint auto;
-        controlled (ctls, ...) {
-            // Only reflections are controlled for QPE.
-            // U runs unconditionally.
-            OuterPrepare(params.outerStatevector, outerReg);
-            within {
-                InnerPrepare(params.innerCoefficients, outerReg, innerReg);
-            } apply {
-                Select(params, outerReg, innerReg, spinReg, systemReg);
-            }
-
-            // c-Ref_B
-            Controlled ReflectAboutZero(ctls, innerReg + spinReg);
-
-            // U†
-            Adjoint OuterPrepare(params.outerStatevector, outerReg);
-            within {
-                InnerPrepare(params.innerCoefficients, outerReg, innerReg);
-            } apply {
-                Adjoint Select(params, outerReg, innerReg, spinReg, systemReg);
-            }
-
-            // c-Ref_{a,B}
-            Controlled ReflectAboutZero(ctls, outerReg + innerReg + spinReg);
-        }
-        controlled adjoint auto;
-    }
-
-    /// Creates a controlled SOSSA walk callable from parameters.
-    function MakeControlledSOSSAWalkOp(
-        params : SOSSAWalkParams,
-    ) : (Qubit, Qubit[]) => Unit {
-        let numOrbitals = params.numOrbitals;
-        let xo = numOrbitals + params.numRanks * params.numCopies;
-        let numOuterQubits = Ceiling(Lg(IntAsDouble(xo)));
-        let numInnerQubits = Ceiling(Lg(IntAsDouble(params.numBases + 1)));
-        let numSpinQubits = 2;
-        let numSystemQubits = 2 * numOrbitals;
-
-        (control, allQubits) => {
-            let outerReg = allQubits[0..numOuterQubits - 1];
-            let innerReg = allQubits[numOuterQubits..numOuterQubits + numInnerQubits - 1];
-            let spinReg = allQubits[numOuterQubits + numInnerQubits..numOuterQubits + numInnerQubits + numSpinQubits - 1];
-            let systemReg = allQubits[numOuterQubits + numInnerQubits + numSpinQubits..numOuterQubits + numInnerQubits + numSpinQubits + numSystemQubits - 1];
-            for _ in 0..params.power - 1 {
-                Controlled SOSSAWalkStep([control], (params, outerReg, innerReg, spinReg, systemReg));
-            }
+    /// D1 Majorana: X(sys[0]) · CZ(spin, sys[0]).
+    operation MajoranaD1(spinReg : Qubit[], target : Qubit[]) : Unit is Adj + Ctl {
+        X(target[0]);
+        if Length(spinReg) > 0 {
+            CZ(spinReg[0], target[0]);
         }
     }
 
-    /// Circuit entry point for controlled SOSSA walk (allocates qubits).
-    operation MakeControlledSOSSAWalkCircuit(
-        numOrbitals : Int,
-        numRanks : Int,
-        numBases : Int,
-        numCopies : Int,
-        numD1 : Int,
-        outerStatevector : Double[],
-        innerCoefficients : Double[][],
-        dqRotationAngles : Double[][],
-        sfRotationAngles : Double[][],
-        rotationBitPrecision : Int,
-        coefficientBitPrecision : Int,
-        power : Int,
-    ) : Unit {
-        let params = new SOSSAWalkParams {
-            numOrbitals = numOrbitals,
-            numRanks = numRanks,
-            numBases = numBases,
-            numCopies = numCopies,
-            numD1 = numD1,
-            outerStatevector = outerStatevector,
-            innerCoefficients = innerCoefficients,
-            dqRotationAngles = dqRotationAngles,
-            sfRotationAngles = sfRotationAngles,
-            rotationBitPrecision = rotationBitPrecision,
-            coefficientBitPrecision = coefficientBitPrecision,
-            power = power,
-        };
-        let xo = numOrbitals + numRanks * numCopies;
-        let numOuterQubits = Ceiling(Lg(IntAsDouble(xo)));
-        let numInnerQubits = Ceiling(Lg(IntAsDouble(numBases + 1)));
-        let numSpinQubits = 2;
-        let numSystemQubits = 2 * numOrbitals;
-        let totalAncilla = numOuterQubits + numInnerQubits + numSpinQubits;
+    /// Q1 Majorana: X(sys[0]) · CZ(spin, sys[0]) · Z(spin).
+    operation MajoranaQ1(spinReg : Qubit[], target : Qubit[]) : Unit is Adj + Ctl {
+        X(target[0]);
+        if Length(spinReg) > 0 {
+            CZ(spinReg[0], target[0]);
+            Z(spinReg[0]);
+        }
+    }
 
-        use control = Qubit();
-        use allQubits = Qubit[totalAncilla + numSystemQubits];
-        let op = MakeControlledSOSSAWalkOp(params);
-        op(control, allQubits);
+    /// SF Majorana: Z(sys[0]).
+    operation MajoranaSF(target : Qubit[]) : Unit is Adj + Ctl {
+        Z(target[0]);
     }
 }
