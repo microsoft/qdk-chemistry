@@ -107,9 +107,11 @@ extends:
         name: Azure-Pipelines-DevTools-EO
         image: windows-2022
         os: windows
+
     stages:
     - stage: BuildAndTest
       displayName: Build and Test Python Wheels
+
       jobs:
       - ${{ each target in parameters.matrix }}:
         - job: Build_${{ target.name }}
@@ -133,7 +135,6 @@ extends:
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
-
           timeoutInMinutes: 480
           strategy:
             matrix:
@@ -145,11 +146,18 @@ extends:
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
           templateContext:
+            # Disable auto-injected CodeQL C++ for ARM64 and macOS
+            ${{ if not(eq(target.arch, 'x86_64')) }}:
+              sdl:
+                codeql:
+                  compiled:
+                    enabled: false
             outputs:
             - output: pipelineArtifact
               displayName: Upload Python $(pythonVersion) Wheels for ${{ target.os }} ${{ target.march }}
               targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
+
           steps:
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
@@ -249,16 +257,21 @@ extends:
           displayName: Test ${{ target.march }} ${{ target.os }} wheels
           variables:
             LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-          templateContext:
-            inputs:
-            - input: pipelineArtifact
-              artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
-              targetPath: $(Agent.BuildDirectory)/qdk-chemistry/python/repaired_wheelhouse
           steps:
           - checkout: self
             path: qdk-chemistry
             fetchDepth: 1
             retryCountOnTaskFailure: 3
+
+          # Download after checkout to prevent checkout from wiping the artifact.
+          # templateContext.inputs runs before steps; DownloadPipelineArtifact here
+          # runs after checkout, so the wheel survives into the test script.
+          - task: DownloadPipelineArtifact@2
+            displayName: Download wheel artifact
+            inputs:
+              buildType: current
+              artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
+              targetPath: $(Agent.BuildDirectory)/qdk-chemistry/python/repaired_wheelhouse
 
           - task: PipAuthenticate@1
             displayName: Pip Authenticate
