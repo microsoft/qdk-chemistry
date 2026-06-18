@@ -27,7 +27,7 @@ resources:
   # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
   - container: linux_build_container
     image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-    # options: --user root
+    options: --user root
 
 parameters:
 - name: pythonVersions
