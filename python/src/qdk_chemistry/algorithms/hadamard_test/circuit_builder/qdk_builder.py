@@ -63,8 +63,7 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             "statePrep": state_prep_op,
             "repControlledEvolution": ctrl_evol_op,
             "testBasis": qsharp_basis,
-            "control": 0,
-            "systems": [i + 1 for i in range(num_system_qubits)],
+            "numSystemQubits": num_system_qubits,
             "numAncillaQubits": num_ancilla_qubits,
         }
 

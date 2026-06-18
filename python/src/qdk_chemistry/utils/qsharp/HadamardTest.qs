@@ -4,15 +4,17 @@
 
 namespace QDKChemistry.Utils.HadamardTest {
 
-    import Std.Arrays.Subarray;
-
     /// Prepare a Hadamard test circuit.
+    ///
+    /// Qubits are allocated and laid out in a fixed order: `[control, system, ancilla]`.
+    /// The control qubit is always the first qubit, followed by the system qubits and then
+    /// the ancilla qubits. This avoids any possibility of index collisions between the
+    /// control, system, and ancilla registers.
     /// # Parameters
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
     /// - `testBasis`: Measurement basis for the control qubit. Supported values are `PauliX`, `PauliY`, and `PauliZ`.
-    /// - `control`: The index of the control qubit in the allocated register.
-    /// - `systems`: An array of indices representing the system qubits.
+    /// - `numSystemQubits`: Number of system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled evolution (0 if none).
     /// # Returns
     /// A single-element result array containing the control-qubit measurement in the selected basis.
@@ -20,18 +22,13 @@ namespace QDKChemistry.Utils.HadamardTest {
         statePrep : Qubit[] => Unit,
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         testBasis : Pauli,
-        control : Int,
-        systems : Int[],
+        numSystemQubits : Int,
         numAncillaQubits : Int,
     ) : Result[] {
-        use qs = Qubit[Length(systems) + 1 + numAncillaQubits];
-        let control_q = qs[control];
-        let system_q = Subarray(systems, qs);
-        let ancillas = if numAncillaQubits == 0 {
-            []
-        } else {
-            qs[1 + Length(systems)..Length(qs) - 1]
-        };
+        use qs = Qubit[1 + numSystemQubits + numAncillaQubits];
+        let control_q = qs[0];
+        let system_q = qs[1..numSystemQubits];
+        let ancillas = qs[1 + numSystemQubits..Length(qs) - 1];
         let allTargets = system_q + ancillas;
 
         statePrep(system_q);
