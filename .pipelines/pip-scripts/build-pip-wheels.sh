@@ -13,21 +13,25 @@ LIBFLAME_VERSION=${9:-5.2.0}
 MAC_BUILD=${10:-OFF}
 
 export CFLAGS="-fPIC -Os"
+# Use sudo for system-level installs when running as a non-root pipeline agent.
+SUDO=""
+[ "$(id -u)" != "0" ] && SUDO="sudo"
+
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
     # Try to prevent stochastic segfault from libc-bin (requires root; skip otherwise)
     if [ "$(id -u)" = "0" ]; then
         echo "Reinstalling libc-bin..."
         rm -f /var/lib/dpkg/info/libc-bin.*
-        apt-get clean
-        apt-get update -q
-        apt-get install -y -q libc-bin
+        $SUDO apt-get clean
+        $SUDO apt-get update -q
+        $SUDO apt-get install -y -q libc-bin
     fi
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
-    apt-get update -q
-    apt-get install -y -q \
+    $SUDO apt-get update -q
+    $SUDO apt-get install -y -q \
         build-essential \
         curl \
         gcc g++ \
@@ -73,7 +77,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     cd cmake-${CMAKE_VERSION}
     ./bootstrap --parallel=$(nproc) --prefix=/usr/local
     make --silent -j$(nproc)
-    make install
+    $SUDO make install
     cd ..
     rm -r cmake-${CMAKE_VERSION}
     cmake --version
@@ -81,10 +85,10 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
     echo "Downloading and installing BLIS..."
-    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
+    $SUDO bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
 
     echo "Downloading and installing libflame..."
-    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+    $SUDO bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
     arch -arm64 brew upgrade
@@ -105,7 +109,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD} ${HDF5_VERSION}
+$SUDO bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD} ${HDF5_VERSION}
 
 # Bootstrap Anaconda's `conda` and create the build env. See header of the
 # sourced script for full rationale (CFSClean / ms-ensureconda platform gaps /
