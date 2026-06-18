@@ -283,6 +283,8 @@ Args:
     periodic (bool, optional): If True, add an edge between the first and
         last site (ring topology). Requires n > 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    dfs_ordering (bool, optional): If True, relabel sites using deterministic
+        DFS traversal order. Defaults to False.
 
 Returns:
     LatticeGraph: Chain lattice with n sites.
@@ -323,6 +325,8 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    dfs_ordering (bool, optional): If True, relabel sites using deterministic
+        DFS traversal order. Defaults to False.
 
 Returns:
     LatticeGraph: Square lattice with nx * ny sites.
@@ -366,6 +370,8 @@ Args:
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
+    dfs_ordering (bool, optional): If True, relabel sites using deterministic
+        DFS traversal order. Defaults to False.
 
 Returns:
     LatticeGraph: Triangular lattice with nx * ny sites.
@@ -409,6 +415,8 @@ Args:
     periodic_y (bool, optional): If True, apply periodic boundary conditions
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
+    dfs_ordering (bool, optional): If True, relabel sites using deterministic
+        DFS traversal order. Defaults to False.
 
 Returns:
     LatticeGraph: Honeycomb lattice with 2 * nx * ny sites.
@@ -463,6 +471,8 @@ Args:
         along y. Requires ny >= 2. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
+    dfs_ordering (bool, optional): If True, relabel sites using deterministic
+        DFS traversal order. Defaults to False.
 
 Returns:
     LatticeGraph: Kagome lattice with 3 * nx * ny sites.

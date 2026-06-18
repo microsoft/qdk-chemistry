@@ -97,7 +97,10 @@ def _python_single_species_map_hamiltonian(
             if abs(h_pq) > integral_threshold:
                 accumulate_epq(p, q, h_pq)
 
-    two_body = np.asarray(hamiltonian.get_two_body_integrals()[0]).reshape(-1)
+    if hamiltonian.has_two_body_integrals():
+        two_body = np.asarray(hamiltonian.get_two_body_integrals()[0]).reshape(-1)
+    else:
+        two_body = np.array([], dtype=float)
     expected_size = n_spatial**4
     if two_body.size == expected_size and np.any(
         np.abs(two_body) > integral_threshold
