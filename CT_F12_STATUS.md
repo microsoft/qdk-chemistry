@@ -1,8 +1,10 @@
 # CT-F12 Implementation Status
 
-**Delivered:** F12-HF reference energy, validated to max precision against the
-canonical transcorrelated reference (Comment on J. Chem. Phys. 136, 084107,
-arXiv:2211.09685v2, Table I).
+**Delivered:** the Hartree-Fock and MP2-level rows of the canonical
+transcorrelated reference (Comment on J. Chem. Phys. 136, 084107,
+arXiv:2211.09685v2, Table I), each validated to max precision: F12-HF,
+conventional MP2, F12-MP2, and MP2-F12 / (MP2-)F12c. The coupled-cluster rows
+require a CC amplitude solver and are out of scope.
 
 ## Validation (neon atom, frozen-core, gamma = 1.5)
 
@@ -38,6 +40,28 @@ Eq. 27 verbatim; doubling the S intermediate (`ctf12_f12.cpp`, "remove the
 spurious 1/2") closes aDZ to 1.2e-9 while leaving aTZ/aQZ unchanged (S is
 negligible once the CABS is well-resolved). S enters only the virtual blocks of
 C1bar/C2bar, so the first-order energy is unaffected.
+
+## MP2-level rows (neon atom, frozen-core, gamma = 1.5)
+
+All reproduced to the references' 9-digit floor (~1e-9):
+
+| Method        | aug-cc-pVDZ   | aug-cc-pVTZ   | aug-cc-pVQZ   |
+|---------------|---------------|---------------|---------------|
+| MP2           | -0.206873509  | -0.272518905  | -0.297242804  |
+| F12-MP2       | -0.301361903  | -0.308391143  | -0.313067546  |
+| (MP2-)F12c    | -0.104682301  | -0.043083912  | -0.020967256  |
+| MP2-F12       | -0.311555810  | -0.315602818  | -0.318210060  |
+
+- **Conventional MP2** must correlate with orbital energies self-consistent with
+  our integrals (diagonal Fock), not the input SCF backend's (~1e-7 different ->
+  systematic ~2e-9 MP2 error).
+- **F12-MP2** = F12-HF relaxation + MP2 over the dressed Hamiltonian (relative to
+  bare HF). Requires the relaxed orbitals converged on the density, not just the
+  energy (energy-only leaves a ~1e-6 gradient -> ~1e-8 MP2 error).
+- **(MP2-)F12c** = the no-coupling part (= first-order F12-HF, our
+  `f12_hf_energy`) plus the geminal-conventional-doubles coupling (E_CT + E_CC;
+  MPQC `mp2f12` structure: C intermediate, T2 amplitudes, C-bar/CC-bar reductor
+  coefficients 5/8,-1/8 and 14/64,2/64). MP2-F12 = MP2 + (MP2-)F12c.
 
 ## Key result: F12-HF is SCF-converged, not first-order
 
@@ -79,11 +103,16 @@ mean field. The orbital relaxation (dominated by the U intermediate) closes the
   inexpensive "standard" estimate (selectable option).
 - `f12_hf_scf_energy(input)` -> the self-consistent F12-HF correction (the
   quantity tabulated as "F12-HF" in the reference literature).
+- `mp2_energy(input)` -> conventional frozen-core MP2 correlation energy.
+- `f12_mp2_energy(input)` -> total F12-MP2 correlation (MP2 over the dressed
+  Hamiltonian, relative to bare HF).
+- `mp2_f12_correction(input)` -> the (MP2-)F12c correction; MP2-F12 total =
+  `mp2_energy + mp2_f12_correction`.
 
 ## Test coverage
 
-- `test_ctf12_f12_hf.cpp`: F12-HF SCF correction for Ne / aug-cc-pV{D,T,Q}Z
-  against the reference, plus the first-order "standard" estimate for aDZ.
+- `test_ctf12_f12_hf.cpp`: F12-HF SCF correction (plus first-order estimate) and
+  the four MP2-level rows for Ne / aug-cc-pV{D,T,Q}Z against the reference.
 - `test_geminal_eri.cpp`, `test_cabs.cpp`, `test_optri_basis.cpp`: integral,
   CABS, and OptRI-basis infrastructure.
 - Python: factory, settings, backend registration.

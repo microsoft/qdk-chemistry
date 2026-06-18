@@ -381,7 +381,62 @@ double f12_hf_energy(const F12Intermediates& im) {
   return energy;
 }
 
-double f12_hf_scf_energy(const F12HartreeFockInput& in) {
+double mp2_energy(const F12HartreeFockInput& in) {
+  QDK_LOG_TRACE_ENTERING();
+  const auto& obs = in.obs;
+  const std::size_t nao = static_cast<std::size_t>(obs.nbf());
+  const std::size_t nmo = static_cast<std::size_t>(in.mo_coefficients.cols());
+  const std::size_t nocc = in.n_occupied, nc = in.n_core;
+
+  auto cc_ao = gem::four_center_coulomb(obs, obs, obs, obs);
+  auto cc_mo = gem::mo_transform_4index(cc_ao.get(), nao, nao, nao, nao,
+                                        in.mo_coefficients, in.mo_coefficients,
+                                        in.mo_coefficients, in.mo_coefficients);
+  Tensor4 chem{cc_mo.get(), nmo, nmo,
+               nmo};  // chemist (pq|rs); <pq|rs> = (pr|qs)
+
+  // Orbital energies self-consistent with these integrals (diagonal Fock),
+  // rather than the input energies which come from a different SCF backend.
+  Eigen::MatrixXd h_ao =
+      gem::kinetic_matrix(obs) + gem::nuclear_matrix(obs, in.nuclei);
+  Eigen::MatrixXd hmo =
+      in.mo_coefficients.transpose() * h_ao * in.mo_coefficients;
+  Eigen::VectorXd eps(nmo);
+  for (std::size_t p = 0; p < nmo; ++p) {
+    double f = hmo(static_cast<int>(p), static_cast<int>(p));
+    for (std::size_t i = 0; i < nocc; ++i)
+      f += 2.0 * chem(p, p, i, i) - chem(p, i, i, p);
+    eps(static_cast<int>(p)) = f;
+  }
+
+  double energy = 0.0;
+  for (std::size_t i = nc; i < nocc; ++i)
+    for (std::size_t j = nc; j < nocc; ++j)
+      for (std::size_t a = nocc; a < nmo; ++a)
+        for (std::size_t b = nocc; b < nmo; ++b) {
+          const double iajb = chem(i, a, j, b);  // <ij|ab>
+          const double ibja = chem(i, b, j, a);  // <ij|ba>
+          energy += iajb * (2.0 * iajb - ibja) /
+                    (eps(static_cast<int>(i)) + eps(static_cast<int>(j)) -
+                     eps(static_cast<int>(a)) - eps(static_cast<int>(b)));
+        }
+  return energy;
+}
+
+namespace {
+
+struct DressedResult {
+  double e_hf;
+  double e_f12hf;
+  std::vector<double> gbar;     // dressed <pq|rs> in the original MO basis
+  Eigen::MatrixXd c_relaxed;    // original-MO -> F12-HF-relaxed-MO rotation
+  Eigen::VectorXd eps_relaxed;  // dressed-Fock eigenvalues
+  std::size_t nbf;
+  std::size_t nocc;
+  std::size_t ncore;
+};
+
+DressedResult run_f12_hf(const F12HartreeFockInput& in) {
   QDK_LOG_TRACE_ENTERING();
   Workspace w = build_workspace(in);
   VXB vxb = compute_vxb(w);
@@ -411,15 +466,24 @@ double f12_hf_scf_energy(const F12HartreeFockInput& in) {
         for (std::size_t s = 0; s < nbf; ++s)
           gp[gpidx(p, q, r, s)] = CHEM(p, r, q, s);
 
+  struct ScfOut {
+    double e;
+    Eigen::MatrixXd c;
+    Eigen::VectorXd eps;
+  };
   auto run_scf = [&](const Eigen::MatrixXd& hh,
-                     const std::vector<double>& gg) -> double {
+                     const std::vector<double>& gg) -> ScfOut {
     Eigen::MatrixXd cmo = Eigen::MatrixXd::Identity(nbf, nbf);
+    Eigen::MatrixXd d_old = Eigen::MatrixXd::Zero(nbf, nbf);
+    Eigen::VectorXd eps = Eigen::VectorXd::Zero(nbf);
     double e_old = 0.0;
     for (int iter = 0; iter < 200; ++iter) {
       Eigen::MatrixXd d = Eigen::MatrixXd::Zero(nbf, nbf);
       for (std::size_t i = 0; i < nocc; ++i)
         d += 2.0 * cmo.col(static_cast<int>(i)) *
              cmo.col(static_cast<int>(i)).transpose();
+      const double dd_change = (d - d_old).cwiseAbs().maxCoeff();
+      d_old = d;
       Eigen::MatrixXd f = hh;
       for (std::size_t p = 0; p < nbf; ++p)
         for (std::size_t q = 0; q < nbf; ++q) {
@@ -441,10 +505,12 @@ double f12_hf_scf_energy(const F12HartreeFockInput& in) {
                 f(static_cast<int>(p), static_cast<int>(q)));
       Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es(f);
       cmo = es.eigenvectors();
-      if (iter > 0 && std::abs(e - e_old) < 1e-12) return e;
+      eps = es.eigenvalues();
+      if (iter > 0 && std::abs(e - e_old) < 1e-12 && dd_change < 1e-11)
+        return {e, cmo, eps};
       e_old = e;
     }
-    return e_old;
+    return {e_old, cmo, eps};
   };
 
   // ---- Dressed two-body correction C2bar (paper Eq. 20-22) over OBS^4 ----
@@ -684,9 +750,181 @@ double f12_hf_scf_energy(const F12HartreeFockInput& in) {
               0.25 * (c2[c2idx(p, r, q, s)] + c2[c2idx(r, p, s, q)] +
                       c2[c2idx(q, s, p, r)] + c2[c2idx(s, q, r, p)]);
 
-  const double e_hf = run_scf(hmo, gp);
-  const double e_f12hf = run_scf(hbar, gbar);
-  return e_f12hf - e_hf;
+  const ScfOut hf = run_scf(hmo, gp);
+  const ScfOut f12 = run_scf(hbar, gbar);
+  return {hf.e, f12.e, std::move(gbar), f12.c, f12.eps, nbf, nocc, nc};
+}
+
+}  // namespace
+
+double f12_hf_scf_energy(const F12HartreeFockInput& in) {
+  QDK_LOG_TRACE_ENTERING();
+  const DressedResult r = run_f12_hf(in);
+  return r.e_f12hf - r.e_hf;
+}
+
+double f12_mp2_energy(const F12HartreeFockInput& in) {
+  QDK_LOG_TRACE_ENTERING();
+  const DressedResult r = run_f12_hf(in);
+  const std::size_t nbf = r.nbf, nocc = r.nocc, nc = r.ncore;
+  const std::size_t nvo = nocc - nc, nvir = nbf - nocc;
+  const Eigen::MatrixXd& c = r.c_relaxed;
+  const Eigen::VectorXd& eps = r.eps_relaxed;
+  const std::vector<double>& g = r.gbar;
+  auto gidx = [&](std::size_t p, std::size_t q, std::size_t rr, std::size_t s) {
+    return ((p * nbf + q) * nbf + rr) * nbf + s;
+  };
+
+  // Transform the dressed <pq|rs> from the original to the F12-HF-relaxed MO
+  // basis, restricted to the (occ occ | vir vir) block needed for MP2.
+  std::vector<double> t1(nvo * nbf * nbf * nbf, 0.0);
+  for (std::size_t i = 0; i < nvo; ++i)
+    for (std::size_t q = 0; q < nbf; ++q)
+      for (std::size_t rr = 0; rr < nbf; ++rr)
+        for (std::size_t s = 0; s < nbf; ++s) {
+          double v = 0.0;
+          for (std::size_t p = 0; p < nbf; ++p)
+            v += c(static_cast<int>(p), static_cast<int>(nc + i)) *
+                 g[gidx(p, q, rr, s)];
+          t1[((i * nbf + q) * nbf + rr) * nbf + s] = v;
+        }
+  std::vector<double> t2(nvo * nvo * nbf * nbf, 0.0);
+  for (std::size_t i = 0; i < nvo; ++i)
+    for (std::size_t j = 0; j < nvo; ++j)
+      for (std::size_t rr = 0; rr < nbf; ++rr)
+        for (std::size_t s = 0; s < nbf; ++s) {
+          double v = 0.0;
+          for (std::size_t q = 0; q < nbf; ++q)
+            v += c(static_cast<int>(q), static_cast<int>(nc + j)) *
+                 t1[((i * nbf + q) * nbf + rr) * nbf + s];
+          t2[((i * nvo + j) * nbf + rr) * nbf + s] = v;
+        }
+  std::vector<double> t3(nvo * nvo * nvir * nbf, 0.0);
+  for (std::size_t i = 0; i < nvo; ++i)
+    for (std::size_t j = 0; j < nvo; ++j)
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t s = 0; s < nbf; ++s) {
+          double v = 0.0;
+          for (std::size_t rr = 0; rr < nbf; ++rr)
+            v += c(static_cast<int>(rr), static_cast<int>(nocc + a)) *
+                 t2[((i * nvo + j) * nbf + rr) * nbf + s];
+          t3[((i * nvo + j) * nvir + a) * nbf + s] = v;
+        }
+  std::vector<double> t4(nvo * nvo * nvir * nvir, 0.0);
+  for (std::size_t i = 0; i < nvo; ++i)
+    for (std::size_t j = 0; j < nvo; ++j)
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t b = 0; b < nvir; ++b) {
+          double v = 0.0;
+          for (std::size_t s = 0; s < nbf; ++s)
+            v += c(static_cast<int>(s), static_cast<int>(nocc + b)) *
+                 t3[((i * nvo + j) * nvir + a) * nbf + s];
+          t4[((i * nvo + j) * nvir + a) * nvir + b] = v;
+        }
+
+  double energy = 0.0;
+  for (std::size_t i = 0; i < nvo; ++i)
+    for (std::size_t j = 0; j < nvo; ++j)
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t b = 0; b < nvir; ++b) {
+          const double iajb = t4[((i * nvo + j) * nvir + a) * nvir + b];
+          const double ibja = t4[((i * nvo + j) * nvir + b) * nvir + a];
+          energy +=
+              iajb * (2.0 * iajb - ibja) /
+              (eps(static_cast<int>(nc + i)) + eps(static_cast<int>(nc + j)) -
+               eps(static_cast<int>(nocc + a)) -
+               eps(static_cast<int>(nocc + b)));
+        }
+  // Total F12-MP2 correlation relative to the bare HF reference: the F12-HF
+  // relaxation plus the residual MP2 over the dressed Hamiltonian.
+  return (r.e_f12hf - r.e_hf) + energy;
+}
+
+double mp2_f12_correction(const F12HartreeFockInput& in) {
+  QDK_LOG_TRACE_ENTERING();
+  Workspace w = build_workspace(in);
+  VXB vxb = compute_vxb(w);
+  const std::size_t nv = w.n_val, nocc = w.n_occ, nc = w.n_core, nbf = w.n_mo;
+  const std::size_t nvir = w.n_vir, ncabs = w.n_cabs, nao = w.n_ao_obs;
+  auto P = [&](std::size_t i, std::size_t j, std::size_t k, std::size_t l) {
+    return vidx(nv, i, j, k, l);
+  };
+  // Orbital energies self-consistent with the integrals (diagonal Fock).
+  auto eocc = [&](std::size_t i) {
+    return w.f_rimo(static_cast<int>(nc + i), static_cast<int>(nc + i));
+  };
+  auto evir = [&](std::size_t a) {
+    return w.f_rimo(static_cast<int>(nocc + a), static_cast<int>(nocc + a));
+  };
+
+  // No-coupling part V[2Cbar] - X[CCbar] + B[CCbar] (= first-order F12-HF).
+  double e_nc = 0.0;
+  for (std::size_t i = 0; i < nv; ++i)
+    for (std::size_t j = 0; j < nv; ++j) {
+      const double eij = eocc(i) + eocc(j);
+      const double vt = 2 * vxb.v[P(i, j, i, j)] - vxb.v[P(i, j, j, i)];
+      const double xt = 2 * vxb.x[P(i, j, i, j)] - vxb.x[P(i, j, j, i)];
+      const double bt = 2 * vxb.b[P(i, j, i, j)] - vxb.b[P(i, j, j, i)];
+      e_nc += 2 * vt - eij * xt + bt;
+    }
+
+  // Geminal-conventional coupling C_ij^{ab} (raw geminal, vir-CABS Fock).
+  auto Cidx = [&](std::size_t i, std::size_t j, std::size_t a, std::size_t b) {
+    return ((i * nv + j) * nvir + a) * nvir + b;
+  };
+  std::vector<double> cc(nv * nv * nvir * nvir, 0.0);
+  for (std::size_t i = 0; i < nv; ++i)
+    for (std::size_t j = 0; j < nv; ++j)
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t b = 0; b < nvir; ++b) {
+          double c = 0.0;
+          for (std::size_t x = 0; x < ncabs; ++x)
+            c += w.f_rimo(static_cast<int>(nocc + a),
+                          static_cast<int>(nbf + x)) *
+                     w.rg(i, j, nbf + x, nocc + b) +
+                 w.f_rimo(static_cast<int>(nocc + b),
+                          static_cast<int>(nbf + x)) *
+                     w.rg(i, j, nocc + a, nbf + x);
+          cc[Cidx(i, j, a, b)] = c;
+        }
+
+  // Conventional <ij|ab> over OBS valence-occ x virtual (restricted transform).
+  Eigen::MatrixXd c_vir = w.c_obs.rightCols(static_cast<int>(nvir));
+  auto cc_ao = gem::four_center_coulomb(in.obs, in.obs, in.obs, in.obs);
+  auto ovov = gem::mo_transform_4index(cc_ao.get(), nao, nao, nao, nao, w.c_val,
+                                       c_vir, w.c_val, c_vir);
+  Tensor4 OVOV{ovov.get(), nvir, nv, nvir};  // (i a | j b) chemist
+
+  // Conventional amplitudes t2 and Cbar = C / (e_i + e_j - e_a - e_b).
+  std::vector<double> t2(cc.size(), 0.0), cbar(cc.size(), 0.0);
+  for (std::size_t i = 0; i < nv; ++i)
+    for (std::size_t j = 0; j < nv; ++j)
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t b = 0; b < nvir; ++b) {
+          const double den = eocc(i) + eocc(j) - evir(a) - evir(b);
+          t2[Cidx(i, j, a, b)] = OVOV(i, a, j, b) / den;  // <ij|ab> / den
+          cbar[Cidx(i, j, a, b)] = cc[Cidx(i, j, a, b)] / den;
+        }
+
+  // Coupling energy: E_CT (C with conventional doubles) + E_CC (C squared).
+  constexpr double cbar_d = 5.0 / 8.0, cbar_x = -1.0 / 8.0;
+  constexpr double ccbar_d = 14.0 / 64.0, ccbar_x = 2.0 / 64.0;
+  double e_ct = 0.0, e_cc = 0.0;
+  for (std::size_t i = 0; i < nv; ++i)
+    for (std::size_t j = 0; j < nv; ++j) {
+      double ct_d = 0, ct_x = 0, cc_d = 0, cc_x = 0;
+      for (std::size_t a = 0; a < nvir; ++a)
+        for (std::size_t b = 0; b < nvir; ++b) {
+          const double cij = cc[Cidx(i, j, a, b)];
+          ct_d += cij * t2[Cidx(i, j, a, b)];
+          ct_x += cij * t2[Cidx(j, i, a, b)];
+          cc_d += cij * cbar[Cidx(i, j, a, b)];
+          cc_x += cij * cbar[Cidx(j, i, a, b)];
+        }
+      e_ct += 2 * (cbar_d * ct_d + cbar_x * ct_x);
+      e_cc += ccbar_d * cc_d + ccbar_x * cc_x;
+    }
+  return e_nc + e_ct + e_cc;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft::ctf12

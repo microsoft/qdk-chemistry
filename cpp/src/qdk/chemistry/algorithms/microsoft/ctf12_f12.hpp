@@ -88,4 +88,43 @@ double f12_hf_energy(const F12Intermediates& intermediates);
  */
 double f12_hf_scf_energy(const F12HartreeFockInput& input);
 
+/**
+ * @brief Conventional frozen-core closed-shell MP2 correlation energy.
+ *
+ * Evaluated in the orbital basis from the canonical Hartree-Fock orbitals, with
+ * the lowest @c n_core orbitals left uncorrelated.
+ *
+ * @param input The F12-HF reference description.
+ * @return The MP2 correlation energy in Hartree.
+ */
+double mp2_energy(const F12HartreeFockInput& input);
+
+/**
+ * @brief Total F12-MP2 correlation energy using the dressed Hamiltonian.
+ *
+ * Relaxes the orbitals in the dressed mean field (as @ref f12_hf_scf_energy)
+ * and adds frozen-core closed-shell MP2 over the dressed two-electron integrals
+ * with the dressed-Fock orbital energies. The returned value is the total
+ * correlation relative to the bare Hartree-Fock reference, i.e. the F12-HF
+ * relaxation plus the residual MP2.
+ *
+ * @param input The F12-HF reference description.
+ * @return The total F12-MP2 correlation energy in Hartree.
+ */
+double f12_mp2_energy(const F12HartreeFockInput& input);
+
+/**
+ * @brief Conventional explicitly-correlated MP2-F12 correction (fixed-amplitude
+ *        SP ansatz, approximation C).
+ *
+ * Adds the geminal-conventional-doubles coupling to the diagonal V/X/B
+ * intermediates. The returned value is @f$ E(\mathrm{MP2\text{-}F12}) -
+ * E(\mathrm{MP2}) @f$; the total MP2-F12 correlation energy is this plus
+ * @ref mp2_energy.
+ *
+ * @param input The F12-HF reference description.
+ * @return The F12 correction to the MP2 correlation energy in Hartree.
+ */
+double mp2_f12_correction(const F12HartreeFockInput& input);
+
 }  // namespace qdk::chemistry::algorithms::microsoft::ctf12

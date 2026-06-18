@@ -88,6 +88,25 @@ void run_neon_f12_hf(const std::string& obs_name, const std::string& cabs_name,
   ::libint2::finalize();
 }
 
+// Reproduces the MP2-level rows of the Comment Table I for the neon atom:
+// conventional MP2, transcorrelated F12-MP2, the F12 correction to MP2
+// (MP2-)F12c, and the total MP2-F12 correlation energy.
+void run_neon_mp2(const std::string& obs_name, const std::string& cabs_name,
+                  double mp2_ref, double f12_mp2_ref, double f12c_ref,
+                  double mp2_f12_ref, double tol) {
+  scf::QDKChemistryConfig::set_resources_dir(TEST_RESOURCES_DIR);
+  ::libint2::initialize();
+  const auto input = neon_input(obs_name, cabs_name);
+  const double mp2 = ctf12::mp2_energy(input);
+  const double f12c = ctf12::mp2_f12_correction(input);
+  EXPECT_NEAR(mp2, mp2_ref, tol) << obs_name << " MP2 " << mp2;
+  EXPECT_NEAR(f12c, f12c_ref, tol) << obs_name << " (MP2-)F12c " << f12c;
+  EXPECT_NEAR(mp2 + f12c, mp2_f12_ref, tol) << obs_name << " MP2-F12";
+  EXPECT_NEAR(ctf12::f12_mp2_energy(input), f12_mp2_ref, tol)
+      << obs_name << " F12-MP2";
+  ::libint2::finalize();
+}
+
 }  // namespace
 
 TEST(CtF12HartreeFock, NeonAugCcPvdz) {
@@ -101,4 +120,19 @@ TEST(CtF12HartreeFock, NeonAugCcPvtz) {
 
 TEST(CtF12HartreeFock, NeonAugCcPvqz) {
   run_neon_f12_hf("aug-cc-pvqz", "aug-cc-pvqz-optri", -0.019939990, 1e-8);
+}
+
+TEST(CtF12Mp2, NeonAugCcPvdz) {
+  run_neon_mp2("aug-cc-pvdz", "aug-cc-pvdz-optri", -0.206873509, -0.301361902,
+               -0.104682301, -0.311555810, 1e-8);
+}
+
+TEST(CtF12Mp2, NeonAugCcPvtz) {
+  run_neon_mp2("aug-cc-pvtz", "aug-cc-pvtz-optri", -0.272518905, -0.308391143,
+               -0.043083913, -0.315602818, 1e-8);
+}
+
+TEST(CtF12Mp2, NeonAugCcPvqz) {
+  run_neon_mp2("aug-cc-pvqz", "aug-cc-pvqz-optri", -0.297242806, -0.313067546,
+               -0.020967256, -0.318210062, 1e-8);
 }
