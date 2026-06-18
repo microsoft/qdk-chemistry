@@ -247,13 +247,11 @@ bilinear(j, k) is available on both forms.
       .def_static(
           "verstraete_cirac", &MajoranaMapping::verstraete_cirac,
           py::arg("lattice"),
-          "Construct a Verstraete-Cirac encoding from a general 2D "
-          "LatticeGraph whose edges connect nearest neighbours on a "
-          "recoverable rectangular site grid (axis-aligned and diagonal "
-          "bonds are both supported, e.g. square and triangular lattices). "
-          "The lattice describes one spin species; the result has "
-          "num_modes = 2 * n_sites (one block per spin) and carries "
-          "codespace stabilizers via the ``stabilizers`` property.");
+          "Construct a Verstraete-Cirac encoding from any connected "
+          "LatticeGraph (square, triangular, honeycomb, kagome, etc.). "
+          "The default vertex order is the JW backbone; auxiliary modes scale "
+          "with off-backbone degree.  num_modes = 2 * n_sites and stabilizers "
+          "are exposed via the ``stabilizers`` property.");
 
   mapping
       .def(

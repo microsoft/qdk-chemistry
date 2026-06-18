@@ -265,44 +265,30 @@ class MajoranaMapping : public DataClass {
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
   /**
-   * @brief Verstraete-Cirac (auxiliary-qubit) encoding for a 2D lattice.
+   * @brief Verstraete-Cirac (auxiliary-qubit) encoding for a lattice graph.
    *
-   * Builds a locality-preserving fermion-to-qubit encoding directly from the
-   * edges of a 2D ``LatticeGraph``.  The 2D site layout is recovered from
-   * connectivity alone by one general embedding algorithm (king's-move
-   * constraint propagation with backtracking on ambiguous cells).  Axis-
-   * aligned and diagonal nearest-neighbour bonds are both accepted, so
-   * square, rectangular, and triangular lattices are handled uniformly
-   * rather than as special cases.  Each lattice site is paired with one
-   * auxiliary qubit; horizontal and vertical hopping terms map to
-   * constant-weight Pauli operators independent of system size (diagonal bonds
-   * are decorated by products of auxiliary bilinears along the auxiliary
-   * coupling graph and may carry larger weight).  The encoding acts on the
-   * physical subspace defined by the returned ``stabilizers()``.
+   * Builds a locality-preserving fermion-to-qubit encoding on any connected
+   * ``LatticeGraph``.  The default vertex order is the JW backbone; auxiliary
+   * Majorana modes scale with each site's off-backbone degree so square,
+   * triangular, honeycomb, and kagome lattices are handled uniformly without
+   * 2D coordinate recovery or grid metadata on ``MajoranaMapping``.
+   *
+   * Codespace stabilizers (edge link products plus paired gauge modes) are
+   * stored on the mapping; the mapper appends a generic ``lambda*(I-S)``
+   * penalty per stabilizer.
    *
    * The lattice describes a single spin species (``n_sites`` sites); the
-   * factory produces a mapping with ``num_modes == 2 * n_sites`` (one
-   * Verstraete-Cirac block per spin sector), so it is consumed by
-   * ``QubitMapper`` exactly like ``jordan_wigner(num_modes=2*n_sites)`` and
-   * uses ``2 * num_modes`` qubits.
+   * factory produces ``num_modes == 2 * n_sites`` (one block per spin
+   * sector) for consumption by ``QubitMapper`` like
+   * ``jordan_wigner(num_modes=2*n_sites)``.
    *
-   * The factory precomputes the full upper-triangle of Majorana bilinears
-   * (``O(num_modes^2)`` entries, each a potentially long JW Pauli word), so
-   * memory and build time grow quickly with lattice size.  It is intended
-   * for modest 2D lattices (e.g. up to ``4 x 4`` sites per spin species as
-   * exercised in the test suite), not large-scale production runs.
-   *
-   * @param lattice A single connected 2D nearest-neighbour lattice (e.g.
-   *        ``LatticeGraph::square`` or ``LatticeGraph::triangular``).
+   * @param lattice A connected ``LatticeGraph`` with at least three sites.
    * @return MajoranaMapping with name ``"verstraete-cirac"`` and stabilizers.
-   * @throws std::invalid_argument If the lattice is empty, exceeds the
-   *         supported site count (25 per spin species), is effectively
-   *         one-dimensional, or its connectivity cannot be embedded as a 2D
-   *         nearest-neighbour layout on a rectangular site grid.
+   * @throws std::invalid_argument If the lattice is too small or exceeds
+   *         supported register sizes.
    *
    * @see F. Verstraete and J. I. Cirac, J. Stat. Mech. (2005) P09012.
    * @see J. D. Whitfield, V. Havlicek, M. Troyer, Phys. Rev. A 94, 030301(R).
-   * @see V. Havlicek, M. Troyer, J. D. Whitfield, Phys. Rev. A 95, 032332.
    */
   static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
 

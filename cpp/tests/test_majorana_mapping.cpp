@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 
 #include <complex>
+#include <map>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <stdexcept>
 #include <string>
@@ -253,4 +255,94 @@ TEST(TaperingSpecificationHashTest, HashIncludesIndicesAndEigenvalues) {
   EXPECT_EQ(first.content_hash(), same.content_hash());
   EXPECT_NE(first.content_hash(), different_index.content_hash());
   EXPECT_NE(first.content_hash(), different_eigenvalue.content_hash());
+}
+
+TEST(VerstraeteCiracFactoryTest, RejectsTooFewSites) {
+  auto lattice = LatticeGraph::square(1, 2);
+  EXPECT_THROW(MajoranaMapping::verstraete_cirac(lattice),
+               std::invalid_argument);
+}
+
+TEST(VerstraeteCiracFactoryTest, SquareLatticeDimensions) {
+  auto lattice = LatticeGraph::square(2, 2);
+  const std::size_t n_sites = lattice.num_sites();
+  auto mapping = MajoranaMapping::verstraete_cirac(lattice);
+
+  EXPECT_EQ(mapping.name(), "verstraete-cirac");
+  EXPECT_EQ(mapping.base_encoding(), "verstraete-cirac");
+  EXPECT_EQ(mapping.num_modes(), 2 * n_sites);
+  EXPECT_GE(mapping.num_qubits(), mapping.num_modes());
+  EXPECT_FALSE(mapping.is_majorana_atomic());
+  EXPECT_FALSE(mapping.stabilizers().empty());
+  EXPECT_EQ(mapping.num_qubits() - mapping.stabilizers().size(), 2 * n_sites);
+}
+
+TEST(VerstraeteCiracFactoryTest, ChainGraphNeedsNoLatticePresets) {
+  auto chain = LatticeGraph::chain(5);
+  auto mapping = MajoranaMapping::verstraete_cirac(chain);
+
+  EXPECT_EQ(mapping.num_modes(), 2 * chain.num_sites());
+  EXPECT_EQ(mapping.num_qubits(), mapping.num_modes());
+  EXPECT_TRUE(mapping.stabilizers().empty());
+}
+
+TEST(VerstraeteCiracFactoryTest, CustomEdgeListGraphAccepted) {
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  // 5-cycle: topology is not square/triangular/honeycomb/kagome.
+  std::map<Edge, double> edges = {
+      {{0, 1}, 1.0}, {{1, 2}, 1.0}, {{2, 3}, 1.0}, {{3, 4}, 1.0}, {{0, 4}, 1.0},
+  };
+  auto graph = LatticeGraph::make_bidirectional(LatticeGraph(edges, 5));
+  auto mapping = MajoranaMapping::verstraete_cirac(graph);
+
+  EXPECT_EQ(mapping.num_modes(), 10);
+  EXPECT_GE(mapping.num_qubits(), mapping.num_modes());
+  EXPECT_FALSE(mapping.stabilizers().empty());
+}
+
+TEST(VerstraeteCiracFactoryTest, StabilizersAreHermitianPauliOperators) {
+  auto mapping = MajoranaMapping::verstraete_cirac(LatticeGraph::square(3, 3));
+  for (const auto& [coeff, word] : mapping.stabilizers()) {
+    EXPECT_NEAR(coeff.imag(), 0.0, 1e-12);
+    EXPECT_NEAR(std::abs(coeff.real()), 1.0, 1e-12);
+    for (const auto& [qubit, op] : word) {
+      EXPECT_TRUE(op == 1 || op == 2 || op == 3);
+      (void)qubit;
+    }
+  }
+}
+
+TEST(VerstraeteCiracFactoryTest, MajoranaAccessorRaises) {
+  auto mapping = MajoranaMapping::verstraete_cirac(LatticeGraph::square(2, 2));
+  EXPECT_THROW(mapping.majorana(0), std::logic_error);
+}
+
+TEST(VerstraeteCiracFactoryTest, HashIncludesStabilizers) {
+  auto first = MajoranaMapping::verstraete_cirac(LatticeGraph::square(2, 2));
+  auto second = MajoranaMapping::verstraete_cirac(LatticeGraph::square(2, 3));
+  EXPECT_NE(first.content_hash(), second.content_hash());
+}
+
+TEST(VerstraeteCiracEngineTest, IdentityCoefficientMatchesJordanWigner) {
+  auto lattice = LatticeGraph::square(2, 2);
+  auto vc = MajoranaMapping::verstraete_cirac(lattice);
+  auto jw = MajoranaMapping::jordan_wigner(vc.num_modes());
+  const double h1_alpha[4] = {1.0, 0.0, 0.0, 0.5};
+  const double h1_beta[4] = {2.0, 0.0, 0.0, 1.5};
+  const double eri_zero[16] = {};
+
+  auto jw_result = majorana_map_hamiltonian(
+      jw, 0.0, h1_alpha, h1_beta, eri_zero, eri_zero, eri_zero,
+      /*n_spatial=*/2, /*spin_symmetric=*/false, /*threshold=*/1e-12,
+      /*integral_threshold=*/1e-12);
+  auto vc_result = majorana_map_hamiltonian(
+      vc, 0.0, h1_alpha, h1_beta, eri_zero, eri_zero, eri_zero,
+      /*n_spatial=*/2, /*spin_symmetric=*/false, /*threshold=*/1e-12,
+      /*integral_threshold=*/1e-12);
+
+  auto jw_terms = collect_terms(jw_result, jw.num_qubits());
+  auto vc_terms = collect_terms(vc_result, vc.num_qubits());
+
+  expect_real_term(jw_terms, "IIIIIIII", 2.5);
+  expect_real_term(vc_terms, std::string(vc.num_qubits(), 'I'), 2.5);
 }
