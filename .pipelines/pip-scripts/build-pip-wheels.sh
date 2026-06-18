@@ -18,8 +18,6 @@ SUDO=""
 
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     # Update and install dependencies (Azure Linux 3 / tdnf)
-    echo "Upgrading glibc..."
-    $SUDO tdnf upgrade -y glibc
     echo "Installing tdnf dependencies..."
     $SUDO tdnf update -y
     $SUDO tdnf install -y \
