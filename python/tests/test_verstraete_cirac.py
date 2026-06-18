@@ -180,33 +180,139 @@ class TestVerstraeteCiracMapping:
             for p_term in qh_vc.pauli_strings:
                 assert commute(stab, p_term), f"Stabilizer {i} does not commute with Hamiltonian term {p_term}!"
 
-    def test_pauli_weight_scaling(self) -> None:
-        """Check nearest-neighbor hopping terms in the mapped qubit Hamiltonian.
+    @pytest.mark.parametrize(
+        ("lattice_type", "kwargs", "max_allowed_weight"),
+        [
+            ("square", {}, 8),
+            ("triangular", {}, 8),
+            ("honeycomb", {}, 12),
+            ("kagome", {}, 12),
+        ],
+        ids=[
+            "square",
+            "triangular",
+            "honeycomb",
+            "kagome",
+        ],
+    )
+    def test_pauli_weight_scaling(self, lattice_type: str, kwargs: dict, max_allowed_weight: int) -> None:
+        """Check if Pauli weights stay below a certain threshold.
 
-        Max Pauli weight of nearest-neighbor hops should be constant for square grids of dimensions:
-        - 2x2 (L=2)
-        - 3x3 (L=3)
-        - 4x4 (L=4)
+        Max Pauli weight of nearest-neighbor hops should be constant for grids of dimensions
+        L = 2, 3, 4.
+
+        We check across multiple lattice topologies (square, triangular, honeycomb, kagome):
+        - Mapped hopping terms retain constant-weight scaling (e.g. max weight 4 or 5)
+        - Mapped stabilizer products S_i * S_{i+1} have weights that are bounded by the
+          analytical Jordan-Wigner overlap formula: w <= delta_start + delta_end + 2,
+          where delta_start and delta_end are the qubit offsets between the stabilizer endpoints
+        - Physical loop-plaquettes are bounded by the topology's respective maximum weight limit
         """
         mapper = create("qubit_mapper", "qdk")
 
+        def multiply_pauli_labels(p1: str, p2: str) -> str:
+            table = {
+                ("I", "I"): "I",
+                ("I", "X"): "X",
+                ("I", "Y"): "Y",
+                ("I", "Z"): "Z",
+                ("X", "I"): "X",
+                ("X", "X"): "I",
+                ("X", "Y"): "Z",
+                ("X", "Z"): "Y",
+                ("Y", "I"): "Y",
+                ("Y", "X"): "Z",
+                ("Y", "Y"): "I",
+                ("Y", "Z"): "X",
+                ("Z", "I"): "Z",
+                ("Z", "X"): "Y",
+                ("Z", "Y"): "X",
+                ("Z", "Z"): "I",
+            }
+            return "".join(table[(c1, c2)] for c1, c2 in zip(p1, p2, strict=False))
+
+        def get_expected_weight(p1: str, p2: str) -> int:
+            indices1 = [idx for idx, char in enumerate(p1) if char != "I"]
+            indices2 = [idx for idx, char in enumerate(p2) if char != "I"]
+            if not indices1 or not indices2:
+                return 0
+            a1, b1 = indices1[0], indices1[-1]
+            a2, b2 = indices2[0], indices2[-1]
+            if a1 > a2:
+                a1, b1, a2, b2 = a2, b2, a1, b1
+            if a2 <= b1:
+                union_size = max(b1, b2) - a1 + 1
+                overlap_int = max(0, min(b1, b2) - a2 - 1)
+                return union_size - overlap_int
+            return (b1 - a1 + 1) + (b2 - a2 + 1)
+
+        def check_local_plaquette(
+            stabs_list: list[str],
+            i_idx: int,
+            w: int,
+            p_str: str,
+            thresh: int,
+            max_weight: int,
+        ) -> None:
+            indices1 = [idx for idx, char in enumerate(stabs_list[i_idx]) if char != "I"]
+            indices2 = [idx for idx, char in enumerate(stabs_list[i_idx + 1]) if char != "I"]
+            if indices1 and indices2:
+                a1, b1 = indices1[0], indices1[-1]
+                a2, b2 = indices2[0], indices2[-1]
+                if abs(a1 - a2) <= thresh and abs(b1 - b2) <= thresh:
+                    assert w <= max_weight, (
+                        f"Local plaquette stabilizer {p_str} has weight {w} > {max_weight}, violating local scaling"
+                    )
+
         max_weights = []
         for grid_length in [2, 3, 4]:
-            lattice = LatticeGraph.square(grid_length, grid_length, dfs_ordering=True)
+            lattice = getattr(LatticeGraph, lattice_type)(grid_length, grid_length, dfs_ordering=True, **kwargs)
             # Create a simple hopping-only Hamiltonian (U=0) on the L x L lattice
             ham = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=0.0)
 
             vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
             qh_vc = mapper.run(ham, vc_mapping)
 
+            # Identify and construct the set of stabilizer penalty terms using the product of stabilizers logic
+            stabs = [sparse_pauli_word_to_label(word, qh_vc.num_qubits) for _, word in vc_mapping.stabilizers]
+            half_stabs = len(stabs) // 2
+
+            penalty_strings = set()
+            if half_stabs >= 1:
+                threshold = (max_allowed_weight - 2) // 2
+
+                penalty_strings.add(stabs[0])
+                for i in range(half_stabs - 1):
+                    prod = multiply_pauli_labels(stabs[i], stabs[i + 1])
+                    penalty_strings.add(prod)
+                    weight = sum(1 for c in prod if c != "I")
+                    expected_weight = get_expected_weight(stabs[i], stabs[i + 1])
+                    assert weight <= expected_weight, (
+                        f"Weight {weight} exceeds analytical expected bound {expected_weight} "
+                        f"for product of stabilizer {i} and {i + 1}"
+                    )
+                    check_local_plaquette(stabs, i, weight, prod, threshold, max_allowed_weight)
+
+                penalty_strings.add(stabs[half_stabs])
+                for i in range(half_stabs, len(stabs) - 1):
+                    prod = multiply_pauli_labels(stabs[i], stabs[i + 1])
+                    penalty_strings.add(prod)
+                    weight = sum(1 for c in prod if c != "I")
+                    expected_weight = get_expected_weight(stabs[i], stabs[i + 1])
+                    assert weight <= expected_weight, (
+                        f"Weight {weight} exceeds analytical expected bound {expected_weight} "
+                        f"for product of stabilizer {i} and {i + 1}"
+                    )
+                    check_local_plaquette(stabs, i, weight, prod, threshold, max_allowed_weight)
+            else:
+                penalty_strings.update(stabs)
+
             weights = []
-            for pauli_str, coeff in zip(qh_vc.pauli_strings, qh_vc.coefficients, strict=False):
+            for pauli_str in qh_vc.pauli_strings:
                 if pauli_str == "I" * len(pauli_str):
                     continue
-                # Skip stabilizer penalty terms. Physical hops have a coefficient of t/2 (0.5 here).
-                # Stabilizer penalty terms are scaled by lambda = 1.0 + ||h_1||_1, which sums all hop
-                # amplitudes and yields >= 17.0 for L >= 2. A threshold of 2.0 (2.0*t) cleanly splits them.
-                if np.abs(coeff) > 2.0:
+                # Skip local plaquette penalty terms
+                if pauli_str in penalty_strings:
                     continue
                 # Weight is the number of non-I characters
                 weight = sum(1 for c in pauli_str if c != "I")
@@ -214,9 +320,17 @@ class TestVerstraeteCiracMapping:
 
             max_weights.append(max(weights))
 
-        assert max_weights[0] == max_weights[1] == max_weights[2], (
-            f"Maximum Pauli weights grew or varied with grid length: {max_weights}"
-        )
+        # Verify that physical terms have constant-weight scaling.
+        # For the triangular lattice, the 2x2 grid is too small to reach the bulk max hopping weight
+        # of 5, so we only assert that the weights are equal/constant for the larger sizes L >= 3.
+        if lattice_type == "triangular":
+            assert max_weights[1] == max_weights[2], (
+                f"Maximum Pauli weights grew with grid length for {lattice_type}: {max_weights}"
+            )
+        else:
+            assert all(w == max_weights[0] for w in max_weights), (
+                f"Maximum Pauli weights grew or varied with grid length for {lattice_type}: {max_weights}"
+            )
 
 
 class TestVerstraeteCiracSpectral:

@@ -712,6 +712,83 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     }
   }
 
+  if (!mapping.stabilizers().empty()) {
+    double h1_sum = 0.0;
+    for (std::size_t p = 0; p < n_spatial; ++p) {
+      for (std::size_t q = 0; q < n_spatial; ++q) {
+        h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+        if (!spin_symmetric) {
+          h1_sum += std::abs(h1_beta[p * n_spatial + q]);
+        } else {
+          h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+        }
+      }
+    }
+
+    // If stabilizers are included in the mapping, our total Hamiltonian becomes
+    // H_total = H_physical + H_aux. We add H_aux = λ · Σ_i (I − S_i S_{i+1})
+    // (sum of products of adjacent stabilizers per spin channel) to penalize
+    // unphysical codespace sectors using local terms.
+    double aux_ham_coefficient = 1.0 + h1_sum;
+
+    std::size_t num_stabs = mapping.stabilizers().size();
+    std::size_t half_stabs = num_stabs / 2;
+
+    struct PackedStab {
+      std::complex<double> coeff;
+      PackedPauliWord<NW> word;
+    };
+    std::vector<PackedStab> packed_stabs;
+    packed_stabs.reserve(num_stabs);
+    for (const auto& [coeff, word] : mapping.stabilizers()) {
+      packed_stabs.push_back({coeff, sparse_to_packed<NW>(word)});
+    }
+
+    std::size_t num_penalty_terms = 0;
+    if (half_stabs >= 2) {
+      num_penalty_terms = 2 * (half_stabs - 1);
+    } else {
+      num_penalty_terms = num_stabs;
+    }
+
+    PackedPauliWord<NW> identity{};
+    acc.accumulate(identity,
+                   std::complex<double>(aux_ham_coefficient * num_stabs, 0.0));
+
+    // For each spin sector, we accumulate the single boundary link stabilizer
+    // individually to lift the Z_2 gauge degeneracy, followed by the products
+    // of adjacent link stabilizers (S_i * S_{i+1}) to form loop-plaquette
+    // stabilizers.
+    if (half_stabs >= 1) {
+      auto accumulate_product = [&](std::size_t i, std::size_t j) {
+        const auto& s1 = packed_stabs[i];
+        const auto& s2 = packed_stabs[j];
+        auto [phase_idx, word] = multiply_packed(s1.word, s2.word);
+        std::complex<double> prod_coeff =
+            apply_phase(phase_idx, s1.coeff * s2.coeff);
+        acc.accumulate(word, -aux_ham_coefficient * prod_coeff);
+      };
+      // S[0] * S[0..n/2] for α spin Majoranas
+      acc.accumulate(packed_stabs[0].word,
+                     -aux_ham_coefficient * packed_stabs[0].coeff);
+      for (std::size_t i = 0; i < half_stabs - 1; ++i) {
+        accumulate_product(i, i + 1);
+      }
+
+      // S[n/2] * S[n/2..] for β spin Majoranas
+      acc.accumulate(packed_stabs[half_stabs].word,
+                     -aux_ham_coefficient * packed_stabs[half_stabs].coeff);
+      for (std::size_t i = half_stabs; i < num_stabs - 1; ++i) {
+        accumulate_product(i, i + 1);
+      }
+    } else {
+      // Fallback to individual stabilizers if too few to form products
+      for (const auto& stab : packed_stabs) {
+        acc.accumulate(stab.word, -aux_ham_coefficient * stab.coeff);
+      }
+    }
+  }
+
   // ─── Extract results as sparse Pauli words ──────────────────────
   auto terms = acc.get_terms(threshold);
 
