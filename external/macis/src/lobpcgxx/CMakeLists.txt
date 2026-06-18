@@ -40,9 +40,18 @@ if(NOT lapackpp_FOUND )
     ${_blaspp_patch}
     UPDATE_DISCONNECTED TRUE
   )
+  if(MSVC)
+      set(_lapackpp_patch PATCH_COMMAND "${CMAKE_COMMAND}"
+          -DPATCH_FILE=${QDK_CMAKE_PATCHES_DIR}/lapackpp-msvc-allocator.patch
+          -P ${QDK_CMAKE_PATCHES_DIR}/apply-patch.cmake)
+  else()
+      set(_lapackpp_patch "")
+  endif()
   FetchContent_Declare( lapackpp
     GIT_REPOSITORY https://github.com/icl-utk-edu/lapackpp.git
     GIT_TAG v2025.05.28
+    UPDATE_DISCONNECTED TRUE
+    ${_lapackpp_patch}
   )
 
   FetchContent_MakeAvailable( blaspp )

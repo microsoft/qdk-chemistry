@@ -17,7 +17,7 @@
 #   -SkipConfigure  # Skip CMake configure, incremental build only
 #   -SkipPython     # Skip Python build, only do C++
 #   -SkipTests      # Skip test runs
-#   -Debug          # Build C++ in Debug mode (build-msvc-debug/, enables MSVC iterator checks).
+#   -DebugBuild     # Build C++ in Debug mode (build-msvc-debug/, enables MSVC iterator checks).
 #                   # Python build is skipped automatically.
 
 param(
@@ -27,7 +27,7 @@ param(
     [switch]$SkipConfigure,
     [switch]$SkipPython,
     [switch]$SkipTests,
-    [switch]$Debug
+    [switch]$DebugBuild
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,7 +36,7 @@ if (-not (Test-Path "$RepoRoot\cpp\CMakeLists.txt")) {
     Write-Error "This script must be run from the repository root."
     exit 1
 }
-if ($Debug) {
+if ($DebugBuild) {
     $BuildDir   = "$RepoRoot\cpp\build-msvc-debug"
     $InstallDir = "$RepoRoot\install-msvc-debug"
     $BuildType  = "Debug"
@@ -279,7 +279,7 @@ if (-not $SkipCpp) {
             -DMACIS_ENABLE_TESTS=OFF `
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
-            -DCMAKE_BUILD_TYPE=$BuildType `
+            -DCMAKE_BUILD_TYPE="$BuildType" `
             -DCMAKE_C_COMPILER=cl `
             -DCMAKE_CXX_COMPILER=cl `
             -DCMAKE_INSTALL_PREFIX="$InstallDir" `

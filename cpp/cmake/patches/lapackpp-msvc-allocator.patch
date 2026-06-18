@@ -1,0 +1,24 @@
+# MSVC Debug CRT compatibility patch for lapackpp v2025.05.28.
+# Apply with: git apply lapackpp-msvc-allocator.patch  (run from lapackpp source root)
+#
+# src/NoConstructAllocator.hh: add template rebind constructor.
+# MSVC's _ITERATOR_DEBUG_LEVEL=2 (enabled in Debug builds) causes the std::vector
+# destructor to rebind the allocator from NoConstructAllocator<T> to
+# NoConstructAllocator<std::_ContainerProxy> for iterator validation tracking.
+# The rebind uses a converting constructor that the class lacks, producing C2440
+# errors across all lapackpp source files that use lapack::vector<>.
+diff --git a/src/NoConstructAllocator.hh b/src/NoConstructAllocator.hh
+--- a/src/NoConstructAllocator.hh
++++ b/src/NoConstructAllocator.hh
+@@ -25,7 +25,11 @@ struct NoConstructAllocator
+     using value_type = T;
+
+     NoConstructAllocator() = default;
+
++    // MSVC Debug CRT rebinds allocator<T> to allocator<_ContainerProxy> for iterator tracking.
++    template <typename U>
++    NoConstructAllocator(const NoConstructAllocator<U>&) noexcept {}
++
+     // Construction given an allocated pointer is a null-op.
+     //
+     // @tparam Args Parameter pack which handles all possible calling

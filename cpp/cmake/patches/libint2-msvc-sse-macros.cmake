@@ -55,3 +55,54 @@ else()
 endif()
 
 message(STATUS "libint2 MSVC SSE macro patching complete.")
+
+# Patch array_adaptor.h: ext_stack_allocator is missing the template rebind
+# constructor required by MSVC Debug CRT (_ITERATOR_DEBUG_LEVEL=2).
+# The vector destructor rebinds allocator<T,N> to allocator<_ContainerProxy,N>,
+# which requires a converting constructor that the class lacks (C2440 error).
+set(_alloc_file "libint-2.9.0/include/libint2/util/array_adaptor.h")
+if(NOT EXISTS "${_alloc_file}")
+    message(WARNING "libint2-msvc-sse-macros: ${_alloc_file} not found, skipping")
+    return()
+endif()
+
+file(READ "${_alloc_file}" _alloc_content)
+set(_alloc_original "${_alloc_content}")
+
+string(REPLACE
+    "  template <class _Up>
+  struct rebind {"
+    "  // MSVC Debug CRT rebinds allocator<T> to allocator<_ContainerProxy> for iterator tracking.
+  template <typename U>
+  ext_stack_allocator(const ext_stack_allocator<U, N>&) noexcept
+      : stack_(nullptr), free_(nullptr) {}
+
+  template <class _Up>
+  struct rebind {"
+    _alloc_content "${_alloc_content}")
+
+# Also fix allocate() and pointer_on_stack() to gracefully handle stack_==nullptr
+# (which happens when the allocator was constructed via the rebind constructor above).
+string(REPLACE
+    "  T* allocate(std::size_t n) {
+    assert(stack_ != nullptr && \"array_view_allocator not initialized\");
+    if (stack_ + N - free_ >="
+    "  T* allocate(std::size_t n) {
+    if (stack_ != nullptr && stack_ + N - free_ >="
+    _alloc_content "${_alloc_content}")
+
+string(REPLACE
+    "  bool pointer_on_stack(T* ptr) const {
+    return stack_ <= ptr && ptr < stack_ + N;"
+    "  bool pointer_on_stack(T* ptr) const {
+    return stack_ != nullptr && stack_ <= ptr && ptr < stack_ + N;"
+    _alloc_content "${_alloc_content}")
+
+if(NOT "${_alloc_content}" STREQUAL "${_alloc_original}")
+    file(WRITE "${_alloc_file}" "${_alloc_content}")
+    message(STATUS "  Patched: ${_alloc_file} (added MSVC rebind constructor to ext_stack_allocator)")
+else()
+    message(STATUS "  Already patched or pattern not found: ${_alloc_file}")
+endif()
+
+message(STATUS "libint2 MSVC allocator patching complete.")
