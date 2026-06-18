@@ -13,7 +13,11 @@ echo "Downloading BLIS ${BLIS_VERSION}..."
 rm -rf blis blis-${BLIS_VERSION} blis.zip
 export BLIS_CHECKSUM=40134f6570d5539609c6328252ad1530c010931bb96f4e249e08279fd978da7a
 wget -q https://github.com/flame/blis/archive/refs/tags/${BLIS_VERSION}.zip -O blis.zip
-echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
+if command -v sha256sum >/dev/null 2>&1; then
+    echo "${BLIS_CHECKSUM}  blis.zip" | sha256sum --check || exit 1
+else
+    echo "${BLIS_CHECKSUM}  blis.zip" | shasum -a 256 -c || exit 1
+fi
 unzip -q blis.zip
 rm blis.zip
 mv blis-${BLIS_VERSION} blis
