@@ -116,11 +116,12 @@ extends:
         displayName: Build x86-64-v3 linux wheels
         variables:
           LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+        templateContext:
           outputs:
           - output: pipelineArtifact
-            displayName: Upload Python $(pythonVersion) Wheels for x86-64-v3 linux
+            displayName: Upload Python $(pythonVersion) Wheels for linux x86-64-v3
             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-            artifactName: linux-x86_64-wheels-python$(pythonVersion)
+            artifactName: linux-x86_64-v3-wheels-python$(pythonVersion)
         steps:
         - script: |
             set -x
