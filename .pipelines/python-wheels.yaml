@@ -89,6 +89,9 @@ extends:
       codeql:
         compiled:
           enabled: true
+        interpreted:
+          language: python
+        language: cpp
       psscriptanalyzer:
         enabled: false
         justificationForDisabling: Powershell is not used in this repository.

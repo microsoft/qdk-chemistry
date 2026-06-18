@@ -77,7 +77,8 @@ steps:
                                                       ${{ parameters.libflameVersion }} \
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux ${{ parameters.march }} native)
-    retryCountOnTaskFailure: 2
+    retryCountOnTaskFailure: 1
+    timeoutInMinutes: 60
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
