@@ -27,18 +27,9 @@ resources:
   # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
   - container: linux_build_container
     image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
-    options: --user root
+    # options: --user root
 
 parameters:
-- name: target
-  type: object
-  default:
-    name: linux_x86_64
-    os: linux
-    arch: x86_64
-    march: x86-64-v3
-    imageName: Ubuntu24.04Nightly
-  displayName: Target platform
 - name: pythonVersions
   type: stringList
   values:
@@ -108,12 +99,12 @@ extends:
     - stage: Build
       displayName: Build C++ Deps and Python Wheels
       jobs:
-      - job: Build_${{ parameters.target.name }}
+      - job: Build_x86_64
         pool:
-          name: $(CPU_POOL_X86)
+          name: aqe-1es-HB120-pool
           demands:
-          - ImageOverride -equals ${{ parameters.target.imageName }}
-          os: ${{ parameters.target.os }}
+          - ImageOverride -equals 1es-pt-azurelinux3
+          os: linux
         container: linux_build_container
         timeoutInMinutes: 60
         strategy:
@@ -122,58 +113,52 @@ extends:
               Py${{ replace(py, '.', '_') }}:
                 pythonVersion: ${{ py }}
           maxParallel: 5
-        displayName: Build ${{ parameters.target.march }} ${{ parameters.target.os }} wheels
+        displayName: Build x86-64-v3 linux wheels
         variables:
           LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-        templateContext:
-            # Disable auto-injected CodeQL C++ for ARM64 and macOS: the build doesn't run
-            # in a target: container (ARM64 uses docker run; macOS is native but the C++
-            # source is identical to x86_64, so one scan suffices).
-          ${{ if not(eq(parameters.target.arch, 'x86_64')) }}:
-            sdl:
-              codeql:
-                compiled:
-                  enabled: false
           outputs:
           - output: pipelineArtifact
-            displayName: Upload Python $(pythonVersion) Wheels for ${{ parameters.target.os }} ${{ parameters.target.march }}
+            displayName: Upload Python $(pythonVersion) Wheels for x86-64-v3 linux
             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-            artifactName: ${{ parameters.target.os }}-${{ parameters.target.arch }}-wheels-python$(pythonVersion)
+            artifactName: linux-x86_64-wheels-python$(pythonVersion)
         steps:
-        - ${{ if eq(parameters.target.os, 'linux') }}:
-          - script: |
-              set -x
-              whoami && id
-              pwd
-              ls -la
-              echo "== uname =="
-              uname -a
+        # - script: |
+        #     set -x
 
-              echo "== os-release =="
-              cat /etc/os-release || true
+        #     whoami && id
 
-              echo "== cgroup =="
-              cat /proc/1/cgroup || true
+        #     echo "== uname =="
+        #     uname -a
 
-              echo "== mountinfo =="
-              grep -E 'overlay|container' /proc/1/mountinfo || true
+        #     echo "== os-release =="
+        #     cat /etc/os-release || true
 
-              echo "== env =="
-              env | grep -Ei 'container|docker|podman' || true
+        #     echo "== cgroup =="
+        #     cat /proc/1/cgroup || true
 
-              echo "== pid1 =="
-              ps -p 1 -o pid,comm,args=
+        #     echo "== mountinfo =="
+        #     grep -E 'overlay|container' /proc/1/mountinfo || true
 
-              which apt-get || echo "no apt-get"
-              which docker && docker ps || echo "no docker"
-            target: linux_build_container
-            displayName: Diagnose environment
+        #     echo "== env =="
+        #     env | grep -Ei 'container|docker|podman' || true
+
+        #     echo "== pid1 =="
+        #     ps -p 1 -o pid,comm,args=
+
+        #     which apt-get || echo "no apt-get"
+        #     which docker && docker ps || echo "no docker"
+
+        #     pwd
+        #     ls -la
+        #     ls -la ..
+        #   target: linux_build_container
+        #   displayName: Diagnose environment
 
         - script: |
             set -x
+
             whoami && id
-            pwd
-            ls -la
+
             echo "== uname =="
             uname -a
 
@@ -194,6 +179,10 @@ extends:
 
             which apt-get || echo "no apt-get"
             which docker && docker ps || echo "no docker"
+
+            pwd
+            ls -la
+            ls -la ..
           displayName: Diagnose environment (without target)
 
 
@@ -213,7 +202,7 @@ extends:
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
           parameters:
-            march: ${{ parameters.target.march }}
+            march: x86-64-v3
             buildTesting: OFF
             enableCoverage: OFF
             agentBuildDirectory: $(Agent.BuildDirectory)
