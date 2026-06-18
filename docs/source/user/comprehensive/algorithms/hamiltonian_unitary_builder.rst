@@ -305,7 +305,7 @@ Related classes
 
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
 - :class:`~qdk_chemistry.data.QubitHamiltonian`: Input qubit Hamiltonian
-- :doc:`PhaseEstimation <phase_estimation>`: Consumer of time-evolution unitaries and walk operators
+- :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading
 ---------------
