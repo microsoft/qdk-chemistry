@@ -12,14 +12,12 @@
 #include <memory>
 #include <numeric>
 #include <qdk/chemistry/data/wavefunction.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/mp2.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <sstream>
+#include <stdexcept>
 #include <tuple>
 #include <variant>
 
@@ -164,8 +162,8 @@ WavefunctionContainer::WavefunctionContainer(WavefunctionType type)
                             std::nullopt,        // one_rdm_aa
                             std::nullopt,        // one_rdm_bb
                             std::nullopt,        // two_rdm_spin_traced
-                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_aaaa
+                            std::nullopt,        // two_rdm_aabb
                             std::nullopt,        // two_rdm_bbbb
                             OrbitalEntropies{},  // entropies
                             type) {
@@ -180,8 +178,8 @@ WavefunctionContainer::WavefunctionContainer(
                             std::nullopt,  // one_rdm_aa
                             std::nullopt,  // one_rdm_bb
                             two_rdm_spin_traced,
-                            std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_aaaa
+                            std::nullopt,  // two_rdm_aabb
                             std::nullopt,  // two_rdm_bbbb
                             entropies, type) {
   QDK_LOG_TRACE_ENTERING();
@@ -192,8 +190,8 @@ WavefunctionContainer::WavefunctionContainer(
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_aa,
     const std::optional<ContainerTypes::MatrixVariant>& one_rdm_bb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_spin_traced,
-    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_aaaa,
+    const std::optional<ContainerTypes::VectorVariant>& two_rdm_aabb,
     const std::optional<ContainerTypes::VectorVariant>& two_rdm_bbbb,
     const OrbitalEntropies& entropies, WavefunctionType type)
     : WavefunctionContainer(
@@ -281,9 +279,9 @@ WavefunctionContainer::get_active_two_rdm_spin_dependent() const {
                                          ContainerTypes::VectorVariant> {
         return std::make_tuple(
             ContainerTypes::VectorVariant{sbt.block(
-                {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})},
-            ContainerTypes::VectorVariant{sbt.block(
                 {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})},
+            ContainerTypes::VectorVariant{sbt.block(
+                {axes::alpha(), axes::alpha(), axes::beta(), axes::beta()})},
             ContainerTypes::VectorVariant{sbt.block(
                 {axes::beta(), axes::beta(), axes::beta(), axes::beta()})});
       },
@@ -340,8 +338,120 @@ WavefunctionContainer::get_active_two_rdm_spin_traced() const {
 }
 
 bool WavefunctionContainer::_is_restricted_closed_shell() const {
-  auto [n_alpha, n_beta] = get_active_num_electrons();
+  // "Restricted closed shell" is a spin (S_z) concept: it only applies when the
+  // single-particle basis explicitly declares a spin axis. Absent a spin axis
+  // the spin-dependent quantities are not derived from this property, so report
+  // false rather than consulting the spin-resolved (throwing) accessors.
+  auto symmetries = get_orbitals()->symmetries();
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    return false;
+  }
+  auto [n_alpha, n_beta] = _read_spin_count(*active_num_particles());
   return get_orbitals()->is_restricted() && (n_alpha == n_beta);
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+WavefunctionContainer::_make_particle_count(std::size_t n_alpha,
+                                            std::size_t n_beta) const {
+  using SBS = SymmetryBlockedScalar<std::size_t>;
+  auto symmetries = get_orbitals()->symmetries();
+  if (symmetries && symmetries->has_axis(AxisName::Spin)) {
+    auto sym = std::make_shared<const SymmetryProduct>(
+        SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+    SBS::BlockMap blocks;
+    blocks[{axes::alpha()}] = std::make_shared<const std::size_t>(n_alpha);
+    blocks[{axes::beta()}] = std::make_shared<const std::size_t>(n_beta);
+    return std::make_shared<const SBS>(SBS::SymmetriesArray{sym},
+                                       std::move(blocks));
+  }
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  SBS::BlockMap blocks;
+  blocks[{SymmetryLabel{}}] =
+      std::make_shared<const std::size_t>(n_alpha + n_beta);
+  return std::make_shared<const SBS>(SBS::SymmetriesArray{sym},
+                                     std::move(blocks));
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+WavefunctionContainer::_make_orbital_occupations(
+    const Eigen::VectorXd& alpha, const Eigen::VectorXd& beta) const {
+  using SBT = SymmetryBlockedTensor<1>;
+  auto symmetries = get_orbitals()->symmetries();
+  if (symmetries && symmetries->has_axis(AxisName::Spin)) {
+    // Alpha and beta occupations are stored independently (non-equivalent
+    // spin axis): even restricted orbitals can carry distinct per-spin
+    // occupations for open-shell references.
+    auto sym = std::make_shared<const SymmetryProduct>(
+        SymmetryProduct({axes::spin(1, /*equivalent=*/false)}));
+    std::unordered_map<SymmetryLabel, std::size_t> ext;
+    ext[axes::alpha()] = static_cast<std::size_t>(alpha.size());
+    ext[axes::beta()] = static_cast<std::size_t>(beta.size());
+    SBT::BlockMap blocks;
+    blocks[{axes::alpha()}] = std::make_shared<const Eigen::VectorXd>(alpha);
+    blocks[{axes::beta()}] = std::make_shared<const Eigen::VectorXd>(beta);
+    return std::make_shared<const SBT>(
+        SBT::SymmetriesArray{sym}, SBT::ExtentsArray{ext}, std::move(blocks));
+  }
+  auto sym =
+      std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial());
+  Eigen::VectorXd total = alpha + beta;
+  std::unordered_map<SymmetryLabel, std::size_t> ext;
+  ext[SymmetryLabel{}] = static_cast<std::size_t>(total.size());
+  SBT::BlockMap blocks;
+  blocks[{SymmetryLabel{}}] = std::make_shared<const Eigen::VectorXd>(total);
+  return std::make_shared<const SBT>(SBT::SymmetriesArray{sym},
+                                     SBT::ExtentsArray{ext}, std::move(blocks));
+}
+
+std::pair<std::size_t, std::size_t> WavefunctionContainer::_read_spin_count(
+    const SymmetryBlockedScalar<std::size_t>& scalar) {
+  const auto& symmetries = scalar.symmetries()[0];
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    throw std::runtime_error(
+        "Spin-resolved electron counts are unavailable: the single-particle "
+        "basis carries no spin (S_z) axis. Use active_num_particles() / "
+        "total_num_particles() for the symmetry-blocked count instead.");
+  }
+  return {scalar.value(axes::alpha()), scalar.value(axes::beta())};
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::_read_spin_occupations(
+    const SymmetryBlockedTensor<1>& tensor) {
+  const auto& symmetries = tensor.symmetries()[0];
+  if (!symmetries || !symmetries->has_axis(AxisName::Spin)) {
+    throw std::runtime_error(
+        "Spin-resolved orbital occupations are unavailable: the "
+        "single-particle basis carries no spin (S_z) axis. Use "
+        "active_orbital_occupations() / total_orbital_occupations() for the "
+        "symmetry-blocked occupations instead.");
+  }
+  return {tensor.block({axes::alpha()}), tensor.block({axes::beta()})};
+}
+
+std::pair<size_t, size_t> WavefunctionContainer::get_total_num_electrons()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_count(*total_num_particles());
+}
+
+std::pair<size_t, size_t> WavefunctionContainer::get_active_num_electrons()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_count(*active_num_particles());
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::get_total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_occupations(*total_orbital_occupations());
+}
+
+std::pair<Eigen::VectorXd, Eigen::VectorXd>
+WavefunctionContainer::get_active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _read_spin_occupations(*active_orbital_occupations());
 }
 
 bool WavefunctionContainer::has_one_rdm_spin_dependent() const {
@@ -681,10 +791,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (j.contains("configuration_set")) {
       auto config_set = ConfigurationSet::from_json(j["configuration_set"]);
       determinants = config_set.get_configurations();
       orbitals = config_set.get_orbitals();
+      if (!config_set.sector_layout().empty()) {
+        sector = config_set.sector_layout().front().first;
+      }
     } else {
       determinants = {};
       orbitals = nullptr;
@@ -764,39 +878,36 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
                      active_one_rdm || active_two_rdm;
 
       if (has_any) {
-        if (container_type == "cas") {
-          return std::make_unique<CasWavefunctionContainer>(
+        if (container_type == "state_vector" || container_type == "cas" ||
+            container_type == "sci") {
+          return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
-        } else if (container_type == "sci") {
-          return std::make_unique<SciWavefunctionContainer>(
-              coefficients, determinants, orbitals,
-              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
+              std::move(active_one_rdm), std::move(active_two_rdm), sector,
+              entropies, type);
         } else {
           throw std::runtime_error(
-              "RDMs are only supported for CAS and SCI containers in "
+              "RDMs are only supported for state-vector containers in "
               "WavefunctionContainer::from_json. Container type: " +
               container_type);
         }
       }
     }
 
-    if (container_type == "cas") {
-      return std::make_unique<CasWavefunctionContainer>(
+    // Legacy container_type values "cas" and "sci" are accepted here to
+    // support forward-looking back-compat: once the deferred 0.1.0 reader is
+    // implemented (bypassing the version gate above), existing cas/sci files
+    // will load through this path without additional changes.
+    if (container_type == "state_vector" || container_type == "cas" ||
+        container_type == "sci") {
+      return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
-    } else if (container_type == "sci") {
-      return std::make_unique<SciWavefunctionContainer>(
-          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
+          sector, entropies, type);
     } else {
       throw std::runtime_error(
-          "Did not expect to get here for containers other than cas/sci. "
-          "Expected delegation to container-specific methods.");
+          "Unrecognized container_type '" + container_type +
+          "' in WavefunctionContainer::from_json. Expected 'state_vector', "
+          "'cas', or 'sci'.");
     }
   } catch (const std::exception& e) {
     throw std::runtime_error("JSON error: " + std::string(e.what()));
@@ -806,6 +917,35 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
 WavefunctionType WavefunctionContainer::get_type() const {
   QDK_LOG_TRACE_ENTERING();
   return _type;
+}
+
+namespace {
+constexpr const char* kNotDeterminantExpansionMessage =
+    "This wavefunction container is not a determinant/coefficient expansion, "
+    "so determinant and coefficient accessors are not available.";
+}  // namespace
+
+const ContainerTypes::VectorVariant& WavefunctionContainer::get_coefficients()
+    const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+ContainerTypes::ScalarVariant WavefunctionContainer::get_coefficient(
+    const Configuration&) const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+const ContainerTypes::DeterminantVector&
+WavefunctionContainer::get_active_determinants() const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
+}
+
+size_t WavefunctionContainer::size() const {
+  QDK_LOG_TRACE_ENTERING();
+  throw std::runtime_error(kNotDeterminantExpansionMessage);
 }
 
 // Wavefunction implementations
@@ -829,6 +969,29 @@ Wavefunction& Wavefunction::operator=(const Wavefunction& other) {
   return *this;
 }
 
+std::vector<std::string> Wavefunction::sectors() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->sectors();
+}
+
+bool Wavefunction::has_sector(const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  auto names = _container->sectors();
+  return std::find(names.begin(), names.end(), name) != names.end();
+}
+
+std::shared_ptr<const Orbitals> Wavefunction::sector_basis(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->sector_basis(name);
+}
+
+std::shared_ptr<const SymmetryProduct> Wavefunction::sector_symmetries(
+    const std::string& name) const {
+  QDK_LOG_TRACE_ENTERING();
+  return sector_basis(name)->symmetries();
+}
+
 std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_orbitals();
@@ -837,6 +1000,30 @@ std::shared_ptr<Orbitals> Wavefunction::get_orbitals() const {
 std::string Wavefunction::get_container_type() const {
   QDK_LOG_TRACE_ENTERING();
   return _container->get_container_type();
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+Wavefunction::total_num_particles() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->total_num_particles();
+}
+
+std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+Wavefunction::active_num_particles() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_num_particles();
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+Wavefunction::total_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->total_orbital_occupations();
+}
+
+std::shared_ptr<const SymmetryBlockedTensor<1>>
+Wavefunction::active_orbital_occupations() const {
+  QDK_LOG_TRACE_ENTERING();
+  return _container->active_orbital_occupations();
 }
 
 std::pair<size_t, size_t> Wavefunction::get_total_num_electrons() const {
@@ -906,7 +1093,7 @@ Configuration Wavefunction::get_active_determinant(
 
   if (active_indices.empty()) {
     // Empty active space - return empty configuration
-    return Configuration("");
+    return Configuration::from_spin_half_string("");
   }
 
   const std::string total_str = total_determinant.to_string();
@@ -922,7 +1109,7 @@ Configuration Wavefunction::get_active_determinant(
     }
   }
 
-  return Configuration(active_str);
+  return Configuration::from_spin_half_string(active_str);
 }
 
 Configuration Wavefunction::get_total_determinant(
@@ -963,7 +1150,7 @@ Configuration Wavefunction::get_total_determinant(
     }
   }
 
-  return Configuration(total_str);
+  return Configuration::from_spin_half_string(total_str);
 }
 
 size_t Wavefunction::size() const {
@@ -1036,10 +1223,14 @@ std::shared_ptr<Wavefunction> Wavefunction::truncate(
       },
       top_coeffs);
 
-  // Create new wavefunction with SciWavefunctionContainer
-  return std::make_shared<Wavefunction>(
-      std::make_unique<SciWavefunctionContainer>(normalized_coeffs, top_configs,
-                                                 get_orbitals(), get_type()));
+  // Create new wavefunction with a StateVectorContainer, preserving the
+  // source wavefunction's sector.
+  const auto sector_names = sectors();
+  const std::string sector = sector_names.empty()
+                                 ? std::string(Wavefunction::DEFAULT_SECTOR)
+                                 : sector_names.front();
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      normalized_coeffs, top_configs, get_orbitals(), sector, get_type()));
 }
 
 double Wavefunction::norm() const {
@@ -1218,16 +1409,12 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
 
     // Dispatch to appropriate container implementation
     std::unique_ptr<WavefunctionContainer> container;
-    if (container_type == "cas") {
-      container = CasWavefunctionContainer::from_json(j["container"]);
-    } else if (container_type == "sci") {
-      container = SciWavefunctionContainer::from_json(j["container"]);
-    } else if (container_type == "sd") {
-      container = SlaterDeterminantContainer::from_json(j["container"]);
-    } else if (container_type == "coupled_cluster") {
-      container = CoupledClusterContainer::from_json(j["container"]);
-    } else if (container_type == "mp2") {
-      container = MP2Container::from_json(j["container"]);
+    if (container_type == "state_vector" || container_type == "cas" ||
+        container_type == "sci" || container_type == "sd") {
+      container = StateVectorContainer::from_json(j["container"]);
+    } else if (container_type == "amplitude" ||
+               container_type == "coupled_cluster" || container_type == "mp2") {
+      container = AmplitudeContainer::from_json(j["container"]);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
@@ -1318,16 +1505,12 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
 
     // Dispatch to appropriate container implementation
     std::unique_ptr<WavefunctionContainer> container;
-    if (container_type == "cas") {
-      container = CasWavefunctionContainer::from_hdf5(container_group);
-    } else if (container_type == "sci") {
-      container = SciWavefunctionContainer::from_hdf5(container_group);
-    } else if (container_type == "sd") {
-      container = SlaterDeterminantContainer::from_hdf5(container_group);
-    } else if (container_type == "coupled_cluster") {
-      container = CoupledClusterContainer::from_hdf5(container_group);
-    } else if (container_type == "mp2") {
-      container = MP2Container::from_hdf5(container_group);
+    if (container_type == "state_vector" || container_type == "cas" ||
+        container_type == "sci" || container_type == "sd") {
+      container = StateVectorContainer::from_hdf5(container_group);
+    } else if (container_type == "amplitude" ||
+               container_type == "coupled_cluster" || container_type == "mp2") {
+      container = AmplitudeContainer::from_hdf5(container_group);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
@@ -1622,11 +1805,15 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
     // Load configuration set (delegates to ConfigurationSet deserialization)
     DeterminantVector determinants;
     std::shared_ptr<Orbitals> orbitals;
+    std::string sector = Wavefunction::DEFAULT_SECTOR;
     if (group.nameExists("configuration_set")) {
       H5::Group config_set_group = group.openGroup("configuration_set");
       auto config_set = ConfigurationSet::from_hdf5(config_set_group);
       determinants = config_set.get_configurations();
       orbitals = config_set.get_orbitals();
+      if (!config_set.sector_layout().empty()) {
+        sector = config_set.sector_layout().front().first;
+      }
     } else {
       determinants = {};
       orbitals = nullptr;
@@ -1721,34 +1908,27 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
                      active_one_rdm || active_two_rdm;
 
       if (has_any) {
-        if (container_type == "cas") {
-          return std::make_unique<CasWavefunctionContainer>(
+        if (container_type == "state_vector" || container_type == "cas" ||
+            container_type == "sci") {
+          return std::make_unique<StateVectorContainer>(
               coefficients, determinants, orbitals,
               std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
-        } else if (container_type == "sci") {
-          return std::make_unique<SciWavefunctionContainer>(
-              coefficients, determinants, orbitals,
-              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), entropies,
-              type);
+              std::move(active_one_rdm), std::move(active_two_rdm), sector,
+              entropies, type);
         }
       }
     }
 
-    if (container_type == "cas") {
-      return std::make_unique<CasWavefunctionContainer>(
+    if (container_type == "state_vector" || container_type == "cas" ||
+        container_type == "sci") {
+      return std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
-    } else if (container_type == "sci") {
-      return std::make_unique<SciWavefunctionContainer>(
-          coefficients, determinants, orbitals, std::nullopt, std::nullopt,
-          entropies, type);
+          sector, entropies, type);
     } else {
       throw std::runtime_error(
-          "Did not expect to get here for containers other than cas/sci. "
-          "Expected delegation to container-specific methods.");
+          "Did not expect to get here for containers other than "
+          "state_vector/cas/sci. Expected delegation to container-specific "
+          "methods.");
     }
   } catch (const H5::Exception& e) {
     throw std::runtime_error("HDF5 error: " + std::string(e.getCDetailMsg()));
@@ -1807,15 +1987,25 @@ std::string Wavefunction::get_summary() const {
       << (get_type() == WavefunctionType::SelfDual ? "SelfDual" : "NotSelfDual")
       << "\n";
   oss << "  Complex: " << (is_complex() ? "yes" : "no") << "\n";
-  oss << "  Norm: " << norm() << "\n";
 
-  auto [n_alpha_total, n_beta_total] = get_total_num_electrons();
-  auto [n_alpha_active, n_beta_active] = get_active_num_electrons();
+  // Particle counts: use v2 APIs and format conditionally on spin axis.
+  auto total_count = total_num_particles();
+  auto active_count = active_num_particles();
+  auto symmetries = get_orbitals()->symmetries();
+  bool has_spin = symmetries && symmetries->has_axis(AxisName::Spin);
 
-  oss << "  Total electrons (α,β): (" << n_alpha_total << "," << n_beta_total
-      << ")\n";
-  oss << "  Active electrons (α,β): (" << n_alpha_active << "," << n_beta_active
-      << ")\n";
+  if (has_spin) {
+    auto alpha_label = axes::alpha();
+    auto beta_label = axes::beta();
+    oss << "  Total electrons (α,β): (" << total_count->value(alpha_label)
+        << "," << total_count->value(beta_label) << ")\n";
+    oss << "  Active electrons (α,β): (" << active_count->value(alpha_label)
+        << "," << active_count->value(beta_label) << ")\n";
+  } else {
+    oss << "  Total particles: " << total_count->value(SymmetryLabel{}) << "\n";
+    oss << "  Active particles: " << active_count->value(SymmetryLabel{})
+        << "\n";
+  }
 
   // RDM availability
   oss << "  1-RDM available: " << (has_one_rdm_spin_dependent() ? "yes" : "no")
@@ -1824,8 +2014,11 @@ std::string Wavefunction::get_summary() const {
       << "\n";
 
   if (auto orbitals = get_orbitals()) {
-    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs, "
-        << (orbitals->is_restricted() ? "restricted" : "unrestricted");
+    oss << "  Orbitals: " << orbitals->get_num_molecular_orbitals() << " MOs";
+    if (has_spin) {
+      oss << ", "
+          << (orbitals->is_restricted() ? "restricted" : "unrestricted");
+    }
   } else {
     oss << "  Orbitals: none";
   }

@@ -8,12 +8,14 @@
 #include <pybind11/stl.h>
 
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -348,5 +350,54 @@ handles each spin channel independently (unrestricted orbitals).
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
+)");
+
+  // Overload taking a Hamiltonian directly.  Container dispatch and sparse
+  // index marshalling live in the C++ library overload.
+  data.def(
+      "majorana_map_hamiltonian",
+      [](const MajoranaMapping& mapping, const Hamiltonian& hamiltonian,
+         bool spin_symmetric, double threshold,
+         double integral_threshold) -> py::tuple {
+        const MajoranaMapResult result =
+            majorana_map_hamiltonian(mapping, hamiltonian, spin_symmetric,
+                                     threshold, integral_threshold);
+        return py::make_tuple(py::cast(result.words),
+                              py::cast(result.coefficients));
+      },
+      py::arg("mapping"), py::arg("hamiltonian"), py::arg("spin_symmetric"),
+      py::arg("threshold"), py::arg("integral_threshold"),
+      R"(
+Map a fermionic Hamiltonian to qubit Pauli terms.
+
+The two-body integrals are consumed in the native storage format of the
+Hamiltonian's container: Cholesky (three-center) and sparse containers are
+read directly without materializing the dense N^4 two-body tensor; any
+other container uses the dense path.
+
+For Cholesky and dense containers, the returned ``(words, coefficients)``
+match the dense path for the same underlying integrals.  For sparse
+containers, stored entries are canonicalized and symmetry-expanded before
+mapping, so results agree with the dense path when integrals are stored
+canonically or symmetry-complete (as for in-repo model builders); the
+sparse fast path is more robust when only non-canonical symmetry
+representatives are stored.
+
+The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
+is intentionally **not** included in the mapped operator, matching the
+buffer-based overload as invoked by ``QdkQubitMapper`` (which always
+passes ``core_energy=0.0``); callers that need the constant term must add
+it separately.
+
+Args:
+    mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
+    hamiltonian (Hamiltonian): The fermionic Hamiltonian.
+    spin_symmetric (bool): Use the spin-summed restricted fast path.
+    threshold (float): Drop Pauli terms with magnitude below this value.
+    integral_threshold (float): Skip integrals with magnitude below this value.
+
+Returns:
+    tuple: ``(words, coefficients)`` where ``words`` is a list of sparse Pauli
+    words and ``coefficients`` is a list of complex coefficients.
 )");
 }
