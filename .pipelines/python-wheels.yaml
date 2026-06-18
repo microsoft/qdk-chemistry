@@ -154,6 +154,38 @@ extends:
             ls -la ..
           displayName: Diagnose environment (without target)
 
+        - script: |
+            set -x
+
+            whoami && id
+
+            echo "== uname =="
+            uname -a
+
+            echo "== os-release =="
+            cat /etc/os-release || true
+
+            echo "== cgroup =="
+            cat /proc/1/cgroup || true
+
+            echo "== mountinfo =="
+            grep -E 'overlay|container' /proc/1/mountinfo || true
+
+            echo "== env =="
+            env | grep -Ei 'container|docker|podman' || true
+
+            echo "== pid1 =="
+            ps -p 1 -o pid,comm,args=
+
+            which apt-get || echo "no apt-get"
+            which docker && docker ps || echo "no docker"
+
+            pwd
+            ls -la
+            ls -la ..
+          displayName: Diagnose environment (with target)
+          target: linux_build_container
+
         - task: PipAuthenticate@1
           displayName: Pip Authenticate
           inputs:
