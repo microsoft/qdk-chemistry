@@ -74,6 +74,7 @@ steps:
                                                       ${{ parameters.macBuild }}
     displayName: Build wheel (Linux ${{ parameters.march }})
     retryCountOnTaskFailure: 2
+    target: ${{ parameters.containerName }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 

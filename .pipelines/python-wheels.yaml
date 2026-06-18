@@ -105,7 +105,6 @@ extends:
           demands:
           - ImageOverride -equals 1es-pt-azurelinux3
           os: linux
-        container: linux_build_container
         timeoutInMinutes: 60
         strategy:
           matrix:
@@ -192,12 +191,12 @@ extends:
             artifactFeeds: AzureQuantum/quantum-apps-dependencies
             onlyAddExtraIndex: false
 
-        # # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
-        # # same environment for C++ tracing to work; using target: keeps them in the container.
+        # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
+        # same environment for C++ tracing to work; using target: keeps them in the container.
         # - ${{ if eq(parameters.target.arch, 'x86_64') }}:
-        #   - task: CodeQL3000Init@0
-        #     target: linux_build_container
-        #     displayName: CodeQL Initialize
+        - task: CodeQL3000Init@0
+          target: linux_build_container
+          displayName: CodeQL Initialize
 
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
@@ -210,14 +209,29 @@ extends:
             devTag: ${{ parameters.devTag }}
             containerName: linux_build_container
 
+        # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
+        # - ${{ if eq(target.arch, 'x86_64') }}:
+        - task: CodeQL3000Finalize@0
+          target: linux_build_container
+          condition: always()
+          displayName: CodeQL Finalize
+
+        - template: .pipelines/templates/test-pip-wheels.yml@self
+          parameters:
+            agentBuildDirectory: $(Agent.BuildDirectory)
+            pythonVersion: $(pythonVersion)
+            runSlowTests: ${{ parameters.runSlowTests }}
+            # ${{ if eq(target.os, 'macOS') }}:
+              # macBuild: ON
+
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user. For Linux container jobs we run as root
           # throughout, so no ownership transfer is needed (sudo is also not available in the
           # minimal ubuntu:24.04 image).
         # - ${{ if not(eq(parameters.target.os, 'linux')) }}:
-        #   - script: |
-        #       sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-        #     displayName: Fix wheel directory ownership
+        - script: |
+            sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+          displayName: Fix wheel directory ownership
 
         # - task: TwineAuthenticate@1
         #   inputs:
