@@ -95,10 +95,24 @@ class HadamardTest(Algorithm):
     with the nested ``circuit_executor``.
     """
 
-    def __init__(self):
-        """Initialize a Hadamard test generator."""
+    def __init__(
+        self,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
+    ):
+        """Initialize a Hadamard test generator.
+
+        Args:
+            test_basis: Measurement basis for the control qubit.
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution.
+
+        """
         super().__init__()
         self._settings = HadamardTestSettings()
+        self._settings.set("test_basis", test_basis.value)
+        if num_ancilla_qubits < 0:
+            raise ValueError("num_ancilla_qubits must be a positive integer.")
+        self._settings.set("num_ancilla_qubits", num_ancilla_qubits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test."""
@@ -124,6 +138,8 @@ class HadamardTest(Algorithm):
             CircuitExecutorData returned directly by the given simulator.
 
         """
+        if not isinstance(state_preparation_circuit, Circuit):
+            raise TypeError("state_preparation_circuit must be an instance of Circuit.")
         if not isinstance(unitary, UnitaryRepresentation):
             raise TypeError("unitary must be an instance of UnitaryRepresentation.")
         if not isinstance(shots, int):

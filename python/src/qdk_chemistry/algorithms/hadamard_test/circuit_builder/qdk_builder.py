@@ -48,7 +48,7 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         r"""Build a Hadamard test circuit using the Q# backend.
 
         The target unitary is mapped into a controlled evolution circuit internally; the
-        resulting controlled unitary circuit must place its ancilla qubit at index 0.
+        resulting controlled unitary circuit must place its control qubit at index 0.
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.

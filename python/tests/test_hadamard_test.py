@@ -31,9 +31,9 @@ _QDK_BUILDER = "qdk"
 _QISKIT_BUILDER = "qiskit"
 
 
-def _make_hadamard_test(builder_name: str):
+def _make_hadamard_test(builder_name: str, test_basis: HadamardTestBasis = HadamardTestBasis.X):
     """Create a Hadamard test configured to use the given circuit builder backend."""
-    hadamard_test = create("hadamard_test")
+    hadamard_test = create("hadamard_test", test_basis=test_basis)
     hadamard_test.settings().set("circuit_builder", AlgorithmRef("hadamard_test_circuit_builder", builder_name))
     return hadamard_test
 
@@ -134,8 +134,7 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Qiskit Hadamard generator reproduces the Y-basis reference observable for water."""
-    hadamard_test = _make_hadamard_test(_QISKIT_BUILDER)
-    hadamard_test.settings().set("test_basis", HadamardTestBasis.Y.value)
+    hadamard_test = _make_hadamard_test(_QISKIT_BUILDER, HadamardTestBasis.Y)
     result = hadamard_test.run(
         water_hadamard_benchmark.state_preparation,
         water_hadamard_benchmark.unitary,
@@ -152,8 +151,7 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
-    hadamard_test = _make_hadamard_test(_QDK_BUILDER)
-    hadamard_test.settings().set("test_basis", HadamardTestBasis.Y.value)
+    hadamard_test = _make_hadamard_test(_QDK_BUILDER, HadamardTestBasis.Y)
     result = hadamard_test.run(
         water_hadamard_benchmark.state_preparation,
         water_hadamard_benchmark.unitary,
