@@ -76,7 +76,7 @@ extends:
         useAgentBuildDirectory: true
       codeql:
         compiled:
-          enabled: true
+          enabled: false
         sourceLanguages: python
         binaryLanguages: cpp
       psscriptanalyzer:
@@ -207,8 +207,9 @@ extends:
             fi
             echo "Installing sudo into container $CID..."
             docker exec --user root "$CID" bash -c "
-              apt-get update -q &&
-              apt-get install -y -q sudo &&
+              DEBIAN_FRONTEND=noninteractive apt-get update -q &&
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
+                -o Dpkg::Options::='--force-confold' sudo &&
               echo '%azure_pipelines_sudo ALL=(ALL) NOPASSWD:ALL' \
                 > /etc/sudoers.d/azure_pipelines_sudo &&
               chmod 0440 /etc/sudoers.d/azure_pipelines_sudo
@@ -220,7 +221,7 @@ extends:
         # - ${{ if eq(parameters.target.arch, 'x86_64') }}:
         - task: CodeQL3000Init@0
           target: linux_build_container
-          displayName: CodeQL Initialize
+          displayName: 🛡🛡 CodeQL Initialize
 
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
@@ -238,7 +239,7 @@ extends:
         - task: CodeQL3000Finalize@0
           target: linux_build_container
           condition: always()
-          displayName: CodeQL Finalize
+          displayName: 🛡🛡 CodeQL Finalize
 
         - template: .pipelines/templates/test-pip-wheels.yml@self
           parameters:
