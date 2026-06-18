@@ -66,168 +66,133 @@ variables:
 - group: QdkChemistry
 - name: ComponentDetection.MaxDetectionThreads
   value: '16'
-extends:
-  template: v1/1ES.Official.PipelineTemplate.yml@1ESPipelineTemplates
-  parameters:
-    sdl:
-      autobaseline:
-        enableForGitHub: true
-      componentgovernance:
-        useAgentBuildDirectory: true
-      codeql:
-        compiled:
-          enabled: true
-        sourceLanguages: python
-        binaryLanguages: cpp
-      psscriptanalyzer:
-        enabled: false
-        justificationForDisabling: Powershell is not used in this repository.
-        break: false
-      armory:
-        enabled: false
-        justificationForDisabling: ARM templates are not used in this repository.
-        break: false
-      eslint:
-        enabled: false
-        justificationForDisabling: JavaScript is not used in this repository.
-        exitOnFatalError: true
-      sourceAnalysisPool:
-        name: Azure-Pipelines-DevTools-EO
-        image: windows-2022
-        os: windows
-    stages:
-    - stage: Build
-      displayName: Build C++ Deps and Python Wheels
-      jobs:
-      - job: Build_x86_64
-        pool:
-          name: aqe-1es-HB120-pool
-          demands:
-          - ImageOverride -equals 1es-pt-azurelinux3
-          os: linux
-        container: linux_build_container
-        timeoutInMinutes: 60
-        strategy:
-          matrix:
-            ${{ each py in parameters.pythonVersions }}:
-              Py${{ replace(py, '.', '_') }}:
-                pythonVersion: ${{ py }}
-          maxParallel: 5
-        displayName: Build x86-64-v3 linux wheels
-        variables:
-          LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
-        templateContext:
-          outputs:
-          - output: pipelineArtifact
-            displayName: Upload Python $(pythonVersion) Wheels for linux x86-64-v3
-            targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
-            artifactName: linux-x86_64-v3-wheels-python$(pythonVersion)
-        steps:
-        - script: |
-            set -x
+stages:
+- stage: Build
+  displayName: Build C++ Deps and Python Wheels
+  jobs:
+  - job: Build_x86_64
+    pool:
+      name: aqe-1es-HB120-pool
+      demands:
+      - ImageOverride -equals 1es-pt-azurelinux3
+      os: linux
+    container: linux_build_container
+    timeoutInMinutes: 60
+    strategy:
+      matrix:
+        ${{ each py in parameters.pythonVersions }}:
+          Py${{ replace(py, '.', '_') }}:
+            pythonVersion: ${{ py }}
+      maxParallel: 5
+    displayName: Build x86-64-v3 linux wheels
+    variables:
+      LD_LIBRARY_PATH: $LD_LIBRARY_PATH:/usr/local/lib
+    steps:
+    - script: |
+        set -x
 
-            whoami && id
+        whoami && id
 
-            echo "== uname =="
-            uname -a
+        echo "== uname =="
+        uname -a
 
-            echo "== os-release =="
-            cat /etc/os-release || true
+        echo "== os-release =="
+        cat /etc/os-release || true
 
-            echo "== cgroup =="
-            cat /proc/1/cgroup || true
+        echo "== cgroup =="
+        cat /proc/1/cgroup || true
 
-            echo "== mountinfo =="
-            grep -E 'overlay|container' /proc/1/mountinfo || true
+        echo "== mountinfo =="
+        grep -E 'overlay|container' /proc/1/mountinfo || true
 
-            echo "== env =="
-            env | grep -Ei 'container|docker|podman' || true
+        echo "== env =="
+        env | grep -Ei 'container|docker|podman' || true
 
-            echo "== pid1 =="
-            ps -p 1 -o pid,comm,args=
+        echo "== pid1 =="
+        ps -p 1 -o pid,comm,args=
 
-            which apt-get || echo "no apt-get"
-            which docker && docker ps || echo "no docker"
+        which apt-get || echo "no apt-get"
+        which docker && docker ps || echo "no docker"
 
-            pwd
-            ls -la
-            ls -la ..
-          displayName: Diagnose environment (without target)
+        pwd
+        ls -la
+        ls -la ..
+      displayName: Diagnose environment (without target)
 
-        - script: |
-            set -x
+    - script: |
+        set -x
 
-            whoami && id
+        whoami && id
 
-            echo "== uname =="
-            uname -a
+        echo "== uname =="
+        uname -a
 
-            echo "== os-release =="
-            cat /etc/os-release || true
+        echo "== os-release =="
+        cat /etc/os-release || true
 
-            echo "== cgroup =="
-            cat /proc/1/cgroup || true
+        echo "== cgroup =="
+        cat /proc/1/cgroup || true
 
-            echo "== mountinfo =="
-            grep -E 'overlay|container' /proc/1/mountinfo || true
+        echo "== mountinfo =="
+        grep -E 'overlay|container' /proc/1/mountinfo || true
 
-            echo "== env =="
-            env | grep -Ei 'container|docker|podman' || true
+        echo "== env =="
+        env | grep -Ei 'container|docker|podman' || true
 
-            echo "== pid1 =="
-            ps -p 1 -o pid,comm,args=
+        echo "== pid1 =="
+        ps -p 1 -o pid,comm,args=
 
-            which apt-get || echo "no apt-get"
-            which docker && docker ps || echo "no docker"
+        which apt-get || echo "no apt-get"
+        which docker && docker ps || echo "no docker"
 
-            pwd
-            ls -la
-            ls -la ..
-          displayName: Diagnose environment (with target)
-          target: linux_build_container
+        pwd
+        ls -la
+        ls -la ..
+      displayName: Diagnose environment (with target)
+      target: linux_build_container
 
-        - task: PipAuthenticate@1
-          displayName: Pip Authenticate
-          inputs:
-            artifactFeeds: AzureQuantum/quantum-apps-dependencies
-            onlyAddExtraIndex: false
+    - task: PipAuthenticate@1
+      displayName: Pip Authenticate
+      inputs:
+        artifactFeeds: AzureQuantum/quantum-apps-dependencies
+        onlyAddExtraIndex: false
 
-        # # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
-        # # same environment for C++ tracing to work; using target: keeps them in the container.
-        # - ${{ if eq(parameters.target.arch, 'x86_64') }}:
-        #   - task: CodeQL3000Init@0
-        #     target: linux_build_container
-        #     displayName: CodeQL Initialize
+    # # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
+    # # same environment for C++ tracing to work; using target: keeps them in the container.
+    # - ${{ if eq(parameters.target.arch, 'x86_64') }}:
+    #   - task: CodeQL3000Init@0
+    #     target: linux_build_container
+    #     displayName: CodeQL Initialize
 
-        # Build - Linux x86_64
-        - template: .pipelines/templates/build-pip-wheels.yml@self
-          parameters:
-            march: x86-64-v3
-            buildTesting: OFF
-            enableCoverage: OFF
-            agentBuildDirectory: $(Agent.BuildDirectory)
-            pythonVersion: $(pythonVersion)
-            devTag: ${{ parameters.devTag }}
-            containerName: linux_build_container
+    # Build - Linux x86_64
+    - template: templates/build-pip-wheels.yml
+      parameters:
+        march: x86-64-v3
+        buildTesting: OFF
+        enableCoverage: OFF
+        agentBuildDirectory: $(Agent.BuildDirectory)
+        pythonVersion: $(pythonVersion)
+        devTag: ${{ parameters.devTag }}
+        containerName: linux_build_container
 
-          # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
-          # back to the original base image user. For Linux container jobs we run as root
-          # throughout, so no ownership transfer is needed (sudo is also not available in the
-          # minimal ubuntu:24.04 image).
-        # - ${{ if not(eq(parameters.target.os, 'linux')) }}:
-        #   - script: |
-        #       sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
-        #     displayName: Fix wheel directory ownership
+      # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
+      # back to the original base image user. For Linux container jobs we run as root
+      # throughout, so no ownership transfer is needed (sudo is also not available in the
+      # minimal ubuntu:24.04 image).
+    # - ${{ if not(eq(parameters.target.os, 'linux')) }}:
+    #   - script: |
+    #       sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+    #     displayName: Fix wheel directory ownership
 
-        # - task: TwineAuthenticate@1
-        #   inputs:
-        #     artifactFeed: $(artifactProject)/$(artifactFeed)
-        #   displayName: Authenticate to internal feed
-        #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+    # - task: TwineAuthenticate@1
+    #   inputs:
+    #     artifactFeed: $(artifactProject)/$(artifactFeed)
+    #   displayName: Authenticate to internal feed
+    #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
-        # - script: |
-        #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
-        #     python3 -m pip install twine
-        #     python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-        #   displayName: Upload wheel with twine
-        #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+    # - script: |
+    #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
+    #     python3 -m pip install twine
+    #     python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+    #   displayName: Upload wheel with twine
+    #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
