@@ -12,12 +12,15 @@ References:
 # --------------------------------------------------------------------------------------------
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import h5py
 import numpy as np
 
-from .block_encoding import BlockEncodingContainer, Prepare
+from .block_encoding import BlockEncodingContainer, wavefunction_from_hdf5, wavefunction_to_hdf5
+
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Wavefunction
 
 __all__ = ["SOSSAContainer", "SOSSAInnerPrepare", "SOSSASelect"]
 
@@ -130,7 +133,7 @@ class SOSSAContainer(BlockEncodingContainer):
 
     def __init__(
         self,
-        outer_prepare: Prepare,
+        outer_prepare: "Wavefunction",
         inner_prepare: SOSSAInnerPrepare,
         select: SOSSASelect,
         normalization: float,
@@ -176,7 +179,7 @@ class SOSSAContainer(BlockEncodingContainer):
 
         """
         num_system = 2 * self.select.num_orbitals
-        num_ancilla = self.outer_prepare.num_prepare_qubits + self.inner_prepare.num_inner_qubits
+        num_ancilla = self.outer_prepare.get_orbitals().num_modes() + self.inner_prepare.num_inner_qubits
         # Additional ancilla: 2 spin qubits + flag + keep register (approximate)
         num_ancilla += 3
         return num_system + num_ancilla
@@ -193,11 +196,7 @@ class SOSSAContainer(BlockEncodingContainer):
             "power": self.power,
             "quantum_walk": self.quantum_walk,
             "normalization": self.normalization,
-            "outer_prepare": {
-                "statevector": self.outer_prepare.statevector.tolist(),
-                "num_prepare_qubits": self.outer_prepare.num_prepare_qubits,
-                "prepare_qubits": self.outer_prepare.prepare_qubits,
-            },
+            "outer_prepare": self.outer_prepare.to_json(),
             "inner_prepare": {
                 "conditional_coefficients": self.inner_prepare.conditional_coefficients.tolist(),
                 "num_inner_qubits": self.inner_prepare.num_inner_qubits,
@@ -222,7 +221,7 @@ class SOSSAContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
         group.attrs["normalization"] = self.normalization
-        self.outer_prepare.to_hdf5(group.create_group("outer_prepare"))
+        wavefunction_to_hdf5(self.outer_prepare, group.create_group("outer_prepare"))
         self.inner_prepare.to_hdf5(group.create_group("inner_prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
@@ -231,12 +230,9 @@ class SOSSAContainer(BlockEncodingContainer):
         """Create a SOSSAContainer from a JSON dictionary."""
         cls._validate_json_version(cls._serialization_version, json_data)
 
-        op = json_data["outer_prepare"]
-        outer_prepare = Prepare(
-            statevector=np.array(op["statevector"], dtype=float),
-            num_prepare_qubits=op["num_prepare_qubits"],
-            prepare_qubits=op["prepare_qubits"],
-        )
+        from qdk_chemistry.data import Wavefunction  # noqa: PLC0415
+
+        outer_prepare = Wavefunction.from_json(json_data["outer_prepare"])
 
         ip = json_data["inner_prepare"]
         inner_prepare = SOSSAInnerPrepare(
@@ -268,7 +264,7 @@ class SOSSAContainer(BlockEncodingContainer):
     @classmethod
     def from_hdf5(cls, group: h5py.Group) -> "SOSSAContainer":
         """Load a SOSSAContainer from an HDF5 group."""
-        outer_prepare = Prepare.from_hdf5(group["outer_prepare"])
+        outer_prepare = wavefunction_from_hdf5(group["outer_prepare"])
         inner_prepare = SOSSAInnerPrepare.from_hdf5(group["inner_prepare"])
         select = SOSSASelect.from_hdf5(group["select"])
         return cls(
@@ -292,7 +288,7 @@ class SOSSAContainer(BlockEncodingContainer):
             f"  Orbitals N={n}, Ranks R={r}, Bases B={b}, Copies C={c}\n"
             f"  Xo = N + R*C = {n + r * c}\n"
             f"  Normalization Lambda = {self.normalization:.6f}\n"
-            f"  Outer PREPARE: {self.outer_prepare.num_prepare_qubits} qubits\n"
+            f"  Outer PREPARE: {self.outer_prepare.get_orbitals().num_modes()} qubits\n"
             f"  Inner PREPARE: {self.inner_prepare.num_inner_qubits} qubits, {b+1} basis entries\n"
             f"  System: {2*n} spin-orbitals\n"
             f"  Quantum Walk: {'Yes' if self.quantum_walk else 'No'}"

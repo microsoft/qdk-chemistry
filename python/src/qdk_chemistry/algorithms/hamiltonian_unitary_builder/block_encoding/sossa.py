@@ -28,8 +28,14 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
     HamiltonianUnitaryBuilderSettings,
 )
-from qdk_chemistry.data import FactorizedHamiltonianContainer, UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import Prepare
+from qdk_chemistry.data import (
+    Configuration,
+    FactorizedHamiltonianContainer,
+    ModelOrbitals,
+    StateVectorContainer,
+    UnitaryRepresentation,
+    Wavefunction,
+)
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAContainer,
     SOSSAInnerPrepare,
@@ -151,11 +157,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         num_outer_qubits = int(ceil(log2(Xo))) if Xo > 1 else 1
         num_inner_qubits = int(ceil(log2(B + 1))) if B + 1 > 1 else 1
 
-        outer_prepare = Prepare(
-            statevector=outer_arr,
-            num_prepare_qubits=num_outer_qubits,
-            prepare_qubits=list(range(num_outer_qubits)),
-        )
+        outer_prepare = self._build_outer_prepare(outer_arr, num_outer_qubits)
 
         inner_prepare = SOSSAInnerPrepare(
             conditional_coefficients=inner_arr,
@@ -183,6 +185,33 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         )
 
         return UnitaryRepresentation(container=container)
+
+    @staticmethod
+    def _build_outer_prepare(statevector: np.ndarray, num_qubits: int) -> Wavefunction:
+        """Build a Wavefunction encoding the outer PREPARE statevector.
+
+        Args:
+            statevector: Array of amplitudes for the outer PREPARE oracle.
+            num_qubits: Number of qubits in the prepare register.
+
+        Returns:
+            Wavefunction whose coefficients encode the outer PREPARE amplitudes.
+
+        """
+        coeffs_list: list[float] = []
+        dets: list[Configuration] = []
+        for idx, amp in enumerate(statevector):
+            if amp != 0.0:
+                bitstring = format(idx, f"0{num_qubits}b")
+                dets.append(Configuration.from_bitstring(bitstring))
+                coeffs_list.append(float(amp))
+        orbitals = ModelOrbitals(num_qubits)
+        coeffs_arr = np.array(coeffs_list)
+        norm = np.linalg.norm(coeffs_arr)
+        if norm > 0:
+            coeffs_arr = coeffs_arr / norm
+        container = StateVectorContainer(coeffs_arr, dets, orbitals)
+        return Wavefunction(container)
 
     # =========================================================================
     # Circuit synthesis helpers (from arXiv:2502.15882, Appendix B)

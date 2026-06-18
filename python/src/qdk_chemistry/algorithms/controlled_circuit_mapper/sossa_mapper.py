@@ -84,7 +84,7 @@ class OuterPrepareMapper:
             A Q# callable ``(Qubit[]) => Unit is Adj + Ctl`` for outer prepare.
 
         """
-        statevector = container.outer_prepare.statevector.tolist()
+        statevector = container.outer_prepare.get_coefficients().tolist()
         if self.algorithm == "alias_sampling":
             return QSHARP_UTILS.SOSSAWalk.MakeOuterPrepareAliasSampling(
                 statevector, self.coefficient_bit_precision
@@ -352,6 +352,9 @@ class SOSSAMapper(ControlledCircuitMapper):
             program=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkCircuit,
             parameter=walk_params,
         )
-        qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(walk_params)
+        qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(
+            outer_prepare_op, inner_prepare_op, select_op,
+            num_system_qubits, num_outer_qubits, num_inner_qubits, power,
+        )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=qsharp_op)

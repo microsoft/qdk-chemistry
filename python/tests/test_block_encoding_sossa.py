@@ -15,9 +15,14 @@ import pytest
 from qdk import qsharp
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import FactorizedHamiltonianContainer
+from qdk_chemistry.data import (
+    Configuration,
+    FactorizedHamiltonianContainer,
+    ModelOrbitals,
+    StateVectorContainer,
+    Wavefunction,
+)
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.block_encoding import Prepare
 from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSAContainer,
     SOSSAInnerPrepare,
@@ -118,11 +123,17 @@ def _make_h2_sossa_unitary_representation():
     num_outer_qubits = ceil(log2(x_o_dim)) if x_o_dim > 1 else 1
     num_inner_qubits = ceil(log2(num_bases + 1)) if num_bases + 1 > 1 else 1
 
-    outer_prepare = Prepare(
-        statevector=outer_statevector,
-        num_prepare_qubits=num_outer_qubits,
-        prepare_qubits=list(range(num_outer_qubits)),
-    )
+    # Build outer prepare Wavefunction
+    coeffs_list = []
+    dets = []
+    for idx, amp in enumerate(outer_statevector):
+        if amp != 0.0:
+            bitstring = format(idx, f"0{num_outer_qubits}b")
+            dets.append(Configuration.from_bitstring(bitstring))
+            coeffs_list.append(float(amp))
+    orbitals = ModelOrbitals(num_outer_qubits)
+    sv_container = StateVectorContainer(np.array(coeffs_list), dets, orbitals)
+    outer_prepare = Wavefunction(sv_container)
     inner_prepare = SOSSAInnerPrepare(
         conditional_coefficients=inner_coefficients,
         num_inner_qubits=num_inner_qubits,
@@ -176,8 +187,8 @@ class TestSOSSAContainer:
         assert restored.quantum_walk == container.quantum_walk
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(
-            restored.outer_prepare.statevector,
-            container.outer_prepare.statevector,
+            restored.outer_prepare.get_coefficients(),
+            container.outer_prepare.get_coefficients(),
             atol=float_comparison_absolute_tolerance,
         )
         assert np.allclose(
@@ -207,7 +218,7 @@ class TestSOSSAContainer:
         assert restored.power == container.power
         assert np.isclose(restored.normalization, container.normalization)
         assert np.allclose(
-            restored.outer_prepare.statevector, container.outer_prepare.statevector
+            restored.outer_prepare.get_coefficients(), container.outer_prepare.get_coefficients()
         )
         assert np.allclose(
             restored.select.sf_rotation_angles, container.select.sf_rotation_angles
@@ -278,7 +289,7 @@ class TestSOSSABuilder:
         result = builder.run(fh)
         container = result.get_container()
 
-        sv = container.outer_prepare.statevector
+        sv = container.outer_prepare.get_coefficients()
         assert np.isclose(np.sum(sv**2), 1.0, atol=1e-10)
 
     def test_normalization_positive(self):
@@ -357,7 +368,7 @@ class TestSOSSABuilder:
 
         assert isinstance(container, SOSSAContainer)
         x_o_dim = num_orbitals + num_ranks * num_copies
-        assert len(container.outer_prepare.statevector) == x_o_dim
+        assert len(container.outer_prepare.get_coefficients()) == x_o_dim
         assert container.inner_prepare.conditional_coefficients.shape[0] == x_o_dim
         assert container.normalization > 0
 
