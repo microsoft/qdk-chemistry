@@ -19,6 +19,7 @@ jobs:
       run: |
         mkdir -p dist
         VERSION="${{ github.event.release.tag_name }}"
+        VERSION="${VERSION:-${{ github.ref_name }}}"
         zip -r "dist/qdk-chemistry-examples-${VERSION}.zip" examples
 
     - name: Upload workflow artifact
