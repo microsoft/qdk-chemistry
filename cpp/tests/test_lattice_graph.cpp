@@ -6,6 +6,9 @@
 
 #include <Eigen/Dense>
 #include <cmath>
+#include <map>
+#include <set>
+#include <stdexcept>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 
 #include "ut_common.hpp"
@@ -515,6 +518,31 @@ static void check_valid_edge_coloring(const EdgeColoring& coloring) {
   }
 }
 
+static void check_edge_coloring_matches_graph(const LatticeGraph& graph) {
+  ASSERT_TRUE(graph.edge_coloring().has_value());
+  const auto& coloring = *graph.edge_coloring();
+  std::uint64_t edge_count = 0;
+
+  const auto& adj = graph.sparse_adjacency_matrix();
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      if (it.row() < it.col() && it.value() != 0.0) {
+        ++edge_count;
+        auto edge = std::make_pair(static_cast<std::uint64_t>(it.row()),
+                                   static_cast<std::uint64_t>(it.col()));
+        EXPECT_EQ(coloring.count(edge), 1u);
+      }
+    }
+  }
+
+  EXPECT_EQ(edge_count, graph.num_edges());
+  EXPECT_EQ(coloring.size(), static_cast<std::size_t>(graph.num_edges()));
+  for (const auto& [edge, color] : coloring) {
+    (void)color;
+    EXPECT_TRUE(graph.are_connected(edge.first, edge.second));
+  }
+}
+
 TEST_F(LatticeGraphTest, ColorCount) {
   auto chain_open = LatticeGraph::chain(5, false);
   ASSERT_TRUE(chain_open.edge_coloring().has_value());
@@ -686,22 +714,43 @@ TEST_F(LatticeGraphTest, Permute) {
     }
   }
 
-  auto expect_path_ordered = [](const LatticeGraph& ordered,
-                                const char* name) {
-    for (std::uint64_t i = 0; i < ordered.num_sites() - 1; ++i) {
-      EXPECT_TRUE(ordered.are_connected(i, i + 1))
-          << name << " sites " << i << " and " << (i + 1)
-          << " are not connected";
-    }
-    ASSERT_TRUE(ordered.edge_coloring().has_value());
+  auto expect_dfs_ordered = [](const LatticeGraph& ordered,
+                               const LatticeGraph& baseline,
+                               const char* name) {
+    EXPECT_EQ(ordered.num_sites(), baseline.num_sites()) << name;
+    EXPECT_EQ(ordered.num_edges(), baseline.num_edges()) << name;
+    EXPECT_EQ(ordered.num_nonzeros(), baseline.num_nonzeros()) << name;
+    EXPECT_EQ(ordered.is_symmetric(), baseline.is_symmetric()) << name;
+    ASSERT_TRUE(ordered.edge_coloring().has_value()) << name;
     check_valid_edge_coloring(*ordered.edge_coloring());
+    check_edge_coloring_matches_graph(ordered);
   };
 
-  // Confirms dfs_ordering=true yields path-consecutive adjacency.
-  expect_path_ordered(LatticeGraph::square(3, 3, false, false, 1.0, true),
-                      "ordered_sq");
-  expect_path_ordered(LatticeGraph::honeycomb(2, 2, false, true, 1.0, true),
-                      "ordered_hc");
-  expect_path_ordered(LatticeGraph::kagome(2, 1, false, false, 1.0, 0, true),
-                      "ordered_kg");
+  // dfs_ordering uses a cheap deterministic traversal; it should not require
+  // a Hamiltonian path or throw when the exact path search would be expensive.
+  const auto ordered_sq =
+      LatticeGraph::square(4, 4, false, false, 1.0, true);
+  const auto ordered_sq_again =
+      LatticeGraph::square(4, 4, false, false, 1.0, true);
+  expect_dfs_ordered(ordered_sq, LatticeGraph::square(4, 4), "ordered_sq");
+  EXPECT_TRUE(ordered_sq.adjacency_matrix().isApprox(
+      ordered_sq_again.adjacency_matrix()));
+  EXPECT_EQ(*ordered_sq.edge_coloring(), *ordered_sq_again.edge_coloring());
+
+  expect_dfs_ordered(LatticeGraph::honeycomb(2, 2, false, true, 1.0, true),
+                     LatticeGraph::honeycomb(2, 2, false, true),
+                     "ordered_hc");
+  expect_dfs_ordered(LatticeGraph::kagome(2, 1, false, false, 1.0, 0, true),
+                     LatticeGraph::kagome(2, 1, false, false),
+                     "ordered_kg");
+}
+
+TEST_F(LatticeGraphTest, PermuteRejectsInvalidPath) {
+  auto graph = LatticeGraph::chain(4);
+
+  EXPECT_THROW(LatticeGraph::permute(graph, {0, 1, 2}), std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::permute(graph, {0, 1, 2, 4}),
+               std::invalid_argument);
+  EXPECT_THROW(LatticeGraph::permute(graph, {0, 1, 1, 2}),
+               std::invalid_argument);
 }

@@ -486,8 +486,9 @@ class LatticeGraph : public DataClass {
    * and remaps the edge coloring array to maintain consistency with the new vertex indices.
    *
    * @param graph The source lattice graph to be permuted.
-   * @param path A sequence of original vertex indices defining the new ordered layout.
+   * @param path A permutation of original vertex indices defining the new ordered layout.
    * @return A new LatticeGraph instance containing the permuted topology and updated edge colors.
+   * @throws std::invalid_argument If path is not a valid permutation of all graph vertices.
    */
   static LatticeGraph permute(const LatticeGraph& graph,
                               const std::vector<std::uint64_t>& path);

@@ -13,7 +13,6 @@
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <random>
-#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
@@ -29,102 +28,65 @@ static void add_edge(std::vector<Triplet>& triplets, int i, int j, double t) {
   triplets.emplace_back(j, i, t);
 }
 
-/**
- * @brief Depth-first search (DFS) helper to find a Hamiltonian path in a sparse
- * graph.
- *
- * This is a recursive backtracking search used by find_hamiltonian_path().
- * The current recursion branch appends curr to path, marks it as visited, and
- * then tries each unvisited neighbor reachable from curr. If a branch reaches
- * adj.rows() vertices, path contains a Hamiltonian path and the function
- * returns true. If no neighbor can complete the path, the function restores
- * visited/path to their previous state before returning false so the caller can
- * try a different branch.
- *
- * The routine treats every non-zero sparse adjacency entry as an edge and
- * ignores self-loops. It assumes visited has one entry per vertex and that path
- * contains the prefix chosen by earlier recursion frames. The search is exact
- * for the explored start vertex, but Hamiltonian-path search is exponential in
- * the worst case; callers should only use it for small lattice graphs or during
- * explicit graph reordering.
- *
- * @param curr    The vertex index currently being visited.
- * @param adj     The sparse adjacency matrix of the graph.
- * @param visited Tracks which vertices are already present in the current
- *                recursion branch; restored on backtracking.
- * @param path    Stores the candidate path prefix; contains the full
- *                Hamiltonian path on success and is restored on failure.
- * @return True if the current branch can be extended to a Hamiltonian path;
- *         false after fully backtracking from curr.
- */
-bool find_hamiltonian_path_dfs(std::uint64_t curr,
-                               const Eigen::SparseMatrix<double>& adj,
-                               std::vector<bool>& visited,
-                               std::vector<std::uint64_t>& path) {
-  path.push_back(curr);
-  if (path.size() == static_cast<std::size_t>(adj.rows())) {
-    return true;
-  }
-  visited[curr] = true;
+std::vector<std::uint64_t> dfs_traversal_order(
+    const Eigen::SparseMatrix<double>& adj) {
+  const auto vertex_count = static_cast<std::size_t>(adj.rows());
+  std::vector<std::vector<std::uint64_t>> neighbors(vertex_count);
 
-  // Iterate directly over the sparse matrix columns/rows for neighbors
-  for (Eigen::SparseMatrix<double>::InnerIterator it(adj, curr); it; ++it) {
-    std::uint64_t neighbor = it.row();
-    if (neighbor != curr && !visited[neighbor]) {
-      if (find_hamiltonian_path_dfs(neighbor, adj, visited, path)) {
-        return true;
+  for (int k = 0; k < adj.outerSize(); ++k) {
+    for (Eigen::SparseMatrix<double>::InnerIterator it(adj, k); it; ++it) {
+      if (it.value() == 0.0 || it.row() == it.col()) {
+        continue;
+      }
+      const auto row = static_cast<std::uint64_t>(it.row());
+      const auto col = static_cast<std::uint64_t>(it.col());
+      neighbors[static_cast<std::size_t>(row)].push_back(col);
+      neighbors[static_cast<std::size_t>(col)].push_back(row);
+    }
+  }
+
+  for (auto& row : neighbors) {
+    std::sort(row.begin(), row.end());
+    row.erase(std::unique(row.begin(), row.end()), row.end());
+  }
+
+  std::vector<bool> visited(vertex_count, false);
+  std::vector<std::uint64_t> path;
+  path.reserve(vertex_count);
+
+  std::vector<std::uint64_t> stack;
+  for (std::size_t start = 0; start < vertex_count; ++start) {
+    if (visited[start]) {
+      continue;
+    }
+
+    stack.push_back(static_cast<std::uint64_t>(start));
+    while (!stack.empty()) {
+      const auto curr = stack.back();
+      stack.pop_back();
+
+      const auto curr_idx = static_cast<std::size_t>(curr);
+      if (visited[curr_idx]) {
+        continue;
+      }
+      visited[curr_idx] = true;
+      path.push_back(curr);
+
+      const auto& curr_neighbors = neighbors[curr_idx];
+      for (auto it = curr_neighbors.rbegin(); it != curr_neighbors.rend();
+           ++it) {
+        if (!visited[static_cast<std::size_t>(*it)]) {
+          stack.push_back(*it);
+        }
       }
     }
   }
-  visited[curr] = false;
-  path.pop_back();
-  return false;
-}
 
-/**
- * @brief Search for a Hamiltonian path in the given sparse graph.
- *
- * Tries to find a path that visits every vertex exactly once, starting the
- * search from each possible vertex in the graph. The function delegates to a
- * recursive depth-first backtracking search for each candidate start vertex and
- * returns immediately when the first complete path is found.
- *
- * The returned path is a permutation of vertex indices in traversal order:
- * consecutive entries in the vector are connected by non-zero entries in adj.
- * Self-loops are ignored by the DFS helper and every non-zero sparse matrix
- * entry is treated as an edge. In practice this helper is used with symmetric
- * lattice adjacency matrices, so undirected edges are available from either
- * endpoint.
- *
- * This is an exact search over the explored graph, not a heuristic, but finding
- * a Hamiltonian path is NP-complete in general. The worst-case running time is
- * exponential in the number of vertices, so this helper is intended for small
- * lattice graphs and optional DFS-based reordering. If the graph is
- * disconnected or no Hamiltonian path exists, the function returns an empty
- * vector.
- *
- * @param adj The sparse adjacency matrix representing the graph.
- * @return A vector of vertex indices in path order, or an empty vector if no
- * path exists.
- */
-std::vector<std::uint64_t> find_hamiltonian_path(
-    const Eigen::SparseMatrix<double>& adj) {
-  std::uint64_t V = adj.rows();
-  std::vector<bool> visited(V, false);
-  std::vector<std::uint64_t> path;
-  for (std::uint64_t start = 0; start < V; ++start) {
-    if (find_hamiltonian_path_dfs(start, adj, visited, path)) {
-      return path;
-    }
-  }
-  return {};
+  return path;
 }
 
 LatticeGraph apply_dfs_ordering(const LatticeGraph& graph) {
-  auto path = find_hamiltonian_path(graph.sparse_adjacency_matrix());
-  if (path.empty()) {
-    throw std::runtime_error("No Hamiltonian path found in the lattice graph.");
-  }
+  auto path = dfs_traversal_order(graph.sparse_adjacency_matrix());
   return LatticeGraph::permute(graph, path);
 }
 
@@ -1084,18 +1046,45 @@ LatticeGraph LatticeGraph::permute(const LatticeGraph& graph,
   std::uint64_t V = graph.num_sites();
   const auto& adj = graph.sparse_adjacency_matrix();
 
+  if (V > static_cast<std::uint64_t>(std::numeric_limits<int>::max())) {
+    throw std::invalid_argument(
+        "LatticeGraph::permute graph has too many sites for Eigen's "
+        "permutation index type.");
+  }
+
+  const auto vertex_count = static_cast<std::size_t>(V);
+  if (path.size() != vertex_count) {
+    throw std::invalid_argument(
+        "LatticeGraph::permute path length must match graph.num_sites().");
+  }
+
+  std::vector<bool> seen(vertex_count, false);
+  for (std::size_t i = 0; i < vertex_count; ++i) {
+    const auto site = path[i];
+    if (site >= V) {
+      throw std::invalid_argument(
+          "LatticeGraph::permute path contains a vertex index out of range.");
+    }
+    const auto site_idx = static_cast<std::size_t>(site);
+    if (seen[site_idx]) {
+      throw std::invalid_argument(
+          "LatticeGraph::permute path must not contain duplicate vertices.");
+    }
+    seen[site_idx] = true;
+  }
+
   // Reorder the adjacency matrix using Eigen's PermutationMatrix
   Eigen::PermutationMatrix<Eigen::Dynamic, Eigen::Dynamic, int> P(
       static_cast<Eigen::Index>(V));
-  for (std::uint64_t i = 0; i < V; ++i) {
+  for (std::size_t i = 0; i < vertex_count; ++i) {
     P.indices()[static_cast<Eigen::Index>(i)] = static_cast<int>(path[i]);
   }
   Eigen::SparseMatrix<double> new_adj = P * adj * P.transpose();
   new_adj.makeCompressed();
 
-  std::vector<std::uint64_t> inv_p(V);
-  for (std::uint64_t i = 0; i < V; ++i) {
-    inv_p[path[i]] = i;
+  std::vector<std::uint64_t> inv_p(vertex_count);
+  for (std::size_t i = 0; i < vertex_count; ++i) {
+    inv_p[static_cast<std::size_t>(path[i])] = static_cast<std::uint64_t>(i);
   }
 
   std::optional<EdgeColoring> new_coloring = std::nullopt;
