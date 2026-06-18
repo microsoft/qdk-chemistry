@@ -90,6 +90,18 @@ if (-not $SkipPrereqs) {
         }
     }
 
+    # Fall back to standalone LLVM installations (winget / installer / chocolatey)
+    if (-not $clangCl) {
+        $standaloneCandidates = @(
+            "${env:ProgramFiles}\LLVM\bin\clang-cl.exe",
+            "${env:ProgramFiles(x86)}\LLVM\bin\clang-cl.exe",
+            "${env:LocalAppData}\Programs\LLVM\bin\clang-cl.exe"
+        )
+        foreach ($c in $standaloneCandidates) {
+            if (Test-Path $c) { $clangCl = $c; break }
+        }
+    }
+
     if (-not $clangCl) {
         Write-Host "clang-cl not found. Installing VS Build Tools with C++ and Clang components..." -ForegroundColor Magenta
         Write-Host "This requires an elevated (admin) PowerShell and will take several minutes."
@@ -128,6 +140,16 @@ if (-not $SkipPrereqs) {
                 "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
             )
             foreach ($c in $candidates) {
+                if (Test-Path $c) { $clangCl = $c; break }
+            }
+        }
+        if (-not $clangCl) {
+            $standaloneCandidates = @(
+                "${env:ProgramFiles}\LLVM\bin\clang-cl.exe",
+                "${env:ProgramFiles(x86)}\LLVM\bin\clang-cl.exe",
+                "${env:LocalAppData}\Programs\LLVM\bin\clang-cl.exe"
+            )
+            foreach ($c in $standaloneCandidates) {
                 if (Test-Path $c) { $clangCl = $c; break }
             }
         }
@@ -243,7 +265,10 @@ if (-not $SkipPrereqs) {
     $vsPath = & $vswhere -latest -products * -property installationPath 2>$null
     $candidates = @(
         "$vsPath\VC\Tools\Llvm\x64\bin\clang-cl.exe",
-        "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe"
+        "$vsPath\VC\Tools\Llvm\bin\clang-cl.exe",
+        "${env:ProgramFiles}\LLVM\bin\clang-cl.exe",
+        "${env:ProgramFiles(x86)}\LLVM\bin\clang-cl.exe",
+        "${env:LocalAppData}\Programs\LLVM\bin\clang-cl.exe"
     )
     foreach ($c in $candidates) {
         if (Test-Path $c) {
