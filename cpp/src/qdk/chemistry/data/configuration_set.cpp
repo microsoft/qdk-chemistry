@@ -413,6 +413,7 @@ ConfigurationSet ConfigurationSet::from_hdf5(H5::Group& group) {
       config._packed_orbs.assign(flat_data.begin() + i * packed_size,
                                  flat_data.begin() + (i + 1) * packed_size);
       config._bits_per_mode = bpm;
+      config._num_modes = orbital_capacity;
       configurations.push_back(std::move(config));
     }
 

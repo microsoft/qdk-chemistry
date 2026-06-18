@@ -33,7 +33,6 @@ When QPE acts on the qubitization walk operator :math:`W`, the eigenvalues are :
    E = \lambda \cos(2\pi\varphi)
 
 where :math:`\lambda = \sum_j |\alpha_j|` is the 1-norm of the Hamiltonian coefficients.
-No alias resolution is needed because the cosine maps the full :math:`[0, 1)` range to a unique energy in :math:`[-\lambda, \lambda]`.
 
 :class:`~qdk_chemistry.data.QpeResult` is the output of the :doc:`PhaseEstimation <../algorithms/phase_estimation>` algorithm and supports full :doc:`serialization <serialization>` to JSON and HDF5 formats.
 For details on how different :term:`QPE` implementations (:ref:`IQPE <iqpe-algorithm>`, :ref:`standard QFT-based <standard-qpe-algorithm>`) populate this result, see the :doc:`PhaseEstimation algorithm documentation <../algorithms/phase_estimation>`.
