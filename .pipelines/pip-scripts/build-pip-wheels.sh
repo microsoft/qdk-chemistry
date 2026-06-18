@@ -193,7 +193,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     ldd build/cp*/_core.*.so
 
     # Repair wheel
-    auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    auditwheel repair --plat manylinux_2_28 dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
