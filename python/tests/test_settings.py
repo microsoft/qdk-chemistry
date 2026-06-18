@@ -13,6 +13,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+try:
+    import pyscf  # noqa: F401
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
+
 from qdk_chemistry.data import (
     AlgorithmRef,
     SettingNotFoundError,
@@ -1391,6 +1398,7 @@ class TestAlgorithmRefSettings:
         with pytest.raises(ValueError, match="cannot be changed"):
             s.set("inner_algo", AlgorithmRef("wrong_type", "whatever"))
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_algorithm_ref_with_kwargs(self):
         """AlgorithmRef constructed with kwargs stores them in .settings."""
         ref = AlgorithmRef("scf_solver", "pyscf", max_iterations=200, method="dft")
@@ -1406,6 +1414,7 @@ class TestAlgorithmRefSettings:
         # In either case the construction must succeed.
         assert ref.settings is None or isinstance(ref.settings, Settings)
 
+    @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_single_level_nesting_in_settings(self):
         """An AlgorithmRef with kwargs can be stored in Settings."""
         s = _SettingsWithAlgorithmRef()
