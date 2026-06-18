@@ -19,7 +19,7 @@ from .base import UnitaryContainer
 if TYPE_CHECKING:
     from qdk_chemistry.data import Wavefunction
 
-__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select"]
+__all__ = ["BlockEncodingContainer", "ControlledOperation", "LCUContainer", "Select", "wavefunction_from_hdf5", "wavefunction_to_hdf5"]
 
 
 class BlockEncodingContainer(UnitaryContainer):
@@ -269,7 +269,7 @@ class LCUContainer(BlockEncodingContainer):
         group.attrs["power"] = self.power
         group.attrs["quantum_walk"] = self.quantum_walk
 
-        _wavefunction_to_hdf5(self.prepare, group.create_group("prepare"))
+        wavefunction_to_hdf5(self.prepare, group.create_group("prepare"))
         self.select.to_hdf5(group.create_group("select"))
 
     @classmethod
@@ -324,7 +324,7 @@ class LCUContainer(BlockEncodingContainer):
             LCUContainer: The deserialized instance.
 
         """
-        prepare = _wavefunction_from_hdf5(group["prepare"])
+        prepare = wavefunction_from_hdf5(group["prepare"])
 
         select = Select.from_hdf5(group["select"])
         quantum_walk = bool(group.attrs.get("quantum_walk", group.attrs.get("reflect", False)))
@@ -353,7 +353,7 @@ class LCUContainer(BlockEncodingContainer):
         )
 
 
-def _wavefunction_to_hdf5(wavefunction: "Wavefunction", group: h5py.Group) -> None:
+def wavefunction_to_hdf5(wavefunction: "Wavefunction", group: h5py.Group) -> None:
     """Serialize a Wavefunction into an h5py Group via a temp-file bridge.
 
     The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper
@@ -377,7 +377,7 @@ def _wavefunction_to_hdf5(wavefunction: "Wavefunction", group: h5py.Group) -> No
         os.unlink(tmp_path)
 
 
-def _wavefunction_from_hdf5(group: h5py.Group) -> "Wavefunction":
+def wavefunction_from_hdf5(group: h5py.Group) -> "Wavefunction":
     """Deserialize a Wavefunction from an h5py Group via a temp-file bridge.
 
     The C++ Wavefunction only exposes file-based HDF5 I/O.  This helper

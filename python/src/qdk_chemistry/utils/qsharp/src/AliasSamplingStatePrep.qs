@@ -18,6 +18,7 @@
 /// Reference: Babbush et al. arXiv:1805.03662, Fig. 11.
 namespace QDKChemistry.Utils.AliasSampling {
 
+    import Std.Arithmetic.ApplyIfGreaterLE;
     import Std.Arrays.MappedOverRange;
     import Std.Canon.ApplyToEachCA;
     import Std.Convert.IntAsBoolArray;
@@ -27,6 +28,8 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.StatePreparation.PrepareUniformSuperposition;
+    import Std.TableLookup.Select;
+    import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
@@ -136,22 +139,26 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nPadded = 1 <<< nIndexQubits;
         let barHeight = (1 <<< mu) - 1;
 
+        // Build QROM data table: (keep_ℓ, alt_ℓ) for each index
+        let selectData = MappedOverRange(
+            idx -> if idx < nCoeffs {
+                IntAsBoolArray(keepCoeff[idx], mu)
+                    + IntAsBoolArray(altIndex[idx], nIndexQubits)
+            } else {
+                IntAsBoolArray(barHeight, mu)
+                    + IntAsBoolArray(idx, nIndexQubits)
+            },
+            0..nPadded - 1
+        );
+
         // Step 1: Uniform superposition over L terms
         PrepareUniformSuperposition(nCoeffs, indexRegister);
 
         // Step 2: H⊗μ on comparison register
         ApplyToEachCA(H, uniformRegister);
 
-        // Step 3: QROM load (keep_ℓ, alt_ℓ)
-        // For simulation, use controlled writes.
-        for idx in 0..nPadded - 1 {
-            let keepVal = if idx < nCoeffs { keepCoeff[idx] } else { barHeight };
-            let altVal = if idx < nCoeffs { altIndex[idx] } else { idx };
-            let keepBits = IntAsBoolArray(keepVal, mu);
-            let altBits = IntAsBoolArray(altVal, nIndexQubits);
-            // Load via controlled-on-int (simulation path)
-            ApplyControlledOnInt(idx, LoadBits(keepBits + altBits, _), indexRegister, qromOutput);
-        }
+        // Step 3: QROM load via SELECT-SWAP network
+        SelectSwap(-1, selectData, indexRegister, qromOutput);
 
         // Step 4: Compare σ ≥ keep_ℓ → set flag
         let keepLoaded = qromOutput[0..mu - 1];
@@ -161,45 +168,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Step 5: Conditional swap index ↔ alt
         for i in 0..nIndexQubits - 1 {
             Controlled SWAP([flagQubit], (indexRegister[i], altLoaded[i]));
-        }
-    }
-
-    /// Load a classical bit pattern into a qubit register (X gates for 1-bits).
-    internal operation LoadBits(bits : Bool[], target : Qubit[]) : Unit is Adj + Ctl {
-        for i in 0..Length(bits) - 1 {
-            if bits[i] {
-                X(target[i]);
-            }
-        }
-    }
-
-    /// Comparison: if lhs > rhs (little-endian), flip target.
-    internal operation ApplyIfGreaterLE(
-        op : Qubit => Unit is Adj + Ctl,
-        lhs : Qubit[],
-        rhs : Qubit[],
-        target : Qubit,
-    ) : Unit is Adj + Ctl {
-        // Ripple comparison: use the standard comparison approach.
-        // For simulation, we use a simple controlled approach.
-        let n = Length(lhs);
-        use anc = Qubit[n];
-        // Compute borrow chain for lhs > rhs (i.e., rhs < lhs)
-        // This is a simplified simulation-mode comparator.
-        within {
-            // Compute comparison bits
-            for i in 0..n - 1 {
-                // anc[i] = carry from comparing bits [0..i]
-                CNOT(lhs[i], anc[i]);
-                CNOT(rhs[i], anc[i]);
-                if i > 0 {
-                    // Propagate carry
-                    Controlled X([anc[i - 1], rhs[i]], anc[i]);
-                }
-            }
-        } apply {
-            // If most significant borrow indicates lhs > rhs, apply op
-            Controlled op([anc[n - 1]], target);
         }
     }
 
@@ -233,6 +201,4 @@ namespace QDKChemistry.Utils.AliasSampling {
         return (numIndexQubits, numQubits);
     }
 
-    /// Helper needed for interop
-    import Std.Canon.ApplyControlledOnInt;
 }

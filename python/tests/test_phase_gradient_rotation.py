@@ -1,0 +1,216 @@
+"""Tests for PhaseGradient.qs: RzViaPhaseGradient and RyViaPhaseGradient.
+
+Validates that the phase gradient rotation operations produce correct
+Rz and Ry rotations by comparing simulation statevectors against
+analytically expected values.
+
+The rotation angle is θ = 4π·x/2^b where x is the integer encoded
+in angleQubits and b = Length(phaseGradient).
+"""
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
+import math
+from pathlib import Path
+
+import numpy as np
+import pytest
+import qdk
+
+_QS_DIR = Path(__file__).resolve().parent.parent / "src" / "qdk_chemistry" / "utils" / "qsharp"
+
+
+# ---------------------------------------------------------------------------
+# Q# wrappers — allocate qubits via QIR.Runtime so they persist for dump_machine.
+# Qubit layout: target[0], angle[0..n-1], pg[0..n-1].
+# ---------------------------------------------------------------------------
+
+_RZ_WRAPPER = """
+operation TestRz(angleValue : Int, nBits : Int) : Unit {
+    let target = QIR.Runtime.AllocateQubitArray(1);
+    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
+    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
+
+    H(target[0]);
+
+    for k in 0..nBits - 1 {
+        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+    }
+
+    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+    QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+}
+"""
+
+_RZ_ROUNDTRIP_WRAPPER = """
+operation TestRzRoundtrip(angleValue : Int, nBits : Int) : Unit {
+    let target = QIR.Runtime.AllocateQubitArray(1);
+    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
+    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
+
+    H(target[0]);
+
+    for k in 0..nBits - 1 {
+        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+    }
+
+    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+    QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+}
+"""
+
+_RY_WRAPPER = """
+operation TestRy(angleValue : Int, nBits : Int) : Unit {
+    let target = QIR.Runtime.AllocateQubitArray(1);
+    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
+    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
+
+    for k in 0..nBits - 1 {
+        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+    }
+
+    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+    QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+}
+"""
+
+_RY_ROUNDTRIP_WRAPPER = """
+operation TestRyRoundtrip(angleValue : Int, nBits : Int) : Unit {
+    let target = QIR.Runtime.AllocateQubitArray(1);
+    let angle  = QIR.Runtime.AllocateQubitArray(nBits);
+    let pg     = QIR.Runtime.AllocateQubitArray(nBits);
+
+    H(target[0]);
+
+    for k in 0..nBits - 1 {
+        if (angleValue >>> k) &&& 1 == 1 { X(angle[k]); }
+    }
+
+    QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+    QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient(target[0], angle, pg);
+    Adjoint QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(pg);
+}
+"""
+
+
+def _make_ctx(*wrappers: str) -> qdk.Context:
+    ctx = qdk.Context(project_root=str(_QS_DIR))
+    for w in wrappers:
+        ctx.eval(w)
+    return ctx
+
+
+def _reverse_bits(x: int, n: int) -> int:
+    """Reverse the bit order of *x* within an *n*-bit field."""
+    result = 0
+    for k in range(n):
+        if (x >> k) & 1:
+            result |= 1 << (n - 1 - k)
+    return result
+
+
+def _target_amps(sv: np.ndarray, x: int, n_bits: int) -> tuple[complex, complex]:
+    """Extract target qubit amplitudes from the full statevector.
+
+    Qubit layout (BE in dump_machine): qubit 0 = MSB.
+    Allocation order: target[0] (bit 2n), angle[0..n-1] (bits 2n-1..n), pg[0..n-1] (bits n-1..0).
+    After uncomputing pg → |0⟩ and angle = |x⟩ (LE), the angle's LE bits
+    map to descending bit positions, requiring bit-reversal of x.
+    """
+    angle_idx = _reverse_bits(x, n_bits) << n_bits
+    idx_0 = angle_idx  # target = |0⟩
+    idx_1 = angle_idx | (1 << (2 * n_bits))  # target = |1⟩
+    return sv[idx_0], sv[idx_1]
+
+
+class TestRzViaPhaseGradient:
+    """Tests for the RzViaPhaseGradient operation."""
+
+    @pytest.mark.parametrize(
+        "x, n",
+        [
+            (0, 4),  # θ = 0 → Rz = I
+            (1, 4),  # θ = π/4
+            (2, 4),  # θ = π/2
+            (4, 4),  # θ = π → Rz = diag(-i, i)
+            (8, 4),  # θ = 2π → Rz = -I
+            (3, 5),  # θ = 3π/8
+            (7, 4),  # θ = 7π/4
+        ],
+    )
+    def test_rotation_phase(self, x, n):
+        """Phase ratio amp(|0⟩)/amp(|1⟩) matches Rz(-4πx/2^n).
+
+        The CNOT-adder-CNOT pattern on the phase gradient eigenstate yields
+        diag(e^{+2πix/2^n}, e^{-2πix/2^n}), which is Rz(-4πx/2^n).
+        """
+        ctx = _make_ctx(_RZ_WRAPPER)
+        ctx.code.TestRz(x, n)
+        sv = np.array(ctx.dump_machine().as_dense_state())
+        a0, a1 = _target_amps(sv, x, n)
+
+        # Rz preserves amplitudes on |+⟩
+        np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
+        np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
+
+        # Rz(-θ)|+⟩ = (e^{iθ/2}|0⟩ + e^{-iθ/2}|1⟩)/√2  ⟹  a0/a1 = e^{iθ}
+        theta = 4.0 * math.pi * x / (1 << n)
+        np.testing.assert_allclose(a0 / a1, np.exp(1j * theta), atol=1e-6)
+
+    @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (7, 4)])
+    def test_adjoint_roundtrip(self, x, n):
+        """Rz followed by Adjoint Rz returns target to |+⟩."""
+        ctx = _make_ctx(_RZ_ROUNDTRIP_WRAPPER)
+        ctx.code.TestRzRoundtrip(x, n)
+        sv = np.array(ctx.dump_machine().as_dense_state())
+        a0, a1 = _target_amps(sv, x, n)
+
+        np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
+        np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
+        np.testing.assert_allclose(a0 / a1, 1.0, atol=1e-8)
+
+
+class TestRyViaPhaseGradient:
+    """Tests for the RyViaPhaseGradient operation."""
+
+    @pytest.mark.parametrize(
+        "x, n",
+        [
+            (0, 4),  # θ = 0 → Ry = I
+            (1, 4),  # θ = π/4
+            (2, 4),  # θ = π/2
+            (4, 4),  # θ = π → Ry|0⟩ = |1⟩
+            (3, 5),  # θ = 3π/8
+            (7, 4),  # θ = 7π/4
+        ],
+    )
+    def test_rotation_probabilities(self, x, n):
+        """P(|0⟩) = cos²(θ/2), P(|1⟩) = sin²(θ/2) with θ = 4πx/2^n."""
+        ctx = _make_ctx(_RY_WRAPPER)
+        ctx.code.TestRy(x, n)
+        sv = np.array(ctx.dump_machine().as_dense_state())
+        a0, a1 = _target_amps(sv, x, n)
+
+        theta = 4.0 * math.pi * x / (1 << n)
+        np.testing.assert_allclose(abs(a0) ** 2, math.cos(theta / 2) ** 2, atol=1e-6)
+        np.testing.assert_allclose(abs(a1) ** 2, math.sin(theta / 2) ** 2, atol=1e-6)
+
+    @pytest.mark.parametrize("x, n", [(1, 4), (5, 5), (3, 4)])
+    def test_adjoint_roundtrip(self, x, n):
+        """Ry followed by Adjoint Ry returns target to |+⟩."""
+        ctx = _make_ctx(_RY_ROUNDTRIP_WRAPPER)
+        ctx.code.TestRyRoundtrip(x, n)
+        sv = np.array(ctx.dump_machine().as_dense_state())
+        a0, a1 = _target_amps(sv, x, n)
+
+        np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
+        np.testing.assert_allclose(abs(a1), 1 / math.sqrt(2), atol=1e-8)
+        np.testing.assert_allclose(a0 / a1, 1.0, atol=1e-8)

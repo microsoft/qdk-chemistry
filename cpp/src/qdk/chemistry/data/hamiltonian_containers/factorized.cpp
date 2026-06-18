@@ -52,7 +52,11 @@ std::unique_ptr<HamiltonianContainer> FactorizedHamiltonianContainer::clone()
   // Reconstruct from stored data. The base-class SBT one-body
   // is immutable/shared, but for clone we go through the dense ctor.
   auto [h1_alpha, h1_beta] = get_one_body_integrals();
-  auto [fock_alpha, fock_beta] = get_inactive_fock_matrix();
+  Eigen::MatrixXd fock_alpha = Eigen::MatrixXd::Zero(0, 0);
+  if (has_inactive_fock_matrix()) {
+    auto [fa, fb] = get_inactive_fock_matrix();
+    fock_alpha = fa;
+  }
   return std::make_unique<FactorizedHamiltonianContainer>(
       h1_alpha, _u, _w, _wb, _num_ranks, _num_bases, _num_copies, _orbitals,
       _core_energy, fock_alpha, _bliss_core_shift, _energy_gap, _type);
@@ -205,9 +209,13 @@ size_t FactorizedHamiltonianContainer::get_num_orbitals() const {
   return _orbitals->get_active_space_indices().first.size();
 }
 
-size_t FactorizedHamiltonianContainer::get_num_ranks() const { return _num_ranks; }
+size_t FactorizedHamiltonianContainer::get_num_ranks() const {
+  return _num_ranks;
+}
 
-size_t FactorizedHamiltonianContainer::get_num_bases() const { return _num_bases; }
+size_t FactorizedHamiltonianContainer::get_num_bases() const {
+  return _num_bases;
+}
 
 size_t FactorizedHamiltonianContainer::get_num_copies() const {
   return _num_copies;
@@ -253,8 +261,7 @@ double FactorizedHamiltonianContainer::get_lambda_eff() const {
   double lambda = get_lambda();
   double eg = _energy_gap;
   if (eg <= 0.0) {
-    throw std::runtime_error(
-        "E_gap must be positive for a valid SOS walk");
+    throw std::runtime_error("E_gap must be positive for a valid SOS walk");
   }
   if (eg >= 2.0 * lambda) {
     throw std::runtime_error(
@@ -396,8 +403,8 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
 
   // Version
-  H5::Attribute version_attr = group.createAttribute(
-      "version", string_type, H5::DataSpace(H5S_SCALAR));
+  H5::Attribute version_attr =
+      group.createAttribute("version", string_type, H5::DataSpace(H5S_SCALAR));
   std::string v(SERIALIZATION_VERSION);
   version_attr.write(string_type, v);
 
@@ -408,38 +415,42 @@ void FactorizedHamiltonianContainer::to_hdf5(H5::Group& group) const {
   ct_attr.write(string_type, ct);
 
   // Scalar attributes
-  group.createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_core_energy);
-  group.createAttribute("bliss_core_shift", H5::PredType::NATIVE_DOUBLE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("bliss_core_shift", H5::PredType::NATIVE_DOUBLE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_bliss_core_shift);
-  group.createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("energy_gap", H5::PredType::NATIVE_DOUBLE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_DOUBLE, &_energy_gap);
 
   hsize_t r_val = _num_ranks, b_val = _num_bases, c_val = _num_copies;
-  group.createAttribute("num_ranks", H5::PredType::NATIVE_HSIZE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("num_ranks", H5::PredType::NATIVE_HSIZE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &r_val);
-  group.createAttribute("num_bases", H5::PredType::NATIVE_HSIZE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("num_bases", H5::PredType::NATIVE_HSIZE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &b_val);
-  group.createAttribute("num_copies", H5::PredType::NATIVE_HSIZE,
-                        H5::DataSpace(H5S_SCALAR))
+  group
+      .createAttribute("num_copies", H5::PredType::NATIVE_HSIZE,
+                       H5::DataSpace(H5S_SCALAR))
       .write(H5::PredType::NATIVE_HSIZE, &c_val);
 
   // Datasets
-  auto write_vector = [&](const std::string& name,
-                          const Eigen::VectorXd& vec) {
+  auto write_vector = [&](const std::string& name, const Eigen::VectorXd& vec) {
     hsize_t dims = vec.size();
     H5::DataSpace space(1, &dims);
     auto ds = group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, space);
     ds.write(vec.data(), H5::PredType::NATIVE_DOUBLE);
   };
 
-  auto write_matrix = [&](const std::string& name,
-                          const Eigen::MatrixXd& mat) {
+  auto write_matrix = [&](const std::string& name, const Eigen::MatrixXd& mat) {
     hsize_t dims[2] = {static_cast<hsize_t>(mat.rows()),
                        static_cast<hsize_t>(mat.cols())};
     H5::DataSpace space(2, dims);
@@ -484,12 +495,9 @@ FactorizedHamiltonianContainer::from_hdf5(H5::Group& group) {
       .read(H5::PredType::NATIVE_DOUBLE, &energy_gap);
 
   hsize_t r_val, b_val, c_val;
-  group.openAttribute("num_ranks")
-      .read(H5::PredType::NATIVE_HSIZE, &r_val);
-  group.openAttribute("num_bases")
-      .read(H5::PredType::NATIVE_HSIZE, &b_val);
-  group.openAttribute("num_copies")
-      .read(H5::PredType::NATIVE_HSIZE, &c_val);
+  group.openAttribute("num_ranks").read(H5::PredType::NATIVE_HSIZE, &r_val);
+  group.openAttribute("num_bases").read(H5::PredType::NATIVE_HSIZE, &b_val);
+  group.openAttribute("num_copies").read(H5::PredType::NATIVE_HSIZE, &c_val);
 
   auto read_vector = [&](const std::string& name) -> Eigen::VectorXd {
     auto ds = group.openDataSet(name);
@@ -543,14 +551,14 @@ void FactorizedHamiltonianContainer::validate_integral_dimensions() const {
   size_t expected_w = _num_ranks * _num_bases * _num_copies;
 
   if (static_cast<size_t>(_u.size()) != expected_u) {
-    throw std::invalid_argument(
-        "U matrices size mismatch: expected " + std::to_string(expected_u) +
-        ", got " + std::to_string(_u.size()));
+    throw std::invalid_argument("U matrices size mismatch: expected " +
+                                std::to_string(expected_u) + ", got " +
+                                std::to_string(_u.size()));
   }
   if (static_cast<size_t>(_w.size()) != expected_w) {
-    throw std::invalid_argument(
-        "W matrices size mismatch: expected " + std::to_string(expected_w) +
-        ", got " + std::to_string(_w.size()));
+    throw std::invalid_argument("W matrices size mismatch: expected " +
+                                std::to_string(expected_w) + ", got " +
+                                std::to_string(_w.size()));
   }
   if (_wb.rows() != static_cast<Eigen::Index>(_num_ranks) ||
       _wb.cols() != static_cast<Eigen::Index>(_num_copies)) {
@@ -572,9 +580,9 @@ void FactorizedHamiltonianContainer::hash_update(
   hash_value(ctx, static_cast<int64_t>(_num_copies));
   hash_value(ctx, _bliss_core_shift);
   hash_value(ctx, _energy_gap);
-  hash_eigen(ctx, _u);
-  hash_eigen(ctx, _w);
-  hash_eigen(ctx, _wb);
+  hash_value(ctx, _u);
+  hash_value(ctx, _w);
+  hash_value(ctx, _wb);
 }
 
 }  // namespace qdk::chemistry::data

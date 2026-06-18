@@ -50,7 +50,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build an outer PREPARE using coherent pure-state preparation.
     function MakeOuterPreparePureState(
-        statevector : Double[],
+        statevector : Double[]
     ) : (Qubit[]) => Unit is Adj + Ctl {
         qs => PreparePureStateD(statevector, qs)
     }
@@ -89,7 +89,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build an inner PREPARE using direct controlled preparation.
     function MakeInnerPrepareDirect(
-        innerCoefficients : Double[][],
+        innerCoefficients : Double[][]
     ) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         (outerReg, innerReg) => {
             let xo = Length(innerCoefficients);
@@ -122,7 +122,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build a SELECT using QROM + phase gradient rotation.
     function MakeSelectPhaseGradient(
-        params : SelectParams,
+        params : SelectParams
     ) : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
         // TODO: Replace with QROM angle load + phase gradient adder.
         // For now, uses direct Ry rotations as simulation placeholder.
@@ -133,7 +133,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build a SELECT using direct rotation synthesis.
     function MakeSelectDirectRotation(
-        params : SelectParams,
+        params : SelectParams
     ) : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl {
         (outerReg, innerReg, spinReg, systemReg) => {
             SelectImpl(params, outerReg, innerReg, spinReg, systemReg);
@@ -290,8 +290,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             for _ in 0..power - 1 {
                 Controlled SOSSAWalkStep(
                     [control],
-                    (outerPrepareOp, innerPrepareOp, selectOp,
-                     outerReg, innerReg, spinReg, systemReg),
+                    (outerPrepareOp, innerPrepareOp, selectOp, outerReg, innerReg, spinReg, systemReg),
                 );
             }
         }
@@ -313,8 +312,13 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         use control = Qubit();
         use allQubits = Qubit[totalAncilla + numSystemQubits];
         let op = MakeControlledSOSSAWalkOp(
-            outerPrepareOp, innerPrepareOp, selectOp,
-            numSystemQubits, numOuterQubits, numInnerQubits, power,
+            outerPrepareOp,
+            innerPrepareOp,
+            selectOp,
+            numSystemQubits,
+            numOuterQubits,
+            numInnerQubits,
+            power,
         );
         op(control, allQubits);
     }
