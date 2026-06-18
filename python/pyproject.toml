@@ -47,7 +47,7 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,test]"
+  "qdk-chemistry[coverage,dev,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]"
 ]
 coverage = [
   "coverage",
@@ -98,8 +98,11 @@ qiskit-extras = [
   "pylatexenc==2.10; python_version < '3.14'",
   "requests>=2.33.0; python_version < '3.14'"
 ]
+qre = [
+  "qdk[qre,jupyter]>=1.29.1; python_version >= '3.11'"
+]
 test = [
-  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras]",
+  "qdk-chemistry[coverage,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "nbclient",
   "nbformat",
   "pennylane",
