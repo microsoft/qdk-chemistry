@@ -1101,8 +1101,8 @@ class MacisPmcTest : public ::testing::Test {
     // Configuration 2: "22u0d0" (mixed occupation)
     configs.push_back(Configuration::from_spin_half_string("22u0d0"));
 
-    // Configuration 3: "220020" (different pattern)
-    configs.push_back(Configuration::from_spin_half_string("22020"));
+    // Configuration 3: "220200" (different pattern)
+    configs.push_back(Configuration::from_spin_half_string("220200"));
 
     return configs;
   }
@@ -1318,7 +1318,7 @@ TEST_P(ThrowsOnUnrestrictedHamiltonianTest, ThrowsOnUnrestrictedHamiltonian) {
     std::vector<Configuration> configs;
     configs.push_back(Configuration::from_spin_half_string("222000"));
     configs.push_back(Configuration::from_spin_half_string("22u0d0"));
-    configs.push_back(Configuration::from_spin_half_string("22020"));
+    configs.push_back(Configuration::from_spin_half_string("220200"));
     EXPECT_THROW(calculator->run(hamiltonian, configs), std::runtime_error);
   } else {
     auto calculator = MultiConfigurationCalculatorFactory::create(calc_name);
