@@ -71,7 +71,7 @@ steps:
 # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
 # same environment for C++ tracing to work; using target: keeps them in the container.
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
-  - ${{ if neq(parameters.march, 'armv8-a') }}:
+  - ${{ if ne(parameters.march, 'armv8-a') }}:
     - task: CodeQL3000Init@0
       target: ${{ parameters.containerName }}
       displayName: 🛡🛡 CodeQL Initialize
@@ -98,7 +98,7 @@ steps:
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
-  - ${{ if neq(parameters.march, 'armv8-a') }}:
+  - ${{ if ne(parameters.march, 'armv8-a') }}:
     # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
     # - ${{ if eq(target.arch, 'x86_64') }}:
     - task: CodeQL3000Finalize@0
