@@ -217,16 +217,6 @@ extends:
             "
           displayName: Install sudo in build container
 
-        # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
-        # same environment for C++ tracing to work; using target: keeps them in the container.
-        # - ${{ if eq(parameters.target.arch, 'x86_64') }}:
-        - task: CodeQL3000Init@0
-          target: linux_build_container
-          displayName: 🛡🛡 CodeQL Initialize
-          inputs:
-            languages: cpp,python
-            sourceRoot: $(Agent.BuildDirectory)/qdk-chemistry
-
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
           parameters:
@@ -237,13 +227,6 @@ extends:
             pythonVersion: $(pythonVersion)
             devTag: ${{ parameters.devTag }}
             containerName: linux_build_container
-
-        # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
-        # - ${{ if eq(target.arch, 'x86_64') }}:
-        - task: CodeQL3000Finalize@0
-          target: linux_build_container
-          condition: always()
-          displayName: 🛡🛡 CodeQL Finalize
 
         - template: .pipelines/templates/test-pip-wheels.yml@self
           parameters:

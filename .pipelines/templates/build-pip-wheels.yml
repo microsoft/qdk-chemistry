@@ -68,7 +68,17 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
+# CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
+# same environment for C++ tracing to work; using target: keeps them in the container.
 - ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - ${{ if neq(parameters.march, 'armv8-a') }}:
+    - task: CodeQL3000Init@0
+      target: ${{ parameters.containerName }}
+      displayName: 🛡🛡 CodeQL Initialize
+      inputs:
+        languages: cpp,python
+        sourceRoot: $(Agent.BuildDirectory)/qdk-chemistry
+
   - script: |
       echo "Running pip wheel build (Linux ${{ parameters.march }})..."
       cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry
@@ -87,6 +97,14 @@ steps:
     target: ${{ parameters.containerName }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+
+  - ${{ if neq(parameters.march, 'armv8-a') }}:
+    # CodeQL Finalize - x86_64 Linux only (condition: always() so it runs even on build failure)
+    # - ${{ if eq(target.arch, 'x86_64') }}:
+    - task: CodeQL3000Finalize@0
+      target: ${{ parameters.containerName }}
+      condition: always()
+      displayName: 🛡🛡 CodeQL Finalize
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
