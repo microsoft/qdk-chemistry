@@ -192,7 +192,11 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel
+    # Repair wheel. --plat manylinux_2_28 pins the glibc floor to 2.28 so the
+    # wheel installs on any reasonably modern distro (Ubuntu 20.04+, Azure Linux 3).
+    # Without it auditwheel defaults to the host glibc (2.39 on Azure Linux 3),
+    # producing a wheel that pip inside the conda testenv rejects because conda's
+    # Python for Azure Linux 3 reports manylinux_2_35 as its platform ceiling.
     auditwheel repair --plat manylinux_2_28 dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
