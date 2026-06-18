@@ -30,6 +30,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         fmt-devel \
         gcc \
         gcc-c++ \
+        gcc-gfortran \
         git \
         glibc-devel \
         gtest-devel \
