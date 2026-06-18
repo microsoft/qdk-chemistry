@@ -33,7 +33,7 @@ _QISKIT_BUILDER = "qiskit"
 
 def _make_hadamard_test(builder_name: str, test_basis: HadamardTestBasis = HadamardTestBasis.X):
     """Create a Hadamard test configured to use the given circuit builder backend."""
-    hadamard_test = create("hadamard_test", test_basis=test_basis)
+    hadamard_test = create("hadamard_test", test_basis=test_basis.value)
     hadamard_test.settings().set("circuit_builder", AlgorithmRef("hadamard_test_circuit_builder", builder_name))
     return hadamard_test
 
