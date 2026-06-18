@@ -60,6 +60,8 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         """
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
         num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
+        if num_ancilla_qubits < 0:
+            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
 
         Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 

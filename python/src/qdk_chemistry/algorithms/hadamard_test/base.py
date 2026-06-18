@@ -111,7 +111,7 @@ class HadamardTest(Algorithm):
         self._settings = HadamardTestSettings()
         self._settings.set("test_basis", test_basis.value)
         if num_ancilla_qubits < 0:
-            raise ValueError("num_ancilla_qubits must be a positive integer.")
+            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
         self._settings.set("num_ancilla_qubits", num_ancilla_qubits)
 
     def type_name(self) -> str:
@@ -149,6 +149,8 @@ class HadamardTest(Algorithm):
 
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
         num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
+        if num_ancilla_qubits < 0:
+            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
 
         circuit_builder = self._create_nested("circuit_builder")
         circuit_builder.settings().set("test_basis", test_basis.value)

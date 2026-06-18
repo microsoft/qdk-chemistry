@@ -170,6 +170,21 @@ def test_hadamard_test_rejects_invalid_test_basis() -> None:
         hadamard_test.settings().set("test_basis", "InvalidBasis")
 
 
+def test_hadamard_test_rejects_negative_num_ancilla_qubits_setting(
+    water_hadamard_benchmark: HadamardWaterBenchmark,
+) -> None:
+    """Negative ancilla qubit settings are rejected at run time."""
+    hadamard_test = create("hadamard_test")
+    hadamard_test.settings().set("num_ancilla_qubits", -1)
+
+    with pytest.raises(ValueError, match="non-negative integer"):
+        hadamard_test.run(
+            water_hadamard_benchmark.state_preparation,
+            water_hadamard_benchmark.unitary,
+            shots=_SHOTS,
+        )
+
+
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
     water_hadamard_benchmark: HadamardWaterBenchmark,
