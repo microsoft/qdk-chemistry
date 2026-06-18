@@ -258,6 +258,10 @@ def test_factory_list():
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
 )
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
+)
 def test_state_prep_energy():
     """Test the examples/state_prep_energy.ipynb notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
@@ -285,6 +289,10 @@ def test_state_prep_energy():
 @pytest.mark.skipif(
     not QDK_CHEMISTRY_HAS_QISKIT,
     reason="Qiskit dependencies not available",
+)
+@pytest.mark.skipif(
+    not PYSCF_AVAILABLE,
+    reason="PySCF not available",
 )
 def test_qpe_stretched_n2():
     """Test the examples/qpe_stretched_n2.ipynb notebook executes without errors."""
