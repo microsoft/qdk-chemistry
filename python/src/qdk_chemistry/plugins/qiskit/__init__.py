@@ -57,7 +57,9 @@ def qiskit_load():
     Logger.trace_entering()
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
-    from qdk_chemistry.plugins.qiskit.hadamard_test import QiskitHadamardTestCircuitBuilder  # noqa: PLC0415
+    from qdk_chemistry.plugins.qiskit.hadamard_test_circuit_builder import (  # noqa: PLC0415
+        QiskitHadamardTestCircuitBuilder,
+    )
     from qdk_chemistry.plugins.qiskit.phase_estimation_circuit_builder import (  # noqa: PLC0415
         QiskitIterativeQpeCircuitBuilder,
         QiskitStandardQpeCircuitBuilder,
