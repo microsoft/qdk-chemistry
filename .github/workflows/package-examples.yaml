@@ -1,0 +1,38 @@
+name: Package Examples
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  package-examples:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Create zip
+      run: |
+        mkdir -p dist
+        VERSION="${{ github.event.release.tag_name }}"
+        zip -r "dist/qdk-chemistry-examples-${VERSION}.zip" examples
+
+    - name: Upload workflow artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: qdk-chemistry-examples-zip
+        path: dist/*.zip
+
+    - name: Upload release asset
+      if: github.event_name == 'release'
+      run: |
+        gh release upload \
+          "${{ github.event.release.tag_name }}" \
+          "dist/qdk-chemistry-examples-${{ github.event.release.tag_name }}.zip" \
+          --clobber
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
