@@ -134,11 +134,12 @@ def test_qiskit_hadamard_generator_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Qiskit Hadamard generator reproduces the Y-basis reference observable for water."""
-    result = _make_hadamard_test(_QISKIT_BUILDER).run(
+    hadamard_test = _make_hadamard_test(_QISKIT_BUILDER)
+    hadamard_test.settings().set("test_basis", HadamardTestBasis.Y.value)
+    result = hadamard_test.run(
         water_hadamard_benchmark.state_preparation,
         water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        test_basis=HadamardTestBasis.Y,
     )
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
@@ -151,11 +152,12 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Q# Hadamard generator reproduces the Y-basis reference observable for water."""
-    result = _make_hadamard_test(_QDK_BUILDER).run(
+    hadamard_test = _make_hadamard_test(_QDK_BUILDER)
+    hadamard_test.settings().set("test_basis", HadamardTestBasis.Y.value)
+    result = hadamard_test.run(
         water_hadamard_benchmark.state_preparation,
         water_hadamard_benchmark.unitary,
         shots=_SHOTS,
-        test_basis=HadamardTestBasis.Y,
     )
     counts = result.bitstring_counts
     observable_value = (counts.get("0", 0) - counts.get("1", 0)) / _SHOTS
@@ -163,30 +165,11 @@ def test_qdk_hadamard_test_measures_water_observable_in_y_basis(
     assert np.isclose(observable_value, 0.98, atol=1e-12)
 
 
-@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
-def test_qiskit_hadamard_generator_rejects_invalid_test_basis() -> None:
-    """Qiskit generator rejects unsupported Hadamard measurement bases."""
-    state_prep_qc = QuantumCircuit(1, name="state")
-
-    with pytest.raises(TypeError, match="HadamardTestBasis"):
-        _make_hadamard_test(_QISKIT_BUILDER).run(
-            Circuit(qasm=qasm3.dumps(state_prep_qc)),
-            object(),
-            shots=_SHOTS,
-            test_basis="Z",
-        )
-
-
-@pytest.mark.skipif(not _HAS_QSHARP, reason="Q# not available")
-def test_qdk_hadamard_test_rejects_invalid_test_basis() -> None:
-    """Q# generator rejects unsupported Hadamard measurement bases."""
-    with pytest.raises(TypeError, match="HadamardTestBasis"):
-        _make_hadamard_test(_QDK_BUILDER).run(  # type: ignore[arg-type]
-            object(),
-            object(),
-            shots=_SHOTS,
-            test_basis="Z",
-        )
+def test_hadamard_test_rejects_invalid_test_basis() -> None:
+    """Setting an unsupported measurement basis is rejected."""
+    hadamard_test = create("hadamard_test")
+    with pytest.raises(ValueError, match="allowed options"):
+        hadamard_test.settings().set("test_basis", "InvalidBasis")
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -201,7 +184,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
             object(),
             water_hadamard_benchmark.unitary,
             shots=_SHOTS,
-            test_basis=HadamardTestBasis.X,
         )
 
     with pytest.raises(TypeError, match="UnitaryRepresentation"):
@@ -209,7 +191,6 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
             Circuit(qasm=qasm3.dumps(QuantumCircuit(1))),
             object(),
             shots=_SHOTS,
-            test_basis=HadamardTestBasis.X,
         )
 
 
@@ -226,7 +207,6 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
             bad_state_preparation_circuit,
             water_hadamard_benchmark.unitary,
             shots=_SHOTS,
-            test_basis=HadamardTestBasis.X,
         )
 
     with pytest.raises(TypeError, match="UnitaryRepresentation"):
@@ -234,7 +214,6 @@ def test_qdk_hadamard_test_rejects_incompatible_input_circuits(
             water_hadamard_benchmark.state_preparation,
             object(),
             shots=_SHOTS,
-            test_basis=HadamardTestBasis.X,
         )
 
 
@@ -243,9 +222,14 @@ def test_hadamard_test_accepts_explicit_mapper(
     water_hadamard_benchmark: HadamardWaterBenchmark,
 ) -> None:
     """Explicit controlled circuit mapper setting is honored."""
-    hadamard_test = _make_hadamard_test(_QISKIT_BUILDER)
+    hadamard_test = create("hadamard_test")
     hadamard_test.settings().set(
-        "controlled_circuit_mapper", AlgorithmRef("controlled_circuit_mapper", "pauli_sequence")
+        "circuit_builder",
+        AlgorithmRef(
+            "hadamard_test_circuit_builder",
+            _QISKIT_BUILDER,
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        ),
     )
 
     result = hadamard_test.run(

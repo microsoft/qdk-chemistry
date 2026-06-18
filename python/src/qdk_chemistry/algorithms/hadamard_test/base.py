@@ -54,8 +54,9 @@ class HadamardTestSettings(Settings):
     def __init__(self):
         """Initialize the settings for the Hadamard test.
 
-        Includes nested algorithm references for the circuit builder,
-        the controlled circuit mapper and the circuit executor.
+        Includes nested algorithm references for the circuit builder and the
+        circuit executor, the measurement basis for the control qubit, and the
+        number of ancilla qubits.
 
         """
         super().__init__()
@@ -68,6 +69,19 @@ class HadamardTestSettings(Settings):
             "circuit_executor",
             "algorithm_ref",
             AlgorithmRef("circuit_executor", "qdk_full_state_simulator"),
+        )
+        self._set_default(
+            "test_basis",
+            "string",
+            HadamardTestBasis.X.value,
+            "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
+            [basis.value for basis in HadamardTestBasis],
+        )
+        self._set_default(
+            "num_ancilla_qubits",
+            "int",
+            0,
+            "Number of ancilla qubits needed by the controlled evolution (0 if none).",
         )
 
 
@@ -95,31 +109,30 @@ class HadamardTest(Algorithm):
         state_preparation_circuit: Circuit,
         unitary: UnitaryRepresentation,
         shots: int,
-        test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ) -> CircuitExecutorData:
         r"""Run the Hadamard test by building and executing a backend-specific circuit.
+
+        The measurement basis and ancilla count are read from this algorithm's settings
+        (``test_basis`` and ``num_ancilla_qubits``).
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
             shots: Number of shots to execute the circuit.
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             CircuitExecutorData returned directly by the given simulator.
 
         """
-        if not isinstance(test_basis, HadamardTestBasis):
-            raise TypeError("test_basis must be an instance of HadamardTestBasis.")
         if not isinstance(unitary, UnitaryRepresentation):
             raise TypeError("unitary must be an instance of UnitaryRepresentation.")
         if not isinstance(shots, int):
             raise TypeError("shots must be an integer.")
         if shots <= 0:
             raise ValueError("shots must be a positive integer.")
+
+        test_basis = HadamardTestBasis(self._settings.get("test_basis"))
+        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
 
         circuit_builder = self._create_nested("circuit_builder")
         circuit_builder.settings().set("test_basis", test_basis.value)
