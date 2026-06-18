@@ -346,8 +346,8 @@ if (-not $SkipCpp) {
         Write-Host ""
         Write-Host "=== Step 3: Run C++ tests ===" -ForegroundColor Yellow
         Push-Location "$BuildDir"
-        $env:OMP_NUM_THREADS = 4
-        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST"
+        $env:OMP_NUM_THREADS = 2
+        ctest --output-on-failure --verbose --timeout 400 --output-junit ctest_results.xml -E "MACIS_SERIAL_TEST" 2>&1 *> ctest.log
         $ctestExit = $LASTEXITCODE
         Pop-Location
         if ($ctestExit -ne 0) {
@@ -400,8 +400,8 @@ if (-not $SkipPython) {
     if (-not $SkipTests) {
         Write-Host ""
         Write-Host "=== Step 6: Run Python tests ===" -ForegroundColor Yellow
-        $env:OMP_NUM_THREADS = 4
-        pytest -v --tb=short
+        $env:OMP_NUM_THREADS = 2
+        pytest -v --tb=short 2>&1 *> pytest.log
         $pytestExit = $LASTEXITCODE
         if ($pytestExit -ne 0) {
             Write-Warning "Some Python tests failed (exit code: $pytestExit)"
