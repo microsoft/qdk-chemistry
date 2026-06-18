@@ -177,7 +177,7 @@ def test_qiskit_hadamard_generator_rejects_incompatible_input_circuits(
     """Qiskit generator raises errors when inputs cannot produce Qiskit circuits."""
     generator = _make_hadamard_test(_QISKIT_BUILDER)
 
-    with pytest.raises(ValueError, match="state_preparation"):
+    with pytest.raises(TypeError, match="state_preparation"):
         generator.run(  # type: ignore[arg-type]
             object(),
             water_hadamard_benchmark.unitary,
