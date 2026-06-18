@@ -27,16 +27,19 @@ from __future__ import annotations
 
 import itertools
 import math
+from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from qdk_chemistry.data import PauliTermAccumulator
+from qdk_chemistry.utils.zassenhaus_generation import zassenhaus_commutator_plan
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping
 
     from qdk_chemistry.data import QubitHamiltonian
+    from qdk_chemistry.utils.zassenhaus_generation import PlanExpr, PlanTerm
 
 __all__: list[str] = [
     "commutator",
@@ -49,6 +52,8 @@ __all__: list[str] = [
     "do_pauli_maps_qw_commute",
     "does_nested_commutator_vanish",
     "get_commutation_checker",
+    "zassenhaus_coefficient_sum",
+    "zassenhaus_omitted_commutator_norm",
 ]
 
 
@@ -404,3 +409,107 @@ def commutator_bound_higher_order(
         if not does_nested_commutator_vanish(*labels):
             total += (2.0**order) * math.prod(abs_coeffs[i] for i in idx_tuple)
     return total
+
+
+def zassenhaus_coefficient_sum(
+    *,
+    order: int,
+    num_terms: int,
+    commutator_exponents: Mapping[int, PlanExpr] | None = None,
+) -> float:
+    r"""Return the absolute coefficient sum for the first omitted exponent.
+
+    An order-``p`` Zassenhaus approximation keeps correction exponents through
+    ``C_p``.  The leading omitted local remainder is therefore ``C_{p+1}``.
+    For the naive bound we combine like symbolic commutators and use
+    ``sum(abs(c_w))`` over the terms in ``C_{p+1}``.
+    """
+    if num_terms < 2:
+        return 0.0
+
+    omitted_order = order + 1
+    if commutator_exponents is None:
+        commutator_exponents, _ = zassenhaus_commutator_plan(
+            tuple(range(num_terms)),
+            max_order=omitted_order,
+        )
+
+    if omitted_order not in commutator_exponents:
+        raise ValueError(f"commutator_exponents must include Zassenhaus exponent C_{omitted_order} for order {order}.")
+
+    return float(sum(abs(coeff) for coeff in commutator_exponents[omitted_order].values()))
+
+
+def _combine_hamiltonian_terms(
+    terms: Mapping[str, complex],
+    *,
+    num_qubits: int,
+    weight_threshold: float,
+) -> QubitHamiltonian:
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    filtered = [(label, coeff) for label, coeff in terms.items() if abs(coeff) > weight_threshold]
+    if not filtered:
+        return QubitHamiltonian(["I" * num_qubits], np.array([0.0], dtype=complex))
+
+    labels, coefficients = zip(*filtered, strict=True)
+    return QubitHamiltonian(list(labels), np.asarray(coefficients, dtype=complex))
+
+
+def zassenhaus_omitted_commutator_norm(
+    hamiltonian: QubitHamiltonian,
+    *,
+    order: int,
+    weight_threshold: float,
+) -> float:
+    r"""Return a Pauli 1-norm bound for the first omitted Zassenhaus exponent.
+
+    The returned value bounds ``||C_{order + 1}(-i H_1, ..., -i H_m)||``.
+    Multiplication by powers of ``-i`` does not change the norm, so the
+    Hamiltonian commutator DAG can be evaluated directly and scaled by the
+    symbolic Zassenhaus coefficients.
+    """
+    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+    if len(real_terms) < 2:
+        return 0.0
+
+    omitted_order = order + 1
+    leaves = tuple(range(len(real_terms)))
+    commutator_exponents, plan = zassenhaus_commutator_plan(leaves, max_order=omitted_order)
+
+    exponent = commutator_exponents[omitted_order]
+    if not exponent:
+        return 0.0
+
+    from qdk_chemistry.data import QubitHamiltonian  # noqa: PLC0415
+
+    leaf_hamiltonians: dict[int, QubitHamiltonian] = {
+        idx: QubitHamiltonian([label], np.asarray([coeff], dtype=complex))
+        for idx, (label, coeff) in enumerate(real_terms)
+    }
+    cache: dict[PlanTerm, QubitHamiltonian] = {}
+
+    def evaluate(ref: PlanTerm) -> QubitHamiltonian:
+        if isinstance(ref, int):
+            return leaf_hamiltonians[ref]
+
+        if ref not in plan:
+            raise TypeError(f"Unexpected Zassenhaus plan reference: {ref!r}.")
+
+        if ref not in cache:
+            left, right = plan[ref]
+            cache[ref] = commutator(evaluate(left), evaluate(right))
+        return cache[ref]
+
+    combined_terms: dict[str, complex] = defaultdict(complex)
+    for ref, symbolic_coeff in exponent.items():
+        contribution = evaluate(ref)
+        for label, coeff in zip(contribution.pauli_strings, contribution.coefficients, strict=True):
+            combined_terms[label] += complex(symbolic_coeff) * complex(coeff)
+
+    omitted_hamiltonian = _combine_hamiltonian_terms(
+        combined_terms,
+        num_qubits=hamiltonian.num_qubits,
+        weight_threshold=weight_threshold,
+    )
+    return omitted_hamiltonian.schatten_norm

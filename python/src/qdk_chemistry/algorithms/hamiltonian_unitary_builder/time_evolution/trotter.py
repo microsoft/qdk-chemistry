@@ -20,18 +20,13 @@ References:
 
 from __future__ import annotations
 
-import numpy as np
-
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )
 from qdk_chemistry.data import (
-    FlatPartition,
-    LayeredPartition,
     QubitHamiltonian,
-    TermPartition,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -355,105 +350,6 @@ class Trotter(TimeEvolutionBuilder):
                     )
 
         return terms
-
-    def _group_terms(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-    ) -> list[list[QubitHamiltonian]]:
-        """Group Hamiltonian terms for Trotter decomposition.
-
-        When the Hamiltonian carries a populated
-        :attr:`~qdk_chemistry.data.QubitHamiltonian.term_partition`, it is
-        consumed directly.  Both :class:`~qdk_chemistry.data.LayeredPartition`
-        and :class:`~qdk_chemistry.data.FlatPartition` are accepted.
-
-        When no partition is present, each Pauli term is treated as its own
-        single-term group with no reordering.
-
-        Args:
-            qubit_hamiltonian: The qubit Hamiltonian to group.
-
-        Returns:
-            A list of groups, where each group is a list of
-            ``QubitHamiltonian`` sub-groups (parallelisable layers).
-
-        """
-        partition = qubit_hamiltonian.term_partition
-        if partition is not None:
-            Logger.debug(
-                f"Trotter: consuming QubitHamiltonian.term_partition "
-                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
-            )
-            return self._groups_from_partition(qubit_hamiltonian, partition)
-
-        Logger.debug("Trotter: no term_partition present; treating each Pauli term as its own group.")
-        return [
-            [
-                QubitHamiltonian(
-                    pauli_strings=[label],
-                    coefficients=[coeff],
-                    encoding=qubit_hamiltonian.encoding,
-                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-                )
-            ]
-            for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
-        ]
-
-    def _groups_from_partition(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-        partition: TermPartition,
-    ) -> list[list[QubitHamiltonian]]:
-        """Materialise a :class:`TermPartition` into Trotter sub-groups.
-
-        Both :class:`~qdk_chemistry.data.LayeredPartition` and
-        :class:`~qdk_chemistry.data.FlatPartition` are supported. A flat
-        partition's groups are treated as single layers. Groups are sorted by
-        ascending layer count so that the smallest groups sit on the outside
-        of the Strang/Suzuki splitting and merge at boundaries.
-
-        Args:
-            qubit_hamiltonian: Source Hamiltonian whose Pauli terms the partition indexes into.
-            partition: Index-based partition carried on ``qubit_hamiltonian``.
-
-        Returns:
-            List of groups; each group is a list of layer ``QubitHamiltonian`` objects.
-
-        """
-        labels = qubit_hamiltonian.pauli_strings
-        coeffs = qubit_hamiltonian.coefficients
-        encoding = qubit_hamiltonian.encoding
-        fmo = qubit_hamiltonian.fermion_mode_order
-
-        def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
-            return QubitHamiltonian(
-                pauli_strings=[labels[i] for i in indices],
-                coefficients=np.asarray([coeffs[i] for i in indices]),
-                encoding=encoding,
-                fermion_mode_order=fmo,
-            )
-
-        # Normalise to (group → tuple of layers of indices)
-        if isinstance(partition, LayeredPartition):
-            layered_groups = partition.groups
-        elif isinstance(partition, FlatPartition):
-            layered_groups = tuple((g,) for g in partition.groups)
-        else:
-            raise TypeError(
-                f"Unsupported TermPartition subtype: {type(partition).__name__}. "
-                "Expected FlatPartition or LayeredPartition."
-            )
-
-        groups: list[list[QubitHamiltonian]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-        # Drop empty groups (no layers / all layers empty).
-        groups = [g for g in groups if g]
-
-        # Sort groups by ascending layer count so the smallest sits on the
-        # outside of the Strang/Suzuki splitting (maximises boundary merging).
-        groups.sort(key=len)
-        return groups
 
     def _exponentiate_commuting(
         self,

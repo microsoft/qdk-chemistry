@@ -25,15 +25,13 @@ import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )
 from qdk_chemistry.data import (
-    FlatPartition,
-    LayeredPartition,
+    AlgorithmRef,
     QubitHamiltonian,
-    TermPartition,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -85,6 +83,12 @@ class ZassenhausSettings(TimeEvolutionSettings):
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
         )
+        self._set_default(
+            "term_grouper",
+            "algorithm_ref",
+            AlgorithmRef("term_grouper", "commuting"),
+            "Nested term partitioner algorithm reference.",
+        )
 
 
 class Zassenhaus(TimeEvolutionBuilder):
@@ -101,6 +105,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
+        term_grouper: AlgorithmRef | None = None,
     ):
         """Initialize Zassenhaus builder with specified Zassenhaus decomposition settings.
 
@@ -113,6 +118,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
+            term_grouper: Optional algorithm reference for the term grouper.
 
         """
         super().__init__()
@@ -125,6 +131,8 @@ class Zassenhaus(TimeEvolutionBuilder):
         self._settings.set("num_divisions", num_divisions)
         self._settings.set("error_bound", error_bound)
         self._settings.set("weight_threshold", weight_threshold)
+        if term_grouper is not None:
+            self._settings.set("term_grouper", term_grouper)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
         """Construct the unitary representation using Zassenhaus decomposition.
@@ -396,9 +404,16 @@ class Zassenhaus(TimeEvolutionBuilder):
             return correction_terms
 
         correction_hamiltonian = self._terms_to_hamiltonian(correction_terms)
-        internal_builder = Zassenhaus(order=internal_order, time=1.0)
+        term_grouper = self._create_nested("term_grouper")
+        grouped_correction_hamiltonian = term_grouper.run(correction_hamiltonian)
+
+        internal_builder = Zassenhaus(
+            order=internal_order,
+            time=1.0,
+            term_grouper=self._settings.get("term_grouper"),
+        )
         internal_execution_terms = internal_builder._decompose_zassenhaus_step(
-            correction_hamiltonian, time=1.0, atol=0.0
+            grouped_correction_hamiltonian, time=1.0, atol=0.0
         )
         return list(reversed(internal_execution_terms))
 
@@ -426,69 +441,6 @@ class Zassenhaus(TimeEvolutionBuilder):
         for qubit, pauli in pauli_term.items():
             chars[num_qubits - qubit - 1] = pauli
         return "".join(chars)
-
-    def _group_terms(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-    ) -> list[list[QubitHamiltonian]]:
-        """Group Hamiltonian terms for Zassenhaus decomposition."""
-        partition = qubit_hamiltonian.term_partition
-        if partition is not None:
-            Logger.debug(
-                f"Zassenhaus: consuming QubitHamiltonian.term_partition "
-                f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
-            )
-            return self._groups_from_partition(qubit_hamiltonian, partition)
-
-        Logger.debug("Zassenhaus: no term_partition present; treating each Pauli term as its own group.")
-        return [
-            [
-                QubitHamiltonian(
-                    pauli_strings=[label],
-                    coefficients=[coeff],
-                    encoding=qubit_hamiltonian.encoding,
-                    fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-                )
-            ]
-            for label, coeff in zip(qubit_hamiltonian.pauli_strings, qubit_hamiltonian.coefficients, strict=True)
-        ]
-
-    def _groups_from_partition(
-        self,
-        qubit_hamiltonian: QubitHamiltonian,
-        partition: TermPartition,
-    ) -> list[list[QubitHamiltonian]]:
-        """Materialise a :class:`TermPartition` into Zassenhaus sub-groups."""
-        labels = qubit_hamiltonian.pauli_strings
-        coeffs = qubit_hamiltonian.coefficients
-        encoding = qubit_hamiltonian.encoding
-        fmo = qubit_hamiltonian.fermion_mode_order
-
-        def _make(indices: tuple[int, ...]) -> QubitHamiltonian:
-            return QubitHamiltonian(
-                pauli_strings=[labels[i] for i in indices],
-                coefficients=np.asarray([coeffs[i] for i in indices]),
-                encoding=encoding,
-                fermion_mode_order=fmo,
-            )
-
-        if isinstance(partition, LayeredPartition):
-            layered_groups = partition.groups
-        elif isinstance(partition, FlatPartition):
-            layered_groups = tuple((g,) for g in partition.groups)
-        else:
-            raise TypeError(
-                f"Unsupported TermPartition subtype: {type(partition).__name__}. "
-                "Expected FlatPartition or LayeredPartition."
-            )
-
-        groups: list[list[QubitHamiltonian]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
 
     def _exponentiate_commuting(
         self,

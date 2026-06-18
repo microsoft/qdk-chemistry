@@ -13,11 +13,11 @@ import pytest
 import scipy.linalg
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.data import (
     AlgorithmRef,
     FlatPartition,
@@ -379,6 +379,21 @@ class TestZassenhausTimeEvolution:
         )
         container_part = Zassenhaus(num_divisions=1, order=4, time=t_sim).run(ham_partitioned).get_container()
         assert len(container_part.step_terms) == 12
+
+    def test_zassenhaus_custom_term_grouper(self):
+        """Verify that a custom term grouper is correctly applied to correction terms."""
+        h = QubitHamiltonian(pauli_strings=["XI", "ZZ"], coefficients=[2.0, 1.0])
+        # Default term grouper should work
+        builder_default = Zassenhaus(order=2, time=0.2)
+        container_default = builder_default.run(h).get_container()
+
+        # Let's configure it with a custom term grouper (e.g. qubit_wise_commuting)
+        custom_grouper = AlgorithmRef("term_grouper", "qubit_wise_commuting")
+        builder_custom = Zassenhaus(order=2, time=0.2, term_grouper=custom_grouper)
+        container_custom = builder_custom.run(h).get_container()
+
+        assert len(container_default.step_terms) > 0
+        assert len(container_custom.step_terms) > 0
 
     def test_zassenhaus_bubble_and_merge_optimization(self):
         """Verify the Bubble & Merge optimization reduces term counts and preserves accuracy."""
