@@ -8,26 +8,57 @@ from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
-from qdk_chemistry.data import Circuit
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    Circuit,
+    ControlledUnitary,
+    Settings,
+    UnitaryRepresentation,
+)
 
 __all__: list[str] = [
     "HadamardTestCircuitBuilder",
     "HadamardTestCircuitBuilderFactory",
+    "HadamardTestCircuitBuilderSettings",
 ]
+
+
+class HadamardTestCircuitBuilderSettings(Settings):
+    """Settings for the Hadamard test circuit builder algorithm.
+
+    Includes the nested algorithm reference for the controlled circuit mapper
+    used to synthesize the controlled evolution circuit.
+    """
+
+    def __init__(self):
+        """Initialize the settings for the Hadamard test circuit builder."""
+        super().__init__()
+        self._set_default(
+            "controlled_circuit_mapper",
+            "algorithm_ref",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
 
 
 class HadamardTestCircuitBuilder(Algorithm):
     """Abstract base class for Hadamard test circuit builders.
 
-    A circuit builder turns a prepared state and a controlled evolution circuit
-    into a single backend-specific Hadamard test circuit, separating the
-    backend-dependent circuit construction from the backend-agnostic
-    orchestration performed by ``HadamardTest``.
+    A circuit builder turns a prepared state and a target unitary into a single
+    backend-specific Hadamard test circuit. It owns the controlled circuit
+    mapper used to synthesize the controlled evolution.
     """
 
-    def __init__(self):
-        """Initialize the Hadamard test circuit builder."""
+    def __init__(self, controlled_circuit_mapper: AlgorithmRef | None = None):
+        """Initialize the Hadamard test circuit builder.
+
+        Args:
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+
+        """
         super().__init__()
+        self._settings = HadamardTestCircuitBuilderSettings()
+        if controlled_circuit_mapper is not None:
+            self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test_circuit_builder."""
@@ -37,19 +68,18 @@ class HadamardTestCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
-        num_system_qubits: int,
-        ctrl_time_evol_unitary_circuit: Circuit,
+        unitary: UnitaryRepresentation,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
         num_ancilla_qubits: int = 0,
     ) -> Circuit:
-        r"""Build the Hadamard test circuit for a given state and controlled unitary.
+        r"""Build the Hadamard test circuit for a given state and target unitary.
 
-        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
+        The unitary is mapped into a controlled evolution circuit internally via
+        :meth:`_create_controlled_circuit`.
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
-            num_system_qubits: Number of qubits in the system register.
-            ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
+            unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
             num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
@@ -58,6 +88,24 @@ class HadamardTestCircuitBuilder(Algorithm):
             Circuit representing the Hadamard test workflow for the selected backend.
 
         """
+
+    def _create_controlled_circuit(self, unitary: UnitaryRepresentation) -> Circuit:
+        r"""Map a target unitary into a controlled evolution circuit.
+
+        Wraps ``unitary`` in a :class:`~qdk_chemistry.data.ControlledUnitary` controlled on the
+        Hadamard test control qubit (index 0) and runs the nested ``controlled_circuit_mapper``
+        to synthesize the controlled-:math:`U` circuit.
+
+        Args:
+            unitary: Unitary representation :math:`U` to map into a controlled circuit.
+
+        Returns:
+            The controlled circuit implementing controlled-:math:`U`.
+
+        """
+        controlled_unitary = ControlledUnitary(unitary=unitary, control_indices=[0])
+        circuit_mapper = self._create_nested("controlled_circuit_mapper")
+        return circuit_mapper.run(controlled_unitary=controlled_unitary)
 
 
 class HadamardTestCircuitBuilderFactory(AlgorithmFactory):
@@ -72,5 +120,5 @@ class HadamardTestCircuitBuilderFactory(AlgorithmFactory):
         return "hadamard_test_circuit_builder"
 
     def default_algorithm_name(self) -> str:
-        """Return 'qdk_circuit_builder' as the default algorithm name."""
-        return "qdk_circuit_builder"
+        """Return 'qdk' as the default algorithm name."""
+        return "qdk"

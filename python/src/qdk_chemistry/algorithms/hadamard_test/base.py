@@ -12,7 +12,6 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     CircuitExecutorData,
-    ControlledUnitary,
     Settings,
     UnitaryRepresentation,
 )
@@ -63,12 +62,7 @@ class HadamardTestSettings(Settings):
         self._set_default(
             "circuit_builder",
             "algorithm_ref",
-            AlgorithmRef("hadamard_test_circuit_builder", "qdk_circuit_builder"),
-        )
-        self._set_default(
-            "controlled_circuit_mapper",
-            "algorithm_ref",
-            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            AlgorithmRef("hadamard_test_circuit_builder", "qdk"),
         )
         self._set_default(
             "circuit_executor",
@@ -81,10 +75,10 @@ class HadamardTest(Algorithm):
     """Hadamard test generator.
 
     Orchestrates the backend-agnostic Hadamard test workflow: it validates the
-    inputs, builds the controlled evolution circuit via the nested
-    ``controlled_circuit_mapper``, delegates the backend-specific circuit
-    construction to the nested ``hadamard_test_circuit_builder``, and executes
-    the resulting circuit with the nested ``circuit_executor``.
+    inputs, delegates the backend-specific circuit construction (including
+    mapping the target unitary into a controlled evolution circuit) to the
+    nested ``hadamard_test_circuit_builder``, and executes the resulting circuit
+    with the nested ``circuit_executor``.
     """
 
     def __init__(self):
@@ -122,27 +116,16 @@ class HadamardTest(Algorithm):
             raise TypeError("test_basis must be an instance of HadamardTestBasis.")
         if not isinstance(unitary, UnitaryRepresentation):
             raise TypeError("unitary must be an instance of UnitaryRepresentation.")
-        num_system_qubits = unitary.get_num_qubits()
         if not isinstance(shots, int):
             raise TypeError("shots must be an integer.")
         if shots <= 0:
             raise ValueError("shots must be a positive integer.")
 
-        controlled_evolution = ControlledUnitary(
-            unitary=unitary,
-            control_indices=[0],
-        )
-
-        mapper = self._create_nested("controlled_circuit_mapper")
-
-        ctrl_time_evol_unitary_circuit = mapper.run(controlled_unitary=controlled_evolution)
-
         circuit_builder = self._create_nested("circuit_builder")
 
         circuit = circuit_builder.run(
             state_preparation_circuit,
-            num_system_qubits,
-            ctrl_time_evol_unitary_circuit,
+            unitary,
             test_basis,
             num_ancilla_qubits,
         )

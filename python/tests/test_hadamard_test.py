@@ -27,8 +27,8 @@ _SHOTS = 100
 _EVOLUTION_TIME = float(np.pi / 48.0)
 _OBSERVABLE_POWER = 10
 
-_QDK_BUILDER = "qdk_circuit_builder"
-_QISKIT_BUILDER = "qiskit_circuit_builder"
+_QDK_BUILDER = "qdk"
+_QISKIT_BUILDER = "qiskit"
 
 
 def _make_hadamard_test(builder_name: str):

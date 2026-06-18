@@ -7,7 +7,7 @@
 
 from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis, basis_to_qsharp_pauli
 from qdk_chemistry.algorithms.hadamard_test.circuit_builder.base import HadamardTestCircuitBuilder
-from qdk_chemistry.data import Circuit
+from qdk_chemistry.data import Circuit, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -26,19 +26,18 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
-        num_system_qubits: int,
-        ctrl_time_evol_unitary_circuit: Circuit,
+        unitary: UnitaryRepresentation,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
         num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
 
-        Currently, the function only accepts the controlled unitary circuit whose index of ancilla qubit is 0.
+        The target unitary is mapped into a controlled evolution circuit internally; the
+        resulting controlled unitary circuit must place its ancilla qubit at index 0.
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
-            num_system_qubits: Number of qubits in the system register.
-            ctrl_time_evol_unitary_circuit: Controlled evolution circuit implementing the target unitary.
+            unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
             num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
@@ -50,6 +49,9 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 
         qsharp_basis = basis_to_qsharp_pauli(test_basis)
+
+        num_system_qubits = unitary.get_num_qubits()
+        ctrl_time_evol_unitary_circuit = self._create_controlled_circuit(unitary)
 
         state_prep_op = state_preparation_circuit._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
@@ -76,4 +78,4 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
     def name(self) -> str:
         """Return the name of the QdkHadamardTestCircuitBuilder algorithm."""
-        return "qdk_circuit_builder"
+        return "qdk"
