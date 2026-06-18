@@ -276,7 +276,7 @@ if (-not $SkipCpp) {
             -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
             -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
             -DQDK_ENABLE_OPENMP=ON `
-            -DMACIS_ENABLE_TESTS=OFF `
+            -DMACIS_ENABLE_TESTS=ON `
             -DBUILD_SHARED_LIBS=OFF `
             -DBUILD_TESTING=ON `
             -DCMAKE_BUILD_TYPE="$BuildType" `
