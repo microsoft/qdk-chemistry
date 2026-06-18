@@ -27,7 +27,8 @@ class HadamardTestCircuitBuilderSettings(Settings):
     """Settings for the Hadamard test circuit builder algorithm.
 
     Includes the nested algorithm reference for the controlled circuit mapper
-    used to synthesize the controlled evolution circuit.
+    used to synthesize the controlled evolution circuit, the measurement basis
+    for the control qubit, and the number of ancilla qubits.
     """
 
     def __init__(self):
@@ -37,6 +38,19 @@ class HadamardTestCircuitBuilderSettings(Settings):
             "controlled_circuit_mapper",
             "algorithm_ref",
             AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        self._set_default(
+            "test_basis",
+            "string",
+            HadamardTestBasis.X.value,
+            "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
+            [basis.value for basis in HadamardTestBasis],
+        )
+        self._set_default(
+            "num_ancilla_qubits",
+            "int",
+            0,
+            "Number of ancilla qubits needed by the controlled evolution (0 if none).",
         )
 
 
@@ -48,17 +62,27 @@ class HadamardTestCircuitBuilder(Algorithm):
     mapper used to synthesize the controlled evolution.
     """
 
-    def __init__(self, controlled_circuit_mapper: AlgorithmRef | None = None):
+    def __init__(
+        self,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
+    ):
         """Initialize the Hadamard test circuit builder.
 
         Args:
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         """
         super().__init__()
         self._settings = HadamardTestCircuitBuilderSettings()
         if controlled_circuit_mapper is not None:
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
+        self._settings.set("test_basis", test_basis.value)
+        self._settings.set("num_ancilla_qubits", num_ancilla_qubits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test_circuit_builder."""
@@ -69,8 +93,6 @@ class HadamardTestCircuitBuilder(Algorithm):
         self,
         state_preparation_circuit: Circuit,
         unitary: UnitaryRepresentation,
-        test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build the Hadamard test circuit for a given state and target unitary.
 
@@ -80,9 +102,6 @@ class HadamardTestCircuitBuilder(Algorithm):
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit representing the Hadamard test workflow for the selected backend.

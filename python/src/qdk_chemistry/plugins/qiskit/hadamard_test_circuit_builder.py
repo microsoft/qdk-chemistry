@@ -6,7 +6,7 @@
 
 from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis
 from qdk_chemistry.algorithms.hadamard_test.circuit_builder.base import HadamardTestCircuitBuilder
-from qdk_chemistry.data import Circuit, UnitaryRepresentation
+from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryRepresentation
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitHadamardTestCircuitBuilder"]
@@ -17,17 +17,30 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
     def __init__(
         self,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
     ):
-        """Initialize QiskitHadamardTestCircuitBuilder."""
+        """Initialize QiskitHadamardTestCircuitBuilder.
+
+        Args:
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
+
+        """
         Logger.trace_entering()
-        super().__init__()
+        super().__init__(
+            controlled_circuit_mapper=controlled_circuit_mapper,
+            test_basis=test_basis,
+            num_ancilla_qubits=num_ancilla_qubits,
+        )
 
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
         unitary: UnitaryRepresentation,
-        test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Qiskit backend.
 
@@ -37,9 +50,6 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit containing the OpenQASM3 representation of the Qiskit Hadamard test circuit.
@@ -55,6 +65,9 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
                 "Qiskit is required to use QiskitHadamardTestCircuitBuilder. "
                 "Install qiskit or use QdkHadamardTestCircuitBuilder."
             ) from err
+
+        test_basis = HadamardTestBasis(self._settings.get("test_basis"))
+        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
 
         num_system_qubits = unitary.get_num_qubits()
         ctrl_time_evol_unitary_circuit = self._create_controlled_circuit(unitary)

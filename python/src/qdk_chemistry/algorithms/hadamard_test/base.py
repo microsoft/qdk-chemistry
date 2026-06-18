@@ -122,12 +122,12 @@ class HadamardTest(Algorithm):
             raise ValueError("shots must be a positive integer.")
 
         circuit_builder = self._create_nested("circuit_builder")
+        circuit_builder.settings().set("test_basis", test_basis.value)
+        circuit_builder.settings().set("num_ancilla_qubits", num_ancilla_qubits)
 
         circuit = circuit_builder.run(
             state_preparation_circuit,
             unitary,
-            test_basis,
-            num_ancilla_qubits,
         )
 
         circuit_executor = self._create_nested("circuit_executor")

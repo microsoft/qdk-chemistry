@@ -7,7 +7,7 @@
 
 from qdk_chemistry.algorithms.hadamard_test.base import HadamardTestBasis, basis_to_qsharp_pauli
 from qdk_chemistry.algorithms.hadamard_test.circuit_builder.base import HadamardTestCircuitBuilder
-from qdk_chemistry.data import Circuit, UnitaryRepresentation
+from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryRepresentation
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -18,17 +18,32 @@ __all__: list[str] = ["QdkHadamardTestCircuitBuilder"]
 class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
     """Hadamard test circuit builder based on the Q# framework."""
 
-    def __init__(self):
-        """Initialize QdkHadamardTestCircuitBuilder."""
+    def __init__(
+        self,
+        controlled_circuit_mapper: AlgorithmRef | None = None,
+        test_basis: HadamardTestBasis = HadamardTestBasis.X,
+        num_ancilla_qubits: int = 0,
+    ):
+        """Initialize QdkHadamardTestCircuitBuilder.
+
+        Args:
+            controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
+            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
+              ``HadamardTestBasis.Z``).
+            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
+
+        """
         Logger.trace_entering()
-        super().__init__()
+        super().__init__(
+            controlled_circuit_mapper=controlled_circuit_mapper,
+            test_basis=test_basis,
+            num_ancilla_qubits=num_ancilla_qubits,
+        )
 
     def _run_impl(
         self,
         state_preparation_circuit: Circuit,
         unitary: UnitaryRepresentation,
-        test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ) -> Circuit:
         r"""Build a Hadamard test circuit using the Q# backend.
 
@@ -38,14 +53,14 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
             unitary: Unitary representation :math:`U` (e.g. a time-evolution unitary built with the desired power).
-            test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
-              ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         Returns:
             Circuit containing compiled and rendered Q# Hadamard test artifacts.
 
         """
+        test_basis = HadamardTestBasis(self._settings.get("test_basis"))
+        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
+
         Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 
         qsharp_basis = basis_to_qsharp_pauli(test_basis)
