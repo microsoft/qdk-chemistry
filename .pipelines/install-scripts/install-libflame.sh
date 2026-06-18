@@ -25,7 +25,7 @@ rm -rf libflame libflame-${LIBFLAME_VERSION} libflame.zip
 export LIBFLAME_CHECKSUM=e120f559758c21392448f45301918f45760f5ab59d246e4d144079c664d5b64b
 wget -q https://github.com/flame/libflame/archive/refs/tags/${LIBFLAME_VERSION}.zip -O libflame.zip
 if command -v sha256sum >/dev/null 2>&1; then
-    echo "${LIBFLAME_CHECKSUM}  libflame.zip" | sha256sum --check || exit 1
+    echo "${LIBFLAME_CHECKSUM}  libflame.zip" | sha256sum -c || exit 1
 else
     echo "${LIBFLAME_CHECKSUM}  libflame.zip" | shasum -a 256 -c || exit 1
 fi
