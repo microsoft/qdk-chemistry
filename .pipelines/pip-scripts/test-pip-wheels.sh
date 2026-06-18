@@ -14,34 +14,32 @@ else
 fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then
-    # Update and install dependencies needed for testing (Ubuntu / apt-get)
+    # Update and install dependencies needed for testing (Azure Linux 3 / tdnf)
     SUDO=""
     [ "$(id -u)" != "0" ] && SUDO="sudo"
-    export DEBIAN_FRONTEND=noninteractive
-    echo "Installing apt dependencies..."
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q \
+    echo "Installing tdnf dependencies..."
+    $SUDO tdnf update -y
+    $SUDO tdnf install -y \
+        bzip2-devel \
         curl \
         gcc \
-        g++ \
+        gcc-c++ \
         git \
-        libbz2-dev \
-        libffi-dev \
-        liblzma-dev \
-        libncurses-dev \
-        libreadline-dev \
-        libsqlite3-dev \
-        libssl-dev \
-        libxml2-dev \
-        libxmlsec1-dev \
+        libffi-devel \
+        libxml2-devel \
         make \
+        ncurses-devel \
+        openssl-devel \
         python3 \
-        python3-dev \
-        python3-venv \
+        python3-devel \
+        readline-devel \
+        sqlite-devel \
         unzip \
         wget \
-        xz-utils \
-        zlib1g-dev
+        xmlsec1-devel \
+        xz \
+        xz-devel \
+        zlib-devel
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update

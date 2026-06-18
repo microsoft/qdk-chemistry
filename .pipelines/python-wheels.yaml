@@ -271,12 +271,6 @@ extends:
               runSlowTests: ${{ parameters.runSlowTests }}
               ${{ if eq(target.os, 'macOS') }}:
                 macBuild: ON
-              ${{ if and(eq(target.os, 'linux'), eq(target.arch, 'x86_64')) }}:
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/amd64
-              ${{ if and(eq(target.os, 'linux'), eq(target.arch, 'aarch64')) }}:
-                dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
-                imageTag: linux/arm64/v8
 
           - task: TwineAuthenticate@1
             inputs:
