@@ -9,6 +9,7 @@
 
 #include <nlohmann/json.hpp>
 #include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <qdk/chemistry/data/pauli_operator.hpp>
 #include <qdk/chemistry/data/tapering.hpp>
@@ -153,6 +154,9 @@ bilinear(j, k) is available on both forms.
                                  -> std::optional<TaperingSpecification> {
                                return self.tapering();
                              })
+      .def_property_readonly("stabilizers", &MajoranaMapping::stabilizers)
+      .def_property_readonly("auxiliary_penalty_terms",
+                             &MajoranaMapping::auxiliary_penalty_terms)
       .def_property_readonly("is_majorana_atomic",
                              &MajoranaMapping::is_majorana_atomic)
       .def(
@@ -231,7 +235,9 @@ bilinear(j, k) is available on both forms.
                 num_modes, n_alpha, n_beta);
           },
           py::arg("num_modes"), py::arg("symmetries"),
-          "Construct a symmetry-conserving Bravyi-Kitaev encoding.");
+          "Construct a symmetry-conserving Bravyi-Kitaev encoding.")
+      .def_static("verstraete_cirac", &MajoranaMapping::verstraete_cirac,
+                  py::arg("lattice"), "Construct a Verstraete-Cirac encoding.");
 
   mapping
       .def(

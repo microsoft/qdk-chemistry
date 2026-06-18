@@ -52,6 +52,45 @@ Symmetry-conserving Bravyi-Kitaev :cite:`Bravyi2017tapering`
 Bravyi-Kitaev tree :cite:`Havlicek2017`
    A tree-based variant of the Bravyi-Kitaev transformation that uses a different qubit indexing strategy.
 
+.. _encoding-verstraete-cirac:
+
+Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017`
+   An auxiliary-Majorana encoding that reduces Jordan-Wigner parity strings on
+   lattice Hamiltonians by adding auxiliary degrees of freedom for lattice
+   edges that are not local in the internal one-dimensional ordering. Use
+   :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with an
+   undirected :class:`~qdk_chemistry.data.LatticeGraph`.
+
+   The factory preserves the physical site labels of the input lattice, but it
+   derives an internal ordering for the Jordan-Wigner backbone. Built-in lattice
+   factories provide edge-coloring metadata that helps the Verstraete-Cirac
+   factory identify path-local edges without assuming that labels ``0..V-1``
+   are already a physical path. For custom lattices, symmetric adjacency is
+   required; arbitrary labels are accepted, and the factory falls back to a
+   deterministic graph-derived order when no topology metadata is available.
+   Passing ``dfs_ordering=True`` to supported lattice factories can further
+   reduce the number of non-path edges, auxiliary qubits, and stabilizers.
+
+   The returned mapping is bilinear-only: individual Majorana operators are not
+   exposed as Pauli words, but bilinears needed by the native mapper are
+   precomputed. The mapping stores two related stabilizer collections. Raw link
+   stabilizers are available through ``stabilizers`` as codespace constraints
+   and for diagnostics. Automatic penalty terms are taken from
+   ``auxiliary_penalty_terms`` and are built from local lattice-cycle products,
+   so the mapper does not directly add every raw link stabilizer as a penalty.
+   A tree-like lattice may therefore have raw stabilizers but no automatic
+   cycle-penalty terms.
+
+   This encoding is intended for the native QDK mapper, which reads the
+   precomputed bilinear table. Third-party mapper backends select transforms by
+   standard encoding name and should not be expected to interpret the
+   Verstraete-Cirac bilinear table.
+
+   Example::
+
+      lattice = LatticeGraph.square(4, 4, dfs_ordering=True)
+      mapping = MajoranaMapping.verstraete_cirac(lattice)
+      qubit_hamiltonian = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
 
 Using the QubitMapper
 ---------------------
@@ -188,7 +227,7 @@ This is a **table-driven** backend: it reads the Pauli-string table from the :cl
 Any valid ``MajoranaMapping`` works — factory-produced or custom user-defined tables.
 The mapping's ``name`` and ``base_encoding`` are used only for metadata on the output, not to select a transform.
 
-Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, and any custom encoding
+Supported encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`, :ref:`Parity <encoding-parity>`, :ref:`SCBK <encoding-scbk>`, :ref:`Verstraete-Cirac <encoding-verstraete-cirac>`, and any custom encoding
 
 The native mapper uses blocked spin-orbital ordering internally (alpha orbitals first, then beta orbitals).
 Use ``QubitHamiltonian.to_interleaved()`` for alternative qubit orderings if needed.

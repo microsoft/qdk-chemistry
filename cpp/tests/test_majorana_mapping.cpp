@@ -5,6 +5,8 @@
 #include <gtest/gtest.h>
 
 #include <complex>
+#include <map>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <stdexcept>
 #include <string>
@@ -253,4 +255,57 @@ TEST(TaperingSpecificationHashTest, HashIncludesIndicesAndEigenvalues) {
   EXPECT_EQ(first.content_hash(), same.content_hash());
   EXPECT_NE(first.content_hash(), different_index.content_hash());
   EXPECT_NE(first.content_hash(), different_eigenvalue.content_hash());
+}
+
+TEST(VerstraeteCiracMappingTest, UsesGraphDerivedOrderForRelabeledSquare) {
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+
+  auto square = LatticeGraph::square(2, 2, false, false);
+  auto builtin = MajoranaMapping::verstraete_cirac(square);
+
+  // Relabel the same colored square so index order is no longer the row-major
+  // line scan used by the factory's old index-distance heuristic.
+  auto relabeled =
+      MajoranaMapping::verstraete_cirac(LatticeGraph::permute(
+          square, std::vector<std::uint64_t>{1, 2, 0, 3}));
+
+  EXPECT_EQ(relabeled.num_modes(), builtin.num_modes());
+  EXPECT_EQ(relabeled.num_qubits(), builtin.num_qubits());
+  EXPECT_EQ(relabeled.stabilizers().size(), builtin.stabilizers().size());
+  EXPECT_EQ(relabeled.auxiliary_penalty_terms().size(),
+            builtin.auxiliary_penalty_terms().size());
+  EXPECT_GT(relabeled.auxiliary_penalty_terms().size(), 0u);
+
+  // Same 2x2 square connectivity supplied as a custom uncolored edge map.
+  // The graph-derived fallback should still accept the arbitrary labels.
+  std::map<Edge, double> custom_edges = {
+      {{0, 2}, 1.0},
+      {{2, 0}, 1.0},
+      {{2, 1}, 1.0},
+      {{1, 2}, 1.0},
+      {{1, 3}, 1.0},
+      {{3, 1}, 1.0},
+      {{3, 0}, 1.0},
+      {{0, 3}, 1.0},
+  };
+  auto custom =
+      MajoranaMapping::verstraete_cirac(LatticeGraph(custom_edges, 4));
+
+  EXPECT_EQ(custom.num_modes(), 8u);
+  EXPECT_GT(custom.num_qubits(), custom.num_modes());
+  EXPECT_GT(custom.stabilizers().size(), 0u);
+}
+
+TEST(VerstraeteCiracMappingTest, RejectsDirectedCustomLattice) {
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+
+  std::map<Edge, double> directed_edges = {
+      {{0, 1}, 1.0},
+      {{1, 2}, 1.0},
+      {{2, 0}, 1.0},
+  };
+
+  EXPECT_THROW(
+      MajoranaMapping::verstraete_cirac(LatticeGraph(directed_edges, 3)),
+      std::invalid_argument);
 }

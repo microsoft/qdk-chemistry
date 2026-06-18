@@ -232,7 +232,7 @@ class LatticeGraph : public DataClass {
    * @throws std::invalid_argument If n == 0.
    */
   static LatticeGraph chain(std::uint64_t n, bool periodic = false,
-                            double t = 1.0);
+                            double t = 1.0, bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional square lattice.
@@ -266,7 +266,7 @@ class LatticeGraph : public DataClass {
    */
   static LatticeGraph square(std::uint64_t nx, std::uint64_t ny,
                              bool periodic_x = false, bool periodic_y = false,
-                             double t = 1.0);
+                             double t = 1.0, bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional triangular lattice.
@@ -305,7 +305,8 @@ class LatticeGraph : public DataClass {
   static LatticeGraph triangular(std::uint64_t nx, std::uint64_t ny,
                                  bool periodic_x = false,
                                  bool periodic_y = false, double t = 1.0,
-                                 int coloring_seed = 0);
+                                 int coloring_seed = 0,
+                                 bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional honeycomb lattice.
@@ -344,7 +345,8 @@ class LatticeGraph : public DataClass {
    */
   static LatticeGraph honeycomb(std::uint64_t nx, std::uint64_t ny,
                                 bool periodic_x = false,
-                                bool periodic_y = false, double t = 1.0);
+                                bool periodic_y = false, double t = 1.0,
+                                bool dfs_ordering = false);
 
   /**
    * @brief Create a two-dimensional kagome lattice.
@@ -394,7 +396,8 @@ class LatticeGraph : public DataClass {
    */
   static LatticeGraph kagome(std::uint64_t nx, std::uint64_t ny,
                              bool periodic_x = false, bool periodic_y = false,
-                             double t = 1.0, int coloring_seed = 0);
+                             double t = 1.0, int coloring_seed = 0,
+                             bool dfs_ordering = false);
 
   /**
    * @brief Edge coloring stored at construction time, if any.
@@ -476,6 +479,18 @@ class LatticeGraph : public DataClass {
    */
   static LatticeGraph from_hdf5(H5::Group& group);
 
+  /**
+   * @brief Creates a new lattice graph by permuting the vertices of an existing graph
+   * based on a specified path.
+   * This function reorders the sparse adjacency matrix using Eigen's permutation operations
+   * and remaps the edge coloring array to maintain consistency with the new vertex indices.
+   *
+   * @param graph The source lattice graph to be permuted.
+   * @param path A sequence of original vertex indices defining the new ordered layout.
+   * @return A new LatticeGraph instance containing the permuted topology and updated edge colors.
+   */
+  static LatticeGraph permute(const LatticeGraph& graph,
+                              const std::vector<std::uint64_t>& path);
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 

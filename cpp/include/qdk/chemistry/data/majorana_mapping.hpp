@@ -19,7 +19,7 @@
 namespace qdk::chemistry::data {
 
 class Hamiltonian;
-
+class LatticeGraph;
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
  *
@@ -101,6 +101,50 @@ class MajoranaMapping : public DataClass {
   /// Optional post-mapping tapering specification.
   const std::optional<TaperingSpecification>& tapering() const {
     return tapering_;
+  }
+
+  /**
+   * @brief Stabilizer constraints carried by this mapping.
+   *
+   * Each entry is a Pauli term `(coefficient, word)` representing a stabilizer
+   * operator whose +1 eigenspace defines the physical codespace for encodings
+   * with auxiliary degrees of freedom, such as the Verstraete-Cirac mapping.
+   * These terms are exposed as metadata so callers can inspect, serialize, or
+   * explicitly project onto the stabilizer codespace.
+   *
+   * Raw stabilizers are not necessarily the same terms inserted automatically
+   * as penalty Hamiltonians. Use auxiliary_penalty_terms() for the local
+   * auxiliary terms that the mapper adds by default when penalizing unphysical
+   * sectors.
+   *
+   * @return Reference to the vector of stabilizer Pauli terms.
+   */
+  const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+  stabilizers() const {
+    return stabilizers_;
+  }
+
+  /**
+   * @brief Local auxiliary terms used for automatic stabilizer penalties.
+   *
+   * These terms are optional Pauli operators derived from the mapping's
+   * auxiliary Majorana stabilizers. For the Verstraete-Cirac encoding they are
+   * built as products of auxiliary link stabilizers around local lattice
+   * cycles/plaquettes. The raw link stabilizers remain available through
+   * stabilizers(), but they can carry long Jordan-Wigner strings; the terms
+   * returned here are the local operators that should be inserted into the
+   * mapped Hamiltonian as penalty terms.
+   *
+   * majorana_map_hamiltonian() uses this list, when non-empty, to add an
+   * automatic penalty Hamiltonian of the form lambda * sum_i (I - P_i), where
+   * P_i is one returned auxiliary penalty term. Mappings without auxiliary
+   * penalty metadata return an empty vector.
+   *
+   * @return Reference to the vector of local auxiliary penalty terms.
+   */
+  const std::vector<std::pair<std::complex<double>, SparsePauliWord>>&
+  auxiliary_penalty_terms() const {
+    return auxiliary_penalty_terms_;
   }
 
   /**
@@ -246,13 +290,51 @@ class MajoranaMapping : public DataClass {
   static MajoranaMapping symmetry_conserving_bravyi_kitaev(
       std::size_t num_modes, std::size_t n_alpha, std::size_t n_beta);
 
+  /**
+   * @brief Verstraete-Cirac encoding.
+   *
+   * Maps two spin species on an undirected `LatticeGraph` using the
+   * Verstraete-Cirac auxiliary-Majorana construction. The public physical mode
+   * labels remain the lattice site labels for each spin sector, while the
+   * factory chooses an internal Jordan-Wigner ordering from the graph
+   * connectivity.
+   *
+   * Edges selected as local in that internal order are represented directly.
+   * Connected lattice edges outside the selected local edge set are dressed
+   * with auxiliary Majorana link stabilizers so hopping terms remain local in
+   * the mapped bilinear table. If the lattice carries edge-coloring metadata,
+   * the factory uses it to preserve a topology-aware local edge set under
+   * vertex relabeling; otherwise it falls back to deterministic graph
+   * traversal/search heuristics for custom graphs.
+   *
+   * The returned mapping is bilinear-only: individual Majorana operators are
+   * not exposed, but `bilinear(j, k)` is precomputed for all physical
+   * Majorana pairs. Raw link stabilizers are available through
+   * `stabilizers()`. Automatic stabilizer penalties use
+   * `auxiliary_penalty_terms()`, which stores local products of link
+   * stabilizers around graph cycles rather than inserting each raw link
+   * stabilizer directly.
+   *
+   * @param lattice The `LatticeGraph` connectivity.
+   * @return MajoranaMapping with name ``"verstraete-cirac"``, `2 *
+   *         lattice.num_sites()` physical fermionic modes, and additional
+   *         qubits for auxiliary modes required by non-local lattice edges.
+   * @throws std::invalid_argument If the lattice has fewer than three sites or
+   *         is not symmetric.
+   */
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
+
  private:
   MajoranaMapping(
       std::vector<SparsePauliWord> table,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
-      std::optional<TaperingSpecification> tapering = std::nullopt);
+      std::optional<TaperingSpecification> tapering = std::nullopt,
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+          stabilizers = {},
+      std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+          auxiliary_penalty_terms = {});
 
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
@@ -280,6 +362,13 @@ class MajoranaMapping : public DataClass {
 
   /// Feed the mapping's identifying data into a content hash.
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+  /// Optional stabilizer terms.
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers_;
+
+  /// Optional local auxiliary terms used by the mapper penalty Hamiltonian.
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>>
+      auxiliary_penalty_terms_;
 
   /// Upper-triangle index: (j, k) with j < k, M = 2*num_modes.
   std::size_t bilinear_index(std::size_t j, std::size_t k) const {

@@ -168,6 +168,14 @@ class PackedAccumulator {
     return result;
   }
 
+  double coefficient_l1_norm() const {
+    double norm = 0.0;
+    for (const auto& entry : terms_) {
+      norm += std::abs(entry.second);
+    }
+    return norm;
+  }
+
  private:
   std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
                      PackedPauliWordHash<NW>>
@@ -398,6 +406,12 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     double threshold,
                                     double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
+  if (mapping.num_modes() != n_modes) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: mapping num_modes (" +
+        std::to_string(mapping.num_modes()) + ") must match 2 * n_spatial (" +
+        std::to_string(n_modes) + ")");
+  }
 
   PackedAccumulator<NW> acc;
 
@@ -700,6 +714,27 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
           }
         }
       }
+    }
+  }
+
+  const auto& auxiliary_penalty_terms = mapping.auxiliary_penalty_terms();
+  if (!auxiliary_penalty_terms.empty()) {
+    // If stabilizers are included in the mapping, our total Hamiltonian becomes
+    // H_total = H_physical + H_aux. We add H_aux = λ · Σ_i (I − P_i), where
+    // P_i are local auxiliary cycle/plaquette products, to penalize unphysical
+    // sectors without adding the nonlocal raw link stabilizers directly.
+    // Use the full Pauli coefficient 1-norm of H_physical so two-body
+    // interactions contribute to the bound.
+    double aux_ham_coefficient = 1.0 + acc.coefficient_l1_norm();
+
+    PackedPauliWord<NW> identity{};
+    acc.accumulate(identity,
+                   std::complex<double>(aux_ham_coefficient *
+                                             auxiliary_penalty_terms.size(),
+                                         0.0));
+
+    for (const auto& [coeff, word] : auxiliary_penalty_terms) {
+      acc.accumulate(sparse_to_packed<NW>(word), -aux_ham_coefficient * coeff);
     }
   }
 
