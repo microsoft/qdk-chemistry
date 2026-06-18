@@ -163,13 +163,6 @@ class SortedDoubleLoopHamiltonianGenerator
           // Early exit if excitation level too high
           if (ex_alpha_count > 4) continue;
 
-          // Early exit if the only possible matrix element is 4x alpha
-          if (ex_alpha_count == 4) {
-            const double h_el_all_alpha_4 =
-                this->matrix_element_4(bra_alpha, ket_alpha, ex_alpha);
-            if (std::abs(h_el_all_alpha_4) < H_thresh) continue;
-          }
-
           const size_t beta_st_ket = unique_alpha_ket_idx[ia_ket];
           const size_t beta_en_ket = unique_alpha_ket_idx[ia_ket + 1];
 
@@ -188,16 +181,6 @@ class SortedDoubleLoopHamiltonianGenerator
               // Skip if total excitation level too high
               if ((ex_alpha_count + ex_beta_count) > 4) continue;
 
-              // Integral lookups are cheap
-              if (ex_beta_count == 4) {
-                const double h_el_all_beta_4 =
-                    this->matrix_element_4(bra_beta, ket_beta, ex_beta);
-                if (std::abs(h_el_all_beta_4) < H_thresh) continue;
-              }
-
-              // Need to consider the threshold here to ensure accurate count
-              // For this first counting pass, we'll just count everything
-              // that could potentially be non-zero based on excitation rank
               row_nnz_local[ibra]++;
 
               // For symmetric matrices, count both entries
@@ -320,30 +303,22 @@ class SortedDoubleLoopHamiltonianGenerator
                 h_el = this->matrix_element_diag(bra_occ_alpha, bra_occ_beta);
               }
 
-              // Direct insertion into the CSR arrays using atomic operations
-              // Get the current insertion position for this row and atomically
-              // increment
               index_t offset_row;
 #ifdef _OPENMP
-// Use OpenMP atomic capture to safely get current value and increment
-#pragma omp atomic capture
-              offset_row = row_offsets[ibra]++;
+#pragma omp critical
+              { offset_row = row_offsets[ibra]++; }
 #else
-              // Sequential fallback
               offset_row = row_offsets[ibra]++;
 #endif /* _OPENMP */
 
-              // Insert values (no synchronization needed as each thread writes
-              // to unique locations)
               colind[offset_row] = iket;
               nzval[offset_row] = h_el;
 
-              // For symmetric matrices, also handle the symmetric entry
               if (is_symm && ibra != iket) {
                 index_t offset_col;
 #ifdef _OPENMP
-#pragma omp atomic capture
-                offset_col = row_offsets[iket]++;
+#pragma omp critical
+                { offset_col = row_offsets[iket]++; }
 #else
                 offset_col = row_offsets[iket]++;
 #endif /* _OPENMP */
