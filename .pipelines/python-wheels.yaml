@@ -225,6 +225,7 @@ extends:
           displayName: 🛡🛡 CodeQL Initialize
           inputs:
             languages: cpp,python
+            sourceRoot: $(Agent.BuildDirectory)/qdk-chemistry
 
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
