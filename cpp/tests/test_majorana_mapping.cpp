@@ -257,6 +257,13 @@ TEST(TaperingSpecificationHashTest, HashIncludesIndicesAndEigenvalues) {
   EXPECT_NE(first.content_hash(), different_eigenvalue.content_hash());
 }
 
+TEST(VerstraeteCiracFactoryTest, RejectsDisconnectedGraph) {
+  using Edge = std::pair<std::uint64_t, std::uint64_t>;
+  std::map<Edge, double> edges = {{{0, 1}, 1.0}, {{2, 3}, 1.0}};
+  auto graph = LatticeGraph::make_bidirectional(LatticeGraph(edges, 4));
+  EXPECT_THROW(MajoranaMapping::verstraete_cirac(graph), std::invalid_argument);
+}
+
 TEST(VerstraeteCiracFactoryTest, RejectsTooFewSites) {
   auto lattice = LatticeGraph::square(1, 2);
   EXPECT_THROW(MajoranaMapping::verstraete_cirac(lattice),

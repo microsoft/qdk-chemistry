@@ -54,7 +54,7 @@ Bravyi-Kitaev tree :cite:`Havlicek2017`
 
 .. _encoding-verstraete-cirac:
 
-Verstraete-Cirac :cite:`VerstraeteCirac2005,Whitfield2016,Havlicek2017locality`
+Verstraete-Cirac :cite:`VerstraeteCirac2005,Whitfield2016,Havlicek2017`
    A locality-preserving encoding for lattice fermion models (e.g. Fermi-Hubbard). Operates on any connected :class:`~qdk_chemistry.data.LatticeGraph`; the default vertex order is the Jordan-Wigner backbone and auxiliary Majorana modes scale with each site's off-backbone degree, so square, triangular, honeycomb, and kagome lattices are supported uniformly. Use :meth:`~qdk_chemistry.data.MajoranaMapping.verstraete_cirac` with a lattice describing one spin species; the factory emits ``num_modes = 2 * n_sites``. Stabilizers are stored on the mapping (no grid metadata on ``MajoranaMapping``); the mapper appends a generic ``lambda*(I-S)`` penalty per stabilizer so the physical codespace spectrum is reproduced.
 
 

@@ -359,6 +359,27 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     throw std::invalid_argument(
         name + " requires a connected lattice graph with at least 3 sites");
   }
+
+  {
+    std::vector<bool> seen(V, false);
+    std::vector<std::uint64_t> stack = {0};
+    seen[0] = true;
+    while (!stack.empty()) {
+      const std::uint64_t u = stack.back();
+      stack.pop_back();
+      for (std::uint64_t v = 0; v < V; ++v) {
+        if (!seen[v] && lattice.are_connected(u, v)) {
+          seen[v] = true;
+          stack.push_back(v);
+        }
+      }
+    }
+    if (!std::all_of(seen.begin(), seen.end(),
+                     [](bool visited) { return visited; })) {
+      throw std::invalid_argument(name + " requires a connected lattice graph");
+    }
+  }
+
   // Cap extended qubit register size (physical + auxiliary modes per spin).
   constexpr std::size_t kMaxVcBaseQubits = 128;
   if (V > 64) {

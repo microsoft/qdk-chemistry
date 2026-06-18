@@ -1,6 +1,6 @@
 """Tests for the Verstraete-Cirac fermion-to-qubit encoding.
 
-Covers issue #482 acceptance criteria: factory on general 2D lattices,
+Covers issue #482 acceptance criteria: factory on connected lattice graphs,
 codespace spectrum vs Jordan-Wigner, constant hopping Pauli weight,
 serialization round-trips, and stabilizer commutation on diverse topologies.
 """
@@ -45,7 +45,14 @@ def _lowest_eigenvalues_sparse(qh: QubitHamiltonian, k: int) -> np.ndarray:
     """Return the ``k`` smallest eigenvalues via sparse Lanczos."""
     matrix = qh.to_matrix(sparse=True).tocsr()
     matrix = 0.5 * (matrix + matrix.getH())
-    vals = spla.eigsh(matrix, k=k, which="SA", return_eigenvectors=False)
+    vals = spla.eigsh(
+        matrix,
+        k=k,
+        which="SA",
+        return_eigenvectors=False,
+        tol=1e-12,
+        maxiter=500_000,
+    )
     return np.sort(vals.real)[:k]
 
 
@@ -212,7 +219,16 @@ class TestVerstraeteCiracSpectrum:
             ),
             k=4,
         )
-        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-8
+        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
+
+    def test_disconnected_graph_rejected(self) -> None:
+        """Two-component graphs raise ``ValueError``."""
+        adj = np.zeros((4, 4))
+        adj[0, 1] = adj[1, 0] = 1.0
+        adj[2, 3] = adj[3, 2] = 1.0
+        lattice = LatticeGraph.from_dense_matrix(adj)
+        with pytest.raises(ValueError, match="connected"):
+            MajoranaMapping.verstraete_cirac(lattice)
 
     def test_hubbard_2x2_spectrum_survives_threshold(self) -> None:
         """2x2 Hubbard spectrum unchanged under coefficient thresholding."""
@@ -233,7 +249,7 @@ class TestVerstraeteCiracSpectrum:
             ),
             k=4,
         )
-        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-8
+        assert np.max(np.abs(jw_eigs - vc_eigs)) < 1e-10
 
     def test_hubbard_3x3_matches_jordan_wigner(self) -> None:
         """Spectral check on 3x3 — not just 'runs without error'."""
@@ -253,7 +269,7 @@ class TestVerstraeteCiracSpectrum:
             ),
             k=6,
         )
-        assert np.max(np.abs(jw_eigs[:4] - vc_eigs[:4])) < 1e-8
+        assert np.max(np.abs(jw_eigs[:4] - vc_eigs[:4])) < 1e-10
 
     def test_periodic_2x2_hubbard_matches_jordan_wigner(self) -> None:
         """Periodic 2x2 Hubbard lowest eigenvalues match Jordan-Wigner."""
@@ -303,7 +319,7 @@ class TestVerstraeteCiracSpectrum:
         vc_mapping = MajoranaMapping.verstraete_cirac(lattice)
         qh_vc = mapper.run(hamiltonian, vc_mapping)
         h_vc = qh_vc.to_matrix(sparse=True)
-        eigs_vc, vecs_vc = spla.eigsh(h_vc, k=8, which="SA")
+        eigs_vc, vecs_vc = spla.eigsh(h_vc, k=8, which="SA", tol=1e-12, maxiter=500_000)
 
         stabs = [
             QubitHamiltonian(
@@ -321,7 +337,7 @@ class TestVerstraeteCiracSpectrum:
         assert len(code_space_eigs) >= 2
         unique_vc = np.unique(np.round(np.sort(code_space_eigs), 6))
         unique_jw = np.unique(np.round(np.sort(jw_eigs), 6))
-        np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-8)
+        np.testing.assert_allclose(unique_vc[:2], unique_jw[:2], atol=1e-10)
 
 
 class TestVerstraeteCiracLocality:
