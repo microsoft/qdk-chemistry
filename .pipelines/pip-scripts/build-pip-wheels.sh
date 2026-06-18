@@ -156,7 +156,8 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
-        -C cmake.define.Boost_NO_BOOST_CMAKE=ON
+        -C cmake.define.Boost_NO_BOOST_CMAKE=ON \
+        -C cmake.define.MACIS_ENABLE_BOOST=OFF
 
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
