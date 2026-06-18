@@ -192,12 +192,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel. --plat pins the glibc floor to 2.35 so the wheel installs on
-    # Ubuntu 22.04+ and Azure Linux 3. Without it auditwheel defaults to the host
-    # glibc, producing a wheel that pip inside the conda testenv rejects because
-    # conda's Python for Azure Linux 3 reports manylinux_2_35 as its platform ceiling.
+    # Repair wheel. --plat pins the glibc floor to the minimum required by the
+    # wheel's actual versioned symbols (GLIBC_2.38 from libc.so.6 on AzureLinux3).
+    # A lower floor such as manylinux_2_35 is not achievable without rebuilding on
+    # an older toolchain; auditwheel enforces that --plat >= actual symbol max.
     auditwheel show dist/qdk_chemistry-*.whl
-    auditwheel repair --plat "manylinux_2_35_$(uname -m)" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    auditwheel repair --plat "manylinux_2_38_$(uname -m)" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
