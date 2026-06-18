@@ -54,10 +54,14 @@ class DensePureStatePreparation(StatePreparation):
         """
         dets = wavefunction.get_active_determinants()
         coeffs = np.asarray(wavefunction.get_coefficients())
+        if np.iscomplexobj(coeffs):
+            if not np.allclose(coeffs.imag, 0.0):
+                raise ValueError("Dense state preparation requires real coefficients (imaginary part must be zero).")
+            coeffs = coeffs.real
         n_qubits = len(dets[0].to_bits())
-        statevector = np.zeros(2**n_qubits, dtype=float)
         if n_qubits > 32:
             raise ValueError("Dense state preparation is only supported for up to 32 qubits.")
+        statevector = np.zeros(2**n_qubits, dtype=float)
         for coeff, det in zip(coeffs, dets, strict=True):
             bits = det.to_bits()
             idx = 0
