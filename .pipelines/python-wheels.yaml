@@ -77,8 +77,9 @@ extends:
       codeql:
         compiled:
           enabled: false
-        sourceLanguages: python
-        binaryLanguages: cpp
+        language: cpp
+        interpreted:
+          language: python
       psscriptanalyzer:
         enabled: false
         justificationForDisabling: Powershell is not used in this repository.
@@ -222,6 +223,8 @@ extends:
         - task: CodeQL3000Init@0
           target: linux_build_container
           displayName: 🛡🛡 CodeQL Initialize
+          inputs:
+            languages: cpp,python
 
         # Build - Linux x86_64
         - template: .pipelines/templates/build-pip-wheels.yml@self
