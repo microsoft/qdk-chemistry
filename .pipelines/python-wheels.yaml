@@ -253,7 +253,7 @@ extends:
             inputs:
             - input: pipelineArtifact
               artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python$(pythonVersion)
-              targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
+              targetPath: $(Agent.BuildDirectory)/qdk-chemistry/python/repaired_wheelhouse
           steps:
           - checkout: self
             path: qdk-chemistry

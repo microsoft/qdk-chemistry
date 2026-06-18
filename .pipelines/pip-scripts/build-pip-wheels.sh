@@ -33,6 +33,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         gcc-gfortran \
         git \
         glibc-devel \
+        kernel-headers \
         gtest-devel \
         libffi-devel \
         libxml2-devel \
