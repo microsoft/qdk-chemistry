@@ -293,9 +293,9 @@ class MajoranaMapping : public DataClass {
   /**
    * @brief Verstraete-Cirac encoding.
    *
-   * Maps two spin species on an undirected `LatticeGraph` using the
+   * Maps one or two spin species on an undirected `LatticeGraph` using the
    * Verstraete-Cirac auxiliary-Majorana construction. The public physical mode
-   * labels remain the lattice site labels for each spin sector, while the
+   * labels remain the lattice site labels for each spin species, while the
    * factory chooses an internal Jordan-Wigner ordering from the graph
    * connectivity.
    *
@@ -316,13 +316,19 @@ class MajoranaMapping : public DataClass {
    * stabilizer directly.
    *
    * @param lattice The `LatticeGraph` connectivity.
+   * @param spin_species Number of spin species to encode. Use 1 for a
+   *        spinless/single-species lattice model, or 2 for QDK's spinful
+   *        electronic-structure convention.
    * @return MajoranaMapping with name ``"verstraete-cirac"``, `2 *
-   *         lattice.num_sites()` physical fermionic modes, and additional
-   *         qubits for auxiliary modes required by non-local lattice edges.
+   *         lattice.num_sites()` physical fermionic modes when
+   *         ``spin_species == 2`` and `lattice.num_sites()` modes when
+   *         ``spin_species == 1``, plus additional qubits for auxiliary modes
+   *         required by non-local lattice edges.
    * @throws std::invalid_argument If the lattice has fewer than three sites or
-   *         is not symmetric.
+   *         is not symmetric, or if spin_species is not 1 or 2.
    */
-  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice);
+  static MajoranaMapping verstraete_cirac(const LatticeGraph& lattice,
+                                          std::size_t spin_species = 1);
 
  private:
   MajoranaMapping(

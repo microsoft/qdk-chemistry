@@ -779,9 +779,15 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
 
 // ── Factory: Verstraete-Cirac ──────────────────────────────────────────
 
-MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
+MajoranaMapping MajoranaMapping::verstraete_cirac(
+    const LatticeGraph& lattice, std::size_t spin_species) {
   using namespace detail;
   const std::string name = "verstraete-cirac";
+
+  if (spin_species != 1 && spin_species != 2) {
+    throw std::invalid_argument(name +
+                                " requires spin_species to be either 1 or 2");
+  }
 
   std::uint64_t V = lattice.num_sites();
   if (V < 3) {
@@ -844,9 +850,9 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     total_n_aux += n_aux[u];
   }
 
-  std::size_t modes_per_spin = V + total_n_aux;
-  std::size_t num_modes = 2 * V;                 // 2 spin species
-  std::size_t base_qubits = 2 * modes_per_spin;  // total qubits in jw_base
+  std::size_t modes_per_species = V + total_n_aux;
+  std::size_t num_modes = spin_species * V;
+  std::size_t base_qubits = spin_species * modes_per_species;
 
   auto jw_base = MajoranaMapping::jordan_wigner(base_qubits);
 
@@ -861,13 +867,15 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
 
   auto get_sys_majorana = [&](std::uint64_t site, std::size_t spin,
                               std::size_t offset) -> std::size_t {
-    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
+    std::size_t mode_idx =
+        spin * modes_per_species + site_to_mode_offset[site];
     return 2 * mode_idx + offset;
   };
 
   auto get_aux_majorana = [&](std::uint64_t site, std::size_t spin,
                               std::size_t offset) -> std::size_t {
-    std::size_t mode_idx = spin * modes_per_spin + site_to_mode_offset[site];
+    std::size_t mode_idx =
+        spin * modes_per_species + site_to_mode_offset[site];
     return 2 * (mode_idx + 1) + offset;
   };
 
@@ -886,9 +894,9 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
 
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
   std::vector<std::map<std::pair<std::uint64_t, std::uint64_t>, std::size_t>>
-      edge_to_stab_idx(2);
+      edge_to_stab_idx(spin_species);
 
-  for (std::size_t spin = 0; spin < 2; ++spin) {
+  for (std::size_t spin = 0; spin < spin_species; ++spin) {
     // Add 2-body link stabilizers for non-adjacent edges on the lattice
     for (std::uint64_t u = 0; u < V; ++u) {
       for (std::uint64_t v : non_adjacent_incident[u]) {
@@ -932,13 +940,13 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     }
   }
 
-  // Use products of link stabilizers around lattice cycles as the automatic
-  // auxiliary penalty terms. The raw link stabilizers remain exposed as
-  // codespace constraints, but they are not inserted directly because their
-  // Jordan-Wigner strings can be nonlocal.
+  // Use products of explicit auxiliary link stabilizers around lattice cycles
+  // as the automatic auxiliary penalty terms. In this reduced construction,
+  // path-local cycle edges do not carry auxiliary links, so a valid cycle
+  // product can contain a single explicit link.
   std::vector<StabilizerTerm> auxiliary_penalty_terms;
   std::set<std::vector<std::size_t>> seen_cycle_products;
-  for (std::size_t spin = 0; spin < 2; ++spin) {
+  for (std::size_t spin = 0; spin < spin_species; ++spin) {
     for (const auto& edge : non_adjacent_edges) {
       auto path = shortest_path_excluding_edge(lattice_neighbors, edge.first,
                                                edge.second, edge);
@@ -963,7 +971,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
         add_cycle_edge(path[i], path[i + 1]);
       }
 
-      if (cycle_indices.size() < 2) {
+      if (cycle_indices.empty()) {
         continue;
       }
 
@@ -980,7 +988,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
 
   // Build a lookup table of VC bilinears by dressing non-local JW bilinears
   // with their stabilizer to make everything local
-  std::size_t num_physical_modes = 2 * V;
+  std::size_t num_physical_modes = spin_species * V;
   std::size_t num_physical_majoranas = 2 * num_physical_modes;
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> upper_triangle;
   upper_triangle.reserve(num_physical_majoranas * (num_physical_majoranas - 1) /

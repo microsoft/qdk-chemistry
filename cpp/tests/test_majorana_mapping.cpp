@@ -262,6 +262,11 @@ TEST(VerstraeteCiracMappingTest, UsesGraphDerivedOrderForRelabeledSquare) {
 
   auto square = LatticeGraph::square(2, 2, false, false);
   auto builtin = MajoranaMapping::verstraete_cirac(square);
+  auto spinful = MajoranaMapping::verstraete_cirac(square, 2);
+
+  EXPECT_EQ(builtin.num_modes(), 4u);
+  EXPECT_EQ(spinful.num_modes(), 8u);
+  EXPECT_EQ(spinful.num_qubits(), 2u * builtin.num_qubits());
 
   // Relabel the same colored square so index order is no longer the row-major
   // line scan used by the factory's old index-distance heuristic.
@@ -291,9 +296,17 @@ TEST(VerstraeteCiracMappingTest, UsesGraphDerivedOrderForRelabeledSquare) {
   auto custom =
       MajoranaMapping::verstraete_cirac(LatticeGraph(custom_edges, 4));
 
-  EXPECT_EQ(custom.num_modes(), 8u);
+  EXPECT_EQ(custom.num_modes(), 4u);
   EXPECT_GT(custom.num_qubits(), custom.num_modes());
   EXPECT_GT(custom.stabilizers().size(), 0u);
+}
+
+TEST(VerstraeteCiracMappingTest, RejectsInvalidSpinSpecies) {
+  auto square = LatticeGraph::square(2, 2, false, false);
+  EXPECT_THROW(MajoranaMapping::verstraete_cirac(square, 0),
+               std::invalid_argument);
+  EXPECT_THROW(MajoranaMapping::verstraete_cirac(square, 3),
+               std::invalid_argument);
 }
 
 TEST(VerstraeteCiracMappingTest, RejectsDirectedCustomLattice) {

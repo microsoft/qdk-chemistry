@@ -643,14 +643,8 @@ EdgeColoring square_coloring(std::int64_t Nx, std::int64_t Ny, bool periodic_x,
     }
   }
 
-  // Compact the color labels so the result is in 0..(distinct-1).
-  std::map<int, int> remap;
-  for (const auto& [edge, c] : out) {
-    remap.emplace(c, static_cast<int>(remap.size()));
-  }
-  for (auto& [edge, c] : out) {
-    c = remap.at(c);
-  }
+  // Keep axis labels stable: the Verstraete-Cirac factory treats colors 0 and
+  // 1 as path-local square-lattice edges.
   return out;
 }
 

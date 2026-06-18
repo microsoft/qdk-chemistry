@@ -130,6 +130,62 @@ SettingTypeMismatchError = SettingTypeMismatch
 SettingsAreLockedError = SettingsAreLocked
 
 
+_native_verstraete_cirac = MajoranaMapping.verstraete_cirac
+
+
+def _verstraete_cirac_compat(lattice: LatticeGraph, spin_species: int = 1) -> MajoranaMapping:
+    """Compatibility wrapper for older local native extensions.
+
+    Current C++ bindings expose ``verstraete_cirac(lattice, spin_species=1)``.
+    Some editable environments can still load an older compiled ``_core`` that
+    only exposes ``verstraete_cirac(lattice)`` and returns a two-species mapping.
+    Keep that environment runnable by deriving the alpha-sector bilinear table
+    and stabilizer metadata for the requested single-species mapping.
+    """
+    try:
+        return _native_verstraete_cirac(lattice, spin_species)
+    except TypeError:
+        if spin_species not in {1, 2}:
+            raise ValueError("verstraete-cirac requires spin_species to be either 1 or 2") from None
+
+        native_mapping = _native_verstraete_cirac(lattice)
+        if spin_species == 2 or native_mapping.num_modes == lattice.num_sites:
+            return native_mapping
+
+        num_modes = lattice.num_sites
+        if native_mapping.num_modes < num_modes:
+            raise ValueError(
+                "verstraete-cirac native mapping has fewer modes than the lattice; "
+                "rebuild qdk_chemistry._core from the current sources."
+            )
+
+        bilinears = [
+            native_mapping.bilinear(j, k)
+            for j in range(2 * num_modes)
+            for k in range(j + 1, 2 * num_modes)
+        ]
+        single_species = MajoranaMapping.from_bilinears(
+            num_modes,
+            bilinears,
+            name=native_mapping.name or "verstraete-cirac",
+        )
+
+        data = single_species.to_json()
+        native_data = native_mapping.to_json()
+        stabilizers = native_data.get("stabilizers", [])
+        if stabilizers:
+            data["stabilizers"] = stabilizers[: len(stabilizers) // 2]
+        auxiliary_penalty_terms = native_data.get("auxiliary_penalty_terms", [])
+        if auxiliary_penalty_terms:
+            data["auxiliary_penalty_terms"] = auxiliary_penalty_terms[
+                : len(auxiliary_penalty_terms) // 2
+            ]
+        return MajoranaMapping.from_json(data)
+
+
+MajoranaMapping.verstraete_cirac = staticmethod(_verstraete_cirac_compat)
+
+
 __all__ = [
     "AOType",
     "AlgorithmRef",

@@ -70,6 +70,10 @@ Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017`
    deterministic graph-derived order when no topology metadata is available.
    Passing ``dfs_ordering=True`` to supported lattice factories can further
    reduce the number of non-path edges, auxiliary qubits, and stabilizers.
+   By default, the factory creates a spinless/single-species mapping with
+   ``lattice.num_sites`` physical fermionic modes. Pass ``spin_species=2`` to
+   encode QDK's spinful electronic-structure convention with alpha and beta
+   sectors.
 
    The returned mapping is bilinear-only: individual Majorana operators are not
    exposed as Pauli words, but bilinears needed by the native mapper are
@@ -91,6 +95,8 @@ Verstraete-Cirac :cite:`Verstraete2005,Whitfield2016,Havlicek2017`
       lattice = LatticeGraph.square(4, 4, dfs_ordering=True)
       mapping = MajoranaMapping.verstraete_cirac(lattice)
       qubit_hamiltonian = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+
+      spinful_mapping = MajoranaMapping.verstraete_cirac(lattice, spin_species=2)
 
 Using the QubitMapper
 ---------------------
