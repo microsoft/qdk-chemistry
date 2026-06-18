@@ -192,21 +192,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel. --plat must be >= the wheel's actual maximum versioned GLIBC
-    # symbol, which varies with the build toolchain. Detect it from readelf so
-    # the script never needs updating when the toolchain or glibc changes.
+    # Repair wheel. Let auditwheel determine the required platform tag (it accounts
+    # for both GLIBC_x.y and GLIBCXX_x.y.z policy levels, unlike a raw readelf scan).
     auditwheel show dist/qdk_chemistry-*.whl
-    _WHL_INSPECT=$(mktemp -d)
-    python3 -m zipfile -e dist/qdk_chemistry-*.whl "$_WHL_INSPECT"
-    _GLIBC_MAX=$(find "$_WHL_INSPECT" -name '*.so*' -type f \
-        -exec readelf -sW {} + 2>/dev/null \
-        | grep -oE 'GLIBC_[0-9]+\.[0-9]+' \
-        | sed 's/GLIBC_//' \
-        | sort -t. -k1,1n -k2,2n \
-        | tail -n1)
-    rm -rf "$_WHL_INSPECT"
-    _PLAT_TAG="manylinux_${_GLIBC_MAX//./_}_$(uname -m)"
-    echo "Max GLIBC symbol in wheel: GLIBC_${_GLIBC_MAX} -> --plat ${_PLAT_TAG}"
+    _PLAT_TAG=$(auditwheel show dist/qdk_chemistry-*.whl 2>&1 \
+        | grep -oP '"manylinux_[^"]*"' | tr -d '"' | head -1)
+    echo "auditwheel required platform tag: ${_PLAT_TAG}"
     auditwheel repair --plat "${_PLAT_TAG}" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
