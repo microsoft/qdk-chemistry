@@ -192,12 +192,22 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel. --plat pins the glibc floor to the minimum required by the
-    # wheel's actual versioned symbols (GLIBC_2.38 from libc.so.6 on AzureLinux3).
-    # A lower floor such as manylinux_2_35 is not achievable without rebuilding on
-    # an older toolchain; auditwheel enforces that --plat >= actual symbol max.
+    # Repair wheel. --plat must be >= the wheel's actual maximum versioned GLIBC
+    # symbol, which varies with the build toolchain. Detect it from readelf so
+    # the script never needs updating when the toolchain or glibc changes.
     auditwheel show dist/qdk_chemistry-*.whl
-    auditwheel repair --plat "manylinux_2_38_$(uname -m)" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    _WHL_INSPECT=$(mktemp -d)
+    python3 -m zipfile -e dist/qdk_chemistry-*.whl "$_WHL_INSPECT"
+    _GLIBC_MAX=$(find "$_WHL_INSPECT" -name '*.so*' -type f \
+        -exec readelf -sW {} + 2>/dev/null \
+        | grep -oE 'GLIBC_[0-9]+\.[0-9]+' \
+        | sed 's/GLIBC_//' \
+        | sort -t. -k1,1n -k2,2n \
+        | tail -n1)
+    rm -rf "$_WHL_INSPECT"
+    _PLAT_TAG="manylinux_${_GLIBC_MAX//./_}_$(uname -m)"
+    echo "Max GLIBC symbol in wheel: GLIBC_${_GLIBC_MAX} -> --plat ${_PLAT_TAG}"
+    auditwheel repair --plat "${_PLAT_TAG}" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
