@@ -26,7 +26,7 @@ resources:
   # all share one environment (see codeql-docker docs). Both x86_64 and aarch64 reference this
   # resource; Docker selects the correct arch variant from the multi-arch manifest automatically.
   - container: linux_build_container
-    image: mcr.microsoft.com/mirror/docker/library/ubuntu:22.04
+    image: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
     options: --user root
 
 parameters:
@@ -190,6 +190,30 @@ extends:
           inputs:
             artifactFeeds: AzureQuantum/quantum-apps-dependencies
             onlyAddExtraIndex: false
+
+        # Install sudo in the build container so that subsequent container steps can use it.
+        # 1ES PT enforces uid 1001 for all container steps regardless of `options: --user root`,
+        # and ubuntu:24.04 does not ship sudo. This step runs on the host agent (no target:),
+        # which has docker access, and installs sudo + configures the azure_pipelines_sudo group
+        # (already created by ADO) for passwordless sudo before CodeQL Init runs.
+        - script: |
+            set -ex
+            CID=$(docker ps --filter "ancestor=mcr.microsoft.com/mirror/docker/library/ubuntu:24.04" \
+                  --format "{{.ID}}" | head -1)
+            if [ -z "$CID" ]; then
+              echo "ERROR: could not find running ubuntu:24.04 container" >&2
+              docker ps
+              exit 1
+            fi
+            echo "Installing sudo into container $CID..."
+            docker exec --user root "$CID" bash -c "
+              apt-get update -q &&
+              apt-get install -y -q sudo &&
+              echo '%azure_pipelines_sudo ALL=(ALL) NOPASSWD:ALL' \
+                > /etc/sudoers.d/azure_pipelines_sudo &&
+              chmod 0440 /etc/sudoers.d/azure_pipelines_sudo
+            "
+          displayName: Install sudo in build container
 
         # CodeQL Init - x86_64 Linux only. Init, build, and Finalize must all run in the
         # same environment for C++ tracing to work; using target: keeps them in the container.
