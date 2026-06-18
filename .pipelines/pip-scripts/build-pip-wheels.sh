@@ -58,6 +58,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
 
     # boost-devel on Azure Linux 3 strips the CMake config files; synthesise a
     # minimal BoostConfig.cmake so find_package(Boost CONFIG REQUIRED) works.
+    BOOST_VERSION=$(python3 -c "
+import re, sys
+text = open('/usr/include/boost/version.hpp').read()
+num = int(re.search(r'define BOOST_VERSION (\d+)', text).group(1))
+print(f'{num // 100000}.{num // 100 % 1000}.{num % 100}')
+")
+    echo "Detected Boost version: ${BOOST_VERSION}"
     BOOST_CMAKE_DIR=/usr/lib/cmake/Boost
     $SUDO mkdir -p "${BOOST_CMAKE_DIR}"
     $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfig.cmake" > /dev/null <<'EOF'
@@ -68,8 +75,8 @@ if(NOT TARGET Boost::boost)
     INTERFACE_INCLUDE_DIRECTORIES "/usr/include")
 endif()
 EOF
-    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfigVersion.cmake" > /dev/null <<'EOF'
-set(PACKAGE_VERSION "1.83.0")
+    $SUDO tee "${BOOST_CMAKE_DIR}/BoostConfigVersion.cmake" > /dev/null <<EOF
+set(PACKAGE_VERSION "${BOOST_VERSION}")
 if(PACKAGE_VERSION VERSION_LESS PACKAGE_FIND_VERSION)
   set(PACKAGE_VERSION_COMPATIBLE FALSE)
 else()
