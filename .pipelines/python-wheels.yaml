@@ -122,38 +122,6 @@ extends:
             targetPath: $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse/
             artifactName: linux-x86_64-wheels-python$(pythonVersion)
         steps:
-        # - script: |
-        #     set -x
-
-        #     whoami && id
-
-        #     echo "== uname =="
-        #     uname -a
-
-        #     echo "== os-release =="
-        #     cat /etc/os-release || true
-
-        #     echo "== cgroup =="
-        #     cat /proc/1/cgroup || true
-
-        #     echo "== mountinfo =="
-        #     grep -E 'overlay|container' /proc/1/mountinfo || true
-
-        #     echo "== env =="
-        #     env | grep -Ei 'container|docker|podman' || true
-
-        #     echo "== pid1 =="
-        #     ps -p 1 -o pid,comm,args=
-
-        #     which apt-get || echo "no apt-get"
-        #     which docker && docker ps || echo "no docker"
-
-        #     pwd
-        #     ls -la
-        #     ls -la ..
-        #   target: linux_build_container
-        #   displayName: Diagnose environment
-
         - script: |
             set -x
 
@@ -184,7 +152,6 @@ extends:
             ls -la
             ls -la ..
           displayName: Diagnose environment (without target)
-
 
         - task: PipAuthenticate@1
           displayName: Pip Authenticate
@@ -219,15 +186,15 @@ extends:
         #       sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/python/repaired_wheelhouse
         #     displayName: Fix wheel directory ownership
 
-        - task: TwineAuthenticate@1
-          inputs:
-            artifactFeed: $(artifactProject)/$(artifactFeed)
-          displayName: Authenticate to internal feed
-          condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+        # - task: TwineAuthenticate@1
+        #   inputs:
+        #     artifactFeed: $(artifactProject)/$(artifactFeed)
+        #   displayName: Authenticate to internal feed
+        #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
 
-        - script: |
-            cd $(Agent.BuildDirectory)/qdk-chemistry/python
-            python3 -m pip install twine
-            python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
-          displayName: Upload wheel with twine
-          condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
+        # - script: |
+        #     cd $(Agent.BuildDirectory)/qdk-chemistry/python
+        #     python3 -m pip install twine
+        #     python3 -m twine upload -r $(artifactFeed) repaired_wheelhouse/*.whl --config-file $(PYPIRC_PATH)
+        #   displayName: Upload wheel with twine
+        #   condition: and(succeeded(), ${{ parameters.publishInternalFeed }})
