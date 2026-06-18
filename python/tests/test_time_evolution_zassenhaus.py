@@ -7,16 +7,18 @@
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import pytest
 import scipy.linalg
 
-from qdk_chemistry.algorithms import registry
+from qdk_chemistry.algorithms import create, registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_expansion import (
     zassenhaus_factors,
 )
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import MajoranaMapping, QubitHamiltonian, Structure, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     PauliProductFormulaContainer,
 )
@@ -89,34 +91,24 @@ def _heisenberg_chain_4() -> QubitHamiltonian:
     return QubitHamiltonian(pauli_strings=labels, coefficients=np.ones(len(labels)))
 
 
+@functools.lru_cache(maxsize=1)
 def _h2_sto3g_jw() -> QubitHamiltonian:
-    """Canonical H2/STO-3G qubit Hamiltonian (Jordan-Wigner, 4 qubits, R=0.7414 A).
+    """H2/STO-3G qubit Hamiltonian (Jordan-Wigner, 4 qubits) built via the QDK pipeline.
 
-    Coefficients are the widely reproduced OpenFermion values; the absolute
-    constant is irrelevant to the tests, which compute the reference ground-state
-    energy from the operator itself.
+    Produced the same way the rest of the library does (SCF -> Hamiltonian constructor
+    -> Jordan-Wigner qubit mapping), rather than hardcoding coefficients, at the H2
+    equilibrium bond length (1.4 Bohr ~ 0.74 A; ``Structure`` coordinates are in Bohr).
+    Cached so the SCF runs only once across the test module.
     """
-    # (coefficient, {qubit_index: pauli_axis})
-    raw: list[tuple[float, dict[int, str]]] = [
-        (-0.09706626816762854, {}),
-        (0.17141282644776915, {0: "Z"}),
-        (0.17141282644776912, {1: "Z"}),
-        (-0.22343153690813466, {2: "Z"}),
-        (-0.22343153690813466, {3: "Z"}),
-        (0.16868898170361207, {0: "Z", 1: "Z"}),
-        (0.12062523483390411, {0: "Z", 2: "Z"}),
-        (0.16592785033770345, {0: "Z", 3: "Z"}),
-        (0.16592785033770345, {1: "Z", 2: "Z"}),
-        (0.12062523483390411, {1: "Z", 3: "Z"}),
-        (0.17441287612261588, {2: "Z", 3: "Z"}),
-        (-0.04530261550379932, {0: "X", 1: "X", 2: "Y", 3: "Y"}),
-        (0.04530261550379932, {0: "X", 1: "Y", 2: "Y", 3: "X"}),
-        (0.04530261550379932, {0: "Y", 1: "X", 2: "X", 3: "Y"}),
-        (-0.04530261550379932, {0: "Y", 1: "Y", 2: "X", 3: "X"}),
-    ]
-    labels = [_terms_to_label(mapping, 4) for _, mapping in raw]
-    coeffs = np.array([c for c, _ in raw])
-    return QubitHamiltonian(pauli_strings=labels, coefficients=coeffs, encoding="jordan-wigner")
+    coords = np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.4]])
+    structure = Structure(coords, symbols=["H", "H"])
+
+    scf_solver = create("scf_solver")
+    _, wavefunction = scf_solver.run(structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+
+    hamiltonian = create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+    n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
+    return create("qubit_mapper").run(hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals))
 
 
 # ----------------------------------------------------------------------------------
@@ -256,6 +248,39 @@ def test_factor_count_grows_with_order():
     assert counts == sorted(counts)
     assert counts[0] == len(terms)  # order 1 == bare Trotter product
     assert counts[-1] > counts[0]
+
+
+def test_target_accuracy_increases_divisions():
+    """A tighter ``target_accuracy`` raises the automatic time-division count."""
+    hamiltonian = QubitHamiltonian(pauli_strings=["XI", "ZZ", "IY"], coefficients=np.array([1.0, 0.6, 0.4]))
+
+    baseline = Zassenhaus(order=3, time=1.0).run(hamiltonian).get_container().step_reps
+    loose = Zassenhaus(order=3, time=1.0, target_accuracy=1e-2).run(hamiltonian).get_container().step_reps
+    tight = Zassenhaus(order=3, time=1.0, target_accuracy=1e-4).run(hamiltonian).get_container().step_reps
+
+    assert baseline == 1  # target_accuracy disabled by default
+    assert tight > loose > baseline
+
+
+def test_term_partition_is_consumed():
+    """A populated ``term_partition`` orders the seed terms by group; result stays O(t^(p+1))."""
+    hamiltonian = create_heisenberg_hamiltonian(
+        LatticeGraph.chain(4, periodic=False), jx=1.0, jy=1.0, jz=1.0, include_term_groups=True
+    )
+    assert hamiltonian.term_partition is not None
+
+    # _ordered_terms must reproduce the partition's grouped index order.
+    ordered = Zassenhaus._ordered_terms(hamiltonian, weight_threshold=1e-12)
+    expected_indices: list[int] = []
+    for group in hamiltonian.term_partition.groups:
+        for layer in group:  # LayeredPartition: group -> layers -> indices
+            expected_indices.extend(layer)
+    expected_labels = [hamiltonian.pauli_strings[i] for i in expected_indices]
+    assert [label for label, _ in ordered] == expected_labels
+
+    # Consuming the partition must not break the error scaling.
+    slope = _fit_error_slope(hamiltonian, order=3)
+    assert abs(slope - 4) < 0.1
 
 
 # ----------------------------------------------------------------------------------

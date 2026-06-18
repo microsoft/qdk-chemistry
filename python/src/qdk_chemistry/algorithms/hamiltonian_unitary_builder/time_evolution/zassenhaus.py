@@ -28,14 +28,17 @@ References:
 
 from __future__ import annotations
 
+import math
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_expansion import zassenhaus_factors
-from qdk_chemistry.data import QubitHamiltonian, UnitaryRepresentation
+from qdk_chemistry.data import FlatPartition, LayeredPartition, QubitHamiltonian, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.pauli_commutation import commutator_bound_higher_order
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
 
@@ -52,6 +55,9 @@ class ZassenhausSettings(TimeEvolutionSettings):
                 higher commutator corrections, giving error ``O(t**(p+1))``.
             num_divisions: Number of time divisions ``N``.  Each division evolves
                 for ``time / N`` and the step is repeated ``N`` times.
+            target_accuracy: Target accuracy for automatic time-division count
+                (0.0 means disabled).  When set, ``N`` is estimated from a
+                commutator error bound and the larger of it and ``num_divisions`` is used.
             weight_threshold: The absolute threshold for filtering small coefficients.
 
         """
@@ -62,6 +68,12 @@ class ZassenhausSettings(TimeEvolutionSettings):
             "int",
             1,
             "Explicit number of time divisions (each evolves for time / num_divisions).",
+        )
+        self._set_default(
+            "target_accuracy",
+            "double",
+            0.0,
+            "Target accuracy for automatic time-division count (0.0 means disabled).",
         )
         self._set_default(
             "weight_threshold", "float", 1e-12, "The absolute threshold for filtering small coefficients."
@@ -106,6 +118,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         *,
         time: float = 0.0,
         num_divisions: int = 1,
+        target_accuracy: float = 0.0,
         weight_threshold: float = 1e-12,
         power: int = 1,
         power_strategy: str = "repeat",
@@ -117,6 +130,9 @@ class Zassenhaus(TimeEvolutionBuilder):
             time: The evolution time. Defaults to 0.0.
             num_divisions: Number of time divisions ``N`` (each evolves for
                 ``time / N`` and the step repeats ``N`` times). Defaults to 1.
+            target_accuracy: Target accuracy for automatic division count. When > 0,
+                ``N`` is estimated from a commutator error bound and the larger of it
+                and ``num_divisions`` is used. Use 0.0 (default) to disable.
             weight_threshold: Threshold for filtering small coefficients. Defaults to 1e-12.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for U^power: ``"rescale"`` or ``"repeat"`` (default).
@@ -129,6 +145,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         self._settings.set("power_strategy", power_strategy)
         self._settings.set("order", order)
         self._settings.set("num_divisions", num_divisions)
+        self._settings.set("target_accuracy", target_accuracy)
         self._settings.set("weight_threshold", weight_threshold)
 
     def _run_impl(self, qubit_hamiltonian: QubitHamiltonian) -> UnitaryRepresentation:
@@ -148,17 +165,17 @@ class Zassenhaus(TimeEvolutionBuilder):
         if order < 1:
             raise ValueError(f"Zassenhaus expansion order must be >= 1, got {order}.")
 
-        num_divisions = self._settings.get("num_divisions")
-        if num_divisions < 1:
-            raise ValueError(f"num_divisions must be a positive integer, got {num_divisions}.")
+        if self._settings.get("num_divisions") < 1:
+            raise ValueError(f"num_divisions must be a positive integer, got {self._settings.get('num_divisions')}.")
 
         if not qubit_hamiltonian.is_hermitian(tolerance=weight_threshold):
             raise ValueError("Non-Hermitian Hamiltonian: coefficients have nonzero imaginary parts.")
 
+        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, effective_time)
         num_qubits = qubit_hamiltonian.num_qubits
         delta = effective_time / num_divisions
 
-        terms = qubit_hamiltonian.get_real_coefficients(tolerance=weight_threshold)
+        terms = self._ordered_terms(qubit_hamiltonian, weight_threshold)
         step_terms = self._build_step_terms(terms, order=order, delta=delta, atol=weight_threshold)
 
         container = PauliProductFormulaContainer(
@@ -167,6 +184,64 @@ class Zassenhaus(TimeEvolutionBuilder):
             num_qubits=num_qubits,
         )
         return UnitaryRepresentation(container=container)
+
+    def _resolve_num_divisions(self, qubit_hamiltonian: QubitHamiltonian, time: float) -> int:
+        r"""Determine the number of time divisions ``N``.
+
+        Without *target_accuracy* this is just the ``num_divisions`` setting.  When
+        *target_accuracy* :math:`\epsilon` is set, ``N`` is estimated from the
+        commutator error bound: the order-:math:`p` remainder scales as
+        :math:`\alpha\,t^{p+1}/N^{p}`, where :math:`\alpha` is the sum of degree-:math:`(p+1)`
+        nested-commutator norms (:func:`~qdk_chemistry.utils.pauli_commutation.commutator_bound_higher_order`,
+        the same infrastructure the Trotter builder uses).  Setting that
+        :math:`\le \epsilon` gives :math:`N = \lceil (\alpha t^{p+1}/\epsilon)^{1/p} \rceil`.
+        The larger of the manual and estimated value is returned.
+        """
+        manual = self._settings.get("num_divisions")
+        target_accuracy = self._settings.get("target_accuracy")
+        if target_accuracy <= 0.0 or time == 0.0:
+            return manual
+
+        order = self._settings.get("order")
+        weight_threshold = self._settings.get("weight_threshold")
+        alpha = commutator_bound_higher_order(qubit_hamiltonian, order, weight_threshold=weight_threshold)
+        if alpha <= 0.0:
+            return manual
+        auto = math.ceil((alpha * abs(time) ** (order + 1) / target_accuracy) ** (1.0 / order))
+        return max(manual, auto, 1)
+
+    @staticmethod
+    def _ordered_terms(qubit_hamiltonian: QubitHamiltonian, weight_threshold: float) -> list[tuple[str, float]]:
+        """Return ``(pauli_label, real_coeff)`` pairs, ordered by ``term_partition`` if present.
+
+        When the Hamiltonian carries a :class:`~qdk_chemistry.data.TermPartition`, the bare
+        first-order product consumes it so that commuting terms within a group are adjacent
+        (consistent with the Trotter builder); otherwise terms keep their natural order.
+        Terms whose real coefficient is below *weight_threshold* are dropped.
+        """
+        partition = qubit_hamiltonian.term_partition
+        labels = qubit_hamiltonian.pauli_strings
+        coefficients = qubit_hamiltonian.coefficients
+
+        if partition is None:
+            indices: list[int] = list(range(len(labels)))
+        else:
+            indices = []
+            for group in partition.groups:
+                if isinstance(partition, LayeredPartition):
+                    for layer in group:
+                        indices.extend(layer)
+                elif isinstance(partition, FlatPartition):
+                    indices.extend(group)
+                else:
+                    raise TypeError(f"Unsupported TermPartition subtype: {type(partition).__name__}.")
+
+        ordered: list[tuple[str, float]] = []
+        for index in indices:
+            real = complex(coefficients[index]).real
+            if abs(real) > weight_threshold:
+                ordered.append((labels[index], real))
+        return ordered
 
     @staticmethod
     def _build_step_terms(

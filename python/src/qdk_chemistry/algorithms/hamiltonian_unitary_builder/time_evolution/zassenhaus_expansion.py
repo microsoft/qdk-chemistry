@@ -130,21 +130,33 @@ _DEXPINV_COEFFS: dict[int, float] = {
 SPoly = dict[int, GradedPoly]
 
 
+def _words_commute(word_a: PauliWord, word_b: PauliWord) -> bool:
+    """Whether two Pauli words commute.
+
+    Two Pauli strings commute iff the number of qubits where both act with
+    *different* (non-identity) single-qubit operators is even.  This mirrors the
+    label-based check in :func:`qdk_chemistry.utils.pauli_commutation.commutator`,
+    on sparse words instead of full strings.
+    """
+    axes_b = dict(word_b)
+    anticommuting = sum(1 for qubit, axis_a in word_a if axes_b.get(qubit, axis_a) != axis_a)
+    return anticommuting % 2 == 0
+
+
 def _word_commutator(word_a: PauliWord, word_b: PauliWord) -> tuple[complex, PauliWord] | None:
     r"""Commutator of two Pauli words: ``(coeff, word)`` for :math:`[P_a, P_b]`, or ``None`` if they commute.
 
-    For Pauli strings, :math:`P_a P_b = \phi_{ab} Q` and :math:`P_b P_a = \phi_{ba} Q`
-    (the same word :math:`Q`), so :math:`[P_a, P_b] = (\phi_{ab} - \phi_{ba}) Q`, which
-    vanishes exactly when the two strings commute.  This is what keeps the corrections
-    sparse: every commutator is a single Pauli word, and commuting pairs cost nothing.
+    When the two strings anticommute, :math:`P_b P_a = -P_a P_b`, so
+    :math:`[P_a, P_b] = P_a P_b - P_b P_a = 2\,P_a P_b`.  We therefore short-circuit on
+    the cheap commutativity pre-check (skipping commuting pairs entirely) and evaluate a
+    single product :math:`P_a P_b` -- the :math:`P_b P_a` phase is fixed by the
+    anticommutation relation and never computed.  Every commutator is a single Pauli
+    word, which is what keeps the corrections sparse.
     """
-    list_a, list_b = list(word_a), list(word_b)
-    phase_ab, product = PauliTermAccumulator.multiply_uncached(list_a, list_b)
-    phase_ba, _ = PauliTermAccumulator.multiply_uncached(list_b, list_a)
-    coeff = phase_ab - phase_ba
-    if abs(coeff) < 1e-15:
+    if _words_commute(word_a, word_b):
         return None
-    return coeff, _canonical_word(product)
+    phase_ab, product = PauliTermAccumulator.multiply_uncached(list(word_a), list(word_b))
+    return 2.0 * phase_ab, _canonical_word(product)
 
 
 def _poly_commutator(left: GradedPoly, right: GradedPoly, max_degree: int, tol: float = 1e-14) -> GradedPoly:
@@ -217,6 +229,7 @@ def _bch_merge(z_poly: GradedPoly, f_poly: GradedPoly, max_degree: int, tol: flo
     seed = {w: dict(dm) for w, dm in z_poly.items()}
     omega: SPoly = {0: {w: dict(dm) for w, dm in seed.items()}}
     previous = _poly_clean(_sop_to_poly(omega), tol)
+    converged = False
     for _ in range(max_degree + 3):
         # integrand(s) = sum_k c_k ad_{Omega(s)}^k (f)
         integrand: SPoly = {}
@@ -240,6 +253,11 @@ def _bch_merge(z_poly: GradedPoly, f_poly: GradedPoly, max_degree: int, tol: flo
         previous = current
         if converged:
             break
+    if not converged:
+        raise RuntimeError(
+            f"BCH merge (dexpinv Picard iteration) did not converge within {max_degree + 3} iterations "
+            f"at max_degree={max_degree}."
+        )
     return previous
 
 
@@ -324,29 +342,54 @@ def zassenhaus_factors(
         bucket[1] = bucket.get(1, 0j) + coeff
     target = _poly_clean(target, tol)
 
-    for degree in range(2, order + 1):
-        log_unitary = _log_of_product(factors, order, tol)
+    # Maintain the running log incrementally: start from the seed product, then fold in
+    # each batch of corrections as they are appended -- rather than recomputing the full
+    # product log every order (the corrections from earlier orders are already baked in).
+    running_log = _log_of_product(factors, order, tol)
 
-        difference = _poly_add_inplace({w: dict(dm) for w, dm in log_unitary.items()}, target, scale=-1.0)
+    for degree in range(2, order + 1):
+        difference = _poly_add_inplace({w: dict(dm) for w, dm in running_log.items()}, target, scale=-1.0)
         residual = _poly_clean(difference, tol)
 
         # Append -R_n: the degree-`degree` part of the residual, in canonical order.
+        new_factors: list[tuple[PauliWord, int, complex]] = []
         for word in sorted(residual.keys()):
             coeff = residual[word].get(degree, 0j)
             if abs(coeff) > tol:
-                factors.append((word, degree, -coeff))
+                new_factors.append((word, degree, -coeff))
+        factors.extend(new_factors)
+
+        # Fold the newly appended factors into the running log for the next order
+        # (skipped on the final order: the log is not needed again).
+        if degree < order:
+            for word, factor_degree, coeff in new_factors:
+                running_log = _bch_merge(running_log, {word: {factor_degree: coeff}}, order, tol)
 
     return [_to_factor(word, degree, coeff) for word, degree, coeff in factors]
 
 
-def _to_factor(word: PauliWord, degree: int, coeff: complex) -> ZassenhausFactor:
+def _to_factor(word: PauliWord, degree: int, coeff: complex, hermiticity_tol: float = 1e-9) -> ZassenhausFactor:
     r"""Convert an internal ``(word, degree, antihermitian coeff)`` triple to a :class:`ZassenhausFactor`.
 
     The internal coefficient ``coeff`` is the antihermitian prefactor of
     :math:`\exp(\text{coeff}\, t^{d} P)`.  For a Hermitian Hamiltonian it is purely
     imaginary, so the rotation angle ``theta`` with :math:`\exp(-i\,\theta\,t^{d}P)`
-    is ``theta = i * coeff`` (real).
+    is ``theta = i * coeff`` (real); the rotation angle keeps ``Im(coeff)`` and the
+    real part is discarded.
+
+    A non-negligible real part signals non-Hermitian drift (an upstream non-Hermitian
+    input or an arithmetic bug), so it is rejected rather than silently dropped.
+
+    Raises:
+        ValueError: If ``abs(coeff.real) > hermiticity_tol``.
     """
+    if abs(coeff.real) > hermiticity_tol:
+        axes = {1: "X", 2: "Y", 3: "Z"}
+        label = " ".join(f"{axes[a]}{q}" for q, a in word) or "I"
+        raise ValueError(
+            f"Non-Hermitian drift: factor on [{label}] (degree {degree}) has "
+            f"|Re(coeff)| = {abs(coeff.real):.2e} > {hermiticity_tol:.1e}."
+        )
     angle_coefficient = (1j * coeff).real
     return ZassenhausFactor(pauli_term=_word_to_term_map(word), angle_coefficient=angle_coefficient, degree=degree)
 

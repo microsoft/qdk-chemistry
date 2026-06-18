@@ -196,6 +196,9 @@ At :math:`p = 1` the construction reduces to the first-order Trotter product.
    * - ``num_divisions``
      - int
      - Number of time divisions :math:`N` (each evolves for ``time / N`` and the step repeats :math:`N` times). Default is 1.
+   * - ``target_accuracy``
+     - float
+     - Target accuracy :math:`\epsilon` for automatic division count. When set, :math:`N` is estimated from the commutator error bound :math:`N = \lceil(\alpha\,t^{p+1}/\epsilon)^{1/p}\rceil` (same infrastructure as the Trotter ``"commutator"`` bound) and the larger of it and ``num_divisions`` is used. When ``0.0`` (default), automatic estimation is disabled.
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
@@ -211,6 +214,8 @@ When the input :class:`~qdk_chemistry.data.QubitHamiltonian` carries a populated
 
 In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
 This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
+
+The Zassenhaus builder also consumes the partition: its bare first-order product orders the Hamiltonian terms by group so that commuting terms within a group are adjacent (matching the Trotter term ordering), which is the starting point for its commutator corrections.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
