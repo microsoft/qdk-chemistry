@@ -43,6 +43,26 @@ steps:
   fetchDepth: 1
   retryCountOnTaskFailure: 3
 
+# Sanity check: verify we're running inside the Ubuntu container as root,
+# not on the host AzureLinux pool. If this fails the 1ES container job
+# didn't actually containerize the steps.
+- ${{ if eq(parameters.macBuild, 'OFF') }}:
+  - script: |
+      set -e
+      echo "whoami: $(whoami) (uid=$(id -u))"
+      echo "--- /etc/os-release ---"
+      cat /etc/os-release
+      . /etc/os-release
+      if [ "$ID" != "ubuntu" ]; then
+        echo "ERROR: expected to run inside Ubuntu container, got ID=$ID" >&2
+        exit 1
+      fi
+      if [ "$(id -u)" != "0" ]; then
+        echo "ERROR: expected to run as root inside the container" >&2
+        exit 1
+      fi
+    displayName: Verify Ubuntu container environment
+
 # Check if user provided a development tag for release and validate before building wheels.
 # If a development tag is provided and is valid, the VERSION file in the top level directory
 # will be updated to include the dev tag before publishing to PyPI.
