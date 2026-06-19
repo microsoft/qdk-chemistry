@@ -10,6 +10,7 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 #include "microsoft/cholesky_hamiltonian.hpp"
+#include "microsoft/scalar_relativistic_hamiltonian.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -27,12 +28,22 @@ std::unique_ptr<HamiltonianConstructor> make_microsoft_hamiltonian() {
       qdk::chemistry::algorithms::microsoft::HamiltonianConstructor>();
 }
 
+std::unique_ptr<HamiltonianConstructor>
+make_microsoft_scalar_relativistic_hamiltonian() {
+  QDK_LOG_TRACE_ENTERING();
+
+  return std::make_unique<qdk::chemistry::algorithms::microsoft::
+                              ScalarRelativisticHamiltonianConstructor>();
+}
+
 void HamiltonianConstructorFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   HamiltonianConstructorFactory::register_instance(&make_microsoft_hamiltonian);
   HamiltonianConstructorFactory::register_instance(
       &make_microsoft_cholesky_hamiltonian);
+  HamiltonianConstructorFactory::register_instance(
+      &make_microsoft_scalar_relativistic_hamiltonian);
 }
 
 }  // namespace qdk::chemistry::algorithms
