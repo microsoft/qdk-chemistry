@@ -216,7 +216,8 @@ extends:
                 . /etc/os-release
                 echo "Trying sudo"
                 sudo apt-get update || true
-                apt-get update
+                echo "without"
+                apt-get update || true
               displayName: Verify container
 
           - task: PipAuthenticate@1
