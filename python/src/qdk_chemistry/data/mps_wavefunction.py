@@ -3,12 +3,6 @@
 This module provides a Python container for wavefunctions stored as Matrix Product
 States (MPS). The MPS tensors are stored directly and can be used with the
 MPS-based sequential state preparation algorithm.
-
-The MPS decomposition and Givens-based circuit synthesis is based on the work of:
-  - Berry, Tong, et al. arXiv:2409.11748 (site unitary construction, Appendix B)
-  - Rupprecht & Wölk (2025), published on Zenodo
-    (https://zenodo.org/records/15587498)
-    Original implementation rewritten and adapted for integration into qdk-chemistry.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -59,12 +53,6 @@ class MPSWavefunction:
     The first tensor should have ``chi_left = 1`` (open boundary on the left) and
     the last tensor should have ``chi_right = 1`` (open boundary on the right).
 
-    Attribution
-    -----------
-    The Berry decomposition and Givens rotation circuit synthesis used by the
-    MPS state preparation algorithm is based on code originally published by
-    Felix Rupprecht (DLR) on Zenodo (https://zenodo.org/records/15587498),
-    rewritten and adapted for integration into the QDK Chemistry library.
     """
 
     def __init__(self, tensors: Sequence[np.ndarray], site_dim: int = 4):
