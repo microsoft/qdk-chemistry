@@ -273,7 +273,7 @@ extends:
       dependsOn: []   # parallel to Build; does not gate Approval/Release
       jobs:
       - job: CodeQL_Scan_linux_x86_64
-        displayName: CodeQL C++ scan (Linux x86_64, Python 3.13)
+        displayName: CodeQL C++ scan (Linux x86_64)
         pool:
           name: $(CPU_POOL_X86)
           demands:
@@ -294,21 +294,13 @@ extends:
           fetchDepth: 1
           retryCountOnTaskFailure: 3
 
-        - task: PipAuthenticate@1
-          displayName: Pip Authenticate
-          inputs:
-            artifactFeeds: AzureQuantum/quantum-apps-dependencies
-            onlyAddExtraIndex: false
-
         # Heavy env setup + CMake configure run BEFORE CodeQL Init so the
         # database is not polluted by configure-time toolchain probes.
         - script: |
             set -e
             cd $(Agent.BuildDirectory)/qdk-chemistry
-            bash .pipelines/pip-scripts/codeql-scan.sh deps 3.13
+            bash .pipelines/pip-scripts/codeql-scan.sh deps
           displayName: Install deps + CMake configure (pre-CodeQL)
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
         - task: CodeQL3000Init@0
           displayName: CodeQL Initialize
@@ -319,10 +311,8 @@ extends:
         - script: |
             set -e
             cd $(Agent.BuildDirectory)/qdk-chemistry
-            bash .pipelines/pip-scripts/codeql-scan.sh build 3.13
+            bash .pipelines/pip-scripts/codeql-scan.sh build
           displayName: CMake build (under CodeQL)
-          env:
-            SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
         - task: CodeQL3000Finalize@0
           displayName: CodeQL Finalize
