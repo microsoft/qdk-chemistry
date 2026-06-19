@@ -303,7 +303,7 @@ extends:
           displayName: Install deps + CMake configure (pre-CodeQL)
 
         - task: CodeQL3000Init@0
-          displayName: CodeQL Initialize
+          displayName: 🛡 CodeQL Initialize
           inputs:
             Enabled: true
             Language: cpp
@@ -315,7 +315,7 @@ extends:
           displayName: CMake build (under CodeQL)
 
         - task: CodeQL3000Finalize@0
-          displayName: CodeQL Finalize
+          displayName: 🛡 CodeQL Finalize
           condition: always()
 
 

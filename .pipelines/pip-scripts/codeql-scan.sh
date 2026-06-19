@@ -60,16 +60,31 @@ if [ "$PHASE" = "deps" ]; then
         gcc g++ \
         git \
         libboost-all-dev \
+        libbz2-dev \
         libeigen3-dev \
+        libffi-dev \
         libfmt-dev \
         libgmock-dev \
         libgtest-dev \
+        liblzma-dev \
+        libncursesw5-dev \
         libpugixml-dev \
+        libreadline-dev \
+        libsqlite3-dev \
+        libssl-dev \
+        libxml2-dev \
+        libxmlsec1-dev \
         make \
         ninja-build \
         nlohmann-json3-dev \
+        patchelf \
+        pybind11-dev \
         python3 \
         python3-dev \
+        python3-pip \
+        python3-pybind11 \
+        python3-venv \
+        tk-dev \
         unzip \
         wget \
         xz-utils \
