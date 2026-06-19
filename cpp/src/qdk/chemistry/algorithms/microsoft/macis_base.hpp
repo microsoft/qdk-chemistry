@@ -9,9 +9,7 @@
 #include <macis/asci/determinant_search.hpp>
 #include <macis/mcscf/mcscf.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
-#include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <set>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -149,7 +147,9 @@ inline data::Wavefunction build_wavefunction(
   std::copy(coeffs.begin(), coeffs.end(), C_vector.data());
   std::vector<data::Configuration> dets_configs;
   dets_configs.reserve(dets.size());
-  for (auto det : dets) dets_configs.emplace_back(det, nmo);
+  for (auto det : dets)
+    dets_configs.emplace_back(
+        data::Configuration::from_spin_half_bitset(det, nmo));
 
   const bool eval_one_rdm = settings.get<bool>("calculate_one_rdm");
   const bool eval_two_rdm = settings.get<bool>("calculate_two_rdm");
@@ -271,12 +271,12 @@ inline data::Wavefunction build_wavefunction(
     container = std::make_unique<Container>(
         C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
         to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aaaa),
-        to_vv(two_aabb), to_vv(two_bbbb), computed_entropies,
+        to_vv(two_aabb), to_vv(two_bbbb), "electrons", computed_entropies,
         data::WavefunctionType::SelfDual);
   } else {
-    container = std::make_unique<Container>(C_vector, dets_configs,
-                                            hamiltonian.get_orbitals(),
-                                            data::WavefunctionType::SelfDual);
+    container = std::make_unique<Container>(
+        C_vector, dets_configs, hamiltonian.get_orbitals(), "electrons",
+        data::WavefunctionType::SelfDual);
   }
   return data::Wavefunction(std::move(container));
 }

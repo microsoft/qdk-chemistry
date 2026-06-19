@@ -13,7 +13,7 @@
 #include <macis/mcscf/cas.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sci.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 // Local implementation details
@@ -183,7 +183,7 @@ struct asci_helper {
 
     // Build wavefunction with unified builder (supports spin-dependent RDMs
     // when requested)
-    data::Wavefunction wfn = build_wavefunction<data::SciWavefunctionContainer>(
+    data::Wavefunction wfn = build_wavefunction<data::StateVectorContainer>(
         settings_, hamiltonian, ham_gen, num_molecular_orbitals, C_casci, dets);
 
     // Add core energy to get total energy

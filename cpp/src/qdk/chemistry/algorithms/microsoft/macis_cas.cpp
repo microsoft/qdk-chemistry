@@ -11,7 +11,7 @@
 #include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/util/mpi.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/cas.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -102,7 +102,7 @@ struct cas_helper {
           const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
     }
 
-    data::Wavefunction wfn = build_wavefunction<data::CasWavefunctionContainer>(
+    data::Wavefunction wfn = build_wavefunction<data::StateVectorContainer>(
         settings_, hamiltonian, ham_gen, num_molecular_orbitals, C_casci, dets);
 
     // Add core energy to get total energy

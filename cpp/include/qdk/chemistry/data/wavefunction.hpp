@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/configuration_set.hpp>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
 #include <string>
@@ -281,28 +282,48 @@ class WavefunctionContainer {
 
   /**
    * @brief Get all coefficients
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all coefficients (real or complex)
    */
-  virtual const VectorVariant& get_coefficients() const = 0;
+  virtual const VectorVariant& get_coefficients() const;
 
   /**
    * @brief Get coefficient for a specific determinant
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @param det Configuration/determinant to get coefficient for
    * @return Scalar coefficient (real or complex)
    */
-  virtual ScalarVariant get_coefficient(const Configuration& det) const = 0;
+  virtual ScalarVariant get_coefficient(const Configuration& det) const;
 
   /**
    * @brief Get all determinants in the wavefunction
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Vector of all configurations/determinants
    */
-  virtual const DeterminantVector& get_active_determinants() const = 0;
+  virtual const DeterminantVector& get_active_determinants() const;
 
   /**
    * @brief Get number of determinants
+   *
+   * Only meaningful for determinant-expansion containers. The base
+   * implementation throws; containers that are not a determinant/coefficient
+   * expansion (e.g. amplitude-based wavefunctions) do not override it.
+   *
    * @return Number of determinants in the wavefunction
    */
-  virtual size_t size() const = 0;
+  virtual size_t size() const;
 
   /**
    * @brief Calculate overlap with another wavefunction
@@ -403,31 +424,106 @@ class WavefunctionContainer {
   virtual Eigen::MatrixXd get_mutual_information() const;
 
   /**
-   * @brief Get total number of alpha and beta electrons (active + inactive)
-   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * The block structure is induced by the single-particle basis: when the
+   * associated @ref Orbitals carry a spin (@f$S_z@f$) axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ count; when they carry no spin
+   * axis the result holds a single trivial block with the aggregate count.
+   *
+   * @return Shared pointer to the symmetry-blocked total particle count.
    */
-  virtual std::pair<size_t, size_t> get_total_num_electrons() const = 0;
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_particles() const = 0;
+
+  /**
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
+   *
+   * Blocked the same way as @ref total_num_particles; see that method for the
+   * basis-induced block structure.
+   *
+   * @return Shared pointer to the symmetry-blocked active particle count.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_particles() const = 0;
+
+  /**
+   * @brief Orbital occupations for all orbitals (total = active + inactive +
+   * virtual) as a rank-1 symmetry-blocked tensor.
+   *
+   * When the associated @ref Orbitals carry a spin axis the result holds an
+   * independent @f$\alpha@f$ and @f$\beta@f$ occupation vector; otherwise it
+   * holds a single trivial block with the spin-summed occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  total_orbital_occupations() const = 0;
+
+  /**
+   * @brief Orbital occupations for active orbitals only as a rank-1
+   * symmetry-blocked tensor.
+   *
+   * Blocked the same way as @ref total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   * @throws std::runtime_error if occupations are not available for this
+   *         container type.
+   */
+  virtual std::shared_ptr<const SymmetryBlockedTensor<1>>
+  active_orbital_occupations() const = 0;
+
+  /**
+   * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_particles.
+   *
+   * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
+   */
+  virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_particles.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
-  virtual std::pair<size_t, size_t> get_active_num_electrons() const = 0;
+  virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_total_orbital_occupations() const = 0;
+  get_total_orbital_occupations() const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   virtual std::pair<Eigen::VectorXd, Eigen::VectorXd>
-  get_active_orbital_occupations() const = 0;
+  get_active_orbital_occupations() const;
 
   /**
    * @brief Check if spin-dependent one-particle RDMs for active orbitals are
@@ -580,7 +676,8 @@ class WavefunctionContainer {
 
   /**
    * @brief Get container type identifier for serialization
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const = 0;
 
@@ -625,6 +722,28 @@ class WavefunctionContainer {
         "Configuration set not available for this container type");
   }
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this container spans.
+   *
+   * A sector is a named single-particle basis; every container owns its own
+   * sector-to-basis binding (see @ref sector_basis) and must report it. The
+   * current single-species containers report one electronic sector.
+   *
+   * @return Names of the container's sectors.
+   */
+  virtual std::vector<std::string> sectors() const = 0;
+
+  /**
+   * @brief Single-particle basis bound to a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if this container has no sector named @p name.
+   */
+  virtual std::shared_ptr<const Orbitals> sector_basis(
+      const std::string& name) const = 0;
+
   /**
    * @brief Feed identifying data into a hash context.
    * Subclasses override to add their container-specific data.
@@ -645,6 +764,56 @@ class WavefunctionContainer {
    * singlet
    */
   bool _is_restricted_closed_shell() const;
+
+  /**
+   * @brief Build a symmetry-blocked particle count from per-spin counts.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * aggregate count @p n_alpha + @p n_beta.
+   *
+   * @param n_alpha Number of alpha electrons.
+   * @param n_beta Number of beta electrons.
+   * @return Shared pointer to the symmetry-blocked count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  _make_particle_count(std::size_t n_alpha, std::size_t n_beta) const;
+
+  /**
+   * @brief Build symmetry-blocked orbital occupations from per-spin vectors.
+   *
+   * The block structure is induced by the associated @ref Orbitals. A spin
+   * (@f$S_z@f$) axis yields independent @f$\alpha@f$ and @f$\beta@f$ blocks,
+   * while a basis with no spin axis yields a single trivial block carrying the
+   * spin-summed occupations @p alpha + @p beta.
+   *
+   * @param alpha Alpha-spin occupation vector.
+   * @param beta Beta-spin occupation vector.
+   * @return Shared pointer to the symmetry-blocked occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> _make_orbital_occupations(
+      const Eigen::VectorXd& alpha, const Eigen::VectorXd& beta) const;
+
+  /**
+   * @brief Read the (alpha, beta) values of a spin-blocked scalar.
+   *
+   * @param scalar Symmetry-blocked scalar to read.
+   * @return Pair of (alpha_value, beta_value).
+   * @throws std::runtime_error if @p scalar carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<std::size_t, std::size_t> _read_spin_count(
+      const SymmetryBlockedScalar<std::size_t>& scalar);
+
+  /**
+   * @brief Read the (alpha, beta) blocks of a rank-1 spin-blocked tensor.
+   *
+   * @param tensor Symmetry-blocked rank-1 tensor to read.
+   * @return Pair of (alpha_block, beta_block).
+   * @throws std::runtime_error if @p tensor carries no spin (@f$S_z@f$) axis.
+   */
+  static std::pair<Eigen::VectorXd, Eigen::VectorXd> _read_spin_occupations(
+      const SymmetryBlockedTensor<1>& tensor);
 
   // spin-traced RDMs
   mutable std::shared_ptr<MatrixVariant> _one_rdm_spin_traced = nullptr;
@@ -681,6 +850,9 @@ class WavefunctionContainer {
 class Wavefunction : public DataClass,
                      public std::enable_shared_from_this<Wavefunction> {
  public:
+  /// Sentinel sector name for single-species wavefunctions.
+  static constexpr const char* DEFAULT_SECTOR = "__default__";
+
   /**
    * @brief Get the data type name for this class
    * @return "wavefunction"
@@ -703,8 +875,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Construct wavefunction with container (orbitals are stored in
-   * container)
-   * @param container Wavefunction container implementation
+   * container).
+   * @param container Wavefunction container implementation.
    */
   Wavefunction(std::unique_ptr<WavefunctionContainer> container);
 
@@ -738,7 +910,8 @@ class Wavefunction : public DataClass,
 
   /**
    * @brief Get the type of the underlying container
-   * @return String identifying the container type (e.g., "cas", "sci", "sd")
+   * @return String identifying the container type (e.g., "state_vector",
+   * "coupled_cluster", "mp2")
    */
   virtual std::string get_container_type() const;
 
@@ -767,29 +940,137 @@ class Wavefunction : public DataClass,
     return dynamic_cast<const T*>(_container.get()) != nullptr;
   }
 
+  // ---- Single-particle sectors --------------------------------------------
+
+  /**
+   * @brief Names of the single-particle sectors this wavefunction spans.
+   *
+   * A sector is a named single-particle basis; the sector inherits that
+   * basis's single-particle symmetries (see @ref sector_symmetries). Sectors
+   * are owned by the underlying container (which binds each name to a basis);
+   * these accessors surface that binding. The current single-species data
+   * model reports the sole @ref Wavefunction::DEFAULT_SECTOR.
+   *
+   * @return Names of the wavefunction's sectors.
+   */
+  std::vector<std::string> sectors() const;
+
+  /**
+   * @brief Whether a sector with the given name is present.
+   * @param name Sector name to look up.
+   * @return @c true iff the container binds a basis under @p name.
+   */
+  bool has_sector(const std::string& name) const;
+
+  /**
+   * @brief Single-particle basis associated with a sector.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref Orbitals bound to @p name.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const Orbitals> sector_basis(const std::string& name) const;
+
+  /**
+   * @brief Single-particle symmetries inherited from a sector's basis.
+   * @param name Sector name to resolve.
+   * @return Shared pointer to the @ref SymmetryProduct of the sector's basis.
+   * @throws std::out_of_range if no sector named @p name is present.
+   */
+  std::shared_ptr<const SymmetryProduct> sector_symmetries(
+      const std::string& name) const;
+
+  /**
+   * @brief Number of particles (active + inactive) as a symmetry-blocked
+   * scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_num_particles.
+   *
+   * @return Shared pointer to the symmetry-blocked total particle count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  total_num_particles() const;
+
+  /**
+   * @brief Number of active-space particles as a symmetry-blocked scalar.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_num_particles.
+   *
+   * @return Shared pointer to the symmetry-blocked active particle count.
+   */
+  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
+  active_num_particles() const;
+
+  /**
+   * @brief Orbital occupations for all orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::total_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked total orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
+      const;
+
+  /**
+   * @brief Orbital occupations for active orbitals as a rank-1 symmetry-blocked
+   * tensor.
+   *
+   * Forwards to the underlying container's @ref
+   * WavefunctionContainer::active_orbital_occupations.
+   *
+   * @return Shared pointer to the symmetry-blocked active orbital occupations.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
+      const;
+
   /**
    * @brief Get total number of alpha and beta electrons (active + inactive)
+   *
+   * Spin-resolved view of @ref total_num_particles.
+   *
    * @return Pair of (n_alpha_total, n_beta_total) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref total_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_total_num_electrons() const;
 
   /**
    * @brief Get number of active alpha and beta electrons
+   *
+   * Spin-resolved view of @ref active_num_particles.
+   *
    * @return Pair of (n_alpha_active, n_beta_active) electrons
+   * @throws std::runtime_error if the single-particle basis carries no spin
+   *         (@f$S_z@f$) axis; use @ref active_num_particles instead.
    */
   virtual std::pair<size_t, size_t> get_active_num_electrons() const;
 
   /**
    * @brief Get orbital occupations for all orbitals (total = active + inactive
    * + virtual)
+   *
+   * Spin-resolved view of @ref total_orbital_occupations.
+   *
    * @return Pair of (alpha_occupations_total, beta_occupations_total)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref total_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_total_orbital_occupations()
       const;
 
   /**
    * @brief Get orbital occupations for active orbitals only
+   *
+   * Spin-resolved view of @ref active_orbital_occupations.
+   *
    * @return Pair of (alpha_active_occupations, beta_active_occupations)
+   * @throws std::runtime_error if occupations are not available, or if the
+   *         single-particle basis carries no spin (@f$S_z@f$) axis; use
+   *         @ref active_orbital_occupations instead.
    */
   std::pair<Eigen::VectorXd, Eigen::VectorXd> get_active_orbital_occupations()
       const;
@@ -877,7 +1158,7 @@ class Wavefunction : public DataClass,
    *
    * Creates a new wavefunction containing only the top N determinants
    * ranked by absolute coefficient value, with coefficients renormalized.
-   * The resulting wavefunction uses a SciWavefunctionContainer.
+   * The resulting wavefunction uses a StateVectorContainer.
    *
    * @param max_determinants Maximum number of determinants to keep.
    *        If nullopt, returns a copy with all determinants, with
