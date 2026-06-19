@@ -343,7 +343,7 @@ if (-not $SkipPython) {
     # Do not install:
     # - plugins: pyscf does not build on Windows
     # - jupyter: requires plugins
-    uv pip install -v .[coverage,dev,docs,qiskit-extras,openfermion-extras] `
+    uv pip install -v .[test] `
         -C cmake.args=-GNinja `
         -C cmake.define.CMAKE_PREFIX_PATH="$env:CMAKE_PREFIX_PATH;$InstallDir" `
         -C cmake.define.CMAKE_C_COMPILER=cl `
