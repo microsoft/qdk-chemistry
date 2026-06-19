@@ -439,22 +439,6 @@ class Zassenhaus(TimeEvolutionBuilder):
             coefficients.append(term.angle)
         return QubitHamiltonian(pauli_strings=labels, coefficients=np.asarray(coefficients, dtype=complex))
 
-
-    def _exponentiate_commuting(
-        self,
-        group: QubitHamiltonian,
-        time: float,
-        *,
-        atol: float = 1e-12,
-    ) -> list[ExponentiatedPauliTerm]:
-        r"""Exponentiate a group of commuting Pauli terms."""
-        terms: list[ExponentiatedPauliTerm] = []
-        for label, coeff in group.get_real_coefficients(tolerance=atol):
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-        return terms
-
     def _optimize_pauli_sequence(
         self,
         terms: list[ExponentiatedPauliTerm],

@@ -351,37 +351,6 @@ class Trotter(TimeEvolutionBuilder):
 
         return terms
 
-    def _exponentiate_commuting(
-        self,
-        group: QubitHamiltonian,
-        time: float,
-        *,
-        atol: float = 1e-12,
-    ) -> list[ExponentiatedPauliTerm]:
-        r"""Exponentiate a group of commuting Pauli terms.
-
-        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
-        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
-        group commute, the product of rotations equals the exponential of
-        the sum regardless of ordering.
-
-        Args:
-            group: The group of commuting Hamiltonian terms to exponentiate.
-            time: The evolution time used to compute rotation angles
-                (:math:`\theta_j = c_j \cdot t`).
-            atol: Absolute tolerance for filtering small coefficients.
-
-        Returns:
-            A flat list of :class:`ExponentiatedPauliTerm`.
-
-        """
-        terms: list[ExponentiatedPauliTerm] = []
-        for label, coeff in group.get_real_coefficients(tolerance=atol):
-            mapping = self._pauli_label_to_map(label)
-            angle = coeff * time
-            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
-        return terms
-
     def name(self) -> str:
         """Return the name of the unitary builder."""
         return "trotter"

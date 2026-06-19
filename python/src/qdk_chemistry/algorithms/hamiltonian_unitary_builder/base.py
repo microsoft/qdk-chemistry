@@ -18,6 +18,7 @@ from qdk_chemistry.data import (
     TermPartition,
     UnitaryRepresentation,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
@@ -207,6 +208,37 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         groups = [g for g in groups if g]
         groups.sort(key=len)
         return groups
+
+    def _exponentiate_commuting(
+        self,
+        group: QubitHamiltonian,
+        time: float,
+        *,
+        atol: float = 1e-12,
+    ) -> list[ExponentiatedPauliTerm]:
+        r"""Exponentiate a group of commuting Pauli terms.
+
+        Each term :math:`P_j` with coefficient :math:`c_j` is converted to
+        the rotation :math:`e^{-i\,c_j\,t\,P_j}`.  Because all terms in the
+        group commute, the product of rotations equals the exponential of
+        the sum regardless of ordering.
+
+        Args:
+            group: The group of commuting Hamiltonian terms to exponentiate.
+            time: The evolution time used to compute rotation angles
+                (:math:`\theta_j = c_j \cdot t`).
+            atol: Absolute tolerance for filtering small coefficients.
+
+        Returns:
+            A flat list of ExponentiatedPauliTerm.
+
+        """
+        terms: list[ExponentiatedPauliTerm] = []
+        for label, coeff in group.get_real_coefficients(tolerance=atol):
+            mapping = self._pauli_label_to_map(label)
+            angle = coeff * time
+            terms.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=angle))
+        return terms
 
 
 class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):

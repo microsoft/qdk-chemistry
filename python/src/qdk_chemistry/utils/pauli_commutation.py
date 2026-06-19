@@ -124,7 +124,6 @@ def pauli_map_to_label(pauli_map: dict[int, str], num_qubits: int) -> str:
     return "".join(chars)
 
 
-
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
     r"""Check whether two Pauli strings commute.
 
