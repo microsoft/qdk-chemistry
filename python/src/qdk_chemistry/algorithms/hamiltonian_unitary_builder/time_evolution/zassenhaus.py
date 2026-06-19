@@ -39,7 +39,11 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.pauli_commutation import commutator, do_pauli_maps_commute
+from qdk_chemistry.utils.pauli_commutation import (
+    commutator,
+    do_pauli_maps_commute,
+    pauli_map_to_label,
+)
 from qdk_chemistry.utils.zassenhaus_generation import PlanTerm, zassenhaus_commutator_plan
 
 __all__: list[str] = ["Zassenhaus", "ZassenhausSettings"]
@@ -431,16 +435,10 @@ class Zassenhaus(TimeEvolutionBuilder):
         labels = []
         coefficients = []
         for term in terms:
-            labels.append(self._pauli_map_to_label(term.pauli_term, num_qubits))
+            labels.append(pauli_map_to_label(term.pauli_term, num_qubits))
             coefficients.append(term.angle)
         return QubitHamiltonian(pauli_strings=labels, coefficients=np.asarray(coefficients, dtype=complex))
 
-    def _pauli_map_to_label(self, pauli_term: dict[int, str], num_qubits: int) -> str:
-        """Convert a qubit-indexed Pauli map to a QubitHamiltonian label."""
-        chars = ["I"] * num_qubits
-        for qubit, pauli in pauli_term.items():
-            chars[num_qubits - qubit - 1] = pauli
-        return "".join(chars)
 
     def _exponentiate_commuting(
         self,

@@ -49,6 +49,7 @@ __all__: list[str] = [
     "do_pauli_maps_qw_commute",
     "does_nested_commutator_vanish",
     "get_commutation_checker",
+    "pauli_map_to_label",
 ]
 
 
@@ -110,6 +111,18 @@ def _sparse_word_to_label(word: list[tuple[int, int]], n_qubits: int) -> str:
         chars[q] = "X" if p == 1 else "Y" if p == 2 else "Z"
     # q_n...q_0
     return "".join(reversed(chars))
+
+
+def pauli_map_to_label(pauli_map: dict[int, str], num_qubits: int) -> str:
+    """Convert a qubit-indexed Pauli map to a Pauli string label.
+
+    The rightmost character of the returned string corresponds to qubit 0.
+    """
+    chars = ["I"] * num_qubits
+    for qubit, pauli in pauli_map.items():
+        chars[num_qubits - qubit - 1] = pauli
+    return "".join(chars)
+
 
 
 def do_pauli_labels_commute(label_a: str, label_b: str) -> bool:
