@@ -9,10 +9,15 @@ integrated into the QDK/Chemistry framework.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from qdk_chemistry.data import Settings
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 class Algorithm(ABC):
@@ -108,6 +113,24 @@ class Algorithm(ABC):
         """
         self._settings.lock()
         return self._run_impl(*args, **kwargs)
+
+    def hash(self, *args, **kwargs) -> str:
+        """Compute a deterministic content hash for a run with these inputs.
+
+        Same signature as ``run()`` but returns a hex hash string instead
+        of executing. Identical inputs produce identical hashes.
+
+        Args:
+            args: The arguments that would be passed to run().
+            kwargs: The keyword arguments that would be passed to run().
+
+        Returns:
+            str: 16-character hex content hash.
+
+        """
+        from qdk_chemistry.algorithms.hashing import run_content_hash  # noqa: PLC0415
+
+        return run_content_hash(self.type_name(), self.name(), self._settings, *args, **kwargs)
 
     def settings(self) -> Settings:
         """Get the settings for this algorithm.

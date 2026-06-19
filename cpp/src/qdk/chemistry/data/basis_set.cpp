@@ -2485,4 +2485,45 @@ std::pair<size_t, int> BasisSet::basis_to_shell_index(
   throw std::out_of_range("Shell index not found in basis set");
 }
 
+void BasisSet::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
+  hash_value(ctx, get_data_type_name());
+  hash_value(ctx, _name);
+  hash_value(ctx, static_cast<int64_t>(_atomic_orbital_type));
+  if (_structure) {
+    hash_field_presence(ctx, true);
+    hash_value(ctx, _structure->content_hash());
+  } else {
+    hash_field_presence(ctx, false);
+  }
+  // Hash all shells per atom
+  hash_value(ctx, static_cast<uint64_t>(_shells_per_atom.size()));
+  for (const auto& atom_shells : _shells_per_atom) {
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
+    for (const auto& shell : atom_shells) {
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
+    }
+  }
+  // Hash ECP shells
+  hash_value(ctx, static_cast<uint64_t>(_ecp_shells_per_atom.size()));
+  for (const auto& atom_shells : _ecp_shells_per_atom) {
+    hash_value(ctx, static_cast<uint64_t>(atom_shells.size()));
+    for (const auto& shell : atom_shells) {
+      hash_value(ctx, static_cast<uint64_t>(shell.atom_index));
+      hash_value(ctx, static_cast<int64_t>(shell.orbital_type));
+      hash_value(ctx, shell.exponents);
+      hash_value(ctx, shell.coefficients);
+      hash_value(ctx, shell.rpowers);
+    }
+  }
+  hash_value(ctx, _ecp_name);
+  hash_value(ctx, static_cast<uint64_t>(_ecp_electrons.size()));
+  for (auto e : _ecp_electrons) {
+    hash_value(ctx, static_cast<uint64_t>(e));
+  }
+}
+
 }  // namespace qdk::chemistry::data

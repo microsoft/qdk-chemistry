@@ -10,9 +10,13 @@
 #include <qdk/chemistry/data/configuration.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/utils/string_utils.hpp>
+#include <string>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::data {
+
+class Wavefunction;  // forward declaration for DEFAULT_SECTOR
 
 /**
  * @class ConfigurationSet
@@ -40,6 +44,7 @@ class ConfigurationSet : public DataClass {
    * @param configurations Vector of configurations (representing active space
    * only)
    * @param orbitals Shared pointer to orbital basis set
+   * @param sector Name of the single-particle sector the orbitals belong to
    * @throws std::invalid_argument if configurations are inconsistent with
    * active space or if orbitals pointer is null
    *
@@ -49,24 +54,10 @@ class ConfigurationSet : public DataClass {
    * virtual orbitals are not included in the configuration representation.
    */
   ConfigurationSet(const std::vector<Configuration>& configurations,
-                   std::shared_ptr<Orbitals> orbitals);
+                   std::shared_ptr<Orbitals> orbitals, std::string sector);
 
-  /**
-   * @brief Construct a ConfigurationSet from configurations and orbital
-   * information (move)
-   * @param configurations Vector of configurations (representing active space
-   * only, moved)
-   * @param orbitals Shared pointer to orbital basis set
-   * @throws std::invalid_argument if configurations are inconsistent with
-   * active space or if orbitals pointer is null
-   *
-   * @note All configurations must have the same number of orbitals and
-   * sufficient capacity to represent the active space defined in the orbitals
-   * object. Configurations only represent the active space; inactive and
-   * virtual orbitals are not included in the configuration representation.
-   */
   ConfigurationSet(std::vector<Configuration>&& configurations,
-                   std::shared_ptr<Orbitals> orbitals);
+                   std::shared_ptr<Orbitals> orbitals, std::string sector);
 
   /**
    * @brief Get the configurations
@@ -79,6 +70,20 @@ class ConfigurationSet : public DataClass {
    * @return Shared pointer to orbitals
    */
   std::shared_ptr<Orbitals> get_orbitals() const;
+
+  /**
+   * @brief Get the sector layout: the ordered partition of a configuration's
+   * slots across named single-particle sectors.
+   *
+   * Each entry pairs a sector name with the single-particle basis whose modes
+   * occupy that segment. Today this is a single entry (the sector name supplied
+   * at construction, backed by @ref get_orbitals); mixed-statistics systems
+   * will return several entries.
+   *
+   * @return Reference to the ordered sector layout.
+   */
+  const std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>>&
+  sector_layout() const;
 
   /**
    * @brief Get the number of configurations in the set
@@ -225,22 +230,28 @@ class ConfigurationSet : public DataClass {
   static ConfigurationSet from_hdf5_file(const std::string& filename);
 
  private:
+  void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
   /// Configurations in the set
   std::vector<Configuration> _configurations;
 
   /// Orbital information (holds active space definition)
   std::shared_ptr<Orbitals> _orbitals;
 
+  /// Ordered sector layout (slot partition across single-particle sectors).
+  std::vector<std::pair<std::string, std::shared_ptr<Orbitals>>> _sector_layout;
+
   /**
    * @brief Validate that all configurations are consistent with active space
    * @throws std::invalid_argument if validation fails
    *
    * Checks that:
-   * - All configurations have the same number of orbitals
-   * - All configurations have the same electron count (both alpha and beta)
-   * - Configurations have sufficient orbital capacity for the active space size
-   * - Any orbitals beyond the active space size are unoccupied (no
-   * "overhanging" electrons)
+   * - All configurations have the same number of modes
+   * - All configurations have the same particle count (for spin-½: both alpha
+   *   and beta)
+   * - Configurations have sufficient mode capacity for the active space size
+   * - Any modes beyond the active space size are unoccupied (no "overhanging"
+   *   particles)
    *
    * Note: Configurations only represent the active space orbitals. Inactive
    * and virtual orbitals are not included in

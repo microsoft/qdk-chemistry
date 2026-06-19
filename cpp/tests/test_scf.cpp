@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
-#include <qdk/chemistry/data/wavefunction_containers/sd.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/orbital_rotation.hpp>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
@@ -46,9 +46,9 @@ class TestSCF : public ScfSolver {
 
     auto orbitals = std::make_shared<Orbitals>(coefficients, energies,
                                                std::nullopt, nullptr);
-    auto wfn = std::make_shared<Wavefunction>(
-        std::make_unique<SlaterDeterminantContainer>(Configuration("000"),
-                                                     orbitals));
+    auto wfn =
+        std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+            Configuration::from_spin_half_string("000"), orbitals));
     return {0.0, wfn};
   }
 };
@@ -779,8 +779,8 @@ TEST_F(ScfTest, AgHBasisSetRoundTripSerialization) {
 
   // Create orbitals with the deserialized basis set - this validates
   // that the basis set is fully functional
-  auto orbitals2 = std::make_shared<Orbitals>(
-      coeff_alpha, energies_alpha, overlap, basis_set2, std::nullopt);
+  auto orbitals2 = std::make_shared<Orbitals>(coeff_alpha, energies_alpha,
+                                              overlap, basis_set2);
 
   EXPECT_TRUE(orbitals2->has_basis_set());
   EXPECT_EQ(orbitals2->get_basis_set()->get_name(), "def2-svp");
