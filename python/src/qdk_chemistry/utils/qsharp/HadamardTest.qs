@@ -36,17 +36,15 @@ namespace QDKChemistry.Utils.HadamardTest {
         H(control_q);
         repControlledEvolution(control_q, allTargets);
 
+        ResetAll(allTargets);
         if (testBasis == PauliX) {
-            H(control_q);
+            return [MResetX(control_q)];
         } elif (testBasis == PauliY) {
-            Adjoint S(control_q);
-            H(control_q);
+            return [MResetY(control_q)];
         } elif (testBasis == PauliZ) {
-            // Direct Z-basis measurement: no additional rotation is required.
+            return [MResetZ(control_q)];
         } else {
             fail $"Invalid measurement basis: {testBasis}. Supported values are PauliX, PauliY, and PauliZ.";
         }
-        ResetAll(allTargets);
-        return [MResetZ(control_q)];
     }
 }
