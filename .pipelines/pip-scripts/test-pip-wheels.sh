@@ -15,14 +15,16 @@ fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then
     # Update and install dependencies needed for testing (Ubuntu / apt-get)
-    export DEBIAN_FRONTEND=noninteractive
     SUDO=""
     if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
     fi
+    # sudo resets the environment by default, so exporting DEBIAN_FRONTEND alone
+    # is not enough — use `sudo env` to pass it through to apt-get/dpkg.
+    APT="$SUDO env DEBIAN_FRONTEND=noninteractive apt-get"
     echo "Installing apt dependencies..."
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q \
+    $APT update -q
+    $APT install -y -q \
         curl \
         gcc \
         g++ \

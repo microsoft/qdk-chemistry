@@ -21,18 +21,23 @@ if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
 fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
-    export DEBIAN_FRONTEND=noninteractive
-    # Try to prevent stochastic segfault from libc-bin
-    echo "Reinstalling libc-bin..."
-    $SUDO rm -f /var/lib/dpkg/info/libc-bin.*
-    $SUDO apt-get clean
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q libc-bin
+    # sudo resets the environment by default, so exporting DEBIAN_FRONTEND alone
+    # is not enough — use `sudo env` to pass it through to apt-get/dpkg, otherwise
+    # tzdata and friends prompt and hang the pipeline.
+    APT="$SUDO env DEBIAN_FRONTEND=noninteractive apt-get"
+    # Try to prevent stochastic segfault from libc-bin (requires root; skip otherwise)
+    if [ "$(id -u)" = "0" ]; then
+        echo "Reinstalling libc-bin..."
+        rm -f /var/lib/dpkg/info/libc-bin.*
+        $APT clean
+        $APT update -q
+        $APT install -y -q libc-bin
+    fi
 
     # Update and install dependencies
     echo "Installing apt dependencies..."
-    $SUDO apt-get update -q
-    $SUDO apt-get install -y -q \
+    $APT update -q
+    $APT install -y -q \
         build-essential \
         curl \
         gcc g++ \
