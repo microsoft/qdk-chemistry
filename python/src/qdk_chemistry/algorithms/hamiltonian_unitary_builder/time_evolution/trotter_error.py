@@ -1,17 +1,17 @@
-r"""Trotter and Zassenhaus error bound estimation for accuracy-aware parameterization.
+r"""Trotter error bound estimation for accuracy-aware parameterization.
 
-This module provides functions to compute the number of steps
-required to achieve a target accuracy for Trotter and Zassenhaus
-product-formula decompositions.
+This module provides functions to compute the number of Trotter steps
+required to achieve a target accuracy for product-formula decompositions.
 
 Two bounds are offered:
 
 * **naive** - uses the triangle-inequality bound
-  (e.g., :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil` for first-order Trotter).
+  :math:`N = \\lceil (\\sum_j |\\alpha_j|)^2 t^2 / \\epsilon \\rceil`.
 
-* **commutator** (tighter) - uses the commutator-based bounds or evaluates
-  explicit nested commutators (for Zassenhaus) to leverage commuting terms
-  and reduce estimated step count.
+* **commutator** (tighter) - uses the commutator-based bound from
+  Childs *et al.* (2021):
+  :math:`N = \\lceil \\frac{t^2}{2\\epsilon}
+  \\sum_{j<k} \\lVert [\\alpha_j P_j, \\alpha_k P_k] \\rVert \\rceil`.
 
 References:
     Childs, A. M., et al. "Theory of Trotter Error with Commutator
