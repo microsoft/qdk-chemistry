@@ -66,6 +66,92 @@ def _make_random_data_2d(
     ]
 
 
+def _ceil_log2(n: int) -> int:
+    """Ceiling of log2(n), i.e. number of address bits for n entries."""
+    import math
+    return math.ceil(math.log2(n))
+
+
+def _phase_lookup_cost(n: int) -> int:
+    """Toffoli cost of PhaseLookup (measurement-based unlookup) on n address qubits.
+
+    PhaseLookup constructs power products on two halves of the address register.
+    Each half of size m allocates 2^m - m - 1 AND gates (Toffolis).
+    Ref: Gidney, arXiv:2505.15917.
+    """
+    if n <= 0:
+        return 0
+    n1 = n // 2       # floor(n/2)
+    n2 = n - n1       # ceil(n/2)
+    return max(0, 2**n1 - n1 - 1) + max(0, 2**n2 - n2 - 1)
+
+
+def _expected_tof_1d(n_data: int, n_bits: int, lam: int) -> int:
+    """Expected Toffoli count for 1D SelectSwap.
+
+    Components:
+      - Forward Select (unary iteration) on N/K entries: N/K - 2
+      - Swap network (binary routing tree): (K-1)*b Fredkin gates
+      - Adjoint Select (Unlookup via PhaseLookup): PhaseLookup(ceil_log2(N/K))
+    """
+    if lam == 0:
+        return n_data - 2
+    K = 2**lam
+    n_select = _ceil_log2(n_data // K)
+    select_cost = n_data // K - 2
+    swap_cost = (K - 1) * n_bits
+    unlookup_cost = _phase_lookup_cost(n_select)
+    return select_cost + swap_cost + unlookup_cost
+
+
+def _expected_qubits_1d(n_data: int, n_bits: int, lam: int) -> int:
+    """Expected qubit count for 1D SelectSwap.
+
+    Layout:
+      - address register: ceil_log2(N)
+      - output register: b
+      - data register (λ>0): K*b
+      - Select tree ancillas: ceil_log2(N/K) - 1
+    Peak = 2*ceil_log2(N) - λ + b*(K+1) - 1  (for λ>0)
+         = 2*ceil_log2(N) + b - 1             (for λ=0)
+    """
+    n_addr = _ceil_log2(n_data)
+    if lam == 0:
+        return 2 * n_addr + n_bits - 1
+    K = 2**lam
+    return 2 * n_addr - lam + n_bits * (K + 1) - 1
+
+
+def _expected_tof_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> int:
+    """Expected Toffoli count for 2D Select2DLoad.
+
+    Components:
+      - UnaryIteration tree over N_out entries: N_out - 2 AND gates
+      - Controlled Select at each leaf on N_in/K entries: N_in/K - 1 each
+      - Swap network: (K-1)*b Fredkin gates
+    Total = N_out * N_in / K - 2 + (K-1)*b
+    """
+    K = 2**lam
+    return n_outer * n_inner // K - 2 + (K - 1) * n_bits
+
+
+def _expected_qubits_2d(n_outer: int, n_inner: int, n_bits: int, lam: int) -> int:
+    """Expected qubit count for 2D Select2DLoad.
+
+    Layout:
+      - outer address: ceil_log2(N_out)
+      - inner address: ceil_log2(N_in)
+      - target register: K*b
+      - UnaryIteration ancillas: ceil_log2(N_out) - 1
+      - Controlled Select ancillas: ceil_log2(N_in/K)
+    Peak = 2*ceil_log2(N_out) + 2*ceil_log2(N_in) - λ + K*b - 1
+    """
+    K = 2**lam
+    n_outer_addr = _ceil_log2(n_outer)
+    n_inner_addr = _ceil_log2(n_inner)
+    return 2 * n_outer_addr + 2 * n_inner_addr - lam + K * n_bits - 1
+
+
 # ════════════════════════════════════════════════════════════════════════════
 #  Statevector correctness tests
 # ════════════════════════════════════════════════════════════════════════════
@@ -97,10 +183,6 @@ class TestSelectSwapCorrectness:
         ctx = _make_context()
         result = ctx.eval(f"{_NS}.TestSelectSwap1DCorrectness({_bools_to_qs(data)}, -1)")
         assert result, "SelectSwap 1D with auto lambda failed"
-
-
-class TestSelect2DCorrectness:
-    """Verify Select2DLoad loads the correct data for each (outer, inner) address."""
 
     @pytest.mark.parametrize("n_outer,n_inner,n_bits,num_swap_bits", [
         (2, 4, 3, 0),   # no swap
@@ -139,18 +221,23 @@ def _estimate(qsharp_estimator, expr: str) -> dict:
 class TestSelectSwapResourceEstimates:
     """Verify Toffoli (CCZ) and qubit counts from qsharp.estimate.
 
-    Baseline values obtained from qsharp.estimate on the actual Q# implementation.
-    These serve as regression tests — any change in counts indicates a code change.
+    Expected values computed from analytical formulas:
+      Tof = (N/K - 2) + (K-1)*b + PhaseLookup(ceil_log2(N/K))
+      Qubits = 2*ceil_log2(N) - λ + b*(K+1) - 1
+    where K = 2^λ, and PhaseLookup accounts for measurement-based unlookup
+    (Gidney arXiv:2505.15917).
     """
 
-    @pytest.mark.parametrize("n_data,n_bits,expected_tof,expected_qubits", [
-        (4, 4, 2, 7),
-        (8, 4, 6, 9),
-        (8, 8, 6, 13),
-        (16, 4, 14, 11),
+    @pytest.mark.parametrize("n_data,n_bits", [
+        (4, 4),
+        (8, 4),
+        (8, 8),
+        (16, 4),
     ])
-    def test_1d_no_swap(self, qsharp_estimator, n_data, n_bits, expected_tof, expected_qubits):
+    def test_1d_no_swap(self, qsharp_estimator, n_data, n_bits):
         """SelectSwap(lambda=0): plain Select, Toffoli = N - 2."""
+        expected_tof = _expected_tof_1d(n_data, n_bits, 0)
+        expected_qubits = _expected_qubits_1d(n_data, n_bits, 0)
         lc = _estimate(qsharp_estimator, f"{_NS}.EstimateSelectSwap1D({n_data}, {n_bits}, 0)")
         assert lc["cczCount"] == expected_tof, (
             f"n_data={n_data}, n_bits={n_bits}: "
@@ -161,15 +248,17 @@ class TestSelectSwapResourceEstimates:
             f"qubits={lc['numQubits']}, expected={expected_qubits}"
         )
 
-    @pytest.mark.parametrize("n_data,n_bits,lam,expected_tof,expected_qubits", [
-        (8, 4, 1, 6, 16),
-        (8, 4, 2, 12, 23),
-        (16, 4, 1, 11, 18),
-        (16, 8, 1, 15, 30),
-        (16, 8, 2, 26, 45),
+    @pytest.mark.parametrize("n_data,n_bits,lam", [
+        (8, 4, 1),
+        (8, 4, 2),
+        (16, 4, 1),
+        (16, 8, 1),
+        (16, 8, 2),
     ])
-    def test_1d_swap(self, qsharp_estimator, n_data, n_bits, lam, expected_tof, expected_qubits):
+    def test_1d_swap(self, qsharp_estimator, n_data, n_bits, lam):
         """SelectSwap(lambda>0): SWAP network trades qubits for Toffolis."""
+        expected_tof = _expected_tof_1d(n_data, n_bits, lam)
+        expected_qubits = _expected_qubits_1d(n_data, n_bits, lam)
         lc = _estimate(qsharp_estimator, f"{_NS}.EstimateSelectSwap1D({n_data}, {n_bits}, {lam})")
         assert lc["cczCount"] == expected_tof, (
             f"n_data={n_data}, n_bits={n_bits}, lam={lam}: "
@@ -182,20 +271,27 @@ class TestSelectSwapResourceEstimates:
 
 
 class TestSelect2DResourceEstimates:
-    """Verify 2D Select2DLoad Toffoli and qubit counts from qsharp.estimate."""
+    """Verify 2D Select2DLoad Toffoli and qubit counts from qsharp.estimate.
 
-    @pytest.mark.parametrize("n_outer,n_inner,n_bits,lam,expected_tof,expected_qubits", [
-        (2, 4, 4, 0, 6, 9),
-        (4, 4, 4, 0, 14, 11),
-        (4, 8, 4, 0, 30, 13),
-        (2, 4, 4, 1, 6, 12),
-        (4, 8, 4, 1, 18, 16),
-        (4, 8, 8, 2, 30, 39),
+    Expected values computed from analytical formulas:
+      Tof = N_out * N_in / K - 2 + (K-1)*b
+      Qubits = 2*ceil_log2(N_out) + 2*ceil_log2(N_in) - λ + K*b - 1
+    """
+
+    @pytest.mark.parametrize("n_outer,n_inner,n_bits,lam", [
+        (2, 4, 4, 0),
+        (4, 4, 4, 0),
+        (4, 8, 4, 0),
+        (2, 4, 4, 1),
+        (4, 8, 4, 1),
+        (4, 8, 8, 2),
     ])
     def test_2d_toffoli_and_qubits(
-        self, qsharp_estimator, n_outer, n_inner, n_bits, lam, expected_tof, expected_qubits
+        self, qsharp_estimator, n_outer, n_inner, n_bits, lam
     ):
-        """Select2DLoad: Toffoli and qubit counts match baseline."""
+        """Select2DLoad: Toffoli and qubit counts match analytical formulas."""
+        expected_tof = _expected_tof_2d(n_outer, n_inner, n_bits, lam)
+        expected_qubits = _expected_qubits_2d(n_outer, n_inner, n_bits, lam)
         lc = _estimate(
             qsharp_estimator,
             f"{_NS}.EstimateSelect2DLoad({n_outer}, {n_inner}, {n_bits}, {lam})",

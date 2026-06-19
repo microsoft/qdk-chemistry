@@ -16,6 +16,11 @@ from dataclasses import dataclass
 from math import ceil, log2
 from typing import Any
 
+import numpy as np
+
+from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
+from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.controlled_unitary import ControlledUnitary
@@ -77,6 +82,10 @@ class OuterPrepareMapper:
     def build_op(self, container: SOSSAContainer) -> Any:
         """Build the Q# outer prepare callable from container data.
 
+        Delegates to the corresponding state preparation algorithm
+        (alias_sampling, dense_pure_state, or qrom_state_prep) and
+        returns the Q# callable from the resulting circuit.
+
         Args:
             container: The SOSSA container with outer_prepare coefficients.
 
@@ -84,17 +93,19 @@ class OuterPrepareMapper:
             A Q# callable ``(Qubit[]) => Unit is Adj + Ctl`` for outer prepare.
 
         """
-        statevector = container.outer_prepare.get_coefficients().tolist()
-        if self.algorithm == "alias_sampling":
-            return QSHARP_UTILS.SOSSAWalk.MakeOuterPrepareAliasSampling(
-                statevector, self.coefficient_bit_precision
-            )
         if self.algorithm == "dense_pure":
-            return QSHARP_UTILS.SOSSAWalk.MakeOuterPreparePureState(statevector)
-        # qrom
-        return QSHARP_UTILS.SOSSAWalk.MakeOuterPrepareQROM(
-            statevector, self.coefficient_bit_precision
-        )
+            prep = DensePureStatePreparation()
+            circuit = prep.run(container.outer_prepare)
+        else:
+            statevector = np.asarray(container.outer_prepare.get_coefficients())
+            num_qubits = ceil(log2(len(statevector))) if len(statevector) > 1 else 1
+            qubit_indices = list(range(num_qubits))
+            if self.algorithm == "alias_sampling":
+                prep = AliasSamplingStatePreparation(bits_precision=self.coefficient_bit_precision)
+            else:
+                prep = QROMStatePreparation(rotation_bit_precision=self.coefficient_bit_precision)
+            circuit = prep.prepare_from_statevector(statevector, num_qubits, qubit_indices)
+        return circuit._qsharp_op
 
 
 @dataclass(frozen=True)
@@ -139,14 +150,17 @@ class InnerPrepareMapper:
             container: The SOSSA container with inner_prepare coefficients.
 
         Returns:
-            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj + Ctl``
+            A Q# callable ``(Qubit[], Qubit[]) => Unit is Adj``
             for inner prepare (takes outer register and inner register).
 
         """
         coefficients = container.inner_prepare.conditional_coefficients.tolist()
+        # TODO: add a setting for non-free-rider version where we compute G, R on the fly instead of storing them
         if self.algorithm == "controlled_alias_sampling":
+            fr = container.inner_prepare.free_rider_data
+            fr_data = fr.tolist() if fr is not None else []
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSampling(
-                coefficients, self.coefficient_bit_precision
+                coefficients, fr_data, self.coefficient_bit_precision
             )
         # direct
         return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients)

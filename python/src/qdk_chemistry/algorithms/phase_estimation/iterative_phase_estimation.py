@@ -13,6 +13,8 @@ References:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+from typing import Any
+
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
@@ -22,6 +24,7 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitHamiltonian,
 )
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSAContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.phase import iterative_phase_feedback_update, phase_fraction_from_feedback
 
@@ -71,15 +74,18 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitHamiltonian,
+        qubit_hamiltonian: QubitHamiltonian | Any = None,
         *,
+        factorized_hamiltonian: Any = None,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
-        """Run the iterative phase estimation algorithm with the given state preparation circuit and qubit Hamiltonian.
+        """Run the iterative phase estimation algorithm with the given state preparation circuit and Hamiltonian.
 
         Args:
             state_preparation: The state preparation circuit.
             qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            factorized_hamiltonian: A FactorizedHamiltonianContainer for SOSSA-based QPE.
+                Mutually exclusive with qubit_hamiltonian.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -107,7 +113,9 @@ class IterativePhaseEstimation(PhaseEstimation):
             circuit_builder.settings().update("phase_correction", phase_feedback)
             circuit_builder.settings().update("num_iteration", iteration)
             iteration_circuits = circuit_builder._run_impl(  # noqa: SLF001
-                state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian
+                state_preparation=state_preparation,
+                qubit_hamiltonian=qubit_hamiltonian,
+                factorized_hamiltonian=factorized_hamiltonian,
             )
             iteration_circuit = iteration_circuits[0]
             Logger.info(f"Iteration {iteration + 1} / {num_bits}: circuit generated.")
@@ -150,8 +158,13 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
         if isinstance(unitary_builder, SOSSABuilder):
             # For SOSSA block encoding, use E = Λ cos(2πφ) where Λ is the SOSSA normalization.
-            # Retrieve Λ from the builder settings (set during build_from_dfthc).
-            lambda_val = unitary_builder.settings().get("normalization")
+            # Build the unitary once more to access the container's normalization.
+            hamiltonian = factorized_hamiltonian if factorized_hamiltonian is not None else qubit_hamiltonian
+            unitary_rep = unitary_builder.run(hamiltonian)
+            container = unitary_rep.get_container()
+            if not isinstance(container, SOSSAContainer):
+                raise TypeError(f"Expected SOSSAContainer, got {type(container)}")
+            lambda_val = container.normalization
             return QpeResult.from_qubitization_result(
                 method=self.name(),
                 phase_fraction=phase_fraction,

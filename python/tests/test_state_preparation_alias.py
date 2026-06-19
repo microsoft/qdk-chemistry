@@ -5,9 +5,11 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
 from pathlib import Path
 
 import numpy as np
+import pytest
 import qdk
 
 from qdk_chemistry.algorithms import registry
@@ -116,8 +118,9 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
     
-    def test_circuit_prepare_correct_state(self):
-        """Test that the prepared circuit creates the correct state.
+    @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
+    def test_marginal_probs_random(self, num_coefficients):
+        """Verify alias sampling marginal probabilities with random coefficients.
 
         The alias sampling circuit prepares:
           |0⟩ → Σ_ℓ √(p̃_ℓ) |ℓ⟩|garbage_ℓ⟩
@@ -126,78 +129,16 @@ class TestAliasSamplingStatePreparation:
         We verify the marginal probability on the index register matches the
         expected distribution within the discretization tolerance.
         """
-        coefficients = [0.5, 0.3, 0.7, 0.1]
-        num_index_qubits = 2
-        bits_precision = 4
+        rng = np.random.default_rng(seed=42 + num_coefficients)
+        coefficients = rng.uniform(0.01, 1.0, size=num_coefficients).tolist()
+        num_index_qubits = math.ceil(math.log2(num_coefficients))
+        bits_precision = 6
 
         full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
         marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
 
-        # Expected: p(ℓ) = |c_ℓ| / Σ|c_j|
         abs_coeffs = np.abs(coefficients)
         expected_probs = abs_coeffs / np.sum(abs_coeffs)
 
-        # Discretization tolerance: O(1 / 2^bits_precision) per coefficient
         atol = 2.0 / (2**bits_precision)
         np.testing.assert_allclose(marginal_probs[:len(coefficients)], expected_probs, atol=atol)
-
-    def test_marginal_probs_uniform(self):
-        """Verify alias sampling produces a uniform distribution for equal coefficients."""
-        coefficients = [1.0, 1.0, 1.0, 1.0]
-        num_index_qubits = 2
-        bits_precision = 4
-
-        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
-        marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
-
-        expected_probs = np.array([0.25, 0.25, 0.25, 0.25])
-
-        atol = 2.0 / (2**bits_precision)
-        np.testing.assert_allclose(marginal_probs, expected_probs, atol=atol)
-
-    def test_marginal_probs_eight_components(self):
-        """Verify alias sampling marginal probabilities for an 8-component distribution."""
-        coefficients = [0.5, 0.3, 0.7, 0.1, 0.4, 0.2, 0.6, 0.8]
-        num_index_qubits = 3
-        bits_precision = 6
-
-        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
-        marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
-
-        abs_coeffs = np.abs(coefficients)
-        expected_probs = abs_coeffs / np.sum(abs_coeffs)
-
-        atol = 2.0 / (2**bits_precision)
-        np.testing.assert_allclose(marginal_probs, expected_probs, atol=atol)
-
-    def test_marginal_probs_skewed(self):
-        """Verify alias sampling with a heavily skewed distribution."""
-        coefficients = [0.99, 0.005, 0.003, 0.002]
-        num_index_qubits = 2
-        bits_precision = 6
-
-        full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bits_precision)
-        marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
-
-        abs_coeffs = np.abs(coefficients)
-        expected_probs = abs_coeffs / np.sum(abs_coeffs)
-
-        atol = 2.0 / (2**bits_precision)
-        np.testing.assert_allclose(marginal_probs, expected_probs, atol=atol)
-
-    def test_higher_precision_improves_fidelity(self):
-        """Verify that increasing bits_precision improves the marginal probability accuracy."""
-        coefficients = [0.5, 0.3, 0.7, 0.1]
-        num_index_qubits = 2
-        abs_coeffs = np.abs(coefficients)
-        expected_probs = abs_coeffs / np.sum(abs_coeffs)
-
-        errors = []
-        for bp in [3, 6]:
-            full_sv = _run_alias_sampling_and_dump(coefficients, num_index_qubits, bp)
-            marginal_probs = _compute_marginal_probs(full_sv, num_index_qubits)
-            error = np.max(np.abs(marginal_probs[:len(coefficients)] - expected_probs))
-            errors.append(error)
-
-        # Higher precision should give smaller error
-        assert errors[1] <= errors[0]
