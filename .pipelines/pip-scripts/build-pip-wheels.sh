@@ -21,7 +21,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
     # Try to prevent stochastic segfault from libc-bin
     echo "Reinstalling libc-bin..."
-    $SUDO rm /var/lib/dpkg/info/libc-bin.*
+    $SUDO rm -f /var/lib/dpkg/info/libc-bin.*
     $SUDO apt-get clean
     $SUDO apt-get update -q
     $SUDO apt-get install -y -q libc-bin
