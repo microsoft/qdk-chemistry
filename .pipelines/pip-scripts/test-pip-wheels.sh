@@ -17,7 +17,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     # Update and install dependencies needed for testing (Ubuntu / apt-get)
     export DEBIAN_FRONTEND=noninteractive
     SUDO=""
-    [ "$(id -u)" != "0" ] && SUDO="sudo"
+    if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
+        SUDO="sudo"
+    fi
     echo "Installing apt dependencies..."
     $SUDO apt-get update -q
     $SUDO apt-get install -y -q \

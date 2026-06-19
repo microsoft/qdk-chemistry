@@ -13,9 +13,12 @@ LIBFLAME_VERSION=${9:-5.2.0}
 MAC_BUILD=${10:-OFF}
 
 export CFLAGS="-fPIC -Os"
-# Use sudo for system-level installs when running as a non-root pipeline agent.
+# Use sudo for system-level installs when running as non-root and sudo is
+# available. In the 1ES container we run as root (no sudo binary present).
 SUDO=""
-[ "$(id -u)" != "0" ] && SUDO="sudo"
+if [ "$(id -u)" != "0" ] && command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+fi
 
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
