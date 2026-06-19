@@ -15,7 +15,6 @@ namespace QDKChemistry.Utils.HadamardTest {
     /// - `repControlledEvolution`: A function to perform repeated controlled evolution.
     /// - `testBasis`: Measurement basis for the control qubit. Supported values are `PauliX`, `PauliY`, and `PauliZ`.
     /// - `numSystemQubits`: Number of system qubits.
-    /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled evolution (0 if none).
     /// # Returns
     /// A single-element result array containing the control-qubit measurement in the selected basis.
     operation HadamardTest(
@@ -23,20 +22,17 @@ namespace QDKChemistry.Utils.HadamardTest {
         repControlledEvolution : (Qubit, Qubit[]) => Unit,
         testBasis : Pauli,
         numSystemQubits : Int,
-        numAncillaQubits : Int,
     ) : Result[] {
-        use qs = Qubit[1 + numSystemQubits + numAncillaQubits];
+        use qs = Qubit[1 + numSystemQubits];
         let control_q = qs[0];
         let system_q = qs[1..numSystemQubits];
-        let ancillas = qs[1 + numSystemQubits..Length(qs) - 1];
-        let allTargets = system_q + ancillas;
 
         statePrep(system_q);
 
         H(control_q);
-        repControlledEvolution(control_q, allTargets);
+        repControlledEvolution(control_q, system_q);
 
-        ResetAll(allTargets);
+        ResetAll(system_q);
         if (testBasis == PauliX) {
             return [MResetX(control_q)];
         } elif (testBasis == PauliY) {

@@ -27,8 +27,8 @@ class HadamardTestCircuitBuilderSettings(Settings):
     """Settings for the Hadamard test circuit builder algorithm.
 
     Includes the nested algorithm reference for the controlled circuit mapper
-    used to synthesize the controlled evolution circuit, the measurement basis
-    for the control qubit, and the number of ancilla qubits.
+    used to synthesize the controlled evolution circuit and the measurement
+    basis for the control qubit.
     """
 
     def __init__(self):
@@ -46,12 +46,6 @@ class HadamardTestCircuitBuilderSettings(Settings):
             "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
             [basis.value for basis in HadamardTestBasis],
         )
-        self._set_default(
-            "num_ancilla_qubits",
-            "int",
-            0,
-            "Number of ancilla qubits needed by the controlled evolution (0 if none).",
-        )
 
 
 class HadamardTestCircuitBuilder(Algorithm):
@@ -66,7 +60,6 @@ class HadamardTestCircuitBuilder(Algorithm):
         self,
         controlled_circuit_mapper: AlgorithmRef | None = None,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ):
         """Initialize the Hadamard test circuit builder.
 
@@ -74,7 +67,6 @@ class HadamardTestCircuitBuilder(Algorithm):
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         """
         super().__init__()
@@ -82,7 +74,6 @@ class HadamardTestCircuitBuilder(Algorithm):
         if controlled_circuit_mapper is not None:
             self._settings.set("controlled_circuit_mapper", controlled_circuit_mapper)
         self._settings.set("test_basis", test_basis.value)
-        self._settings.set("num_ancilla_qubits", num_ancilla_qubits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test_circuit_builder."""

@@ -19,7 +19,6 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         self,
         controlled_circuit_mapper: AlgorithmRef | None = None,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ):
         """Initialize QiskitHadamardTestCircuitBuilder.
 
@@ -27,14 +26,12 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         """
         Logger.trace_entering()
         super().__init__(
             controlled_circuit_mapper=controlled_circuit_mapper,
             test_basis=test_basis,
-            num_ancilla_qubits=num_ancilla_qubits,
         )
 
     def _run_impl(
@@ -67,10 +64,6 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             ) from err
 
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
-        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
-        if num_ancilla_qubits < 0:
-            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
-
         num_system_qubits = unitary.get_num_qubits()
         ctrl_time_evol_unitary_circuit = self._create_controlled_circuit(unitary)
 
@@ -78,9 +71,6 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         control = QuantumRegister(1, "control")
         system_target = QuantumRegister(num_system_qubits, "system")
         registers = [control, system_target]
-        if num_ancilla_qubits > 0:
-            extra_ancillas = QuantumRegister(num_ancilla_qubits, "extra_ancillas")
-            registers.append(extra_ancillas)
         classical = ClassicalRegister(1, "c")
         registers.append(classical)
         circuit = QuantumCircuit(*registers)
@@ -97,8 +87,6 @@ class QiskitHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         # Prepare ancilla and apply controlled time evolution.
         control_qubit = control[0]
         target_qubits = list(system_target)
-        if num_ancilla_qubits > 0:
-            target_qubits += list(extra_ancillas)
 
         circuit.h(control_qubit)
 

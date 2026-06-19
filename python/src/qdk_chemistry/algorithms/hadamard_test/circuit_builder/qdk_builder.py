@@ -22,7 +22,6 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
         self,
         controlled_circuit_mapper: AlgorithmRef | None = None,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ):
         """Initialize QdkHadamardTestCircuitBuilder.
 
@@ -30,14 +29,12 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             controlled_circuit_mapper: Optional algorithm reference for the controlled circuit mapper.
             test_basis: Measurement basis for the control qubit (``HadamardTestBasis.X``, ``HadamardTestBasis.Y``, or
               ``HadamardTestBasis.Z``).
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution (0 if none).
 
         """
         Logger.trace_entering()
         super().__init__(
             controlled_circuit_mapper=controlled_circuit_mapper,
             test_basis=test_basis,
-            num_ancilla_qubits=num_ancilla_qubits,
         )
 
     def _run_impl(
@@ -59,10 +56,6 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
 
         """
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
-        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
-        if num_ancilla_qubits < 0:
-            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
-
         Logger.debug(f"Building qsharp circuit for measurement on {test_basis.value} basis.")
 
         qsharp_basis = basis_to_qsharp_pauli(test_basis)
@@ -83,7 +76,6 @@ class QdkHadamardTestCircuitBuilder(HadamardTestCircuitBuilder):
             "repControlledEvolution": ctrl_evol_op,
             "testBasis": qsharp_basis,
             "numSystemQubits": num_system_qubits,
-            "numAncillaQubits": num_ancilla_qubits,
         }
 
         return Circuit(

@@ -77,12 +77,6 @@ class HadamardTestSettings(Settings):
             "Measurement basis for the control qubit ('X', 'Y', or 'Z').",
             [basis.value for basis in HadamardTestBasis],
         )
-        self._set_default(
-            "num_ancilla_qubits",
-            "int",
-            0,
-            "Number of ancilla qubits needed by the controlled evolution (0 if none).",
-        )
 
 
 class HadamardTest(Algorithm):
@@ -98,21 +92,16 @@ class HadamardTest(Algorithm):
     def __init__(
         self,
         test_basis: HadamardTestBasis = HadamardTestBasis.X,
-        num_ancilla_qubits: int = 0,
     ):
         """Initialize a Hadamard test generator.
 
         Args:
             test_basis: Measurement basis for the control qubit.
-            num_ancilla_qubits: Number of ancilla qubits needed by the controlled evolution.
 
         """
         super().__init__()
         self._settings = HadamardTestSettings()
         self._settings.set("test_basis", test_basis.value)
-        if num_ancilla_qubits < 0:
-            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
-        self._settings.set("num_ancilla_qubits", num_ancilla_qubits)
 
     def type_name(self) -> str:
         """Return the algorithm type name as hadamard_test."""
@@ -126,8 +115,7 @@ class HadamardTest(Algorithm):
     ) -> CircuitExecutorData:
         r"""Run the Hadamard test by building and executing a backend-specific circuit.
 
-        The measurement basis and ancilla count are read from this algorithm's settings
-        (``test_basis`` and ``num_ancilla_qubits``).
+        The measurement basis is read from this algorithm's settings (``test_basis``).
 
         Args:
             state_preparation_circuit: Circuit that prepares the trial state on system qubits.
@@ -148,13 +136,9 @@ class HadamardTest(Algorithm):
             raise ValueError("shots must be a positive integer.")
 
         test_basis = HadamardTestBasis(self._settings.get("test_basis"))
-        num_ancilla_qubits = self._settings.get("num_ancilla_qubits")
-        if num_ancilla_qubits < 0:
-            raise ValueError("num_ancilla_qubits must be a non-negative integer.")
 
         circuit_builder = self._create_nested("circuit_builder")
         circuit_builder.settings().set("test_basis", test_basis.value)
-        circuit_builder.settings().set("num_ancilla_qubits", num_ancilla_qubits)
 
         circuit = circuit_builder.run(
             state_preparation_circuit,
