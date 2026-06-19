@@ -71,19 +71,19 @@ def _build_expected_statevector(
 ) -> np.ndarray:
     """Build a normalized expected statevector matching Q# dump_machine output.
 
-    Q# dump_machine uses little-endian (qubit k = bit k of index).
-    With reversed rowMap, to_bits()[k] maps to Q# qubit (n-1-k), so
-    dump_machine index is the little-endian interpretation of to_bits().
+    Q# dump_machine returns a statevector in big-endian order:
+    the first allocated qubit (qs[0]) is the MSB of the index.
+    With the reversed rowMap used in DensePureStatePreparation,
+    the dump_machine index is the MSB interpretation of to_bits().
     """
     n_qubits = 2 * num_orbitals
     expected = np.zeros(2**n_qubits, dtype=complex)
     for coeff, det in zip(coeffs, dets, strict=True):
         bits = det.to_bits()
-        # bits is [alpha_0,...,alpha_{N-1}, beta_0,...,beta_{N-1}]
-        # dump_machine index = LE interpretation: qubit k = bit k
+        # dump_machine index = MSB interpretation of bits
         index = 0
-        for i, b in enumerate(bits):
-            index |= b << i
+        for b in bits:
+            index = (index << 1) | b
         expected[index] = coeff
     norm = np.linalg.norm(expected)
     if norm > 0:
@@ -183,6 +183,7 @@ class TestDensePureStatePreparation:
         actual_sv = _run_state_prep_and_dump(circuit)
 
         # Build expected statevector for 1-bit-per-mode config using to_bits().
+        # dump_machine uses big-endian: MSB interpretation of bits.
         bits = det.to_bits()
         n_qubits = len(bits)
         index = 0
@@ -227,9 +228,9 @@ class TestDensePureStatePreparation:
         dense_prep = create("state_prep", "dense_pure_state")
         sparse_prep = create("state_prep", "sparse_isometry_gf2x")
 
-        # Dense prep with reversed rowMap produces a Qiskit circuit with reversed
-        # qubit ordering; reverse_bits() aligns it with the Hamiltonian convention.
-        dense_circuit = dense_prep.run(wavefunction_4e4o).get_qiskit_circuit().reverse_bits()
+        # Dense prep with identity rowMap produces Qiskit circuit with standard
+        # qubit ordering matching the Hamiltonian convention.
+        dense_circuit = dense_prep.run(wavefunction_4e4o).get_qiskit_circuit()
         sparse_circuit = sparse_prep.run(wavefunction_4e4o).get_qiskit_circuit()
 
         hamiltonian_op = SparsePauliOp(hamiltonian_4e4o.pauli_strings, hamiltonian_4e4o.coefficients)
