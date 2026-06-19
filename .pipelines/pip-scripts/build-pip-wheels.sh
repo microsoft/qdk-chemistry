@@ -170,8 +170,13 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     echo "Checking shared dependencies..."
     ldd build/cp*/_core.*.so
 
-    # Repair wheel
-    auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
+    # Repair wheel. Let auditwheel determine the required platform tag (it accounts
+    # for both GLIBC_x.y and GLIBCXX_x.y.z policy levels, unlike a raw readelf scan).
+    auditwheel show dist/qdk_chemistry-*.whl
+    _PLAT_TAG=$(auditwheel show dist/qdk_chemistry-*.whl 2>&1 \
+        | grep -oP '"manylinux_[^"]*"' | tr -d '"' | head -1)
+    echo "auditwheel required platform tag: ${_PLAT_TAG}"
+    auditwheel repair --plat "${_PLAT_TAG}" dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
     # Fix RPATH
     WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
